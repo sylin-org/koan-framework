@@ -24,7 +24,7 @@ dotnet add package Sylin.Koan.Web.Auth
 
 Dev/testing tip
 
-- When using Koan.Web.Auth.TestProvider in Development, its userinfo may include `roles[]`, `permissions[]`, and `claims{}`. These are mapped into the cookie principal (roles → ClaimTypes.Role, permissions → `Koan.permission`, claims{} → 1:1) so you can exercise authorization flows end-to-end.
+- When using Koan.Web.Auth.Connector.Test in Development, its userinfo may include `roles[]`, `permissions[]`, and `claims{}`. These are mapped into the cookie principal (roles → ClaimTypes.Role, permissions → `Koan.permission`, claims{} → 1:1) so you can exercise authorization flows end-to-end.
 
 Sign-out (controller)
 
@@ -49,3 +49,4 @@ See [`TECHNICAL.md`](TECHNICAL.md) for contracts and configuration.
 ## References
 
 - Decisions: `/docs/decisions/WEB-0043-auth-multi-protocol-oauth-oidc-saml.md`, `/docs/decisions/WEB-0044-web-auth-discovery-and-health.md`, `/docs/decisions/WEB-0045-auth-provider-adapters-separate-projects.md`
+

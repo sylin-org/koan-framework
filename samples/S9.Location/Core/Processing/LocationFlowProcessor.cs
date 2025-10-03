@@ -1,12 +1,12 @@
-using System;
+﻿using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Koan.Data.Core;
-using Koan.Flow.Actions;
-using Koan.Flow.Core.Extensions;
-using Koan.Flow.Infrastructure;
-using Koan.Flow.Model;
+using Koan.Canon.Actions;
+using Koan.Canon.Core.Extensions;
+using Koan.Canon.Infrastructure;
+using Koan.Canon.Model;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -65,11 +65,11 @@ public sealed class LocationFlowProcessor : BackgroundService
     private async Task ProcessPendingAsync(CancellationToken ct)
     {
         await using var scope = _serviceProvider.CreateAsyncScope();
-        var flowActions = scope.ServiceProvider.GetRequiredService<IFlowActions>();
+        var flowActions = scope.ServiceProvider.GetRequiredService<ICanonActions>();
         var pipeline = scope.ServiceProvider.GetRequiredService<IResolutionPipeline>();
 
         var processed = 0;
-        using (DataSetContext.With(FlowSets.StageShort(FlowSets.Parked)))
+        using (EntityContext.With(CanonSets.StageShort(CanonSets.Parked)))
         {
             while (!ct.IsCancellationRequested)
             {

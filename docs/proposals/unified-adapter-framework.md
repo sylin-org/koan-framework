@@ -477,7 +477,7 @@ Success depends on careful implementation planning, comprehensive testing, and m
 
 **Specific Code Analysis Discoveries:**
 
-**1. OllamaAdapter Pattern Analysis (`src/Koan.Ai.Provider.Ollama/OllamaAdapter.cs`)**
+**1. OllamaAdapter Pattern Analysis (`src/Koan.AI.Connector.Ollama/OllamaAdapter.cs`)**
 ```csharp
 // Configuration Duplication (18 lines across multiple methods)
 private static OllamaOptions GetOllamaOptions(IConfiguration configuration)
@@ -503,7 +503,7 @@ public async Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context
 }
 ```
 
-**2. PostgreSQL Adapter Factory Pattern (`src/Koan.Data.Postgres/PostgresAdapterFactory.cs`)**
+**2. PostgreSQL Adapter Factory Pattern (`src/Koan.Data.Connector.Postgres/PostgresAdapterFactory.cs`)**
 ```csharp
 [KoanService(ServiceKind.Database, shortCode: "postgres", name: "PostgreSQL",
     ContainerImage = "postgres", DefaultTag = "16", DefaultPorts = new[] { 5432 },
@@ -528,13 +528,13 @@ public class PostgresAdapterFactory : IAdapterFactory<IPostgresDataAdapter>
 }
 ```
 
-**3. Mongo Adapter Factory Analysis (`src/Koan.Data.Mongo/MongoAdapterFactory.cs`)**
+**3. Mongo Adapter Factory Analysis (`src/Koan.Data.Connector.Mongo/MongoAdapterFactory.cs`)**
 - Nearly identical structure to PostgreSQL (145 lines vs 168 lines)
 - Same service discovery patterns with different connection string format
 - Duplicate health check implementation with MongoDB-specific client calls
 - Same orchestration metadata attribute pattern with different service parameters
 
-**4. Redis Health Contributor (`src/Koan.Data.Redis/RedisHealthContributor.cs`)**
+**4. Redis Health Contributor (`src/Koan.Data.Connector.Redis/RedisHealthContributor.cs`)**
 ```csharp
 public class RedisHealthContributor : IHealthContributor
 {

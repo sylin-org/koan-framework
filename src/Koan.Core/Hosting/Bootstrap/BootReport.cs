@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Text;
 
 namespace Koan.Core.Hosting.Bootstrap;
@@ -24,6 +25,9 @@ public sealed class BootReport
         if (_modules.Count == 0) return;
         _modules[^1].Notes.Add(message);
     }
+
+    public IReadOnlyList<BootModule> GetModules()
+        => _modules.Select(m => new BootModule(m.Name, m.Version, m.Settings.AsReadOnly(), m.Notes.AsReadOnly())).ToList();
 
     // NEW: Decision logging methods
     public void AddDecision(string category, string decision, string reason, string[]? alternatives = null)
@@ -87,23 +91,23 @@ public sealed class BootReport
     {
         var sb = new StringBuilder();
         var timestamp = DateTime.Now.ToString("HH:mm:ss");
-        
+
         // Framework header with version info
         var coreModule = _modules.FirstOrDefault(m => m.Name.Contains("Core"));
         var frameworkVersion = coreModule.Name != null ? (coreModule.Version ?? "unknown") : "unknown";
-        
+
         var headerText = $"Koan FRAMEWORK v{frameworkVersion}";
         var lineLength = 80;
         var padding = new string('─', Math.Max(0, lineLength - headerText.Length - 4));
         sb.AppendLine($"┌─ {headerText} {padding}");
         sb.AppendLine($"│ Core: {frameworkVersion}");
-        
+
         // Module hierarchy
         foreach (var module in _modules.Where(m => !m.Name.Contains("Core")).OrderBy(m => m.Name))
         {
             sb.AppendLine($"│   ├─ {module.Name}: {module.Version ?? "unknown"}");
         }
-        
+
         if (_modules.Any(m => !m.Name.Contains("Core")))
         {
             var lastModule = _modules.Where(m => !m.Name.Contains("Core")).OrderBy(m => m.Name).LastOrDefault();
@@ -112,20 +116,20 @@ public sealed class BootReport
                 sb.AppendLine($"│   └─ {lastModule.Name}: {lastModule.Version ?? "unknown"}");
             }
         }
-        
+
         // Startup phase
         if (options.ShowDecisions && _decisions.Any())
         {
             var startupText = "STARTUP";
             var startupPadding = new string('─', Math.Max(0, lineLength - startupText.Length - 4));
             sb.AppendLine($"├─ {startupText} {startupPadding}");
-            
+
             foreach (var decision in _decisions)
             {
                 FormatDecisionKoanStyle(sb, decision, timestamp, options);
             }
         }
-        
+
         return sb.ToString();
     }
 
@@ -176,6 +180,12 @@ public class DecisionLogEntry
     public string[] Alternatives { get; set; } = Array.Empty<string>();
     public string? ConnectionString { get; set; }
 }
+
+public sealed record BootModule(
+    string Name,
+    string? Version,
+    IReadOnlyList<(string Key, string Value, bool Secret)> Settings,
+    IReadOnlyList<string> Notes);
 
 public class BootReportOptions
 {

@@ -12,7 +12,6 @@ services:
       ASPNETCORE_URLS: "http://+:5084"
       Koan__Web__ExposeObservabilitySnapshot: "true"
       Koan__Data__Couchbase__Bucket: "Koan"
-      Koan__Data__Weaviate__Endpoint: "http://weaviate:8080"
       Koan__Ai__AutoDiscoveryEnabled: "true"
       Koan__Ai__AllowDiscoveryInNonDev: "true"
       Koan_AI_OLLAMA_URLS: "http://host.docker.internal:11434"
@@ -30,20 +29,27 @@ services:
       Koan__Web__Auth__TestProvider__JwtAudience: "s5-recs-client"
       Koan__Web__Auth__TestProvider__JwtExpirationMinutes: "120"
     volumes:
-      - ../data:/app/data
+      - ../.Koan/Data:/app/data
+      - ../.Koan/cache:/app/cache
     depends_on:
-      - couchbase
-      - weaviate
-  couchbase:
-    image: public.ecr.aws/docker/library/couchbase:latest
+      mongo:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+      ollama:
+        condition: service_started
+  mongo:
+    image: mongo:latest
+    container_name: mongo
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
     volumes:
-      - ../data/couchbase:/opt/couchbase/var
+      - ../.Koan/Data/mongo:/data/db
     ports:
-      - "5081:8091"  # Web UI
-      - "8092:8092"  # Views
-      - "8093:8093"  # Query
-      - "8094:8094"  # Search
-      - "11210:11210" # Data service
+      - "4900:27017"
   weaviate:
     image: semitechnologies/weaviate:latest
     environment:
@@ -54,14 +60,34 @@ services:
       # Stable single-node clustering to avoid RAFT bootstrap loops
       CLUSTER_HOSTNAME: "node1"
       RAFT_BOOTSTRAP_EXPECT: "1"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/v1/meta"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
     volumes:
-      - ../data/weaviate:/var/lib/weaviate
+      - ../.Koan/Data/weaviate:/var/lib/weaviate
     ports:
       - "5082:8080"
   ollama:
     image: ollama/ollama:latest
     volumes:
-      - ../data/ollama-models:/root/.ollama
+      - ../.Koan/Data/ollama-models:/root/.ollama
     ports:
       - "5083:11434"
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.13.4
+    environment:
+      discovery.type: "single-node"
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 5s
+      timeout: 2s
+      retries: 12
+    volumes:
+      - ../.Koan/Data/elasticsearch:/usr/share/elasticsearch/data
+    ports:
+      - "5085:9200"
 volumes: {}

@@ -1,22 +1,23 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <LangVersion>preview</LangVersion>
     <RootNamespace>Koan.Web.Auth.Services</RootNamespace>
-    <Version>0.6.2</Version>
-    <AssemblyVersion>0.6.2</AssemblyVersion>
-    <FileVersion>0.6.2</FileVersion>
+    <Description>Authentication service helpers for Koan Web: token exchange clients, caching bridges, and backend-to-backend auth flows.</Description>
+    <PackageTags>$(CommonPackageTags);web;auth;services;tokens</PackageTags>
+    <Version>0.6.3</Version>
+    <AssemblyVersion>0.6.3</AssemblyVersion>
+    <FileVersion>0.6.3</FileVersion>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Koan.Core\Koan.Core.csproj" />
     <ProjectReference Include="..\Koan.Web.Auth\Koan.Web.Auth.csproj" />
-    <ProjectReference Include="..\Koan.Web.Auth.TestProvider\Koan.Web.Auth.TestProvider.csproj" />
+    <ProjectReference Include="..\Connectors\Web\Auth\Test\Koan.Web.Auth.Connector.Test.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.Http" Version="9.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="9.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.0-rc.1.25451.107" />
+    <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="10.0.0-rc.1.25451.107" />
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.2.1" />
   </ItemGroup>
 </Project>

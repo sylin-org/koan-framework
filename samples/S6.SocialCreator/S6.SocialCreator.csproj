@@ -1,6 +1,7 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>preview</LangVersion>
@@ -8,15 +9,19 @@
     <EnableDefaultContentItems>false</EnableDefaultContentItems>
   </PropertyGroup>
   <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\..\src\Koan.Core\Koan.Core.csproj" />
     <ProjectReference Include="..\..\src\Koan.Web\Koan.Web.csproj" />
     <ProjectReference Include="..\..\src\Koan.Media.Core\Koan.Media.Core.csproj" />
     <ProjectReference Include="..\..\src\Koan.Media.Abstractions\Koan.Media.Abstractions.csproj" />
   <ProjectReference Include="..\..\src\Koan.Media.Web\Koan.Media.Web.csproj" />
     <ProjectReference Include="..\..\src\Koan.Storage\Koan.Storage.csproj" />
-    <ProjectReference Include="..\..\src\Koan.Storage.Local\Koan.Storage.Local.csproj" />
+    <ProjectReference Include="..\..\src\\Connectors\\Storage\\Local\Koan.Storage.Connector.Local.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="wwwroot/**" CopyToPublishDirectory="Always" />
   </ItemGroup>
 </Project>
+

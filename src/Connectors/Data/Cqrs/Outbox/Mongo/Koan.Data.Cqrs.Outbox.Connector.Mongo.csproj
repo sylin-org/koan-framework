@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <Description>Outbox implementation for Koan CQRS using MongoDB.</Description>
+    <PackageTags>$(CommonPackageTags);data;cqrs;outbox;mongodb</PackageTags>
+    <Version>0.6.3</Version>
+    <AssemblyVersion>0.6.3</AssemblyVersion>
+    <FileVersion>0.6.3</FileVersion>
+  </PropertyGroup>
+  <ItemGroup>
+  <ProjectReference Include="..\..\..\..\..\Koan.Data.Cqrs\Koan.Data.Cqrs.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.0-rc.1.25451.107" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="MongoDB.Driver" Version="3.5.0" />
+  </ItemGroup>
+</Project>

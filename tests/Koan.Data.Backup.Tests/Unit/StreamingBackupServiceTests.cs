@@ -38,14 +38,14 @@ public class StreamingBackupServiceTests : IClassFixture<BackupTestFixture>
         manifest.Should().NotBeNull();
         manifest.Name.Should().Be(backupName);
         manifest.Description.Should().Be(options.Description);
-        manifest.Tags.Should().BeEquivalentTo(options.Tags);
+        manifest.Labels.Should().BeEquivalentTo(options.Tags);
         manifest.Status.Should().Be(BackupStatus.Completed);
         manifest.Entities.Should().HaveCount(1);
 
         var entityInfo = manifest.Entities.First();
         entityInfo.EntityType.Should().Be(nameof(TestUser));
         entityInfo.KeyType.Should().Be(nameof(Guid));
-        entityInfo.ItemCount.Should().BeGreaterOrEqualTo(0);
+        entityInfo.ItemCount.Should().BeGreaterThanOrEqualTo(0);
         entityInfo.ContentHash.Should().NotBeNullOrEmpty();
         entityInfo.StorageFile.Should().NotBeNullOrEmpty();
     }
@@ -111,7 +111,7 @@ public class StreamingBackupServiceTests : IClassFixture<BackupTestFixture>
         var manifest = await backupService.BackupEntityAsync<TestProduct, string>(backupName, options);
 
         // Assert
-        manifest.Tags.Should().Contain(tag);
+        manifest.Labels.Should().Contain(tag);
         manifest.Status.Should().Be(BackupStatus.Completed);
     }
 

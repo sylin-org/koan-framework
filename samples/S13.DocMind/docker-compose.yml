@@ -1,0 +1,99 @@
+services:
+  app:
+    build:
+      context: ../..
+      dockerfile: samples/S13.DocMind/Dockerfile
+    image: s13-docmind:dev
+    container_name: api
+    ports:
+      - "5120:5125"
+    environment:
+      ASPNETCORE_ENVIRONMENT: "Development"
+      ASPNETCORE_URLS: "http://+:5125"
+      Koan__Web__ExposeObservabilitySnapshot: "true"
+      Koan__Data__Mongo__ConnectionString: "mongodb://mongo:27017"
+      Koan__Data__Mongo__Database: "Koan"
+      Koan__Data__Weaviate__Endpoint: "http://weaviate:8080"
+      Koan__Ai__AutoDiscoveryEnabled: "true"
+      Koan__Ai__AllowDiscoveryInNonDev: "true"
+      Koan_AI_OLLAMA_URLS: "http://host.docker.internal:11434"
+      # Explicit Ollama service registration (Production-safe)
+      Koan__Ai__Services__Ollama__0__Id: "ollama"
+      Koan__Ai__Services__Ollama__0__BaseUrl: "http://ollama:11434"
+      Koan__Ai__Services__Ollama__0__DefaultModel: "all-minilm"
+      # Disable explicit registration in dev so discovery picks a single best endpoint (host-first)
+      Koan__Ai__Services__Ollama__0__Enabled: "false"
+      # Readiness: require the embedding model to be present
+      Koan__Ai__Ollama__RequiredModels__0: "all-minilm"
+    depends_on:
+      - mongodb
+      - weaviate
+    restart: unless-stopped
+
+  mongodb:
+    image: mongo:latest
+    hostname: mongo
+    ports:
+      - "5121:27017"
+    volumes:
+      - mongo_data:/data/db
+    environment:
+      MONGO_INITDB_DATABASE: s13docmind
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  weaviate:
+    image: semitechnologies/weaviate:latest
+    container_name: weaviate
+    hostname: weaviate
+    ports:
+      - "5122:8080"
+    environment:
+      QUERY_DEFAULTS_LIMIT: "25"
+      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: "true"
+      PERSISTENCE_DATA_PATH: "/var/lib/weaviate"
+      DEFAULT_VECTORIZER_MODULE: "none"
+      # Stable single-node clustering to avoid RAFT bootstrap loops
+      CLUSTER_HOSTNAME: "node1"
+      RAFT_BOOTSTRAP_EXPECT: "1"
+    volumes:
+      - weaviate_data:/var/lib/weaviate
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/v1/.well-known/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    ports:
+      - "5123:11434"
+    volumes:
+      - ollama_models:/root/.ollama
+    environment:
+      - OLLAMA_MODELS_DIR=/root/.ollama
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/version"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    restart: unless-stopped
+
+volumes:
+  mongo_data:
+    name: s13_docmind_mongo_data
+  weaviate_data:
+    name: s13_docmind_weaviate_data
+  ollama_models:
+    name: s13_docmind_ollama_models
+
+networks:
+  default:
+    name: s13_docmind_network

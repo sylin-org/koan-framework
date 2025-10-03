@@ -1,12 +1,13 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using Koan.Data.Abstractions.Annotations;
-using Koan.Flow.Attributes;
-using Koan.Flow.Model;
+using Koan.Canon.Attributes;
+using Koan.Canon.Model;
+using Koan.Data.Core.Model;
 
 namespace S9.Location.Core.Models;
 
 [Storage(Name = "raw_locations", Namespace = "s9")]
-public class RawLocation : FlowEntity<RawLocation>
+public class RawLocation : Entity<RawLocation>
 {
     public string SourceSystem { get; set; } = string.Empty;
     public string SourceId { get; set; } = string.Empty;

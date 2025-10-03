@@ -1,7 +1,7 @@
-using System;
+﻿using System;
 using System.Threading;
 using System.Threading.Tasks;
-using Koan.Flow.Core.Interceptors;
+using Koan.Canon.Core.Interceptors;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -32,7 +32,7 @@ public sealed class LocationIntakeConfigurator : IHostedService
             return Task.CompletedTask;
         }
 
-        FlowInterceptors.For<RawLocation>().BeforeIntake(async entity =>
+        CanonInterceptors.For<RawLocation>().BeforeIntake(async entity =>
         {
             await using var scope = _serviceProvider.CreateAsyncScope();
             var normalization = scope.ServiceProvider.GetRequiredService<INormalizationService>();
@@ -42,7 +42,7 @@ public sealed class LocationIntakeConfigurator : IHostedService
             if (string.IsNullOrWhiteSpace(entity.Address))
             {
                 logger.LogWarning("Dropping location {SourceSystem}/{SourceId} because the address is empty", entity.SourceSystem, entity.SourceId);
-                return FlowIntakeActions.Drop(entity, LocationFlowConstants.ParkedInvalidPayload);
+                return CanonIntakeActions.Drop(entity, LocationFlowConstants.ParkedInvalidPayload);
             }
 
             var normalizationResult = normalization.Normalize(entity.SourceSystem, entity.Address);
@@ -58,12 +58,12 @@ public sealed class LocationIntakeConfigurator : IHostedService
                     entity.CanonicalLocationId = cached.CanonicalLocationId;
                     entity.Metadata["canonical_id"] = cached.CanonicalLocationId;
                     logger.LogDebug("Cache hit for {HashPrefix}", normalizationResult.Hash[..Math.Min(normalizationResult.Hash.Length, 8)]);
-                    return FlowIntakeActions.Continue(entity);
+                    return CanonIntakeActions.Continue(entity);
                 }
             }
 
             logger.LogDebug("Parking location {SourceSystem}/{SourceId} for harmonization", entity.SourceSystem, entity.SourceId);
-            return FlowIntakeActions.Park(entity, LocationFlowConstants.ParkedWaitingForResolution);
+            return CanonIntakeActions.Park(entity, LocationFlowConstants.ParkedWaitingForResolution);
         });
 
         _configured = true;

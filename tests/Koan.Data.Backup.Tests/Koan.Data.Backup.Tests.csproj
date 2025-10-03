@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
@@ -9,26 +9,26 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
-    <PackageReference Include="xunit" Version="2.6.1" />
-    <PackageReference Include="xunit.runner.visualstudio" Version="2.5.3">
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
-    <PackageReference Include="coverlet.collector" Version="6.0.0">
+    <PackageReference Include="coverlet.collector" Version="6.0.4">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
-    <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.0" />
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.8" />
-    <PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.0" />
-    <PackageReference Include="Moq" Version="4.20.69" />
-    <PackageReference Include="FluentAssertions" Version="6.12.0" />
-    <PackageReference Include="Testcontainers" Version="3.6.0" />
-    <PackageReference Include="Testcontainers.MongoDb" Version="3.6.0" />
-    <PackageReference Include="Microsoft.Extensions.Configuration" Version="9.0.8" />
-    <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="9.0.8" />
-    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="9.0.8" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.0-rc.1.25451.107" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.0-rc.1.25451.107" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.0-rc.1.25451.107" />
+    <PackageReference Include="Moq" Version="4.20.72" />
+    <PackageReference Include="FluentAssertions" Version="8.7.0" />
+    <PackageReference Include="Testcontainers" Version="4.7.0" />
+    <PackageReference Include="Testcontainers.MongoDb" Version="4.7.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.0-rc.1.25451.107" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="10.0.0-rc.1.25451.107" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="10.0.0-rc.1.25451.107" />
   </ItemGroup>
 
   <ItemGroup>
@@ -36,8 +36,8 @@
     <ProjectReference Include="..\..\src\Koan.Data.Core\Koan.Data.Core.csproj" />
     <ProjectReference Include="..\..\src\Koan.Storage\Koan.Storage.csproj" />
     <ProjectReference Include="..\..\src\Koan.Core\Koan.Core.csproj" />
-    <ProjectReference Include="..\..\src\Koan.Data.Sqlite\Koan.Data.Sqlite.csproj" />
-    <ProjectReference Include="..\..\src\Koan.Data.Mongo\Koan.Data.Mongo.csproj" />
+    <ProjectReference Include="..\..\src\\Connectors\\Data\\Sqlite\Koan.Data.Connector.Sqlite.csproj" />
+    <ProjectReference Include="..\..\src\\Connectors\\Data\\Mongo\Koan.Data.Connector.Mongo.csproj" />
   </ItemGroup>
 
   <ItemGroup>

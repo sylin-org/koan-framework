@@ -1,8 +1,8 @@
-using System.Threading;
+﻿using System.Threading;
 using System.Threading.Tasks;
 using Koan.Data.Core;
-using Koan.Flow.Infrastructure;
-using Koan.Flow.Model;
+using Koan.Canon.Infrastructure;
+using Koan.Canon.Model;
 using Microsoft.Extensions.Logging;
 using S9.Location.Core.Diagnostics;
 using S9.Location.Core.Models;
@@ -31,7 +31,7 @@ public sealed class LocationMetricsService : ILocationMetricsService
         var cacheCount = await ResolutionCache.Count(ct);
         var parkedCount = 0;
 
-        using (DataSetContext.With(FlowSets.StageShort(FlowSets.Parked)))
+        using (EntityContext.With(CanonSets.StageShort(CanonSets.Parked)))
         {
             parkedCount = await ParkedRecord<RawLocation>.Count(ct);
         }

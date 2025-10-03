@@ -1,11 +1,11 @@
 using Koan.Core;
 using Koan.Core.Modules;
+using Koan.Core.Logging;
 using Koan.Orchestration.Aspire.SelfOrchestration;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 
 namespace Koan.Orchestration.Aspire.Initialization;
 
@@ -15,13 +15,14 @@ namespace Koan.Orchestration.Aspire.Initialization;
 /// </summary>
 public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 {
+    private static readonly KoanLog.KoanLogScope Log = KoanLog.For<KoanAutoRegistrar>();
+
     public string ModuleName => "Koan.Orchestration.Aspire";
     public string? ModuleVersion => typeof(KoanAutoRegistrar).Assembly.GetName().Version?.ToString();
 
     public void Initialize(IServiceCollection services)
     {
-        var logger = services.BuildServiceProvider().GetService<ILoggerFactory>()?.CreateLogger("Koan.Orchestration.Aspire");
-        logger?.LogDebug("Koan.Orchestration.Aspire KoanAutoRegistrar loaded");
+        Log.BootDebug(LogActions.Init, "loaded");
 
         // Session ID is now managed by KoanEnv.SessionId - no need to set it here
 
@@ -33,37 +34,37 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         // Add configuration provider based on detected mode
         AddOrchestrationConfigurationForMode(services, orchestrationMode, KoanEnv.SessionId);
 
-        logger?.LogInformation("Orchestration mode detected: {Mode}", orchestrationMode);
+        Log.BootInfo(LogActions.ModeDetected, "detected", ("mode", orchestrationMode));
 
         switch (orchestrationMode)
         {
             case OrchestrationMode.SelfOrchestrating:
-                logger?.LogInformation("Self-orchestration mode detected - registering dependency orchestrator");
+                Log.BootInfo(LogActions.ModeCase, "self-orchestrating");
                 RegisterSelfOrchestrationServices(services);
                 break;
 
             case OrchestrationMode.DockerCompose:
-                logger?.LogInformation("Docker Compose mode detected - using container network endpoints");
+                Log.BootInfo(LogActions.ModeCase, "docker-compose");
                 // Configuration provider already added in AddOrchestrationConfigurationIfNeeded
                 break;
 
             case OrchestrationMode.Kubernetes:
-                logger?.LogInformation("Kubernetes mode detected - using K8s service DNS endpoints");
+                Log.BootInfo(LogActions.ModeCase, "kubernetes");
                 // Configuration provider already added in AddOrchestrationConfigurationIfNeeded
                 break;
 
             case OrchestrationMode.AspireAppHost:
-                logger?.LogInformation("Aspire AppHost mode detected - using Aspire service management");
+                Log.BootInfo(LogActions.ModeCase, "aspire-apphost");
                 // No additional services needed - AppHost handles orchestration
                 break;
 
             case OrchestrationMode.Standalone:
-                logger?.LogInformation("Standalone mode detected - using external dependencies");
+                Log.BootInfo(LogActions.ModeCase, "standalone");
                 // Running with external dependencies (production)
                 break;
 
             default:
-                logger?.LogWarning("Unknown orchestration mode: {Mode} - defaulting to Standalone behavior", orchestrationMode);
+                Log.BootWarning(LogActions.ModeCase, "unknown", ("mode", orchestrationMode));
                 break;
         }
     }
@@ -190,5 +191,12 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             // If reflection fails, fall back to environment variables
             // The orchestration system will still work, just without configuration provider
         }
+    }
+
+    private static class LogActions
+    {
+        public const string Init = "registrar.init";
+        public const string ModeDetected = "registrar.mode";
+        public const string ModeCase = "registrar.mode.case";
     }
 }

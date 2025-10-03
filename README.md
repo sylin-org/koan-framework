@@ -2,9 +2,9 @@
 
 **Try it. Be delighted. Build sophisticated apps with simple patterns.**
 
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![.NET](https://img.shields.io/badge/.NET-9.0-purple.svg)](https://dotnet.microsoft.com/download)
-[![Framework Version](https://img.shields.io/badge/Version-v0.2.18-green.svg)](https://github.com/sylin-org/koan-framework/releases)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/sylin-org/koan-framework/blob/dev/LICENSE)
+[![.NET](https://img.shields.io/badge/.NET-10.0-purple.svg)](https://dotnet.microsoft.com/download)
+[![Framework Version](https://img.shields.io/badge/Version-v0.6.3-green.svg)](https://github.com/sylin-org/koan-framework/releases)
 [![GitHub Stars](https://img.shields.io/github/stars/sylin-org/koan-framework)](https://github.com/sylin-org/koan-framework/stargazers)
 
 > **The .NET framework that makes small teams capable of sophisticated solutions through intelligent automation, AI-native patterns, and elegant scaling.**
@@ -13,12 +13,14 @@
 
 ## From Simple to Sophisticated in Minutes
 
+**Koan keeps the AR ergonomics developers love** - entities with `Save()`, discoverable CRUD controllers - **while neutralizing the common AR traps** with set-scoped routing, capability-aware queries, batch ops, a shared endpoint service, and first-class event flows. You get AR’s "don't make me think" feel without painting yourself into a single-DB, fat-controller, N+1-ridden corner.
+
 ### **1. Get started quickly**
 
 ```bash
 # 2 minutes to working API
 dotnet new web -n MyApp && cd MyApp
-dotnet add package Koan.Core Koan.Web Koan.Data.Sqlite
+dotnet add package Koan.Core Koan.Web Koan.Data.Connector.Sqlite
 ```
 
 ```csharp
@@ -63,7 +65,7 @@ public class TodoCompleted : Entity<TodoCompleted>
 }
 
 // Reference = Intent (no configuration ceremony)
-// dotnet add package Koan.Messaging.RabbitMq
+// dotnet add package Koan.Messaging.Connector.RabbitMq
 
 await new TodoCompleted { TodoId = todo.Id }.Send();  // Same pattern extends
 ```
@@ -92,11 +94,38 @@ var similar = await Product.SemanticSearch("eco-friendly laptops");
 
 ---
 
-### **4. Intelligent Automation**
+### **4. Semantic Streaming Pipelines**
 
 ```csharp
-// Small teams, sophisticated solutions
+// Complex AI workflows made simple - process 10,000 documents in one pipeline
 
+await Document.AllStream()
+    .Pipeline()
+    .ForEach(doc => {
+        doc.ProcessedAt = DateTime.UtcNow;
+        doc.Status = "processing";
+    })
+    .Tokenize(doc => $"{doc.Title} {doc.Content}")     // AI tokenization
+    .Embed(new AiEmbedOptions { Model = "all-minilm" }) // Generate embeddings
+    .Branch(branch => branch
+        .OnSuccess(success => success
+            .Save()                                     // Clean, semantic - no type pollution
+            .Notify(doc => $"Document '{doc.Title}' processed successfully"))
+        .OnFailure(failure => failure
+            .Trace(env => $"Failed: {env.Error?.Message}")
+            .Notify(doc => $"Processing failed for '{doc.Title}'")))
+    .ExecuteAsync();
+
+// What just happened:
+// ✓ Streamed 10K+ documents without memory issues
+// ✓ Generated AI embeddings with automatic batching
+// ✓ Stored documents (PostgreSQL) + vectors (Weaviate) in one .Save()
+// ✓ Branched success/failure paths with notifications
+// ✓ Full observability and error handling
+// ✓ All with clean, readable, semantic code
+```
+
+```csharp
 // Event-driven architecture through simple patterns
 Flow.OnUpdate<Todo>(async (todo, previous) => {
     if (todo.IsCompleted && !previous.IsCompleted) {
@@ -108,15 +137,9 @@ Flow.OnUpdate<Todo>(async (todo, previous) => {
     }
     return UpdateResult.Continue();
 });
-
-// Multi-provider scaling with zero code changes
-// dotnet add package Koan.Data.Postgres Koan.Data.Vector
-
-await todo.Save();                                    // → PostgreSQL
-var similar = await Todo.SemanticSearch("urgent");   // → Vector DB
 ```
 
-**Generate sophisticated architectures and deployment artifacts automatically. Functional prototypes in hours, not weeks.**
+**Semantic pipelines turn complex AI + data workflows into readable, maintainable code. Enterprise-grade streaming, embedding generation, and multi-provider storage in natural .NET patterns.**
 
 ---
 
@@ -154,19 +177,34 @@ dotnet build, dotnet test, dotnet publish
 
 ## Why Choose Koan
 
-| **What You Want** | **How Koan Delivers** |
-|-------------------|----------------------|
-| **Fast prototyping** | Functional apps in minutes, not hours |
-| **Modern patterns** | AI-native, event-driven, multi-provider by design |
-| **Simple scaling** | One pattern (`Entity<>`) from CRUD to enterprise |
-| **Team productivity** | Small teams build sophisticated solutions |
-| **Low risk adoption** | Works with existing .NET tools and knowledge |
+Koan gives you **Active Record ergonomics** with the **scalability of a Data Mapper**—and adds polyglot storage, flows, and semantic pipelines without ceremony.
+
+**Legend:** 🟩 Good · 🟨 Mixed/depends · 🟥 Weak
+
+| Capability                          | EF  | AR  | Koan |
+| ----------------------------------- | --- | --- | ---- |
+| Time to first API                   | 🟨  | 🟩  | 🟩   |
+| Polyglot storage (SQL/NoSQL/Vector) | 🟨  | 🟥  | 🟩   |
+| Multi-tenant & view routing         | 🟨  | 🟥  | 🟩   |
+| Event-driven & projections          | 🟨  | 🟥  | 🟩   |
+| Semantic/Vector pipeline            | 🟥  | 🟥  | 🟩   |
+| Capability detection / fallback     | 🟨  | 🟥  | 🟩   |
+| Migrations & schema                 | 🟩  | 🟨  | 🟨   |
+
+**What this means in practice**
+
+- **Start simple, scale cleanly:** AR‑easy CRUD today; switch on Flow, sets, and vectors when complexity appears.
+- **One pattern, many backends:** Swap providers without rewriting your domain or controllers.
+- **AI‑native:** Semantic search, embeddings, and streaming pipelines are first‑class, not bolt‑ons.
+
+**Deep comparison:** [See the full, categorized matrix.](https://github.com/sylin-org/koan-framework/blob/dev/docs/architecture/comparison.md)
 
 ---
 
 ## Quick Start Paths
 
 ### **For Individual Developers**
+
 ```bash
 # Try the quickstart
 git clone https://github.com/koan-framework/quickstart
@@ -174,10 +212,11 @@ cd quickstart && dotnet run
 
 # Create your first app
 dotnet new web -n MyApp
-dotnet add package Koan.Core Koan.Web Koan.Data.Sqlite
+dotnet add package Koan.Core Koan.Web Koan.Data.Connector.Sqlite
 ```
 
 ### **For Teams & Architects**
+
 ```bash
 # Explore enterprise patterns
 git clone https://github.com/koan-framework/enterprise-sample
@@ -187,12 +226,13 @@ cd enterprise-sample && ./start.bat
 ```
 
 ### **For AI-First Projects**
+
 ```bash
 # Start with AI-native patterns
 dotnet new web -n AiApp
 dotnet add package Koan.Core Koan.Web Koan.AI.Ollama Koan.Data.Vector
 
-# Get: Chat APIs, semantic search, embedding generation, MCP integration
+# Get: Chat APIs, semantic search, embedding generation, streaming pipelines, MCP integration
 ```
 
 ---
@@ -200,22 +240,26 @@ dotnet add package Koan.Core Koan.Web Koan.AI.Ollama Koan.Data.Vector
 ## Technology Stack
 
 **70+ integrated modules spanning:**
+
 - **Data**: PostgreSQL, MongoDB, SQLite, Redis, Vector databases
 - **AI**: Ollama, OpenAI, Azure OpenAI, semantic search, embeddings
+- **Pipelines**: Semantic streaming, AI tokenization, cross-pillar integration
 - **Messaging**: RabbitMQ, Azure Service Bus, in-memory patterns
 - **Web**: Authentication (Google, Microsoft, Discord), GraphQL, transformers
 - **Orchestration**: Docker, Podman, Aspire, CLI automation
 - **Enterprise**: Secrets management, observability, backup, health monitoring
 
-**Integrated modules that work together without configuration.**
+**Integrated modules that work together seamlessly through semantic pipeline patterns.**
 
 ---
 
 ## What Teams Are Building
 
 - **AI-native applications** with chat, embeddings, and semantic search
+- **Streaming data pipelines** processing millions of documents with AI enrichment
 - **Event-driven architectures** with sophisticated business logic
 - **Multi-tenant SaaS** with provider transparency across environments
+- **Content processing workflows** that combine AI, vector search, and notifications
 - **Rapid prototypes** that scale to production without rewrites
 - **Enterprise applications** with governance-friendly deployment artifacts
 
@@ -237,11 +281,12 @@ Feedback and contributions help improve the framework.
 
 ## Requirements & Getting Started
 
-- **.NET 9 SDK** or later
+- **.NET 10 SDK** or later
 - **Docker** or **Podman** (for container features)
 - **5 minutes** to get started
 
 ### Install & Run
+
 ```bash
 # Option 1: Try the quickstart
 git clone https://github.com/koan-framework/quickstart
@@ -249,7 +294,7 @@ cd quickstart && dotnet run
 
 # Option 2: Start from scratch
 dotnet new web -n MyKoanApp
-dotnet add package Koan.Core Koan.Web Koan.Data.Sqlite
+dotnet add package Koan.Core Koan.Web Koan.Data.Connector.Sqlite
 # Add your Entity<> models and EntityController<> endpoints
 dotnet run
 ```
@@ -260,10 +305,10 @@ dotnet run
 
 ## Enterprise Support & Documentation
 
-- **[Complete Documentation](documentation/README.md)** - Architecture, patterns, and guides
-- **[Quickstart Guide](documentation/getting-started/quickstart.md)** - Get running immediately
-- **[Enterprise Architecture Guide](documentation/architecture/principles.md)** - Strategic framework adoption
-- **[Troubleshooting Guide](documentation/support/troubleshooting.md)** - Solutions to common challenges
+- **[Complete Documentation](docs/index.md)** - Architecture, patterns, and guides
+- **[Quickstart Guide](docs/getting-started/quickstart.md)** - Get running immediately
+- **[Enterprise Architecture Guide](docs/architecture/principles.md)** - Strategic framework adoption
+- **[Troubleshooting Guide](docs/support/troubleshooting.md)** - Solutions to common challenges
 
 **For enterprise adoption support and architecture guidance, explore our comprehensive documentation.**
 
@@ -277,4 +322,5 @@ Licensed under the Apache License 2.0. See [LICENSE](LICENSE) for details.
 
 **Koan Framework: Build sophisticated apps with simple patterns.**
 
-*A .NET framework that makes small teams capable of sophisticated solutions.*
+_A .NET framework that makes small teams capable of sophisticated solutions._
+

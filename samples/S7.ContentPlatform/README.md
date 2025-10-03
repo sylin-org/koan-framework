@@ -143,7 +143,7 @@ GET /api/authors/alice/stats
 ## 🛠️ Configuration
 
 The sample uses:
-- **JSON file storage** for simplicity (via `Koan.Data.Json`)
+- **JSON file storage** for simplicity (via `Koan.Data.Connector.Json`)
 - **In-memory data** with seeded examples
 - **Generic capability controllers** for moderation/soft-delete
 - **Swagger documentation** for API exploration
@@ -151,15 +151,15 @@ The sample uses:
 ### Key Dependencies
 ```xml
 <ProjectReference Include="../../src/Koan.Web.Extensions/Koan.Web.Extensions.csproj" />
-<ProjectReference Include="../../src/Koan.Data.Json/Koan.Data.Json.csproj" />
-<ProjectReference Include="../../src/Koan.Web.Swagger/Koan.Web.Swagger.csproj" />
+<ProjectReference Include="../../src/Koan.Data.Connector.Json/Koan.Data.Connector.Json.csproj" />
+<ProjectReference Include="../../src/Koan.Web.Connector.Swagger/Koan.Web.Connector.Swagger.csproj" />
 ```
 
 ## 📈 Extension Ideas
 
 This sample can be extended with:
 - **Authentication/Authorization** (via `Koan.Web.Auth`)
-- **Real database** (via `Koan.Data.Postgres` or `Koan.Data.SqlServer`)
+- **Real database** (via `Koan.Data.Connector.Postgres` or `Koan.Data.Connector.SqlServer`)
 - **Search capabilities** (via `Koan.Data.Vector` for semantic search)
 - **File uploads** (via `Koan.Media` for article images)
 - **Messaging notifications** (via `Koan.Messaging` for editorial alerts)
@@ -173,3 +173,4 @@ After exploring this sample, you'll understand:
 - Using data sets to organize content by lifecycle stage
 - Building role-based content platforms with audit trails
 - Integrating generic capability controllers for common operations
+

@@ -93,6 +93,35 @@ if (KoanEnv.AllowMagicInProduction) {
 }
 ```
 
+#### 5. Vector Export for Migration (DATA-0078)
+```csharp
+// Streaming vector export for provider migration or caching
+// Available in: ElasticSearch, Weaviate, Qdrant (planned), Milvus (planned)
+// Not available: Pinecone (throws NotSupportedException)
+
+// Use case: Migrate vectors between providers without regenerating via AI
+var vectorRepo = serviceProvider.GetRequiredService<IVectorSearchRepository<Media, string>>();
+
+await foreach (var batch in vectorRepo.ExportAllAsync(batchSize: 100, ct))
+{
+    // batch.Id: Entity identifier
+    // batch.Embedding: float[] vector
+    // batch.Metadata: Optional metadata
+
+    // Cache the embedding to avoid expensive AI regeneration
+    var contentHash = EmbeddingCache.ComputeContentHash(embeddingText);
+    await cache.SetAsync(contentHash, modelId, batch.Embedding, ct);
+}
+
+// Provider-specific implementations:
+// - ElasticSearch: Scroll API with match_all query (default batch: 1000)
+// - Weaviate: GraphQL offset pagination with _additional.vector (default batch: 100)
+// - Unsupported adapters: Throws NotSupportedException with helpful message
+
+// Common pattern: Export → Cache → Switch Provider → Import from Cache
+// This enables zero-cost vector DB migration without calling AI APIs again
+```
+
 ### Critical Anti-Patterns to Detect
 
 #### Manual Repository Pattern
@@ -343,10 +372,10 @@ public class Todo : Entity<Todo> { }
 #### Cross-Provider Consistency
 ```csharp
 // Test provider transparency with different backends
-using var sqliteContext = DataSetContext.With("sqlite-set");
+using var sqliteContext = EntityContext.With("sqlite-set");
 var sqliteTodos = await Todo.All();
 
-using var mongoContext = DataSetContext.With("mongo-set");
+using var mongoContext = EntityContext.With("mongo-set");
 var mongoTodos = await Todo.All();
 // Same API, different storage backends
 ```
@@ -519,3 +548,4 @@ ME: "Noted - enterprise requirements take precedence for this domain. I'll adjus
 - **Advisory improvement**: Become a more effective technical advisor through our collaboration
 
 This framework ensures productive architectural collaboration while maintaining clear authority and decision-making responsibility.
+- never use docker compose up or build if a start.bat script is available.

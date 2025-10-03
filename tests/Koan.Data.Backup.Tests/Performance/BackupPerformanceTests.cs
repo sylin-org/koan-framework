@@ -191,7 +191,7 @@ public class BackupPerformanceTests : IClassFixture<BackupTestFixture>
 
         // Discovery should be fast
         stopwatch.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(30), "Discovery should complete within 30 seconds");
-        catalog.TotalCount.Should().BeGreaterOrEqualTo(10);
+        catalog.TotalCount.Should().BeGreaterThanOrEqualTo(10);
 
         // Test query performance
         stopwatch.Restart();
@@ -204,7 +204,7 @@ public class BackupPerformanceTests : IClassFixture<BackupTestFixture>
 
         _output.WriteLine($"Query time: {stopwatch.Elapsed}");
         stopwatch.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(10), "Query should complete within 10 seconds");
-        queryResult.Backups.Should().HaveCountGreaterOrEqualTo(10);
+        queryResult.Backups.Should().HaveCountGreaterThanOrEqualTo(10);
     }
 
     [Fact]

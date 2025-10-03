@@ -52,8 +52,8 @@ services:
       S8__Location__Geocoding__GoogleMapsApiKey: "${GOOGLE_MAPS_API_KEY:-}"
       DOTNET_ENVIRONMENT: Development
       # Debug logging
-      Logging__LogLevel__Koan.Ai.Provider.Ollama: "Debug"
-      Logging__LogLevel__Koan.Ai.Provider.Ollama.Initialization.OllamaDiscoveryService: "Debug"
+      Logging__LogLevel__Koan.AI.Connector.Ollama: "Debug"
+      Logging__LogLevel__Koan.AI.Connector.Ollama.Initialization.OllamaDiscoveryService: "Debug"
       Logging__LogLevel__Microsoft.Extensions.Hosting: "Debug"
     depends_on:
       mongo:

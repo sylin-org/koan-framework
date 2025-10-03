@@ -21,7 +21,7 @@ public static class StorageNameRegistry
     {
         var cfg = AggregateConfigs.Get<TEntity, TKey>(sp);
         var provider = cfg.Provider;
-        var set = DataSetContext.Current;
+        var set = EntityContext.Current?.Partition;
         var key = BagKey(provider, set);
         return AggregateBags.GetOrAdd<TEntity, TKey, string>(sp, key, () =>
         {

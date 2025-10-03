@@ -1,0 +1,257 @@
+<div class="container-fluid py-4" ng-controller="HomeController">
+    <!-- Loading State -->
+    <div ng-if="loading" class="d-flex justify-content-center align-items-center" style="min-height: 400px;">
+        <div class="text-center">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-3 text-muted">Loading dashboard...</p>
+        </div>
+    </div>
+
+    <!-- Dashboard Content -->
+    <div ng-if="!loading">
+        <!-- Header -->
+        <div class="row mb-4">
+            <div class="col">
+                <h1 class="h2 mb-1">Document Intelligence Dashboard</h1>
+                <p class="text-muted">Monitor your document processing and analysis pipeline</p>
+            </div>
+            <div class="col-auto">
+                <button class="btn btn-outline-primary me-2" ng-click="refresh()">
+                    <i class="bi bi-arrow-clockwise"></i> Refresh
+                </button>
+                <button class="btn btn-primary" ng-click="quickUpload()">
+                    <i class="bi bi-upload"></i> Quick Upload
+                </button>
+            </div>
+        </div>
+
+        <!-- Statistics Cards -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card bg-primary text-white">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="card-title mb-1">Total Files</h6>
+                                <h3 class="mb-0">{{stats.files.totalFiles || 0}}</h3>
+                            </div>
+                            <i class="bi bi-files display-6 opacity-50"></i>
+                        </div>
+                        <small class="opacity-75">{{getTotalFileSize()}}</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-success text-white">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="card-title mb-1">Processed</h6>
+                                <h3 class="mb-0">{{stats.files.processedFiles || 0}}</h3>
+                            </div>
+                            <i class="bi bi-check-circle display-6 opacity-50"></i>
+                        </div>
+                        <small class="opacity-75">{{getProcessingRate()}}% completion</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-warning text-white">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="card-title mb-1">Pending</h6>
+                                <h3 class="mb-0">{{stats.files.pendingFiles || 0}}</h3>
+                            </div>
+                            <i class="bi bi-clock display-6 opacity-50"></i>
+                        </div>
+                        <small class="opacity-75">Awaiting processing</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-info text-white">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="card-title mb-1">Document Types</h6>
+                                <h3 class="mb-0">{{documentTypes.length || 0}}</h3>
+                            </div>
+                            <i class="bi bi-tags display-6 opacity-50"></i>
+                        </div>
+                        <small class="opacity-75">Active templates</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="row mb-4">
+            <div class="col">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Quick Actions</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <div class="d-grid">
+                                    <button class="btn btn-outline-primary btn-lg" ng-click="navigateToUpload()">
+                                        <i class="bi bi-upload fs-4 d-block mb-2"></i>
+                                        Upload Documents
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="d-grid">
+                                    <button class="btn btn-outline-success btn-lg" ng-click="navigateToDocumentTypes()">
+                                        <i class="bi bi-tags fs-4 d-block mb-2"></i>
+                                        Manage Types
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="d-grid">
+                                    <button class="btn btn-outline-info btn-lg" ng-click="navigateToAnalysis()">
+                                        <i class="bi bi-graph-up fs-4 d-block mb-2"></i>
+                                        View Analytics
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content Grid -->
+        <div class="row">
+            <!-- Recent Files -->
+            <div class="col-md-6 mb-4">
+                <div class="card h-100">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0">Recent Files</h5>
+                        <button class="btn btn-sm btn-outline-primary" ng-click="navigateToFiles()">
+                            View All <i class="bi bi-arrow-right"></i>
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div ng-if="recentFiles.length === 0" class="text-center text-muted py-4">
+                            <i class="bi bi-files display-4"></i>
+                            <p class="mt-2 mb-0">No files uploaded yet</p>
+                            <button class="btn btn-sm btn-primary mt-2" ng-click="navigateToUpload()">
+                                Upload First File
+                            </button>
+                        </div>
+                        <div ng-if="recentFiles.length > 0">
+                            <div ng-repeat="file in recentFiles" class="d-flex align-items-center py-2 border-bottom"
+                                 ng-class="{'border-0': $last}">
+                                <div class="me-3">
+                                    <i class="{{getFileIcon(file)}} fs-4 text-primary"></i>
+                                </div>
+                                <div class="flex-grow-1 min-w-0">
+                                    <h6 class="mb-1 text-truncate">{{file.displayName}}</h6>
+                                    <small class="text-muted d-block">
+                                        {{formatFileSize(file.fileSize)}} • {{formatDate(file.createdAt)}}
+                                    </small>
+                                </div>
+                                <div class="ms-2">
+                                    <span class="badge {{getStateClass(file)}}">{{getStateLabel(file)}}</span>
+                                </div>
+                                <div class="ms-2">
+                                    <button class="btn btn-sm btn-outline-secondary" ng-click="viewFile(file.id)">
+                                        <i class="bi bi-eye"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Analyses -->
+            <div class="col-md-6 mb-4">
+                <div class="card h-100">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0">Recent Analyses</h5>
+                        <button class="btn btn-sm btn-outline-primary" ng-click="navigateToAnalysis()">
+                            View All <i class="bi bi-arrow-right"></i>
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div ng-if="recentAnalyses.length === 0" class="text-center text-muted py-4">
+                            <i class="bi bi-graph-up display-4"></i>
+                            <p class="mt-2 mb-0">No analyses completed yet</p>
+                            <small class="text-muted">Upload files and assign types to start analyzing</small>
+                        </div>
+                        <div ng-if="recentAnalyses.length > 0">
+                            <div ng-repeat="analysis in recentAnalyses" class="d-flex align-items-center py-2 border-bottom"
+                                 ng-class="{'border-0': $last}">
+                                <div class="me-3 text-center">
+                                    <div class="badge {{getConfidenceClass(analysis.confidence)}} rounded-pill">
+                                        {{formatConfidenceScore(analysis.confidence)}}
+                                    </div>
+                                    <div class="badge mt-2 {{getStatusClass(analysis.status)}}">{{getStatusLabel(analysis.status)}}</div>
+                                </div>
+                                <div class="flex-grow-1 min-w-0">
+                                    <h6 class="mb-1 text-truncate">{{analysis.title}}</h6>
+                                    <small class="text-muted d-block text-truncate">
+                                        {{primaryFinding(analysis) || 'Manual session ready'}}
+                                    </small>
+                                </div>
+                                <div class="text-end me-3">
+                                    <div class="text-muted small">{{analysis.documentCount || 0}} document(s)</div>
+                                    <div class="text-muted small">{{formatDate(analysis.lastRunAt || analysis.createdAt)}}</div>
+                                </div>
+                                <div>
+                                    <button class="btn btn-sm btn-outline-secondary" ng-click="viewAnalysis(analysis.id)">
+                                        <i class="bi bi-eye"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Document Types Overview -->
+        <div class="row">
+            <div class="col">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0">Document Types</h5>
+                        <button class="btn btn-sm btn-outline-primary" ng-click="navigateToDocumentTypes()">
+                            Manage Types <i class="bi bi-arrow-right"></i>
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div ng-if="documentTypes.length === 0" class="text-center text-muted py-4">
+                            <i class="bi bi-tags display-4"></i>
+                            <p class="mt-2 mb-0">No document types configured</p>
+                            <button class="btn btn-sm btn-primary mt-2" ng-click="navigateToDocumentTypes()">
+                                Create First Type
+                            </button>
+                        </div>
+                        <div ng-if="documentTypes.length > 0" class="row g-3">
+                            <div ng-repeat="type in documentTypes" class="col-md-4">
+                                <div class="card border-0 bg-light h-100">
+                                    <div class="card-body text-center">
+                                        <i class="{{getTypeIcon(type)}} display-6 text-primary mb-2"></i>
+                                        <h6 class="card-title">{{type.name}}</h6>
+                                        <p class="card-text text-muted small">{{type.description || 'No description'}}</p>
+                                        <button class="btn btn-sm btn-outline-primary" ng-click="viewDocumentType(type.id)">
+                                            View Details
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

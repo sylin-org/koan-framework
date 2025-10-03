@@ -1,8 +1,8 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
   </PropertyGroup>
@@ -10,13 +10,13 @@
   <ItemGroup>
     <!-- Core Koan Framework -->
     <ProjectReference Include="..\..\..\src\Koan.Core\Koan.Core.csproj" />
-    <ProjectReference Include="..\..\..\src\Koan.Flow.Core\Koan.Flow.Core.csproj" />
+    <ProjectReference Include="..\..\..\src\Koan.Canon.Core\Koan.Canon.Core.csproj" />
     
     <!-- Local project reference -->
     <ProjectReference Include="..\S8.Location.Core\S8.Location.Core.csproj" />
     
     <!-- Hosting dependencies -->
-    <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.8" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.0-rc.1.25451.107" />
   </ItemGroup>
 
 </Project>

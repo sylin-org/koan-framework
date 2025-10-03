@@ -33,10 +33,10 @@ public static class KoanServiceEvents
         public const string Processed = "OutboxProcessed";
         public const string Failed = "OutboxFailed";
     }
-    public static class Flow
+    public static class Canon
     {
-        public const string EntityProcessed = "FlowEntityProcessed";
-        public const string EntityParked = "FlowEntityParked";
-        public const string EntityFailed = "FlowEntityFailed";
+        public const string EntityProcessed = "CanonEntityProcessed";
+        public const string EntityParked = "CanonEntityParked";
+        public const string EntityFailed = "CanonEntityFailed";
     }
 }

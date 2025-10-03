@@ -475,11 +475,11 @@
     const weight = parseFloat(Dom.$('preferWeight')?.value || String((window.S5Const?.RECS?.DEFAULT_PREFER_WEIGHT) ?? 0.2));
     const genre = Dom.val('genreFilter') || '';
     const episodeSel = Dom.val('episodeFilter') || '';
-    const episodesMax = episodeSel === 'short' 
+    const episodesMax = episodeSel === 'short'
       ? ((window.S5Const?.EPISODES?.SHORT_MAX) ?? 12)
-      : (episodeSel === 'medium' 
+      : (episodeSel === 'medium'
         ? ((window.S5Const?.EPISODES?.MEDIUM_MAX) ?? 25)
-        : (episodeSel === 'long' 
+        : (episodeSel === 'long'
           ? ((window.S5Const?.EPISODES?.LONG_MAX) ?? 9999)
           : null));
     const genres = []; if(genre) genres.push(genre);
@@ -494,6 +494,9 @@
     // Include media type filter if set
     const mediaTypeFilter = window.currentMediaType && window.currentMediaType !== 'all' ? window.currentMediaType : null;
 
+    // Get rating and year filters (returns null for values at extremes)
+    const { ratingMin, ratingMax, yearMin, yearMax } = readDualRangeValues();
+
     const body = {
       text: text || '',
       topK,
@@ -504,7 +507,12 @@
         spoilerSafe: true,
         preferTags,
         preferWeight: weight,
-        mediaType: mediaTypeFilter
+        mediaType: mediaTypeFilter,
+        // Add rating/year filters - null values handled gracefully by backend
+        ratingMin: ratingMin,
+        ratingMax: ratingMax,
+        yearMin: yearMin,
+        yearMax: yearMax
       },
       userId
     };
@@ -520,12 +528,31 @@
 
   function mapItemToMedia(item){
   const a = item.media || item;
-  const score = typeof item.score === 'number' ? item.score : (typeof a.popularity === 'number' ? a.popularity : ((window.S5Const?.RATING?.DEFAULT_POPULARITY_SCORE) ?? 0.7));
-  const stars = (window.S5Const?.RATING?.STARS) ?? 5;
-  const minR = (window.S5Const?.RATING?.MIN) ?? 0;
-  const maxR = (window.S5Const?.RATING?.MAX) ?? 5;
-  const roundTo = (window.S5Const?.RATING?.ROUND_TO) ?? 10;
-  const computedRating = Math.max(minR, Math.min(maxR, Math.round(score * stars * roundTo) / roundTo));
+
+  // Use backend's computed rating (80% score + 20% popularity)
+  // Fallback to client-side computation for legacy data
+  let rating;
+  if (a.rating != null) {
+    // Backend provides blended rating
+    rating = a.rating;
+  } else if (a.averageScore != null && a.popularity != null) {
+    // Fallback: compute blend client-side (80/20 formula)
+    rating = (a.averageScore * 0.8) + a.popularity;
+  } else if (a.averageScore != null) {
+    // Only score available
+    rating = a.averageScore;
+  } else {
+    // Legacy: compute from popularity/score
+    const score = typeof item.score === 'number' ? item.score : (a.popularity || 0.7);
+    const stars = (window.S5Const?.RATING?.STARS) ?? 5;
+    rating = score * stars;
+  }
+
+  // Round to 1 decimal place for display
+  const displayRating = Math.round(rating * 10) / 10;
+
+  // Use backend's computed year, or extract from startDate
+  const year = a.year ?? (a.startDate ? new Date(a.startDate).getFullYear() : '');
 
   // Extract media type from mediaTypeId
   const getTypeFromMediaTypeId = (mediaTypeId) => {
@@ -544,7 +571,7 @@
 
   const mediaType = a.type || getTypeFromMediaTypeId(a.mediaTypeId) || 'TV';
 
-    return { id:a.id, title: a.titleEnglish || a.title || a.titleRomaji || a.titleNative || 'Untitled', englishTitle:a.titleEnglish||'', coverUrl:a.coverUrl||'', backdrop:a.bannerUrl||a.coverUrl||'', rating:computedRating, popularity:a.popularity||0, episodes:a.episodes||0, type:mediaType, mediaTypeId:a.mediaTypeId, year:a.year||'', status:a.status||'', studio:a.studio||'', source:a.source||'', synopsis:a.synopsis||'', genres: Array.isArray(a.genres)? a.genres : (Array.isArray(a.tags)? a.tags: []) };
+    return { id:a.id, title: a.titleEnglish || a.title || a.titleRomaji || a.titleNative || 'Untitled', englishTitle:a.titleEnglish||'', coverUrl:a.coverUrl||'', backdrop:a.bannerUrl||a.coverUrl||'', rating:displayRating, popularity:a.popularity||0, episodes:a.episodes||0, type:mediaType, mediaTypeId:a.mediaTypeId, year:year, status:a.status||'', studio:a.studio||'', source:a.source||'', synopsis:a.synopsis||'', genres: Array.isArray(a.genres)? a.genres : (Array.isArray(a.tags)? a.tags: []) };
   }
 
   function loadContentForTab(tab){
@@ -630,19 +657,35 @@
       const btn = Dom.$('moreBtn'); if(btn){ if(window.filteredData.length >= window.currentRecsTopK) btn.classList.remove('hidden'); else btn.classList.add('hidden'); }
     }catch{ Dom.$('moreBtn')?.classList.add('hidden'); showToast('Search failed', 'error'); }
   }
-  window.applyFilters = function(){
+  window.applyFilters = async function(){
+    // Note: For recommendation views (forYou/freeBrowsing), filters are applied on the BACKEND
+    // For Library view, filters are applied client-side on already-fetched data
     const genre = Dom.val('genreFilter');
     const episode = Dom.val('episodeFilter');
     const { ratingMin, ratingMax, yearMin, yearMax } = readDualRangeValues();
     const search = Dom.val('globalSearch');
 
-    window.filteredData = (window.S5Filters && S5Filters.filter)
-      ? S5Filters.filter(window.mediaData, { genre, episode, ratingMin, ratingMax, yearMin, yearMax })
-      : [...window.mediaData];
-
     // Update filter chips
     if (window.S5Filters && S5Filters.updateFilterChips) {
       S5Filters.updateFilterChips({ genre, episode, ratingMin, ratingMax, yearMin, yearMax, search });
+    }
+
+    // For recommendation views, re-fetch from backend with new filters
+    if (window.currentView === 'forYou') {
+      window.currentRecsTopK = PAGE_SIZE;
+      await window.loadAnimeData();
+      return;
+    } else if (window.currentView === 'freeBrowsing') {
+      window.currentRecsTopK = PAGE_SIZE;
+      await window.loadFreeBrowsingData();
+      return;
+    }
+
+    // For Library view, apply client-side filters
+    if (window.currentView === 'library') {
+      window.filteredData = (window.S5Filters && S5Filters.filter)
+        ? S5Filters.filter(window.mediaData, { genre, episode, ratingMin, ratingMax, yearMin, yearMax })
+        : [...window.mediaData];
     }
 
     applySortAndFilters();

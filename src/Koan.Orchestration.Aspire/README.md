@@ -1,5 +1,7 @@
 # Koan.Orchestration.Aspire
 
+> ✅ Validated against discovery pipeline, initialization registrar, and self-orchestration services on **2025-09-29**. See [`TECHNICAL.md`](./TECHNICAL.md) for detailed lifecycle diagrams and edge-case coverage.
+
 Distributed Aspire resource registration for Koan Framework modules via the KoanAutoRegistrar pattern.
 
 ## Overview
@@ -136,10 +138,10 @@ Environment.SetEnvironmentVariable("ASPIRE_CONTAINER_RUNTIME", "docker");
 
 ### Infrastructure Modules (Priority 100-500)
 
-- **Koan.Data.Postgres**: PostgreSQL database with automatic schema management
-- **Koan.Data.Redis**: Redis cache with connection multiplexer
-- **Koan.Data.MongoDB**: MongoDB with authentication and database initialization
-- **Koan.Data.SqlServer**: SQL Server with connection string generation
+- **Koan.Data.Connector.Postgres**: PostgreSQL database with automatic schema management
+- **Koan.Data.Connector.Redis**: Redis cache with connection multiplexer
+- **Koan.Data.Connector.MongoDB**: MongoDB with authentication and database initialization
+- **Koan.Data.Connector.SqlServer**: SQL Server with connection string generation
 
 ### Application Modules (Priority 1000+)
 
@@ -242,6 +244,9 @@ public void RegisterAspireResources(IDistributedApplicationBuilder builder, ICon
 - Verify configuration keys match module expectations
 - Check configuration precedence and sources
 - Use logging to debug configuration values
+
+## Documentation
+- [`TECHNICAL.md`](./TECHNICAL.md) – discovery flow, registrar contract, orchestration modes, self-orchestration, and validation notes.
 
 ### Diagnostic Information
 

@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>preview</LangVersion>
@@ -10,31 +10,28 @@
     <ProjectReference Include="..\..\src\Koan.Core\Koan.Core.csproj" />
     <ProjectReference Include="..\..\src\Koan.Core.Adapters\Koan.Core.Adapters.csproj" />
     <ProjectReference Include="..\..\src\Koan.Web\Koan.Web.csproj" />
-    <ProjectReference Include="..\..\src\Koan.Web.Swagger\Koan.Web.Swagger.csproj" />
+    <ProjectReference Include="..\..\src\Connectors\Web\Swagger\Koan.Web.Connector.Swagger.csproj" />
     <ProjectReference Include="..\..\src\Koan.Data.Core\Koan.Data.Core.csproj" />
     <ProjectReference Include="..\..\src\Koan.Data.Vector.Abstractions\Koan.Data.Vector.Abstractions.csproj" />
     <ProjectReference Include="..\..\src\Koan.Data.Vector\Koan.Data.Vector.csproj" />
-    <ProjectReference Include="..\..\src\Koan.Data.Couchbase\Koan.Data.Couchbase.csproj" />
-    <ProjectReference Include="..\..\src\Koan.Data.Weaviate\Koan.Data.Weaviate.csproj" />
+    <ProjectReference Include="..\..\src\Connectors\Data\Mongo\Koan.Data.Connector.Mongo.csproj" />
+    <ProjectReference Include="..\..\src\Connectors\Data\Vector\Weaviate\Koan.Data.Vector.Connector.Weaviate.csproj" />
+    <!-- <ProjectReference Include="..\..\src\Connectors\Data\ElasticSearch\Koan.Data.Connector.ElasticSearch.csproj" /> -->
     <ProjectReference Include="..\..\src\Koan.AI\Koan.AI.csproj" />
     <ProjectReference Include="..\..\src\Koan.AI.Contracts\Koan.AI.Contracts.csproj" />
-    <ProjectReference Include="..\..\src\Koan.Ai.Provider.Ollama\Koan.Ai.Provider.Ollama.csproj" />
+    <ProjectReference Include="..\..\src\Koan.AI.Web\Koan.AI.Web.csproj" />
+    <ProjectReference Include="..\..\src\Connectors\AI\Ollama\Koan.AI.Connector.Ollama.csproj" />
     <ProjectReference Include="..\..\src\Koan.Scheduling\Koan.Scheduling.csproj" />
     <!-- Auth core and dev TestProvider for Development login/testing -->
     <ProjectReference Include="..\..\src\Koan.Web.Auth\Koan.Web.Auth.csproj" />
-    <ProjectReference Include="..\..\src\Koan.Web.Auth.TestProvider\Koan.Web.Auth.TestProvider.csproj" />
+    <ProjectReference Include="..\..\src\Connectors\Web\Auth\Test\Koan.Web.Auth.Connector.Test.csproj" />
     <ProjectReference Include="..\..\src\Koan.Web.Auth.Services\Koan.Web.Auth.Services.csproj" />
     <!-- Backup and Restore Web API -->
     <ProjectReference Include="..\..\src\Koan.Web.Backup\Koan.Web.Backup.csproj" />
-  <ProjectReference Include="..\..\src\Koan.Web.Extensions\Koan.Web.Extensions.csproj" />
-  </ItemGroup>
-  <PropertyGroup>
-    <EnableDefaultContentItems>false</EnableDefaultContentItems>
-  </PropertyGroup>
-  <ItemGroup>
-    <Content Include="wwwroot\\**\\*" CopyToPublishDirectory="PreserveNewest" CopyToOutputDirectory="PreserveNewest" />
+    <ProjectReference Include="..\..\src\Koan.Web.Extensions\Koan.Web.Extensions.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
   </ItemGroup>
 </Project>
+

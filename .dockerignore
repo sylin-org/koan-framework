@@ -1,0 +1,54 @@
+# Build outputs
+**/bin/
+**/obj/
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# IDE
+.vs/
+.vscode/
+**/*.user
+**/*.suo
+**/*.userosscache
+**/*.sln.docstates
+
+# Documentation (not needed for runtime)
+*.md
+!samples/**/README.md
+
+# Tests (not needed for sample builds)
+**/Tests/
+**/tests/
+**/*.Tests/
+**/*.Test/
+
+# Node
+**/node_modules/
+
+# Docker
+**/Dockerfile
+**/.dockerignore
+**/docker-compose*.yml
+
+# Docker volume data only (not source code under src/Connectors/Data/)
+**/.Koan/Data/
+
+# Logs
+**/logs/
+**/*.log
+
+# OS
+**/.DS_Store
+**/Thumbs.db
+
+# Temporary files
+**/tmp/
+**/temp/
+
+
+# Temporary files
+**/tmp/
+**/temp/

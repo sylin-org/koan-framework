@@ -58,7 +58,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar, IKoanAspireRegistrar
         // - Cross-cutting concerns like logging or monitoring
 
         // Note: Infrastructure resources (postgres, redis) are registered by their
-        // respective data provider modules (Koan.Data.Postgres, Koan.Data.Redis)
+        // respective data provider modules (Koan.Data.Connector.Postgres, Koan.Data.Connector.Redis)
     }
 
     public int Priority => 1000; // Applications register after infrastructure

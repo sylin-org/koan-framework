@@ -19,7 +19,7 @@ services:
       DOTNET_ENVIRONMENT: Development
   # Koan.Web: running behind a reverse proxy; let proxy own security headers
       Koan__Web__IsProxiedApi: "true"
-  # Enable Swagger UI in non-development per Koan.Web.Swagger policy
+  # Enable Swagger UI in non-development per Koan.Web.Connector.Swagger policy
       Koan__Web__Swagger__Enabled: "true"
   # Optional OpenTelemetry endpoint (enable by uncommenting the collector service below)
   # OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
@@ -56,3 +56,4 @@ services:
   #     interval: 5s
   #     timeout: 5s
   #     retries: 10
+

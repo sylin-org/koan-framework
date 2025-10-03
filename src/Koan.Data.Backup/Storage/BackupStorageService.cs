@@ -5,6 +5,7 @@ using Newtonsoft.Json;
 using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace Koan.Data.Backup.Storage;
 
@@ -29,11 +30,11 @@ public class BackupStorageService
     /// <summary>
     /// Creates a backup archive stream for writing
     /// </summary>
-    public async Task<(Stream Stream, string BackupPath)> CreateBackupArchiveAsync(string backupName, string storageProfile, CancellationToken ct = default)
+    public Task<(Stream Stream, string BackupPath)> CreateBackupArchiveAsync(string backupName, string storageProfile, CancellationToken ct = default)
     {
         var backupPath = $"backups/{backupName}-{DateTimeOffset.UtcNow:yyyyMMdd-HHmmss}.zip";
         var stream = new MemoryStream(); // We'll use MemoryStream and upload when complete
-        return (stream, backupPath);
+        return Task.FromResult<(Stream, string)>((stream, backupPath));
     }
 
     /// <summary>

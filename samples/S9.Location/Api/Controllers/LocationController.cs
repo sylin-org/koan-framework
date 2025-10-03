@@ -1,9 +1,9 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Koan.Data.Core;
-using Koan.Flow.Infrastructure;
-using Koan.Flow.Model;
+using Koan.Canon.Infrastructure;
+using Koan.Canon.Model;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using S9.Location.Core.Models;
@@ -42,7 +42,7 @@ public class LocationController : ControllerBase
     [HttpGet("parked")]
     public async Task<ActionResult<IReadOnlyList<ParkedRecord<RawLocation>>>> GetParked([FromQuery] int pageSize = 25, CancellationToken ct = default)
     {
-        using (DataSetContext.With(FlowSets.StageShort(FlowSets.Parked)))
+        using (EntityContext.With(CanonSets.StageShort(CanonSets.Parked)))
         {
             var records = await ParkedRecord<RawLocation>.FirstPage(pageSize, ct);
             return Ok(records);

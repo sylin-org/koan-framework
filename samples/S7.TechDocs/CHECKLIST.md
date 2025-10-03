@@ -13,12 +13,12 @@ References
 
 ## Package wiring (once)
 - [ ] Add and configure (dev/prod as appropriate):
-  - [ ] Koan.Web.Extensions, Koan.Web.Swagger
-  - [ ] Koan.Web.Auth.TestProvider (dev), Koan.Web.Auth.Oidc (prod)
-  - [ ] Koan.Data.Postgres, Koan.Data.Relational
+  - [ ] Koan.Web.Extensions, Koan.Web.Connector.Swagger
+  - [ ] Koan.Web.Auth.Connector.Test (dev), Koan.Web.Auth.Connector.Oidc (prod)
+  - [ ] Koan.Data.Connector.Postgres, Koan.Data.Relational
   - [ ] Koan.Data.Vector (pgvector)
-  - [ ] Koan.Messaging.Inbox.Http (dev) / Koan.Messaging.RabbitMq (prod)
-  - [ ] Koan.AI, Koan.Ai.Provider.Ollama (dev) or selected provider
+  - [ ] Koan.Messaging.Inbox.Connector.Http (dev) / Koan.Messaging.Connector.RabbitMq (prod)
+  - [ ] Koan.AI, Koan.AI.Connector.Ollama (dev) or selected provider
   - [ ] Koan.Recipe.Observability
 
 ---
@@ -35,12 +35,12 @@ References
 - [x] Ensure server-side filtering by role remains enforced (DB-backed via adapter)
 - [ ] Create relational schema (Documents, Collections, Users, Roles, Ratings, Bookmarks, Issues) in Postgres
 - [ ] Add migrations/setup scripts and apply to dev/prod (optional; using AutoCreate for now)
-- [x] Wire Koan.Data.Postgres adapter via options; verify connections
+- [x] Wire Koan.Data.Connector.Postgres adapter via options; verify connections
 - [x] Switch Development to Postgres (single database across environments)
 - [ ] Keep controllers and services (no CQRS); use first-class model statics against Postgres
 
 ## Phase 2 – AuthN/Z (policies + ownership)
-- [x] Dev: Koan.Web.Auth.TestProvider; Prod: Koan.Web.Auth.Oidc
+- [x] Dev: Koan.Web.Auth.Connector.Test; Prod: Koan.Web.Auth.Connector.Oidc
 - [x] Policies: Reader (auth), Author, Moderator, Admin
 - [ ] Ownership checks (Author can edit own Draft; Moderator can change any)
 - [ ] Remove UI role switcher in non-Development builds
@@ -110,3 +110,4 @@ References
 - Keep controllers (no inline endpoints). Centralize constants. One public class per file.
 - For production, document decisions under /docs/decisions and update TOCs.
  - Single database: Postgres hosts OLTP, FTS (tsvector), and vectors (pgvector); no separate CQRS store.
+

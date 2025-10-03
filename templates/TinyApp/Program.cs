@@ -1,5 +1,5 @@
 using Koan.Data.Core;
-using Koan.Web.Swagger;
+using Koan.Web.Connector.Swagger;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -16,3 +16,4 @@ var app = builder.Build();
 app.MapGet("/", () => Results.Redirect("/swagger"));
 
 app.Run($"http://localhost:__PORT__");
+

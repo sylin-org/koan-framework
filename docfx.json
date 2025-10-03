@@ -34,15 +34,15 @@
       },
       {
         "files": [
+          "docs/**.md",
           "documentation/**.md",
-          "docs/index.md",
           "docs/toc.yml"
         ],
         "exclude": [
           "**/obj/**",
           "**/bin/**",
           "documentation/archive/**",
-          "documentation/decisions/toc.yml"
+          "docs/decisions/toc.yml"
         ]
       },
       {
@@ -97,14 +97,20 @@
     },
     "fileMetadata": {
       "_appTitle": {
+        "docs/decisions/**": "Architecture Decisions - Koan Framework",
         "documentation/decisions/**": "Architecture Decisions - Koan Framework",
+        "docs/guides/**": "Developer Guides - Koan Framework",
         "documentation/guides/**": "Developer Guides - Koan Framework",
+        "docs/reference/**": "API Reference - Koan Framework",
         "documentation/reference/**": "API Reference - Koan Framework",
         "api/**": "API Documentation - Koan Framework"
       },
       "_tocTitle": {
+        "docs/decisions/**": "Decisions",
         "documentation/decisions/**": "Decisions",
+        "docs/guides/**": "Guides",
         "documentation/guides/**": "Guides",
+        "docs/reference/**": "Reference",
         "documentation/reference/**": "Reference",
         "api/**": "API"
       }

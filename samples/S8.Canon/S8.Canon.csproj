@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>preview</LangVersion>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <!-- Avoid compiling nested sample subprojects under this aggregator project -->
+  <ItemGroup>
+    <Compile Remove="S8.Canon.Api\**\*.cs" />
+    <Compile Remove="S8.Canon.Adapters.Bms\**\*.cs" />
+    <Compile Remove="S8.Canon.Adapters.Oem\**\*.cs" />
+    <Compile Remove="S8.Canon.Shared\**\*.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Koan.Core\Koan.Core.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Web\Koan.Web.csproj" />
+    <ProjectReference Include="..\..\src\\Connectors\\Web\\Swagger\Koan.Web.Connector.Swagger.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Data.Core\Koan.Data.Core.csproj" />
+    <ProjectReference Include="..\..\src\\Connectors\\Data\\Json\Koan.Data.Connector.Json.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Canon.Core\Koan.Canon.Core.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Canon.Web\Koan.Canon.Web.csproj" />
+    <ProjectReference Include="..\..\tests\Koan.Testing\Koan.Testing.csproj" />
+  <ProjectReference Include="S8.Canon.Shared\S8.Canon.Shared.csproj" />
+  </ItemGroup>
+</Project>
+

@@ -56,7 +56,7 @@ public class EntityBackupExtensionsTests : IClassFixture<BackupTestFixture>
         manifest.Should().NotBeNull();
         manifest.Name.Should().Be(backupName);
         manifest.Description.Should().Be(options.Description);
-        manifest.Tags.Should().BeEquivalentTo(options.Tags);
+        manifest.Labels.Should().BeEquivalentTo(options.Tags);
         manifest.Status.Should().Be(BackupStatus.Completed);
     }
 
@@ -82,7 +82,7 @@ public class EntityBackupExtensionsTests : IClassFixture<BackupTestFixture>
         manifest.Should().NotBeNull();
         manifest.Name.Should().Be(backupName);
         manifest.Description.Should().Be(description);
-        manifest.Tags.Should().BeEquivalentTo(tags);
+        manifest.Labels.Should().BeEquivalentTo(tags);
         manifest.Status.Should().Be(BackupStatus.Completed);
     }
 

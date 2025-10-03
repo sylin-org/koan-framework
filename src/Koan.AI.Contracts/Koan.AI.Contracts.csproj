@@ -1,18 +1,18 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <Description>Contracts for Koan AI: IAi entrypoint, DTOs, and router hints.</Description>
-    <PackageTags>$(CommonPackageTags);ai;contracts;dtos</PackageTags>
-    <Version>0.6.2</Version>
-    <AssemblyVersion>0.6.2</AssemblyVersion>
-    <FileVersion>0.6.2</FileVersion>
+    <Description>Contracts for Koan AI: prompts, request/response shapes, and standard token accounting models.</Description>
+    <PackageTags>$(CommonPackageTags);ai;contracts</PackageTags>
+    <Version>0.6.3</Version>
+    <AssemblyVersion>0.6.3</AssemblyVersion>
+    <FileVersion>0.6.3</FileVersion>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Koan.Core\Koan.Core.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
   </ItemGroup>
 </Project>

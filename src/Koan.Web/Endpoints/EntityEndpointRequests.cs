@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Microsoft.AspNetCore.JsonPatch;
+using Koan.Web.Attributes;
 
 namespace Koan.Web.Endpoints;
 
@@ -12,6 +13,12 @@ public sealed class EntityCollectionRequest
     public string? With { get; init; }
     public string? Shape { get; init; }
     public bool ForcePagination { get; init; }
+    public bool ApplyPagination { get; init; }
+    public bool PaginationRequested { get; init; }
+    public bool ClientRequestedAll { get; init; }
+    public required PaginationPolicy Policy { get; init; }
+    public bool IncludeTotalCount { get; init; }
+    public int AbsoluteMaxRecords { get; init; }
     public string? Accept { get; init; }
     public string? BasePath { get; init; }
     public IReadOnlyDictionary<string, string?> QueryParameters { get; init; } = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);

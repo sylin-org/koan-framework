@@ -6,7 +6,7 @@ public class BackupOptions
 {
     public string? Description { get; set; }
     public string[] Tags { get; set; } = Array.Empty<string>();
-    public string? Set { get; set; }
+    public string? Partition { get; set; }
     public string StorageProfile { get; set; } = string.Empty;
     public CompressionLevel CompressionLevel { get; set; } = CompressionLevel.Optimal;
     public bool VerificationEnabled { get; set; } = true;
@@ -28,7 +28,7 @@ public class GlobalBackupOptions : BackupOptions
 
 public class RestoreOptions
 {
-    public string? TargetSet { get; set; }
+    public string? TargetPartition { get; set; }
     public string StorageProfile { get; set; } = string.Empty;
     public bool ReplaceExisting { get; set; } = false;
     public bool DisableConstraints { get; set; } = true;
@@ -46,7 +46,7 @@ public class GlobalRestoreOptions : RestoreOptions
     public int MaxConcurrency { get; set; } = Environment.ProcessorCount;
     public string[]? IncludeEntityTypes { get; set; }
     public string[]? ExcludeEntityTypes { get; set; }
-    public Dictionary<string, string> EntitySetMapping { get; set; } = new(); // EntityType -> TargetSet
-    public bool RestoreToOriginalSets { get; set; } = true;
+    public Dictionary<string, string> EntityPartitionMapping { get; set; } = new(); // EntityType -> TargetPartition
+    public bool RestoreToOriginalPartitions { get; set; } = true;
     public bool ValidateBeforeRestore { get; set; } = true;
 }

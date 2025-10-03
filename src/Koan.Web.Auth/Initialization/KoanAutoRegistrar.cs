@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Koan.Core;
 using Koan.Web.Auth.Extensions;
+using Koan.Web.Extensions;
 
 namespace Koan.Web.Auth.Initialization;
 
@@ -17,6 +18,9 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         // Ensure auth services are registered once
         services.AddKoanWebAuth();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<Microsoft.AspNetCore.Hosting.IStartupFilter, Hosting.KoanWebAuthStartupFilter>());
+
+        // Ensure MVC discovers controllers from this assembly
+        services.AddKoanControllersFrom<Controllers.DiscoveryController>();
     }
 
     public void Describe(Koan.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)

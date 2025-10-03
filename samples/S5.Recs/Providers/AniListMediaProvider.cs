@@ -9,7 +9,10 @@ using System.Runtime.CompilerServices;
 
 namespace S5.Recs.Providers;
 
-internal sealed class AniListMediaProvider(IHttpClientFactory httpFactory, ILogger<AniListMediaProvider>? logger = null) : IMediaProvider
+internal sealed class AniListMediaProvider(
+    IHttpClientFactory httpFactory,
+    Services.IRawCacheService? cacheService = null,
+    ILogger<AniListMediaProvider>? logger = null) : IMediaProvider
 {
     public string Code => "anilist";
     public string Name => "AniList";
@@ -18,6 +21,9 @@ internal sealed class AniListMediaProvider(IHttpClientFactory httpFactory, ILogg
     public MediaType[] SupportedTypes => Array.Empty<MediaType>();
 
     private static readonly Uri AniListEndpoint = new("https://graphql.anilist.co/");
+
+    // Job ID for current fetch operation (set by FetchStreamAsync)
+    private string? _currentJobId;
 
     public async Task<List<Media>> FetchAsync(MediaType mediaType, int limit, CancellationToken ct)
     {
@@ -50,6 +56,25 @@ internal sealed class AniListMediaProvider(IHttpClientFactory httpFactory, ILogg
 
         var http = httpFactory;
         if (http is null) yield break;
+
+        // Generate job ID for this fetch operation
+        _currentJobId = Guid.CreateVersion7().ToString("n");
+
+        // Check for incremental import (latest manifest timestamp as threshold)
+        DateTimeOffset? incrementalThreshold = null;
+        if (cacheService != null)
+        {
+            var latestManifest = await cacheService.GetLatestManifestAsync(Code, mediaType.Name, ct);
+            if (latestManifest != null)
+            {
+                incrementalThreshold = latestManifest.FetchedAt;
+                logger?.LogInformation("AniList incremental import mode: fetching items updated after {Threshold:u}", incrementalThreshold);
+            }
+            else
+            {
+                logger?.LogInformation("AniList full import mode: no previous cache found");
+            }
+        }
 
         using var client = http.CreateClient();
         var query = BuildGraphQLQuery(mediaType);
@@ -106,6 +131,20 @@ internal sealed class AniListMediaProvider(IHttpClientFactory httpFactory, ILogg
                     rateLimitRetries = 0; transientRetries = 0;
 
                     var txt = await res.Content.ReadAsStringAsync(ct);
+
+                    // Cache raw response before parsing
+                    if (cacheService != null && _currentJobId != null)
+                    {
+                        try
+                        {
+                            await cacheService.WritePageAsync(Code, mediaType.Name, _currentJobId, pageNum, txt, ct);
+                        }
+                        catch (Exception cacheEx)
+                        {
+                            logger?.LogWarning(cacheEx, "Failed to cache page {Page}: {Error}", pageNum, cacheEx.Message);
+                        }
+                    }
+
                     var doc = JToken.Parse(txt);
                     var dataEl = doc["data"];
                     var pageEl = dataEl?["Page"];
@@ -128,6 +167,8 @@ internal sealed class AniListMediaProvider(IHttpClientFactory httpFactory, ILogg
                         {
                             batch = new List<Media>();
                             int skipped = 0;
+                            int oldItemCount = 0;
+
                             foreach (var m in media)
                             {
                                 var mediaItem = await MapToMedia(m, mediaType, ct);
@@ -135,6 +176,12 @@ internal sealed class AniListMediaProvider(IHttpClientFactory httpFactory, ILogg
                                 {
                                     batch.Add(mediaItem);
                                     totalFetched++;
+
+                                    // Check if item is older than incremental threshold
+                                    if (incrementalThreshold.HasValue && mediaItem.UpdatedAt <= incrementalThreshold.Value)
+                                    {
+                                        oldItemCount++;
+                                    }
                                 }
                                 else
                                 {
@@ -145,9 +192,17 @@ internal sealed class AniListMediaProvider(IHttpClientFactory httpFactory, ILogg
                             }
                             if (skipped > 0)
                                 logger?.LogDebug("AniList page {Page}: skipped {Skipped} malformed media entries", pageNum, skipped);
+
+                            // Incremental import early termination: if all items on this page are old, stop fetching
+                            if (incrementalThreshold.HasValue && batch.Count > 0 && oldItemCount == batch.Count)
+                            {
+                                logger?.LogInformation("AniList incremental: reached threshold on page {Page} (all {Count} items older than {Threshold:u}). Stopping fetch.",
+                                    pageNum, batch.Count, incrementalThreshold);
+                                hasNext = false;
+                            }
                         }
 
-                        logger?.LogInformation("AniList page {Page} fetched. Accumulated: {Count}/{Limit}", pageNum, totalFetched, limit);
+                        //logger?.LogInformation("AniList page {Page} fetched. Accumulated: {Count}/{Limit}", pageNum, totalFetched, limit);
                         pageNum++;
                         await Task.Delay(TimeSpan.FromMilliseconds(300), ct);
                     }
@@ -189,6 +244,28 @@ internal sealed class AniListMediaProvider(IHttpClientFactory httpFactory, ILogg
                 yield break;
             }
         }
+
+        // Write cache manifest after successful stream completion
+        if (cacheService != null && _currentJobId != null && totalFetched > 0)
+        {
+            try
+            {
+                var manifest = new Services.CacheManifest
+                {
+                    JobId = _currentJobId,
+                    Source = Code,
+                    MediaType = mediaType.Name,
+                    FetchedAt = DateTimeOffset.UtcNow,
+                    TotalPages = pageNum - 1,
+                    TotalItems = totalFetched
+                };
+                await cacheService.WriteManifestAsync(Code, mediaType.Name, _currentJobId, manifest, ct);
+            }
+            catch (Exception ex)
+            {
+                logger?.LogWarning(ex, "Failed to write cache manifest: {Error}", ex.Message);
+            }
+        }
     }
 
     private string BuildGraphQLQuery(MediaType mediaType)
@@ -204,7 +281,7 @@ internal sealed class AniListMediaProvider(IHttpClientFactory httpFactory, ILogg
                         perPage
                         total
                     }}
-                    media(type: {typeFilter}, sort: POPULARITY_DESC) {{
+                    media(type: {typeFilter}, sort: UPDATED_AT_DESC) {{
                         id
                         siteUrl
                         title {{
@@ -225,6 +302,7 @@ internal sealed class AniListMediaProvider(IHttpClientFactory httpFactory, ILogg
                         description(asHtml: false)
                         averageScore
                         popularity
+                        updatedAt
                         coverImage {{
                             extraLarge
                             large
@@ -320,7 +398,7 @@ internal sealed class AniListMediaProvider(IHttpClientFactory httpFactory, ILogg
             double? averageScore = null;
             if (avgTok?.Type == JTokenType.Integer)
             {
-                averageScore = avgTok.Value<int>() / 10.0; // Convert from 0-100 to 0-10 scale
+                averageScore = (avgTok.Value<int>() / 100.0) * 4 + 1; // Convert from 0-100 to 1-5 scale
             }
 
             // Images
@@ -342,8 +420,23 @@ internal sealed class AniListMediaProvider(IHttpClientFactory httpFactory, ILogg
             var status = item["status"]?.Value<string>();
             var format = item["format"]?.Value<string>();
 
+            // UpdatedAt timestamp (Unix timestamp from API)
+            var updatedAtValue = DateTimeOffset.UtcNow; // Default fallback
+            var updatedAtTok = item["updatedAt"];
+            if (updatedAtTok?.Type == JTokenType.Integer)
+            {
+                try
+                {
+                    var unixTimestamp = updatedAtTok.Value<long>();
+                    updatedAtValue = DateTimeOffset.FromUnixTimeSeconds(unixTimestamp);
+                }
+                catch
+                {
+                    // Fall back to UtcNow if conversion fails
+                }
+            }
+
             // Resolve MediaFormat - for now, use a placeholder
-            // TODO: Implement proper MediaFormat resolution after seeding
             var mediaFormatId = "placeholder-format-id";
 
             var media = new Media
@@ -379,7 +472,7 @@ internal sealed class AniListMediaProvider(IHttpClientFactory httpFactory, ILogg
                     ["anilist_url"] = $"https://anilist.co/{mediaType.Name.ToLowerInvariant()}/{rawId}"
                 },
                 ImportedAt = DateTimeOffset.UtcNow,
-                UpdatedAt = DateTimeOffset.UtcNow
+                UpdatedAt = updatedAtValue
             };
 
             return Task.FromResult<Media?>(media);
@@ -396,40 +489,20 @@ internal sealed class AniListMediaProvider(IHttpClientFactory httpFactory, ILogg
         try
         {
             if (dateToken is not JObject dateObj) return null;
-
-            // Handle null values more defensively
             var yearToken = dateObj["year"];
             var monthToken = dateObj["month"];
             var dayToken = dateObj["day"];
-
-            // Skip if year is null or not a valid integer
             if (yearToken == null || yearToken.Type == JTokenType.Null) return null;
 
-            int? year = null;
-            int? month = null;
-            int? day = null;
-
-            // Parse year safely
-            if (yearToken.Type == JTokenType.Integer)
-                year = yearToken.Value<int>();
-
-            // Parse month safely (default to 1 if null)
-            if (monthToken != null && monthToken.Type == JTokenType.Integer)
-                month = monthToken.Value<int>();
-
-            // Parse day safely (default to 1 if null)
-            if (dayToken != null && dayToken.Type == JTokenType.Integer)
-                day = dayToken.Value<int>();
-
+            int? year = null, month = null, day = null;
+            if (yearToken.Type == JTokenType.Integer) year = yearToken.Value<int>();
+            if (monthToken != null && monthToken.Type == JTokenType.Integer) month = monthToken.Value<int>();
+            if (dayToken != null && dayToken.Type == JTokenType.Integer) day = dayToken.Value<int>();
             if (year is null) return null;
 
             return new DateOnly(year.Value, month ?? 1, day ?? 1);
         }
-        catch
-        {
-            // If any parsing fails, return null to be as permissive as possible
-            return null;
-        }
+        catch { return null; }
     }
 
     private static TimeSpan ComputeBackoff(int attempt, int maxMs)

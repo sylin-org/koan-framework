@@ -3,7 +3,7 @@ using Koan.Data.Core;
 using Koan.Messaging;
 using Koan.Web.Extensions;
 using Koan.Web.Extensions.GenericControllers;
-using Koan.Web.Swagger;
+using Koan.Web.Connector.Swagger;
 using S7.ContentPlatform.Models;
 using Koan.Web.Extensions.Authorization;
 using Koan.Web.Extensions.Policies;
@@ -97,3 +97,4 @@ namespace S7.ContentPlatform
 {
     public partial class Program { }
 }
+

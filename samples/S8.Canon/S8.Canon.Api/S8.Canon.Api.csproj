@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\Koan.Data.Core\Koan.Data.Core.csproj" />
+  <ProjectReference Include="..\..\..\src\\Connectors\\Data\\Mongo\Koan.Data.Connector.Mongo.csproj" />
+    <ProjectReference Include="..\..\..\src\Koan.Canon.Core\Koan.Canon.Core.csproj" />
+  <ProjectReference Include="..\..\..\src\Koan.Canon.Web\Koan.Canon.Web.csproj" />
+  <ProjectReference Include="..\..\..\src\\Connectors\\Web\\Swagger\Koan.Web.Connector.Swagger.csproj" />
+    <ProjectReference Include="..\S8.Canon.Shared\S8.Canon.Shared.csproj" />
+  <ProjectReference Include="..\..\..\src\Koan.Messaging.Core\Koan.Messaging.Core.csproj" />
+  <ProjectReference Include="..\..\..\src\\Connectors\\Messaging\\RabbitMq\Koan.Messaging.Connector.RabbitMq.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Update="appsettings.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+</Project>

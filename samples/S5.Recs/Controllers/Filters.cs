@@ -6,5 +6,9 @@ public record Filters(
     bool SpoilerSafe = true,
     string[]? PreferTags = null,
     double? PreferWeight = null,
-    string? MediaType = null
+    string? MediaType = null,
+    double? RatingMin = null,
+    double? RatingMax = null,
+    int? YearMin = null,
+    int? YearMax = null
 );

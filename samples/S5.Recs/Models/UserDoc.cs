@@ -5,7 +5,7 @@ using Koan.Data.Core.Optimization;
 
 namespace S5.Recs.Models;
 
-[DataAdapter("couchbase")]
+
 [Storage(Name = "Users")]
 [OptimizeStorage(OptimizationType = StorageOptimizationType.None, Reason = "Uses human-readable string identifiers, not GUIDs")]
 public sealed class UserDoc : Entity<UserDoc>

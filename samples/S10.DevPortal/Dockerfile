@@ -1,12 +1,12 @@
 # S10.DevPortal Dockerfile - Multi-stage build for efficient container size
-FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS base
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS base
 WORKDIR /app
 EXPOSE 5090
 
 # Create data directory for SQLite
 RUN mkdir -p /app/data && chmod 755 /app/data
 
-FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0.100-rc.1 AS build
 WORKDIR /src
 
 # Copy project files first for better layer caching
@@ -17,9 +17,9 @@ COPY ["src/Koan.Core/Koan.Core.csproj", "src/Koan.Core/"]
 COPY ["src/Koan.Web/Koan.Web.csproj", "src/Koan.Web/"]
 COPY ["src/Koan.Web.Extensions/Koan.Web.Extensions.csproj", "src/Koan.Web.Extensions/"]
 COPY ["src/Koan.Data.Core/Koan.Data.Core.csproj", "src/Koan.Data.Core/"]
-COPY ["src/Koan.Data.Mongo/Koan.Data.Mongo.csproj", "src/Koan.Data.Mongo/"]
-COPY ["src/Koan.Data.Postgres/Koan.Data.Postgres.csproj", "src/Koan.Data.Postgres/"]
-COPY ["src/Koan.Data.Sqlite/Koan.Data.Sqlite.csproj", "src/Koan.Data.Sqlite/"]
+COPY ["src/Koan.Data.Connector.Mongo/Koan.Data.Connector.Mongo.csproj", "src/Koan.Data.Connector.Mongo/"]
+COPY ["src/Koan.Data.Connector.Postgres/Koan.Data.Connector.Postgres.csproj", "src/Koan.Data.Connector.Postgres/"]
+COPY ["src/Koan.Data.Connector.Sqlite/Koan.Data.Connector.Sqlite.csproj", "src/Koan.Data.Connector.Sqlite/"]
 
 # Restore dependencies
 RUN dotnet restore "samples/S10.DevPortal/S10.DevPortal.csproj"

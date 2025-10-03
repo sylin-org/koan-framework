@@ -36,7 +36,7 @@ public class MediaLibraryController : ControllerBase
         // Apply updates
         if (body.Favorite is bool f) entry.Favorite = f;
         if (body.Status is MediaStatus s) entry.Status = s;
-        if (body.Rating is int r) entry.Rating = Math.Clamp(r, 1, 10); // 1-10 scale
+        if (body.Rating is int r) entry.Rating = Math.Clamp(r, 1, 5); // 1-5 scale
         if (body.Progress is int p) entry.Progress = Math.Max(0, p);
         if (body.Notes is string n) entry.Notes = n;
 

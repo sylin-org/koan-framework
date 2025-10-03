@@ -1,4 +1,4 @@
-# S8.Location Implementation Analysis
+﻿# S8.Location Implementation Analysis
 
 **Document Type**: Implementation Analysis  
 **Target Audience**: Developers, Architects  
@@ -11,7 +11,7 @@
 
 The S8.Location sample project demonstrates a canonical location standardization system using SHA512 deduplication and the orchestrator bidirectional pattern. However, the current implementation contains several critical architectural issues that prevent proper operation and diverge from Koan Framework best practices.
 
-**Key Finding**: The implementation attempts to use non-existent APIs and patterns from an older version of Koan.Flow, resulting in a system that cannot function as designed.
+**Key Finding**: The implementation attempts to use non-existent APIs and patterns from an older version of Koan.Canon, resulting in a system that cannot function as designed.
 
 ---
 
@@ -37,7 +37,7 @@ The S8.Location sample project demonstrates a canonical location standardization
 **File**: `src/samples/S8.Location/S8.Location.Core/Interceptors/LocationInterceptor.cs:32-86`
 
 **Problem Details**:
-- Line 32: `FlowInterceptors.For<Models.Location>()` - This fluent API doesn't exist in Koan.Flow.Core
+- Line 32: `FlowInterceptors.For<Models.Location>()` - This fluent API doesn't exist in Koan.Canon.Core
 - Line 44: `services.BuildServiceProvider().GetService<T>()` - Anti-pattern that creates new service provider
 - Hash collision detection drops duplicates instead of retrieving cached canonical IDs
 - Should implement `IFlowIntakeInterceptor<Location>` interface
@@ -118,7 +118,7 @@ The S8.Location sample project demonstrates a canonical location standardization
 
 ### Flow Pipeline Breakdown
 
-The implementation misunderstands Koan.Flow's lifecycle:
+The implementation misunderstands Koan.Canon's lifecycle:
 
 - **Expected**: FlowEntity → Intake Interceptor → Park/Continue → Orchestrator → Canonical
 - **Actual**: FlowEntity → Registration Failure → No Processing
@@ -417,4 +417,4 @@ public async Task<HealthCheckResult> CheckAsync(CancellationToken ct)
 
 **Document Status**: Ready for Implementation  
 **Approval Required**: Architecture Team Sign-off on Flow Integration Approach  
-**Dependencies**: Koan.Flow.Core v0.2.18+ patterns and interfaces
+**Dependencies**: Koan.Canon.Core v0.2.18+ patterns and interfaces

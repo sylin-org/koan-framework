@@ -1,4 +1,4 @@
----
+﻿---
 name: Koan-flow-specialist
 description: Expert in Koan's Flow/Event Sourcing system integrated with Entity<T> patterns. Specializes in implementing flow handlers, projections, materialization engines, dynamic entities, external ID correlation, and event-driven architectures that work seamlessly with multi-provider data storage.
 model: inherit
@@ -344,8 +344,8 @@ public class IdempotentOrderHandler : IFlowEventHandler<OrderCreatedEvent> {
 ```
 
 ## Real Implementation Examples
-- `samples/S8.Flow/` - Complete Flow integration examples
-- `src/Koan.Flow/` - Core Flow implementation patterns
+- `samples/S8.Canon/` - Complete Flow integration examples
+- `src/Koan.Canon/` - Core Flow implementation patterns
 - Flow debugging patterns from CLAUDE.md debugging section
 - Integration with Entity<T> relationship navigation
 - Multi-provider event storage strategies

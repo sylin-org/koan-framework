@@ -61,7 +61,7 @@ dotnet new web
 
   <ItemGroup>
     <!-- Adding this reference automatically enables Postgres -->
-    <PackageReference Include="Koan.Data.Postgres" Version="1.0.0" />
+    <PackageReference Include="Koan.Data.Connector.Postgres" Version="1.0.0" />
   </ItemGroup>
 </Project>
 ```
@@ -87,7 +87,7 @@ using Koan.Core;
 var builder = WebApplication.CreateBuilder(args);
 
 // This single line:
-// 1. Detects you have Koan.Data.Postgres referenced
+// 1. Detects you have Koan.Data.Connector.Postgres referenced
 // 2. Automatically configures PostgreSQL
 // 3. Sets up orchestration-aware connection strings
 builder.Services.AddKoan();
@@ -134,9 +134,9 @@ Now let's add Redis caching to demonstrate multi-service orchestration.
 ```xml
 <!-- MyFirstKoanApp.csproj -->
 <ItemGroup>
-  <PackageReference Include="Koan.Data.Postgres" Version="1.0.0" />
+  <PackageReference Include="Koan.Data.Connector.Postgres" Version="1.0.0" />
   <!-- Adding this automatically provisions Redis -->
-  <PackageReference Include="Koan.Data.Redis" Version="1.0.0" />
+  <PackageReference Include="Koan.Data.Connector.Redis" Version="1.0.0" />
 </ItemGroup>
 ```
 
@@ -144,7 +144,7 @@ Now let's add Redis caching to demonstrate multi-service orchestration.
 ```csharp
 // Models/User.cs
 using Koan.Core;
-using Koan.Data.Redis;
+using Koan.Data.Connector.Redis;
 
 public class User : Entity<User>
 {
@@ -492,8 +492,8 @@ services.AddStackExchangeRedisCache(options =>
 **Koan approach**: Intent through package references
 ```csharp
 // Just add package references in .csproj:
-// <PackageReference Include="Koan.Data.Postgres" />
-// <PackageReference Include="Koan.Data.Redis" />
+// <PackageReference Include="Koan.Data.Connector.Postgres" />
+// <PackageReference Include="Koan.Data.Connector.Redis" />
 
 // Then just:
 services.AddKoan(); // Everything auto-configured
@@ -521,8 +521,8 @@ var products = await Product.All(); // Same across all providers
 **Storage switching example**:
 ```xml
 <!-- Switch from Postgres to MongoDB by changing one reference -->
-<!-- <PackageReference Include="Koan.Data.Postgres" /> -->
-<PackageReference Include="Koan.Data.MongoDB" />
+<!-- <PackageReference Include="Koan.Data.Connector.Postgres" /> -->
+<PackageReference Include="Koan.Data.Connector.MongoDB" />
 ```
 
 **Your entity code doesn't change at all.**
@@ -1077,10 +1077,10 @@ private List<DependencyDescriptor> DiscoverRequiredDependencies()
         StringComparer.OrdinalIgnoreCase);
 
     // Scan for known data providers
-    if (assemblyNames.Contains("Koan.Data.Postgres"))
+    if (assemblyNames.Contains("Koan.Data.Connector.Postgres"))
         dependencies.Add(CreatePostgresDependency());
 
-    if (assemblyNames.Contains("Koan.Data.Redis"))
+    if (assemblyNames.Contains("Koan.Data.Connector.Redis"))
         dependencies.Add(CreateRedisDependency());
 
     if (assemblyNames.Contains("Koan.AI.Ollama"))

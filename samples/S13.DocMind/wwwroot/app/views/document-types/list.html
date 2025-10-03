@@ -1,0 +1,246 @@
+<div class="container-fluid py-4" ng-controller="DocumentTypesController">
+    <!-- Loading State -->
+    <div ng-if="loading" class="d-flex justify-content-center align-items-center" style="min-height: 400px;">
+        <div class="text-center">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-3 text-muted">Loading document types...</p>
+        </div>
+    </div>
+
+    <!-- Document Types Content -->
+    <div ng-if="!loading">
+        <!-- Header -->
+        <div class="row mb-4">
+            <div class="col">
+                <h1 class="h2 mb-1">Document Types</h1>
+                <p class="text-muted">Manage templates for automated document classification and analysis</p>
+            </div>
+            <div class="col-auto">
+                <button class="btn btn-outline-primary me-2" ng-click="refresh()">
+                    <i class="bi bi-arrow-clockwise"></i> Refresh
+                </button>
+                <button class="btn btn-primary" ng-click="createType()">
+                    <i class="bi bi-plus-lg"></i> Create Type
+                </button>
+            </div>
+        </div>
+
+        <!-- Filters and Search -->
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="input-group">
+                    <span class="input-group-text">
+                        <i class="bi bi-search"></i>
+                    </span>
+                    <input type="text" class="form-control" placeholder="Search document types..."
+                           ng-model="filterText">
+                </div>
+            </div>
+            <div class="col-md-3">
+                <select class="form-select" ng-model="sortField">
+                    <option ng-repeat="option in sortOptions" value="{{option.value}}">{{option.label}}</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <div class="btn-group w-100" role="group">
+                    <button type="button" class="btn btn-outline-secondary"
+                            ng-class="{'active': !sortReverse}"
+                            ng-click="sortReverse = false">
+                        <i class="bi bi-sort-down"></i> Ascending
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary"
+                            ng-class="{'active': sortReverse}"
+                            ng-click="sortReverse = true">
+                        <i class="bi bi-sort-up"></i> Descending
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bulk Actions -->
+        <div class="row mb-3" ng-if="selectedTypes.length > 0">
+            <div class="col">
+                <div class="alert alert-info d-flex justify-content-between align-items-center">
+                    <span>
+                        <i class="bi bi-check-square me-2"></i>
+                        {{selectedTypes.length}} type(s) selected
+                    </span>
+                    <div class="btn-group" role="group">
+                        <button class="btn btn-sm btn-outline-success" ng-click="bulkActivate()">
+                            <i class="bi bi-check-circle"></i> Activate
+                        </button>
+                        <button class="btn btn-sm btn-outline-warning" ng-click="bulkDeactivate()">
+                            <i class="bi bi-pause-circle"></i> Deactivate
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger" ng-click="bulkDelete()">
+                            <i class="bi bi-trash"></i> Delete
+                        </button>
+                        <button class="btn btn-sm btn-outline-secondary" ng-click="clearSelection()">
+                            <i class="bi bi-x"></i> Clear
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Document Types Grid/List -->
+        <div class="row" ng-if="filteredTypes().length === 0">
+            <div class="col">
+                <div class="text-center py-5">
+                    <i class="bi bi-tags display-4 text-muted"></i>
+                    <h4 class="mt-3 text-muted">No document types found</h4>
+                    <p class="text-muted" ng-if="filterText">
+                        Try adjusting your search to see more results.
+                    </p>
+                    <p class="text-muted" ng-if="!filterText">
+                        Create your first document type to start classifying documents.
+                    </p>
+                    <button class="btn btn-primary mt-2" ng-click="createType()">
+                        <i class="bi bi-plus-lg"></i> Create Document Type
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Document Types Cards -->
+        <div class="row" ng-if="filteredTypes().length > 0">
+            <div ng-repeat="type in filteredTypes()" class="col-lg-6 col-xl-4 mb-4">
+                <div class="card h-100 border-0 shadow-sm">
+                    <!-- Card Header -->
+                    <div class="card-header bg-white border-bottom-0 pb-0">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox"
+                                       ng-checked="isTypeSelected(type)"
+                                       ng-click="toggleTypeSelection(type)">
+                            </div>
+                            <div class="text-center flex-grow-1">
+                                <i class="{{getTypeIcon(type)}} display-6 text-primary mb-2"></i>
+                                <h5 class="card-title mb-1">{{type.name}}</h5>
+                                <span class="badge {{getStatusClass(type)}} mb-2">{{getStatusLabel(type)}}</span>
+                            </div>
+                            <div class="dropdown">
+                                <button class="btn btn-sm btn-outline-secondary" type="button"
+                                        data-bs-toggle="dropdown" aria-expanded="false">
+                                    <i class="bi bi-three-dots-vertical"></i>
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end">
+                                    <li><a class="dropdown-item" href="#" ng-click="viewType(type)">
+                                        <i class="bi bi-eye me-2"></i>View Details
+                                    </a></li>
+                                    <li><a class="dropdown-item" href="#" ng-click="editType(type)">
+                                        <i class="bi bi-pencil me-2"></i>Edit
+                                    </a></li>
+                                    <li><a class="dropdown-item" href="#" ng-click="duplicateType(type)">
+                                        <i class="bi bi-files me-2"></i>Duplicate
+                                    </a></li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li><a class="dropdown-item text-danger" href="#" ng-click="deleteType(type)">
+                                        <i class="bi bi-trash me-2"></i>Delete
+                                    </a></li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Card Body -->
+                    <div class="card-body">
+                        <p class="card-text text-muted small mb-3" style="min-height: 3rem;">
+                            {{type.description || 'No description provided'}}
+                        </p>
+
+                        <!-- Type Statistics -->
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <div class="text-center">
+                                    <div class="fw-bold text-primary">{{type.fileCount || 0}}</div>
+                                    <small class="text-muted">Files</small>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="text-center">
+                                    <div class="fw-bold text-success">{{type.analysisCount || 0}}</div>
+                                    <small class="text-muted">Analyses</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Type Details -->
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <small class="text-muted">Created:</small>
+                                <small class="text-muted">{{formatDate(type.createdAt)}}</small>
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center" ng-if="type.lastUsed">
+                                <small class="text-muted">Last Used:</small>
+                                <small class="text-muted">{{formatDate(type.lastUsed)}}</small>
+                            </div>
+                        </div>
+
+                        <!-- Extraction Prompt Preview -->
+                        <div ng-if="type.extractionPrompt" class="mb-3">
+                            <small class="text-muted d-block mb-1">Extraction Prompt:</small>
+                            <div class="bg-light rounded p-2">
+                                <small class="text-muted font-monospace">
+                                    {{type.extractionPrompt.length > 100 ?
+                                      (type.extractionPrompt | limitTo: 100) + '...' :
+                                      type.extractionPrompt}}
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Card Footer -->
+                    <div class="card-footer bg-white border-top-0 pt-0">
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-center">
+                            <button class="btn btn-outline-primary btn-sm" ng-click="viewType(type)">
+                                <i class="bi bi-eye me-1"></i> View
+                            </button>
+                            <button class="btn btn-outline-secondary btn-sm" ng-click="editType(type)">
+                                <i class="bi bi-pencil me-1"></i> Edit
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Results Summary -->
+        <div class="row mt-3" ng-if="filteredTypes().length > 0">
+            <div class="col">
+                <div class="d-flex justify-content-between align-items-center">
+                    <small class="text-muted">
+                        Showing {{filteredTypes().length}} of {{documentTypes.length}} document types
+                        <span ng-if="selectedTypes.length > 0"> • {{selectedTypes.length}} selected</span>
+                    </small>
+                    <div ng-if="selectedTypes.length === 0">
+                        <button class="btn btn-sm btn-outline-secondary me-2" ng-click="selectAllTypes()">
+                            <i class="bi bi-check-all"></i> Select All
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.card {
+    transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1) !important;
+}
+
+.form-check-input {
+    margin-top: 0.1rem;
+}
+
+.dropdown-toggle::after {
+    display: none;
+}
+</style>

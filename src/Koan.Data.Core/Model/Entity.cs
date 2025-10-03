@@ -3,10 +3,14 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Koan.Data.Abstractions;
+using Koan.Data.Core;
+using Koan.Data.Core.Transfers;
+using Koan.Data.Core.Events;
 using Koan.Data.Core.Relationships;
 
 namespace Koan.Data.Core.Model
@@ -53,24 +57,47 @@ namespace Koan.Data.Core.Model
         }
         // Example usage:
         // var result = GetMethodDelegate(typeof(TEntity), "FacadeMethodName")(entity, new object?[] { arg1, arg2 });
-    [Key]
+        [Key]
         public virtual TKey Id { get; set; } = default!;
+
+        public static EntityEventsBuilder<TEntity, TKey> Events => EntityEventRegistry<TEntity, TKey>.Builder;
 
         // Static conveniences forward to the data facade without exposing its namespace in domain types
         public static Task<TEntity?> Get(TKey id, CancellationToken ct = default)
-            => Data<TEntity, TKey>.GetAsync(id, ct);
-        // Set-aware variants
-        public static Task<TEntity?> Get(TKey id, string set, CancellationToken ct = default)
-            => Data<TEntity, TKey>.GetAsync(id, set, ct);
+            => EntityEventExecutor<TEntity, TKey>.ExecuteLoadAsync(token => Data<TEntity, TKey>.GetAsync(id, token), ct);
+        // Partition-aware variants
+        public static Task<TEntity?> Get(TKey id, string partition, CancellationToken ct = default)
+            => EntityEventExecutor<TEntity, TKey>.ExecuteLoadAsync(token => Data<TEntity, TKey>.GetAsync(id, partition, token), ct);
 
         public static Task<IReadOnlyList<TEntity>> All(CancellationToken ct = default)
             => Data<TEntity, TKey>.All(ct);
-        public static Task<IReadOnlyList<TEntity>> All(string set, CancellationToken ct = default)
-            => Data<TEntity, TKey>.All(set, ct);
+
+        public static Task<IReadOnlyList<TEntity>> All(DataQueryOptions? options, CancellationToken ct = default)
+            => Data<TEntity, TKey>.All(options, ct);
+
+        public static Task<QueryResult<TEntity>> AllWithCount(DataQueryOptions? options = null, CancellationToken ct = default)
+            => Data<TEntity, TKey>.AllWithCount(options, ct);
+        public static Task<IReadOnlyList<TEntity>> All(string partition, CancellationToken ct = default)
+            => Data<TEntity, TKey>.All(partition, ct);
+        public static Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
+            => Data<TEntity, TKey>.Query(predicate, ct);
+
+        public static Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, DataQueryOptions? options, CancellationToken ct = default)
+            => Data<TEntity, TKey>.Query(predicate, options, ct);
+
+        public static Task<QueryResult<TEntity>> QueryWithCount(Expression<Func<TEntity, bool>> predicate, DataQueryOptions? options = null, CancellationToken ct = default)
+            => Data<TEntity, TKey>.QueryWithCount(predicate, options, ct);
+
         public static Task<IReadOnlyList<TEntity>> Query(string query, CancellationToken ct = default)
             => Data<TEntity, TKey>.Query(query, ct);
-        public static Task<IReadOnlyList<TEntity>> Query(string query, string set, CancellationToken ct = default)
-            => Data<TEntity, TKey>.Query(query, set, ct);
+
+        public static Task<IReadOnlyList<TEntity>> Query(string query, DataQueryOptions? options, CancellationToken ct = default)
+            => Data<TEntity, TKey>.Query(query, options, ct);
+
+        public static Task<QueryResult<TEntity>> QueryWithCount(string query, DataQueryOptions? options = null, CancellationToken ct = default)
+            => Data<TEntity, TKey>.QueryWithCount(query, options, ct);
+        public static Task<IReadOnlyList<TEntity>> Query(string query, string partition, CancellationToken ct = default)
+            => Data<TEntity, TKey>.Query(query, partition, ct);
 
         // Streaming (IAsyncEnumerable)
         public static IAsyncEnumerable<TEntity> AllStream(int? batchSize = null, CancellationToken ct = default)
@@ -89,50 +116,267 @@ namespace Koan.Data.Core.Model
             => Data<TEntity, TKey>.CountAllAsync(ct);
         public static Task<int> Count(string query, CancellationToken ct = default)
             => Data<TEntity, TKey>.CountAsync(query, ct);
-        public static Task<int> CountAll(string set, CancellationToken ct = default)
-            => Data<TEntity, TKey>.CountAllAsync(set, ct);
-        public static Task<int> Count(string query, string set, CancellationToken ct = default)
-            => Data<TEntity, TKey>.CountAsync(query, set, ct);
+        public static Task<int> CountAll(string partition, CancellationToken ct = default)
+            => Data<TEntity, TKey>.CountAllAsync(partition, ct);
+        public static Task<int> Count(string query, string partition, CancellationToken ct = default)
+            => Data<TEntity, TKey>.CountAsync(query, partition, ct);
 
         public static IBatchSet<TEntity, TKey> Batch() => Data<TEntity, TKey>.Batch();
 
-        public static Task<int> UpsertMany(IEnumerable<TEntity> models, CancellationToken ct = default)
-            => Data<TEntity, TKey>.UpsertManyAsync(models, ct);
+        public static CopyTransferBuilder<TEntity, TKey> Copy()
+            => new(null, null);
+
+        public static CopyTransferBuilder<TEntity, TKey> Copy(Expression<Func<TEntity, bool>> predicate)
+            => new(predicate ?? throw new ArgumentNullException(nameof(predicate)), null);
+
+        public static CopyTransferBuilder<TEntity, TKey> Copy(Func<IQueryable<TEntity>, IQueryable<TEntity>> query)
+            => new(null, query ?? throw new ArgumentNullException(nameof(query)));
+
+        public static MoveTransferBuilder<TEntity, TKey> Move()
+            => new(null, null);
+
+        public static MoveTransferBuilder<TEntity, TKey> Move(Expression<Func<TEntity, bool>> predicate)
+            => new(predicate ?? throw new ArgumentNullException(nameof(predicate)), null);
+
+        public static MoveTransferBuilder<TEntity, TKey> Move(Func<IQueryable<TEntity>, IQueryable<TEntity>> query)
+            => new(null, query ?? throw new ArgumentNullException(nameof(query)));
+
+        public static MirrorTransferBuilder<TEntity, TKey> Mirror(MirrorMode mode = MirrorMode.Push)
+            => new(mode, null, null);
+
+        public static MirrorTransferBuilder<TEntity, TKey> Mirror(Expression<Func<TEntity, bool>> predicate, MirrorMode mode = MirrorMode.Push)
+            => new(mode, predicate ?? throw new ArgumentNullException(nameof(predicate)), null);
+
+        public static MirrorTransferBuilder<TEntity, TKey> Mirror(Func<IQueryable<TEntity>, IQueryable<TEntity>> query, MirrorMode mode = MirrorMode.Push)
+            => new(mode, null, query ?? throw new ArgumentNullException(nameof(query)));
+
+        public static Task<TEntity> UpsertAsync(TEntity model, CancellationToken ct = default)
+        {
+            if (model is null) throw new ArgumentNullException(nameof(model));
+
+            return EntityEventExecutor<TEntity, TKey>.ExecuteUpsertAsync(
+                model,
+                (entity, token) => Data<TEntity, TKey>.UpsertAsync(entity, token),
+                token => LoadPriorSnapshotAsync(model, token),
+                ct);
+        }
+
+        public static Task<TEntity> UpsertAsync(TEntity model, string partition, CancellationToken ct = default)
+        {
+            if (model is null) throw new ArgumentNullException(nameof(model));
+            if (string.IsNullOrWhiteSpace(partition)) throw new ArgumentException("Partition must be provided.", nameof(partition));
+
+            return EntityEventExecutor<TEntity, TKey>.ExecuteUpsertAsync(
+                model,
+                (entity, token) => Data<TEntity, TKey>.UpsertAsync(entity, partition, token),
+                token => LoadPriorSnapshotAsync(model, token, partition),
+                ct);
+        }
+
+        public static async Task<int> UpsertMany(IEnumerable<TEntity> models, CancellationToken ct = default)
+        {
+            if (models is null) throw new ArgumentNullException(nameof(models));
+
+            var list = models as IReadOnlyList<TEntity> ?? models.ToList();
+            return await EntityEventExecutor<TEntity, TKey>.ExecuteUpsertManyAsync(
+                    list,
+                    (payload, token) => Data<TEntity, TKey>.UpsertManyAsync(payload, token),
+                    (entity, token) => LoadPriorSnapshotAsync(entity, token),
+                    ct)
+                .ConfigureAwait(false);
+        }
+
+        public static async Task<int> UpsertMany(IEnumerable<TEntity> models, string partition, CancellationToken ct = default)
+        {
+            if (models is null) throw new ArgumentNullException(nameof(models));
+            if (string.IsNullOrWhiteSpace(partition)) throw new ArgumentException("Partition must be provided.", nameof(partition));
+
+            var list = models as IReadOnlyList<TEntity> ?? models.ToList();
+            return await EntityEventExecutor<TEntity, TKey>.ExecuteUpsertManyAsync(
+                list,
+                (payload, token) => Data<TEntity, TKey>.UpsertManyAsync(payload, partition, token),
+                (entity, token) => LoadPriorSnapshotAsync(entity, token, partition),
+                ct)
+            .ConfigureAwait(false);
+        }
 
         // Removal helpers
         public static Task<bool> Remove(TKey id, CancellationToken ct = default)
-            => Data<TEntity, TKey>.DeleteAsync(id, ct);
+            => EntityEventExecutor<TEntity, TKey>.ExecuteRemoveAsync(
+                id,
+                token => Data<TEntity, TKey>.GetAsync(id, token),
+                (entity, token) => Data<TEntity, TKey>.DeleteAsync(entity.Id, token),
+                ct);
 
-        public static Task<int> Remove(IEnumerable<TKey> ids, CancellationToken ct = default)
-            => Data<TEntity, TKey>.DeleteManyAsync(ids, ct);
+        public static Task<bool> Remove(TKey id, DataQueryOptions? options, CancellationToken ct = default)
+        {
+            if (options?.Partition is string partition && !string.IsNullOrWhiteSpace(partition))
+            {
+                return Remove(id, partition, ct);
+            }
 
-        // Set-aware removal helpers
-        public static Task<bool> Remove(TKey id, string set, CancellationToken ct = default)
-            => Data<TEntity, TKey>.DeleteAsync(id, set, ct);
+            return Remove(id, ct);
+        }
 
-        public static Task<int> Remove(IEnumerable<TKey> ids, string set, CancellationToken ct = default)
-            => Data<TEntity, TKey>.DeleteManyAsync(ids, set, ct);
+        public static async Task<int> Remove(IEnumerable<TKey> ids, CancellationToken ct = default)
+        {
+            if (ids is null) throw new ArgumentNullException(nameof(ids));
+
+            var list = ids as IReadOnlyList<TKey> ?? ids.ToList();
+            if (!EntityEventRegistry<TEntity, TKey>.HasRemovePipeline)
+            {
+                return await Data<TEntity, TKey>.DeleteManyAsync(list, ct).ConfigureAwait(false);
+            }
+
+            var entities = await LoadEntitiesAsync(list, null, ct).ConfigureAwait(false);
+            if (entities.Count == 0)
+            {
+                return 0;
+            }
+
+            return await EntityEventExecutor<TEntity, TKey>.ExecuteRemoveManyAsync(
+                    entities,
+                    (payload, token) => Data<TEntity, TKey>.DeleteManyAsync(ExtractKeys(payload), token),
+                    ct)
+                .ConfigureAwait(false);
+        }
+
+        public static Task<int> Remove(IEnumerable<TKey> ids, DataQueryOptions? options, CancellationToken ct = default)
+        {
+            if (options?.Partition is string partition && !string.IsNullOrWhiteSpace(partition))
+            {
+                return Remove(ids, partition, ct);
+            }
+
+            return Remove(ids, ct);
+        }
+
+        // Partition-aware removal helpers
+        public static Task<bool> Remove(TKey id, string partition, CancellationToken ct = default)
+        {
+            if (string.IsNullOrWhiteSpace(partition)) throw new ArgumentException("Partition must be provided.", nameof(partition));
+
+            return EntityEventExecutor<TEntity, TKey>.ExecuteRemoveAsync(
+                id,
+                token => Data<TEntity, TKey>.GetAsync(id, partition, token),
+                (entity, token) => Data<TEntity, TKey>.DeleteAsync(entity.Id, partition, token),
+                ct);
+        }
+
+        public static async Task<int> Remove(IEnumerable<TKey> ids, string partition, CancellationToken ct = default)
+        {
+            if (ids is null) throw new ArgumentNullException(nameof(ids));
+            if (string.IsNullOrWhiteSpace(partition)) throw new ArgumentException("Partition must be provided.", nameof(partition));
+
+            var list = ids as IReadOnlyList<TKey> ?? ids.ToList();
+            if (!EntityEventRegistry<TEntity, TKey>.HasRemovePipeline)
+            {
+                return await Data<TEntity, TKey>.DeleteManyAsync(list, partition, ct).ConfigureAwait(false);
+            }
+
+            var entities = await LoadEntitiesAsync(list, partition, ct).ConfigureAwait(false);
+            if (entities.Count == 0)
+            {
+                return 0;
+            }
+
+            return await EntityEventExecutor<TEntity, TKey>.ExecuteRemoveManyAsync(
+                    entities,
+                    (payload, token) => Data<TEntity, TKey>.DeleteManyAsync(ExtractKeys(payload), partition, token),
+                    ct)
+                .ConfigureAwait(false);
+        }
+
+        private static ValueTask<TEntity?> LoadPriorSnapshotAsync(TEntity entity, CancellationToken cancellationToken, string? partition = null)
+        {
+            if (entity is null) throw new ArgumentNullException(nameof(entity));
+
+            var key = entity.Id;
+            if (EqualityComparer<TKey>.Default.Equals(key, default!))
+            {
+                return new ValueTask<TEntity?>((TEntity?)null);
+            }
+
+            return partition is null
+                ? new ValueTask<TEntity?>(Data<TEntity, TKey>.GetAsync(key, cancellationToken))
+                : new ValueTask<TEntity?>(Data<TEntity, TKey>.GetAsync(key, partition, cancellationToken));
+        }
+
+        private static async Task<IReadOnlyList<TEntity>> LoadEntitiesAsync(IReadOnlyList<TKey> ids, string? partition, CancellationToken cancellationToken)
+        {
+            var results = new List<TEntity>(ids.Count);
+            foreach (var id in ids)
+            {
+                var entity = partition is null
+                    ? await Data<TEntity, TKey>.GetAsync(id, cancellationToken).ConfigureAwait(false)
+                    : await Data<TEntity, TKey>.GetAsync(id, partition, cancellationToken).ConfigureAwait(false);
+
+                if (entity != null)
+                {
+                    results.Add(entity);
+                }
+            }
+
+            return results;
+        }
+
+        private static IEnumerable<TKey> ExtractKeys(IReadOnlyList<TEntity> entities)
+        {
+            for (var i = 0; i < entities.Count; i++)
+            {
+                yield return entities[i].Id;
+            }
+        }
 
         public static async Task<int> Remove(string query, CancellationToken ct = default)
         {
-            var items = await Data<TEntity, TKey>.Query(query, ct);
-            var ids = Enumerable.Select<TEntity, TKey>(items, e => e.Id);
-            return await Data<TEntity, TKey>.DeleteManyAsync(ids, ct);
+            var items = await Data<TEntity, TKey>.Query(query, ct).ConfigureAwait(false);
+            if (!EntityEventRegistry<TEntity, TKey>.HasRemovePipeline)
+            {
+                return await Data<TEntity, TKey>.DeleteManyAsync(items.Select(e => e.Id), ct).ConfigureAwait(false);
+            }
+
+            if (items.Count == 0)
+            {
+                return 0;
+            }
+
+            return await EntityEventExecutor<TEntity, TKey>.ExecuteRemoveManyAsync(
+                    items,
+                    (payload, token) => Data<TEntity, TKey>.DeleteManyAsync(ExtractKeys(payload), token),
+                    ct)
+                .ConfigureAwait(false);
         }
 
-        public static async Task<int> Remove(string query, string set, CancellationToken ct = default)
+        public static async Task<int> Remove(string query, string partition, CancellationToken ct = default)
         {
-            var items = await Data<TEntity, TKey>.Query(query, set, ct);
-            var ids = Enumerable.Select<TEntity, TKey>(items, e => e.Id);
-            return await Data<TEntity, TKey>.DeleteManyAsync(ids, set, ct);
+            var items = await Data<TEntity, TKey>.Query(query, partition, ct).ConfigureAwait(false);
+            if (!EntityEventRegistry<TEntity, TKey>.HasRemovePipeline)
+            {
+                return await Data<TEntity, TKey>.DeleteManyAsync(items.Select(e => e.Id), partition, ct).ConfigureAwait(false);
+            }
+
+            if (items.Count == 0)
+            {
+                return 0;
+            }
+
+            return await EntityEventExecutor<TEntity, TKey>.ExecuteRemoveManyAsync(
+                    items,
+                    (payload, token) => Data<TEntity, TKey>.DeleteManyAsync(ExtractKeys(payload), partition, token),
+                    ct)
+                .ConfigureAwait(false);
         }
 
         public static Task<int> RemoveAll(CancellationToken ct = default)
             => Data<TEntity, TKey>.DeleteAllAsync(ct);
 
+        public static Task<int> RemoveAll(DataQueryOptions? options, CancellationToken ct = default)
+            => Data<TEntity, TKey>.DeleteAllAsync(options, ct);
+
         // Instance self-remove
         public Task<bool> Remove(CancellationToken ct = default)
-            => Data<TEntity, TKey>.DeleteAsync(Id, ct);
+            => Remove(Id, ct);
 
         // Instance-based relationship navigation methods
 
@@ -511,3 +755,5 @@ public static class EntityMetadataProvider
 {
     public static Func<IServiceProvider, IRelationshipMetadata>? RelationshipMetadataAccessor;
 }
+
+

@@ -80,10 +80,11 @@ source: src/Koan.Data.Core/
 ## Compatibility and migrations
 
 - Target frameworks: net9.0
-- Works with: Koan.Data.Sqlite, SqlServer, Postgres, Redis, Mongo, Vector providers
+- Works with: Koan.Data.Connector.Sqlite, SqlServer, Postgres, Redis, Mongo, Vector providers
 
 ## References
 
 - ADR ARCH-0040 - config and constants naming: `/docs/decisions/ARCH-0040-config-and-constants-naming.md`
 - ADR DATA-0061 - paging/streaming semantics: `/docs/decisions/DATA-0061-data-access-pagination-and-streaming.md`
 - Engineering guardrails: `/docs/engineering/index.md`
+

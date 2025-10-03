@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <AssemblyName>Koan.Data.Connector.OpenSearch</AssemblyName>
+    <RootNamespace>Koan.Data.Connector.OpenSearch</RootNamespace>
+    <Description>OpenSearch vector adapter for Koan: index provisioning, kNN search, metadata filtering and health checks via the OpenSearch REST API.</Description>
+    <PackageTags>$(CommonPackageTags);data;vector;opensearch;knn</PackageTags>
+    <Version>0.6.3</Version>
+    <AssemblyVersion>0.6.3</AssemblyVersion>
+    <FileVersion>0.6.3</FileVersion>
+  </PropertyGroup>
+  <ItemGroup>
+  <ProjectReference Include="..\..\..\Koan.Data.Abstractions\Koan.Data.Abstractions.csproj" />
+  <ProjectReference Include="..\..\..\Koan.Data.Vector.Abstractions\Koan.Data.Vector.Abstractions.csproj" />
+  <ProjectReference Include="..\..\..\Koan.Data.Core\Koan.Data.Core.csproj" />
+  <ProjectReference Include="..\..\..\Koan.Core\Koan.Core.csproj" />
+  <ProjectReference Include="..\..\..\Koan.Orchestration.Abstractions\Koan.Orchestration.Abstractions.csproj" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.0-rc.1.25451.107" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+  </ItemGroup>
+</Project>

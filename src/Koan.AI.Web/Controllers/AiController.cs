@@ -1,6 +1,9 @@
+using System;
+using System.Collections.Generic;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Koan.AI.Contracts;
+using Koan.AI.Contracts.Adapters;
 using Koan.AI.Contracts.Models;
 using Koan.AI.Contracts.Routing;
 
@@ -55,6 +58,18 @@ public sealed class AiController : ControllerBase
         return Ok(caps);
     }
 
+    [HttpPost(Constants.Routes.AdapterModelInstall)]
+    public Task<IActionResult> InstallModel(string adapterId, [FromBody] AiModelOperationRequest request, CancellationToken ct)
+        => ExecuteModelOperationAsync(adapterId, request, static (manager, payload, token) => manager.EnsureInstalledAsync(payload, token), ct);
+
+    [HttpPost(Constants.Routes.AdapterModelRefresh)]
+    public Task<IActionResult> RefreshModel(string adapterId, [FromBody] AiModelOperationRequest request, CancellationToken ct)
+        => ExecuteModelOperationAsync(adapterId, request, static (manager, payload, token) => manager.RefreshAsync(payload, token), ct);
+
+    [HttpPost(Constants.Routes.AdapterModelFlush)]
+    public Task<IActionResult> FlushModel(string adapterId, [FromBody] AiModelOperationRequest request, CancellationToken ct)
+        => ExecuteModelOperationAsync(adapterId, request, static (manager, payload, token) => manager.FlushAsync(payload, token), ct);
+
     [HttpPost(Constants.Routes.Chat)]
     public async Task<ActionResult<AiChatResponse>> Chat([FromBody] AiChatRequest request, CancellationToken ct)
     {
@@ -85,5 +100,57 @@ public sealed class AiController : ControllerBase
     {
         var res = await _ai.EmbedAsync(request, ct).ConfigureAwait(false);
         return Ok(res);
+    }
+
+    private async Task<IActionResult> ExecuteModelOperationAsync(
+        string adapterId,
+        AiModelOperationRequest request,
+        Func<IAiModelManager, AiModelOperationRequest, CancellationToken, Task<AiModelOperationResult>> operation,
+        CancellationToken ct)
+    {
+        if (request is null)
+        {
+            return BadRequest(new { message = "Model operation payload is required." });
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Model))
+        {
+            return BadRequest(new { message = "Model name is required." });
+        }
+
+        var adapter = _registry.Get(adapterId);
+        if (adapter is null)
+        {
+            return NotFound(new { message = $"Adapter '{adapterId}' was not found." });
+        }
+
+        if (adapter.ModelManager is not IAiModelManager manager)
+        {
+            return StatusCode(StatusCodes.Status405MethodNotAllowed, new { message = $"Adapter '{adapterId}' does not support model management." });
+        }
+
+        var normalized = request with
+        {
+            Model = request.Model.Trim(),
+            Provenance = request.Provenance ?? new AiModelProvenance
+            {
+                RequestedBy = "ai-api",
+                Reason = "manual",
+                RequestedAt = DateTimeOffset.UtcNow,
+                Metadata = new Dictionary<string, string>
+                {
+                    ["adapter_id"] = adapter.Id,
+                    ["operation"] = operation.Method.Name
+                }
+            }
+        };
+
+        var result = await operation(manager, normalized, ct).ConfigureAwait(false);
+        if (!result.Success)
+        {
+            return StatusCode(StatusCodes.Status502BadGateway, result);
+        }
+
+        return Ok(result);
     }
 }

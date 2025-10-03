@@ -1,0 +1,168 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using S13.DocMind.Infrastructure;
+using S13.DocMind.Models;
+
+namespace S13.DocMind.Services;
+
+public interface IDocumentInsightsService
+{
+    Task<DocumentInsightsOverviewResponse> GetOverviewAsync(CancellationToken cancellationToken);
+    Task<DocumentProfileCollectionsResponse> GetProfileCollectionsAsync(string profileId, CancellationToken cancellationToken);
+    Task<DocumentAggregationFeedResponse> GetAggregationFeedAsync(CancellationToken cancellationToken);
+}
+
+public sealed class DocumentInsightsService : IDocumentInsightsService
+{
+    private const string ProjectionId = "global";
+    private readonly TimeProvider _clock;
+    private readonly IDocumentDiscoveryRefreshScheduler _refreshScheduler;
+
+    public DocumentInsightsService(TimeProvider clock, IDocumentDiscoveryRefreshScheduler refreshScheduler)
+    {
+        _clock = clock;
+        _refreshScheduler = refreshScheduler;
+    }
+
+    public async Task<DocumentInsightsOverviewResponse> GetOverviewAsync(CancellationToken cancellationToken)
+    {
+        var projection = await EnsureProjectionAsync(cancellationToken).ConfigureAwait(false);
+        return new DocumentInsightsOverviewResponse
+        {
+            RefreshedAt = projection.RefreshedAt,
+            RefreshDurationSeconds = projection.RefreshDurationSeconds,
+            Overview = projection.Overview,
+            Queue = projection.Queue
+        };
+    }
+
+    public async Task<DocumentProfileCollectionsResponse> GetProfileCollectionsAsync(string profileId, CancellationToken cancellationToken)
+    {
+        var projection = await EnsureProjectionAsync(cancellationToken).ConfigureAwait(false);
+        var collections = string.IsNullOrWhiteSpace(profileId)
+            ? projection.Collections
+            : projection.Collections
+                .Where(summary => string.Equals(summary.ProfileId, profileId, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+        return new DocumentProfileCollectionsResponse
+        {
+            RefreshedAt = projection.RefreshedAt,
+            RefreshDurationSeconds = projection.RefreshDurationSeconds,
+            Collections = collections
+        };
+    }
+
+    public async Task<DocumentAggregationFeedResponse> GetAggregationFeedAsync(CancellationToken cancellationToken)
+    {
+        var projection = await EnsureProjectionAsync(cancellationToken).ConfigureAwait(false);
+        return new DocumentAggregationFeedResponse
+        {
+            RefreshedAt = projection.RefreshedAt,
+            RefreshDurationSeconds = projection.RefreshDurationSeconds,
+            Feed = projection.Feed,
+            Queue = projection.Queue
+        };
+    }
+
+    private async Task<DocumentDiscoveryProjection> EnsureProjectionAsync(CancellationToken cancellationToken)
+    {
+        var projection = await DocumentDiscoveryProjection.Get(ProjectionId, cancellationToken).ConfigureAwait(false);
+        if (projection is null)
+        {
+            await _refreshScheduler.EnsureRefreshAsync("cold-start", cancellationToken).ConfigureAwait(false);
+            projection = await DocumentDiscoveryProjection.Get(ProjectionId, cancellationToken).ConfigureAwait(false);
+        }
+        else if ((_clock.GetUtcNow() - projection.RefreshedAt) > TimeSpan.FromMinutes(5))
+        {
+            await _refreshScheduler.EnsureRefreshAsync("stale-read", cancellationToken).ConfigureAwait(false);
+        }
+
+        return projection ?? new DocumentDiscoveryProjection
+        {
+            RefreshedAt = _clock.GetUtcNow(),
+            Queue = new DocumentQueueProjection { AsOf = _clock.GetUtcNow() }
+        };
+    }
+}
+
+public sealed class DocumentInsightsOverviewResponse
+{
+    public DateTimeOffset RefreshedAt { get; set; }
+    public double? RefreshDurationSeconds { get; set; }
+    public DocumentInsightsOverview Overview { get; set; } = new();
+    public DocumentQueueProjection Queue { get; set; } = new();
+}
+
+public sealed class DocumentProfileCollectionsResponse
+{
+    public DateTimeOffset RefreshedAt { get; set; }
+    public double? RefreshDurationSeconds { get; set; }
+    public IReadOnlyCollection<DocumentCollectionSummary> Collections { get; set; }
+        = Array.Empty<DocumentCollectionSummary>();
+}
+
+public sealed class DocumentAggregationFeedResponse
+{
+    public DateTimeOffset RefreshedAt { get; set; }
+    public double? RefreshDurationSeconds { get; set; }
+    public IReadOnlyCollection<AggregationFeedItem> Feed { get; set; }
+        = Array.Empty<AggregationFeedItem>();
+    public DocumentQueueProjection Queue { get; set; } = new();
+}
+
+public sealed class DocumentInsightsOverview
+{
+    public int TotalDocuments { get; set; }
+    public int CompletedDocuments { get; set; }
+    public int ActiveDocuments { get; set; }
+    public int FailedDocuments { get; set; }
+    public double AverageConfidence { get; set; }
+    public IReadOnlyCollection<DocumentProfileUsage> TopProfiles { get; set; } = Array.Empty<DocumentProfileUsage>();
+    public IReadOnlyCollection<RecentDocumentInsight> RecentDocuments { get; set; } = Array.Empty<RecentDocumentInsight>();
+}
+
+public sealed class DocumentProfileUsage
+{
+    public string ProfileId { get; set; } = string.Empty;
+    public int DocumentCount { get; set; }
+    public DateTimeOffset? LastUsed { get; set; }
+}
+
+public sealed class RecentDocumentInsight
+{
+    public string DocumentId { get; set; } = string.Empty;
+    public string FileName { get; set; } = string.Empty;
+    public DocumentProcessingStatus Status { get; set; }
+    public DateTimeOffset LastProcessedAt { get; set; }
+    public string? AssignedProfileId { get; set; }
+}
+
+public sealed class DocumentCollectionSummary
+{
+    public string ProfileId { get; set; } = string.Empty;
+    public int DocumentCount { get; set; }
+    public double AverageConfidence { get; set; }
+    public IReadOnlyCollection<CollectionDocumentSummary> LatestDocuments { get; set; } = Array.Empty<CollectionDocumentSummary>();
+}
+
+public sealed class CollectionDocumentSummary
+{
+    public string DocumentId { get; set; } = string.Empty;
+    public string FileName { get; set; } = string.Empty;
+    public DocumentProcessingStatus Status { get; set; }
+    public DateTimeOffset LastProcessedAt { get; set; }
+}
+
+public sealed class AggregationFeedItem
+{
+    public string DocumentId { get; set; } = string.Empty;
+    public string FileName { get; set; } = string.Empty;
+    public DocumentProcessingStatus Status { get; set; }
+    public string Summary { get; set; } = string.Empty;
+    public DateTimeOffset LastUpdated { get; set; }
+    public int InsightCount { get; set; }
+}

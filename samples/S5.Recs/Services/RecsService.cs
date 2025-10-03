@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 using S5.Recs.Infrastructure;
 using S5.Recs.Models;
 using Koan.AI.Contracts;
@@ -17,6 +18,7 @@ internal sealed class RecsService : IRecsService
     private readonly IServiceProvider _sp;
     private readonly IConfiguration _configuration;
     private readonly ILogger<RecsService>? _logger;
+    private readonly IOptions<S5.Recs.Options.TagCatalogOptions>? _tagOptions;
 
     // Demo data for fallback scenarios
     private readonly List<Media> _demoMedia = new()
@@ -65,11 +67,12 @@ internal sealed class RecsService : IRecsService
         }
     };
 
-    public RecsService(IServiceProvider sp, IConfiguration configuration, ILogger<RecsService>? logger = null)
+    public RecsService(IServiceProvider sp, IConfiguration configuration, ILogger<RecsService>? logger = null, IOptions<S5.Recs.Options.TagCatalogOptions>? tagOptions = null)
     {
         _sp = sp;
         _configuration = configuration;
         _logger = logger;
+        _tagOptions = tagOptions;
     }
 
     public async Task<(IReadOnlyList<Recommendation> items, bool degraded)> QueryAsync(
@@ -84,6 +87,10 @@ internal sealed class RecsService : IRecsService
         double? preferWeight,
         string? sort,
         string? mediaTypeFilter,
+        double? ratingMin,
+        double? ratingMax,
+        int? yearMin,
+        int? yearMax,
         CancellationToken ct)
     {
         // Guardrails
@@ -115,7 +122,7 @@ internal sealed class RecsService : IRecsService
                     }
 
                     // Apply filters
-                    var filteredMedia = await ApplyFilters(mediaItems, genres, episodesMax, mediaTypeFilter, userId, ct);
+                    var filteredMedia = await ApplyFilters(mediaItems, genres, episodesMax, mediaTypeFilter, userId, ratingMin, ratingMax, yearMin, yearMax, ct);
 
                     // Apply personalization and scoring
                     var recommendations = await ScoreAndPersonalize(filteredMedia, idToScore, userId, preferTags, preferWeight, spoilerSafe, ct);
@@ -138,7 +145,7 @@ internal sealed class RecsService : IRecsService
         try
         {
             var allMedia = await Media.All(ct);
-            var filteredMedia = await ApplyFilters(allMedia, genres, episodesMax, mediaTypeFilter, userId, ct);
+            var filteredMedia = await ApplyFilters(allMedia, genres, episodesMax, mediaTypeFilter, userId, ratingMin, ratingMax, yearMin, yearMax, ct);
 
             var fallbackRecommendations = filteredMedia.Select(media => new Recommendation
             {
@@ -186,7 +193,7 @@ internal sealed class RecsService : IRecsService
             AddedAt = DateTimeOffset.UtcNow
         };
 
-        entry.Rating = Math.Max(1, Math.Min(10, rating)); // 1-10 scale
+        entry.Rating = Math.Max(1, Math.Min(5, rating)); // 1-5 scale
         if (entry.Status == MediaStatus.PlanToConsume)
         {
             entry.Status = MediaStatus.Completed; // Auto-mark as completed when rating
@@ -201,91 +208,83 @@ internal sealed class RecsService : IRecsService
 
     private async Task<float[]> BuildQueryVector(string? text, string? anchorMediaId, string? userId, string[]? preferTags, CancellationToken ct)
     {
-        var ai = Koan.AI.Ai.TryResolve();
-        if (ai is null) return Array.Empty<float>();
-
-        var model = GetConfiguredModel();
-
-        if (!string.IsNullOrWhiteSpace(text))
-        {
-            var request = new AiEmbeddingsRequest { Input = new() { text! }, Model = model };
-            var emb = await ai.EmbedAsync(request, ct);
-            var vector = emb.Vectors.FirstOrDefault() ?? Array.Empty<float>();
-            return vector;
-        }
-
-        if (!string.IsNullOrWhiteSpace(anchorMediaId))
-        {
-            var anchorMedia = await Media.Get(anchorMediaId!, ct);
-            if (anchorMedia != null)
-            {
-                var textAnchor = $"{anchorMedia.Title}\n\n{anchorMedia.Synopsis}\nGenres: {string.Join(", ", anchorMedia.Genres ?? Array.Empty<string>())}";
-                var request = new AiEmbeddingsRequest { Input = new() { textAnchor }, Model = model };
-                var emb = await ai.EmbedAsync(request, ct);
-                var vector = emb.Vectors.FirstOrDefault() ?? Array.Empty<float>();
-                return vector;
-            }
-        }
-
-        if (!string.IsNullOrWhiteSpace(userId))
-        {
-            var profile = await UserProfileDoc.Get(userId!, ct);
-            if (profile?.PrefVector is { Length: > 0 } pv)
-            {
-                // Validate cached vector dimensions match current model expectations
-                // If we're using all-minilm (384 dims) but cached vector is llama2 (4096 dims), invalidate cache
-                const int expectedDimensions = 384; // all-minilm expected dimensions
-                if (pv.Length == expectedDimensions)
-                {
-                    return pv;
-                }
-                else
-                {
-
-                    // Invalidate the cached profile vector by clearing it
-                    profile.PrefVector = null;
-                    await profile.Save();
-
-                    // Continue to regenerate the vector below instead of using cached one
-                }
-            }
-        }
-
-        if (preferTags is { Length: > 0 })
-        {
-            var tagText = $"Tags: {string.Join(", ", preferTags.Where(t => !string.IsNullOrWhiteSpace(t)))}";
-            var request = new AiEmbeddingsRequest { Input = new() { tagText }, Model = model };
-            var emb = await ai.EmbedAsync(request, ct);
-            var vector = emb.Vectors.FirstOrDefault() ?? Array.Empty<float>();
-            return vector;
-        }
-
-        return Array.Empty<float>();
-    }
-
-    private string GetConfiguredModel()
-    {
+        // ADR-0014: Use capability-first Embed API
         try
         {
-            // Use Koan.Core Configuration helpers to read from multiple possible locations
-            var result = Configuration.ReadFirst(_configuration, "all-minilm",
-                "Koan:Services:ollama:DefaultModel",
-                "Koan:Ai:Ollama:DefaultModel",
-                "Koan:Ai:Ollama:RequiredModels:0"  // First element of RequiredModels array
-            );
+            if (!string.IsNullOrWhiteSpace(text))
+            {
+                return await Koan.AI.Ai.Embed(text!, ct);
+            }
 
-            return result;
+            if (!string.IsNullOrWhiteSpace(anchorMediaId))
+            {
+                var anchorMedia = await Media.Get(anchorMediaId!, ct);
+                if (anchorMedia != null)
+                {
+                    var textAnchor = $"{anchorMedia.Title}\n\n{anchorMedia.Synopsis}\nGenres: {string.Join(", ", anchorMedia.Genres ?? Array.Empty<string>())}";
+                    return await Koan.AI.Ai.Embed(textAnchor, ct);
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(userId))
+            {
+                var profile = await UserProfileDoc.Get(userId!, ct);
+                if (profile?.PrefVector is { Length: > 0 } pv)
+                {
+                    // Validate cached vector dimensions match current model expectations
+                    // If we're using all-minilm (384 dims) but cached vector is llama2 (4096 dims), invalidate cache
+                    const int expectedDimensions = 384; // all-minilm expected dimensions
+                    if (pv.Length == expectedDimensions)
+                    {
+                        return pv;
+                    }
+                    else
+                    {
+                        // Invalidate the cached profile vector by clearing it
+                        profile.PrefVector = null;
+                        await profile.Save();
+
+                        // Continue to regenerate the vector below instead of using cached one
+                    }
+                }
+            }
+
+            if (preferTags is { Length: > 0 })
+            {
+                var tagText = $"Tags: {string.Join(", ", preferTags.Where(t => !string.IsNullOrWhiteSpace(t)))}";
+                return await Koan.AI.Ai.Embed(tagText, ct);
+            }
+
+            return Array.Empty<float>();
         }
         catch (Exception ex)
         {
-            _logger?.LogError(ex, "Error in GetConfiguredModel()");
-            return "all-minilm";
+            _logger?.LogWarning(ex, "Failed to generate embedding vector");
+            return Array.Empty<float>();
         }
     }
 
-    private async Task<List<Media>> ApplyFilters(IEnumerable<Media> media, string[]? genres, int? episodesMax, string? mediaTypeFilter, string? userId, CancellationToken ct)
+
+    private async Task<List<Media>> ApplyFilters(
+        IEnumerable<Media> media,
+        string[]? genres,
+        int? episodesMax,
+        string? mediaTypeFilter,
+        string? userId,
+        double? ratingMin,
+        double? ratingMax,
+        int? yearMin,
+        int? yearMax,
+        CancellationToken ct)
     {
         var filtered = media.AsEnumerable();
+
+        // Censor tags filter - load from config and database, then filter out media with censored tags
+        var censoredTags = await GetCensoredTags(ct);
+        if (censoredTags.Length > 0)
+        {
+            filtered = filtered.Where(m => !HasCensoredTags(m, censoredTags));
+        }
 
         // Media type filter - now accepts media type ID directly
         if (!string.IsNullOrWhiteSpace(mediaTypeFilter))
@@ -305,6 +304,36 @@ internal sealed class RecsService : IRecsService
             filtered = filtered.Where(m => m.Episodes is null || m.Episodes <= emax);
         }
 
+        // Rating filter (blended 80/20 score)
+        if (ratingMin.HasValue || ratingMax.HasValue)
+        {
+            filtered = filtered.Where(m => {
+                var rating = m.Rating; // Uses computed property: (AverageScore × 0.8) + Popularity
+                if (!rating.HasValue) return false; // Exclude items without ratings
+
+                if (ratingMin.HasValue && rating.Value < ratingMin.Value)
+                    return false;
+                if (ratingMax.HasValue && rating.Value > ratingMax.Value)
+                    return false;
+                return true;
+            });
+        }
+
+        // Year filter
+        if (yearMin.HasValue || yearMax.HasValue)
+        {
+            filtered = filtered.Where(m => {
+                var year = m.Year; // Uses computed property: StartDate?.Year
+                if (!year.HasValue) return false; // Exclude items without year
+
+                if (yearMin.HasValue && year.Value < yearMin.Value)
+                    return false;
+                if (yearMax.HasValue && year.Value > yearMax.Value)
+                    return false;
+                return true;
+            });
+        }
+
         // Exclude items already in user's library
         if (!string.IsNullOrWhiteSpace(userId))
         {
@@ -314,6 +343,43 @@ internal sealed class RecsService : IRecsService
         }
 
         return filtered.ToList();
+    }
+
+    private async Task<string[]> GetCensoredTags(CancellationToken ct)
+    {
+        // Load from both configuration and database (same logic as TagsController)
+        var configTags = _tagOptions?.Value?.CensorTags ?? Array.Empty<string>();
+        var doc = await CensorTagsDoc.Get("recs:censor-tags", ct);
+        var dbTags = doc?.Tags?.ToArray() ?? Array.Empty<string>();
+
+        // Merge and deduplicate with case-insensitive comparison
+        var merged = configTags.Concat(dbTags)
+            .Where(s => !string.IsNullOrWhiteSpace(s))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        return merged;
+    }
+
+    private static bool HasCensoredTags(Media media, string[] censoredTags)
+    {
+        // Check if media has any tags or genres that match the censored list (case-insensitive)
+        var allMediaTags = (media.Genres ?? Array.Empty<string>())
+            .Concat(media.Tags ?? Array.Empty<string>())
+            .Where(t => !string.IsNullOrWhiteSpace(t));
+
+        foreach (var mediaTag in allMediaTags)
+        {
+            foreach (var censoredTag in censoredTags)
+            {
+                if (mediaTag.Equals(censoredTag, StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     private async Task<List<Recommendation>> ScoreAndPersonalize(List<Media> media, Dictionary<string, double> vectorScores, string? userId, string[]? preferTags, double? preferWeight, bool spoilerSafe, CancellationToken ct)
@@ -417,7 +483,7 @@ internal sealed class RecsService : IRecsService
             foreach (var genre in media.Genres ?? Array.Empty<string>())
             {
                 profile.GenreWeights.TryGetValue(genre, out var oldWeight);
-                var target = rating / 10.0; // Convert to 0-1 scale
+                var target = (rating - 1) / 4.0; // Convert 1-5 to 0-1 scale
                 var updated = (1 - alpha) * oldWeight + alpha * target;
                 profile.GenreWeights[genre] = Math.Clamp(updated, 0, 1);
             }
@@ -425,18 +491,16 @@ internal sealed class RecsService : IRecsService
             foreach (var tag in media.Tags ?? Array.Empty<string>())
             {
                 profile.GenreWeights.TryGetValue(tag, out var oldWeight);
-                var target = (rating / 10.0) - 0.5; // Centered around 0.5
+                var target = ((rating - 1) / 4.0) - 0.5; // Convert 1-5, center around 0.5
                 var updated = (1 - alpha) * oldWeight + alpha * target;
                 profile.GenreWeights[tag] = Math.Clamp(updated, 0, 1);
             }
 
-            // Update preference vector if AI is available
-            var ai = Koan.AI.Ai.TryResolve();
-            if (ai != null)
+            // Update preference vector using capability-first API (ADR-0014)
+            try
             {
                 var textBlend = $"{media.Title}\n\n{media.Synopsis}\nTags: {string.Join(", ", (media.Genres ?? Array.Empty<string>()).Concat(media.Tags ?? Array.Empty<string>()))}";
-                var emb = await ai.EmbedAsync(new AiEmbeddingsRequest { Input = new() { textBlend } }, ct);
-                var vec = emb.Vectors.FirstOrDefault();
+                var vec = await Koan.AI.Ai.Embed(textBlend, ct);
 
                 if (vec is { Length: > 0 })
                 {
@@ -451,6 +515,10 @@ internal sealed class RecsService : IRecsService
                         profile.PrefVector = vec;
                     }
                 }
+            }
+            catch (Exception embEx)
+            {
+                _logger?.LogWarning(embEx, "Failed to update preference vector for user {UserId}", userId);
             }
 
             profile.UpdatedAt = DateTimeOffset.UtcNow;

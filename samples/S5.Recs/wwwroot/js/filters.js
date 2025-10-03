@@ -104,8 +104,8 @@
 
     // Rating range chip
     if (activeFilters.ratingMin != null || activeFilters.ratingMax != null) {
-      const min = activeFilters.ratingMin || 0;
-      const max = activeFilters.ratingMax || 10;
+      const min = activeFilters.ratingMin || 1;
+      const max = activeFilters.ratingMax || 5;
       chips.push({
         type: 'rating',
         label: `Rating: ${min}–${max}`,

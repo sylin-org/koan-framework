@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>preview</LangVersion>
+    <RootNamespace>S14.AdapterBench</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Core Framework -->
+    <ProjectReference Include="..\..\src\Koan.Core\Koan.Core.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Core.Adapters\Koan.Core.Adapters.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Web\Koan.Web.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Web.Extensions\Koan.Web.Extensions.csproj" />
+    <ProjectReference Include="..\..\src\Connectors\Web\Swagger\Koan.Web.Connector.Swagger.csproj" />
+
+    <!-- Data Layer -->
+    <ProjectReference Include="..\..\src\Koan.Data.Abstractions\Koan.Data.Abstractions.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Data.Core\Koan.Data.Core.csproj" />
+
+    <!-- Data Adapters - all providers we're benchmarking -->
+    <ProjectReference Include="..\..\src\Connectors\Data\Sqlite\Koan.Data.Connector.Sqlite.csproj" />
+    <ProjectReference Include="..\..\src\Connectors\Data\Postgres\Koan.Data.Connector.Postgres.csproj" />
+    <ProjectReference Include="..\..\src\Connectors\Data\Mongo\Koan.Data.Connector.Mongo.csproj" />
+    <ProjectReference Include="..\..\src\Connectors\Data\Redis\Koan.Data.Connector.Redis.csproj" />
+  </ItemGroup>
+</Project>

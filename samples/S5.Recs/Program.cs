@@ -21,12 +21,14 @@ builder.Services.AddKoanObservability();
 Directory.CreateDirectory(Path.GetDirectoryName(Path.Combine(builder.Environment.ContentRootPath, S5.Recs.Infrastructure.Constants.Paths.OfflineData))!);
 Directory.CreateDirectory(Path.Combine(builder.Environment.ContentRootPath, S5.Recs.Infrastructure.Constants.Paths.SeedCache));
 
-// AI, Ollama, and Weaviate are auto-registered by their modules via Koan.Core discovery
+// AI, vector, and data adapters are auto-registered by their modules via Koan.Core discovery
 
 // Local services
+builder.Services.AddSingleton<IEmbeddingCache, EmbeddingCache>();
 builder.Services.AddSingleton<ISeedService, SeedService>();
 builder.Services.AddSingleton<IRecsService, RecsService>();
 builder.Services.AddSingleton<IRecommendationSettingsProvider, RecommendationSettingsProvider>();
+builder.Services.AddSingleton<IRawCacheService, RawCacheService>();
 // Tag catalog options (censor list)
 builder.Services.AddKoanOptions<S5.Recs.Options.TagCatalogOptions>(builder.Configuration, "S5:Recs:Tags");
 // Scheduling: tasks are auto-discovered and registered by Koan.Scheduling's auto-registrar
@@ -46,6 +48,18 @@ foreach (var t in providerTypes)
 {
     builder.Services.AddSingleton(providerInterface, t);
 }
+
+// Discover and register all IMediaParser implementations
+var parserInterface = typeof(IMediaParser);
+var parserTypes = typeof(S5.Recs.Program).Assembly.GetTypes()
+    .Where(t => parserInterface.IsAssignableFrom(t) && t is { IsAbstract: false, IsInterface: false });
+foreach (var t in parserTypes)
+{
+    builder.Services.AddSingleton(parserInterface, t);
+}
+
+// Register parser registry
+builder.Services.AddSingleton<IMediaParserRegistry, MediaParserRegistry>();
 
 // Couchbase adapter is auto-registered by its module via Koan.Core discovery
 

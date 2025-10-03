@@ -18,7 +18,7 @@ public class LocationsController : ControllerBase
 
     [HttpGet]
     public async Task<ActionResult<IEnumerable<Core.Models.Location>>> GetLocations(
-        [FromQuery] int page = 1, 
+        [FromQuery] int page = 1,
         [FromQuery] int size = 50)
     {
         var allLocations = await Core.Models.Location.All();
@@ -49,7 +49,7 @@ public class LocationsController : ControllerBase
             Address = request.Address
         };
 
-        // Send through Flow for orchestration
+        // Send through the Canon pipeline for orchestration
         await location.Send();
 
         return CreatedAtAction(nameof(GetLocation), new { id = location.Id }, location);
@@ -82,10 +82,10 @@ public class LocationsController : ControllerBase
             Address = request.Address
         };
 
-        _logger.LogInformation("Test location from {Source}: {ExternalId} -> {Address}", 
+        _logger.LogInformation("Test location from {Source}: {ExternalId} -> {Address}",
             source, request.ExternalId, request.Address);
 
-        // Send through Flow for orchestration
+        // Send through the Canon pipeline for orchestration
         await location.Send();
 
         return Ok(location);
@@ -98,11 +98,11 @@ public class LocationsController : ControllerBase
         {
             var resolver = HttpContext.RequestServices.GetRequiredService<Core.Services.AddressResolutionService>();
             var canonicalId = await resolver.ResolveToCanonicalIdAsync(request.Address);
-            
+
             // Try to get the corrected address from cache
             var aiCorrected = request.Address; // Default to original
-            // In a real implementation, you'd retrieve the AI-corrected version from the resolution cache
-            
+                                               // In a real implementation, you'd retrieve the AI-corrected version from the resolution cache
+
             return Ok(new ResolveAddressResponse(
                 Original: request.Address,
                 Corrected: aiCorrected,
@@ -124,11 +124,11 @@ public class LocationsController : ControllerBase
         {
             var allLocations = await Core.Models.Location.All();
             var total = allLocations.Count();
-            // Flow pipeline stages track status, not entity properties
+            // Canon pipeline stages track status, not entity properties
             var active = allLocations.Count(l => !string.IsNullOrEmpty(l.AgnosticLocationId));
             // AI corrections based on locations with canonical IDs
             var aiCorrected = allLocations.Count(l => !string.IsNullOrEmpty(l.AgnosticLocationId));
-            
+
             return Ok(new ProcessingStatsResponse(
                 TotalProcessed: total,
                 SuccessRate: total > 0 ? Math.Round((double)active / total * 100, 1) : 0,

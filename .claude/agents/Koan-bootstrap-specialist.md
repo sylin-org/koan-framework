@@ -162,7 +162,7 @@ public void Describe(BootReport report, IConfiguration cfg, IHostEnvironment env
 // Module hierarchy
 // ┌─ Koan FRAMEWORK v0.2.18 ─────────────────────────────────────────────
 // │ Core: 0.2.18
-// │   ├─ Koan.Data.Mongo: 0.2.18
+// │   ├─ Koan.Data.Connector.Mongo: 0.2.18
 // │   ├─ Koan.Web.Backup: 0.2.18
 // │   └─ MyModule.Feature: 1.0.0
 

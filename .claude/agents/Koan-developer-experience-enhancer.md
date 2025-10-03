@@ -284,7 +284,7 @@ if (KoanEnv.IsDevelopment) {
     // Output shows:
     // ┌─ Koan FRAMEWORK v0.2.18 ─────────────────
     // │ Core: 0.2.18
-    // │   ├─ Koan.Data.Mongo: 0.2.18
+    // │   ├─ Koan.Data.Connector.Mongo: 0.2.18
     // │   └─ MyApp.Notifications: 1.0.0
     // ├─ STARTUP ────────────────────────────────
     // │ I 10:30:15 Koan:discover  postgresql: server=localhost... ✓
@@ -392,7 +392,7 @@ docker logs app-container --follow | grep "Koan:"
 ## Real Learning Resources
 - `samples/S0.ConsoleJsonRepo/` - Minimal console example
 - `samples/S1.Web/` - Complete web API with relationships
-- `samples/S8.Flow/` - Event sourcing examples
+- `samples/S8.Canon/` - Event sourcing examples
 - `samples/S5.Recs/` - Complex multi-entity application
 - All sample projects include working start.bat scripts
 

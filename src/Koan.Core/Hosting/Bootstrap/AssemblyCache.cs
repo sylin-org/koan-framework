@@ -52,7 +52,7 @@ public sealed class AssemblyCache
     /// <summary>
     /// Checks if a specific assembly name is loaded.
     /// </summary>
-    /// <param name="assemblyName">Name of the assembly (e.g., "Koan.Data.Postgres")</param>
+    /// <param name="assemblyName">Name of the assembly (e.g., "Koan.Data.Connector.Postgres")</param>
     /// <returns>True if the assembly is loaded</returns>
     public bool HasAssembly(string assemblyName)
     {

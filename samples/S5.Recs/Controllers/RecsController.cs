@@ -32,6 +32,10 @@ public class RecsController(IRecsService recs) : ControllerBase
             req.Filters?.PreferWeight,
             req.Sort,
             req.Filters?.MediaType,
+            req.Filters?.RatingMin,
+            req.Filters?.RatingMax,
+            req.Filters?.YearMin,
+            req.Filters?.YearMax,
             ct).GetAwaiter().GetResult();
         return Ok(new { items, degraded });
     }

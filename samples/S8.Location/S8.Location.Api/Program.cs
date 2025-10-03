@@ -3,18 +3,18 @@ using S8.Location.Core.Interceptors;
 using S8.Location.Core.Orchestration;
 using S8.Location.Core.Services;
 using Koan.Data.Core;
-using Koan.Flow;
-using Koan.Web.Swagger;
+using Koan.Canon;
+using Koan.Web.Connector.Swagger;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Koan framework with auto-configuration
 builder.Services.AddKoan();
 
-// Enable Flow pipeline for address processing
-builder.Services.AddKoanFlow();
+// Enable Canon pipeline for address processing
+builder.Services.AddKoanCanon();
 
-// Register Location orchestrator with Flow.OnUpdate handlers
+// Register Location orchestrator with Canon.OnUpdate handlers
 builder.Services.AddHostedService<LocationOrchestrator>();
 
 // Register Location services
@@ -41,14 +41,14 @@ app.Lifetime.ApplicationStarted.Register(async () =>
 {
     try
     {
-        var testLocation = new Location 
-        { 
-            Id = "startup-test-" + Guid.NewGuid().ToString("N").Substring(0, 8), 
+        var testLocation = new Location
+        {
+            Id = "startup-test-" + Guid.NewGuid().ToString("N").Substring(0, 8),
             Address = "123 Main Street, Springfield, IL 62701"
-            // Status removed - Flow pipeline tracks entity state
+            // Status removed - Canon pipeline tracks entity state
         };
         await testLocation.Save();
-        
+
         using var scope = app.Services.CreateScope();
         var logger = scope.ServiceProvider.GetService<ILogger<Program>>();
         logger?.LogInformation("[API] Data provider test: Location saved successfully");

@@ -27,10 +27,10 @@ public class CreateBackupRequest
     public string[] Tags { get; set; } = Array.Empty<string>();
 
     /// <summary>
-    /// Target set name (optional, defaults to "root")
+    /// Target partition name (optional, defaults to "root")
     /// </summary>
     [StringLength(100)]
-    public string? Set { get; set; }
+    public string? Partition { get; set; }
 
     /// <summary>
     /// Storage profile to use (optional, uses default if not specified)
@@ -120,10 +120,10 @@ public class RestoreBackupRequest
     public string BackupName { get; set; } = string.Empty;
 
     /// <summary>
-    /// Target set name (optional)
+    /// Target partition name (optional)
     /// </summary>
     [StringLength(100)]
-    public string? TargetSet { get; set; }
+    public string? TargetPartition { get; set; }
 
     /// <summary>
     /// Storage profile to use for reading backup
@@ -201,14 +201,14 @@ public class RestoreGlobalBackupRequest : RestoreBackupRequest
     public string[]? ExcludeEntityTypes { get; set; }
 
     /// <summary>
-    /// Entity set mapping (EntityType -> TargetSet)
+    /// Entity partition mapping (EntityType -> TargetPartition)
     /// </summary>
-    public Dictionary<string, string> EntitySetMapping { get; set; } = new();
+    public Dictionary<string, string> EntityPartitionMapping { get; set; } = new();
 
     /// <summary>
-    /// Whether to restore to original sets
+    /// Whether to restore to original partitions
     /// </summary>
-    public bool RestoreToOriginalSets { get; set; } = true;
+    public bool RestoreToOriginalPartitions { get; set; } = true;
 
     /// <summary>
     /// Whether to validate backup before restore

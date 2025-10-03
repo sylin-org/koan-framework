@@ -17,6 +17,9 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
     {
         services.AddKoanWeb();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<Microsoft.AspNetCore.Hosting.IStartupFilter, Hosting.KoanWebStartupFilter>());
+
+        // Ensure MVC discovers controllers from this assembly
+        services.AddKoanControllersFrom<Controllers.HealthController>();
     }
 
     public void Describe(Koan.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)

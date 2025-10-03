@@ -1,0 +1,10 @@
+﻿<Project>
+  <ItemGroup>
+    <Compile Include="$(MSBuildThisFileDirectory)GlobalUsings.cs" Link="_GlobalUsings.cs" />
+  </ItemGroup>
+  <ItemGroup Condition="Exists('$(MSBuildProjectDirectory)\wwwroot')">
+    <Content Include="$(MSBuildProjectDirectory)\wwwroot\**\*"
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

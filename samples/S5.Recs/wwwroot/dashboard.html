@@ -47,14 +47,35 @@
       </div>
 
       <div class="bg-slate-900 rounded-xl p-6 border border-slate-800">
-        <div class="flex items-center justify-between mb-6"><h3 class="text-lg font-semibold text-white">Quick Actions</h3>
+        <div class="flex items-center justify-between mb-6">
+          <h3 class="text-lg font-semibold text-white">Rebuild Actions</h3>
           <div class="flex gap-2">
+            <button onclick="rebuildFromCache()" class="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-lg"><i class="fas fa-database mr-2"></i>Rebuild DB from Cache</button>
             <button onclick="vectorUpsert()" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg"><i class="fas fa-brain mr-2"></i>Rebuild Vectors</button>
             <button onclick="rebuildTags()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg"><i class="fas fa-tags mr-2"></i>Rebuild Tags</button>
             <button onclick="rebuildGenres()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg"><i class="fas fa-list mr-2"></i>Rebuild Genres</button>
           </div>
         </div>
         <div id="activity" class="text-sm text-gray-400">Actions appear here.</div>
+      </div>
+
+      <div class="bg-slate-900 rounded-xl p-6 border border-slate-800">
+        <div class="flex items-center justify-between mb-6">
+          <h3 class="text-lg font-semibold text-white">Flush Operations</h3>
+          <div class="flex gap-2 flex-wrap">
+            <button onclick="flushCache()" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg"><i class="fas fa-trash mr-2"></i>Flush Cache</button>
+            <button onclick="flushMedia()" class="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg"><i class="fas fa-film mr-2"></i>Flush Media</button>
+            <button onclick="flushVectors()" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg"><i class="fas fa-brain mr-2"></i>Flush Vectors</button>
+            <button onclick="flushTags()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg"><i class="fas fa-tags mr-2"></i>Flush Tags</button>
+            <button onclick="flushGenres()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg"><i class="fas fa-list mr-2"></i>Flush Genres</button>
+            <button onclick="flushEmbeddingsCache()" class="bg-pink-600 hover:bg-pink-700 text-white px-4 py-2 rounded-lg"><i class="fas fa-microchip mr-2"></i>Flush Embeddings</button>
+          </div>
+          <div class="mt-4">
+            <button onclick="exportEmbeddingsToCache()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg"><i class="fas fa-file-export mr-2"></i>Export to Embeddings Cache</button>
+            <span class="text-sm text-gray-400 ml-2">↑ Populate cache with current vectors for adapter portability</span>
+          </div>
+        </div>
+        <div id="flushActivity" class="text-sm text-gray-400">Flush operations appear here.</div>
       </div>
     </section>
 

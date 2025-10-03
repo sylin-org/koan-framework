@@ -8,8 +8,8 @@ using Koan.Data.Backup.Extensions;
 using Koan.Data.Backup.Models;
 using Koan.Data.Core;
 using Koan.Data.Core.Model;
-using Koan.Data.Sqlite;
-using Koan.Data.Mongo;
+using Koan.Data.Connector.Sqlite;
+using Koan.Data.Connector.Mongo;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -240,7 +240,7 @@ public class FullStackBackupRestoreTests : IAsyncLifetime, IDisposable
 
         manifest.Should().NotBeNull();
         manifest.Status.Should().Be(BackupStatus.Completed);
-        manifest.Entities.Should().HaveCountGreaterOrEqualTo(2, "Should backup at least 2 entity types");
+        manifest.Entities.Should().HaveCountGreaterThanOrEqualTo(2, "Should backup at least 2 entity types");
 
         _output.WriteLine($"Backup completed:");
         _output.WriteLine($"   Name: {manifest.Name}");

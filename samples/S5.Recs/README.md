@@ -370,7 +370,7 @@ start.bat
 
 ### Filters panel (AnimeRadar UX)
 
-- Rating: dual-range 0–5 stars with 0.5 step. Moving one thumb pushes the other so min ≤ max.
+- Rating: dual-range 1–5 stars with 0.5 step. Moving one thumb pushes the other so min ≤ max.
 - Year: dual-range over a rolling 30-year window up to the current year. Max at the top means “present”.
 - Labels update live (e.g., “Rating: 2–4.5★”, “Year: 2010–present”).
 
@@ -441,7 +441,7 @@ Return URL policy
 
 Development TestProvider (optional)
 
-- When the `Koan.Web.Auth.TestProvider` module is referenced, a local OAuth2 provider appears as "Test (Local)" (id: `test`).
+- When the `Koan.Web.Auth.Connector.Test` module is referenced, a local OAuth2 provider appears as "Test (Local)" (id: `test`).
 - Normal login uses `/auth/test/challenge` and `/auth/test/callback` like other providers.
 - The underlying dev IdP endpoints (internal exchange) are served at: `/.testoauth/authorize`, `/.testoauth/token`, `/.testoauth/userinfo`.
 - First-time use shows a minimal HTML form for Name/Email and stores a local cookie to streamline subsequent logins.
@@ -496,3 +496,4 @@ This sample exposes several REST endpoints that demonstrate different aspects of
 - MongoDB document modeling for recommendation use cases
 
 This sample serves as both a working application and a reference implementation for building similar systems in your own projects.
+

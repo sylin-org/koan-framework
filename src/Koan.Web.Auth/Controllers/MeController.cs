@@ -9,10 +9,13 @@ namespace Koan.Web.Auth.Controllers;
 [ApiController]
 public sealed class MeController(IExternalIdentityStore identities) : ControllerBase
 {
-    [Authorize]
     [HttpGet(AuthConstants.Routes.Me)]
     public async Task<ActionResult<CurrentUserDto>> GetMe(CancellationToken ct)
     {
+        // Handle authentication check manually to avoid exceptions for unauthenticated users
+        if (!User.Identity?.IsAuthenticated == true)
+            return Unauthorized();
+
         var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
         if (string.IsNullOrWhiteSpace(userId))
             return Unauthorized();

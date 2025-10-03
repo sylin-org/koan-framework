@@ -2,21 +2,23 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Koan.Core;
-using Microsoft.Extensions.Logging;
+using Koan.Core.Logging;
 
 namespace Koan.Data.Vector.Initialization;
 
 public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 {
+    private static readonly KoanLog.KoanLogScope Log = KoanLog.For<KoanAutoRegistrar>();
+
     public string ModuleName => "Koan.Data.Vector";
     public string? ModuleVersion => typeof(KoanAutoRegistrar).Assembly.GetName().Version?.ToString();
 
     public void Initialize(IServiceCollection services)
     {
-        var logger = services.BuildServiceProvider().GetService<Microsoft.Extensions.Logging.ILoggerFactory>()?.CreateLogger("Koan.Data.Vector.Initialization.KoanAutoRegistrar");
-    logger?.Log(LogLevel.Debug, "Koan.Data.Vector KoanAutoRegistrar loaded.");
+        Log.BootDebug(LogActions.Init, "loaded", ("module", ModuleName));
         // Register vector defaults + resolver service
         services.AddKoanDataVector();
+        Log.BootDebug(LogActions.Init, "services-registered", ("module", ModuleName));
     }
 
     public void Describe(Koan.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)
@@ -24,5 +26,10 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         report.AddModule(ModuleName, ModuleVersion);
         var def = Configuration.Read(cfg, "Koan:Data:VectorDefaults:DefaultProvider", null);
         report.AddSetting("VectorDefaults:DefaultProvider", def, isSecret: false);
+    }
+
+    private static class LogActions
+    {
+        public const string Init = "registrar.init";
     }
 }

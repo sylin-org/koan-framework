@@ -21,7 +21,7 @@
         <dependency id="Sylin.Koan.Core" version="$depVersionRange$" />
         <dependency id="Sylin.Koan.Data.Core" version="$depVersionRange$" />
         <dependency id="Sylin.Koan.Data.Abstractions" version="$depVersionRange$" />
-        <dependency id="Sylin.Koan.Data.Json" version="$depVersionRange$" />
+        <dependency id="Sylin.Koan.Data.Connector.Json" version="$depVersionRange$" />
       </group>
     </dependencies>
   <tags>Koan sylin meta-package data json</tags>
@@ -31,3 +31,4 @@
     <file src="icon.png" target="/" />
   </files>
 </package>
+

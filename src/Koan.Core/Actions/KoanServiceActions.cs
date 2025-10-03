@@ -15,10 +15,10 @@ public static class KoanServiceActions
         public const string RestartMessaging = "restart-messaging";
     }
 
-    public static class Flow
+    public static class Canon
     {
-        public const string ProcessFlowEntity = "process-flow-entity";
-        public const string TriggerProcessing = "trigger-processing";
+        public const string ProcessCanonEntity = "process-canon-entity";
+        public const string TriggerProcessing = "canon-trigger-processing";
     }
 
     public static class Scheduling

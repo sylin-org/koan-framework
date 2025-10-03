@@ -35,8 +35,6 @@
   <LangVersion Condition="'$(LangVersion)' == ''">latestMajor</LangVersion>
   </PropertyGroup>
   <ItemGroup>
-    <!-- Unified versioning across the repo via Nerdbank.GitVersioning -->
-    <PackageReference Include="Nerdbank.GitVersioning" Version="3.6.143" PrivateAssets="all" />
   <!-- SourceLink for better debugging experience on NuGet -->
   <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="All" />
   </ItemGroup>

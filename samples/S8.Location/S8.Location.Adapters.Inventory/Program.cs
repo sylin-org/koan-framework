@@ -1,11 +1,11 @@
-using Microsoft.Extensions.Hosting;
+﻿using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Configuration;
 using S8.Location.Core.Models;
 using Koan.Core;
 using Koan.Core.Hosting;
 using Koan.Data.Core;
-using Koan.Flow.Attributes;
+using Koan.Canon.Attributes;
 using Koan.Messaging;
 
 var builder = Host.CreateApplicationBuilder(args);
@@ -26,7 +26,7 @@ builder.Services.AddKoan();
 var app = builder.Build();
 await app.RunAsync();
 
-[FlowAdapter(system: "inventory", adapter: "inventory", DefaultSource = "inventory")]
+[CanonAdapter(system: "inventory", adapter: "inventory", DefaultSource = "inventory")]
 public sealed class InventoryLocationAdapter : BackgroundService
 {
     private readonly ILogger<InventoryLocationAdapter> _logger;
@@ -56,7 +56,7 @@ public sealed class InventoryLocationAdapter : BackgroundService
                     {
                         var location = new Location
                         {
-                            Id = externalId, // IS1, IS2, etc. - tracked via Flow metadata (source.system, source.adapter)
+                            Id = externalId, // IS1, IS2, etc. - tracked via Canon metadata (source.system, source.adapter)
                             Address = address
                         };
 

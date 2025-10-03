@@ -19,7 +19,7 @@ public sealed class LibraryEntry : Entity<LibraryEntry>
 
     public bool Favorite { get; set; }
     public MediaStatus Status { get; set; }  // PlanToConsume, Consuming, Completed, Dropped, OnHold
-    public int? Rating { get; set; }         // 1-10 scale
+    public int? Rating { get; set; }         // 1-5 scale
     public int? Progress { get; set; }       // Episodes watched / Chapters read
     public DateTimeOffset AddedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }

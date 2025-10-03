@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>Koan.Web.Connector.GraphQl</AssemblyName>
+    <RootNamespace>Koan.Web.Connector.GraphQl</RootNamespace>
+    <Description>Koan GraphQL module providing a controller-hosted GraphQL endpoint and schema for IEntity&lt;&gt; types.</Description>
+    <PackageTags>$(CommonPackageTags);web;graphql;hotchocolate;controllers</PackageTags>
+    <Version>0.6.3</Version>
+    <AssemblyVersion>0.6.3</AssemblyVersion>
+    <FileVersion>0.6.3</FileVersion>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="HotChocolate.AspNetCore" Version="13.8.1" />
+    <PackageReference Include="HotChocolate.Execution" Version="13.8.1" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+    <!-- Exclude the Banana Cake Pop UI middleware pulled transitively to keep runtime surface minimal and avoid test-time probe issues -->
+    <PackageReference Include="BananaCakePop.Middleware" Version="13.0.0" ExcludeAssets="all" />
+  </ItemGroup>
+  <ItemGroup>
+  <ProjectReference Include="..\..\..\Koan.Web\Koan.Web.csproj" />
+  <ProjectReference Include="..\..\..\Koan.Data.Core\Koan.Data.Core.csproj" />
+  <ProjectReference Include="..\..\..\Koan.Core\Koan.Core.csproj" />
+  </ItemGroup>
+</Project>

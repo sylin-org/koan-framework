@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -52,12 +53,12 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
             return CollectionShortCircuit(context, hookContext);
         }
 
-        IReadOnlyList<TEntity> repositoryItems;
+        RepositoryQueryResult queryResult;
         int total;
-        bool repositoryHandledPagination;
         try
         {
-            (repositoryItems, total, repositoryHandledPagination) = await QueryCollectionAsync(repo, request, context.Options, context.CancellationToken);
+            queryResult = await QueryCollectionAsync(request, context.Options, context.CancellationToken);
+            total = queryResult.Total;
         }
         catch (InvalidOperationException ex)
         {
@@ -65,20 +66,48 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
             return new EntityCollectionResult<TEntity>(context, Array.Empty<TEntity>(), 0, null, bad);
         }
 
-        var list = repositoryItems.ToList();
+        if (queryResult.ExceededSafetyLimit)
+        {
+            _logger?.LogWarning(
+                "EntityEndpointService<{Entity}> blocked unpaged response exceeding safety cap {Cap}. Path: {Path}. ReportedTotal: {Total}.",
+                typeof(TEntity).Name,
+                request.Policy.AbsoluteMaxRecords,
+                request.BasePath ?? context.HttpContext?.Request.Path.ToString() ?? "unknown",
+                queryResult.Total);
+
+            var errorPayload = new
+            {
+                error = "Result too large",
+                message = $"This endpoint allows at most {request.Policy.AbsoluteMaxRecords} records without pagination."
+            };
+            var tooLarge = new ObjectResult(errorPayload) { StatusCode = StatusCodes.Status413PayloadTooLarge };
+            return new EntityCollectionResult<TEntity>(context, Array.Empty<TEntity>(), queryResult.Total, null, tooLarge);
+        }
+
+        var list = queryResult.Items.ToList();
         if (context.Options.Sort.Count > 0)
         {
             list = ApplySort(list, context.Options.Sort);
         }
-        if (!repositoryHandledPagination && (request.ForcePagination || ShouldPaginate(context, request)))
+
+        var shouldPaginate = request.ApplyPagination;
+        if (shouldPaginate && !queryResult.RepositoryHandledPagination)
         {
             (list, total) = ApplyPagination(list, context.Options.Page, context.Options.PageSize, total);
             context.Headers["Koan-InMemory-Paging"] = "true";
+        }
+
+        if (shouldPaginate)
+        {
             context.Headers["X-Page"] = context.Options.Page.ToString();
             context.Headers["X-Page-Size"] = context.Options.PageSize.ToString();
-            context.Headers["X-Total-Count"] = total.ToString();
             var totalPages = context.Options.PageSize > 0 ? (int)Math.Ceiling((double)total / context.Options.PageSize) : 0;
             context.Headers["X-Total-Pages"] = totalPages.ToString();
+            if (request.IncludeTotalCount)
+            {
+                context.Headers["X-Total-Count"] = total.ToString();
+            }
+
             if (!string.IsNullOrWhiteSpace(request.BasePath) && request.QueryParameters.Count > 0 && totalPages > 0)
             {
                 var links = BuildLinkHeaders(request.BasePath!, request.QueryParameters, context.Options.Page, context.Options.PageSize, totalPages);
@@ -87,6 +116,10 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
                     context.Headers["Link"] = string.Join(", ", links);
                 }
             }
+        }
+        else if (request.IncludeTotalCount)
+        {
+            context.Headers["X-Total-Count"] = total.ToString();
         }
 
         if (!await _hookPipeline.AfterCollectionAsync(hookContext, list))
@@ -204,7 +237,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
             return ModelShortCircuit(context, hookContext);
         }
 
-        using var _ = DataSetContext.With(string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
+        using var _ = EntityContext.Partition(string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
         var model = await Data<TEntity, TKey>.GetAsync(request.Id!, context.CancellationToken);
         await _hookPipeline.AfterModelFetchAsync(hookContext, model);
         if (model is null)
@@ -241,7 +274,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         TEntity saved;
         if (!string.IsNullOrWhiteSpace(request.Set))
         {
-            using var _ = DataSetContext.With(request.Set);
+            using var _ = EntityContext.Partition(request.Set);
             saved = await request.Model.Upsert<TEntity, TKey>(context.CancellationToken);
         }
         else
@@ -281,7 +314,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
             await _hookPipeline.BeforeSaveAsync(hookContext, model);
         }
 
-        using var _ = DataSetContext.With(string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
+        using var _ = EntityContext.Partition(string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
         var upserted = await Data<TEntity, TKey>.UpsertManyAsync(list, context.CancellationToken);
 
         foreach (var model in list)
@@ -303,7 +336,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
 
         var hookContext = _hookPipeline.CreateContext(context);
 
-        using var _ = DataSetContext.With(string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
+        using var _ = EntityContext.Partition(string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
         var model = await Data<TEntity, TKey>.GetAsync(request.Id, context.CancellationToken);
         if (model is null)
         {
@@ -331,7 +364,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         var repo = _dataService.GetRepository<TEntity, TKey>();
         var writes = WriteCaps(repo);
         context.Headers["Koan-Write-Capabilities"] = writes.Writes.ToString();
-        using var _ = DataSetContext.With(string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
+        using var _ = EntityContext.Partition(string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
         var deleted = await Data<TEntity, TKey>.DeleteManyAsync(request.Ids ?? Array.Empty<TKey>(), context.CancellationToken);
         return new EntityEndpointResult(context, new { deleted });
     }
@@ -343,14 +376,14 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
             return new EntityEndpointResult(request.Context, null, new BadRequestResult());
         }
 
-        using var _ = DataSetContext.With(string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
+        using var _ = EntityContext.Partition(string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
         var removed = await Entity<TEntity, TKey>.Remove(request.Query!, request.Context.CancellationToken);
         return new EntityEndpointResult(request.Context, new { deleted = removed });
     }
 
     public async Task<EntityEndpointResult> DeleteAllAsync(EntityDeleteAllRequest request)
     {
-        using var _ = DataSetContext.With(string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
+        using var _ = EntityContext.Partition(string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
         var deleted = await Entity<TEntity, TKey>.RemoveAll(request.Context.CancellationToken);
         return new EntityEndpointResult(request.Context, new { deleted });
     }
@@ -365,7 +398,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
 
         await _hookPipeline.BeforePatchAsync(hookContext, request.Id?.ToString() ?? string.Empty, request.Patch);
 
-        using var _ = DataSetContext.With(string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
+        using var _ = EntityContext.Partition(string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
         var original = await Data<TEntity, TKey>.GetAsync(request.Id!, context.CancellationToken);
         if (original is null)
         {
@@ -407,28 +440,6 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         {
             context.Headers[kv.Key] = kv.Value;
         }
-    }
-
-    private static bool ShouldPaginate(EntityRequestContext context, EntityCollectionRequest request)
-    {
-        if (request.ForcePagination)
-        {
-            return true;
-        }
-
-        if (context.Options.PageSize > 0 || context.Options.Page > 1)
-        {
-            return true;
-        }
-
-        var http = context.HttpContext;
-        if (http is null)
-        {
-            return false;
-        }
-
-        var query = http.Request.Query;
-        return query.ContainsKey("page") || query.ContainsKey("size");
     }
 
     private static (List<TEntity> Items, int Total) ApplyPagination(List<TEntity> source, int page, int pageSize, int total)
@@ -510,71 +521,84 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
     }
 
 
-    private async Task<(IReadOnlyList<TEntity> Items, int Total, bool RepositoryHandledPagination)> QueryCollectionAsync(
-        IDataRepository<TEntity, TKey> repo,
+    private sealed class RepositoryQueryResult
+    {
+        public RepositoryQueryResult(IReadOnlyList<TEntity> items, int total, bool handled, bool exceededLimit)
+        {
+            Items = items;
+            Total = total;
+            RepositoryHandledPagination = handled;
+            ExceededSafetyLimit = exceededLimit;
+        }
+
+        public IReadOnlyList<TEntity> Items { get; }
+        public int Total { get; }
+        public bool RepositoryHandledPagination { get; }
+        public bool ExceededSafetyLimit { get; }
+    }
+
+    private async Task<RepositoryQueryResult> QueryCollectionAsync(
         EntityCollectionRequest request,
         QueryOptions options,
         CancellationToken cancellationToken)
     {
-        using var _ = DataSetContext.With(string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
-        if (!string.IsNullOrWhiteSpace(request.FilterJson) && repo is ILinqQueryRepository<TEntity, TKey> lrepo)
+        using var _ = EntityContext.Partition(string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
+
+        object? queryPayload = null;
+        if (!string.IsNullOrWhiteSpace(request.FilterJson))
         {
             if (!JsonFilterBuilder.TryBuild<TEntity>(request.FilterJson!, out var predicate, out var error, new JsonFilterBuilder.BuildOptions { IgnoreCase = request.IgnoreCase }))
             {
                 throw new InvalidOperationException(error ?? "Invalid filter");
             }
 
-            IReadOnlyList<TEntity> items;
-            bool paginationHandled = false;
-            if (repo is ILinqQueryRepositoryWithOptions<TEntity, TKey> lrepoOpts)
-            {
-                var dq = new Koan.Data.Abstractions.DataQueryOptions(options.Page, options.PageSize);
-                items = await lrepoOpts.QueryAsync(predicate!, dq, cancellationToken);
-                paginationHandled = true;
-            }
-            else
-            {
-                items = await lrepo.QueryAsync(predicate!, cancellationToken);
-            }
-
-            int total;
-            try { total = await lrepo.CountAsync(predicate!, cancellationToken); } catch { total = items.Count; }
-            return (items, total, paginationHandled);
+            queryPayload = predicate!;
         }
-
-        if (!string.IsNullOrWhiteSpace(options.Q) && repo is IStringQueryRepository<TEntity, TKey> srepo)
+        else if (!string.IsNullOrWhiteSpace(options.Q))
         {
-            IReadOnlyList<TEntity> items;
-            bool paginationHandled = false;
-            if (repo is IStringQueryRepositoryWithOptions<TEntity, TKey> srepoOpts)
-            {
-                var dq = new Koan.Data.Abstractions.DataQueryOptions(options.Page, options.PageSize);
-                items = await srepoOpts.QueryAsync(options.Q!, dq, cancellationToken);
-                paginationHandled = true;
-            }
-            else
-            {
-                items = await srepo.QueryAsync(options.Q!, cancellationToken);
-            }
-
-            int total;
-            try { total = await srepo.CountAsync(options.Q!, cancellationToken); } catch { total = items.Count; }
-            return (items, total, paginationHandled);
+            queryPayload = options.Q;
         }
 
-        if (repo is IDataRepositoryWithOptions<TEntity, TKey> repoOpts)
+        var dataOptions = BuildDataQueryOptions(request, options);
+        var absoluteMax = request.AbsoluteMaxRecords > 0 ? request.AbsoluteMaxRecords : (int?)null;
+
+        var result = await Data<TEntity, TKey>.QueryWithCount(queryPayload, dataOptions, cancellationToken, absoluteMax).ConfigureAwait(false);
+
+        return new RepositoryQueryResult(result.Items, result.TotalCount, result.RepositoryHandledPagination, result.ExceededSafetyLimit);
+    }
+
+    private static DataQueryOptions BuildDataQueryOptions(EntityCollectionRequest request, QueryOptions options)
+    {
+        var queryOptions = new DataQueryOptions();
+
+        if (request.ApplyPagination && options.Page > 0 && options.PageSize > 0)
         {
-            var dq = new Koan.Data.Abstractions.DataQueryOptions(options.Page, options.PageSize);
-            var items = await repoOpts.QueryAsync(null, dq, cancellationToken);
-            int total;
-            try { total = await repoOpts.CountAsync(null, cancellationToken); } catch { total = items.Count; }
-            return (items, total, true);
+            queryOptions = queryOptions.WithPagination(options.Page, options.PageSize);
+
         }
 
-        var fallback = await repo.QueryAsync(null, cancellationToken);
-        int fallbackTotal;
-        try { fallbackTotal = await repo.CountAsync(null, cancellationToken); } catch { fallbackTotal = fallback.Count; }
-        return (fallback, fallbackTotal, false);
+        if (!string.IsNullOrWhiteSpace(request.Set))
+        {
+            queryOptions = queryOptions.ForPartition(request.Set);
+        }
+
+        if (options.Sort.Count > 0)
+        {
+            queryOptions = queryOptions.WithSort(ToSortString(options.Sort));
+        }
+
+        return queryOptions;
+    }
+
+    private static string? ToSortString(IReadOnlyList<SortSpec> sorts)
+    {
+        if (sorts.Count == 0)
+        {
+            return null;
+        }
+
+        return string.Join(",", sorts.Select(s => s.Desc ? $"-{s.Field}" : s.Field));
+
     }
 
     private async Task<(IReadOnlyList<TEntity> Items, int Total)> QueryCollectionFromBodyAsync(
@@ -583,7 +607,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         QueryOptions options,
         CancellationToken cancellationToken)
     {
-        using var _ = DataSetContext.With(string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
+        using var _ = EntityContext.Partition(string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
         if (!string.IsNullOrWhiteSpace(request.FilterJson) && repo is ILinqQueryRepository<TEntity, TKey> lrepo)
         {
             if (!JsonFilterBuilder.TryBuild<TEntity>(request.FilterJson!, out var predicate, out var error, new JsonFilterBuilder.BuildOptions { IgnoreCase = request.IgnoreCase }))

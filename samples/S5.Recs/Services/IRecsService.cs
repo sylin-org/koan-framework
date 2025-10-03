@@ -16,6 +16,10 @@ public interface IRecsService
         double? preferWeight,
         string? sort,
         string? mediaTypeFilter,
+        double? ratingMin,
+        double? ratingMax,
+        int? yearMin,
+        int? yearMax,
         CancellationToken ct);
     Task RateAsync(string userId, string mediaId, int rating, CancellationToken ct);
 }

@@ -14,11 +14,12 @@ using System.Threading.Tasks;
 
 namespace Koan.Data.Direct;
 
-internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, string sourceOrAdapter) : Koan.Data.Core.Direct.IDirectSession
+internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, string? source, string? adapter) : Koan.Data.Core.Direct.IDirectSession
 {
     private readonly IServiceProvider _sp = sp;
     private readonly IConfiguration _cfg = cfg;
-    private string _source = sourceOrAdapter;
+    private readonly string? _source = source;
+    private readonly string? _adapter = adapter;
     private string? _connectionString;
     private TimeSpan _timeout = TimeSpan.FromSeconds(
         (sp.GetService<Microsoft.Extensions.Options.IOptions<Core.Options.DirectOptions>>()?.Value?.TimeoutSeconds) ?? 30);
@@ -190,36 +191,73 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
     private (string provider, string connectionString) Resolve()
     {
         var resolver = _sp.GetService(typeof(IDataConnectionResolver)) as IDataConnectionResolver;
+        var sourceRegistry = _sp.GetService(typeof(Core.DataSourceRegistry)) as Core.DataSourceRegistry;
 
-        // If a connection string/name was provided explicitly via WithConnectionString, resolve it first.
+        // Priority 1: Explicit connection string override via WithConnectionString
         if (!string.IsNullOrWhiteSpace(_connectionString))
         {
             var value = _connectionString!;
-            var byResolver = resolver?.Resolve(_source, value);
+            var providerHint = _adapter ?? _source ?? "Default";
+
+            var byResolver = resolver?.Resolve(providerHint, value);
             if (!string.IsNullOrWhiteSpace(byResolver))
-                return (_source, byResolver!);
+                return (providerHint, byResolver!);
 
             var named = _cfg[$"ConnectionStrings:{value}"] ?? _cfg[$"Koan:Data:Sources:{value}:ConnectionString"];
             if (!string.IsNullOrWhiteSpace(named))
+                return (providerHint, named!);
+
+            return (providerHint, value);
+        }
+
+        // Priority 2: Source routing (look up source definition to get adapter + connection)
+        if (!string.IsNullOrWhiteSpace(_source))
+        {
+            if (sourceRegistry?.TryGetSource(_source, out var sourceDef) == true)
             {
-                return (_source, named!);
+                return (sourceDef.Adapter, sourceDef.ConnectionString);
             }
-            return (_source, value);
+
+            // Fallback: Try config-based resolution for backward compatibility
+            var byCfg = _cfg[$"ConnectionStrings:{_source}"] ?? _cfg[$"Koan:Data:Sources:{_source}:ConnectionString"];
+            if (!string.IsNullOrWhiteSpace(byCfg))
+                return (_source, byCfg!);
+
+            throw new InvalidOperationException(
+                $"Source '{_source}' not found in DataSourceRegistry. Configure Koan:Data:Sources:{_source} or use WithConnectionString().");
         }
 
-        var byName = resolver?.Resolve(_source, _source);
-        if (!string.IsNullOrWhiteSpace(byName))
+        // Priority 3: Adapter routing (use adapter as provider, resolve default connection)
+        if (!string.IsNullOrWhiteSpace(_adapter))
         {
-            return (_source, byName!);
+            var byResolver = resolver?.Resolve(_adapter, _adapter);
+            if (!string.IsNullOrWhiteSpace(byResolver))
+                return (_adapter, byResolver!);
+
+            // Try adapter-specific config path
+            var adapterCfg = _cfg[$"Koan:Data:{_adapter}:ConnectionString"];
+            if (!string.IsNullOrWhiteSpace(adapterCfg))
+                return (_adapter, adapterCfg!);
+
+            // Try default source for this adapter
+            if (sourceRegistry?.TryGetSource("Default", out var defaultSource) == true)
+            {
+                if (string.Equals(defaultSource.Adapter, _adapter, StringComparison.OrdinalIgnoreCase))
+                    return (_adapter, defaultSource.ConnectionString);
+            }
+
+            throw new InvalidOperationException(
+                $"Connection string for adapter '{_adapter}' could not be resolved. Use WithConnectionString() or configure Koan:Data:{_adapter}:ConnectionString.");
         }
 
-        var byCfg = _cfg[$"ConnectionStrings:{_source}"] ?? _cfg[$"Koan:Data:Sources:{_source}:ConnectionString"];
-        if (!string.IsNullOrWhiteSpace(byCfg))
+        // Priority 4: No routing specified - use default source
+        if (sourceRegistry?.TryGetSource("Default", out var defSource) == true)
         {
-            return (_source, byCfg!);
+            return (defSource.Adapter, defSource.ConnectionString);
         }
 
-        throw new InvalidOperationException($"Connection string for '{_source}' could not be resolved. Use WithConnectionString(nameOrConnectionString) or configure Koan:Data:Sources");
+        throw new InvalidOperationException(
+            "No source or adapter specified, and no 'Default' source configured. Specify Direct(source: ...) or Direct(adapter: ...) or configure Koan:Data:Sources:Default.");
     }
 
     private static DbConnection CreateConnection(IServiceProvider sp, string provider, string connectionString)

@@ -1,4 +1,4 @@
-# S8.Location: Canonical Location Standardization System
+﻿# S8.Location: Canonical Location Standardization System
 
 **Project Status**: Implementation Ready  
 **Architecture**: CLD Orchestrator Bidirectional Pattern with SHA512 Deduplication  
@@ -91,10 +91,10 @@ public class AgnosticLocation : Entity<AgnosticLocation>
 
 ### Flow Intake Interceptor Pattern
 
-**Koan.Flow manages all orchestration** - no custom orchestrators needed:
+**Koan.Canon manages all orchestration** - no custom orchestrators needed:
 
 1. **Adapters** → `location.Send()` → **Transport Envelope** → **Message Queue**
-2. **Koan.Flow.Core** → **Built-in orchestrator** consumes Flow entity messages
+2. **Koan.Canon.Core** → **Built-in orchestrator** consumes Flow entity messages
 3. **Flow Intake Pipeline** → Applies registered **FlowIntakeInterceptors**
 4. **LocationInterceptor** → Checks SHA512 signature:
    - **Drop**: Already processed (has signature)
@@ -347,7 +347,7 @@ start.bat
 **Rationale**: Eliminates 95% of resolution calls, consistent results, collision-resistant
 
 ### ADR-003: Flow Intake Interceptor Pattern
-**Decision**: Use Koan.Flow's built-in orchestration with FlowIntakeInterceptors
+**Decision**: Use Koan.Canon's built-in orchestration with FlowIntakeInterceptors
 
 **Rationale**: Leverage framework capabilities, no custom orchestrators needed, cleaner separation of concerns
 
@@ -378,11 +378,11 @@ start.bat
 - **CLD_ORCHESTRATOR_BIDIRECTIONAL_PATTERN.md**: Detailed architecture specification
 - **CLD_LOCATION_STANDARDIZATION.md**: Complete system design and rationale
 - **IMPLEMENTATION.md**: Step-by-step development guide
-- **S8.Flow**: Reference implementation for Flow patterns
+- **S8.Canon**: Reference implementation for Flow patterns
 - **S5.Recs**: Reference implementation for AI integration
 
 ---
 
 **Document Status**: Ready for Implementation  
 **Architecture Status**: Final - Gang Approved ✅  
-**Framework Dependencies**: Koan.Data, Koan.Flow, Koan.Messaging, Koan.AI
+**Framework Dependencies**: Koan.Data, Koan.Canon, Koan.Messaging, Koan.AI

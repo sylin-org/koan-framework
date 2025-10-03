@@ -1,0 +1,607 @@
+<div class="container-fluid py-4" ng-controller="ConfigurationController">
+    <!-- Loading State -->
+    <div ng-if="loading" class="d-flex justify-content-center align-items-center" style="min-height: 400px;">
+        <div class="text-center">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-3 text-muted">Loading configuration...</p>
+        </div>
+    </div>
+
+    <!-- Configuration Content -->
+    <div ng-if="!loading">
+        <!-- Header -->
+        <div class="row mb-4">
+            <div class="col">
+                <h1 class="h2 mb-1">System Configuration</h1>
+                <p class="text-muted">Manage AI models, data storage, and system settings</p>
+            </div>
+            <div class="col-auto">
+                <button class="btn btn-outline-danger me-2" ng-click="resetConfiguration()">
+                    <i class="bi bi-arrow-counterclockwise"></i> Reset to Defaults
+                </button>
+                <button class="btn btn-primary" ng-click="saveConfiguration()" ng-disabled="saving">
+                    <span ng-if="!saving">
+                        <i class="bi bi-save"></i> Save Configuration
+                    </span>
+                    <span ng-if="saving">
+                        <span class="spinner-border spinner-border-sm me-2"></span>
+                        Saving...
+                    </span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Configuration Tabs -->
+        <div class="row mb-4">
+            <div class="col">
+                <ul class="nav nav-pills nav-fill">
+                    <li class="nav-item" ng-repeat="tab in tabs">
+                        <a class="nav-link" ng-class="{'active': isActiveTab(tab.id)}"
+                           href="#" ng-click="setActiveTab(tab.id)">
+                            <i class="{{tab.icon}} me-2"></i>{{tab.label}}
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- AI Models Configuration -->
+        <div ng-if="isActiveTab('models')">
+            <div class="row">
+                <!-- OpenAI -->
+                <div class="col-md-6 mb-4">
+                    <div class="card h-100">
+                        <div class="card-header">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <h5 class="card-title mb-0">
+                                    <i class="bi bi-robot me-2"></i>OpenAI
+                                </h5>
+                                <div class="d-flex align-items-center">
+                                    <span class="badge me-2" ng-class="getProviderStatusClass('openai', 'models')">
+                                        {{getProviderStatusText('openai', 'models')}}
+                                    </span>
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox"
+                                               ng-model="config.models.openai.enabled">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label class="form-label">API Key</label>
+                                <input type="password" class="form-control"
+                                       ng-model="config.models.openai.apiKey"
+                                       placeholder="sk-...">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Base URL</label>
+                                <input type="url" class="form-control"
+                                       ng-model="config.models.openai.baseUrl">
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Default Model</label>
+                                    <select class="form-select" ng-model="config.models.openai.defaultModel">
+                                        <option value="gpt-4-turbo">GPT-4 Turbo</option>
+                                        <option value="gpt-4">GPT-4</option>
+                                        <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Max Tokens</label>
+                                    <input type="number" class="form-control"
+                                           ng-model="config.models.openai.maxTokens" min="1" max="8192">
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Temperature ({{config.models.openai.temperature}})</label>
+                                <input type="range" class="form-range"
+                                       ng-model="config.models.openai.temperature"
+                                       min="0" max="1" step="0.1">
+                            </div>
+                        </div>
+                        <div class="card-footer">
+                            <button class="btn btn-outline-primary btn-sm w-100"
+                                    ng-click="testModel('openai')" ng-disabled="testing.openai || !config.models.openai.enabled">
+                                <span ng-if="!testing.openai">
+                                    <i class="bi bi-lightning me-2"></i>Test Connection
+                                </span>
+                                <span ng-if="testing.openai">
+                                    <span class="spinner-border spinner-border-sm me-2"></span>Testing...
+                                </span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Ollama -->
+                <div class="col-md-6 mb-4">
+                    <div class="card h-100">
+                        <div class="card-header">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <h5 class="card-title mb-0">
+                                    <i class="bi bi-hdd me-2"></i>Ollama (Local)
+                                </h5>
+                                <div class="d-flex align-items-center">
+                                    <span class="badge me-2" ng-class="getProviderStatusClass('ollama', 'models')">
+                                        {{getProviderStatusText('ollama', 'models')}}
+                                    </span>
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox"
+                                               ng-model="config.models.ollama.enabled">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label class="form-label">Base URL</label>
+                                <input type="url" class="form-control"
+                                       ng-model="config.models.ollama.baseUrl">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Default Model</label>
+                                <div class="input-group">
+                                    <select class="form-select" ng-model="config.models.ollama.defaultModel">
+                                        <option ng-repeat="model in config.models.ollama.availableModels"
+                                                value="{{model}}">{{model}}</option>
+                                    </select>
+                                    <button class="btn btn-outline-secondary" type="button"
+                                            ng-click="refreshOllamaModels()" ng-disabled="testing.ollama">
+                                        <i class="bi bi-arrow-clockwise"></i>
+                                    </button>
+                                </div>
+                                <small class="form-text text-muted">Refresh to load available models</small>
+                            </div>
+                        </div>
+                        <div class="card-footer">
+                            <button class="btn btn-outline-primary btn-sm w-100"
+                                    ng-click="testModel('ollama')" ng-disabled="testing.ollama || !config.models.ollama.enabled">
+                                <span ng-if="!testing.ollama">
+                                    <i class="bi bi-lightning me-2"></i>Test Connection
+                                </span>
+                                <span ng-if="testing.ollama">
+                                    <span class="spinner-border spinner-border-sm me-2"></span>Testing...
+                                </span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Anthropic -->
+                <div class="col-md-6 mb-4">
+                    <div class="card h-100">
+                        <div class="card-header">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <h5 class="card-title mb-0">
+                                    <i class="bi bi-chat-dots me-2"></i>Anthropic
+                                </h5>
+                                <div class="d-flex align-items-center">
+                                    <span class="badge me-2" ng-class="getProviderStatusClass('anthropic', 'models')">
+                                        {{getProviderStatusText('anthropic', 'models')}}
+                                    </span>
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox"
+                                               ng-model="config.models.anthropic.enabled">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label class="form-label">API Key</label>
+                                <input type="password" class="form-control"
+                                       ng-model="config.models.anthropic.apiKey"
+                                       placeholder="sk-ant-...">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Base URL</label>
+                                <input type="url" class="form-control"
+                                       ng-model="config.models.anthropic.baseUrl">
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Default Model</label>
+                                    <select class="form-select" ng-model="config.models.anthropic.defaultModel">
+                                        <option value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet</option>
+                                        <option value="claude-3-5-haiku-20241022">Claude 3.5 Haiku</option>
+                                        <option value="claude-3-opus-20240229">Claude 3 Opus</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Max Tokens</label>
+                                    <input type="number" class="form-control"
+                                           ng-model="config.models.anthropic.maxTokens" min="1" max="8192">
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Temperature ({{config.models.anthropic.temperature}})</label>
+                                <input type="range" class="form-range"
+                                       ng-model="config.models.anthropic.temperature"
+                                       min="0" max="1" step="0.1">
+                            </div>
+                        </div>
+                        <div class="card-footer">
+                            <button class="btn btn-outline-primary btn-sm w-100"
+                                    ng-click="testModel('anthropic')" ng-disabled="testing.anthropic || !config.models.anthropic.enabled">
+                                <span ng-if="!testing.anthropic">
+                                    <i class="bi bi-lightning me-2"></i>Test Connection
+                                </span>
+                                <span ng-if="testing.anthropic">
+                                    <span class="spinner-border spinner-border-sm me-2"></span>Testing...
+                                </span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="card mb-4">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0"><i class="bi bi-cloud-download me-2"></i>Model Installations</h5>
+                        <button class="btn btn-outline-primary btn-sm" ng-click="refreshInstallations()">
+                            <i class="bi bi-arrow-repeat"></i> Refresh
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body table-responsive">
+                    <table class="table align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>Model</th>
+                                <th>Provider</th>
+                                <th>Status</th>
+                                <th>Progress</th>
+                                <th>Step</th>
+                                <th>Updated</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr ng-repeat="install in installations">
+                                <td>{{install.modelName}}</td>
+                                <td class="text-uppercase">{{install.provider}}</td>
+                                <td>
+                                    <span class="badge" ng-class="{
+                                        'bg-success': install.state === 'completed',
+                                        'bg-warning text-dark': install.state === 'installing' || install.state === 'queued',
+                                        'bg-danger': install.state === 'failed'
+                                    }">{{install.state | uppercase}}</span>
+                                </td>
+                                <td>
+                                    <div class="progress" style="height: 6px;">
+                                        <div class="progress-bar" role="progressbar" style="width: {{install.progress}}%" aria-valuemin="0" aria-valuemax="100"></div>
+                                    </div>
+                                </td>
+                                <td>{{install.currentStep}}</td>
+                                <td>{{(install.lastUpdated || install.enqueuedAt) | date:'short'}}</td>
+                            </tr>
+                            <tr ng-if="installations.length === 0">
+                                <td colspan="6" class="text-center text-muted py-3">No model installations yet</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Data Storage Configuration -->
+        <div ng-if="isActiveTab('storage')">
+            <div class="row">
+                <!-- MongoDB -->
+                <div class="col-md-6 mb-4">
+                    <div class="card h-100">
+                        <div class="card-header">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <h5 class="card-title mb-0">
+                                    <i class="bi bi-database me-2"></i>MongoDB
+                                </h5>
+                                <div class="d-flex align-items-center">
+                                    <span class="badge me-2" ng-class="getProviderStatusClass('mongodb', 'storage')">
+                                        {{getProviderStatusText('mongodb', 'storage')}}
+                                    </span>
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox"
+                                               ng-model="config.storage.mongodb.enabled">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label class="form-label">Connection String</label>
+                                <input type="text" class="form-control font-monospace"
+                                       ng-model="config.storage.mongodb.connectionString"
+                                       placeholder="mongodb://localhost:27017/database">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Database Name</label>
+                                <input type="text" class="form-control"
+                                       ng-model="config.storage.mongodb.database">
+                            </div>
+                        </div>
+                        <div class="card-footer">
+                            <button class="btn btn-outline-primary btn-sm w-100"
+                                    ng-click="testStorage('mongodb')" ng-disabled="testing.mongodb || !config.storage.mongodb.enabled">
+                                <span ng-if="!testing.mongodb">
+                                    <i class="bi bi-lightning me-2"></i>Test Connection
+                                </span>
+                                <span ng-if="testing.mongodb">
+                                    <span class="spinner-border spinner-border-sm me-2"></span>Testing...
+                                </span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Weaviate -->
+                <div class="col-md-6 mb-4">
+                    <div class="card h-100">
+                        <div class="card-header">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <h5 class="card-title mb-0">
+                                    <i class="bi bi-vector-pen me-2"></i>Weaviate (Vector DB)
+                                </h5>
+                                <div class="d-flex align-items-center">
+                                    <span class="badge me-2" ng-class="getProviderStatusClass('weaviate', 'storage')">
+                                        {{getProviderStatusText('weaviate', 'storage')}}
+                                    </span>
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox"
+                                               ng-model="config.storage.weaviate.enabled">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label class="form-label">Endpoint</label>
+                                <input type="url" class="form-control"
+                                       ng-model="config.storage.weaviate.endpoint"
+                                       placeholder="http://localhost:8080">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">API Key (Optional)</label>
+                                <input type="password" class="form-control"
+                                       ng-model="config.storage.weaviate.apiKey">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Class Name</label>
+                                <input type="text" class="form-control"
+                                       ng-model="config.storage.weaviate.className"
+                                       placeholder="Document">
+                            </div>
+                        </div>
+                        <div class="card-footer">
+                            <button class="btn btn-outline-primary btn-sm w-100"
+                                    ng-click="testStorage('weaviate')" ng-disabled="testing.weaviate || !config.storage.weaviate.enabled">
+                                <span ng-if="!testing.weaviate">
+                                    <i class="bi bi-lightning me-2"></i>Test Connection
+                                </span>
+                                <span ng-if="testing.weaviate">
+                                    <span class="spinner-border spinner-border-sm me-2"></span>Testing...
+                                </span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Redis -->
+                <div class="col-md-6 mb-4">
+                    <div class="card h-100">
+                        <div class="card-header">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <h5 class="card-title mb-0">
+                                    <i class="bi bi-speedometer me-2"></i>Redis (Cache)
+                                </h5>
+                                <div class="d-flex align-items-center">
+                                    <span class="badge me-2" ng-class="getProviderStatusClass('redis', 'storage')">
+                                        {{getProviderStatusText('redis', 'storage')}}
+                                    </span>
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox"
+                                               ng-model="config.storage.redis.enabled">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label class="form-label">Connection String</label>
+                                <input type="text" class="form-control font-monospace"
+                                       ng-model="config.storage.redis.connectionString"
+                                       placeholder="localhost:6379">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Database Number</label>
+                                <input type="number" class="form-control"
+                                       ng-model="config.storage.redis.database" min="0" max="15">
+                            </div>
+                        </div>
+                        <div class="card-footer">
+                            <button class="btn btn-outline-primary btn-sm w-100"
+                                    ng-click="testStorage('redis')" ng-disabled="testing.redis || !config.storage.redis.enabled">
+                                <span ng-if="!testing.redis">
+                                    <i class="bi bi-lightning me-2"></i>Test Connection
+                                </span>
+                                <span ng-if="testing.redis">
+                                    <span class="spinner-border spinner-border-sm me-2"></span>Testing...
+                                </span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Processing Configuration -->
+        <div ng-if="isActiveTab('processing')">
+            <div class="row">
+                <div class="col-md-8">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">
+                                <i class="bi bi-gear me-2"></i>Processing Settings
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Max Concurrent Processing</label>
+                                    <input type="number" class="form-control"
+                                           ng-model="config.processing.maxConcurrentProcessing" min="1" max="10">
+                                    <small class="form-text text-muted">Number of files processed simultaneously</small>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Analysis Timeout (seconds)</label>
+                                    <input type="number" class="form-control"
+                                           ng-model="config.processing.analysisTimeout" min="30" max="3600">
+                                    <small class="form-text text-muted">Maximum time for analysis operations</small>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Retry Attempts</label>
+                                    <input type="number" class="form-control"
+                                           ng-model="config.processing.retryAttempts" min="0" max="5">
+                                    <small class="form-text text-muted">Number of retry attempts for failed operations</small>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Max File Size</label>
+                                    <div class="input-group">
+                                        <input type="number" class="form-control"
+                                               ng-model="config.processing.maxFileSize" min="1048576">
+                                        <span class="input-group-text">{{formatBytes(config.processing.maxFileSize)}}</span>
+                                    </div>
+                                    <small class="form-text text-muted">Maximum allowed file size for upload</small>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Temp File Retention (hours)</label>
+                                    <input type="number" class="form-control"
+                                           ng-model="config.processing.tempFileRetentionHours" min="1" max="168">
+                                    <small class="form-text text-muted">How long to keep temporary processing files</small>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <div class="form-check form-switch mt-4">
+                                        <input class="form-check-input" type="checkbox"
+                                               ng-model="config.processing.enableBackgroundProcessing">
+                                        <label class="form-check-label">Enable Background Processing</label>
+                                    </div>
+                                    <small class="form-text text-muted">Process files asynchronously in the background</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Security Configuration -->
+        <div ng-if="isActiveTab('security')">
+            <div class="row">
+                <div class="col-md-8">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">
+                                <i class="bi bi-shield-lock me-2"></i>Security Settings
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-4">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox"
+                                           ng-model="config.security.enableAuthentication">
+                                    <label class="form-check-label">Enable Authentication</label>
+                                </div>
+                                <small class="form-text text-muted">Require authentication for API access</small>
+                            </div>
+
+                            <div ng-if="config.security.enableAuthentication">
+                                <div class="mb-3">
+                                    <label class="form-label">JWT Secret</label>
+                                    <div class="input-group">
+                                        <input type="password" class="form-control font-monospace"
+                                               ng-model="config.security.jwtSecret">
+                                        <button class="btn btn-outline-secondary" type="button"
+                                                ng-click="generateJwtSecret()">
+                                            <i class="bi bi-arrow-clockwise"></i> Generate
+                                        </button>
+                                    </div>
+                                    <small class="form-text text-muted">Secret key for JWT token signing</small>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Session Timeout (seconds)</label>
+                                    <input type="number" class="form-control"
+                                           ng-model="config.security.sessionTimeout" min="300" max="86400">
+                                    <small class="form-text text-muted">How long sessions remain valid</small>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox"
+                                           ng-model="config.security.enableCors">
+                                    <label class="form-check-label">Enable CORS</label>
+                                </div>
+                                <small class="form-text text-muted">Allow cross-origin requests</small>
+                            </div>
+
+                            <div ng-if="config.security.enableCors">
+                                <label class="form-label">Allowed Origins</label>
+                                <div ng-repeat="origin in config.security.allowedOrigins" class="input-group mb-2">
+                                    <input type="url" class="form-control" ng-model="config.security.allowedOrigins[$index]">
+                                    <button class="btn btn-outline-danger" type="button"
+                                            ng-click="removeAllowedOrigin($index)">
+                                        <i class="bi bi-x"></i>
+                                    </button>
+                                </div>
+                                <button class="btn btn-outline-secondary btn-sm" ng-click="addAllowedOrigin()">
+                                    <i class="bi bi-plus"></i> Add Origin
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.nav-pills .nav-link {
+    border-radius: 0.5rem;
+    margin: 0 0.25rem;
+}
+
+.nav-pills .nav-link.active {
+    background-color: var(--bs-primary);
+}
+
+.card-header .form-check-input {
+    margin-top: 0;
+}
+
+.badge.text-success {
+    background-color: rgba(25, 135, 84, 0.1);
+    color: #198754;
+}
+
+.badge.text-warning {
+    background-color: rgba(255, 193, 7, 0.1);
+    color: #fd7e14;
+}
+
+.badge.text-secondary {
+    background-color: rgba(108, 117, 125, 0.1);
+    color: #6c757d;
+}
+
+.font-monospace {
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 0.875rem;
+}
+</style>

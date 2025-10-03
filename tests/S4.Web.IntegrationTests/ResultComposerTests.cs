@@ -2,7 +2,7 @@ using FluentAssertions;
 using HotChocolate;
 using HotChocolate.Execution;
 using Microsoft.AspNetCore.Http;
-using Koan.Web.GraphQl.Infrastructure;
+using Koan.Web.Connector.GraphQl.Infrastructure;
 using System.Collections.Generic;
 using Xunit;
 
@@ -25,3 +25,4 @@ public class ResultComposerTests
         payload.ContainsKey("extensions").Should().BeTrue();
     }
 }
+

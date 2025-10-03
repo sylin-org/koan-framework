@@ -137,8 +137,8 @@ This will:
 
 Visit the Aspire dashboard (typically `http://localhost:15000`) to see:
 
-- **postgres**: PostgreSQL container (registered by Koan.Data.Postgres)
-- **redis**: Redis container (registered by Koan.Data.Redis)
+- **postgres**: PostgreSQL container (registered by Koan.Data.Connector.Postgres)
+- **redis**: Redis container (registered by Koan.Data.Connector.Redis)
 - **koan-aspire-sample**: Web application (registered by sample app)
 
 All registered automatically without manual configuration!
@@ -236,7 +236,7 @@ builder.AddKoanDiscoveredResources(); // Everything automatic!
 ## Key Benefits Demonstrated
 
 ### 1. Zero Configuration Orchestration
-Adding `Koan.Data.Postgres` package automatically enables PostgreSQL orchestration.
+Adding `Koan.Data.Connector.Postgres` package automatically enables PostgreSQL orchestration.
 
 ### 2. Enterprise Service Ownership
 Teams can own their service's orchestration needs without central coordination.
@@ -256,7 +256,7 @@ Orchestration becomes part of the framework rather than external tooling.
 
 ### Resources Not Appearing in Dashboard
 
-1. **Check module references**: Ensure `Koan.Data.Postgres` and `Koan.Data.Redis` are referenced
+1. **Check module references**: Ensure `Koan.Data.Connector.Postgres` and `Koan.Data.Connector.Redis` are referenced
 2. **Verify environment**: Resources only register in Development by default
 3. **Check logs**: Look for "Koan-Aspire: Successfully registered" messages
 

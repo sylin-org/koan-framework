@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 using S5.Recs.Infrastructure;
 using S5.Recs.Services;
+using Koan.Data.Vector.Abstractions;
 
 namespace S5.Recs.Controllers;
 
@@ -162,6 +164,124 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
         return Ok(q.Select(t => new { tag = t.Tag, count = t.MediaCount }));
     }
 
+    [HttpGet("tags/debug")] // Debug endpoint to analyze tag data issues
+    public async Task<IActionResult> DebugTagData(CancellationToken ct)
+    {
+        var allMedia = await Models.Media.All(ct);
+        var mediaCount = allMedia.Count();
+
+        var mediaWithTags = allMedia.Where(m => m.Tags != null && m.Tags.Length > 0).ToList();
+        var mediaWithTagsCount = mediaWithTags.Count;
+
+        // Extract all raw tags before filtering
+        var allRawTags = new List<string>();
+        foreach (var m in allMedia)
+        {
+            if (m.Genres is { Length: > 0 })
+                allRawTags.AddRange(m.Genres.Where(g => !string.IsNullOrWhiteSpace(g)).Select(g => g.Trim()));
+            if (m.Tags is { Length: > 0 })
+                allRawTags.AddRange(m.Tags.Where(t => !string.IsNullOrWhiteSpace(t)).Select(t => t.Trim()));
+        }
+
+        var uniqueRawTags = allRawTags.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+
+        // Check preemptive filtering impact
+        var flaggedByPreemptive = uniqueRawTags.Where(Infrastructure.PreemptiveTagFilter.ShouldCensor).ToList();
+        var passedPreemptive = uniqueRawTags.Where(t => !Infrastructure.PreemptiveTagFilter.ShouldCensor(t)).ToList();
+
+        // Sample some tags that have/don't have data
+        var sampleMediaWithTags = mediaWithTags.Take(3).Select(m => new {
+            id = m.Id,
+            title = m.TitleEnglish ?? m.Title,
+            genreCount = m.Genres?.Length ?? 0,
+            tagCount = m.Tags?.Length ?? 0,
+            genres = m.Genres?.Take(5),
+            tags = m.Tags?.Take(5)
+        }).ToList();
+
+        return Ok(new {
+            totalMedia = mediaCount,
+            mediaWithTags = mediaWithTagsCount,
+            mediaWithTagsPercent = mediaCount > 0 ? Math.Round((double)mediaWithTagsCount / mediaCount * 100, 1) : 0,
+            totalRawTags = allRawTags.Count,
+            uniqueRawTags = uniqueRawTags.Count,
+            preemptiveFilterStats = new {
+                flaggedCount = flaggedByPreemptive.Count,
+                passedCount = passedPreemptive.Count,
+                flaggedPercent = uniqueRawTags.Count > 0 ? Math.Round((double)flaggedByPreemptive.Count / uniqueRawTags.Count * 100, 1) : 0,
+                sampleFlagged = flaggedByPreemptive.Take(10).ToList(),
+                samplePassed = passedPreemptive.Take(10).ToList()
+            },
+            sampleMediaWithTags,
+            currentTagStatCount = (await Models.TagStatDoc.All(ct)).Count()
+        });
+    }
+
+    [HttpGet("tags/counts")] // Compare tag counts between admin and public endpoints
+    public async Task<IActionResult> CompareTagCounts([FromServices] IOptions<S5.Recs.Options.TagCatalogOptions>? tagOptions, CancellationToken ct)
+    {
+        // Get all TagStatDoc records (what rebuild creates)
+        var allTagStats = await Models.TagStatDoc.All(ct);
+        var totalTagStatDocs = allTagStats.Count();
+
+        // Apply the same filtering logic as /api/tags
+        var opt = tagOptions?.Value?.CensorTags ?? Array.Empty<string>();
+        var doc = await Models.CensorTagsDoc.Get("recs:censor-tags", ct);
+        var dyn = doc?.Tags?.ToArray() ?? Array.Empty<string>();
+        var censor = opt.Concat(dyn).Where(s => !string.IsNullOrWhiteSpace(s)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+
+        var filteredTags = allTagStats.Where(t => !IsCensoredTag(t.Tag, censor)).ToList();
+        var publicTagCount = filteredTags.Count();
+
+        return Ok(new {
+            totalTagStatDocs = totalTagStatDocs,      // What rebuild creates
+            publicTagCount = publicTagCount,          // What /api/tags shows
+            filteredOut = totalTagStatDocs - publicTagCount,
+            censorRulesCount = censor.Length,
+            sampleCensorRules = censor.Take(10).ToArray(),
+            sampleFilteredOutTags = allTagStats
+                .Where(t => IsCensoredTag(t.Tag, censor))
+                .Take(10)
+                .Select(t => new { tag = t.Tag, count = t.MediaCount })
+                .ToArray()
+        });
+    }
+
+    private static bool IsCensoredTag(string tag, string[]? censor)
+        => !string.IsNullOrWhiteSpace(tag) &&
+           (censor?.Any(c => !string.IsNullOrWhiteSpace(c) && tag.Equals(c, StringComparison.OrdinalIgnoreCase)) ?? false);
+
+    [HttpGet("media/count")] // Quick media count check
+    public async Task<IActionResult> GetMediaCount(CancellationToken ct)
+    {
+        var allMedia = await Models.Media.All(ct);
+        var count = allMedia.Count();
+
+        // Sample a few media to check for tag data
+        var mediaWithTags = allMedia.Where(m => m.Tags != null && m.Tags.Length > 0).Take(10).ToList();
+        var mediaWithGenres = allMedia.Where(m => m.Genres != null && m.Genres.Length > 0).Take(10).ToList();
+
+        return Ok(new {
+            totalMediaCount = count,
+            sampleMediaWithTags = mediaWithTags.Select(m => new {
+                id = m.Id,
+                title = m.TitleEnglish ?? m.Title,
+                tagCount = m.Tags?.Length ?? 0,
+                genreCount = m.Genres?.Length ?? 0,
+                sampleTags = m.Tags?.Take(3).ToArray(),
+                sampleGenres = m.Genres?.Take(3).ToArray()
+            }).ToArray(),
+            sampleMediaWithGenres = mediaWithGenres.Select(m => new {
+                id = m.Id,
+                title = m.TitleEnglish ?? m.Title,
+                tagCount = m.Tags?.Length ?? 0,
+                genreCount = m.Genres?.Length ?? 0
+            }).ToArray(),
+            mediaWithTagsCount = allMedia.Count(m => m.Tags != null && m.Tags.Length > 0),
+            mediaWithGenresCount = allMedia.Count(m => m.Genres != null && m.Genres.Length > 0)
+        });
+    }
+
     [HttpGet("tags/censor/hashes")] // Generate MD5 hashes for preemptive filtering
     public async Task<IActionResult> GetCensoredTagHashes(CancellationToken ct)
     {
@@ -248,5 +368,368 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
             await HttpContext.Response.Body.FlushAsync(ct);
             await Task.Delay(1000, ct);
         }
+    }
+
+    // Cache management endpoints
+
+    [HttpGet("cache/list")]
+    public async Task<IActionResult> ListCaches([FromServices] Services.IRawCacheService cache, CancellationToken ct)
+    {
+        var manifests = await cache.ListCachesAsync(ct);
+        return Ok(new { count = manifests.Count, caches = manifests });
+    }
+
+    public record RebuildFromCacheRequest(string? Source = null, string? MediaType = null, string? JobId = null);
+
+    [HttpPost("rebuild-db-from-cache")]
+    public async Task<IActionResult> RebuildFromCache(
+        [FromBody] RebuildFromCacheRequest? req,
+        [FromServices] Services.IRawCacheService cache,
+        [FromServices] Services.IMediaParserRegistry parserRegistry,
+        CancellationToken ct)
+    {
+        req ??= new RebuildFromCacheRequest();
+
+        // If no source/mediaType specified, iterate through ALL unique combinations
+        if (string.IsNullOrWhiteSpace(req.Source) || string.IsNullOrWhiteSpace(req.MediaType))
+        {
+            var allManifests = await cache.ListCachesAsync(ct);
+            var uniqueCombinations = allManifests
+                .Select(m => new { m.Source, m.MediaType })
+                .Distinct()
+                .ToList();
+
+            if (uniqueCombinations.Count == 0)
+            {
+                return NotFound(new { error = "No caches found" });
+            }
+
+            _logger.LogInformation("Rebuild: processing ALL {Count} unique source/mediaType combinations from cache",
+                uniqueCombinations.Count);
+
+            int totalImportedAll = 0;
+            int totalCachedAll = 0;
+            var results = new List<object>();
+
+            foreach (var combo in uniqueCombinations)
+            {
+                // Process each combination
+                var comboResult = await ProcessSourceMediaTypeCombination(
+                    combo.Source,
+                    combo.MediaType,
+                    null, // Process all jobs for this combo
+                    cache,
+                    parserRegistry,
+                    ct);
+
+                if (comboResult != null)
+                {
+                    totalImportedAll += comboResult.Value.Imported;
+                    totalCachedAll += comboResult.Value.Cached;
+                    results.Add(new
+                    {
+                        source = combo.Source,
+                        mediaType = combo.MediaType,
+                        jobsProcessed = comboResult.Value.JobsProcessed,
+                        imported = comboResult.Value.Imported,
+                        cached = comboResult.Value.Cached
+                    });
+                }
+            }
+
+            _logger.LogInformation("Rebuild: completed ALL source/mediaType combinations - total imported {Total}",
+                totalImportedAll);
+
+            return Ok(new
+            {
+                combinations = results,
+                totalImported = totalImportedAll,
+                totalCached = totalCachedAll
+            });
+        }
+
+        // Process single source/mediaType combination
+        var result = await ProcessSourceMediaTypeCombination(
+            req.Source!,
+            req.MediaType!,
+            req.JobId,
+            cache,
+            parserRegistry,
+            ct);
+
+        if (result == null)
+        {
+            return BadRequest(new { error = "Failed to process cache" });
+        }
+
+        return Ok(new
+        {
+            source = req.Source,
+            mediaType = req.MediaType,
+            jobsProcessed = result.Value.JobsProcessed,
+            jobIds = result.Value.JobIds,
+            imported = result.Value.Imported,
+            cached = result.Value.Cached
+        });
+    }
+
+    private async Task<(int JobsProcessed, string[] JobIds, int Imported, int Cached)?> ProcessSourceMediaTypeCombination(
+        string source,
+        string mediaType,
+        string? specificJobId,
+        Services.IRawCacheService cache,
+        Services.IMediaParserRegistry parserRegistry,
+        CancellationToken ct)
+    {
+        // Get parser for this source
+        var parser = parserRegistry.GetParser(source);
+        if (parser == null)
+        {
+            _logger.LogWarning("No parser found for source '{Source}'", source);
+            return null;
+        }
+
+        // Resolve MediaType (use request ct for validation only)
+        var mediaTypeEntity = await Models.MediaType.All(ct)
+            .ContinueWith(t => t.Result.FirstOrDefault(mt => mt.Name.Equals(mediaType, StringComparison.OrdinalIgnoreCase)), ct);
+
+        if (mediaTypeEntity == null)
+        {
+            _logger.LogWarning("MediaType '{MediaType}' not found", mediaType);
+            return null;
+        }
+
+        // Determine which jobs to process (use request ct for validation)
+        List<Services.CacheManifest> jobsToProcess;
+        if (!string.IsNullOrWhiteSpace(specificJobId))
+        {
+            // Process single specific job
+            var manifest = await cache.GetManifestAsync(source, mediaType, specificJobId, ct);
+            if (manifest == null)
+            {
+                _logger.LogWarning("Cache not found: {Source}/{MediaType}/{JobId}", source, mediaType, specificJobId);
+                return null;
+            }
+            jobsToProcess = new List<Services.CacheManifest> { manifest };
+        }
+        else
+        {
+            // Process ALL jobs for this source/mediaType in chronological order (oldest first)
+            var allManifests = await cache.ListCachesAsync(ct);
+            jobsToProcess = allManifests
+                .Where(m => m.Source.Equals(source, StringComparison.OrdinalIgnoreCase) &&
+                           m.MediaType.Equals(mediaType, StringComparison.OrdinalIgnoreCase))
+                .OrderBy(m => m.FetchedAt) // OLDEST FIRST to preserve update order
+                .ToList();
+
+            if (jobsToProcess.Count == 0)
+            {
+                _logger.LogWarning("No caches found for {Source}/{MediaType}", source, mediaType);
+                return null;
+            }
+
+            _logger.LogInformation("Rebuild: processing {Count} cache jobs in chronological order for {Source}/{MediaType}",
+                jobsToProcess.Count, source, mediaType);
+        }
+
+        // Long-running operation: use CancellationToken.None to prevent HTTP timeout cancellation
+        // Parse and import per page to avoid memory issues
+        int totalImported = 0;
+        int totalCached = 0;
+
+        foreach (var job in jobsToProcess)
+        {
+            _logger.LogInformation("Rebuild: processing job {JobId} (fetched {FetchedAt:u})",
+                job.JobId, job.FetchedAt);
+
+            await foreach (var (pageNum, rawJson) in cache.ReadPagesAsync(job.Source, job.MediaType, job.JobId, CancellationToken.None))
+            {
+                var parsedMedia = await parser.ParsePageAsync(rawJson, mediaTypeEntity, CancellationToken.None);
+
+                if (parsedMedia.Count > 0)
+                {
+                    var imported = await Models.Media.UpsertMany(parsedMedia, CancellationToken.None);
+                    totalImported += imported;
+
+                    if (pageNum % 50 == 0) // Log every 50 pages
+                    {
+                        _logger.LogInformation("Rebuild: page {Page} complete ({PageItems} items, total: {Total})",
+                            pageNum, parsedMedia.Count, totalImported);
+                    }
+                }
+            }
+
+            totalCached += job.TotalItems;
+        }
+
+        _logger.LogInformation("Rebuilt database from {JobCount} cache job(s): {Source}/{MediaType} - imported {Imported} items",
+            jobsToProcess.Count, source, mediaType, totalImported);
+
+        return (jobsToProcess.Count, jobsToProcess.Select(j => j.JobId).ToArray(), totalImported, totalCached);
+    }
+
+    // Flush endpoints
+
+    [HttpPost("flush/cache")]
+    public async Task<IActionResult> FlushCache([FromServices] Services.IRawCacheService cache, CancellationToken ct)
+    {
+        var count = await cache.FlushAllAsync(ct);
+        return Ok(new { flushed = "cache", count });
+    }
+
+    [HttpPost("flush/vectors")]
+    public async Task<IActionResult> FlushVectors(CancellationToken ct)
+    {
+        // Delete all vector data
+        var count = 0;
+        if (Koan.Data.Vector.Vector<Models.Media>.IsAvailable)
+        {
+            await foreach (var media in Models.Media.AllStream(1000, ct))
+            {
+                await Koan.Data.Vector.Vector<Models.Media>.Delete(media.Id!, ct);
+                count++;
+            }
+        }
+        return Ok(new { flushed = "vectors", count });
+    }
+
+    [HttpPost("flush/tags")]
+    public async Task<IActionResult> FlushTags(CancellationToken ct)
+    {
+        var allTags = await Models.TagStatDoc.All(ct);
+        var count = allTags.Count();
+
+        foreach (var tag in allTags)
+        {
+            await Models.TagStatDoc.Remove(tag.Id!, ct);
+        }
+
+        return Ok(new { flushed = "tags", count });
+    }
+
+    [HttpPost("flush/genres")]
+    public async Task<IActionResult> FlushGenres(CancellationToken ct)
+    {
+        var allGenres = await Models.GenreStatDoc.All(ct);
+        var count = allGenres.Count();
+
+        foreach (var genre in allGenres)
+        {
+            await Models.GenreStatDoc.Remove(genre.Id!, ct);
+        }
+
+        return Ok(new { flushed = "genres", count });
+    }
+
+    [HttpPost("flush/embeddings")]
+    public async Task<IActionResult> FlushEmbeddingsCache([FromServices] Services.IEmbeddingCache embeddingCache, CancellationToken ct)
+    {
+        var count = await embeddingCache.FlushAsync(ct);
+        return Ok(new { flushed = "embeddings-cache", count });
+    }
+
+    [HttpGet("cache/embeddings/stats")]
+    public async Task<IActionResult> GetEmbeddingsCacheStats([FromServices] Services.IEmbeddingCache embeddingCache, CancellationToken ct)
+    {
+        var stats = await embeddingCache.GetStatsAsync(ct);
+        return Ok(stats);
+    }
+
+    [HttpPost("cache/embeddings/export")]
+    public async Task<IActionResult> ExportEmbeddingsToCache(
+        [FromServices] Koan.Data.Vector.IVectorService vectorService,
+        [FromServices] Services.IEmbeddingCache embeddingCache,
+        [FromServices] Services.ISeedService seedService,
+        [FromQuery] string? entityType,
+        CancellationToken ct)
+    {
+        try
+        {
+            var modelId = "default"; // TODO: Get from configuration
+            var count = 0;
+            var errors = 0;
+
+            _logger.LogInformation("Starting export of existing vectors to embedding cache...");
+
+            // Get vector repository from IVectorService
+            var vectorRepo = vectorService.TryGetRepository<Models.Media, string>();
+            if (vectorRepo == null)
+            {
+                _logger.LogError("Failed to resolve vector repository for Media entity");
+                return StatusCode(500, new { error = "Vector repository not available" });
+            }
+
+            _logger.LogInformation("Using vector repository: {Type}", vectorRepo.GetType().FullName);
+
+            await foreach (var batch in vectorRepo.ExportAllAsync(batchSize: 100, ct))
+            {
+                try
+                {
+                    // Load the media entity to reconstruct the embedding text for content hashing
+                    var media = await Models.Media.Get(batch.Id, ct);
+                    if (media == null)
+                    {
+                        _logger.LogWarning("Media {Id} not found in database, skipping cache export", batch.Id);
+                        errors++;
+                        continue;
+                    }
+
+                    // Use SeedService's BuildEmbeddingText to get consistent hash
+                    var embeddingText = seedService.BuildEmbeddingText(media);
+                    var contentHash = Services.EmbeddingCache.ComputeContentHash(embeddingText);
+
+                    // Cache the existing embedding
+                    await embeddingCache.SetAsync(contentHash, modelId, batch.Embedding, typeof(Models.Media).FullName!, ct);
+                    count++;
+
+                    if (count % 100 == 0)
+                    {
+                        _logger.LogInformation("Export progress: {Count} vectors cached...", count);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error exporting vector {Id} to cache", batch.Id);
+                    errors++;
+                }
+            }
+
+            _logger.LogInformation("Vector export completed: {Count} vectors cached, {Errors} errors", count, errors);
+            return Ok(new
+            {
+                operation = "export-embeddings-to-cache",
+                exported = count,
+                errors,
+                message = $"Exported {count} existing vectors to embedding cache for adapter portability"
+            });
+        }
+        catch (NotSupportedException ex)
+        {
+            _logger.LogWarning(ex, "Vector export not supported by current adapter");
+            return BadRequest(new
+            {
+                error = "Vector export not supported by current vector database adapter",
+                details = ex.Message,
+                suggestion = "Use a vector adapter with native export capabilities"
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to export vectors to cache");
+            return StatusCode(500, new { error = "Export failed", details = ex.Message });
+        }
+    }
+
+    [HttpPost("flush/media")]
+    public async Task<IActionResult> FlushMedia(CancellationToken ct)
+    {
+        var count = 0;
+        await foreach (var media in Models.Media.AllStream(1000, ct))
+        {
+            await Models.Media.Remove(media.Id!, ct);
+            count++;
+        }
+
+        return Ok(new { flushed = "media", count });
     }
 }
