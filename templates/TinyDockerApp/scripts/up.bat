@@ -1,3 +1,0 @@
-@echo off
-echo Starting TinyDockerApp via compose...
-docker compose -f .\compose\docker-compose.yml up -d
