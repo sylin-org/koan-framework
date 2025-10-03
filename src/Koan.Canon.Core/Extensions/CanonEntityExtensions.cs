@@ -312,9 +312,9 @@ public static class CanonEntityExtensions
                 }
             }
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            // Log error but don't fail - some assemblies might not be accessible
+            // Swallow errors - some assemblies might not be accessible
         }
 
         return result;

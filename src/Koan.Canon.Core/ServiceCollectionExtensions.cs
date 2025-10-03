@@ -91,9 +91,9 @@ public static class ServiceCollectionExtensions
             }
             return dict;
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            // Log the error but don't fail completely - this preserves existing error handling  
+            // Swallow parsing errors - this preserves existing error handling
             return null;
         }
     }
@@ -138,23 +138,16 @@ public static class ServiceCollectionExtensions
         // This connects the queue to any registered CanonOrchestrator services
         services.On<string>(async (payload) =>
         {
-            try
+            // Get any registered CanonOrchestrator service and process the message
+            var serviceProvider = Koan.Core.Hosting.App.AppHost.Current;
+            var orchestrator = serviceProvider?.GetService<ICanonOrchestrator>();
+            if (orchestrator != null)
             {
-                // Get any registered CanonOrchestrator service and process the message
-                var serviceProvider = Koan.Core.Hosting.App.AppHost.Current;
-                var orchestrator = serviceProvider?.GetService<ICanonOrchestrator>();
-                if (orchestrator != null)
-                {
-                    await orchestrator.ProcessCanonEntity(payload);
-                }
-                else
-                {
-                    // DefaultCanonOrchestrator will handle it as a fallback
-                }
+                await orchestrator.ProcessCanonEntity(payload);
             }
-            catch (Exception ex)
+            else
             {
-                throw;
+                // DefaultCanonOrchestrator will handle it as a fallback
             }
         });
 
@@ -523,8 +516,9 @@ public static class ServiceCollectionExtensions
                                     {
                                         var json = Newtonsoft.Json.JsonConvert.SerializeObject(rootEntity, Newtonsoft.Json.Formatting.Indented);
                                     }
-                                    catch (Exception ex)
+                                    catch (Exception)
                                     {
+                                        // Swallow deserialization errors
                                     }
 
                                     // Store the entity directly without DynamicCanonEntity wrapper

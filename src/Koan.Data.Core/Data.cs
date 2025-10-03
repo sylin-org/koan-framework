@@ -33,17 +33,21 @@ public static class Data<TEntity, TKey>
 
     public static async Task<IReadOnlyList<TEntity>> All(DataQueryOptions? options, CancellationToken ct = default)
     {
-        var result = await QueryWithCount((Expression<Func<TEntity, bool>>?)null, options, ct).ConfigureAwait(false);
+        Expression<Func<TEntity, bool>>? predicate = null;
+        var result = await QueryWithCount(predicate, options, ct).ConfigureAwait(false);
         return result.Items;
     }
 
     public static Task<QueryResult<TEntity>> AllWithCount(DataQueryOptions? options = null, CancellationToken ct = default)
-        => QueryWithCount((Expression<Func<TEntity, bool>>?)null, options, ct);
+    {
+        Expression<Func<TEntity, bool>>? predicate = null;
+        return QueryWithCount(predicate, options, ct);
+    }
 
     public static Task<QueryResult<TEntity>> QueryWithCount(DataQueryOptions? options, CancellationToken ct = default, int? absoluteMaxRecords = null)
         => QueryWithCount((object?)null, options, ct, absoluteMaxRecords);
 
-    public static Task<QueryResult<TEntity>> QueryWithCount(Expression<Func<TEntity, bool>> predicate, DataQueryOptions? options = null, CancellationToken ct = default, int? absoluteMaxRecords = null)
+    public static Task<QueryResult<TEntity>> QueryWithCount(Expression<Func<TEntity, bool>>? predicate, DataQueryOptions? options = null, CancellationToken ct = default, int? absoluteMaxRecords = null)
         => QueryWithCount((object?)predicate, options, ct, absoluteMaxRecords);
 
     public static Task<QueryResult<TEntity>> QueryWithCount(string query, DataQueryOptions? options = null, CancellationToken ct = default, int? absoluteMaxRecords = null)
@@ -329,7 +333,8 @@ public static class Data<TEntity, TKey>
     }
 
     // Partition-scoped helpers (ambient via EntityContext)
-    public static IDisposable WithPartition(string? partition) => EntityContext.Partition(partition);
+    public static IDisposable WithPartition(string? partition) =>
+        string.IsNullOrEmpty(partition) ? NoOpDisposable.Instance : EntityContext.Partition(partition);
 
     public static Task<TEntity?> GetAsync(TKey id, string partition, CancellationToken ct = default)
     { using var _ = WithPartition(partition); return Repo.GetAsync(id, ct); }
@@ -517,4 +522,11 @@ public static class Data<TEntity, TKey>
 
     // Fluent builder: Data<TEntity,TKey>.MoveFrom("backup").Where(...).Map(...).Copy().BatchSize(1000).To("root");
     public static PartitionMoveBuilder<TEntity, TKey> MoveFrom(string fromPartition) => new(fromPartition);
+
+    private sealed class NoOpDisposable : IDisposable
+    {
+        public static readonly NoOpDisposable Instance = new();
+        private NoOpDisposable() { }
+        public void Dispose() { }
+    }
 }
