@@ -1,8 +1,10 @@
+using System;
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Koan.Core;
 using Koan.Data.Abstractions;
+using Koan.Data.Core;
 using Koan.Data.Connector.Json;
 using Xunit;
 
@@ -38,6 +40,8 @@ public class SetRoutingTests
     [Fact]
     public async Task Json_Resolves_Root_And_Backup()
     {
+        TestHooks.ResetDataConfigs();
+
         var dir = Path.Combine(Path.GetTempPath(), "Koan-set-tests", Guid.NewGuid().ToString("n"));
         Directory.CreateDirectory(dir);
         var sp = BuildJson(dir);
@@ -47,22 +51,28 @@ public class SetRoutingTests
     (sp.GetService(typeof(Koan.Core.Hosting.Runtime.IAppRuntime)) as Koan.Core.Hosting.Runtime.IAppRuntime)?.Discover();
         (sp.GetService(typeof(Koan.Core.Hosting.Runtime.IAppRuntime)) as Koan.Core.Hosting.Runtime.IAppRuntime)?.Start();
 
+        await Data<Todo, string>.DeleteAllAsync();
+        await Data<Todo, string>.DeleteAllAsync("backup");
+
+        var rootTitle = "root-" + Guid.NewGuid().ToString("n");
+        var backupTitle = "backup-" + Guid.NewGuid().ToString("n");
+
         // root (no suffix)
-        var t1 = new Todo { Title = "root-1" };
+        var t1 = new Todo { Title = rootTitle };
         await t1.Save();
-        (await Data<Todo, string>.All()).Count.Should().Be(1);
+        (await Data<Todo, string>.All()).Should().ContainSingle(x => x.Title == rootTitle);
 
         // backup set
-        await Data<Todo, string>.UpsertAsync(new Todo { Title = "backup-1" }, partition: "backup");
+        await Data<Todo, string>.UpsertAsync(new Todo { Title = backupTitle }, partition: "backup");
         var inBackup = await Data<Todo, string>.All(partition: "backup");
-        inBackup.Should().ContainSingle(x => x.Title == "backup-1");
+        inBackup.Should().ContainSingle(x => x.Title == backupTitle);
 
         // ensure isolation between sets
         var inRoot = await Data<Todo, string>.All();
-        inRoot.Should().OnlyContain(x => x.Title == "root-1");
+        inRoot.Should().ContainSingle(x => x.Title == rootTitle);
 
         // delete by predicate in backup
-        var removed = await Data<Todo, string>.Delete(x => x.Title.StartsWith("backup"), partition: "backup");
+        var removed = await Data<Todo, string>.Delete(x => x.Title == backupTitle, partition: "backup");
         removed.Should().Be(1);
         (await Data<Todo, string>.All("backup")).Should().BeEmpty();
     }

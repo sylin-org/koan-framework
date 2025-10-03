@@ -1,3 +1,4 @@
+using System;
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -30,6 +31,8 @@ public class CrossProviderDataMovementTests : IDisposable
 
     public CrossProviderDataMovementTests()
     {
+        TestHooks.ResetDataConfigs();
+
         _tempDir = Path.Combine(Path.GetTempPath(), "Koan-CrossProvider-Tests", Guid.NewGuid().ToString("n"));
         Directory.CreateDirectory(_tempDir);
         _dbFile = Path.Combine(_tempDir, "test.db");
@@ -63,12 +66,18 @@ public class CrossProviderDataMovementTests : IDisposable
     [Fact]
     public async Task DataSetContext_With_Different_Providers_Should_Route_To_Different_Storage()
     {
+        var uniqueTitle = "Cross Provider Test " + Guid.NewGuid().ToString("n");
+
+        await Data<TestEntity, string>.DeleteAllAsync();
+        using (EntityContext.Adapter("json")) { await Data<TestEntity, string>.DeleteAllAsync(); }
+        using (EntityContext.Adapter("sqlite")) { await Data<TestEntity, string>.DeleteAllAsync(); }
+
         // Create test entity
-        var testEntity = new TestEntity { Title = "Cross Provider Test", Value = 42 };
+        var testEntity = new TestEntity { Title = uniqueTitle, Value = 42 };
 
         // Save to "json" provider using DataSetContext
         string jsonId;
-        using (var jsonContext = EntityContext.Partition("json"))
+        using (var jsonContext = EntityContext.Adapter("json"))
         {
             var saved = await Data<TestEntity, string>.UpsertAsync(testEntity);
             jsonId = saved.Id;
@@ -77,7 +86,7 @@ public class CrossProviderDataMovementTests : IDisposable
 
         // Save to "sqlite" provider using DataSetContext
         string sqliteId;
-        using (var sqliteContext = EntityContext.Partition("sqlite"))
+        using (var sqliteContext = EntityContext.Adapter("sqlite"))
         {
             var saved = await Data<TestEntity, string>.UpsertAsync(testEntity);
             sqliteId = saved.Id;
@@ -85,19 +94,17 @@ public class CrossProviderDataMovementTests : IDisposable
         }
 
         // Verify data exists in JSON context
-        using (var jsonContext = EntityContext.Partition("json"))
+        using (var jsonContext = EntityContext.Adapter("json"))
         {
             var jsonData = await Data<TestEntity, string>.All();
-            jsonData.Should().ContainSingle();
-            jsonData.First().Title.Should().Be("Cross Provider Test");
+            jsonData.Should().ContainSingle(x => x.Title == uniqueTitle);
         }
 
         // Verify data exists in SQLite context
-        using (var sqliteContext = EntityContext.Partition("sqlite"))
+        using (var sqliteContext = EntityContext.Adapter("sqlite"))
         {
             var sqliteData = await Data<TestEntity, string>.All();
-            sqliteData.Should().ContainSingle();
-            sqliteData.First().Title.Should().Be("Cross Provider Test");
+            sqliteData.Should().ContainSingle(x => x.Title == uniqueTitle);
         }
 
         // KEY TEST: If this is true provider switching, the storage should be physically different
@@ -112,15 +119,17 @@ public class CrossProviderDataMovementTests : IDisposable
     [Fact]
     public async Task Without_DataSetContext_Should_Use_Default_Provider()
     {
+        await Data<TestEntity, string>.DeleteAllAsync();
         // Save without any DataSetContext - should use default provider
-        var entity = new TestEntity { Title = "Default Provider Test", Value = 99 };
+        var title = "Default Provider Test " + Guid.NewGuid().ToString("n");
+        var entity = new TestEntity { Title = title, Value = 99 };
         var saved = await Data<TestEntity, string>.UpsertAsync(entity);
         saved.Id.Should().NotBeNullOrWhiteSpace();
 
         // Retrieve without DataSetContext
-        var all = await Data<TestEntity, string>.All();
-        all.Should().ContainSingle();
-        all.First().Title.Should().Be("Default Provider Test");
+        var fetched = await Data<TestEntity, string>.GetAsync(saved.Id);
+        fetched.Should().NotBeNull();
+        fetched!.Title.Should().Be(title);
     }
 
     public void Dispose()

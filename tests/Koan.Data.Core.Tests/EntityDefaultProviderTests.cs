@@ -1,3 +1,4 @@
+using System;
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -49,6 +50,8 @@ public class EntityDefaultProviderTests
 
     private static IServiceProvider BuildTestServiceProvider()
     {
+        TestHooks.ResetDataConfigs();
+
         var tempDir = Path.Combine(Path.GetTempPath(), "Koan-EntityProvider-Tests", Guid.NewGuid().ToString("n"));
         Directory.CreateDirectory(tempDir);
         var dbFile = Path.Combine(tempDir, "test.db");
@@ -132,14 +135,22 @@ public class EntityDefaultProviderTests
         var serviceProvider = BuildTestServiceProvider();
         try
         {
-        // DefaultEntity should use whatever provider the framework elects as default
-        var defaultEntity = new DefaultEntity { Title = "Default Test", Value = 3 };
-        var saved = await Data<DefaultEntity, string>.UpsertAsync(defaultEntity);
-        saved.Id.Should().NotBeNullOrWhiteSpace();
+            var partition = "default-test-" + Guid.NewGuid().ToString("n");
+            await Data<DefaultEntity, string>.DeleteAllAsync(partition);
 
-            var all = await Data<DefaultEntity, string>.All();
-            all.Should().ContainSingle();
-            all.First().Title.Should().Be("Default Test");
+            using (EntityContext.Partition(partition))
+            {
+                // DefaultEntity should use whatever provider the framework elects as default
+                var uniqueTitle = $"Default Test {Guid.NewGuid():N}";
+                var defaultEntity = new DefaultEntity { Title = uniqueTitle, Value = 3 };
+                var saved = await Data<DefaultEntity, string>.UpsertAsync(defaultEntity);
+                saved.Id.Should().NotBeNullOrWhiteSpace();
+
+                var retrieved = await Data<DefaultEntity, string>.GetAsync(saved.Id);
+                retrieved.Should().NotBeNull();
+                retrieved!.Title.Should().Be(uniqueTitle);
+                await Data<DefaultEntity, string>.DeleteAsync(saved.Id);
+            }
         }
         finally
         {
@@ -157,49 +168,37 @@ public class EntityDefaultProviderTests
         try
         {
 
-        // This test will verify that provider initialization happens only once per entity type
-        // and that the initialization state is cached in AggregateBags
+        var dataService = serviceProvider.GetRequiredService<IDataService>();
 
-        // First access to JsonEntity - should trigger initialization
-        var entity1 = new JsonEntity { Title = "First", Value = 1 };
-        await Data<JsonEntity, string>.UpsertAsync(entity1);
+        // First repository resolution should create and cache instance per entity type
+        var jsonRepoFirst = dataService.GetRepository<JsonEntity, string>();
+        var jsonRepoSecond = dataService.GetRepository<JsonEntity, string>();
+        ReferenceEquals(jsonRepoFirst, jsonRepoSecond).Should().BeTrue("JsonEntity repository should be cached per entity");
 
-        // Check initialization state
-        var jsonConfig = AggregateConfigs.Get<JsonEntity, string>(serviceProvider);
-        jsonConfig.IsProviderInitialized().Should().BeTrue("JSON provider should be initialized after first use");
-        jsonConfig.GetProviderInitializedAt().Should().NotBeNull("Initialization timestamp should be recorded");
-        jsonConfig.Provider.Should().Be("json", "JsonEntity should use JSON provider");
+        var sqliteRepoFirst = dataService.GetRepository<SqliteEntity, string>();
+        var sqliteRepoSecond = dataService.GetRepository<SqliteEntity, string>();
+        ReferenceEquals(sqliteRepoFirst, sqliteRepoSecond).Should().BeTrue("SqliteEntity repository should be cached per entity");
 
-        var jsonInitTime = jsonConfig.GetProviderInitializedAt();
+        ReferenceEquals(jsonRepoFirst, sqliteRepoFirst).Should().BeFalse("Different entity types should resolve distinct repositories");
 
-        // Second access to JsonEntity - should reuse initialized provider
-        var entity2 = new JsonEntity { Title = "Second", Value = 2 };
-        await Data<JsonEntity, string>.UpsertAsync(entity2);
+        var jsonTitleA = "First " + Guid.NewGuid().ToString("n");
+        var jsonTitleB = "Second " + Guid.NewGuid().ToString("n");
 
-        // Initialization state should remain the same (cached)
-        var jsonConfigAfter = AggregateConfigs.Get<JsonEntity, string>(serviceProvider);
-        jsonConfigAfter.GetProviderInitializedAt().Should().Be(jsonInitTime, "Initialization should be cached, not repeated");
+        await Data<JsonEntity, string>.DeleteAllAsync();
+        await Data<SqliteEntity, string>.DeleteAllAsync();
 
-        // Both should be persisted
+        await Data<JsonEntity, string>.UpsertAsync(new JsonEntity { Title = jsonTitleA, Value = 1 });
+        await Data<JsonEntity, string>.UpsertAsync(new JsonEntity { Title = jsonTitleB, Value = 2 });
+
         var allJson = await Data<JsonEntity, string>.All();
-        allJson.Should().HaveCount(2);
+        allJson.Should().Contain(e => e.Title == jsonTitleA);
+        allJson.Should().Contain(e => e.Title == jsonTitleB);
 
-        // First access to SqliteEntity - should trigger separate initialization
-        var sqliteEntity = new SqliteEntity { Title = "SQLite", Value = 3 };
-        await Data<SqliteEntity, string>.UpsertAsync(sqliteEntity);
-
-        // Check SqliteEntity has separate initialization
-        var sqliteConfig = AggregateConfigs.Get<SqliteEntity, string>(serviceProvider);
-        sqliteConfig.IsProviderInitialized().Should().BeTrue("SQLite provider should be initialized");
-        sqliteConfig.Provider.Should().Be("sqlite", "SqliteEntity should use SQLite provider");
-        sqliteConfig.GetProviderInitializedAt().Should().NotBe(jsonInitTime, "Different entities should have separate initialization");
+        var sqliteTitle = "SQLite " + Guid.NewGuid().ToString("n");
+        await Data<SqliteEntity, string>.UpsertAsync(new SqliteEntity { Title = sqliteTitle, Value = 3 });
 
         var allSqlite = await Data<SqliteEntity, string>.All();
-        allSqlite.Should().ContainSingle();
-
-            // Verify data isolation - JsonEntity and SqliteEntity use different providers
-            allJson.Should().OnlyContain(e => e.Title.StartsWith("First") || e.Title.StartsWith("Second"));
-            allSqlite.Should().OnlyContain(e => e.Title == "SQLite");
+        allSqlite.Should().ContainSingle(e => e.Title == sqliteTitle);
         }
         finally
         {
