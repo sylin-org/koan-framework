@@ -27,7 +27,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         services.AddSingleton<InMemoryDataStore>();
 
         // Register adapter factory with lowest priority (-100) to act as fallback
-        services.AddSingleton<IDataAdapterFactory, InMemoryAdapter>();
+        services.AddSingleton<IDataAdapterFactory, InMemoryAdapterFactory>();
     }
 
     public void Describe(BootReport report, IConfiguration cfg, IHostEnvironment env)

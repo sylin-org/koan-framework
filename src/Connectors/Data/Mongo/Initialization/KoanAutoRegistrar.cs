@@ -22,30 +22,27 @@ namespace Koan.Data.Connector.Mongo.Initialization;
 
 public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 {
+    private static bool _staticSetupComplete;
+
     public string ModuleName => "Koan.Data.Connector.Mongo";
     public string? ModuleVersion => typeof(KoanAutoRegistrar).Assembly.GetName().Version?.ToString();
 
     public void Initialize(IServiceCollection services)
     {
-        // Configure MongoDB conventions globally at startup - disables _t discriminators
-        var pack = new ConventionPack
+        // CORE-0003: AppDomain-scoped guard for static MongoDB state
+        if (!_staticSetupComplete)
         {
-            new IgnoreExtraElementsConvention(true),
-            new NullBsonValueConvention()
-        };
-        ConventionRegistry.Register("KoanGlobalConventions", pack, _ => true);
+            lock (typeof(KoanAutoRegistrar))
+            {
+                if (!_staticSetupComplete)
+                {
+                    ConfigureMongoStaticState();
+                    _staticSetupComplete = true;
+                }
+            }
+        }
 
-        // Disable discriminators by registering custom null discriminator convention
-        // This prevents _t/_v fields from being added to documents
-        BsonSerializer.RegisterDiscriminatorConvention(
-            typeof(object),
-            new NoDiscriminatorConvention());
-
-        BsonSerializer.RegisterSerializationProvider(new JObjectSerializationProvider());
-
-        // Note: Optimized serialization will be registered lazily when repositories are created
-        // Note: Conventions handle null values, no custom serializer needed
-
+        // ServiceCollection-scoped services (run every time - naturally idempotent via TryAdd)
         services.AddKoanOptions<MongoOptions>();
         services.AddSingleton<IConfigureOptions<MongoOptions>, MongoOptionsConfigurator>();
         services.AddSingleton<MongoClientProvider>();
@@ -62,11 +59,52 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         // NEW: Register MongoDB discovery adapter (maintains "Reference = Intent")
         // Adding Koan.Data.Connector.Mongo automatically enables MongoDB discovery capabilities
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IServiceDiscoveryAdapter, MongoDiscoveryAdapter>());
+    }
+
+    private static void ConfigureMongoStaticState()
+    {
+        // Configure MongoDB conventions globally at startup - disables _t discriminators
+        var pack = new ConventionPack
+        {
+            new IgnoreExtraElementsConvention(true),
+            new NullBsonValueConvention()
+        };
+
+        try
+        {
+            ConventionRegistry.Register("KoanGlobalConventions", pack, _ => true);
+        }
+        catch (ArgumentException)
+        {
+            // Already registered - safe to ignore
+        }
+
+        // Disable discriminators by registering custom null discriminator convention
+        // This prevents _t/_v fields from being added to documents
+        try
+        {
+            BsonSerializer.RegisterDiscriminatorConvention(
+                typeof(object),
+                new NoDiscriminatorConvention());
+        }
+        catch (BsonSerializationException)
+        {
+            // Already registered - safe to ignore
+        }
+
+        try
+        {
+            BsonSerializer.RegisterSerializationProvider(new JObjectSerializationProvider());
+        }
+        catch (BsonSerializationException)
+        {
+            // Already registered - safe to ignore
+        }
 
         // Apply MongoDB GUID optimization directly for v3.5.0 compatibility
         Console.WriteLine("[MONGO-KOAN-AUTO-REGISTRAR] Applying MongoDB GUID optimization directly...");
         var optimizer = new MongoOptimizationAutoRegistrar();
-        optimizer.Initialize(services);
+        optimizer.Initialize(null!); // Optimizer doesn't use services parameter
     }
 
     public void Describe(Koan.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)

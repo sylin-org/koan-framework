@@ -7,7 +7,7 @@ namespace Koan.Data.Connector.InMemory;
 /// Maintains isolated storage per (entity type, partition) tuple.
 /// Singleton lifetime ensures data persists across repository instances.
 /// </summary>
-internal sealed class InMemoryDataStore
+public sealed class InMemoryDataStore
 {
     private readonly ConcurrentDictionary<StoreKey, object> _stores = new();
 

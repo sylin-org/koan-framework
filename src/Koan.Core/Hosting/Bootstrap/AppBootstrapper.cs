@@ -65,8 +65,9 @@ public static class AppBootstrapper
         }
         catch { /* ignore */ }
 
-        var registry = InitializerRegistry.Instance;
-        
+        // CORE-0003: Always run initializers for every ServiceCollection.
+        // Initializers are responsible for their own idempotency (AppDomain-scoped guards for static state).
+        // This ensures "Reference = Intent" works in all scenarios (tests, multi-tenant, etc.).
         foreach (var asm in set.Values)
         {
             Type[] types;
@@ -75,14 +76,7 @@ public static class AppBootstrapper
             foreach (var t in types)
             {
                 if (t.IsAbstract || !typeof(IKoanInitializer).IsAssignableFrom(t)) continue;
-                
-                // Check if this initializer has already been invoked
-                if (!registry.TryRegisterInitializer(t))
-                {
-                    // Already invoked - skip duplicate
-                    continue;
-                }
-                
+
                 try
                 {
                     if (Activator.CreateInstance(t) is IKoanInitializer init)

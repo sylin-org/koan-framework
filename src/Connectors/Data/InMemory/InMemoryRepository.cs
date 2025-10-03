@@ -21,12 +21,11 @@ internal sealed class InMemoryRepository<TEntity, TKey> :
     where TKey : notnull
 {
     private readonly InMemoryDataStore _dataStore;
-    private readonly string _partition;
 
-    public InMemoryRepository(InMemoryDataStore dataStore, string partition)
+    public InMemoryRepository(InMemoryDataStore dataStore, string _)
     {
+        // Note: Partition parameter ignored - always resolved dynamically from EntityContext
         _dataStore = dataStore;
-        _partition = partition;
     }
 
     /// <summary>
@@ -42,7 +41,15 @@ internal sealed class InMemoryRepository<TEntity, TKey> :
         WriteCapabilities.BulkDelete |
         WriteCapabilities.AtomicBatch;
 
-    private ConcurrentDictionary<TKey, TEntity> Store => _dataStore.GetOrCreateStore<TEntity, TKey>(_partition);
+    /// <summary>
+    /// Resolves the current partition from EntityContext, always returning a valid partition name.
+    /// This ensures partition isolation is respected even when repositories are cached.
+    /// </summary>
+    private string CurrentPartition =>
+        Koan.Data.Core.EntityContext.Current?.Partition ?? "default";
+
+    private ConcurrentDictionary<TKey, TEntity> Store =>
+        _dataStore.GetOrCreateStore<TEntity, TKey>(CurrentPartition);
 
     // ==================== Read Operations ====================
 
@@ -63,6 +70,13 @@ internal sealed class InMemoryRepository<TEntity, TKey> :
     {
         ct.ThrowIfCancellationRequested();
         var items = Store.Values.AsQueryable();
+
+        // Apply LINQ predicate if provided
+        if (query is Expression<Func<TEntity, bool>> predicate)
+        {
+            items = items.Where(predicate);
+        }
+
         items = ApplyOptions(items, options);
         return Task.FromResult((IReadOnlyList<TEntity>)items.ToList());
     }
@@ -70,6 +84,13 @@ internal sealed class InMemoryRepository<TEntity, TKey> :
     public Task<int> CountAsync(object? query, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
+
+        // Apply LINQ predicate if provided
+        if (query is Expression<Func<TEntity, bool>> predicate)
+        {
+            return Task.FromResult(Store.Values.AsQueryable().Count(predicate));
+        }
+
         return Task.FromResult(Store.Count);
     }
 

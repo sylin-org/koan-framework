@@ -9,7 +9,7 @@ namespace Koan.Data.Connector.InMemory;
 /// Priority: -100 (lowest) to act as fallback when no other adapter is configured.
 /// </summary>
 [ProviderPriority(-100)]
-public sealed class InMemoryAdapter : IDataAdapterFactory
+public sealed class InMemoryAdapterFactory : IDataAdapterFactory
 {
     public bool CanHandle(string provider) =>
         string.Equals(provider, "inmemory", StringComparison.OrdinalIgnoreCase) ||
