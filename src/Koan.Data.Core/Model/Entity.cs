@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Koan.Data.Abstractions;
 using Koan.Data.Core;
+using Koan.Data.Core.Transfers;
 using Koan.Data.Core.Events;
 using Koan.Data.Core.Relationships;
 
@@ -121,6 +122,33 @@ namespace Koan.Data.Core.Model
             => Data<TEntity, TKey>.CountAsync(query, partition, ct);
 
         public static IBatchSet<TEntity, TKey> Batch() => Data<TEntity, TKey>.Batch();
+
+        public static CopyTransferBuilder<TEntity, TKey> Copy()
+            => new(null, null);
+
+        public static CopyTransferBuilder<TEntity, TKey> Copy(Expression<Func<TEntity, bool>> predicate)
+            => new(predicate ?? throw new ArgumentNullException(nameof(predicate)), null);
+
+        public static CopyTransferBuilder<TEntity, TKey> Copy(Func<IQueryable<TEntity>, IQueryable<TEntity>> query)
+            => new(null, query ?? throw new ArgumentNullException(nameof(query)));
+
+        public static MoveTransferBuilder<TEntity, TKey> Move()
+            => new(null, null);
+
+        public static MoveTransferBuilder<TEntity, TKey> Move(Expression<Func<TEntity, bool>> predicate)
+            => new(predicate ?? throw new ArgumentNullException(nameof(predicate)), null);
+
+        public static MoveTransferBuilder<TEntity, TKey> Move(Func<IQueryable<TEntity>, IQueryable<TEntity>> query)
+            => new(null, query ?? throw new ArgumentNullException(nameof(query)));
+
+        public static MirrorTransferBuilder<TEntity, TKey> Mirror(MirrorMode mode = MirrorMode.Push)
+            => new(mode, null, null);
+
+        public static MirrorTransferBuilder<TEntity, TKey> Mirror(Expression<Func<TEntity, bool>> predicate, MirrorMode mode = MirrorMode.Push)
+            => new(mode, predicate ?? throw new ArgumentNullException(nameof(predicate)), null);
+
+        public static MirrorTransferBuilder<TEntity, TKey> Mirror(Func<IQueryable<TEntity>, IQueryable<TEntity>> query, MirrorMode mode = MirrorMode.Push)
+            => new(mode, null, query ?? throw new ArgumentNullException(nameof(query)));
 
         public static Task<TEntity> UpsertAsync(TEntity model, CancellationToken ct = default)
         {
@@ -727,3 +755,5 @@ public static class EntityMetadataProvider
 {
     public static Func<IServiceProvider, IRelationshipMetadata>? RelationshipMetadataAccessor;
 }
+
+
