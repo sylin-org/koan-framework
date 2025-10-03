@@ -45,7 +45,7 @@ internal sealed class InMemoryJobSweeper : KoanBackgroundServiceBase
         {
             try
             {
-                _store.Sweep(completedRetention, faultedRetention);
+                await _store.SweepAsync(completedRetention, faultedRetention, cancellationToken);
             }
             catch (Exception ex)
             {

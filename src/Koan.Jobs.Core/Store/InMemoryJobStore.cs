@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Koan.Data.Core.Metadata;
+using Koan.Data.Core;
 using Koan.Jobs.Model;
 using Koan.Jobs.Support;
 
@@ -12,52 +12,40 @@ namespace Koan.Jobs.Store;
 
 internal sealed class InMemoryJobStore : IJobStore
 {
-    private readonly ConcurrentDictionary<string, StoredJob> _jobs = new();
     private readonly ConcurrentDictionary<string, List<JobExecution>> _executions = new();
     private readonly JobIndexCache _index;
-    private readonly TimestampPropertyBag _timestampBag;
 
     public InMemoryJobStore(JobIndexCache index)
     {
         _index = index;
-        _timestampBag = new TimestampPropertyBag(typeof(Job));
     }
 
-    public Task<Job> CreateAsync(Job job, JobStoreMetadata metadata, CancellationToken cancellationToken)
+    public async Task<Job> CreateAsync(Job job, JobStoreMetadata metadata, CancellationToken cancellationToken)
     {
-        // Auto-update [Timestamp] field if present
-        if (_timestampBag.HasTimestamp)
-            _timestampBag.UpdateTimestamp(job);
-
-        var stored = _jobs.GetOrAdd(job.Id, _ => new StoredJob(job));
-        stored.Update(job);
+        // [Timestamp] auto-updated by RepositoryFacade
+        await job.Save();
         _index.Set(new JobIndexEntry(job.Id, JobStorageMode.InMemory, null, null, metadata.Audit, job.GetType()));
-        return Task.FromResult(job);
+        return job;
     }
 
-    public Task<Job?> GetAsync(string jobId, JobStoreMetadata metadata, CancellationToken cancellationToken)
+    public async Task<Job?> GetAsync(string jobId, JobStoreMetadata metadata, CancellationToken cancellationToken)
     {
-        return Task.FromResult(_jobs.TryGetValue(jobId, out var stored) ? stored.Job : null);
+        return await Job.Get(jobId);
     }
 
-    public Task<Job> UpdateAsync(Job job, JobStoreMetadata metadata, CancellationToken cancellationToken)
+    public async Task<Job> UpdateAsync(Job job, JobStoreMetadata metadata, CancellationToken cancellationToken)
     {
-        // Auto-update [Timestamp] field if present
-        if (_timestampBag.HasTimestamp)
-            _timestampBag.UpdateTimestamp(job);
-
-        var stored = _jobs.GetOrAdd(job.Id, _ => new StoredJob(job));
-        stored.Update(job);
+        // [Timestamp] auto-updated by RepositoryFacade
+        await job.Save();
         _index.Set(new JobIndexEntry(job.Id, JobStorageMode.InMemory, null, null, metadata.Audit, job.GetType()));
-        return Task.FromResult(job);
+        return job;
     }
 
-    public Task RemoveAsync(string jobId, JobStoreMetadata metadata, CancellationToken cancellationToken)
+    public async Task RemoveAsync(string jobId, JobStoreMetadata metadata, CancellationToken cancellationToken)
     {
-        _jobs.TryRemove(jobId, out _);
+        await Data<Job, string>.DeleteAsync(jobId);
         _executions.TryRemove(jobId, out _);
         _index.Remove(jobId);
-        return Task.CompletedTask;
     }
 
     public Task<JobExecution> CreateExecutionAsync(JobExecution execution, JobStoreMetadata metadata, CancellationToken cancellationToken)
@@ -100,43 +88,22 @@ internal sealed class InMemoryJobStore : IJobStore
         return Task.FromResult((IReadOnlyList<JobExecution>)Array.Empty<JobExecution>());
     }
 
-    internal void Sweep(TimeSpan completedRetention, TimeSpan faultedRetention)
+    internal async Task SweepAsync(TimeSpan completedRetention, TimeSpan faultedRetention, CancellationToken cancellationToken = default)
     {
         var now = DateTimeOffset.UtcNow;
-        RemoveIf(job =>
+
+        // Query for jobs to remove using LINQ predicate
+        var jobsToRemove = await Job.Query(job =>
             job.CompletedAt.HasValue &&
             ((job.Status == JobStatus.Completed && completedRetention > TimeSpan.Zero && now - job.CompletedAt >= completedRetention) ||
              (job.Status == JobStatus.Failed && faultedRetention > TimeSpan.Zero && now - job.CompletedAt >= faultedRetention)));
-    }
 
-    private void RemoveIf(Func<Job, bool> predicate)
-    {
-        foreach (var pair in _jobs)
+        // Delete jobs
+        foreach (var job in jobsToRemove)
         {
-            var job = pair.Value.Job;
-            if (predicate(job))
-            {
-                _jobs.TryRemove(pair.Key, out _);
-                _executions.TryRemove(pair.Key, out _);
-                _index.Remove(pair.Key);
-            }
-        }
-    }
-
-    private sealed class StoredJob
-    {
-        private Job _job;
-
-        internal StoredJob(Job job)
-        {
-            _job = job;
-        }
-
-        internal Job Job => _job;
-
-        internal void Update(Job job)
-        {
-            _job = job;
+            await Data<Job, string>.DeleteAsync(job.Id, cancellationToken);
+            _executions.TryRemove(job.Id, out _);
+            _index.Remove(job.Id);
         }
     }
 }

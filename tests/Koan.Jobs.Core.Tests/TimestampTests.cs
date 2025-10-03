@@ -2,7 +2,9 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using FluentAssertions;
+using Koan.Core.Hosting;
 using Koan.Core.Hosting.App;
+using Koan.Data.Core;
 using Koan.Jobs.Core.Tests.Infrastructure;
 using Koan.Jobs.Execution;
 using Koan.Jobs.Model;
@@ -85,6 +87,7 @@ public sealed class TimestampTests
         services.AddSingleton<IConfiguration>(configuration);
         services.AddSingleton<IHostEnvironment>(new TestHostEnvironment());
         services.AddLogging();
+        services.AddKoan();  // Required for Data<Job> in InMemoryJobStore
         services.AddKoanJobs();
 
         var provider = services.BuildServiceProvider();
