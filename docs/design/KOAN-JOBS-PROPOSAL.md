@@ -14,11 +14,12 @@ This proposal defines `Koan.Jobs` - a comprehensive, entity-first long-running t
 **Key Tenets:**
 - **Entity-First Design**: Jobs are `Entity<T>` with GUID v7 IDs and provider transparency
 - **Reference = Intent**: Adding `Koan.Jobs` package auto-enables job infrastructure
-- **Semantic Ergonomics**: `await MyJob.Start(context)`, `await job.WaitAsync()`, `job.StreamProgress()`
+- **Semantic Ergonomics**: `await MyJob.Start(context).Run()`, `await job.Wait()`, `job.OnProgress(handler)`
 - **Correlation Built-In**: OpenTelemetry Activity integration and extensible metadata support
 - **Observable by Default**: Progress tracking, ETA estimation, separate execution history for audit
 - **Clean Separation of Concerns**: Jobs define work; policies define behavior; executions record history
-- **Flexible Storage**: EntityContext enables dedicated databases, multi-tier archiving, and per-tenant isolation
+- **Adaptive Storage Profiles**: Jobs run in-memory by default; `.Persist(...)` opt-in routes work through EntityContext sources and `.Audit()` keeps execution history when needed
+- **Reusable Recipes**: `Jobs.Recipe()` captures persistence, policy, and metadata defaults for consistent reuse across entry points
 
 ---
 
@@ -362,26 +363,36 @@ public abstract class Job : Entity<Job>
     public Dictionary<string, object?> Metadata { get; set; } = new();
 }
 
-// Strongly-typed extension methods for common patterns
+// Extension methods keep the public surface tidy
 public static class JobMetadataExtensions
 {
     public static string? GetTenantId(this Job job)
         => job.Metadata.TryGetValue("TenantId", out var v) ? v?.ToString() : null;
 
-    public static Job WithTenantId(this Job job, string? tenantId)
+    public static Job With(
+        this Job job,
+        string? tenantId = null,
+        string? userId = null,
+        string? correlationId = null,
+        Action<IDictionary<string, object?>>? metadata = null)
     {
-        job.Metadata["TenantId"] = tenantId;
+        if (!string.IsNullOrWhiteSpace(tenantId))
+            job.Metadata["TenantId"] = tenantId;
+
+        if (!string.IsNullOrWhiteSpace(userId))
+            job.Metadata["UserId"] = userId;
+
+        if (!string.IsNullOrWhiteSpace(correlationId))
+            job.CorrelationId = correlationId;
+
+        metadata?.Invoke(job.Metadata);
         return job;
     }
 
-    public static string? GetUserId(this Job job)
-        => job.Metadata.TryGetValue("UserId", out var v) ? v?.ToString() : null;
-
-    public static Job WithUserId(this Job job, string? userId)
-    {
-        job.Metadata["UserId"] = userId;
-        return job;
-    }
+    public static Job With(
+        this Job job,
+        Action<IDictionary<string, object?>> metadata)
+        => job.With(metadata: metadata);
 
     public static Job WithMetadata(this Job job, string key, object? value)
     {
@@ -392,9 +403,9 @@ public static class JobMetadataExtensions
 
 // Usage - fluent and discoverable
 var job = await MediaBackupJob.Start(context)
-    .WithTenantId(tenant.Id)
-    .WithUserId(user.Id)
-    .WithMetadata("SourceSystem", "WebApp");
+    .With(tenantId: tenant.Id, userId: user.Id, correlationId: correlationId,
+        metadata: meta => meta["SourceSystem"] = "WebApp")
+    .Run();
 
 // Query by first-class properties (efficient, indexed)
 var jobs = await Job.Query(j => j.CorrelationId == correlationId);
@@ -440,36 +451,24 @@ public abstract class Job<TJob, TContext, TResult> : Job
     }
 
     // Abstract execution method (implemented by concrete jobs)
-    protected abstract Task<TResult> ExecuteAsync(
+    protected abstract Task<TResult> Execute(
         TContext context,
         IJobProgress progress,
         CancellationToken cancellationToken);
 
-    // Static job start method (Koan entity pattern)
-    public static async Task<TJob> Start(
+    // Static job start method now returns a run builder
+    public static JobRunBuilder<TJob, TContext, TResult> Start(
         TContext context,
         string? correlationId = null,
         CancellationToken cancellationToken = default)
-    {
-        var job = new TJob
-        {
-            Name = typeof(TJob).Name,
-            Status = JobStatus.Queued,
-            QueuedAt = DateTimeOffset.UtcNow,
-            Context = context,
-            CorrelationId = correlationId ?? Activity.Current?.TraceId.ToString()
-        };
-
-        await job.Save();
-
-        // Enqueue for background processing
-        await JobQueue<TJob, TContext, TResult>.Enqueue(job.Id, cancellationToken);
-
-        return job;
-    }
+        => new JobRunBuilder<TJob, TContext, TResult>(
+            typeof(TJob),
+            context,
+            correlationId ?? Activity.Current?.TraceId.ToString(),
+            cancellationToken);
 
     // Instance methods
-    public async Task<TResult> WaitAsync(
+    public async Task<TResult> Wait(
         TimeSpan? timeout = null,
         CancellationToken cancellationToken = default)
     {
@@ -495,36 +494,17 @@ public abstract class Job<TJob, TContext, TResult> : Job
         throw new TimeoutException($"Job {Id} did not complete within {waitTimeout}");
     }
 
-    public async IAsyncEnumerable<JobProgressUpdate> StreamProgressAsync(
-        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    public IDisposable OnProgress(Func<JobProgressUpdate, Task> handler, CancellationToken cancellationToken = default)
     {
-        var lastProgress = -1.0;
-
-        while (true)
-        {
-            var current = await Job.Get(Id, cancellationToken);
-            if (current == null) yield break;
-
-            if (current.Progress != lastProgress)
-            {
-                yield return new JobProgressUpdate
-                {
-                    Percentage = current.Progress,
-                    Message = current.ProgressMessage,
-                    EstimatedCompletion = current.EstimatedCompletion,
-                    UpdatedAt = DateTimeOffset.UtcNow
-                };
-                lastProgress = current.Progress;
-            }
-
-            if (current.Status is JobStatus.Completed or JobStatus.Failed or JobStatus.Cancelled)
-                yield break;
-
-            await Task.Delay(TimeSpan.FromMilliseconds(500), cancellationToken);
-        }
+        return JobProgressBroker.Subscribe(Id, handler, cancellationToken);
     }
 
-    public async Task CancelAsync(CancellationToken cancellationToken = default)
+    public async Task<Job> Refresh(CancellationToken cancellationToken = default)
+    {
+        return await Job.Get(Id, cancellationToken) ?? this;
+    }
+
+    public async Task Cancel(CancellationToken cancellationToken = default)
     {
         var current = await Job.Get(Id, cancellationToken);
         if (current != null)
@@ -534,6 +514,58 @@ public abstract class Job<TJob, TContext, TResult> : Job
             await current.Save();
         }
     }
+}
+```
+
+### Job Run Builder
+
+```csharp
+public sealed class JobRunBuilder<TJob, TContext, TResult>
+    where TJob : Job<TJob, TContext, TResult>, new()
+{
+    private readonly Type _jobType;
+    private readonly TContext _context;
+    private readonly string? _correlationId;
+    private readonly CancellationToken _cancellationToken;
+    private readonly List<Action<TJob>> _mutators = new();
+    private JobStorageMode _storageMode = JobStorageMode.InMemory;
+    private bool _auditExecutions;
+    private string? _source;
+    private string? _partition;
+
+    internal JobRunBuilder(Type jobType, TContext context, string? correlationId, CancellationToken cancellationToken)
+    {
+        _jobType = jobType;
+        _context = context;
+        _correlationId = correlationId;
+        _cancellationToken = cancellationToken;
+    }
+
+    public JobRunBuilder<TJob, TContext, TResult> Persist(string? source = null, string? partition = null)
+    {
+        _storageMode = JobStorageMode.Entity;
+        _source = source;
+        _partition = partition;
+        return this;
+    }
+
+    public JobRunBuilder<TJob, TContext, TResult> Audit(bool enabled = true)
+    {
+        _auditExecutions = enabled;
+        return this;
+    }
+
+    public JobRunBuilder<TJob, TContext, TResult> With(Action<TJob> configure)
+    {
+        if (configure != null) _mutators.Add(configure);
+        return this;
+    }
+
+    public async Task<TJob> Run(CancellationToken cancellationToken = default)
+        => await JobRunDispatcher<TJob, TContext, TResult>.Run(this, cancellationToken);
+
+    internal (Type JobType, TContext Context, string? CorrelationId, CancellationToken CancellationToken, JobStorageMode StorageMode, bool Audit, string? Source, string? Partition, IReadOnlyList<Action<TJob>> Mutators) Build()
+        => (_jobType, _context, _correlationId, _cancellationToken, _storageMode, _auditExecutions, _source, _partition, _mutators);
 }
 ```
 
@@ -572,6 +604,21 @@ public class JobProgressUpdate
 }
 ```
 
+Jobs publish progress updates through `JobProgressBroker`. Consumers subscribe via `job.OnProgress(handler)`, which returns an `IDisposable` for cleanup. When a synchronous snapshot is needed, `await job.Refresh()` fetches the latest persisted state without waiting for another callback.
+
+```csharp
+using var subscription = job.OnProgress(update =>
+{
+    Logger.LogInformation("{Percentage:P0}: {Message}", update.Percentage, update.Message);
+    return Task.CompletedTask;
+});
+
+var snapshot = await job.Refresh();
+Console.WriteLine($"Status: {snapshot.Status}, Progress: {snapshot.Progress:P}");
+```
+
+
+
 ---
 
 ## API Design & Developer Experience
@@ -583,7 +630,7 @@ public class JobProgressUpdate
 [RetryPolicy(MaxAttempts = 5, Strategy = RetryStrategy.ExponentialBackoff)]
 public class MediaBackupJob : Job<MediaBackupJob, BackupContext, BackupResult>
 {
-    protected override async Task<BackupResult> ExecuteAsync(
+    protected override async Task<BackupResult> Execute(
         BackupContext context,
         IJobProgress progress,
         CancellationToken ct)
@@ -596,7 +643,7 @@ public class MediaBackupJob : Job<MediaBackupJob, BackupContext, BackupResult>
         var exported = 0;
         foreach (var item in media)
         {
-            await ExportMediaAsync(item, context.DestinationPath, ct);
+            await ExportMedia(item, context.DestinationPath, ct);
             exported++;
             progress.Report(exported, media.Count, $"Exported {exported}/{media.Count}");
         }
@@ -612,21 +659,28 @@ public class MediaBackupJob : Job<MediaBackupJob, BackupContext, BackupResult>
 }
 
 // Start job
-var job = await MediaBackupJob.Start(
-    new BackupContext { DestinationPath = "/backup" },
-    correlationId: HttpContext.GetCorrelationId()
-);
+var job = await MediaBackupJob
+    .Start(new BackupContext { DestinationPath = "/backup" })
+    .With(correlationId: HttpContext.GetCorrelationId())
+    .Persist(source: "jobs", partition: "hot")
+    .Audit()
+    .Run();
 
-// Monitor progress in real-time
-await foreach (var update in job.StreamProgressAsync())
+// Monitor progress (callback-based)
+using var progress = job.OnProgress(update =>
 {
     Console.WriteLine($"{update.Percentage:P}: {update.Message}");
     if (update.EstimatedCompletion.HasValue)
         Console.WriteLine($"  ETA: {update.EstimatedCompletion.Value:g}");
-}
+    return Task.CompletedTask;
+});
+
+// Ask for a snapshot at any time
+var snapshot = await job.Refresh();
+Console.WriteLine($"Status: {snapshot.Status}, Progress: {snapshot.Progress:P}");
 
 // Or wait for completion
-var result = await job.WaitAsync(timeout: TimeSpan.FromMinutes(10));
+var result = await job.Wait(timeout: TimeSpan.FromMinutes(10));
 Console.WriteLine($"Backed up {result.ItemsExported} items");
 
 // Check execution history
@@ -640,12 +694,12 @@ Console.WriteLine($"Completed in {executions.Count} attempts");
 [RetryPolicy(MaxAttempts = 3)]
 public class ExternalApiJob : Job<ExternalApiJob, ApiContext, ApiResult>, ICustomRetryPolicy
 {
-    protected override async Task<ApiResult> ExecuteAsync(
+    protected override async Task<ApiResult> Execute(
         ApiContext context,
         IJobProgress progress,
         CancellationToken ct)
     {
-        var response = await _httpClient.GetAsync(context.Endpoint, ct);
+        var response = await _httpClient.Get(context.Endpoint, ct);
         response.EnsureSuccessStatusCode(); // Throws on 4xx/5xx
 
         return new ApiResult { StatusCode = (int)response.StatusCode };
@@ -687,11 +741,11 @@ public class BackupController : ControllerBase
         [FromBody] BackupRequest request,
         CancellationToken ct)
     {
-        var job = await MediaBackupJob.Start(
-            new BackupContext { DestinationPath = request.Path },
-            correlationId: HttpContext.GetCorrelationId(),
-            cancellationToken: ct
-        );
+        var job = await MediaBackupJob
+            .Start(new BackupContext { DestinationPath = request.Path })
+            .With(correlationId: HttpContext.GetCorrelationId())
+            .Persist()
+            .Run(ct);
 
         return Accepted($"/api/jobs/{job.Id}", new JobInfo
         {
@@ -751,17 +805,20 @@ public class JobsController : EntityController<Job>
     // GET /api/jobs?correlationId=abc123 (find by correlation)
 
     [HttpGet("{id}/progress")]
-    public IAsyncEnumerable<JobProgressUpdate> StreamProgress(
+    public async Task<ActionResult<JobProgressUpdate>> GetProgress(
         string id,
         CancellationToken ct)
     {
-        var job = Job.Get(id, ct).Result;
-        if (job is Job<MediaBackupJob, BackupContext, BackupResult> typedJob)
-        {
-            return typedJob.StreamProgressAsync(ct);
-        }
+        var job = await Job.Get(id, ct);
+        if (job == null) return NotFound();
 
-        throw new InvalidOperationException("Job type does not support streaming");
+        return Ok(new JobProgressUpdate
+        {
+            Percentage = job.Progress,
+            Message = job.ProgressMessage,
+            EstimatedCompletion = job.EstimatedCompletion,
+            UpdatedAt = DateTimeOffset.UtcNow
+        });
     }
 
     [HttpPost("{id}/cancel")]
@@ -770,7 +827,7 @@ public class JobsController : EntityController<Job>
         var job = await Job.Get(id, ct);
         if (job == null) return NotFound();
 
-        await job.CancelAsync(ct);
+        await job.Cancel(ct);
         return Ok();
     }
 
@@ -790,6 +847,33 @@ public class JobsController : EntityController<Job>
 }
 ```
 
+
+### Job Recipes (Reusable Profiles)
+
+Lightweight starts are great for one-offs, but many teams want a pre-baked configuration that every call site can share. `Jobs.Recipe()` builds that profile and returns a strongly-typed runner you can stash in DI or static fields.
+
+- `.Persist(...)` and `.Audit()` calls on the recipe become defaults for every run.
+- `.WithDefaults(...)` (metadata/action overload) captures tenant, module, or other common tags.
+- `.UsePolicy(...)` pins retry/timeout decisions without sprinkling attributes across types.
+- Per-run overrides still work — calling `.Persist("jobs", "archive")` on the runner will override the recipe for that invocation only.
+
+```csharp
+// Configure once at startup
+var durableBackups = Jobs.Recipe()
+    .Persist(source: "jobs", partition: "hot")
+    .Audit()
+    .WithDefaults(metadata: meta => meta["Module"] = "Backups")
+    .Build<MediaBackupJob>();
+
+// Somewhere in the app
+var job = await durableBackups
+    .Start(new BackupContext { DestinationPath = request.Path })
+    .With(userId: user.Id, correlationId: HttpContext.GetCorrelationId())
+    .Run(ct);
+```
+
+Recipes can be registered through `KoanAutoRegistrar` so they are discoverable from DI, or declared as static fields on the job type for ad-hoc scenarios. Because the underlying store choice lives inside the recipe, swapping from in-memory to persisted storage stays a one-line change.
+
 ---
 
 ## Integration with Existing Koan Infrastructure
@@ -805,15 +889,15 @@ public class JobExecutorService<TJob, TContext, TResult> : KoanBackgroundService
 {
     private readonly IJobQueue<TJob, TContext, TResult> _queue;
 
-    public override async Task ExecuteAsync(CancellationToken cancellationToken)
+    public override async Task Execute(CancellationToken cancellationToken)
     {
-        await foreach (var jobId in _queue.DequeueAsync(cancellationToken))
+        await foreach (var jobId in _queue.Dequeue(cancellationToken))
         {
-            await ProcessJobAsync(jobId, cancellationToken);
+            await ProcessJob(jobId, cancellationToken);
         }
     }
 
-    private async Task ProcessJobAsync(string jobId, CancellationToken ct)
+    private async Task ProcessJob(string jobId, CancellationToken ct)
     {
         var job = await Job.Get(jobId, ct);
         if (job == null) return;
@@ -853,7 +937,7 @@ public class JobExecutorService<TJob, TContext, TResult> : KoanBackgroundService
         try
         {
             // Execute job
-            var result = await job.ExecuteAsync(job.Context!, progress, ct);
+            var result = await job.Execute(job.Context!, progress, ct);
 
             // Success
             job.Status = JobStatus.Completed;
@@ -964,12 +1048,17 @@ public class JobExecutorService<TJob, TContext, TResult> : KoanBackgroundService
 
 ```csharp
 // Automatic correlation from Activity.Current
-var job = await MyJob.Start(context);
+var job = await MyJob
+    .Start(context)
+    .Run();
 // job.CorrelationId = Activity.Current?.TraceId.ToString()
 
 // Or explicit from HTTP headers
 var correlationId = HttpContext.Request.Headers["x-correlation-id"].FirstOrDefault();
-var job = await MyJob.Start(context, correlationId: correlationId);
+var job = await MyJob
+    .Start(context)
+    .With(correlationId: correlationId)
+    .Run();
 
 // Query by correlation
 var relatedJobs = await Job.Query(j => j.CorrelationId == correlationId);
@@ -998,21 +1087,58 @@ Job.Events
     });
 ```
 
-### 4. Multi-Provider Storage
+
+### 4. Storage Profiles & Persistence
+
+Jobs ship with two built-in stores and switch between them based on fluent calls:
+
+- `InMemoryJobStore` *(default)* — zero configuration, ephemeral, and purged by a background sweeper after a short TTL (default 15 minutes). Data disappears on process restart, which is perfect for demos, API-triggered jobs, and workloads that only need "start → poll → done" semantics.
+- `EntityJobStore` — activated once `.Persist(...)` is used. It runs through Koan's `EntityContext`, respects named sources/partitions, and unlocks archival plus execution auditing.
 
 ```csharp
-// Jobs stored in any provider via Entity<T> pattern
-[DataAdapter("postgresql")]  // Force PostgreSQL for JSONB support
-public class AnalyticsJob : Job<AnalyticsJob, AnalyticsContext, AnalyticsResult>
-{ }
+// Ephemeral job - best effort, cleared after TTL or process recycle
+var scratch = await MediaBackupJob
+    .Start(context)
+    .Run();
 
-[DataAdapter("mongodb")]  // Force MongoDB for flexible schema
-public class DataMigrationJob : Job<DataMigrationJob, MigrationContext, MigrationResult>
-{ }
+// Persist using default source/partition registered for jobs
+var durable = await MediaBackupJob
+    .Start(context)
+    .Persist()          // flips store to EntityJobStore
+    .Audit()            // capture JobExecution rows
+    .Run();
 
-// Provider-agnostic querying
-var runningJobs = await Job.Query(j => j.Status == JobStatus.Running);
-// Works across SQL, NoSQL, etc.
+// Route to explicit source + partition
+var warmPath = await MediaBackupJob
+    .Start(context)
+    .Persist(source: "jobs", partition: "warm")
+    .Run();
+
+// Opt back out of execution history for lightweight persistence
+var fireAndForget = await MediaBackupJob
+    .Start(context)
+    .Persist()
+    .Audit(false)
+    .Run();
+```
+
+`Persist()` without parameters uses `JobsOptions.DefaultSource` and `JobsOptions.DefaultPartition`. Passing `source` and/or `partition` overrides them per-job. `.Audit()` toggles creation of `JobExecution` records; it is ignored while the job remains in the in-memory store.
+
+`JobsOptions.DefaultStore` stays at `InMemory`, so simply referencing `Koan.Jobs.Core` never forces a database dependency. Teams opt in when they value durability.
+
+Once persisted, jobs behave like any other entity and can rely on provider annotations or runtime context routing:
+
+```csharp
+[DataAdapter("postgresql")]
+public class AnalyticsJob : Job<AnalyticsJob, AnalyticsContext, AnalyticsResult> { }
+
+using (EntityContext.Source("jobs"))
+using (EntityContext.Partition("hot"))
+{
+    var job = await AnalyticsJob.Start(context)
+        .Persist()
+        .Run();
+}
 ```
 
 ### 5. Data Context Configuration (EntityContext)
@@ -1047,7 +1173,29 @@ Define named data sources in `appsettings.json`:
 }
 ```
 
+Configure job defaults alongside data sources:
+
+```json
+{
+  "Koan": {
+    "Jobs": {
+      "DefaultStore": "InMemory",   // or "Entity"
+      "DefaultSource": "Jobs",
+      "DefaultPartition": "hot",
+      "InMemory": {
+        "CompletedRetentionMinutes": 15,
+        "FaultedRetentionMinutes": 60
+      }
+    }
+  }
+}
+```
+
+`DefaultStore` keeps the framework in lightweight mode until persistence is requested. Retention knobs control how long completed/failed jobs live in the in-memory store before the sweeper removes them.
+
 #### Usage Patterns
+
+> Ambient `EntityContext.Source(...)` / `.Partition(...)` scopes are captured when `.Persist()` is invoked. Without persistence calls, jobs stay in the default in-memory store regardless of the current context.
 
 **A. Global Source Configuration (Recommended)**
 
@@ -1077,8 +1225,10 @@ Use `EntityContext` for runtime source switching:
 // Route specific job to dedicated source
 using (EntityContext.Source("Jobs"))
 {
-    var job = await BackupJob.Start(context);
-    await job.Save(); // Saved to "Jobs" source (PostgreSQL in config above)
+    var job = await BackupJob
+        .Start(context)
+        .Persist() // Saved to "Jobs" source (PostgreSQL in config above)
+        .Run();
 }
 
 // Query jobs from dedicated source
@@ -1107,7 +1257,10 @@ Use partitions for logical separation within same source:
 
 ```csharp
 // Active jobs in default partition
-var job = await BackupJob.Start(context);
+var job = await BackupJob
+    .Start(context)
+    .Persist()
+    .Run();
 
 // After completion, move to archive partition
 if (job.Status == JobStatus.Completed &&
@@ -1149,7 +1302,10 @@ public class JobExecution : Entity<JobExecution>
 }
 
 // No EntityContext needed - adapter fixed at type level
-var job = await BackupJob.Start(context); // Always PostgreSQL
+var job = await BackupJob
+    .Start(context)
+    .Persist() // Always PostgreSQL
+    .Run();
 var executions = await JobExecution.Query(e => e.JobId == jobId); // Always MongoDB
 ```
 
@@ -1258,7 +1414,10 @@ public class JobExecution : Entity<JobExecution> { }
 // Runtime usage
 using (EntityContext.Source("Jobs"))
 {
-    var job = await BackupJob.Start(context);
+    var job = await BackupJob
+        .Start(context)
+        .Persist()
+        .Run();
 }
 
 // Executions auto-route to MongoDB via [DataAdapter]
@@ -1282,6 +1441,8 @@ using (EntityContext.Source("Archive"))
 ## Job Lifecycle Management
 
 ### Automatic Archival Policy
+
+> **Note:** Archival runs only for jobs persisted via `.Persist(...)`. Ephemeral jobs in the in-memory store expire via TTL sweeper and never reach archival tiers.
 
 Jobs have natural lifecycle phases: active (running/pending), completed (recent), and historical (archived). Koan.Jobs provides automatic archival policies to move completed jobs through storage tiers based on age and status.
 
@@ -1398,7 +1559,7 @@ public class JobArchivalService : KoanPeriodicServiceBase
         _logger = logger;
     }
 
-    protected override async Task ExecutePeriodicAsync(CancellationToken ct)
+    protected override async Task ExecutePeriodic(CancellationToken ct)
     {
         if (!_options.Value.Enabled)
         {
@@ -1410,7 +1571,7 @@ public class JobArchivalService : KoanPeriodicServiceBase
         {
             try
             {
-                await ExecutePolicyAsync(policy, ct);
+                await ExecutePolicy(policy, ct);
             }
             catch (Exception ex)
             {
@@ -1420,7 +1581,7 @@ public class JobArchivalService : KoanPeriodicServiceBase
         }
     }
 
-    private async Task ExecutePolicyAsync(
+    private async Task ExecutePolicy(
         JobArchivalPolicy policy,
         CancellationToken ct)
     {
@@ -1917,24 +2078,24 @@ public abstract class FiniteJob<TJob, TContext, TResult, TItem>
     public int FailedItems { get; set; }
 
     // Template method pattern - subclasses provide items and processing logic
-    protected abstract IAsyncEnumerable<TItem> GetItemsAsync(
+    protected abstract IAsyncEnumerable<TItem> GetItems(
         TContext context,
         CancellationToken ct);
 
-    protected abstract Task<ItemResult> ProcessItemAsync(
+    protected abstract Task<ItemResult> ProcessItem(
         TItem item,
         int index,
         IJobProgress progress,
         CancellationToken ct);
 
     // Framework implements item-based execution
-    protected sealed override async Task<TResult> ExecuteAsync(
+    protected sealed override async Task<TResult> Execute(
         TContext context,
         IJobProgress progress,
         CancellationToken ct)
     {
         var items = new List<TItem>();
-        await foreach (var item in GetItemsAsync(context, ct))
+        await foreach (var item in GetItems(context, ct))
             items.Add(item);
 
         TotalItems = items.Count;
@@ -1944,7 +2105,7 @@ public abstract class FiniteJob<TJob, TContext, TResult, TItem>
         {
             try
             {
-                var result = await ProcessItemAsync(items[i], i, progress, ct);
+                var result = await ProcessItem(items[i], i, progress, ct);
 
                 if (result.Success) ProcessedItems++;
                 else if (result.Skipped) SkippedItems++;
@@ -1968,7 +2129,7 @@ public abstract class FiniteJob<TJob, TContext, TResult, TItem>
 // Usage example
 public class MediaExportJob : FiniteJob<MediaExportJob, ExportContext, ExportResult, Media>
 {
-    protected override async IAsyncEnumerable<Media> GetItemsAsync(
+    protected override async IAsyncEnumerable<Media> GetItems(
         ExportContext context,
         CancellationToken ct)
     {
@@ -1976,13 +2137,13 @@ public class MediaExportJob : FiniteJob<MediaExportJob, ExportContext, ExportRes
             yield return media;
     }
 
-    protected override async Task<ItemResult> ProcessItemAsync(
+    protected override async Task<ItemResult> ProcessItem(
         Media item,
         int index,
         IJobProgress progress,
         CancellationToken ct)
     {
-        await ExportMediaAsync(item, ct);
+        await ExportMedia(item, ct);
         return ItemResult.Success();
     }
 
@@ -2020,20 +2181,20 @@ public class DocumentProcessingJob : Job<DocumentProcessingJob, DocumentContext,
     // Retry policy now declarative via attribute
     // Stage tracking via job.Metadata or multi-stage job pattern
 
-    protected override async Task<DocumentResult> ExecuteAsync(
+    protected override async Task<DocumentResult> Execute(
         DocumentContext context,
         IJobProgress progress,
         CancellationToken ct)
     {
         // Existing DocumentProcessingWorker logic moves here
         progress.Report(0.0, "Starting text extraction");
-        var text = await ExtractTextAsync(context.DocumentId, ct);
+        var text = await ExtractText(context.DocumentId, ct);
 
         progress.Report(0.3, "Extracting keywords");
-        var keywords = await ExtractKeywordsAsync(text, ct);
+        var keywords = await ExtractKeywords(text, ct);
 
         progress.Report(0.6, "Generating embeddings");
-        var embeddings = await GenerateEmbeddingsAsync(text, ct);
+        var embeddings = await GenerateEmbeddings(text, ct);
 
         progress.Report(1.0, "Processing complete");
 
@@ -2047,7 +2208,7 @@ var attemptCount = executions.Count;
 ```
 
 **Migration Benefits:**
-- ✅ Standardized API (`Start()`, `WaitAsync()`, `StreamProgressAsync()`)
+- ✅ Standardized API (`Start()`, `Wait()`, `OnProgress()`, `Refresh()`)
 - ✅ Clean separation: domain (Job) vs policy (RetryPolicy) vs audit (JobExecution)
 - ✅ Built-in progress tracking with ETA
 - ✅ Correlation ID auto-capture
@@ -2067,17 +2228,22 @@ var attemptCount = executions.Count;
 - [ ] Implement `Job<TJob, TContext, TResult>` generic base
 - [ ] Implement `IJobProgress` and `JobProgressTracker`
 - [ ] Create `JobQueue<T>` abstraction (in-memory initially)
+- [ ] Implement default `InMemoryJobStore` with TTL eviction
+- [ ] Implement `EntityJobStore` and fluent `.Persist(...)`/`.Audit()`
+- [ ] Implement `JobRunBuilder` with `.Run()` pipeline
+- [ ] Add `Jobs.Recipe()` builder (Persist/Audit/WithDefaults/UsePolicy) and registration hooks
+- [ ] Implement `JobProgressBroker` for callbacks and telemetry fan-out
 - [ ] Implement `JobExecutorService` with retry logic
 - [ ] Auto-registration via `KoanAutoRegistrar`
 - [ ] Support `EntityContext` for data source routing
 - [ ] Default to "Default" source, detect "Jobs" source if configured
 
 ### Phase 2: API Surface (Week 3)
-- [ ] Implement `Start()`, `WaitAsync()`, `StreamProgressAsync()` methods
+- [ ] Implement `Start()`, `Wait()`, `OnProgress()`/`Refresh()` methods
 - [ ] Implement cancellation support
 - [ ] Create `JobsController` for REST API (with execution history endpoints)
 - [ ] Add OpenTelemetry correlation integration
-- [ ] Implement metadata extension methods (`WithTenantId`, `WithUserId`, etc.)
+- [ ] Implement unified metadata helpers (`With(...)`, `GetTenantId`, etc.)
 - [ ] Document data source configuration patterns (dedicated DB, archiving, multi-tenant)
 
 ### Phase 3: Advanced Features (Week 4-5)
@@ -2151,24 +2317,28 @@ var attemptCount = executions.Count;
 ### Job Lifecycle Methods
 
 ```csharp
-// Static methods (Entity pattern)
+// Static/builder methods
 await MyJob.Start(context, correlationId?, ct)
-await MyJob.Get(jobId, ct)
-await MyJob.Query(predicate, ct)
-await MyJob.Remove(jobId, ct)
+    .With(metadata: meta => meta["TenantId"] = tenantId)
+    .Persist()
+    .Audit()
+    .Run();
+await MyJob.Get(jobId, ct);
+await MyJob.Query(predicate, ct);
+await MyJob.Remove(jobId, ct);
 
 // Instance methods
-await job.Save()
-await job.WaitAsync(timeout?, ct)
-await job.StreamProgressAsync(ct)
-await job.CancelAsync(ct)
-await job.GetParent<ParentJob>(ct)  // For child jobs
-await job.GetChildren<ChildJob>(ct) // For parent jobs
+await job.Save();
+await job.Wait(timeout?, ct);
+using var hook = job.OnProgress(update => Task.CompletedTask);
+await job.Refresh(ct);
+await job.Cancel(ct);
+await job.GetParent<ParentJob>(ct);  // For child jobs
+await job.GetChildren<ChildJob>(ct); // For parent jobs
 
 // Metadata fluent API
-job.WithTenantId(tenantId)
-   .WithUserId(userId)
-   .WithMetadata(key, value)
+job.With(tenantId: tenantId, userId: userId)
+   .With(metadata: meta => meta[key] = value);
 ```
 
 ### Progress Reporting
@@ -2251,7 +2421,7 @@ await foreach (var job in Job.QueryStream("status eq 'Running'", batchSize: 100)
 - ✅ Leverages .NET standards (`IProgress<T>`, `Activity`, `CancellationToken`)
 - ✅ Improves on industry patterns (Hangfire/Quartz) with better DX and observability
 - ✅ Generalizes proven patterns from S13.DocMind with cleaner architecture
-- ✅ Provides semantic, ergonomic API (`Start()`, `WaitAsync()`, `StreamProgress()`)
+- ✅ Provides semantic, ergonomic API (`Start()`, `Wait()`, `OnProgress()`, `Refresh()`)
 - ✅ Integrates seamlessly with existing Koan infrastructure (BackgroundServices, Entity events, OpenTelemetry)
 - ✅ Supports extensible metadata for domain-specific tracking (TenantId, UserId, custom keys)
 - ✅ Provides complete execution audit trail via `JobExecution` entity
@@ -2270,3 +2440,4 @@ await foreach (var job in Job.QueryStream("status eq 'Running'", batchSize: 100)
 - Can be disabled or customized via configuration
 
 **Next Steps**: Review decision points and approve implementation roadmap for Phase 1 kickoff.
+

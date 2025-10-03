@@ -1,0 +1,99 @@
+using System;
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
+using Koan.Data.Core;
+using Koan.Jobs.Model;
+using Koan.Jobs.Support;
+
+namespace Koan.Jobs.Store;
+
+internal sealed class EntityJobStore : IJobStore
+{
+    private readonly JobIndexCache _index;
+
+    public EntityJobStore(JobIndexCache index)
+    {
+        _index = index;
+    }
+
+    public async Task<Job> CreateAsync(Job job, JobStoreMetadata metadata, CancellationToken cancellationToken)
+    {
+        job.StorageMode = JobStorageMode.Entity;
+        job.Source = metadata.Source ?? job.Source;
+        job.Partition = metadata.Partition ?? job.Partition;
+        job.AuditTrailEnabled = metadata.Audit;
+        job.UpdatedAt = DateTimeOffset.UtcNow;
+
+        using var scope = EnterContext(job.Source, job.Partition);
+        await job.Save(cancellationToken).ConfigureAwait(false);
+        _index.Set(new JobIndexEntry(job.Id, JobStorageMode.Entity, job.Source, job.Partition, job.GetType()));
+        return job;
+    }
+
+    public async Task<Job?> GetAsync(string jobId, JobStoreMetadata metadata, CancellationToken cancellationToken)
+    {
+        using var scope = EnterContext(metadata.Source, metadata.Partition);
+        var job = await Job.Get(jobId, cancellationToken).ConfigureAwait(false);
+        if (job != null)
+        {
+            _index.Set(new JobIndexEntry(job.Id, JobStorageMode.Entity, job.Source, job.Partition, job.GetType()));
+        }
+        return job;
+    }
+
+    public async Task<Job> UpdateAsync(Job job, JobStoreMetadata metadata, CancellationToken cancellationToken)
+    {
+        job.StorageMode = JobStorageMode.Entity;
+        job.Source = metadata.Source ?? job.Source;
+        job.Partition = metadata.Partition ?? job.Partition;
+        job.AuditTrailEnabled = metadata.Audit;
+        job.UpdatedAt = DateTimeOffset.UtcNow;
+
+        using var scope = EnterContext(job.Source, job.Partition);
+        await job.Save(cancellationToken).ConfigureAwait(false);
+        _index.Set(new JobIndexEntry(job.Id, JobStorageMode.Entity, job.Source, job.Partition, job.GetType()));
+        return job;
+    }
+
+    public async Task RemoveAsync(string jobId, JobStoreMetadata metadata, CancellationToken cancellationToken)
+    {
+        using var scope = EnterContext(metadata.Source, metadata.Partition);
+        await Job.Remove(jobId, cancellationToken).ConfigureAwait(false);
+        _index.Remove(jobId);
+    }
+
+    public async Task<JobExecution> CreateExecutionAsync(JobExecution execution, JobStoreMetadata metadata, CancellationToken cancellationToken)
+    {
+        using var scope = EnterContext(metadata.Source, metadata.Partition);
+        await execution.Save(cancellationToken).ConfigureAwait(false);
+        return execution;
+    }
+
+    public async Task<JobExecution> UpdateExecutionAsync(JobExecution execution, JobStoreMetadata metadata, CancellationToken cancellationToken)
+    {
+        using var scope = EnterContext(metadata.Source, metadata.Partition);
+        await execution.Save(cancellationToken).ConfigureAwait(false);
+        return execution;
+    }
+
+    public async Task<IReadOnlyList<JobExecution>> ListExecutionsAsync(string jobId, JobStoreMetadata metadata, CancellationToken cancellationToken)
+    {
+        using var scope = EnterContext(metadata.Source, metadata.Partition);
+        var executions = await JobExecution.Query(e => e.JobId == jobId, cancellationToken).ConfigureAwait(false);
+        return executions;
+    }
+
+    private static IDisposable EnterContext(string? source, string? partition)
+    {
+        if (string.IsNullOrWhiteSpace(source) && string.IsNullOrWhiteSpace(partition))
+            return new NoopDisposable();
+
+        return EntityContext.With(source: source, partition: partition);
+    }
+
+    private sealed class NoopDisposable : IDisposable
+    {
+        public void Dispose() { }
+    }
+}
