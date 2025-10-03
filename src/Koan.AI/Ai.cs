@@ -183,18 +183,6 @@ public static class Ai
         return new AiContextScope(source, provider, model);
     }
 
-    // ============================================================================
-    // Legacy API (BACKWARD COMPATIBILITY)
-    // ============================================================================
-
-    [Obsolete("Use Chat() for capability-based routing. Prompt() will be removed in v1.0")]
-    public static Task<AiChatResponse> Prompt(string message, string? model = null, AiPromptOptions? opts = null, CancellationToken ct = default)
-        => Resolve().PromptAsync(BuildChat(message, model, opts), ct);
-
-    [Obsolete("Use Stream() with AiChatOptions for capability-based routing. This overload will be removed in v1.0")]
-    public static IAsyncEnumerable<AiChatChunk> Stream(string message, string? model = null, AiPromptOptions? opts = null, CancellationToken ct = default)
-        => Resolve().StreamAsync(BuildChat(message, model, opts), ct);
-
     public static Task<AiEmbeddingsResponse> Embed(AiEmbeddingsRequest req, CancellationToken ct = default)
         => Resolve().EmbedAsync(req, ct);
 
@@ -245,14 +233,6 @@ public static class Ai
         _resolver ??= CreateResolver(sp);
         return _resolver(sp);
     }
-
-    private static AiChatRequest BuildChat(string message, string? model, AiPromptOptions? opts)
-        => new()
-        {
-            Messages = new() { new AiMessage("user", message) },
-            Model = model,
-            Options = opts
-        };
 
     private static AiChatRequest BuildChatRequest(AiChatOptions options)
     {

@@ -303,38 +303,6 @@ public abstract class CanonOrchestratorBase : KoanFluentServiceBase, ICanonOrche
                 }
             }
 
-            // Legacy intake interceptors (for backward compatibility)
-            if (CanonIntakeInterceptors.HasInterceptor(modelType))
-            {
-                var result = CanonIntakeInterceptors.Intercept(payload);
-                payload = result.Payload;
-
-                Logger.LogDebug("Legacy intake interceptor processed {Model}: MustDrop={MustDrop}, ParkingStatus={ParkingStatus}",
-                    model, result.MustDrop, result.ParkingStatus ?? "none");
-
-                // Handle legacy interceptor instructions
-                if (result.MustDrop)
-                {
-                    Logger.LogInformation("Legacy intake interceptor requested DROP for {Model} - skipping processing", model);
-                    return;
-                }
-
-                if (!string.IsNullOrEmpty(result.ParkingStatus))
-                {
-                    // Legacy interceptor wants to park this record
-                    if (metadata == null)
-                    {
-                        metadata = new JObject();
-                    }
-                    ((JObject)metadata)["parking.status"] = result.ParkingStatus;
-                    ((JObject)metadata)["parking.reason"] = "interceptor";
-                    shouldPark = true;
-
-                    Logger.LogDebug("Intake interceptor requested PARK for {Model} with status {ParkingStatus}",
-                        model, result.ParkingStatus);
-                }
-            }
-
             // If parking was requested by interceptor, always use default intake processing
             // This ensures proper parking behavior regardless of Canon.OnUpdate handlers
             if (shouldPark)
