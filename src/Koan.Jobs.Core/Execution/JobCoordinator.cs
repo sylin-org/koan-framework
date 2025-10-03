@@ -62,10 +62,6 @@ internal sealed class JobCoordinator : IJobCoordinator
             QueuedAt = DateTimeOffset.UtcNow,
             CreatedAt = DateTimeOffset.UtcNow,
             CorrelationId = request.CorrelationId,
-            StorageMode = storageMode,
-            Source = source,
-            Partition = partition,
-            AuditTrailEnabled = audit,
             Progress = 0d
         };
 
@@ -85,8 +81,6 @@ internal sealed class JobCoordinator : IJobCoordinator
         if (saved is not TJob typed)
             throw new InvalidOperationException($"Store returned unexpected job type {saved.GetType().FullName}." );
 
-        _index.Set(new JobIndexEntry(typed.Id, storageMode, typed.Source, typed.Partition, typeof(TJob)));
-
         await _eventPublisher.PublishQueuedAsync(typed, cancellationToken).ConfigureAwait(false);
 
         var baseType = typeof(TJob).BaseType;
@@ -98,8 +92,8 @@ internal sealed class JobCoordinator : IJobCoordinator
             typed.Id,
             typeof(TJob),
             storageMode,
-            typed.Source,
-            typed.Partition,
+            source,
+            partition,
             audit,
             contextType,
             resultType);
@@ -124,13 +118,17 @@ internal sealed class JobCoordinator : IJobCoordinator
         if (job == null)
             return;
 
-        if (job.Status is JobStatus.Completed or JobStatus.Succeeded or JobStatus.Failed or JobStatus.Cancelled)
+        if (job.Status is JobStatus.Completed or JobStatus.Failed or JobStatus.Cancelled)
             return;
 
         _logger.LogInformation("Cancelling job {JobId} (status: {Status})", job.Id, job.Status);
 
-        job.CancellationRequested = true;
-        job.UpdatedAt = DateTimeOffset.UtcNow;
+        if (!_index.TryGet(jobId, out var entry))
+        {
+            entry = new JobIndexEntry(jobId, mode, metadata.Source, metadata.Partition, metadata.Audit, job.GetType());
+            _index.Set(entry);
+        }
+        entry.CancellationRequested = true;
 
         if (job.Status is JobStatus.Created or JobStatus.Queued)
         {
@@ -144,8 +142,6 @@ internal sealed class JobCoordinator : IJobCoordinator
         {
             await store.UpdateAsync(job, metadata, cancellationToken).ConfigureAwait(false);
         }
-
-        _index.Set(new JobIndexEntry(job.Id, mode, job.Source, job.Partition, job.GetType()));
     }
 
     public async Task<IReadOnlyList<JobExecution>> GetExecutionsAsync(string jobId, CancellationToken cancellationToken)
@@ -158,7 +154,7 @@ internal sealed class JobCoordinator : IJobCoordinator
     {
         if (_index.TryGet(jobId, out var entry))
         {
-            var metadata = new JobStoreMetadata(entry.StorageMode, entry.Source, entry.Partition, _options.AuditByDefault, _options.SerializerOptions);
+            var metadata = new JobStoreMetadata(entry.StorageMode, entry.Source, entry.Partition, entry.AuditEnabled, _options.SerializerOptions);
             return (_resolver.Resolve(entry.StorageMode), metadata, entry.StorageMode);
         }
 

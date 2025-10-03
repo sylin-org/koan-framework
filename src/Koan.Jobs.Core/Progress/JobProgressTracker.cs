@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Koan.Jobs.Model;
 using Koan.Jobs.Store;
+using Koan.Jobs.Support;
 
 namespace Koan.Jobs.Progress;
 
@@ -13,21 +14,23 @@ internal sealed class JobProgressTracker : IJobProgress
     private readonly IJobStore _store;
     private readonly JobStoreMetadata _metadata;
     private readonly JobProgressBroker _broker;
+    private readonly JobIndexCache _index;
     private readonly CancellationToken _cancellationToken;
     private readonly ConcurrentBag<Task> _pending = new();
 
-    internal JobProgressTracker(Job job, IJobStore store, JobStoreMetadata metadata, JobProgressBroker broker, CancellationToken cancellationToken)
+    internal JobProgressTracker(Job job, IJobStore store, JobStoreMetadata metadata, JobProgressBroker broker, JobIndexCache index, CancellationToken cancellationToken)
     {
         _job = job;
         _store = store;
         _metadata = metadata;
         _broker = broker;
+        _index = index;
         _cancellationToken = cancellationToken;
     }
 
     public DateTimeOffset? EstimatedCompletion => _job.EstimatedCompletion;
 
-    public bool CancellationRequested => _job.CancellationRequested;
+    public bool CancellationRequested => _index.TryGet(_job.Id, out var entry) && entry.CancellationRequested;
 
     public void Report(double percentage, string? message = null, DateTimeOffset? estimatedCompletion = null)
     {
@@ -36,7 +39,6 @@ internal sealed class JobProgressTracker : IJobProgress
             _job.ProgressMessage = message;
         if (estimatedCompletion.HasValue)
             _job.EstimatedCompletion = estimatedCompletion;
-        _job.UpdatedAt = DateTimeOffset.UtcNow;
         SchedulePersistence();
     }
 
@@ -53,7 +55,6 @@ internal sealed class JobProgressTracker : IJobProgress
             _job.ProgressMessage = message;
         if (estimatedCompletion.HasValue)
             _job.EstimatedCompletion = estimatedCompletion;
-        _job.UpdatedAt = DateTimeOffset.UtcNow;
         SchedulePersistence();
     }
 

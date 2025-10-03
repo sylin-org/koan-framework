@@ -22,14 +22,9 @@ internal sealed class InMemoryJobStore : IJobStore
 
     public Task<Job> CreateAsync(Job job, JobStoreMetadata metadata, CancellationToken cancellationToken)
     {
-        job.StorageMode = JobStorageMode.InMemory;
-        job.Source = null;
-        job.Partition = null;
-        job.UpdatedAt = DateTimeOffset.UtcNow;
-
         var stored = _jobs.GetOrAdd(job.Id, _ => new StoredJob(job));
         stored.Update(job);
-        _index.Set(new JobIndexEntry(job.Id, JobStorageMode.InMemory, null, null, job.GetType()));
+        _index.Set(new JobIndexEntry(job.Id, JobStorageMode.InMemory, null, null, metadata.Audit, job.GetType()));
         return Task.FromResult(job);
     }
 
@@ -40,10 +35,9 @@ internal sealed class InMemoryJobStore : IJobStore
 
     public Task<Job> UpdateAsync(Job job, JobStoreMetadata metadata, CancellationToken cancellationToken)
     {
-        job.UpdatedAt = DateTimeOffset.UtcNow;
         var stored = _jobs.GetOrAdd(job.Id, _ => new StoredJob(job));
         stored.Update(job);
-        _index.Set(new JobIndexEntry(job.Id, JobStorageMode.InMemory, null, null, job.GetType()));
+        _index.Set(new JobIndexEntry(job.Id, JobStorageMode.InMemory, null, null, metadata.Audit, job.GetType()));
         return Task.FromResult(job);
     }
 
@@ -100,7 +94,7 @@ internal sealed class InMemoryJobStore : IJobStore
         var now = DateTimeOffset.UtcNow;
         RemoveIf(job =>
             job.CompletedAt.HasValue &&
-            ((job.Status is JobStatus.Completed or JobStatus.Succeeded && completedRetention > TimeSpan.Zero && now - job.CompletedAt >= completedRetention) ||
+            ((job.Status == JobStatus.Completed && completedRetention > TimeSpan.Zero && now - job.CompletedAt >= completedRetention) ||
              (job.Status == JobStatus.Failed && faultedRetention > TimeSpan.Zero && now - job.CompletedAt >= faultedRetention)));
     }
 

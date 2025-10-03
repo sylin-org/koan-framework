@@ -16,7 +16,7 @@ public sealed class JobsOptions
 
 public sealed class InMemoryStoreOptions
 {
-    public int CompletedRetentionMinutes { get; set; } = 15;
-    public int FaultedRetentionMinutes { get; set; } = 60;
+    public int CompletedRetentionMinutes { get; set; } = 60;
+    public int FaultedRetentionMinutes { get; set; } = 120;
     public int SweepIntervalSeconds { get; set; } = 60;
 }

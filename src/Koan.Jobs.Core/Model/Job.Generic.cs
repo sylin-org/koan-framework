@@ -47,7 +47,7 @@ public abstract partial class Job<TJob, TContext, TResult> : Job
         {
             cancellationToken.ThrowIfCancellationRequested();
             var snapshot = await Refresh(cancellationToken).ConfigureAwait(false);
-            if (snapshot.Status is JobStatus.Completed or JobStatus.Succeeded)
+            if (snapshot.Status == JobStatus.Completed)
             {
                 return snapshot.Result ?? default!;
             }

@@ -53,9 +53,13 @@ internal sealed class JobExecutor
             return;
         }
 
-        _index.Set(new JobIndexEntry(job.Id, item.StorageMode, job.Source, job.Partition, item.JobType));
+        if (!_index.TryGet(job.Id, out var entry))
+        {
+            entry = new JobIndexEntry(job.Id, item.StorageMode, item.Source, item.Partition, item.AuditExecutions, item.JobType);
+            _index.Set(entry);
+        }
 
-        if (job.CancellationRequested)
+        if (entry.CancellationRequested)
         {
             job.Status = JobStatus.Cancelled;
             job.CompletedAt ??= DateTimeOffset.UtcNow;
@@ -91,12 +95,11 @@ internal sealed class JobExecutor
             job.QueuedAt ??= job.CreatedAt;
             job.ProgressMessage = null;
             job.LastError = null;
-            job.UpdatedAt = DateTimeOffset.UtcNow;
 
             await store.UpdateAsync(job, metadata, cancellationToken).ConfigureAwait(false);
             await _eventPublisher.PublishStartedAsync(job, cancellationToken).ConfigureAwait(false);
 
-            var tracker = new JobProgressTracker(job, store, metadata, _progressBroker, cancellationToken);
+            var tracker = new JobProgressTracker(job, store, metadata, _progressBroker, _index, cancellationToken);
             var outcome = await InvokeRunner(item, job, tracker, cancellationToken).ConfigureAwait(false);
             await tracker.FlushAsync(cancellationToken).ConfigureAwait(false);
 
@@ -116,7 +119,6 @@ internal sealed class JobExecutor
                 job.Status = JobStatus.Completed;
                 job.CompletedAt = DateTimeOffset.UtcNow;
                 job.Duration = job.CompletedAt - job.CreatedAt;
-                job.UpdatedAt = DateTimeOffset.UtcNow;
                 await store.UpdateAsync(job, metadata, cancellationToken).ConfigureAwait(false);
                 await _eventPublisher.PublishCompletedAsync(job, cancellationToken).ConfigureAwait(false);
                 return;
@@ -127,7 +129,6 @@ internal sealed class JobExecutor
                 job.Status = JobStatus.Cancelled;
                 job.CompletedAt = DateTimeOffset.UtcNow;
                 job.Duration = job.CompletedAt - job.CreatedAt;
-                job.UpdatedAt = DateTimeOffset.UtcNow;
                 await store.UpdateAsync(job, metadata, cancellationToken).ConfigureAwait(false);
                 await _eventPublisher.PublishCancelledAsync(job, cancellationToken).ConfigureAwait(false);
                 return;
@@ -140,7 +141,6 @@ internal sealed class JobExecutor
                 job.Status = JobStatus.Failed;
                 job.CompletedAt = DateTimeOffset.UtcNow;
                 job.Duration = job.CompletedAt - job.CreatedAt;
-                job.UpdatedAt = DateTimeOffset.UtcNow;
                 await store.UpdateAsync(job, metadata, cancellationToken).ConfigureAwait(false);
                 await _eventPublisher.PublishFailedAsync(job, outcome.Error?.Message, cancellationToken).ConfigureAwait(false);
                 return;
@@ -149,7 +149,6 @@ internal sealed class JobExecutor
             var delay = descriptor.ComputeDelay(attempt);
             job.Status = JobStatus.Queued;
             job.QueuedAt = DateTimeOffset.UtcNow.Add(delay);
-            job.UpdatedAt = DateTimeOffset.UtcNow;
             await store.UpdateAsync(job, metadata, cancellationToken).ConfigureAwait(false);
             await _eventPublisher.PublishFailedAsync(job, outcome.Error?.Message, cancellationToken).ConfigureAwait(false);
 

@@ -19,15 +19,9 @@ internal sealed class EntityJobStore : IJobStore
 
     public async Task<Job> CreateAsync(Job job, JobStoreMetadata metadata, CancellationToken cancellationToken)
     {
-        job.StorageMode = JobStorageMode.Entity;
-        job.Source = metadata.Source ?? job.Source;
-        job.Partition = metadata.Partition ?? job.Partition;
-        job.AuditTrailEnabled = metadata.Audit;
-        job.UpdatedAt = DateTimeOffset.UtcNow;
-
-        using var scope = EnterContext(job.Source, job.Partition);
+        using var scope = EnterContext(metadata.Source, metadata.Partition);
         await job.Save(cancellationToken).ConfigureAwait(false);
-        _index.Set(new JobIndexEntry(job.Id, JobStorageMode.Entity, job.Source, job.Partition, job.GetType()));
+        _index.Set(new JobIndexEntry(job.Id, JobStorageMode.Entity, metadata.Source, metadata.Partition, metadata.Audit, job.GetType()));
         return job;
     }
 
@@ -37,22 +31,16 @@ internal sealed class EntityJobStore : IJobStore
         var job = await Job.Get(jobId, cancellationToken).ConfigureAwait(false);
         if (job != null)
         {
-            _index.Set(new JobIndexEntry(job.Id, JobStorageMode.Entity, job.Source, job.Partition, job.GetType()));
+            _index.Set(new JobIndexEntry(job.Id, JobStorageMode.Entity, metadata.Source, metadata.Partition, metadata.Audit, job.GetType()));
         }
         return job;
     }
 
     public async Task<Job> UpdateAsync(Job job, JobStoreMetadata metadata, CancellationToken cancellationToken)
     {
-        job.StorageMode = JobStorageMode.Entity;
-        job.Source = metadata.Source ?? job.Source;
-        job.Partition = metadata.Partition ?? job.Partition;
-        job.AuditTrailEnabled = metadata.Audit;
-        job.UpdatedAt = DateTimeOffset.UtcNow;
-
-        using var scope = EnterContext(job.Source, job.Partition);
+        using var scope = EnterContext(metadata.Source, metadata.Partition);
         await job.Save(cancellationToken).ConfigureAwait(false);
-        _index.Set(new JobIndexEntry(job.Id, JobStorageMode.Entity, job.Source, job.Partition, job.GetType()));
+        _index.Set(new JobIndexEntry(job.Id, JobStorageMode.Entity, metadata.Source, metadata.Partition, metadata.Audit, job.GetType()));
         return job;
     }
 

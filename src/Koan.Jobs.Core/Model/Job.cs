@@ -56,17 +56,6 @@ public abstract partial class Job : Entity<Job>
     [Column(TypeName = "jsonb")]
     public Dictionary<string, object?> Metadata { get; set; } = new();
 
-    [MaxLength(128)]
-    public string? Source { get; set; }
-
-    [MaxLength(128)]
-    public string? Partition { get; set; }
-
-    public JobStorageMode StorageMode { get; set; } = JobStorageMode.InMemory;
-
-    public bool AuditTrailEnabled { get; set; }
-
-    public bool CancellationRequested { get; set; }
-
-    public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
+    [Timestamp]
+    public DateTimeOffset LastModified { get; set; }
 }
