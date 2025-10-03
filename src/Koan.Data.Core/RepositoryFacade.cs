@@ -1,5 +1,6 @@
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Instructions;
+using Koan.Data.Core.Metadata;
 using Koan.Data.Core.Schema;
 using System.Linq.Expressions;
 
@@ -8,6 +9,7 @@ namespace Koan.Data.Core;
 /// <summary>
 /// Adds cross-cutting behaviors on top of an underlying repository:
 /// - Ensures identifiers for all upserts (single, many, batch)
+/// - Auto-updates [Timestamp] fields on save operations
 /// - Advertises query/write capabilities
 /// - Bridges optional LINQ and raw-string querying
 /// - Forwards instruction execution when supported by the adapter
@@ -29,14 +31,16 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
     private readonly IDataRepository<TEntity, TKey> _inner;
     private readonly IAggregateIdentityManager _manager;
     private readonly EntitySchemaGuard<TEntity, TKey> _schemaGuard;
+    private readonly TimestampPropertyBag _timestampBag;
     private readonly QueryCapabilities _caps;
     private readonly WriteCapabilities _writeCaps;
     /// <summary>
-    /// Create a facade over a repository with identity management.
+    /// Create a facade over a repository with identity management and timestamp auto-update.
     /// </summary>
     public RepositoryFacade(IDataRepository<TEntity, TKey> inner, IAggregateIdentityManager manager, EntitySchemaGuard<TEntity, TKey> schemaGuard)
     {
         _inner = inner; _manager = manager; _schemaGuard = schemaGuard;
+        _timestampBag = new TimestampPropertyBag(typeof(TEntity));
         _caps = inner is IQueryCapabilities qc ? qc.Capabilities : QueryCapabilities.None;
         _writeCaps = inner is IWriteCapabilities wc ? wc.Writes : WriteCapabilities.None;
     }
@@ -151,6 +155,11 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
     {
         await GuardAsync(ct).ConfigureAwait(false);
         await _manager.EnsureIdAsync<TEntity, TKey>(model, ct).ConfigureAwait(false);
+
+        // Auto-update [Timestamp] field if present
+        if (_timestampBag.HasTimestamp)
+            _timestampBag.UpdateTimestamp(model);
+
         return await _inner.UpsertAsync(model, ct).ConfigureAwait(false);
     }
 
@@ -163,6 +172,10 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
         {
             ct.ThrowIfCancellationRequested();
             await _manager.EnsureIdAsync<TEntity, TKey>(m, ct).ConfigureAwait(false);
+
+            // Auto-update [Timestamp] field if present
+            if (_timestampBag.HasTimestamp)
+                _timestampBag.UpdateTimestamp(m);
         }
         return await _inner.UpsertManyAsync(list, ct).ConfigureAwait(false);
     }
