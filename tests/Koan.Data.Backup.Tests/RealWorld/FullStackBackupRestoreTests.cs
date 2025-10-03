@@ -260,7 +260,14 @@ public class FullStackBackupRestoreTests : IAsyncLifetime, IDisposable
     {
         _output.WriteLine("Verifying backup files...");
 
-        var backupPath = Path.Combine(_tempDirectory, "backups", $"{manifest.Name}-{manifest.CreatedAt:yyyyMMdd-HHmmss}.zip");
+        manifest.StorageProfile.Should().Be("test");
+        manifest.ArchiveStorageKey.Should().NotBeNullOrWhiteSpace();
+        manifest.ArchiveFileName.Should().NotBeNullOrWhiteSpace();
+
+        var relativeKey = manifest.ArchiveStorageKey.Replace('/', Path.DirectorySeparatorChar);
+        Path.GetFileName(relativeKey).Should().Be(manifest.ArchiveFileName);
+
+        var backupPath = Path.Combine(_tempDirectory, "backups", relativeKey);
         File.Exists(backupPath).Should().BeTrue($"Backup file should exist at {backupPath}");
 
         var fileInfo = new FileInfo(backupPath);

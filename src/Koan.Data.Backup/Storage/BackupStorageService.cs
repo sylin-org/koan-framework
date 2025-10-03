@@ -1,5 +1,6 @@
 using Koan.Data.Backup.Models;
 using Koan.Storage.Abstractions;
+using Koan.Storage;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using System.IO.Compression;
@@ -30,11 +31,14 @@ public class BackupStorageService
     /// <summary>
     /// Creates a backup archive stream for writing
     /// </summary>
-    public Task<(Stream Stream, string BackupPath)> CreateBackupArchiveAsync(string backupName, string storageProfile, CancellationToken ct = default)
+    public Task<(Stream Stream, BackupArchiveDescriptor Descriptor)> CreateBackupArchiveAsync(
+        string backupName,
+        DateTimeOffset createdAt,
+        CancellationToken ct = default)
     {
-        var backupPath = $"backups/{backupName}-{DateTimeOffset.UtcNow:yyyyMMdd-HHmmss}.zip";
-        var stream = new MemoryStream(); // We'll use MemoryStream and upload when complete
-        return Task.FromResult<(Stream, string)>((stream, backupPath));
+        var descriptor = BackupArchiveNaming.Create(backupName, createdAt);
+        var stream = new MemoryStream(); // We'll use MemoryStream and upload when complete for now
+        return Task.FromResult<(Stream, BackupArchiveDescriptor)>((stream, descriptor));
     }
 
     /// <summary>
@@ -52,8 +56,8 @@ public class BackupStorageService
         var fileName = set == "root" ? $"{entityTypeName}.jsonl" : $"{entityTypeName}#{set}.jsonl";
         var entry = archive.CreateEntry($"entities/{fileName}", CompressionLevel.Optimal);
 
-        using var entryStream = entry.Open();
-        using var writer = new StreamWriter(entryStream, Encoding.UTF8);
+        await using var entryStream = entry.Open();
+        await using var writer = new StreamWriter(entryStream, Encoding.UTF8, bufferSize: 1024, leaveOpen: true);
 
         var count = 0;
         var totalBytes = 0L;
@@ -81,6 +85,8 @@ public class BackupStorageService
                 }
             }
 
+            await writer.FlushAsync();
+            await entryStream.FlushAsync(ct);
             hasher.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
 
             var entityInfo = new EntityBackupInfo
@@ -160,22 +166,26 @@ public class BackupStorageService
     /// <summary>
     /// Uploads the completed backup archive to storage
     /// </summary>
-    public async Task<string> UploadBackupArchiveAsync(Stream archiveStream, string backupPath, string storageProfile, CancellationToken ct = default)
+    public async Task<StorageObject> UploadBackupArchiveAsync(
+        Stream archiveStream,
+        BackupArchiveDescriptor descriptor,
+        string storageProfile,
+        CancellationToken ct = default)
     {
         archiveStream.Position = 0;
 
         var storageObject = await _storageService.PutAsync(
             storageProfile,
             "backups",
-            backupPath,
+            descriptor.StorageKey,
             archiveStream,
             "application/zip",
             ct);
 
         _logger.LogInformation("Uploaded backup archive to {Path} ({SizeKB} KB)",
-            backupPath, storageObject.Size / 1024);
+            descriptor.StorageKey, storageObject.Size / 1024);
 
-        return storageObject.ContentHash ?? string.Empty;
+        return storageObject;
     }
 
     /// <summary>
@@ -213,7 +223,7 @@ public class BackupStorageService
         if (entry == null)
             throw new InvalidOperationException($"Entity data file {storageFile} not found in backup");
 
-        using var entryStream = entry.Open();
+        await using var entryStream = entry.Open();
         using var reader = new StreamReader(entryStream);
 
         var lineNumber = 0;
@@ -259,3 +269,5 @@ public class BackupStorageService
         return Convert.ToHexString(hash).ToLowerInvariant();
     }
 }
+
+

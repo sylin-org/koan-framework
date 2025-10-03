@@ -13,6 +13,11 @@ public class BackupManifest : StorageEntity<BackupManifest>
     public string CreatedBy { get; set; } = "system";
     public string Version { get; set; } = "1.0";
 
+    // Archive metadata
+    public string StorageProfile { get; set; } = string.Empty;
+    public string ArchiveStorageKey { get; set; } = string.Empty;
+    public string ArchiveFileName { get; set; } = string.Empty;
+
     // Entity metadata
     public List<EntityBackupInfo> Entities { get; set; } = new();
     public Dictionary<string, string> Metadata { get; set; } = new();
@@ -44,13 +49,16 @@ public class EntityBackupInfo
 
 public class BackupVerification
 {
-    public string OverallChecksum { get; set; } = default!;
+    public string OverallChecksum { get; set; } = string.Empty;
     public long TotalSizeBytes { get; set; }
     public int TotalItemCount { get; set; }
     public double CompressionRatio { get; set; }
     public bool IsValid { get; set; } = true;
+    public string ArchiveContentHash { get; set; } = string.Empty;
+    public long ArchiveSizeBytes { get; set; }
     public List<string> ValidationErrors { get; set; } = new();
 }
+
 
 public class EntityDiscoveryInfo
 {

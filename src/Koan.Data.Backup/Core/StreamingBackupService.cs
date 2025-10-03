@@ -66,8 +66,14 @@ public class StreamingBackupService : IBackupService
             _activeBackups[manifest.Id] = progress;
 
             // Create backup archive
-            var (archiveStream, backupPath) = await _storageService.CreateBackupArchiveAsync(
-                backupName, options.StorageProfile, ct);
+            var (archiveStream, descriptor) = await _storageService.CreateBackupArchiveAsync(
+                backupName,
+                manifest.CreatedAt,
+                ct);
+
+            manifest.StorageProfile = options.StorageProfile;
+            manifest.ArchiveStorageKey = descriptor.StorageKey;
+            manifest.ArchiveFileName = descriptor.FileName;
 
             using var archive = new ZipArchive(archiveStream, ZipArchiveMode.Create);
 
@@ -108,11 +114,14 @@ public class StreamingBackupService : IBackupService
 
             // Upload to storage
             archive.Dispose(); // Close the archive
-            var contentHash = await _storageService.UploadBackupArchiveAsync(
-                archiveStream, backupPath, options.StorageProfile, ct);
+            var storageObject = await _storageService.UploadBackupArchiveAsync(
+                archiveStream,
+                descriptor,
+                options.StorageProfile,
+                ct);
 
-            manifest.Verification.OverallChecksum = contentHash;
-
+            manifest.Verification.ArchiveContentHash = storageObject.ContentHash ?? string.Empty;
+            manifest.Verification.ArchiveSizeBytes = storageObject.Size;
             // Update final progress
             progress.Status = BackupStatus.Completed;
             progress.ElapsedTime = stopwatch.Elapsed;
@@ -192,8 +201,14 @@ public class StreamingBackupService : IBackupService
             _activeBackups[manifest.Id] = progress;
 
             // Create backup archive
-            var (archiveStream, backupPath) = await _storageService.CreateBackupArchiveAsync(
-                backupName, options.StorageProfile, ct);
+            var (archiveStream, descriptor) = await _storageService.CreateBackupArchiveAsync(
+                backupName,
+                manifest.CreatedAt,
+                ct);
+
+            manifest.StorageProfile = options.StorageProfile;
+            manifest.ArchiveStorageKey = descriptor.StorageKey;
+            manifest.ArchiveFileName = descriptor.FileName;
 
             using var archive = new ZipArchive(archiveStream, ZipArchiveMode.Create);
 
@@ -231,10 +246,15 @@ public class StreamingBackupService : IBackupService
             await _storageService.StoreVerificationAsync(archive, manifest, ct);
 
             // Upload to storage
-            archive.Dispose();
-            var contentHash = await _storageService.UploadBackupArchiveAsync(
-                archiveStream, backupPath, options.StorageProfile, ct);
+            archive.Dispose(); // Close the archive
+            var storageObject = await _storageService.UploadBackupArchiveAsync(
+                archiveStream,
+                descriptor,
+                options.StorageProfile,
+                ct);
 
+            manifest.Verification.ArchiveContentHash = storageObject.ContentHash ?? string.Empty;
+            manifest.Verification.ArchiveSizeBytes = storageObject.Size;
             // Update final progress
             progress.Status = BackupStatus.Completed;
             progress.BytesProcessed = manifest.Verification.TotalSizeBytes;
