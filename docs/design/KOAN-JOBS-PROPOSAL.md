@@ -1,9 +1,10 @@
 # Koan Jobs: Holistic Long-Running Task Management
 
-**Status**: Proposal
+**Status**: Approved - Implementation In Progress
 **Date**: 2025-10-02
+**Updated**: 2025-10-03
 **Author**: Architecture Team
-**Version**: 2.3
+**Version**: 3.0
 
 ---
 
@@ -200,6 +201,10 @@ public abstract class Job : Entity<Job>
     // ===== EXTENSIBLE METADATA =====
     [Column(TypeName = "jsonb")]
     public Dictionary<string, object?> Metadata { get; set; } = new();
+
+    // ===== CHANGE TRACKING =====
+    [Timestamp]
+    public DateTimeOffset LastModified { get; set; }
 }
 
 public enum JobStatus
@@ -298,27 +303,35 @@ public class RetryPolicyAttribute : Attribute
 
 public enum RetryStrategy
 {
-    None,              // No retry (default for jobs without attribute)
+    None,              // No retry
     Immediate,         // Retry immediately
     FixedDelay,        // Wait same time between retries
     LinearBackoff,     // Delay increases linearly (5s, 10s, 15s)
-    ExponentialBackoff // Delay increases exponentially (5s, 10s, 20s, 40s)
+    ExponentialBackoff // Delay increases exponentially (5s, 10s, 20s, 40s) - default
 }
 
 /// <summary>
 /// Optional interface for jobs needing custom retry logic.
 /// Allows inspecting error type, context, etc. to decide if retry should occur.
+/// IMPORTANT: Methods must be synchronous. Retry decisions should be based on
+/// exception type/message analysis, not live service health checks.
 /// </summary>
 public interface ICustomRetryPolicy
 {
     /// <summary>
     /// Decide if this specific execution should be retried.
+    /// Called after each failure before applying MaxAttempts limit.
+    /// Must be synchronous - analyze error details, don't make external calls.
     /// </summary>
+    /// <param name="lastExecution">The execution that just failed</param>
+    /// <returns>True to retry, false to fail immediately</returns>
     bool ShouldRetry(JobExecution lastExecution);
 
     /// <summary>
     /// Calculate custom retry delay. Return null to use policy default.
     /// </summary>
+    /// <param name="lastExecution">The execution that just failed</param>
+    /// <returns>Custom delay, or null for default exponential/linear backoff</returns>
     TimeSpan? GetRetryDelay(JobExecution lastExecution) => null;
 }
 
@@ -329,10 +342,17 @@ public class BackupJob : Job<BackupJob, BackupContext, BackupResult>
     // Job definition - no retry concerns
 }
 
-// No retry for one-time operations
+// Use default retry behavior (3 attempts, exponential backoff)
+public class StandardJob : Job<StandardJob, StandardContext, StandardResult>
+{
+    // No [RetryPolicy] attribute = uses defaults (MaxAttempts=3, ExponentialBackoff)
+}
+
+// Disable retry for one-time operations
+[RetryPolicy(MaxAttempts = 1, Strategy = RetryStrategy.None)]
 public class DatabaseMigrationJob : Job<DatabaseMigrationJob, MigrationContext, MigrationResult>
 {
-    // No [RetryPolicy] attribute = no retry
+    // Explicit single-attempt, no retry
 }
 
 // Custom retry logic
@@ -1183,8 +1203,8 @@ Configure job defaults alongside data sources:
       "DefaultSource": "Jobs",
       "DefaultPartition": "hot",
       "InMemory": {
-        "CompletedRetentionMinutes": 15,
-        "FaultedRetentionMinutes": 60
+        "CompletedRetentionMinutes": 60,
+        "FaultedRetentionMinutes": 120
       }
     }
   }
@@ -2220,95 +2240,173 @@ var attemptCount = executions.Count;
 
 ## Implementation Roadmap
 
-### Phase 1: Core Infrastructure (Week 1-2)
-- [ ] Create `Koan.Jobs.Core` project
-- [ ] Implement base `Job` entity (clean, no retry fields)
-- [ ] Implement `JobExecution` entity for execution history
-- [ ] Implement `RetryPolicyAttribute` and `ICustomRetryPolicy`
-- [ ] Implement `Job<TJob, TContext, TResult>` generic base
-- [ ] Implement `IJobProgress` and `JobProgressTracker`
-- [ ] Create `JobQueue<T>` abstraction (in-memory initially)
-- [ ] Implement default `InMemoryJobStore` with TTL eviction
-- [ ] Implement `EntityJobStore` and fluent `.Persist(...)`/`.Audit()`
-- [ ] Implement `JobRunBuilder` with `.Run()` pipeline
-- [ ] Add `Jobs.Recipe()` builder (Persist/Audit/WithDefaults/UsePolicy) and registration hooks
-- [ ] Implement `JobProgressBroker` for callbacks and telemetry fan-out
-- [ ] Implement `JobExecutorService` with retry logic
-- [ ] Auto-registration via `KoanAutoRegistrar`
-- [ ] Support `EntityContext` for data source routing
-- [ ] Default to "Default" source, detect "Jobs" source if configured
+**Status**: Approved - Execution order revised to front-load breaking changes
 
-### Phase 2: API Surface (Week 3)
-- [ ] Implement `Start()`, `Wait()`, `OnProgress()`/`Refresh()` methods
-- [ ] Implement cancellation support
-- [ ] Create `JobsController` for REST API (with execution history endpoints)
-- [ ] Add OpenTelemetry correlation integration
-- [ ] Implement unified metadata helpers (`With(...)`, `GetTenantId`, etc.)
-- [ ] Document data source configuration patterns (dedicated DB, archiving, multi-tenant)
+**Timeline**: 8 weeks, 6 milestones
+**Approach**: Break-and-rebuild greenfield (no backward compatibility required)
 
-### Phase 3: Advanced Features (Week 4-5)
-- [ ] Parent-child job relationships
-- [ ] `FiniteJob<>` for item-based processing
-- [ ] Multi-stage job support (pipeline pattern)
-- [ ] Persistent queue implementations (Redis, RabbitMQ)
-- [ ] SignalR integration for real-time progress updates
-- [ ] Job priority and queueing strategies
+### Milestone 1: Entity Refactor & Core Cleanup (Week 1) ✅ FOUNDATION
+**Goal**: Clean domain model, remove infrastructure leakage, fix enums
 
-### Phase 4: Developer Experience (Week 6)
-- [ ] Create `Koan.Jobs.Web` for dashboard UI
-- [ ] Code generation for job boilerplate
-- [ ] Template project (`dotnet new koan-job`)
-- [ ] Comprehensive documentation
-- [ ] Migration guide for S13.DocMind
+- [ ] Remove infrastructure fields from Job entity (Source, Partition, StorageMode, AuditTrailEnabled, CancellationRequested, UpdatedAt)
+- [ ] Add `[Timestamp] LastModified` with auto-update support in Koan.Data.Core
+- [ ] Enhance `JobIndexCache` to track storage metadata externally
+- [ ] Update `InMemoryJobStore` and `EntityJobStore` to use index for metadata
+- [ ] Implement ephemeral cancellation via index (CancellationRequested in memory)
+- [ ] Remove `JobStatus.Succeeded` enum value (use single `Completed` state)
+- [ ] Update InMemory TTL: 60 min (completed), 120 min (failed)
+- [ ] Implement `[Timestamp]` auto-update in `Entity<T>.Save()`
+- [ ] Update all tests to new model
 
-### Phase 5: Enterprise Features (Week 7-8)
-- [ ] Implement `JobArchivalService` background service
-- [ ] Implement `JobArchivalPolicy` model and configuration binding
-- [ ] Add default archival policies (enabled by default, 30-day retention)
-- [ ] Implement archive verification before deletion
-- [ ] Add archival metrics (Prometheus/OpenTelemetry)
+### Milestone 2: Critical Interfaces & Fixes (Week 2) ✅ EXTENSIBILITY
+**Goal**: Core extensibility and standards compliance on clean foundation
+
+- [ ] Implement `ICustomRetryPolicy` interface (synchronous)
+- [ ] Wire `ICustomRetryPolicy` into `JobExecutor` retry logic
+- [ ] Fix retry policy defaults: MaxAttempts=3, InitialDelay=5s, Strategy=ExponentialBackoff
+- [ ] Add OpenTelemetry `Activity.Current.TraceId` auto-capture in `JobEnvironment.CreateBuilder`
+- [ ] Tests for custom retry (HTTP status codes, transient vs permanent errors)
+- [ ] Tests for Activity correlation and explicit override
+- [ ] Update existing tests for new retry defaults
+
+### Milestone 3: Jobs.Recipe() System (Week 3) ✅ REUSABILITY
+**Goal**: Reusable job configuration profiles
+
+- [ ] Implement `JobRecipeBuilder` with `.Persist()`, `.Audit()`, `.WithDefaults()`
+- [ ] Implement `JobRecipe<TJob, TContext, TResult>` runner
+- [ ] Create `Jobs.Recipe()` static entry point
+- [ ] Implement per-run override semantics (last `.Persist()` wins)
+- [ ] Tests proving recipe defaults and override behavior
+- [ ] Document recipe patterns (static fields, DI injection if needed)
+
+### Milestone 4: Enterprise Archival System (Weeks 4-5) ✅ PRODUCTION-CRITICAL
+**Goal**: Prevent unbounded job table growth
+
+- [ ] Implement `JobArchivalPolicy` model
 - [ ] Implement `JobArchivalOptions` with `Enabled: true` default
-- [ ] Document per-job-type archival policies
-- [ ] Document three-tier archival strategy (hot→warm→cold) for high-volume scenarios
-- [ ] Job result caching
-- [ ] Distributed job execution (multi-instance coordination)
-- [ ] Batch job operations
+- [ ] Create `DefaultArchivalPolicies` (30-day retention for Completed/Failed/Cancelled)
+- [ ] Implement `JobArchivalService` background worker
+- [ ] Archival verification with retry (3 attempts, 5s delay for eventual consistency)
+- [ ] Only archive entity-persisted jobs (skip InMemory)
+- [ ] Archival metrics (OpenTelemetry counters/histograms)
+- [ ] Tests proving archival, verification, retry logic
+- [ ] Document archival configuration and multi-tier strategies
 
-**Note**: Archival is core functionality, not optional. Default 30-day retention prevents unbounded growth while being conservative enough for most use cases.
+### Milestone 5: REST API & Web Integration (Week 6) ✅ HTTP INTERFACE
+**Goal**: Out-of-box HTTP API for job management
+
+- [ ] Create `Koan.Jobs.Web` project
+- [ ] Implement `JobsController : EntityController<Job>`
+- [ ] `GET /api/jobs/{id}/progress` endpoint
+- [ ] `POST /api/jobs/{id}/cancel` endpoint
+- [ ] `GET /api/jobs/{id}/executions` endpoint
+- [ ] OpenAPI/Swagger documentation
+- [ ] Integration tests for all endpoints
+- [ ] Auto-registration via `AddKoanJobsWeb()`
+
+### Milestone 6: Advanced Features (Weeks 7-8) ✅ WORKFLOWS
+**Goal**: Parent-child navigation, FiniteJob pattern
+
+- [ ] Implement `JobRelationshipExtensions` (.GetChildren, .GetParent, .StartChild)
+- [ ] Implement `FiniteJob<TJob, TContext, TResult, TItem>` base class
+- [ ] Automatic item-based progress tracking
+- [ ] Tests for parent-child workflows
+- [ ] Tests for FiniteJob item processing
+- [ ] Document workflow patterns
+
+### Future Features (Tracked, Not Implemented)
+
+**Distributed Job Execution** (Post-v1.0):
+- Multi-instance coordination
+- Leader election for job assignment
+- Distributed lock mechanism
+- Horizontal scaling support
+
+**Dashboard UI** (Post-v1.0):
+- Real-time job monitoring SPA
+- Job history visualization
+- Manual job triggering
+- Execution analytics
+
+**S13.DocMind Migration** (Next Priority After v1.0):
+- Migration guide from `DocumentProcessingJob` to `Koan.Jobs`
+- Backward compatibility layer (if needed)
+- Data migration scripts
+- Progressive rollout strategy
+
+**SignalR Real-Time Progress** (Post-v1.0):
+- Real-time progress streaming to clients
+- WebSocket-based job monitoring
+
+**Persistent Queues** (Post-v1.0):
+- Redis queue adapter
+- RabbitMQ queue adapter
+
+**Note**: Archival is enabled by default (entity-persisted jobs only). 30-day retention prevents unbounded growth while conservative enough for most use cases.
 
 ---
 
-## Decision Points for Review
+## Architectural Decisions (Cemented)
 
-1. **Naming**: `Koan.Jobs` vs `Koan.Tasks` vs `Koan.Work`?
-   - **Recommendation**: `Koan.Jobs` aligns with industry terminology (Hangfire, Kubernetes Jobs)
+### Core Design
 
-2. **Progress Persistence**: Should progress updates be persisted to database on every report?
-   - **Recommendation**: Throttle persistence (max 1 update per second) to reduce DB load
+1. **Naming**: `Koan.Jobs` ✅ **APPROVED**
+   - Aligns with industry terminology (Hangfire, Kubernetes Jobs)
 
-3. **Queue Implementation**: In-memory or persistent (Redis/RabbitMQ) for initial release?
-   - **Recommendation**: In-memory for v1, persistent as opt-in via `Koan.Jobs.Queue.Redis` package
+2. **Entity Purity**: Jobs are pure domain entities ✅ **APPROVED**
+   - No infrastructure fields (Source, Partition, StorageMode) in entity
+   - Storage metadata tracked in `JobIndexCache` (in-memory)
+   - Change tracking via `[Timestamp] LastModified` (auto-updated)
 
-4. **FiniteJob**: Include in Phase 1 or defer to Phase 3?
-   - **Recommendation**: Defer to Phase 3 after validating base job pattern
+3. **Retry Defaults**: 3 attempts, 5s initial delay, exponential backoff ✅ **APPROVED**
+   - Jobs without `[RetryPolicy]` attribute get these defaults
+   - Explicit `[RetryPolicy(MaxAttempts = 1, Strategy = None)]` to disable
 
-5. **S13.DocMind Migration**: Migrate immediately or keep parallel during transition?
-   - **Recommendation**: Keep parallel initially, deprecate old pattern after v1 stabilizes
+4. **Job Status**: Single success state `Completed` ✅ **APPROVED**
+   - Removed `Succeeded` enum value (BREAKING)
+   - Created → Queued → Running → Completed/Failed/Cancelled
 
-6. **Dashboard UI**: Built-in minimal dashboard or rely on entity endpoints + custom frontend?
-   - **Recommendation**: Leverage existing `EntityController` for v1, dedicated dashboard in v2
+5. **Cancellation Semantics**: Ephemeral in-memory, acceptable on restart ✅ **APPROVED**
+   - `CancellationRequested` tracked in `JobIndexCache` (memory)
+   - Lost on app restart (acceptable for in-flight operations)
+   - Status field provides durable cancellation signal
 
-7. **Job Result Storage**: Always serialize to JSON or support blob storage for large results?
-   - **Recommendation**: JSON for v1 (align with Entity pattern), add `IJobResultStore` abstraction in v2
+### Storage & Persistence
 
-8. **Default Data Source**: Should jobs use "Default" source or require explicit "Jobs" source configuration?
-   - **Recommendation**: Use "Default" source if no "Jobs" source configured (zero-config principle), but document dedicated source as best practice
+6. **InMemory TTL**: 60 min (completed), 120 min (failed) ✅ **APPROVED**
+   - Changed from 15/60 to provide more debugging time
 
-9. **Archival Policy Defaults**: Should archival be enabled by default with opinionated policies, or opt-in?
-   - **Decision**: Enabled by default with generous 1-month retention window. This prevents unbounded job table growth while being conservative enough for most use cases.
+7. **Archival Defaults**: Enabled by default for entity-persisted jobs ✅ **APPROVED**
+   - 30-day retention for Completed/Failed/Cancelled
+   - Moves to "archive" partition, deletes from source
+   - Verification with retry (3 attempts, 5s delay for eventual consistency)
 
-10. **Archival Verification**: Should archival service verify jobs exist in target before deleting from source?
-   - **Recommendation**: Yes, always verify to prevent data loss. Log verification failures and skip deletion on mismatch.
+8. **Default Data Source**: Use "Default" source if "Jobs" not configured ✅ **APPROVED**
+   - Zero-config principle
+   - Document dedicated "Jobs" source as production best practice
+
+### API & Integration
+
+9. **Recipe Override Semantics**: Last wins ✅ **APPROVED**
+   - Recipe provides defaults
+   - Per-run `.Persist()` / `.Audit()` fully overrides recipe settings
+
+10. **OpenTelemetry Integration**: Auto-capture `Activity.Current.TraceId` ✅ **APPROVED**
+    - Explicit `correlationId` parameter overrides Activity
+    - Graceful null if no Activity present
+
+11. **ICustomRetryPolicy**: Synchronous only ✅ **APPROVED**
+    - Retry decisions based on error analysis, not live health checks
+    - Keeps executor simple and fast
+
+### Deferred to Future
+
+12. **Progress Persistence**: Throttled (implementation detail)
+13. **Queue Implementation**: In-memory for v1.0, Redis/RabbitMQ as future opt-in
+14. **Dashboard UI**: Post-v1.0, leverage `EntityController` initially
+15. **Job Result Storage**: JSON for v1.0, blob storage abstraction in v2.0
+16. **FiniteJob**: Milestone 6 (weeks 7-8)
+17. **S13.DocMind Migration**: Post-v1.0 release
 
 ---
 
