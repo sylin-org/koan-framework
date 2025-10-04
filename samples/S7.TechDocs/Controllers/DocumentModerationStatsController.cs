@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Koan.Data.Abstractions;
 using S7.TechDocs.Models;
 using Koan.Web.Extensions.Authorization;
 
@@ -18,8 +19,8 @@ public class DocumentModerationStatsController : ControllerBase
     public async Task<IActionResult> Stats(CancellationToken ct)
     {
         // Submitted count: items in Submitted set
-        int submittedCount = 0;
-    try { submittedCount = await Document.CountAll(Koan.Web.Infrastructure.KoanWebConstants.Sets.Moderation.Submitted, ct); } catch { submittedCount = 0; }
+        long submittedCount = 0;
+        try { submittedCount = await Document.Count.Partition(Koan.Web.Infrastructure.KoanWebConstants.Sets.Moderation.Submitted, CountStrategy.Optimized, ct); } catch { submittedCount = 0; }
 
         // Approved today: Published documents with PublishedAt >= UTC midnight
         var startOfDayUtc = DateTime.UtcNow.Date;
@@ -32,8 +33,8 @@ public class DocumentModerationStatsController : ControllerBase
         catch { }
 
         // Denied total: items in Denied set (no date tracking here)
-        int deniedTotal = 0;
-    try { deniedTotal = await Document.CountAll(Koan.Web.Infrastructure.KoanWebConstants.Sets.Moderation.Denied, ct); } catch { deniedTotal = 0; }
+        long deniedTotal = 0;
+        try { deniedTotal = await Document.Count.Partition(Koan.Web.Infrastructure.KoanWebConstants.Sets.Moderation.Denied, CountStrategy.Optimized, ct); } catch { deniedTotal = 0; }
 
         return Ok(new { submitted = submittedCount, approvedToday, denied = deniedTotal });
     }

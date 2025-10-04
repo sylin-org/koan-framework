@@ -74,11 +74,12 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
         // Fallback: ignore options and use base method; adapters will apply guardrails
         return await _inner.QueryAsync(query, ct).ConfigureAwait(false);
     }
-    public async Task<int> CountAsync(object? query, CancellationToken ct = default)
+    public async Task<CountResult> CountAsync(CountRequest<TEntity> request, CancellationToken ct = default)
     {
         await GuardAsync(ct).ConfigureAwait(false);
-        return await _inner.CountAsync(query, ct).ConfigureAwait(false);
+        return await _inner.CountAsync(request, ct).ConfigureAwait(false);
     }
+
     public async Task<IReadOnlyList<TEntity>> QueryAsync(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
     {
         await GuardAsync(ct).ConfigureAwait(false);
@@ -93,13 +94,6 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
             return await linq.QueryAsync(predicate, options, ct).ConfigureAwait(false);
         if (_inner is ILinqQueryRepository<TEntity, TKey> linqb)
             return await linqb.QueryAsync(predicate, ct).ConfigureAwait(false);
-        throw new NotSupportedException("LINQ queries are not supported by this repository.");
-    }
-    public async Task<int> CountAsync(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
-    {
-        await GuardAsync(ct).ConfigureAwait(false);
-        if (_inner is ILinqQueryRepository<TEntity, TKey> linq)
-            return await linq.CountAsync(predicate, ct).ConfigureAwait(false);
         throw new NotSupportedException("LINQ queries are not supported by this repository.");
     }
 
@@ -123,32 +117,16 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
     public async Task<IReadOnlyList<TEntity>> QueryAsync(string query, object? parameters, CancellationToken ct = default)
     {
         await GuardAsync(ct).ConfigureAwait(false);
-        if (_inner is IStringQueryRepository<TEntity, TKey> rawp)
-            return await rawp.QueryAsync(query, parameters, ct).ConfigureAwait(false);
-        throw new NotSupportedException("String queries are not supported by this repository.");
+        if (_inner is IStringQueryRepositoryWithOptions<TEntity, TKey> rawp)
+            return await rawp.QueryAsync(query, parameters, null, ct).ConfigureAwait(false);
+        throw new NotSupportedException("Parameterized string queries are not supported by this repository.");
     }
     public async Task<IReadOnlyList<TEntity>> QueryAsync(string query, object? parameters, DataQueryOptions? options, CancellationToken ct = default)
     {
         await GuardAsync(ct).ConfigureAwait(false);
         if (_inner is IStringQueryRepositoryWithOptions<TEntity, TKey> rawp)
             return await rawp.QueryAsync(query, parameters, options, ct).ConfigureAwait(false);
-        if (_inner is IStringQueryRepository<TEntity, TKey> rawpb)
-            return await rawpb.QueryAsync(query, parameters, ct).ConfigureAwait(false);
-        throw new NotSupportedException("String queries are not supported by this repository.");
-    }
-    public async Task<int> CountAsync(string query, CancellationToken ct = default)
-    {
-        await GuardAsync(ct).ConfigureAwait(false);
-        if (_inner is IStringQueryRepository<TEntity, TKey> rawc)
-            return await rawc.CountAsync(query, ct).ConfigureAwait(false);
-        throw new NotSupportedException("String queries are not supported by this repository.");
-    }
-    public async Task<int> CountAsync(string query, object? parameters, CancellationToken ct = default)
-    {
-        await GuardAsync(ct).ConfigureAwait(false);
-        if (_inner is IStringQueryRepository<TEntity, TKey> rawcp)
-            return await rawcp.CountAsync(query, parameters, ct).ConfigureAwait(false);
-        throw new NotSupportedException("String queries are not supported by this repository.");
+        throw new NotSupportedException("Parameterized string queries with options are not supported by this repository.");
     }
 
     public async Task<TEntity> UpsertAsync(TEntity model, CancellationToken ct = default)

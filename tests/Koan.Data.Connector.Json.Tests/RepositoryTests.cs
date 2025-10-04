@@ -61,8 +61,8 @@ public class RepositoryTests : KoanTestBase
             await repo.UpsertAsync(new Todo { Id = $"i{i}", Title = titles[i] });
 
         var linq = Assert.IsAssignableFrom<ILinqQueryRepository<Todo, string>>(repo);
-        var count = await linq.CountAsync(x => x.Title == "x");
-        count.Should().Be(titles.Count(t => t == "x"));
+        var countResult = await repo.CountAsync(new CountRequest<Todo> { Predicate = x => x.Title == "x" });
+        countResult.Value.Should().Be(titles.Count(t => t == "x"));
     }
 
     [Fact]

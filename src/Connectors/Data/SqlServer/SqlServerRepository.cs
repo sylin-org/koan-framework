@@ -347,13 +347,66 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
         return rows.Select(FromRow).ToList();
     }
 
-    public async Task<int> CountAsync(object? query, CancellationToken ct = default)
+    public async Task<CountResult> CountAsync(CountRequest<TEntity> request, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        using var act = SqlServerTelemetry.Activity.StartActivity("mssql.count:all");
+        using var act = SqlServerTelemetry.Activity.StartActivity("mssql.count");
         act?.SetTag("entity", typeof(TEntity).FullName);
         await using var conn = Open();
-        return await conn.ExecuteScalarAsync<int>($"SELECT COUNT(1) FROM [dbo].[{TableName}]");
+
+        // Fast count via sys.dm_db_partition_stats when no predicate and strategy allows it
+        if (request.Predicate is null && request.RawQuery is null && request.ProviderQuery is null)
+        {
+            var strategy = request.Options?.CountStrategy ?? CountStrategy.Optimized;
+            if (strategy == CountStrategy.Fast || strategy == CountStrategy.Optimized)
+            {
+                try
+                {
+                    var estimate = await conn.ExecuteScalarAsync<long>(
+                        @"SELECT SUM(p.rows)
+                          FROM sys.partitions p
+                          INNER JOIN sys.tables t ON p.object_id = t.object_id
+                          INNER JOIN sys.schemas s ON t.schema_id = s.schema_id
+                          WHERE s.name = 'dbo' AND t.name = @TableName AND p.index_id IN (0,1)",
+                        new { TableName });
+                    if (estimate >= 0)
+                        return CountResult.Estimate(estimate);
+                }
+                catch
+                {
+                    // Fall back to exact count
+                }
+            }
+        }
+
+        // Exact count based on request type
+        if (request.Predicate is not null)
+        {
+            var translator = new LinqWhereTranslator<TEntity>(_dialect);
+            try
+            {
+                var (whereSql, parameters) = translator.Translate(request.Predicate);
+                whereSql = RewriteWhereForProjection(whereSql);
+                return await CountWhereAsync(whereSql, parameters);
+            }
+            catch (NotSupportedException)
+            {
+                var all = await QueryAsync((object?)null, ct);
+                var count = (long)all.AsQueryable().Count(request.Predicate);
+                return CountResult.Exact(count);
+            }
+        }
+
+        if (request.RawQuery is not null)
+        {
+            var whereSql = RewriteWhereForProjection(request.RawQuery);
+            var count = await conn.ExecuteScalarAsync<long>($"SELECT COUNT(1) FROM [dbo].[{TableName}] WHERE " + whereSql);
+            return CountResult.Exact(count);
+        }
+
+        // No predicate - full table count
+        var totalCount = await conn.ExecuteScalarAsync<long>($"SELECT COUNT(1) FROM [dbo].[{TableName}]");
+        return CountResult.Exact(totalCount);
     }
 
     public async Task<IReadOnlyList<TEntity>> QueryAsync(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
@@ -405,31 +458,14 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
         }
     }
 
-    public Task<int> CountAsync(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        using var act = SqlServerTelemetry.Activity.StartActivity("mssql.count:linq");
-        act?.SetTag("entity", typeof(TEntity).FullName);
-        var translator = new LinqWhereTranslator<TEntity>(_dialect);
-        try
-        {
-            var (whereSql, parameters) = translator.Translate(predicate);
-            whereSql = RewriteWhereForProjection(whereSql);
-            return CountWhereAsync(whereSql, parameters);
-        }
-        catch (NotSupportedException)
-        {
-            return Task.FromResult(QueryAsync(predicate, ct).Result.Count);
-        }
-    }
-
-    private async Task<int> CountWhereAsync(string whereSql, IReadOnlyList<object?> parameters)
+    private async Task<CountResult> CountWhereAsync(string whereSql, IReadOnlyList<object?> parameters)
     {
         await using var conn = Open();
         var sql = $"SELECT COUNT(1) FROM [dbo].[{TableName}] WHERE {whereSql}";
         var dyn = new DynamicParameters();
         for (int i = 0; i < parameters.Count; i++) dyn.Add($"p{i}", parameters[i]);
-        return await conn.ExecuteScalarAsync<int>(sql, dyn);
+        var count = await conn.ExecuteScalarAsync<long>(sql, dyn);
+        return CountResult.Exact(count);
     }
 
     public async Task<IReadOnlyList<TEntity>> QueryAsync(string sql, CancellationToken ct = default)
@@ -514,25 +550,6 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
         }
     }
 
-    public async Task<int> CountAsync(string sql, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        using var act = SqlServerTelemetry.Activity.StartActivity("mssql.count:string");
-        act?.SetTag("entity", typeof(TEntity).FullName);
-        await using var conn = Open();
-        var whereSql = RewriteWhereForProjection(sql);
-        return await conn.ExecuteScalarAsync<int>($"SELECT COUNT(1) FROM [dbo].[{TableName}] WHERE " + whereSql);
-    }
-
-    public async Task<int> CountAsync(string sql, object? parameters, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        using var act = SqlServerTelemetry.Activity.StartActivity("mssql.count:string:param");
-        act?.SetTag("entity", typeof(TEntity).FullName);
-        await using var conn = Open();
-        var whereSql = RewriteWhereForProjection(sql);
-        return await conn.ExecuteScalarAsync<int>($"SELECT COUNT(1) FROM [dbo].[{TableName}] WHERE " + whereSql, parameters);
-    }
 
     public async Task<TEntity> UpsertAsync(TEntity model, CancellationToken ct = default)
     { await UpsertManyAsync(new[] { model }, ct); return model; }

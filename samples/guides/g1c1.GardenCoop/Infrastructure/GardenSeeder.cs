@@ -16,7 +16,7 @@ public static class GardenSeeder
         var ct = cancellationToken;
 
         // if we already have plots, skip seeding
-        if (await Plot.Count(ct) > 0)
+        if (await Plot.Count > 0)
         {
             return;
         }

@@ -94,17 +94,17 @@ public enum CountStrategy
 
 ### API Design
 
-#### Option 1: Explicit Strategy Parameter (Recommended)
+#### Option 1: Fluent Count Accessor (Recommended)
 
-`csharp
-// Entity<T> static helpers expose a fluent count surface
-public static EntityCountAccessor<TEntity, TKey> Count => EntityCountAccessor<TEntity, TKey>.Instance;
+```csharp
+// Proposed Entity<T> surface
+public static EntityCountAccessor<TEntity, TKey> Count { get; } = EntityCountAccessor<TEntity, TKey>.Instance;
 
 public sealed class EntityCountAccessor<TEntity, TKey>
-where TEntity : class, IEntity<TKey>
-where TKey : notnull
+    where TEntity : class, IEntity<TKey>
+    where TKey : notnull
 {
-internal static readonly EntityCountAccessor<TEntity, TKey> Instance = new();
+    internal static readonly EntityCountAccessor<TEntity, TKey> Instance = new();
 
     public Task<long> Exact(CancellationToken ct = default)
         => Data<TEntity, TKey>.CountAllAsync(CountStrategy.Exact, ct);
@@ -117,22 +117,12 @@ internal static readonly EntityCountAccessor<TEntity, TKey> Instance = new();
 
     public Task<long> Where(Expression<Func<TEntity, bool>> predicate, CountStrategy strategy = CountStrategy.Optimized, CancellationToken ct = default)
         => Data<TEntity, TKey>.CountAsync(predicate, strategy, ct);
-
 }
 
 // Usage examples
 var approxTotal = await Todo.Count.Fast();
-// Postgres: Uses reltuples (instant)
-// SQL Server: Uses dm_db_partition_stats (instant)
-// MongoDB: Uses estimatedDocumentCount() (instant)
-// SQLite/JSON: Falls back to Exact
-
-var exactFiltered = await Todo.Count.Where(
-t => t.Status == "PAID",
-CountStrategy.Optimized);
-// Uses index-only scan if covering index exists
-// Falls back to regular scan if no suitable index
-`
+var exactFiltered = await Todo.Count.Where(t => t.Status == "PAID");
+```
 
 #### Option 2: Separate Methods (More Discoverable)
 
@@ -241,20 +231,30 @@ public enum CountStrategy
 
 ```csharp
 // Koan.Data.Core/Model/Entity.cs
-public static Task<long> Count(
-    CountStrategy strategy = CountStrategy.Exact,
-    CancellationToken ct = default)
-    => Data<TEntity, TKey>.CountAllAsync(strategy, ct);
+public static EntityCountAccessor<TEntity, TKey> Count { get; } = EntityCountAccessor<TEntity, TKey>.Instance;
 
-public static Task<long> Count(
-    Expression<Func<TEntity, bool>> predicate,
-    CountStrategy strategy = CountStrategy.Optimized,
-    CancellationToken ct = default)
-    => Data<TEntity, TKey>.CountAsync(predicate, strategy, ct);
+public sealed class EntityCountAccessor<TEntity, TKey>
+    where TEntity : class, IEntity<TKey>
+    where TKey : notnull
+{
+    internal static readonly EntityCountAccessor<TEntity, TKey> Instance = new();
+
+    public Task<long> Exact(CancellationToken ct = default)
+        => Data<TEntity, TKey>.CountAllAsync(CountStrategy.Exact, ct);
+
+    public Task<long> Fast(CancellationToken ct = default)
+        => Data<TEntity, TKey>.CountAllAsync(CountStrategy.Fast, ct);
+
+    public Task<long> Optimized(CancellationToken ct = default)
+        => Data<TEntity, TKey>.CountAllAsync(CountStrategy.Optimized, ct);
+
+    public Task<long> Where(Expression<Func<TEntity, bool>> predicate, CountStrategy strategy = CountStrategy.Optimized, CancellationToken ct = default)
+        => Data<TEntity, TKey>.CountAsync(predicate, strategy, ct);
+}
 
 // Convenience methods
 public static Task<long> EstimateCount(CancellationToken ct = default)
-    => Count(CountStrategy.Fast, ct);
+    => Count.Fast(ct);
 ```
 
 ### Phase 2: Provider Implementations (Weeks 2-3)
@@ -384,6 +384,21 @@ public Task<long?> EstimateCountAsync(CancellationToken ct = default)
 // Note: Index-only optimization happens automatically if covering index exists
 ```
 
+#### Adapter Refactor Checklist
+
+| Connector | Fast Count Plan | Notes |
+|-----------|-----------------|-------|
+| Postgres | Implement metadata + index-aware logic (`IFastCountRepository`) | Prototype path in Phase 2 |
+| SQL Server | DMV-based metadata + index recommendations | Requires provider diagnostic logging |
+| MongoDB | Use `estimatedDocumentCount` and index-aware fallbacks | Confirm capability flags when filter unsupported |
+| Couchbase | Surface bucket statistics for estimates; index counts for filters | Add capability detection and fallbacks |
+| Redis | Use `DBSIZE`/set cardinality for fast counts where safe | Guard behind capability flag; provide exact fallback |
+| SQLite | Explicitly report `FastCount` unsupported | Ensure docs recount fallback behavior |
+| JSON/InMemory | Treat as exact-only but mark `OptimizedCount` for in-memory filtering | No metadata but still align with strategy API |
+| Future providers (MySQL, Elastic, etc.) | Placeholder to validate during onboarding | Update checklist as connectors ship |
+
+All adapters above must be updated (or explicitly exempted) during the count refactor to keep provider behavior transparent and consistent.
+
 ### Phase 3: Framework Integration (Week 3)
 
 **Update QueryWithCount Logic**
@@ -463,7 +478,7 @@ public class QueryResult<TEntity>
 
 Add new section after "Querying, Pagination, Streaming":
 
-````markdown
+```
 ### Fast Counts and Approximation
 
 **Concepts**
@@ -494,7 +509,7 @@ if (caps.Capabilities.HasFlag(QueryCapabilities.FastCount))
     Console.WriteLine($"~{page.TotalCount} total");
 }
 ```
-````
+```
 
 **Provider Capabilities**
 
@@ -517,7 +532,7 @@ UI pagination shows "~1.2M records" without waiting 30 seconds for exact count. 
 - **Fast**: UI pagination, dashboards, monitoring, exploratory queries
 - **Optimized**: Best of both - exact with index optimization
 
-````
+```
 
 **Add ADR**
 
@@ -564,7 +579,7 @@ Create `docs/decisions/DATA-00XX-fast-count-strategies.md` documenting:
 ```csharp
 // Existing code - NO CHANGE
 var count = await Todo.Count();  // Still uses exact count (full scan)
-````
+```
 
 **Explicit Opt-In** for fast counts:
 

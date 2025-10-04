@@ -64,8 +64,8 @@ public class SqliteCountAndSelectTests : KoanTestBase
         for (int i = 0; i < 10; i++) await repo.UpsertAsync(new Todo { Title = i % 2 == 0 ? "milk" : "bread" });
 
         var srepo = (IStringQueryRepository<Todo, string>)repo;
-        var countMilk = await srepo.CountAsync("Title = @p", new { p = "milk" });
-        countMilk.Should().Be(5);
+        var countMilkResult = await repo.CountAsync(new CountRequest<Todo> { RawQuery = "Title = 'milk'" });
+        countMilkResult.Value.Should().Be(5);
     }
 
     [Fact]
@@ -85,12 +85,12 @@ public class SqliteCountAndSelectTests : KoanTestBase
         count1.Should().Be(12);
 
         var srepo = (IStringQueryRepository<Todo, string>)repo;
-        var expected = await srepo.CountAsync("Title LIKE @p", new { p = $"{prefix}-%" });
+        var expectedResult = await repo.CountAsync(new CountRequest<Todo> { RawQuery = $"Title LIKE '{prefix}-%'" });
         // Prove we exceed the DefaultPageSize guardrail (3)
-        expected.Should().BeGreaterThan(3);
+        expectedResult.Value.Should().BeGreaterThan(3);
         var allViaFullSelect = await srepo.QueryAsync($"SELECT Id, Json FROM Todo WHERE Title LIKE '{prefix}-%'");
         allViaFullSelect.Count.Should().BeGreaterThan(3); // not capped by DefaultPageSize
-        allViaFullSelect.Count.Should().Be(expected);
+        allViaFullSelect.Count.Should().Be((int)expectedResult.Value);
     }
 }
 

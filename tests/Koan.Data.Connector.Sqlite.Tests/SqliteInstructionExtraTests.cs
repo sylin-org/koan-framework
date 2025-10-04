@@ -1,6 +1,7 @@
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Instructions;
 using Koan.Data.Core;
 using Koan.Testing;
@@ -53,11 +54,13 @@ public class SqliteInstructionExtraTests : KoanTestBase
         ensured.Should().BeTrue();
 
         await repo.UpsertAsync(new Todo { Title = "x" });
-        (await repo.CountAsync(null)).Should().BeGreaterThan(0);
+        var countResult1 = await repo.CountAsync(new CountRequest<Todo>());
+        countResult1.Value.Should().BeGreaterThan(0);
 
         var cleared = await data.Execute<Todo, int>(new Instruction("data.clear"));
         cleared.Should().BeGreaterThanOrEqualTo(1);
-        (await repo.CountAsync(null)).Should().Be(0);
+        var countResult2 = await repo.CountAsync(new CountRequest<Todo>());
+        countResult2.Value.Should().Be(0);
     }
 }
 

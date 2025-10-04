@@ -67,13 +67,6 @@ internal sealed class RedisRepository<TEntity, TKey> :
         return items;
     }
 
-    public async Task<int> CountAsync(object? query, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        var (_, total) = await ScanAll(page: 1, size: int.MaxValue, ct);
-        return total;
-    }
-
     public async Task<IReadOnlyList<TEntity>> QueryAsync(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
@@ -92,12 +85,20 @@ internal sealed class RedisRepository<TEntity, TKey> :
         return items.AsQueryable().Where(predicate).ToList();
     }
 
-    public async Task<int> CountAsync(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
+    public async Task<CountResult> CountAsync(CountRequest<TEntity> request, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        // Count across the full keyspace for this entity set
-        var (items, _) = await ScanAll(page: 1, size: int.MaxValue, ct);
-        return items.AsQueryable().Count(predicate);
+
+        // Redis has no metadata-based fast count, so always use exact count via scanning
+        if (request.Predicate is not null)
+        {
+            var (items, _) = await ScanAll(page: 1, size: int.MaxValue, ct);
+            var count = (long)items.AsQueryable().Count(request.Predicate);
+            return CountResult.Exact(count);
+        }
+
+        var (_, total) = await ScanAll(page: 1, size: int.MaxValue, ct);
+        return CountResult.Exact((long)total);
     }
 
     public async Task<TEntity> UpsertAsync(TEntity model, CancellationToken ct = default)

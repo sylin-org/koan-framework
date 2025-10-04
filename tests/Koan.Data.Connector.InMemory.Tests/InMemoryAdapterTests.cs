@@ -143,7 +143,7 @@ public sealed class InMemoryAdapterTests : IDisposable
         await new TestEntity { Name = "Match2" }.Save();
         await new TestEntity { Name = "NoMatch" }.Save();
 
-        var count = await Data<TestEntity, string>.CountAsync(e => e.Name.StartsWith("Match"));
+        var count = await TestEntity.Count.Where(e => e.Name.StartsWith("Match"));
 
         count.Should().Be(2);
     }

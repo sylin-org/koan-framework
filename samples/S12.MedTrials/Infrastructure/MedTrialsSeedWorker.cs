@@ -25,7 +25,7 @@ public sealed class MedTrialsSeedWorker : IHostedService
         try
         {
             using var scope = _services.CreateScope();
-            if (await TrialSite.Count(cancellationToken).ConfigureAwait(false) > 0)
+            if (await TrialSite.Count > 0)
             {
                 return;
             }

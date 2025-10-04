@@ -1,10 +1,14 @@
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
+
 namespace Koan.Data.Abstractions;
 
 public interface IDataRepository<TEntity, TKey> where TEntity : IEntity<TKey>
 {
     Task<TEntity?> GetAsync(TKey id, CancellationToken ct = default);
     Task<IReadOnlyList<TEntity>> QueryAsync(object? query, CancellationToken ct = default);
-    Task<int> CountAsync(object? query, CancellationToken ct = default);
+    Task<CountResult> CountAsync(CountRequest<TEntity> request, CancellationToken ct = default);
     Task<TEntity> UpsertAsync(TEntity model, CancellationToken ct = default);
     Task<bool> DeleteAsync(TKey id, CancellationToken ct = default);
 

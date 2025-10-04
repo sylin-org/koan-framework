@@ -54,7 +54,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         }
 
         RepositoryQueryResult queryResult;
-        int total;
+        long total;
         try
         {
             queryResult = await QueryCollectionAsync(request, context.Options, context.CancellationToken);
@@ -165,7 +165,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         }
 
         IReadOnlyList<TEntity> repositoryItems;
-        int total;
+        long total;
         try
         {
             (repositoryItems, total) = await QueryCollectionFromBodyAsync(repo, request, context.Options, context.CancellationToken);
@@ -442,7 +442,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         }
     }
 
-    private static (List<TEntity> Items, int Total) ApplyPagination(List<TEntity> source, int page, int pageSize, int total)
+    private static (List<TEntity> Items, long Total) ApplyPagination(List<TEntity> source, int page, int pageSize, long total)
     {
         if (pageSize <= 0)
         {
@@ -523,7 +523,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
 
     private sealed class RepositoryQueryResult
     {
-        public RepositoryQueryResult(IReadOnlyList<TEntity> items, int total, bool handled, bool exceededLimit)
+        public RepositoryQueryResult(IReadOnlyList<TEntity> items, long total, bool handled, bool exceededLimit)
         {
             Items = items;
             Total = total;
@@ -532,7 +532,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         }
 
         public IReadOnlyList<TEntity> Items { get; }
-        public int Total { get; }
+        public long Total { get; }
         public bool RepositoryHandledPagination { get; }
         public bool ExceededSafetyLimit { get; }
     }
@@ -601,7 +601,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
 
     }
 
-    private async Task<(IReadOnlyList<TEntity> Items, int Total)> QueryCollectionFromBodyAsync(
+    private async Task<(IReadOnlyList<TEntity> Items, long Total)> QueryCollectionFromBodyAsync(
         IDataRepository<TEntity, TKey> repo,
         EntityQueryRequest request,
         QueryOptions options,
@@ -615,22 +615,40 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
                 throw new InvalidOperationException(error ?? "Invalid filter");
             }
             var items = await lrepo.QueryAsync(predicate!, cancellationToken);
-            int total;
-            try { total = await lrepo.CountAsync(predicate!, cancellationToken); } catch { total = items.Count; }
+            long total;
+            try
+            {
+                var countRequest = new CountRequest<TEntity> { Predicate = predicate };
+                var countResult = await repo.CountAsync(countRequest, cancellationToken);
+                total = countResult.Value;
+            }
+            catch { total = items.Count; }
             return (items.ToList(), total);
         }
 
         if (!string.IsNullOrWhiteSpace(options.Q) && repo is IStringQueryRepository<TEntity, TKey> srepo)
         {
             var items = await srepo.QueryAsync(options.Q!, cancellationToken);
-            int total;
-            try { total = await srepo.CountAsync(options.Q!, cancellationToken); } catch { total = items.Count; }
+            long total;
+            try
+            {
+                var countRequest = new CountRequest<TEntity> { RawQuery = options.Q };
+                var countResult = await repo.CountAsync(countRequest, cancellationToken);
+                total = countResult.Value;
+            }
+            catch { total = items.Count; }
             return (items.ToList(), total);
         }
 
         var all = await repo.QueryAsync(null, cancellationToken);
-        int allTotal;
-        try { allTotal = await repo.CountAsync(null, cancellationToken); } catch { allTotal = all.Count; }
+        long allTotal;
+        try
+        {
+            var countRequest = new CountRequest<TEntity>();
+            var countResult = await repo.CountAsync(countRequest, cancellationToken);
+            allTotal = countResult.Value;
+        }
+        catch { allTotal = all.Count; }
         return (all.ToList(), allTotal);
     }
 

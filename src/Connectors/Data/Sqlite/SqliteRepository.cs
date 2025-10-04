@@ -360,13 +360,60 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         return rows.Select(FromRow).ToList();
     }
 
-    public async Task<int> CountAsync(object? query, CancellationToken ct = default)
+    public async Task<CountResult> CountAsync(CountRequest<TEntity> request, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        using var act = SqliteTelemetry.Activity.StartActivity("sqlite.count:all");
+        using var act = SqliteTelemetry.Activity.StartActivity("sqlite.count");
         act?.SetTag("entity", typeof(TEntity).FullName);
         using var conn = Open();
-        return await conn.ExecuteScalarAsync<int>($"SELECT COUNT(1) FROM [{TableName}]");
+
+        // SQLite doesn't have metadata-based fast count, so always use exact count
+        // Handle predicate-based counts
+        if (request.Predicate is not null)
+        {
+            var translator = new LinqWhereTranslator<TEntity>(_dialect);
+            try
+            {
+                var (whereSql, parameters) = translator.Translate(request.Predicate);
+                whereSql = RewriteWhereForProjection(whereSql);
+                var sql = $"SELECT COUNT(1) FROM [{TableName}] WHERE {whereSql}";
+                var dyn = new DynamicParameters();
+                for (int i = 0; i < parameters.Count; i++) dyn.Add($"p{i}", parameters[i]);
+                var count = await conn.ExecuteScalarAsync<long>(sql, dyn);
+                return CountResult.Exact(count);
+            }
+            catch (NotSupportedException)
+            {
+                // Fallback to materialize + count
+                var all = await QueryAsync((object?)null, ct);
+                var count = (long)all.AsQueryable().Count(request.Predicate);
+                return CountResult.Exact(count);
+            }
+        }
+
+        // Handle raw query-based counts
+        if (request.RawQuery is not null)
+        {
+            var whereSql = RewriteWhereForProjection(request.RawQuery);
+            try
+            {
+                var count = await conn.ExecuteScalarAsync<long>($"SELECT COUNT(1) FROM [{TableName}] WHERE " + whereSql);
+                return CountResult.Exact(count);
+            }
+            catch (SqliteException ex) when (IsNoSuchTableForEntity(ex))
+            {
+                Log.RetryMissingTable(_logger, TableName, ex.SqliteErrorCode);
+                var sqliteConn = (SqliteConnection)conn;
+                InvalidateHealth(sqliteConn, TableName);
+                EnsureOrchestrated(sqliteConn);
+                var count = await conn.ExecuteScalarAsync<long>($"SELECT COUNT(1) FROM [{TableName}] WHERE " + whereSql);
+                return CountResult.Exact(count);
+            }
+        }
+
+        // No predicate - full table count
+        var totalCount = await conn.ExecuteScalarAsync<long>($"SELECT COUNT(1) FROM [{TableName}]");
+        return CountResult.Exact(totalCount);
     }
 
     public async Task<IReadOnlyList<TEntity>> QueryAsync(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
@@ -436,28 +483,6 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         }
     }
 
-    public Task<int> CountAsync(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        using var act = SqliteTelemetry.Activity.StartActivity("sqlite.count:linq");
-        act?.SetTag("entity", typeof(TEntity).FullName);
-        var translator = new LinqWhereTranslator<TEntity>(_dialect);
-        try
-        {
-            var (whereSql, parameters) = translator.Translate(predicate);
-            whereSql = RewriteWhereForProjection(whereSql);
-            using var conn = Open();
-            var sql = $"SELECT COUNT(1) FROM [{TableName}] WHERE {whereSql}";
-            var dyn = new DynamicParameters();
-            for (int i = 0; i < parameters.Count; i++) dyn.Add($"p{i}", parameters[i]);
-            return conn.ExecuteScalarAsync<int>(sql, dyn);
-        }
-        catch (NotSupportedException)
-        {
-            // Fallback to materialize + count
-            return Task.FromResult(QueryAsync(predicate, ct).Result.Count);
-        }
-    }
 
     public async Task<IReadOnlyList<TEntity>> QueryAsync(string sql, CancellationToken ct = default)
     {
@@ -625,47 +650,6 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         }
     }
 
-    public async Task<int> CountAsync(string sql, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        using var act = SqliteTelemetry.Activity.StartActivity("sqlite.count:string");
-        act?.SetTag("entity", typeof(TEntity).FullName);
-        using var conn = Open();
-        var whereSql = RewriteWhereForProjection(sql);
-        try
-        {
-            return await conn.ExecuteScalarAsync<int>($"SELECT COUNT(1) FROM [{TableName}] WHERE " + whereSql);
-        }
-        catch (SqliteException ex) when (IsNoSuchTableForEntity(ex))
-        {
-            Log.RetryMissingTable(_logger, TableName, ex.SqliteErrorCode);
-            var sqliteConn = (SqliteConnection)conn;
-            InvalidateHealth(sqliteConn, TableName);
-            EnsureOrchestrated(sqliteConn);
-            return await conn.ExecuteScalarAsync<int>($"SELECT COUNT(1) FROM [{TableName}] WHERE " + whereSql);
-        }
-    }
-
-    public async Task<int> CountAsync(string sql, object? parameters, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        using var act = SqliteTelemetry.Activity.StartActivity("sqlite.count:string:param");
-        act?.SetTag("entity", typeof(TEntity).FullName);
-        using var conn = Open();
-        var whereSql = RewriteWhereForProjection(sql);
-        try
-        {
-            return await conn.ExecuteScalarAsync<int>($"SELECT COUNT(1) FROM [{TableName}] WHERE " + whereSql, parameters);
-        }
-        catch (SqliteException ex) when (IsNoSuchTableForEntity(ex))
-        {
-            Log.RetryMissingTable(_logger, TableName, ex.SqliteErrorCode);
-            var sqliteConn = (SqliteConnection)conn;
-            InvalidateHealth(sqliteConn, TableName);
-            EnsureOrchestrated(sqliteConn);
-            return await conn.ExecuteScalarAsync<int>($"SELECT COUNT(1) FROM [{TableName}] WHERE " + whereSql, parameters);
-        }
-    }
 
     public async Task<TEntity> UpsertAsync(TEntity model, CancellationToken ct = default)
     {

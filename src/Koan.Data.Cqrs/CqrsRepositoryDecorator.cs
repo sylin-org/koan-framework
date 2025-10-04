@@ -35,10 +35,10 @@ internal sealed class CqrsRepositoryDecorator<TEntity, TKey> : IDataRepository<T
         return repo.QueryAsync(query, ct);
     }
 
-    public Task<int> CountAsync(object? query, CancellationToken ct = default)
+    public Task<CountResult> CountAsync(CountRequest<TEntity> request, CancellationToken ct = default)
     {
         var repo = _routing.GetReadRepository<TEntity, TKey>();
-        return repo.CountAsync(query, ct);
+        return repo.CountAsync(request, ct);
     }
     public Task<IReadOnlyList<TEntity>> QueryAsync(System.Linq.Expressions.Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
     => (_routing.GetReadRepository<TEntity, TKey>() as ILinqQueryRepository<TEntity, TKey>)?.QueryAsync(predicate, ct) ?? Task.FromResult<IReadOnlyList<TEntity>>(Array.Empty<TEntity>());

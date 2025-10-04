@@ -166,10 +166,10 @@ public class QueryWithCountTests
             });
         }
 
-        public Task<int> CountAsync(object? query, CancellationToken ct = default)
+        public Task<CountResult> CountAsync(CountRequest<StubEntity> request, CancellationToken ct = default)
         {
             CountCalls++;
-            return Task.FromResult(_items.Count);
+            return Task.FromResult(CountResult.Exact(_items.Count));
         }
 
         public Task<StubEntity> UpsertAsync(StubEntity model, CancellationToken ct = default) => throw new NotImplementedException();

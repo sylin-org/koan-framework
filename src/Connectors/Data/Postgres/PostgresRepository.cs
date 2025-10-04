@@ -361,13 +361,64 @@ internal sealed class PostgresRepository<TEntity, TKey> :
         return rows.Select(FromRow).ToList();
     }
 
-    public async Task<int> CountAsync(object? query, CancellationToken ct = default)
+    public async Task<CountResult> CountAsync(CountRequest<TEntity> request, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        using var act = PgTelemetry.Activity.StartActivity("pg.count:all");
+        using var act = PgTelemetry.Activity.StartActivity("pg.count");
         act?.SetTag("entity", typeof(TEntity).FullName);
         await using var conn = Open();
-        return await conn.ExecuteScalarAsync<int>($"SELECT COUNT(1) FROM {QualifiedTable}");
+
+        // Fast count via pg_stat when no predicate and strategy allows it
+        if (request.Predicate is null && request.RawQuery is null && request.ProviderQuery is null)
+        {
+            var strategy = request.Options?.CountStrategy ?? CountStrategy.Optimized;
+            if (strategy == CountStrategy.Fast || strategy == CountStrategy.Optimized)
+            {
+                try
+                {
+                    var (schema, table) = ResolveSchemaAndTable();
+                    var estimate = await conn.ExecuteScalarAsync<long>(
+                        @"SELECT n_live_tup FROM pg_stat_user_tables
+                          WHERE schemaname = @schema AND relname = @table",
+                        new { schema, table });
+                    if (estimate >= 0)
+                        return CountResult.Estimate(estimate);
+                }
+                catch
+                {
+                    // Fall back to exact count
+                }
+            }
+        }
+
+        // Exact count based on request type
+        if (request.Predicate is not null)
+        {
+            var translator = new LinqWhereTranslator<TEntity>(_dialect);
+            try
+            {
+                var (whereSql, parameters) = translator.Translate(request.Predicate);
+                whereSql = RewriteWhereForProjection(whereSql);
+                return await CountWhereAsync(whereSql, parameters);
+            }
+            catch (NotSupportedException)
+            {
+                var all = await QueryAsync((object?)null, ct);
+                var count = (long)all.AsQueryable().Count(request.Predicate);
+                return CountResult.Exact(count);
+            }
+        }
+
+        if (request.RawQuery is not null)
+        {
+            var whereSql = RewriteWhereForProjection(request.RawQuery);
+            var count = await conn.ExecuteScalarAsync<long>($"SELECT COUNT(1) FROM {QualifiedTable} WHERE " + whereSql);
+            return CountResult.Exact(count);
+        }
+
+        // No predicate - full table count
+        var totalCount = await conn.ExecuteScalarAsync<long>($"SELECT COUNT(1) FROM {QualifiedTable}");
+        return CountResult.Exact(totalCount);
     }
 
     public async Task<IReadOnlyList<TEntity>> QueryAsync(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
@@ -420,31 +471,14 @@ internal sealed class PostgresRepository<TEntity, TKey> :
         }
     }
 
-    public Task<int> CountAsync(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        using var act = PgTelemetry.Activity.StartActivity("pg.count:linq");
-        act?.SetTag("entity", typeof(TEntity).FullName);
-        var translator = new LinqWhereTranslator<TEntity>(_dialect);
-        try
-        {
-            var (whereSql, parameters) = translator.Translate(predicate);
-            whereSql = RewriteWhereForProjection(whereSql);
-            return CountWhereAsync(whereSql, parameters);
-        }
-        catch (NotSupportedException)
-        {
-            return Task.FromResult(QueryAsync(predicate, ct).Result.Count);
-        }
-    }
-
-    private async Task<int> CountWhereAsync(string whereSql, IReadOnlyList<object?> parameters)
+    private async Task<CountResult> CountWhereAsync(string whereSql, IReadOnlyList<object?> parameters)
     {
         await using var conn = Open();
         var sql = $"SELECT COUNT(1) FROM {QualifiedTable} WHERE {whereSql}";
         var dyn = new DynamicParameters();
         for (int i = 0; i < parameters.Count; i++) dyn.Add($"p{i}", parameters[i]);
-        return await conn.ExecuteScalarAsync<int>(sql, dyn);
+        var count = await conn.ExecuteScalarAsync<long>(sql, dyn);
+        return CountResult.Exact(count);
     }
 
     public async Task<IReadOnlyList<TEntity>> QueryAsync(string sql, CancellationToken ct = default)
@@ -529,25 +563,6 @@ internal sealed class PostgresRepository<TEntity, TKey> :
         }
     }
 
-    public async Task<int> CountAsync(string sql, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        using var act = PgTelemetry.Activity.StartActivity("pg.count:string");
-        act?.SetTag("entity", typeof(TEntity).FullName);
-        await using var conn = Open();
-        var whereSql = RewriteWhereForProjection(sql);
-        return await conn.ExecuteScalarAsync<int>($"SELECT COUNT(1) FROM {QualifiedTable} WHERE " + whereSql);
-    }
-
-    public async Task<int> CountAsync(string sql, object? parameters, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        using var act = PgTelemetry.Activity.StartActivity("pg.count:string:param");
-        act?.SetTag("entity", typeof(TEntity).FullName);
-        await using var conn = Open();
-        var whereSql = RewriteWhereForProjection(sql);
-        return await conn.ExecuteScalarAsync<int>($"SELECT COUNT(1) FROM {QualifiedTable} WHERE " + whereSql, parameters);
-    }
 
     public async Task<TEntity> UpsertAsync(TEntity model, CancellationToken ct = default)
     { await UpsertManyAsync(new[] { model }, ct); return model; }

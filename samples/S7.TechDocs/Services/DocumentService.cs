@@ -15,7 +15,7 @@ public class DocumentService : IDocumentService
 
     private static async Task EnsureSeedAsync()
     {
-        var existing = await Document.Count();
+        var existing = await Document.Count;
         if (existing > 0) return;
 
         var seed = new List<Document>

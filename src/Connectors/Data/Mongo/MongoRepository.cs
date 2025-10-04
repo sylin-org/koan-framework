@@ -360,26 +360,39 @@ internal sealed class MongoRepository<TEntity, TKey> :
             return (IReadOnlyList<TEntity>)results;
         }, ct);
 
-    public Task<int> CountAsync(object? query, CancellationToken ct = default)
+    public Task<CountResult> CountAsync(CountRequest<TEntity> request, CancellationToken ct = default)
         => ExecuteWithReadinessAsync(async () =>
         {
             ct.ThrowIfCancellationRequested();
             using var activity = MongoTelemetry.Activity.StartActivity("mongo.count");
             activity?.SetTag("entity", typeof(TEntity).FullName);
             var collection = await GetCollectionAsync(ct).ConfigureAwait(false);
-            var count = await collection.CountDocumentsAsync(Builders<TEntity>.Filter.Empty, cancellationToken: ct).ConfigureAwait(false);
-            return (int)count;
-        }, ct);
 
-    public Task<int> CountAsync(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
-        => ExecuteWithReadinessAsync(async () =>
-        {
-            ct.ThrowIfCancellationRequested();
-            using var activity = MongoTelemetry.Activity.StartActivity("mongo.count.linq");
-            activity?.SetTag("entity", typeof(TEntity).FullName);
-            var collection = await GetCollectionAsync(ct).ConfigureAwait(false);
-            var count = await collection.CountDocumentsAsync(predicate, cancellationToken: ct).ConfigureAwait(false);
-            return (int)count;
+            if (request.Strategy == CountStrategy.Fast && request.Predicate is null && request.RawQuery is null && request.ProviderQuery is null)
+            {
+                var estimate = await collection.EstimatedDocumentCountAsync(cancellationToken: ct).ConfigureAwait(false);
+                return CountResult.Estimate((long)estimate);
+            }
+
+            if (request.Predicate is not null)
+            {
+                var count = await collection.CountDocumentsAsync(request.Predicate, cancellationToken: ct).ConfigureAwait(false);
+                return CountResult.Exact((long)count);
+            }
+
+            if (request.ProviderQuery is FilterDefinition<TEntity> filter)
+            {
+                var count = await collection.CountDocumentsAsync(filter, cancellationToken: ct).ConfigureAwait(false);
+                return CountResult.Exact((long)count);
+            }
+
+            if (request.RawQuery is not null)
+            {
+                throw new NotSupportedException("Mongo adapter does not support string-based count queries. Use LINQ or provider filters.");
+            }
+
+            var total = await collection.CountDocumentsAsync(Builders<TEntity>.Filter.Empty, cancellationToken: ct).ConfigureAwait(false);
+            return CountResult.Exact((long)total);
         }, ct);
 
     public Task<TEntity> UpsertAsync(TEntity model, CancellationToken ct = default)

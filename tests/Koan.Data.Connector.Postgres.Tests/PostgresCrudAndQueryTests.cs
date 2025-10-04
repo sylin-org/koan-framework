@@ -33,8 +33,8 @@ public class PostgresCrudAndQueryTests : IClassFixture<PostgresAutoFixture>
         page1.Count.Should().Be(5);
         page1.First().Name.Should().Be("P-2");
 
-        var count = await lrepo.CountAsync(x => x.Age >= 20, default);
-        count.Should().BeGreaterThan(0);
+        var countResult = await repo.CountAsync(new CountRequest<Person> { Predicate = x => x.Age >= 20 }, default);
+        countResult.Value.Should().BeGreaterThan(0);
     }
 
     public sealed record Person(string Id) : IEntity<string>

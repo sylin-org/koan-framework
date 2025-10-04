@@ -42,6 +42,11 @@ public sealed class DataQueryOptions
     /// </summary>
     public string? Partition { get; init; }
 
+    /// <summary>
+    /// Optional hint for which count strategy should be used.
+    /// </summary>
+    public CountStrategy? CountStrategy { get; init; }
+
     public bool HasPagination => Page.HasValue && Page.Value > 0 && PageSize.HasValue && PageSize.Value > 0;
 
     public int EffectivePage(int defaultValue = 1)
@@ -61,7 +66,8 @@ public sealed class DataQueryOptions
             PageSize = pageSize,
             Filter = Filter,
             Sort = Sort,
-            Partition = Partition
+            Partition = Partition,
+            CountStrategy = CountStrategy
         };
     }
 
@@ -70,37 +76,52 @@ public sealed class DataQueryOptions
         {
             Filter = Filter,
             Sort = Sort,
-            Partition = Partition
+            Partition = Partition,
+            CountStrategy = CountStrategy
         };
 
     public DataQueryOptions WithFilter(string? filter)
         => new()
         {
-            Page = this.Page,
-            PageSize = this.PageSize,
+            Page = Page,
+            PageSize = PageSize,
             Filter = filter,
-            Sort = this.Sort,
-            Partition = this.Partition
+            Sort = Sort,
+            Partition = Partition,
+            CountStrategy = CountStrategy
         };
 
     public DataQueryOptions WithSort(string? sort)
         => new()
         {
-            Page = this.Page,
-            PageSize = this.PageSize,
-            Filter = this.Filter,
+            Page = Page,
+            PageSize = PageSize,
+            Filter = Filter,
             Sort = sort,
-            Partition = this.Partition
+            Partition = Partition,
+            CountStrategy = CountStrategy
         };
 
     public DataQueryOptions ForPartition(string? partition)
         => new()
         {
-            Page = this.Page,
-            PageSize = this.PageSize,
-            Filter = this.Filter,
-            Sort = this.Sort,
-            Partition = partition
+            Page = Page,
+            PageSize = PageSize,
+            Filter = Filter,
+            Sort = Sort,
+            Partition = partition,
+            CountStrategy = CountStrategy
+        };
+
+    public DataQueryOptions WithCountStrategy(CountStrategy? strategy)
+        => new()
+        {
+            Page = Page,
+            PageSize = PageSize,
+            Filter = Filter,
+            Sort = Sort,
+            Partition = Partition,
+            CountStrategy = strategy
         };
 }
 

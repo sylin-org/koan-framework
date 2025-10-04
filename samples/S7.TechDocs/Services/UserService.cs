@@ -12,7 +12,7 @@ public class UserService : IUserService
 
     private static async Task EnsureSeedAsync()
     {
-        var existing = await User.Count();
+        var existing = await User.Count;
         if (existing > 0) return;
         var seed = new List<User>
         {

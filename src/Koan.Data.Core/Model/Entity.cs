@@ -112,15 +112,47 @@ namespace Koan.Data.Core.Model
             => Data<TEntity, TKey>.Page(page, size, ct);
 
         // Counts
-        public static Task<int> Count(CancellationToken ct = default)
-            => Data<TEntity, TKey>.CountAllAsync(ct);
-        public static Task<int> Count(string query, CancellationToken ct = default)
-            => Data<TEntity, TKey>.CountAsync(query, ct);
-        public static Task<int> CountAll(string partition, CancellationToken ct = default)
-            => Data<TEntity, TKey>.CountAllAsync(partition, ct);
-        public static Task<int> Count(string query, string partition, CancellationToken ct = default)
-            => Data<TEntity, TKey>.CountAsync(query, partition, ct);
+        // Simple: await Entity.Count → defaults to optimized
+        // Explicit: await Entity.Count.Exact(ct), await Entity.Count.Fast(ct)
+        public static EntityCountAccessor<TEntity, TKey> Count { get; } = new();
 
+        /// <summary>
+        /// Awaitable count accessor with fluent API.
+        /// Simple: await Todo.Count (defaults to optimized)
+        /// Explicit: await Todo.Count.Exact(ct), await Todo.Count.Fast(ct)
+        /// </summary>
+        public sealed class EntityCountAccessor<TEntity, TKey>
+            where TEntity : class, IEntity<TKey>
+            where TKey : notnull
+        {
+            // Default: await Entity.Count → Optimized strategy
+            public System.Runtime.CompilerServices.TaskAwaiter<long> GetAwaiter()
+                => Data<TEntity, TKey>.CountAsync((object?)null, CountStrategy.Optimized, default).GetAwaiter();
+
+            public Task<long> Exact(CancellationToken ct = default)
+                => Data<TEntity, TKey>.CountAsync(ct);
+
+            public Task<long> Fast(CancellationToken ct = default)
+                => Data<TEntity, TKey>.CountAsync((object?)null, CountStrategy.Fast, ct);
+
+            public Task<long> Optimized(CancellationToken ct = default)
+                => Data<TEntity, TKey>.CountAsync((object?)null, CountStrategy.Optimized, ct);
+
+            public Task<long> Where(Expression<Func<TEntity, bool>> predicate, CountStrategy strategy = CountStrategy.Optimized, CancellationToken ct = default)
+                => Data<TEntity, TKey>.CountAsync(predicate, strategy, ct);
+
+            public Task<long> Where(Expression<Func<TEntity, bool>> predicate, DataQueryOptions options, CancellationToken ct = default)
+                => Data<TEntity, TKey>.CountAsync(predicate, options, ct);
+
+            public Task<long> Query(string query, CountStrategy strategy = CountStrategy.Optimized, CancellationToken ct = default)
+                => Data<TEntity, TKey>.CountAsync(query, strategy, ct);
+
+            public Task<long> Query(string query, DataQueryOptions options, CancellationToken ct = default)
+                => Data<TEntity, TKey>.CountAsync(query, options, ct);
+
+            public Task<long> Partition(string partition, CountStrategy strategy = CountStrategy.Exact, CancellationToken ct = default)
+                => Data<TEntity, TKey>.CountAsync(partition, strategy, ct);
+        }
         public static IBatchSet<TEntity, TKey> Batch() => Data<TEntity, TKey>.Batch();
 
         public static CopyTransferBuilder<TEntity, TKey> Copy()
@@ -755,5 +787,4 @@ public static class EntityMetadataProvider
 {
     public static Func<IServiceProvider, IRelationshipMetadata>? RelationshipMetadataAccessor;
 }
-
 

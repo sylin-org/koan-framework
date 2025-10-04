@@ -42,12 +42,13 @@ public class MongoPagingGuardrailsTests : IClassFixture<MongoAutoFixture>
         if (_sp is null) return; // effectively skip
         TestHooks.ResetDataConfigs();
         await TestMongoTeardown.DropDatabaseAsync(_sp);
-        var repo = (ILinqQueryRepository<Todo, string>)_sp.GetRequiredService<IDataService>().GetRepository<Todo, string>();
+        var repo = _sp.GetRequiredService<IDataService>().GetRepository<Todo, string>();
+        var linqRepo = (ILinqQueryRepository<Todo, string>)repo;
         // Seed 120 docs with same prefix
         for (int i = 0; i < 120; i++)
             await repo.UpsertAsync(new Todo(Guid.NewGuid().ToString("n"), "same"));
 
-        var results = await repo.QueryAsync(x => x.Title == "same");
+        var results = await linqRepo.QueryAsync(x => x.Title == "same");
         results.Count.Should().Be(120);
         await TestMongoTeardown.DropDatabaseAsync(_sp);
     }

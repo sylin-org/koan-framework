@@ -81,20 +81,26 @@ internal sealed class InMemoryRepository<TEntity, TKey> :
         return Task.FromResult((IReadOnlyList<TEntity>)items.ToList());
     }
 
-    public Task<int> CountAsync(object? query, CancellationToken ct = default)
+    // ==================== LINQ Query Operations ====================
+
+    public Task<CountResult> CountAsync(CountRequest<TEntity> request, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
 
-        // Apply LINQ predicate if provided
-        if (query is Expression<Func<TEntity, bool>> predicate)
+        IQueryable<TEntity> items = Store.Values.AsQueryable();
+
+        if (request.Predicate is not null)
         {
-            return Task.FromResult(Store.Values.AsQueryable().Count(predicate));
+            items = items.Where(request.Predicate);
+        }
+        else if (request.RawQuery is not null || request.ProviderQuery is not null)
+        {
+            throw new NotSupportedException("String or provider-specific count queries are not supported by the in-memory adapter.");
         }
 
-        return Task.FromResult(Store.Count);
+        var total = items.Count();
+        return Task.FromResult(new CountResult(total, false));
     }
-
-    // ==================== LINQ Query Operations ====================
 
     public Task<IReadOnlyList<TEntity>> QueryAsync(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
     {
@@ -109,12 +115,6 @@ internal sealed class InMemoryRepository<TEntity, TKey> :
         var items = Store.Values.AsQueryable().Where(predicate);
         items = ApplyOptions(items, options);
         return Task.FromResult((IReadOnlyList<TEntity>)items.ToList());
-    }
-
-    public Task<int> CountAsync(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        return Task.FromResult(Store.Values.AsQueryable().Count(predicate));
     }
 
     // ==================== Write Operations ====================

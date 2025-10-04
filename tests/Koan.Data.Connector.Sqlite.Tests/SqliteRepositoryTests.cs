@@ -90,9 +90,9 @@ public class SqliteRepositoryTests
         (await repo.GetAsync(saved.Id))!.Title.Should().Be("t2");
 
         // basic query and delete (filter by id to avoid cross-test interference)
-        if (repo is IStringQueryRepository<Todo, string> srepo0)
+        if (repo is IStringQueryRepositoryWithOptions<Todo, string> srepo0)
         {
-            var byId = await srepo0.QueryAsync("Id = @id", new { id = saved.Id });
+            var byId = await srepo0.QueryAsync("Id = @id", new { id = saved.Id }, null, default);
             byId.Should().ContainSingle(i => i.Id == saved.Id);
         }
         (await repo.DeleteAsync(saved.Id)).Should().BeTrue();
@@ -110,9 +110,9 @@ public class SqliteRepositoryTests
         await repo.UpsertAsync(new Todo { Title = "milk" });
         await repo.UpsertAsync(new Todo { Title = "bread" });
 
-        var srepo = (IStringQueryRepository<Todo, string>)repo;
+        var srepo = (IStringQueryRepositoryWithOptions<Todo, string>)repo;
         // WHERE suffix (no param bound here)
-        var whereItems = await srepo.QueryAsync("Title LIKE @p", new { p = "%milk%" });
+        var whereItems = await srepo.QueryAsync("Title LIKE @p", new { p = "%milk%" }, null, default);
         whereItems.Should().ContainSingle(i => i.Title == "milk");
 
         var items = await srepo.QueryAsync("Title LIKE '%milk%'");
@@ -139,9 +139,9 @@ public class SqliteRepositoryTests
         await repo.UpsertAsync(new Todo { Title = "a'b" });
 
         // We can't pass parameters through the static facade yet; fetch via repository cast
-        repo.Should().BeAssignableTo<IStringQueryRepository<Todo, string>>();
-        var srepo = (IStringQueryRepository<Todo, string>)repo;
-        var results = await srepo.QueryAsync("Title = @t", new { t = "a'b" });
+        repo.Should().BeAssignableTo<IStringQueryRepositoryWithOptions<Todo, string>>();
+        var srepo = (IStringQueryRepositoryWithOptions<Todo, string>)repo;
+        var results = await srepo.QueryAsync("Title = @t", new { t = "a'b" }, null, default);
         results.Should().HaveCount(1);
     }
 

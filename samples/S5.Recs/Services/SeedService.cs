@@ -317,7 +317,8 @@ internal sealed class SeedService : ISeedService
             using (EntityContext.Partition(null))
             {
                 var repo = dataSvc.GetRepository<Media, string>();
-                mediaCount = await repo.CountAsync(query: null, ct);
+                var result = await repo.CountAsync(new CountRequest<Media>(), ct);
+                mediaCount = (int)result.Value;
             }
         }
         catch (Exception ex)

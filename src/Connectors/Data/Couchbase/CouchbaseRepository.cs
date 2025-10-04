@@ -195,54 +195,49 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
         return await ExecuteQueryAsync(ctx, statement, definition, options, ct).ConfigureAwait(false);
     }
 
-    public Task<int> CountAsync(object? query, CancellationToken ct = default)
+    public Task<CountResult> CountAsync(CountRequest<TEntity> request, CancellationToken ct = default)
         => ExecuteWithReadinessAsync(async () =>
         {
             ct.ThrowIfCancellationRequested();
+            using var act = CouchbaseTelemetry.Activity.StartActivity("couchbase.count");
+            act?.SetTag("entity", typeof(TEntity).FullName);
             var ctx = await ResolveCollectionAsync(ct).ConfigureAwait(false);
+
+            CouchbaseQueryDefinition? definition = null;
             string statement;
-            CouchbaseQueryDefinition? def = null;
-            if (query is CouchbaseQueryDefinition definition)
+
+            if (request.Predicate is not null)
             {
-                statement = $"SELECT RAW COUNT(*) FROM ({definition.Statement}) AS sub";
-                def = new CouchbaseQueryDefinition(statement)
+                if (!CouchbaseLinqQueryTranslator.TryTranslate<TEntity, TKey>(request.Predicate, _optimizationInfo, out var translation))
                 {
-                    Parameters = definition.Parameters
+                    throw new NotSupportedException($"Unable to translate expression '{request.Predicate}' to N1QL for Couchbase.");
+                }
+
+                statement = $"SELECT RAW COUNT(*) FROM .. AS doc WHERE {translation.WhereClause}";
+                definition = new CouchbaseQueryDefinition(statement)
+                {
+                    Parameters = translation.Parameters.ToDictionary(static kvp => kvp.Key, static kvp => kvp.Value)
                 };
             }
-            else if (query is string str && !string.IsNullOrWhiteSpace(str))
+            else if (request.ProviderQuery is CouchbaseQueryDefinition providerDef)
             {
-                statement = $"SELECT RAW COUNT(*) FROM ({str}) AS sub";
+                statement = $"SELECT RAW COUNT(*) FROM ({providerDef.Statement}) AS sub";
+                definition = new CouchbaseQueryDefinition(statement)
+                {
+                    Parameters = providerDef.Parameters
+                };
+            }
+            else if (!string.IsNullOrWhiteSpace(request.RawQuery))
+            {
+                statement = $"SELECT RAW COUNT(*) FROM ({request.RawQuery}) AS sub";
             }
             else
             {
-                statement = $"SELECT RAW COUNT(*) FROM `{ctx.BucketName}`.`{ctx.ScopeName}`.`{ctx.CollectionName}`";
+                statement = $"SELECT RAW COUNT(*) FROM ..";
             }
-
-            var result = await ExecuteScalarQueryAsync<long>(ctx, statement, def, ct).ConfigureAwait(false);
-            return (int)result;
-        }, ct);
-
-    public Task<int> CountAsync(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
-        => ExecuteWithReadinessAsync(async () =>
-        {
-            ct.ThrowIfCancellationRequested();
-            using var act = CouchbaseTelemetry.Activity.StartActivity("couchbase.count.linq");
-            act?.SetTag("entity", typeof(TEntity).FullName);
-            var ctx = await ResolveCollectionAsync(ct).ConfigureAwait(false);
-            if (!CouchbaseLinqQueryTranslator.TryTranslate<TEntity, TKey>(predicate, _optimizationInfo, out var translation))
-            {
-                throw new NotSupportedException($"Unable to translate expression '{predicate}' to N1QL for Couchbase.");
-            }
-
-            var statement = $"SELECT RAW COUNT(*) FROM `{ctx.BucketName}`.`{ctx.ScopeName}`.`{ctx.CollectionName}` AS doc WHERE {translation.WhereClause}";
-            var definition = new CouchbaseQueryDefinition(statement)
-            {
-                Parameters = translation.Parameters.ToDictionary(static kvp => kvp.Key, static kvp => kvp.Value)
-            };
 
             var result = await ExecuteScalarQueryAsync<long>(ctx, statement, definition, ct).ConfigureAwait(false);
-            return (int)result;
+            return CountResult.Exact(result);
         }, ct);
 
     public Task<TEntity> UpsertAsync(TEntity model, CancellationToken ct = default)

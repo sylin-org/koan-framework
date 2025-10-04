@@ -60,14 +60,14 @@ public sealed class RedisCrudAndQueryTests : IClassFixture<RedisAutoFixture>
         var adults = await linq.QueryAsync(p => p.Age >= 18);
         adults.Select(a => a.Id).Should().BeEquivalentTo(new[] { "1" });
 
-        var total = await linq.CountAsync(p => p.Age >= 0);
-        total.Should().Be(2);
+        var countResult = await repo.CountAsync(new CountRequest<Person> { Predicate = p => p.Age >= 0 });
+        countResult.Value.Should().Be(2);
 
         var deleted = await repo.DeleteAsync("1");
         deleted.Should().BeTrue();
 
-        var left = await linq.CountAsync(p => p.Age >= 0);
-        left.Should().Be(1);
+        var countResult2 = await repo.CountAsync(new CountRequest<Person> { Predicate = p => p.Age >= 0 });
+        countResult2.Value.Should().Be(1);
     }
 
     [Fact]

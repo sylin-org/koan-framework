@@ -13,7 +13,7 @@ public class CollectionService : ICollectionService
 
     private static async Task EnsureSeedAsync()
     {
-        var existing = await Collection.Count();
+        var existing = await Collection.Count;
         if (existing > 0) return;
         var seed = new List<Collection>
         {

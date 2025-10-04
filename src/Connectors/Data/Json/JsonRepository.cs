@@ -75,13 +75,6 @@ internal sealed class JsonRepository<TEntity, TKey> :
         return Task.FromResult((IReadOnlyList<TEntity>)list);
     }
 
-    public Task<int> CountAsync(object? query, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        var store = ResolveStore();
-        return Task.FromResult(store.Count);
-    }
-
     public Task<IReadOnlyList<TEntity>> QueryAsync(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
@@ -104,11 +97,23 @@ internal sealed class JsonRepository<TEntity, TKey> :
         return Task.FromResult((IReadOnlyList<TEntity>)list);
     }
 
-    public Task<int> CountAsync(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
+    public Task<CountResult> CountAsync(CountRequest<TEntity> request, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         var store = ResolveStore();
-        return Task.FromResult(store.Values.AsQueryable().Count(predicate));
+        IQueryable<TEntity> items = store.Values.AsQueryable();
+
+        if (request.Predicate is not null)
+        {
+            items = items.Where(request.Predicate);
+        }
+        else if (request.RawQuery is not null || request.ProviderQuery is not null)
+        {
+            throw new NotSupportedException("JSON adapter only supports LINQ-based count queries.");
+        }
+
+        var total = items.Count();
+        return Task.FromResult(new CountResult(total, false));
     }
 
     public Task<TEntity> UpsertAsync(TEntity model, CancellationToken ct = default)
@@ -302,4 +307,3 @@ internal sealed class JsonRepository<TEntity, TKey> :
 
     // No identifier generation here; RepositoryFacade ensures IDs cross-cutting.
 }
-
