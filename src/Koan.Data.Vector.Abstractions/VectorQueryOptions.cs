@@ -9,5 +9,7 @@ public sealed record VectorQueryOptions(
     string? ContinuationToken = null,
     object? Filter = null,
     TimeSpan? Timeout = null,
-    string? VectorName = null
+    string? VectorName = null,
+    string? SearchText = null,  // Hybrid search: text for BM25 keyword matching
+    double? Alpha = null        // Hybrid search: semantic vs keyword weight (0.0=keyword, 1.0=semantic, 0.5=balanced)
 );

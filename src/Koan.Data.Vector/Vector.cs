@@ -71,6 +71,31 @@ public class Vector<TEntity> where TEntity : class, IEntity<string>
     public static Task<VectorQueryResult<string>> Search(VectorQueryOptions options, CancellationToken ct = default)
         => VectorData<TEntity>.SearchAsync(options, ct);
 
-    public static Task<VectorQueryResult<string>> Search(float[] query, int? topK = null, object? filter = null, string? vectorName = null, CancellationToken ct = default)
-        => VectorData<TEntity>.SearchAsync(new VectorQueryOptions(query, TopK: topK, Filter: filter, VectorName: vectorName), ct);
+    /// <summary>
+    /// Unified search interface supporting both pure vector and hybrid (semantic + keyword) search.
+    /// </summary>
+    /// <param name="vector">Query vector embedding (always required).</param>
+    /// <param name="text">Optional text for hybrid BM25 keyword matching. When provided, enables hybrid search.</param>
+    /// <param name="alpha">Optional semantic vs keyword weight. 0.0=keyword only, 1.0=semantic only, 0.5=balanced (default).</param>
+    /// <param name="topK">Maximum number of results to return.</param>
+    /// <param name="filter">Optional provider-specific filter.</param>
+    /// <param name="vectorName">Optional vector name for multi-vector entities.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Vector query results with similarity scores.</returns>
+    public static Task<VectorQueryResult<string>> Search(
+        float[] vector,
+        string? text = null,
+        double? alpha = null,
+        int? topK = null,
+        object? filter = null,
+        string? vectorName = null,
+        CancellationToken ct = default)
+        => VectorData<TEntity>.SearchAsync(new VectorQueryOptions(
+            Query: vector,
+            TopK: topK,
+            Filter: filter,
+            VectorName: vectorName,
+            SearchText: text,
+            Alpha: alpha
+        ), ct);
 }

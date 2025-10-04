@@ -21,7 +21,7 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
     private volatile bool _schemaEnsured;
     private volatile int _discoveredDimension = -1; // -1 means not discovered yet
 
-    public VectorCapabilities Capabilities => VectorCapabilities.Knn | VectorCapabilities.Filters | VectorCapabilities.BulkUpsert | VectorCapabilities.BulkDelete;
+    public VectorCapabilities Capabilities => VectorCapabilities.Knn | VectorCapabilities.Filters | VectorCapabilities.BulkUpsert | VectorCapabilities.BulkDelete | VectorCapabilities.Hybrid;
 
     public WeaviateVectorRepository(IHttpClientFactory httpFactory, IOptions<WeaviateOptions> options, IServiceProvider sp)
     {
@@ -67,7 +67,14 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
             // Minimal schema: store original document id for reverse mapping
             properties = new object[]
             {
-                new { name = "docId", dataType = new[] { "text" } }
+                new { name = "docId", dataType = new[] { "text" } },
+                new
+                {
+                    name = "searchText",
+                    dataType = new[] { "text" },
+                    indexSearchable = true,      // Enable BM25 indexing
+                    tokenization = "word"
+                }
             }
         };
         var bodyJson = JsonConvert.SerializeObject(body, Formatting.Indented);
@@ -171,13 +178,21 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
         ValidateEmbedding(embedding);
         // Weaviate requires UUID ids; derive a deterministic UUID from the entity id (namespaced by class) for stable mapping
         var uuid = DeterministicGuidFromString(ClassName, id!.ToString()!);
+
+        // Build properties including searchText from metadata if available
+        var properties = new Dictionary<string, object?> { ["docId"] = id!.ToString() };
+        if (metadata is IReadOnlyDictionary<string, object> metaDict && metaDict.TryGetValue("searchText", out var searchText))
+        {
+            properties["searchText"] = searchText;
+        }
+
         // Persist minimal properties including original doc id for reverse lookup
         // POST object includes class in payload
         var postObj = new Dictionary<string, object?>
         {
             ["class"] = ClassName,
             ["id"] = uuid.ToString(),
-            ["properties"] = new { docId = id!.ToString() },
+            ["properties"] = properties,
             ["vector"] = embedding,
         };
         // PUT object includes class (some Weaviate versions require it in both URL and payload)
@@ -185,7 +200,7 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
         {
             ["class"] = ClassName,
             ["id"] = uuid.ToString(),
-            ["properties"] = new { docId = id!.ToString() },
+            ["properties"] = properties,
             ["vector"] = embedding,
         };
         var putUrl = $"/v1/objects/{Uri.EscapeDataString(ClassName)}/{Uri.EscapeDataString(uuid.ToString())}";
@@ -284,10 +299,31 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
 
         // Build optional filters using shared AST + dedicated translator
         string whereClause = WeaviateFilterTranslator.TranslateWhereClause(options.Filter);
-        var nearVector = $"nearVector: {{ vector: [{string.Join(",", options.Query.Select(f => f.ToString(System.Globalization.CultureInfo.InvariantCulture)))}] }}";
+
+        // Determine search mode: hybrid or pure vector
+        string searchClause;
+        if (!string.IsNullOrWhiteSpace(options.SearchText))
+        {
+            // Hybrid mode: vector + BM25
+            var alpha = options.Alpha ?? 0.5;
+            var escapedText = options.SearchText.Replace("\"", "\\\"");
+            var vectorStr = string.Join(",", options.Query.Select(f => f.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+            searchClause = $@"hybrid: {{
+                query: ""{escapedText}"",
+                vector: [{vectorStr}],
+                alpha: {alpha.ToString("F2", System.Globalization.CultureInfo.InvariantCulture)}
+            }}";
+        }
+        else
+        {
+            // Pure vector mode
+            var vectorStr = string.Join(",", options.Query.Select(f => f.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+            searchClause = $"nearVector: {{ vector: [{vectorStr}] }}";
+        }
+
         var args = string.IsNullOrEmpty(whereClause)
-            ? $"({nearVector}, limit: {topK})"
-            : $"({nearVector}, limit: {topK}, where: {whereClause})";
+            ? $"({searchClause}, limit: {topK})"
+            : $"({searchClause}, limit: {topK}, where: {whereClause})";
         var gql = new
         {
             // Request docId alongside _additional so we can map back to original ids

@@ -732,7 +732,8 @@ internal sealed class SeedService : ISeedService
                 {
                     ["title"] = media.Title,
                     ["genres"] = media.Genres,
-                    ["popularity"] = media.Popularity
+                    ["popularity"] = media.Popularity,
+                    ["searchText"] = BuildSearchText(media)  // Required for hybrid search
                 };
 
                 await Data<Media, string>.SaveWithVector(media, embedding, vectorMetadata, ct).ConfigureAwait(false);
@@ -755,7 +756,13 @@ internal sealed class SeedService : ISeedService
                     .OnSuccess(success => success
                         .Mutate(envelope =>
                         {
-                            envelope.Features["vector:metadata"] = new { title = envelope.Entity.Title, genres = envelope.Entity.Genres, popularity = envelope.Entity.Popularity };
+                            envelope.Features["vector:metadata"] = new
+                            {
+                                title = envelope.Entity.Title,
+                                genres = envelope.Entity.Genres,
+                                popularity = envelope.Entity.Popularity,
+                                searchText = BuildSearchText(envelope.Entity)  // Required for hybrid search
+                            };
                         })
                         .Do(async (envelope, ct) =>
                         {
@@ -831,5 +838,20 @@ internal sealed class SeedService : ISeedService
         var trimmedText = text.Trim();
         //_logger?.LogDebug("BuildEmbeddingText for media {Id}: {Length} chars, text preview: {Preview}", m.Id, trimmedText.Length, trimmedText.Length > 100 ? trimmedText.Substring(0, 100) + "..." : trimmedText);
         return trimmedText;
+    }
+
+    /// <summary>
+    /// Builds search text for BM25 hybrid search - just title variants for keyword matching.
+    /// </summary>
+    public string BuildSearchText(Media m)
+    {
+        var titles = new List<string>();
+        if (!string.IsNullOrWhiteSpace(m.Title)) titles.Add(m.Title);
+        if (!string.IsNullOrWhiteSpace(m.TitleEnglish) && m.TitleEnglish != m.Title) titles.Add(m.TitleEnglish!);
+        if (!string.IsNullOrWhiteSpace(m.TitleRomaji) && m.TitleRomaji != m.Title) titles.Add(m.TitleRomaji!);
+        if (!string.IsNullOrWhiteSpace(m.TitleNative) && m.TitleNative != m.Title) titles.Add(m.TitleNative!);
+        if (m.Synonyms is { Length: > 0 }) titles.AddRange(m.Synonyms);
+
+        return string.Join(" ", titles.Distinct());
     }
 }

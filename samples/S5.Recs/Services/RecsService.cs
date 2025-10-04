@@ -107,11 +107,39 @@ internal sealed class RecsService : IRecsService
                 || !string.IsNullOrWhiteSpace(userId)
                 || (preferTags is { Length: > 0 }))
             {
-                float[] query = await BuildQueryVector(text, anchorMediaId, userId, preferTags, ct);
+                // ADR-0051: Build separate search intent and user preference vectors
+                var (searchVector, userPrefVector) = await BuildQueryVectors(text, anchorMediaId, userId, preferTags, ct);
 
-                if (query.Length > 0 && Vector<Media>.IsAvailable)
+                // Determine query vector via blending (66% search intent, 34% user preferences)
+                const double SEARCH_INTENT_WEIGHT = 0.66;
+                float[]? queryVector = null;
+
+                if (searchVector != null && userPrefVector != null)
                 {
-                    var vectorResults = await Vector<Media>.Search(new VectorQueryOptions(query, TopK: topK), ct);
+                    // Blend both vectors: prioritize search intent over learned preferences
+                    queryVector = BlendVectors(searchVector, userPrefVector, SEARCH_INTENT_WEIGHT);
+                }
+                else if (searchVector != null)
+                {
+                    queryVector = searchVector;
+                }
+                else if (userPrefVector != null)
+                {
+                    queryVector = userPrefVector;
+                }
+
+                if (queryVector != null && queryVector.Length > 0 && Vector<Media>.IsAvailable)
+                {
+                    // ADR-0051: Use hybrid search with unified API
+                    // Alpha = 0.5 (balanced semantic + keyword) when text query is provided
+                    var vectorResults = await Vector<Media>.Search(
+                        vector: queryVector,
+                        text: text,  // Enables hybrid search if provided
+                        alpha: !string.IsNullOrWhiteSpace(text) ? 0.5 : null,
+                        topK: topK,
+                        ct: ct
+                    );
+
                     var idToScore = vectorResults.Matches.ToDictionary(m => m.Id, m => m.Score);
 
                     var mediaItems = new List<Media>();
@@ -131,7 +159,9 @@ internal sealed class RecsService : IRecsService
                     var sortedRecommendations = ApplySort(recommendations, sort);
                     var finalResults = sortedRecommendations.Take(topK).ToList();
 
-                    _logger?.LogInformation("Multi-media vector query returned {Count} results", finalResults.Count);
+                    _logger?.LogInformation("Multi-media {SearchMode} query returned {Count} results",
+                        !string.IsNullOrWhiteSpace(text) ? "hybrid" : "vector",
+                        finalResults.Count);
                     return (finalResults, false);
                 }
             }
@@ -206,61 +236,94 @@ internal sealed class RecsService : IRecsService
         await UpdateUserPreferences(userId, mediaId, rating, ct);
     }
 
-    private async Task<float[]> BuildQueryVector(string? text, string? anchorMediaId, string? userId, string[]? preferTags, CancellationToken ct)
+    /// <summary>
+    /// Blends two vectors with specified weight for the first vector.
+    /// Result is normalized to preserve cosine similarity semantics.
+    /// </summary>
+    private static float[] BlendVectors(float[] vec1, float[] vec2, double weight1)
     {
-        // ADR-0014: Use capability-first Embed API
+        if (vec1.Length != vec2.Length)
+            throw new ArgumentException($"Vector dimension mismatch: {vec1.Length} vs {vec2.Length}");
+
+        var result = new float[vec1.Length];
+        var weight2 = 1.0 - weight1;
+
+        for (int i = 0; i < result.Length; i++)
+        {
+            result[i] = (float)((weight1 * vec1[i]) + (weight2 * vec2[i]));
+        }
+
+        // Normalize to unit length to preserve cosine similarity
+        var magnitude = Math.Sqrt(result.Sum(x => (double)x * x));
+        if (magnitude > 1e-8)
+        {
+            for (int i = 0; i < result.Length; i++)
+                result[i] /= (float)magnitude;
+        }
+
+        return result;
+    }
+
+    private async Task<(float[]? searchVector, float[]? userPrefVector)> BuildQueryVectors(
+        string? text,
+        string? anchorMediaId,
+        string? userId,
+        string[]? preferTags,
+        CancellationToken ct)
+    {
+        // ADR-0051: Build separate vectors for search intent and user preferences
+        float[]? searchVector = null;
+        float[]? userPrefVector = null;
+
         try
         {
+            // Build search intent vector
             if (!string.IsNullOrWhiteSpace(text))
             {
-                return await Koan.AI.Ai.Embed(text!, ct);
+                searchVector = await Koan.AI.Ai.Embed(text!, ct);
             }
-
-            if (!string.IsNullOrWhiteSpace(anchorMediaId))
+            else if (!string.IsNullOrWhiteSpace(anchorMediaId))
             {
                 var anchorMedia = await Media.Get(anchorMediaId!, ct);
                 if (anchorMedia != null)
                 {
                     var textAnchor = $"{anchorMedia.Title}\n\n{anchorMedia.Synopsis}\nGenres: {string.Join(", ", anchorMedia.Genres ?? Array.Empty<string>())}";
-                    return await Koan.AI.Ai.Embed(textAnchor, ct);
+                    searchVector = await Koan.AI.Ai.Embed(textAnchor, ct);
                 }
             }
+            else if (preferTags is { Length: > 0 })
+            {
+                var tagText = $"Tags: {string.Join(", ", preferTags.Where(t => !string.IsNullOrWhiteSpace(t)))}";
+                searchVector = await Koan.AI.Ai.Embed(tagText, ct);
+            }
 
+            // Build user preference vector
             if (!string.IsNullOrWhiteSpace(userId))
             {
                 var profile = await UserProfileDoc.Get(userId!, ct);
                 if (profile?.PrefVector is { Length: > 0 } pv)
                 {
                     // Validate cached vector dimensions match current model expectations
-                    // If we're using all-minilm (384 dims) but cached vector is llama2 (4096 dims), invalidate cache
                     const int expectedDimensions = 384; // all-minilm expected dimensions
                     if (pv.Length == expectedDimensions)
                     {
-                        return pv;
+                        userPrefVector = pv;
                     }
                     else
                     {
                         // Invalidate the cached profile vector by clearing it
                         profile.PrefVector = null;
                         await profile.Save();
-
-                        // Continue to regenerate the vector below instead of using cached one
                     }
                 }
             }
 
-            if (preferTags is { Length: > 0 })
-            {
-                var tagText = $"Tags: {string.Join(", ", preferTags.Where(t => !string.IsNullOrWhiteSpace(t)))}";
-                return await Koan.AI.Ai.Embed(tagText, ct);
-            }
-
-            return Array.Empty<float>();
+            return (searchVector, userPrefVector);
         }
         catch (Exception ex)
         {
-            _logger?.LogWarning(ex, "Failed to generate embedding vector");
-            return Array.Empty<float>();
+            _logger?.LogWarning(ex, "Failed to generate embedding vectors");
+            return (null, null);
         }
     }
 
