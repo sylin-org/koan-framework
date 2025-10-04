@@ -13,13 +13,13 @@ validation:
 
 # Koan Entity Capabilities: End-to-End Guide
 
-This guide walks through the Koan data pillar, from a single `todo.Save()` to multi-provide---
+This guide walks through the Koan data pillar, from a single `todo.Save()` to multi-provider ---
 
 ## Next Steps
 
-Explore the referenced samples (samples/guides/g1c1.GardenCoop, samples/S5.Recs, samples/S14.AdapterBench) to see these concepts in action. Extend the transfer DSL in your domain by adding `.Mirror()` runs before cut-overs, or `Copy()` recipes to hydrate analytics sources. Combine Flow and Jobs with the transfer DSL to orchestrate large data migrations safely.
+Extend the transfer DSL in your domain by adding `.Mirror()` runs before cut-overs, or `Copy()` recipes to hydrate analytics sources. Combine Flow and Jobs with the transfer DSL to orchestrate large data migrations safely. For working examples, see the `samples/S5.Recs` project.
 
-When in doubt, stick to the entity-first patterns above. They keep your code declarative, provider-agnostic, and ready for Koan's automation pillars.ng, Flow pipelines, and vector exports. Each section grows in sophistication, covering concepts, required packages and configuration, and usage scenarios. Examples draw from g1c1 GardenCoop (beginner-friendly domain, lifecycle automation, streaming), S5.Recs (multi-partition recommendations, Flow/Jobs orchestration, vector usage), and S14.AdapterBench (multi-provider benchmarking with transfer DSL).
+When in doubt, stick to the entity-first patterns above. They keep your code declarative, provider-agnostic, and ready for Koan's automation pillars., Flow pipelines, and vector exports. Each section grows in sophistication, covering concepts, required packages and configuration, and usage scenarios.
 
 ## Prerequisites
 
@@ -30,10 +30,12 @@ Add the Koan baseline packages:
 <PackageReference Include="Koan.Data.Abstractions" Version="0.6.2" />
 ```
 
-Reference at least one data adapter (SQLite example below) and configure the default source:
+Reference at least one data adapter (SQLite example below):
 ```xml
 <PackageReference Include="Koan.Data.Connector.Sqlite" Version="0.6.2" />
 ```
+
+Optionally configure the default source in `appsettings.json` (Koan works without configuration, using sensible defaults):
 ```json
 {
   "Koan": {
@@ -81,7 +83,7 @@ await fetched!.Remove();
 
 **Usage Scenarios**
 
-GardenCoop seeds initial gardening tasks without DbContext or repository plumbing, keeping focus on domain logic. Architects get immediate provider neutrality: swap the adapter in configuration, entity code stays untouched.
+Applications seed initial data without DbContext or repository plumbing, keeping focus on domain logic. Architects get immediate provider neutrality: swap the adapter in configuration, entity code stays untouched.
 
 **Custom Keys**
 
@@ -122,7 +124,7 @@ await foreach (var reading in Reading.QueryStream("plot == "A1"", batchSize: 200
 
 **Usage Scenarios**
 
-GardenCoop uses streaming to analyze months of moisture readings without exhausting memory. S5.Recs paginates personalized suggestions while providing total counts for UI pagination controls.
+Applications stream large datasets (logs, sensor readings, historical records) without exhausting memory. APIs paginate results while providing total counts for UI pagination controls.
 
 **QueryWithCount and Options**
 
@@ -182,7 +184,7 @@ public static class TodoLifecycle
 
 **Usage Scenarios**
 
-GardenCoop enforces that every reminder has a title and automatically formats display text. S5.Recs bulk imports thousands of recommendations in a single batch call to prep nightly jobs.
+Domain models enforce required fields and format display text automatically. Batch imports process thousands of records in a single call to prep nightly jobs or migrations.
 
 ---
 
@@ -217,7 +219,7 @@ using (EntityContext.Adapter("mongo"))
 
 **Usage Scenarios**
 
-S5.Recs isolates tenant recommendations via partitions (`Recommendation#tenant-alpha`). Analytics queries route to dedicated Postgres sources without touching transactional stores.
+Multi-tenant applications isolate data via partitions (`Entity#tenant-alpha`). Analytics queries route to dedicated read-replica sources without touching transactional stores.
 
 **Scope Nesting**
 
@@ -228,6 +230,8 @@ using (EntityContext.Partition("cold"))
     await Todo.Copy().To(partition: "cold-snapshot").Run();
 }
 ```
+
+Boot the runtime with `builder.Services.AddKoan();` in `Program.cs`. Everything below builds on this foundation.
 
 ---
 
@@ -262,7 +266,7 @@ await Todo.Mirror(mode: MirrorMode.Bidirectional)
 
 **Usage Scenarios**
 
-S14.AdapterBench uses `Copy()` to preload providers and `Mirror()` to sync benchmark artifacts back into the default store without hand-written loops. Ops teams move cold data into cheaper storage overnight with `Move()` and a specific delete strategy. Bidirectional `Mirror()` keeps reporting and transactional stores aligned while surfacing conflicts when timestamps are missing.
+Testing frameworks use `Copy()` to preload test data and `Mirror()` to sync results without hand-written loops. Ops teams move cold data into cheaper storage overnight with `Move()` and a specific delete strategy. Bidirectional `Mirror()` keeps reporting and transactional stores aligned while surfacing conflicts when timestamps are missing.
 
 **Query-Shaped Transfer**
 
@@ -322,7 +326,7 @@ public class ArchiveJob : IJob
 
 **Usage Scenarios**
 
-S5.Recs streams recommendation updates to Flow, generating embeddings at scale without full materialization. Jobs provide reliable scheduling and resumption for nightly transfers or DR syncs.
+Applications stream entity updates to Flow pipelines, generating embeddings at scale without full materialization. Jobs provide reliable scheduling and resumption for nightly transfers or DR syncs.
 
 ---
 
@@ -349,7 +353,7 @@ var matches = await Recommendation.Query("vectorDistance < 0.15");
 
 **Usage Scenarios**
 
-S5.Recs exports vector embeddings into a cache via `Copy()` so APIs can respond instantly. Architects can swap vector backends (Weaviate, Pinecone, etc.) by changing configuration, no application code changes.
+Applications export vector embeddings into a cache via `Copy()` so APIs can respond instantly. Architects can swap vector backends (Weaviate, Pinecone, etc.) by changing configuration, no application code changes.
 
 ---
 
