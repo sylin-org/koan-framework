@@ -52,30 +52,48 @@ public sealed class Media : Entity<Media>
 }
 ```
 
-**Traditional Approach (What You DON'T Do):**
+**Traditional Approach (The Scaffolding Ritual):**
+
+*Most frameworks force you through a setup ritual before you can persist data:*
+
 ```csharp
-// ❌ Manual repository pattern
+// ❌ Define repository interface
 public interface IMediaRepository {
     Task<Media> GetAsync(string id);
     Task SaveAsync(Media media);
 }
 
-// ❌ Manual DbContext setup
+// ❌ Implement repository
+public class MediaRepository : IMediaRepository { /* 50 lines */ }
+
+// ❌ Configure DbContext
 public class MediaDbContext : DbContext {
     public DbSet<Media> Media { get; set; }
 }
 
-// ❌ Manual dependency injection
+// ❌ Register services
 services.AddDbContext<MediaDbContext>();
 services.AddScoped<IMediaRepository, MediaRepository>();
+
+// ❌ Inject dependencies
+public class MediaService(IMediaRepository repo) {
+    public Task Save(Media m) => repo.SaveAsync(m);
+}
 ```
 
-**Koan Approach (What You DO):**
+**The Promise:** "This decouples you from the database! You can swap implementations!"
+
+**The Reality:** You write 100+ lines of ceremony for theoretical flexibility you rarely use. The repository becomes a pass-through wrapper with no logic.
+
+**Koan's Philosophy: Eliminate Scaffolding, Keep the Benefits**
+
+Koan uses **ActiveRecord pattern** (easy to understand, quick to use) while providing the **decoupling benefits** that EF's rituals propose:
+
 ```csharp
 // ✅ Define the entity
 public sealed class Media : Entity<Media> { /* ... */ }
 
-// ✅ Use it immediately
+// ✅ Use it immediately (no setup, no DI, no repositories)
 var media = new Media {
     Title = "Kaguya-sama: Love is War",
     Genres = new[] { "Romance", "Comedy" }
@@ -86,10 +104,16 @@ var found = await Media.Get(media.Id);
 var all = await Media.All();
 ```
 
-**Why This Matters:**
-- **No boilerplate**: No repositories, no DbContext, no manual DI
-- **Provider transparent**: MongoDB, SQL Server, Couchbase—same code
-- **Entity-first**: `Todo.Get(id)` instead of `_repository.GetAsync(id)`
+**You Still Get Decoupling:**
+- **Provider transparent**: MongoDB, SQL Server, Couchbase, PostgreSQL—same code
+- **Testable**: Mock `Entity<T>` behavior via Koan's test harness
+- **Swappable**: Change providers via config, not code rewrite
+
+**The Difference:**
+- **Traditional:** Write abstraction layers to achieve decoupling
+- **Koan:** Decoupling is built into `Entity<T>`, you just use it
+
+Zero scaffolding ritual. Maximum productivity. Real provider transparency.
 
 ### Scene 2: The Identity Problem
 
