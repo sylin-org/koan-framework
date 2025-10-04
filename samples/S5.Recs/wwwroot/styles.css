@@ -1670,3 +1670,53 @@ button {
 .media-type-badge:not(.anime):not(.manga):not(.movie):not(.book):not(.tv):not(.novel):not(.game):not(.music):not(.media-anime):not(.media-manga):not(.media-movie):not(.media-book):not(.media-tv):not(.media-novel):not(.media-game):not(.media-music)::before {
   content: "\f008"; /* fa-film as default */
 }
+
+/* Alpha slider for hybrid search (semantic vs keyword balance) */
+.slider-purple {
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+}
+
+.slider-purple::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #a855f7, #ec4899);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.slider-purple::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #a855f7, #ec4899);
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.slider-purple::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+  box-shadow: 0 0 8px rgba(168, 85, 247, 0.6);
+}
+
+.slider-purple::-moz-range-thumb:hover {
+  transform: scale(1.2);
+  box-shadow: 0 0 8px rgba(168, 85, 247, 0.6);
+}
+
+.slider-purple:focus {
+  outline: none;
+}
+
+.slider-purple:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.4);
+}
+
+.slider-purple:focus-visible::-moz-range-thumb {
+  box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.4);
+}

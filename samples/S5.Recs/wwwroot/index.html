@@ -70,15 +70,34 @@
   <div class="flex items-center space-x-4">
           <!-- Search Bar -->
           <div class="relative hidden md:block">
-            <input 
-              type="text" 
+            <input
+              type="text"
               id="globalSearch"
               placeholder="Search media, genres..."
               class="bg-slate-800 text-white placeholder-gray-400 rounded-lg px-4 py-2 pl-10 w-80 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:bg-slate-700 transition-colors"
             >
             <i class="fas fa-search absolute left-3 top-3 text-gray-400 text-sm"></i>
           </div>
-                    
+
+          <!-- Alpha Slider: Semantic vs Keyword Balance -->
+          <div class="hidden lg:flex flex-col items-center space-y-1 bg-slate-800 rounded-lg px-4 py-2 min-w-[200px]">
+            <div class="flex items-center justify-between w-full text-xs text-gray-400">
+              <span title="Keyword/Exact Match">🎯</span>
+              <span id="alphaHint" class="text-purple-400 font-medium">Balanced</span>
+              <span title="Semantic/Meaning">🧠</span>
+            </div>
+            <input
+              type="range"
+              id="alphaSlider"
+              min="0"
+              max="1"
+              step="0.1"
+              value="0.5"
+              class="w-full h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer slider-purple"
+              title="Adjust search mode: Exact match (left) vs Semantic meaning (right)"
+            >
+          </div>
+
           <!-- Current User (display only) -->
           <div class="hidden md:flex items-center space-x-2 bg-slate-800 rounded-lg px-3 py-2">
             <div class="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center" id="currentProfileAvatar">

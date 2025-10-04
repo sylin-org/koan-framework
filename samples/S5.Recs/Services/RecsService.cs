@@ -91,6 +91,7 @@ internal sealed class RecsService : IRecsService
         double? ratingMax,
         int? yearMin,
         int? yearMax,
+        double? alpha,
         CancellationToken ct)
     {
         // Guardrails
@@ -131,11 +132,11 @@ internal sealed class RecsService : IRecsService
                 if (queryVector != null && queryVector.Length > 0 && Vector<Media>.IsAvailable)
                 {
                     // ADR-0051: Use hybrid search with unified API
-                    // Alpha = 0.5 (balanced semantic + keyword) when text query is provided
+                    // Alpha controls semantic (1.0) vs keyword (0.0) balance, defaults to 0.5 if not provided
                     var vectorResults = await Vector<Media>.Search(
                         vector: queryVector,
                         text: text,  // Enables hybrid search if provided
-                        alpha: !string.IsNullOrWhiteSpace(text) ? 0.5 : null,
+                        alpha: !string.IsNullOrWhiteSpace(text) ? (alpha ?? 0.5) : null,
                         topK: topK,
                         ct: ct
                     );

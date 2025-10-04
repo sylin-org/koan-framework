@@ -96,6 +96,28 @@
       });
     }
 
+  // Alpha slider for hybrid search (semantic vs keyword balance)
+    const alphaSlider = Dom.$('alphaSlider');
+    const alphaHint = Dom.$('alphaHint');
+    if (alphaSlider && alphaHint) {
+      const updateAlphaHint = () => {
+        const alpha = parseFloat(alphaSlider.value);
+        if (alpha <= 0.2) {
+          alphaHint.textContent = 'Exact Match';
+        } else if (alpha <= 0.4) {
+          alphaHint.textContent = 'Mostly Exact';
+        } else if (alpha <= 0.6) {
+          alphaHint.textContent = 'Balanced';
+        } else if (alpha <= 0.8) {
+          alphaHint.textContent = 'Mostly Meaning';
+        } else {
+          alphaHint.textContent = 'Semantic';
+        }
+      };
+      alphaSlider.addEventListener('input', updateAlphaHint);
+      updateAlphaHint(); // Initialize on page load
+    }
+
   // Debounced Tag Boost slider: re-render chips immediately for visual cue; reload data after debounce
     const weightSlider = Dom.$('preferWeight');
   if (weightSlider) {
@@ -497,10 +519,14 @@
     // Get rating and year filters (returns null for values at extremes)
     const { ratingMin, ratingMax, yearMin, yearMax } = readDualRangeValues();
 
+    // Get alpha value for hybrid search (semantic vs keyword balance)
+    const alpha = parseFloat(Dom.$('alphaSlider')?.value ?? '0.5');
+
     const body = {
       text: text || '',
       topK,
       sort,
+      alpha: text ? alpha : null, // Only include alpha when there's search text (hybrid mode)
       filters: {
         genres,
         episodesMax,
