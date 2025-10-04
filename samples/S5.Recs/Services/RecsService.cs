@@ -133,10 +133,14 @@ internal sealed class RecsService : IRecsService
                 {
                     // ADR-0051: Use hybrid search with unified API
                     // Alpha controls semantic (1.0) vs keyword (0.0) balance, defaults to 0.5 if not provided
+                    var effectiveAlpha = !string.IsNullOrWhiteSpace(text) ? (alpha ?? 0.5) : (double?)null;
+                    _logger?.LogInformation("Vector search: text={HasText}, alpha={Alpha}, topK={TopK}",
+                        !string.IsNullOrWhiteSpace(text), effectiveAlpha, topK);
+
                     var vectorResults = await Vector<Media>.Search(
                         vector: queryVector,
                         text: text,  // Enables hybrid search if provided
-                        alpha: !string.IsNullOrWhiteSpace(text) ? (alpha ?? 0.5) : null,
+                        alpha: effectiveAlpha,
                         topK: topK,
                         ct: ct
                     );

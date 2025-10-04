@@ -719,7 +719,7 @@ internal sealed class SeedService : ISeedService
             }
         }
 
-        _logger?.LogInformation("Embedding cache: {Hits} hits, {Misses} misses ({HitRate:P1} hit rate)",
+        _logger?.LogInformation("Embedding cache: {CacheHits} hits, {CacheMisses} misses ({HitRate:P1} hit rate)",
             cachedItems.Count, uncachedItems.Count,
             itemsList.Count > 0 ? (double)cachedItems.Count / itemsList.Count : 0);
 
