@@ -116,6 +116,20 @@ public static class ServiceCollectionExtensions
         return services;
     }
 
+    /// <summary>
+    /// Adds backup inventory health check to monitor entity backup coverage.
+    /// </summary>
+    /// <remarks>
+    /// Reports healthy when all entities have backup coverage.
+    /// Reports degraded when entities lack backup attributes.
+    /// Use with services.AddHealthChecks().AddCheck&lt;BackupInventoryHealthCheck&gt;("backup-inventory").
+    /// </remarks>
+    public static IServiceCollection AddBackupInventoryHealthCheck(this IServiceCollection services)
+    {
+        services.TryAddScoped<Services.BackupInventoryHealthCheck>();
+        return services;
+    }
+
     private static IServiceCollection TryAddHostedService<TService>(this IServiceCollection services)
         where TService : class, Microsoft.Extensions.Hosting.IHostedService
     {
