@@ -61,6 +61,8 @@ public class BackupInfo
     public BackupStatus Status { get; set; }
     public long SizeBytes { get; set; }
     public int EntityCount { get; set; }
+    public string ArchiveStorageKey { get; set; } = string.Empty;
+    public string ArchiveFileName { get; set; } = string.Empty;
     public string StorageProfile { get; set; } = default!;
     public string[]? EntityTypes { get; set; }
     public string[]? Providers { get; set; }

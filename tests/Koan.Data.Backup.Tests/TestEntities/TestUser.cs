@@ -1,7 +1,15 @@
 using Koan.Data.Abstractions;
+using Koan.Data.Backup.Attributes;
+
+// Assembly-level backup scope - opt-in all test entities by default
+[assembly: EntityBackupScope(Mode = BackupScope.All)]
 
 namespace Koan.Data.Backup.Tests.TestEntities;
 
+/// <summary>
+/// Test user entity with PII encryption enabled.
+/// </summary>
+[EntityBackup(Encrypt = true)]
 public class TestUser : IEntity<Guid>
 {
     public Guid Id { get; set; } = Guid.CreateVersion7();
@@ -14,6 +22,9 @@ public class TestUser : IEntity<Guid>
     public Dictionary<string, object>? Metadata { get; set; }
 }
 
+/// <summary>
+/// Test product entity using assembly-level backup defaults.
+/// </summary>
 public class TestProduct : IEntity<string>
 {
     public string Id { get; set; } = Guid.CreateVersion7().ToString();
@@ -25,6 +36,10 @@ public class TestProduct : IEntity<string>
     public int Quantity { get; set; }
 }
 
+/// <summary>
+/// Test order entity with schema excluded to reduce backup size.
+/// </summary>
+[EntityBackup(IncludeSchema = false)]
 public class TestOrder : IEntity<long>
 {
     public long Id { get; set; }
