@@ -49,4 +49,14 @@ public class GlobalRestoreOptions : RestoreOptions
     public Dictionary<string, string> EntityPartitionMapping { get; set; } = new(); // EntityType -> TargetPartition
     public bool RestoreToOriginalPartitions { get; set; } = true;
     public bool ValidateBeforeRestore { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets whether to allow partial restore when the backup manifest indicates failure.
+    /// </summary>
+    /// <remarks>
+    /// When true, restore will attempt to restore all entities that completed successfully
+    /// during backup, skipping those with errors. When false, restore will fail if the
+    /// manifest Status is Failed. Default is false for safety.
+    /// </remarks>
+    public bool AllowPartialRestore { get; set; } = false;
 }

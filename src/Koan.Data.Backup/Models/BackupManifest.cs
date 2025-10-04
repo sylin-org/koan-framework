@@ -44,7 +44,35 @@ public class EntityBackupInfo
     public string Provider { get; set; } = default!;
     public Dictionary<string, string> SchemaSnapshot { get; set; } = new();
     public TimeSpan BackupDuration { get; set; }
+
+    /// <summary>
+    /// Gets or sets the error message if the backup failed for this entity.
+    /// </summary>
+    /// <remarks>
+    /// When not null, indicates this entity failed during backup. The manifest
+    /// Status should be marked as Failed, and restore operations should skip
+    /// this entity with a warning.
+    /// </remarks>
     public string? ErrorMessage { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether the backup data for this entity is encrypted.
+    /// </summary>
+    /// <remarks>
+    /// Resolved from the entity's backup policy during backup creation.
+    /// Used during restore to determine if decryption is required.
+    /// </remarks>
+    public bool Encrypt { get; set; } = false;
+
+    /// <summary>
+    /// Gets or sets whether schema information was included in the backup.
+    /// </summary>
+    /// <remarks>
+    /// Resolved from the entity's backup policy during backup creation.
+    /// When false, restore operations will use the current schema instead
+    /// of attempting to restore schema from the backup.
+    /// </remarks>
+    public bool IncludeSchema { get; set; } = true;
 }
 
 public class BackupVerification
