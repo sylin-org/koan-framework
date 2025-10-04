@@ -24,8 +24,7 @@ public static class EndpointRouteBuilderExtensions
         string pattern = "backup")
     {
         var group = endpoints.MapGroup(pattern)
-            .WithTags("Backup Diagnostics")
-            .WithOpenApi();
+            .WithTags("Backup Diagnostics");
 
         // GET /backup/inventory - Get current backup inventory
         group.MapGet("/inventory", async (IEntityDiscoveryService discoveryService) =>

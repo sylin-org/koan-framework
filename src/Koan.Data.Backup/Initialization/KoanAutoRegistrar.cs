@@ -122,7 +122,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             // Emit warnings
             if (inventory.HasWarnings)
             {
-                Log.BootWarn(LogActions.Inventory, "uncovered",
+                Log.BootWarning(LogActions.Inventory, "uncovered",
                     ("count", inventory.TotalWarnings.ToString()));
 
                 foreach (var warning in inventory.Warnings)
