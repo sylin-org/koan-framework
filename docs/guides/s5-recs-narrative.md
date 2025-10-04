@@ -91,15 +91,52 @@ var all = await Media.All();
 - **Provider transparent**: MongoDB, SQL Server, Couchbase—same code
 - **Entity-first**: `Todo.Get(id)` instead of `_repository.GetAsync(id)`
 
-### Scene 2: Deterministic IDs (Not Just UUIDs)
+### Scene 2: The Identity Problem
 
-Most frameworks generate random UUIDs:
+You're importing anime data from AniList's API. You run the import script. Everything works! 10,000 shows in your database.
+
+A week later, AniList updates some metadata. You run the import again. Now you have **20,000 shows**—10,000 duplicates.
+
+**The Challenge:**
+
+How do you guarantee that the same anime from the same provider generates the same ID every time?
+
+**Option 1: Random UUIDs (Traditional)**
+
 ```csharp
-var id = Guid.NewGuid(); // Different every time
-// Problem: Same content from API = different IDs = duplicates!
+var media = new Media {
+    Id = Guid.NewGuid(),  // Different every run
+    ProviderCode = "anilist",
+    ExternalId = "101921"
+};
 ```
 
-S5.Recs uses **deterministic SHA512-based IDs**:
+**Problem:** Every import creates new records. You'd need complex deduplication logic comparing titles, checking external IDs, merging records. Fragile and error-prone.
+
+**Option 2: Use Provider's External ID Directly**
+
+```csharp
+var media = new Media {
+    Id = "101921",  // AniList's ID
+    ProviderCode = "anilist"
+};
+```
+
+**Problem:** Collisions when you add MyAnimeList (also has ID "101921" for different content). You'd need composite keys or prefixing schemes. Still messy.
+
+**Option 3: Composite Key String**
+
+```csharp
+var media = new Media {
+    Id = "anilist:101921",  // Provider + ID
+    ProviderCode = "anilist",
+    ExternalId = "101921"
+};
+```
+
+**Better!** But what about media type? "anilist:101921:anime" vs "anilist:101921:manga"? And what about future schema changes?
+
+**The Decision: Deterministic Hashing**
 
 ```csharp
 public sealed class Media : Entity<Media>
@@ -107,25 +144,63 @@ public sealed class Media : Entity<Media>
     public static string MakeId(string providerCode, string externalId, string mediaTypeId)
     {
         // SHA512 hash of: "anilist:101921:media-anime"
+        // Always produces the same hash for same inputs
         return IdGenerationUtilities.GenerateMediaId(providerCode, externalId, mediaTypeId);
     }
 }
 
 // Usage
 var id = Media.MakeId("anilist", "101921", "media-anime");
+// → "k8j3nf92...sd8f" (64-char SHA512 hash, always same for these inputs)
+
 var media = new Media {
-    Id = id,  // Always the same for this content
+    Id = id,
     ProviderCode = "anilist",
     ExternalId = "101921"
 };
 ```
 
-**Benefits:**
-- **Idempotent imports**: Re-importing same API data → updates, not duplicates
-- **Cross-provider merging**: AniList ID + MAL ID → same content
-- **Predictable**: Test fixtures have stable IDs
+**Why SHA512 Hashing?**
 
-**Rationale:** When you're importing from external APIs (AniList, MyAnimeList), you need **stable identities**. Random UUIDs create chaos—reimporting the same show creates duplicates. Deterministic IDs make your data layer **idempotent**.
+1. **Deterministic**: Same inputs → same hash, every time
+2. **Collision-resistant**: Virtually impossible for different content to get same hash
+3. **Opaque**: Doesn't expose internal structure (security)
+4. **Future-proof**: Can add more fields to hash input without breaking existing IDs
+5. **No length limits**: Unlike composite strings, hash is fixed length
+
+**The Result:**
+
+```csharp
+// First import
+var id1 = Media.MakeId("anilist", "101921", "media-anime");
+await new Media { Id = id1, Title = "Kaguya-sama" }.Save();
+
+// Second import (weeks later, same data)
+var id2 = Media.MakeId("anilist", "101921", "media-anime");
+await new Media { Id = id2, Title = "Kaguya-sama: Love is War" }.Save();
+
+// id1 == id2 → Update existing record, no duplicate!
+```
+
+**Cross-Provider Bonus:**
+
+When you want to merge data from multiple sources, deterministic IDs enable it:
+
+```csharp
+// AniList record
+var anilistId = Media.MakeId("anilist", "101921", "media-anime");
+
+// MyAnimeList record (different external ID)
+var malId = Media.MakeId("mal", "37999", "media-anime");
+
+// These are different IDs (correctly!)
+// You'd need a separate MediaLink entity to mark them as same content
+// But at least you have stable, predictable identities to work with
+```
+
+**Trade-off Accepted:**
+
+Hashing loses human readability. You can't look at an ID and know what it represents. But you gain **idempotence**, which is critical for data pipelines importing from external APIs.
 
 ---
 
@@ -150,26 +225,107 @@ var results = await Media.Where(m =>
 
 Your users want **semantic search**—find content by *meaning*, not just keywords.
 
-### Scene 4: Enter Vector Embeddings
+### Scene 4: Solving the Meaning Problem
 
-**Concept Explanation (Beginner-Friendly):**
+**The Challenge:**
 
-Think of embeddings as **coordinates in meaning-space**:
+Users want to search by meaning, not just keywords. "Shows like Cowboy Bebop" should find tonally similar shows, but keyword search can't do this. How do you enable semantic understanding?
+
+**Option 1: Synonym Dictionaries**
+
+```csharp
+var synonyms = new Dictionary<string, string[]> {
+    { "cat", new[] { "kitten", "feline", "kitty" } },
+    { "sad", new[] { "melancholic", "depressing", "tragic" } }
+};
+
+// Expand query
+var expandedQuery = ExpandWithSynonyms(query, synonyms);
+var results = await Media.Where(m => m.Synopsis.Contains(expandedQuery));
+```
+
+**Problems:**
+- Manual curation (impossible to maintain for all concepts)
+- Language-specific (doesn't work for Japanese/Korean titles)
+- No understanding of **context** ("bank" = financial institution or river edge?)
+- Binary matching (either synonym matches or doesn't)
+
+**Option 2: TF-IDF + Latent Semantic Analysis (LSA)**
+
+*Classic information retrieval approach from the 1990s.*
+
+```csharp
+// Build term-document matrix (word frequency table)
+// Rows = words, Columns = documents, Values = how important each word is to each document
+var tfidf = BuildTfIdfMatrix(allMedia);
+
+// Perform SVD (Singular Value Decomposition) to reduce dimensions
+// "Find patterns in which words tend to appear together"
+var lsa = PerformSVD(tfidf, dimensions: 100);
+
+// Search by projecting query into this reduced space
+var queryVector = TransformQuery(query, lsa);
+var results = CosineSimilarity(queryVector, allDocuments);
+```
+
+**How it works (simplified):**
+```
+Documents:
+  Doc1: "cat kitten meow"
+  Doc2: "dog puppy bark"
+  Doc3: "cat purr feline"
+
+TF-IDF Matrix (word importance):
+          Doc1  Doc2  Doc3
+  cat     0.8   0.0   0.7
+  kitten  0.6   0.0   0.0
+  dog     0.0   0.9   0.0
+  puppy   0.0   0.5   0.0
+
+LSA learns: "cat, kitten, feline often appear together" → Group 1
+            "dog, puppy, bark often appear together" → Group 2
+```
+
+**Problems:**
+- Requires full corpus preprocessing (expensive on updates—need ALL documents upfront)
+- Shallow semantic understanding (learns word co-occurrence, not actual meaning)
+- No cross-lingual capabilities (can't connect "cat" with "猫")
+- Fixed vocabulary (new words not in training corpus = can't be searched)
+
+**Option 3: Pre-Trained Neural Embeddings**
+
+Use AI models trained on billions of text examples to convert text into **coordinates in meaning-space**.
+
+```csharp
+// Convert text to 384-dimensional vector
+var embedding = await Ai.Embed("cute but powerful characters", ct);
+// Result: [0.8, 0.2, 0.1, ...] (384 numbers representing the MEANING)
+```
+
+**Why this works:**
 
 ```
-Traditional:
-"cat" ≠ "kitten" ≠ "feline"  (exact string matching)
+Traditional approaches:
+"cat" ≠ "kitten" ≠ "feline"  (exact string matching or manual synonyms)
 
-Embeddings:
+Neural embeddings (learned from billions of examples):
 "cat"    → [0.8, 0.2, 0.1, ...]  (384 numbers)
 "kitten" → [0.79, 0.21, 0.09, ...] (very close in space)
 "feline" → [0.77, 0.19, 0.11, ...] (close)
 "car"    → [0.1, 0.9, 0.3, ...]   (far away)
 ```
 
-Similar meanings have **similar numbers**. AI models learn these representations from billions of text examples.
+Similar meanings have **similar vectors**. Distance in vector space = semantic similarity.
 
-**S5.Recs Implementation:**
+**The Decision: all-MiniLM-L6-v2 Embeddings**
+
+S5.Recs uses the **all-MiniLM-L6-v2** model:
+- **384 dimensions**: Compact yet powerful semantic representation
+- **Multilingual**: Handles English, Japanese romanization, basic cross-lingual understanding
+- **Fast inference**: ~10ms per embedding on CPU
+- **Pre-trained**: No training required, works out of the box
+
+**Implementation:**
 
 ```csharp
 // 1. Generate embedding for media content
@@ -190,7 +346,9 @@ var results = await Vector<Media>.Search(
 );
 ```
 
-**What `BuildEmbeddingText` Does:**
+**Building Rich Embedding Context:**
+
+Just the title isn't enough—the model needs comprehensive semantic information:
 
 ```csharp
 private string BuildEmbeddingText(Media media)
@@ -217,7 +375,17 @@ engage in a battle of wits to make the other confess their love first.
 Tags: Romance, Comedy, School, Psychological
 ```
 
-**Why Rich Context?** The AI model needs comprehensive information to generate a meaningful embedding. Just the title isn't enough—synopsis and tags provide semantic depth.
+**Why this approach wins:**
+1. **Zero manual work**: No synonym curation or corpus preprocessing
+2. **Contextual understanding**: "bank" near "money" vs "river" produces different embeddings
+3. **Multilingual**: Handles romanized Japanese, basic cross-language similarity
+4. **Continuous similarity**: 0.89 match vs 0.45 match (not just yes/no)
+5. **Scales effortlessly**: New content = just compute embedding
+
+**Trade-offs accepted:**
+- Requires external AI model (Ollama in S5.Recs)
+- 384-dimensional vectors use more storage than keywords
+- Slightly slower than exact string matching (but worth it for semantic power)
 
 ### Scene 5: The Magic of Semantic Search
 
@@ -238,8 +406,21 @@ var results = await Vector<Media>.Search(vector: embedding, topK: 10);
 
 The AI model:
 1. Converted your vague description into a 384-dimensional vector
-2. Compared it to all media embeddings via **cosine similarity**
+2. Compared it to all media embeddings via **cosine similarity** (measures "how aligned" two vectors are)
 3. Returned the closest matches in "meaning-space"
+
+**Cosine Similarity Explained:**
+```
+Two vectors are "similar" if they point in the same direction:
+
+  Vector A: [0.8, 0.2]  ↗
+  Vector B: [0.9, 0.3]  ↗  (pointing same direction → high similarity: 0.98)
+
+  Vector A: [0.8, 0.2]  ↗
+  Vector C: [0.1, 0.9]  ↑  (pointing different direction → low similarity: 0.32)
+
+In 384 dimensions, same principle: aligned vectors = similar meaning
+```
 
 **No keywords matched**, but the semantic meaning aligned perfectly.
 
@@ -281,14 +462,91 @@ Score: 0.28  (too low to rank high!)
 
 **Semantic search fails** when you need **exact lexical matching**.
 
-### Scene 7: Hybrid Search (BM25 + Vectors)
+### Scene 7: Solving the Precision Problem
 
-**Solution:** Combine two search modes:
+**The Challenge:**
 
-1. **BM25 (Keyword)**: Traditional text matching, perfect for exact titles
-2. **Vector (Semantic)**: Meaning-based matching, great for vague queries
+You need both semantic understanding AND exact title matching. How do you combine them?
 
-**Implementation:**
+**Option 1: Dual Queries with Client-Side Merge**
+
+```csharp
+// Run both searches
+var semanticResults = await Vector<Media>.Search(vector, topK: 50);
+var keywordResults = await Media.Where(m => m.Title.Contains(query)).Take(50);
+
+// Merge manually
+var combined = semanticResults.Concat(keywordResults).Distinct().Take(20);
+```
+
+**Problems:**
+- Two separate queries (latency)
+- Manual merge logic (how do you rank them?)
+- Doesn't scale (fetching 50+50 to get 20)
+- Client-side sorting loses provider optimizations
+
+**Option 2: Pre-Filter with Keywords, Then Vector Search**
+
+```csharp
+// First narrow down by keyword
+var candidates = await Media.Where(m =>
+    m.Title.Contains(query) ||
+    m.Synopsis.Contains(query)
+).Take(1000);
+
+// Then vector search within candidates
+var candidateIds = candidates.Select(c => c.Id);
+var results = await Vector<Media>.Search(
+    vector,
+    filter: new { id_in = candidateIds },
+    topK: 20
+);
+```
+
+**Problems:**
+- Keyword pre-filter might exclude good semantic matches
+- Still two queries
+- Complex filter translation across providers
+
+**Option 3: Provider-Native Hybrid Search**
+
+Many vector databases support **hybrid search**—combining **BM25 keyword matching** with **vector similarity** in a **single query** with **provider-optimized fusion**.
+
+*"Provider-optimized fusion" = The vector database internally combines BM25 and vector scores using efficient algorithms (like Reciprocal Rank Fusion - RRF), rather than you merging results in application code.*
+
+```
+Reciprocal Rank Fusion (simplified):
+  BM25 results: [DocA, DocB, DocC]  (ranked 1, 2, 3)
+  Vector results: [DocC, DocA, DocD] (ranked 1, 2, 3)
+
+  RRF score = 1/(rank+60) for each list, then sum:
+    DocA: 1/(1+60) + 1/(2+60) = 0.0164 + 0.0161 = 0.0325
+    DocC: 1/(3+60) + 1/(1+60) = 0.0159 + 0.0164 = 0.0323
+
+  Final ranking: [DocA, DocC, ...] (combined best from both)
+```
+
+**What is BM25?**
+*"Best Matching 25" - A keyword ranking algorithm from the 1970s-90s, still used in Elasticsearch, Weaviate, and search engines.*
+
+```
+How BM25 scores documents:
+  Query: "magic school"
+
+  Document A: "magic school magic school"
+    - Term frequency: "magic" appears 2x, "school" appears 2x
+    - Score: HIGH (exact matches, repeated terms)
+
+  Document B: "a story about a magical academy for wizards"
+    - Term frequency: "magic" appears 0x, "school" appears 0x
+    - Score: LOW (no exact matches, even though semantically related)
+
+BM25 = Keyword matching + Term frequency + Document length normalization
+
+*Document length normalization = Prevents long documents from getting unfairly high scores just because they contain more words*
+```
+
+**The Decision: Hybrid Search with Alpha Blending**
 
 ```csharp
 // Store searchable text alongside vectors
@@ -371,6 +629,14 @@ Hybrid search solves the **polyglot content problem**. Your embedding model has 
 
 You have semantic search working beautifully. Users love it. But every user sees the **same results** for the same query. There's no **personalization**.
 
+**The "Cold Start Problem":**
+*In recommender systems, the challenge of personalizing for users with little or no interaction history.*
+
+```
+New user arrives → Zero ratings → No preference data → Generic recommendations
+(Everyone sees the same results until they rate content)
+```
+
 **The Vision:**
 
 - Alice loves wholesome slice-of-life shows
@@ -381,16 +647,60 @@ You have semantic search working beautifully. Users love it. But every user sees
 
 **How?** By learning from ratings.
 
-### Scene 9: The Preference Vector
+### Scene 9: Learning User Preferences
 
-**Concept (Beginner-Friendly):**
+**The Challenge:**
 
-Every time a user rates content, you:
-1. Generate an embedding for that content
-2. Update the user's **preference vector** (exponential moving average)
-3. Blend it with search queries for personalized results
+Users rate content. How do you capture "what they like" in a way that improves future recommendations?
 
-**Implementation:**
+**Option 1: Genre Counters**
+
+```csharp
+// Track genre preferences
+public class UserProfile
+{
+    public Dictionary<string, int> GenreCounts { get; set; }  // Romance: 15, Action: 3
+}
+
+// When user rates highly
+foreach (var genre in media.Genres)
+    profile.GenreCounts[genre]++;
+```
+
+**Problems:**
+- Too coarse-grained (all "Romance" anime aren't the same)
+- Doesn't capture tone, pacing, art style
+- Explodes with too many genres/tags
+
+**Option 2: Collaborative Filtering (User-to-User)**
+
+```csharp
+// Find similar users
+var similarUsers = FindUsersWith SimilarRatings(currentUser);
+
+// Recommend what they liked
+var recommendations = similarUsers.SelectMany(u => u.HighRatedContent);
+```
+
+**Classic approach!** But problems:
+- Cold start: New users have no ratings to compare
+- Sparsity: 10,000 users × 10,000 shows = 100M possible ratings, most empty
+- Scalability: Comparing users is O(N²) *(means if you double users, computation time quadruples)*
+
+**Option 3: Content-Based with Embeddings**
+
+What if you capture user preferences in the **same 384-dimensional space** as your content embeddings?
+
+```csharp
+public class UserProfile
+{
+    public float[] PrefVector { get; set; }  // 384 dimensions, just like content
+}
+```
+
+Each rating **nudges** the preference vector toward that content's embedding.
+
+**The Decision: Preference Vector with Exponential Moving Average**
 
 ```csharp
 // User rates a show
@@ -431,6 +741,30 @@ public async Task RateAsync(string userId, string mediaId, int rating, Cancellat
 }
 ```
 
+**Exponential Moving Average (EMA) Explained:**
+
+*A technique from signal processing and time-series analysis that gives more weight to recent data while retaining historical context.*
+
+```
+Traditional average (equal weight):
+  Rating 1: "K-On!" → [0.8, 0.2, 0.1]
+  Rating 2: "Death Note" → [0.3, 0.6, 0.5]
+  Average: [0.55, 0.4, 0.3]  ← Equal 50/50 split
+
+Exponential moving average (alpha = 0.3):
+  Rating 1: "K-On!" → PrefVector = [0.8, 0.2, 0.1]
+  Rating 2: "Death Note" → PrefVector = 70% old + 30% new
+    = [0.8, 0.2, 0.1] × 0.7 + [0.3, 0.6, 0.5] × 0.3
+    = [0.65, 0.32, 0.22]  ← Recent rating influences, but doesn't dominate
+
+Why "exponential"?
+  Each new rating has diminishing influence on older history:
+  - Rating 2: 30% influence
+  - Rating 3: 30% of remaining 70% = 21% influence
+  - Rating 4: 30% of remaining 49% = 14.7% influence
+  (Exponentially decaying weights)
+```
+
 **What's Happening:**
 
 ```
@@ -444,11 +778,50 @@ User rates Made in Abyss (5★):
   PrefVector = [0.5, 0.45, 0.35, ...]  (darker preferences growing)
 ```
 
-Each rating **nudges** the preference vector toward that content's embedding. Over time, it captures **what the user likes**.
+Each rating **nudges** the preference vector toward that content's embedding. Over time, it captures **what the user likes** while adapting to changing tastes.
 
-### Scene 10: Vector Blending for Personalized Search
+### Scene 10: Balancing Intent vs. History
 
-When a logged-in user searches, you **blend two vectors**:
+**The Challenge:**
+
+A logged-in user searches for "magic school anime". You have two signals:
+
+1. **Search intent**: What they explicitly want right now
+2. **Learned preferences**: What they generally like based on ratings
+
+How do you combine them?
+
+**Option 1: Only Use Search Intent (Ignore Preferences)**
+
+```csharp
+var searchVector = await Ai.Embed("magic school anime", ct);
+var results = await Vector<Media>.Search(vector: searchVector);
+```
+
+**Problem:** Doesn't personalize. Alice and Bob get identical results despite different tastes.
+
+**Option 2: Only Use Preferences (Ignore Intent)**
+
+```csharp
+var userPrefVector = await UserProfile.GetPrefVector(userId);
+var results = await Vector<Media>.Search(vector: userPrefVector);
+```
+
+**Problem:** Ignores what they *actually searched for*. Bob searches "magic school" but gets dark psychological thrillers because that's his history.
+
+**Option 3: 50/50 Blend**
+
+```csharp
+var blendedVector = BlendVectors(searchVector, userPrefVector, weight: 0.5);
+```
+
+**Seems balanced!** But in practice:
+- User's explicit search should matter more than history
+- If I search "cute slice of life", I probably don't want dark fantasy even if that's 50% of my history
+
+**The Decision: 66% Intent, 34% Preferences**
+
+When a user explicitly searches for something, **their current intent matters more** than learned history.
 
 ```csharp
 // 1. Search intent (what they want right now)
@@ -461,7 +834,7 @@ var userPrefVector = await UserProfile.GetPrefVector(userId, ct);
 var blendedVector = BlendVectors(
     searchVector,
     userPrefVector,
-    weight: 0.66
+    weight: 0.66  // ← Favor explicit intent
 );
 
 // 4. Hybrid search with personalized vector
@@ -472,6 +845,15 @@ var results = await Vector<Media>.Search(
     topK: 50
 );
 ```
+
+**Why 66/34 Specifically?**
+
+Empirically tested ratios:
+- **80/20**: Too much intent, barely personalized
+- **50/50**: History overwhelms intent
+- **66/34**: Sweet spot—respects search while adding personal touch
+
+Think of it as: "Give me magic school anime, but **subtly** favor my tastes."
 
 **BlendVectors Implementation:**
 
@@ -487,6 +869,8 @@ private static float[] BlendVectors(float[] vec1, float[] vec2, double weight1)
     }
 
     // Normalize to unit length (preserve cosine similarity semantics)
+    // "Unit length" = Scale vector so its length is 1.0
+    // Why? Cosine similarity only cares about DIRECTION, not magnitude
     var magnitude = Math.Sqrt(result.Sum(x => (double)x * x));
     if (magnitude > 1e-8)
     {
@@ -519,17 +903,76 @@ Bob searches "magic school anime":
 
 **Same query, personalized results.**
 
-### Scene 11: Genre Weights (Metadata Learning)
+### Scene 11: The Explainability Problem
 
-Beyond the preference vector, S5.Recs also tracks **genre weights**:
+**The Challenge:**
+
+Your preference vector is learning well, but you run into a business requirement:
+
+> "We need to show users WHY they're getting recommendations. 'Based on your interests in Romance and Comedy' makes sense. 'Based on vector coordinate [0.734, -0.891, ...]' does not."
+
+Preference vectors capture nuanced taste, but they're **impossible to interpret**. How do you provide explainability?
+
+**Option 1: Only Use Preference Vector (Latent Semantics)**
+
+```csharp
+// Just the 384-dimensional preference vector
+var blendedVector = BlendVectors(searchVector, userPrefVector, 0.66);
+var results = await Vector<Media>.Search(vector: blendedVector);
+
+// Try to explain...
+// "We recommend this because vector dimensions 47, 103, and 298 are aligned"
+// ❌ Meaningless to users
+```
+
+**Problems:**
+- **Zero explainability**: Can't tell user WHY they got a recommendation
+- **No business rules**: Can't implement "never recommend Horror if user hates it"
+- **No debugging**: When recommendations are wrong, can't understand why
+- **No user control**: Can't let users say "more Romance, less Action"
+
+**Option 2: Only Use Genre Weights (Explicit Metadata)**
+
+```csharp
+// Track explicit genre preferences
+public Dictionary<string, double> GenreWeights { get; set; } = new();
+
+// When user rates content
+foreach (var genre in media.Genres)
+{
+    var target = (rating - 1) / 4.0;  // Convert 1-5 to 0-1
+    GenreWeights[genre] = UpdateWeight(GenreWeights[genre], target);
+}
+
+// Score by genre match
+var score = media.Genres.Sum(g => GenreWeights.GetValueOrDefault(g, 0));
+```
+
+**Problems:**
+- **Too coarse**: "Romance" includes wholesome K-dramas AND dark psychological thrillers
+- **Misses nuance**: Can't capture "likes shows with strong female leads" (not a genre)
+- **Tag sparsity**: Most subtle preferences (pacing, art style, tone) have no explicit tags
+- **Genre pollution**: "Action/Adventure/Fantasy/Comedy" - which genre matters?
+
+**Option 3: Use BOTH (Explicit + Latent)**
+
+Track both interpretable genre weights AND nuanced preference vectors:
 
 ```csharp
 public sealed class UserProfileDoc : Entity<UserProfileDoc>
 {
-    public Dictionary<string, double> GenreWeights { get; set; } = new();
-    public float[]? PrefVector { get; set; }
+    public Dictionary<string, double> GenreWeights { get; set; } = new();  // Explicit
+    public float[]? PrefVector { get; set; }  // Latent
 }
+```
 
+**The Decision: Two-Tier Learning System**
+
+S5.Recs uses **multi-modal personalization**:
+
+**1. Genre Weights (Explicit Metadata)**
+
+```csharp
 // When user rates content
 foreach (var genre in media.Genres)
 {
@@ -540,7 +983,16 @@ foreach (var genre in media.Genres)
 }
 ```
 
-**How It's Used:**
+**2. Preference Vector (Latent Semantics)**
+
+```csharp
+// Update the 384-dimensional vector with EMA
+var contentEmbedding = await Ai.Embed(BuildEmbeddingText(media), ct);
+for (int i = 0; i < profile.PrefVector.Length; i++)
+    profile.PrefVector[i] = (float)((1 - alpha) * profile.PrefVector[i] + alpha * contentEmbedding[i]);
+```
+
+**3. Combined Scoring**
 
 ```csharp
 // During scoring
@@ -555,24 +1007,60 @@ if (userProfile?.GenreWeights != null)
     genreBoost = Math.Min(genreBoost, 1.0) / media.Genres.Length;
 }
 
-// Final recommendation score
+// Blend explicit and latent signals
 var score = (0.4 * vectorScore) + (0.3 * popularityScore) + (0.2 * genreBoost);
 ```
 
-**Why Both?**
+**Why This Hybrid Works:**
 
-- **Genre weights**: Interpretable ("Alice likes Romance: 0.9, Horror: 0.1")
-- **Preference vector**: Captures nuances beyond genres (tone, pacing, art style)
+| Aspect | Genre Weights | Preference Vector |
+|--------|--------------|-------------------|
+| **Interpretability** | ✅ "Alice likes Romance: 90%" | ❌ [0.734, -0.891, ...] |
+| **Nuance** | ❌ Coarse categories | ✅ Captures tone, pacing, style |
+| **Business Rules** | ✅ "Never show Horror if weight < 0.2" | ❌ Can't apply rules to vectors |
+| **Explainability** | ✅ "Based on your love of Romance" | ❌ No human explanation |
+| **Subtle Patterns** | ❌ "Strong female lead" not a genre | ✅ Latent in embedding space |
 
-Together they provide **multi-modal personalization**.
+**Real Example:**
+
+Alice rates "Kaguya-sama: Love is War" (5★):
+
+```
+Genre Weights Update:
+  Romance: 0.5 → 0.65
+  Comedy: 0.4 → 0.58
+  School: 0.3 → 0.51
+
+Preference Vector Update:
+  [0.2, 0.8, 0.1, ...] → [0.35, 0.82, 0.15, ...]
+  (Nudged toward: witty dialogue, psychological games, tsundere characters)
+```
+
+**Explainability in UI:**
+
+```javascript
+// Show interpretable reasons
+"Because you enjoy Romance (90%) and Comedy (85%)"
+
+// Powered by latent preferences behind the scenes
+// (subtle bias toward witty banter, character-driven plots, etc.)
+```
 
 **Rationale (For Architects):**
 
-This is a **two-tier learning system**:
-1. **Explicit metadata** (genres, tags) - Interpretable, fast to compute
-2. **Latent semantics** (embedding vectors) - Captures complex patterns
+This **two-tier learning system** is used in production recommender systems:
+1. **Explicit features** (genres, tags) - Interpretable, supports business logic, user-facing explanations
+2. **Latent features** (embeddings) - Captures complex patterns, improves precision, handles long-tail preferences
 
-Production systems often use both—explicit for explainability and business rules, latent for performance.
+Examples in industry:
+- **Netflix**: Genre preferences + collaborative filtering embeddings
+- **Spotify**: Playlist categories + audio feature embeddings
+- **Amazon**: Product categories + item-to-item collaborative vectors
+
+**Trade-offs accepted:**
+- More storage (both systems tracked per user)
+- Slightly more complex scoring logic
+- Worth it for explainability + nuanced recommendations
 
 ---
 
@@ -605,9 +1093,60 @@ For the same content, the embedding **never changes**. If you've already compute
 
 Why compute it again?
 
-### Scene 13: Content-Addressable Cache
+### Scene 13: Choosing a Cache Strategy
 
-**Solution:** Cache embeddings by **content hash**:
+**The Challenge:**
+
+You need to cache embeddings to avoid redundant AI calls. But how do you key the cache? Different strategies have different trade-offs.
+
+**Option 1: Cache by Entity ID**
+
+```csharp
+// Use media.Id as cache key
+var cached = await _cache.GetAsync(media.Id);
+if (cached != null) return cached;
+
+var embedding = await Ai.Embed(embeddingText, ct);
+await _cache.SetAsync(media.Id, embedding);
+```
+
+**Problems:**
+- **Over-invalidation**: If ANY metadata changes (e.g., fixing a typo in synopsis), cache invalidates
+- **Doesn't detect duplicates**: Same content from different providers = different IDs = cache miss
+- **Content changes missed**: If you update synopsis, old embedding is still served (stale cache)
+
+**Option 2: Cache by (ID + Timestamp)**
+
+```csharp
+// Use ID + UpdatedAt timestamp
+var cacheKey = $"{media.Id}_{media.UpdatedAt:yyyyMMddHHmmss}";
+var cached = await _cache.GetAsync(cacheKey);
+```
+
+**Problems:**
+- **Still misses duplicates**: Same content across providers = cache miss
+- **Timestamp precision**: UpdatedAt might change even when content doesn't (metadata updates)
+- **No cross-entity reuse**: Two shows with identical synopsis = two separate cache entries
+
+**Option 3: Content-Addressable Hashing**
+
+Use the **embedding text itself** as the cache key via cryptographic hashing:
+
+```csharp
+// Hash the actual content we're embedding
+var contentHash = ComputeSHA512Hash(embeddingText);
+var cached = await _cache.GetAsync(contentHash);
+```
+
+**Why this works:**
+- **Same content → Same hash**: Deterministic cache key
+- **Different content → Different hash**: Automatic invalidation
+- **Cross-entity deduplication**: If two shows have identical embedding text, one cache entry serves both
+- **No manual invalidation**: Content changes → hash changes → cache miss (correct behavior)
+
+**The Decision: SHA512 Content-Addressable Cache**
+
+S5.Recs uses **content hashing** for embedding cache keys:
 
 ```csharp
 public class EmbeddingCache : IEmbeddingCache
@@ -669,27 +1208,29 @@ else
 }
 ```
 
+**Why SHA512 Specifically?**
+
+1. **Deterministic**: Same content always produces same hash
+2. **Collision-resistant**: Cryptographically impossible for different content to produce same hash (2^512 space)
+3. **Content-addressable**: The content itself IS the cache key
+4. **Invalidation-free**: Content changes → different hash → automatic cache miss (no manual invalidation logic)
+5. **Cross-entity deduplication**: Two media items with identical embedding text share one cache entry
+
 **The Result:**
 
 ```
-First import:
+First import (10,000 items):
   Cache hits: 0, Cache misses: 10,000 (0% hit rate)
   Time: 30 seconds
 
 Second import (same data):
   Cache hits: 10,000, Cache misses: 0 (100% hit rate)
-  Time: 2 seconds
+  Time: 2 seconds (15x faster!)
 
-Typical production:
+Typical production (updates):
   Cache hits: 8,500, Cache misses: 1,500 (85% hit rate)
   Time: 5 seconds
 ```
-
-**Why SHA512?**
-
-- **Deterministic**: Same content → same hash
-- **Collision-resistant**: Virtually impossible to get same hash for different content
-- **Content-addressable**: The content *is* the key
 
 **File Structure:**
 
@@ -976,6 +1517,14 @@ public async Task<(IReadOnlyList<Recommendation>, bool degraded)> QueryAsync(...
 }
 ```
 
+**What is "Degraded Mode"?**
+*When a service operates with reduced functionality due to component failures, but remains usable.*
+
+```
+Normal mode: ✅ Semantic search + BM25 + personalization
+Degraded mode: ⚠️ Basic keyword search only (slower, less accurate, but works)
+```
+
 **UI Response:**
 
 ```javascript
@@ -986,7 +1535,7 @@ if (response.degraded) {
 
 **Why This Matters:**
 
-Production systems have **partial failures**. Your vector DB might be down for maintenance. Graceful degradation means your app stays usable.
+Production systems have **partial failures**. Your vector DB might be down for maintenance. Graceful degradation means your app stays usable, just with reduced intelligence.
 
 ### Performance Characteristics
 
@@ -1002,6 +1551,8 @@ With cache (85% hit rate):
   - 1,500 AI embedding calls
   - ~5 seconds
   - 10,000 vector upserts (fast)
+
+*Upsert = "Update or Insert" - If record exists, update it; if not, insert it*
 
 Memory:
   - Embedding: 384 floats × 4 bytes = 1.5 KB per item
@@ -1023,6 +1574,25 @@ Personalized search:
   - Vector blending: <1ms (client-side math)
   - Total: same as hybrid search
 ```
+
+**What is HNSW?**
+*"Hierarchical Navigable Small World" - A graph-based algorithm for fast approximate nearest neighbor search.*
+
+```
+Without HNSW (brute force):
+  Compare query vector to ALL 1,000,000 vectors
+  Time: O(N) - scales linearly
+
+With HNSW index:
+  Navigate graph structure to find nearest neighbors
+  Time: O(log N) - logarithmic scaling
+
+  Example: 1M vectors
+    Brute force: 1,000,000 comparisons
+    HNSW: ~10-20 hops through graph (99.9% accuracy)
+```
+
+HNSW enables **sub-second search** even with millions of embeddings.
 
 ### Data Flow Diagram
 
