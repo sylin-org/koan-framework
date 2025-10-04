@@ -6,26 +6,39 @@
 
 ## Overview
 
-The Koan Backup system provides zero-configuration, discovery-based backup and restore capabilities for entities and vectors. It follows the framework's core principles: auto-discovery, provider transparency, and minimal scaffolding.
+The Koan Backup system provides attribute-driven backup and restore capabilities for entities and vectors with explicit opt-in and startup validation. It follows the framework's core principles: provider transparency, minimal scaffolding, and safe defaults that prevent silent data loss.
 
 ## Core Principles
 
-### 1. Discovery Over Configuration
-- Backup capabilities are **discovered** by introspecting registered services
-- No manual registration required
-- Adding a package reference automatically enables backup for that data source
+### 1. Explicit Opt-In with Discovery Support
+- Entities declare backup participation via `[EntityBackup]` attribute
+- Assemblies can opt-in all entities with `[assembly: EntityBackupScope]`
+- Startup inventory validates coverage and warns about missing declarations
+- Prevents silent data loss from unbounded auto-discovery
 
-### 2. Thin Adapters
+### 2. Policy-Driven Configuration
+- Per-entity policies: `Encrypt = true`, `IncludeSchema = false`
+- Assembly-level defaults: `EncryptByDefault`, scope inheritance
+- Runtime validation ensures policy compliance
+- Manifest captures applied policies for audit trails
+
+### 3. Manifest Integrity First
+- Failed backups marked explicitly with `Status = Failed`
+- `EntityBackupInfo.ErrorMessage` captures failure details
+- Restore operations refuse to proceed with corrupted manifests
+- No silent failures or empty dataset acceptance
+
+### 4. Thin Adapters
 - Adapters remain dumb storage implementations
 - Backup orchestrates using existing `Data<T>` and `Vector<T>` APIs
 - Optional constraint management via `IConstraintManager` interface
 
-### 3. Provider Transparency
+### 5. Provider Transparency
 - Export from Weaviate, restore to ElasticSearch
 - Vector embeddings cached in portable format
 - Zero AI regeneration cost when switching providers
 
-### 4. Pragmatic HTTP Semantics
+### 6. Pragmatic HTTP Semantics
 - `GET /backup/create` for simplicity over REST convention
 - Administrative operations, not REST resources
 - Clear intent over protocol purity
@@ -190,6 +203,142 @@ GET /backup/Media/2025-10-02T15-30-45Z/download
 
 ---
 
+## Entity Opt-In and Policy Configuration
+
+### Entity-Level Opt-In
+
+```csharp
+using Koan.Data.Backup.Attributes;
+
+// Basic opt-in
+[EntityBackup]
+public class Media : Entity<Media>
+{
+    public string Title { get; set; } = "";
+    public string ContentUrl { get; set; } = "";
+}
+
+// With encryption for PII
+[EntityBackup(Encrypt = true)]
+public class User : Entity<User>
+{
+    public string Email { get; set; } = "";
+    public string PasswordHash { get; set; } = "";
+}
+
+// Exclude schema to reduce backup size
+[EntityBackup(IncludeSchema = false)]
+public class LogEntry : Entity<LogEntry>
+{
+    public string Message { get; set; } = "";
+    public DateTimeOffset Timestamp { get; set; }
+}
+
+// Explicit opt-out
+[EntityBackup(Enabled = false, Reason = "Derived view, rebuild from source")]
+public class SearchIndex : Entity<SearchIndex>
+{
+    public string IndexData { get; set; } = "";
+}
+```
+
+### Assembly-Level Scope
+
+```csharp
+using Koan.Data.Backup.Attributes;
+
+// Opt-in all entities in this assembly
+[assembly: EntityBackupScope(Mode = BackupScope.All)]
+
+// With default encryption
+[assembly: EntityBackupScope(Mode = BackupScope.All, EncryptByDefault = true)]
+
+namespace MyApp.Models
+{
+    // Automatically included (inherits assembly scope)
+    public class Media : Entity<Media> { }
+
+    // Override assembly default
+    [EntityBackup(Encrypt = false)]
+    public class PublicContent : Entity<PublicContent> { }
+}
+
+// ---
+
+// Require explicit decoration (strict mode)
+[assembly: EntityBackupScope(Mode = BackupScope.None)]
+
+namespace MyApp.SecureModels
+{
+    // Must explicitly opt-in
+    [EntityBackup(Encrypt = true)]
+    public class SensitiveData : Entity<SensitiveData> { }
+
+    // Will generate startup warning (not backed up)
+    public class UnmarkedEntity : Entity<UnmarkedEntity> { }
+}
+```
+
+### Startup Inventory and Validation
+
+```csharp
+public class EntityDiscoveryService
+{
+    public BackupInventory BuildInventory(IServiceProvider services)
+    {
+        var inventory = new BackupInventory();
+
+        // Discover all Entity<> types via AggregateConfigs
+        var entityTypes = AggregateConfigs.GetAllRegisteredTypes();
+
+        foreach (var entityType in entityTypes)
+        {
+            // Apply assembly scope
+            var assemblyScope = GetAssemblyScope(entityType.Assembly);
+
+            // Check for entity-level attribute
+            var entityAttr = entityType.GetCustomAttribute<EntityBackupAttribute>();
+
+            // Compute effective policy
+            var policy = ResolvePolicy(assemblyScope, entityAttr);
+
+            if (policy.IsIncluded)
+            {
+                inventory.IncludedEntities.Add(new EntityBackupPolicy
+                {
+                    EntityType = entityType,
+                    Encrypt = policy.Encrypt,
+                    IncludeSchema = policy.IncludeSchema,
+                    Source = policy.Source // Assembly vs Entity attribute
+                });
+            }
+            else if (policy.ShouldWarn)
+            {
+                inventory.Warnings.Add($"Entity {entityType.Name} has no backup coverage (assembly scope: {assemblyScope?.Mode})");
+            }
+        }
+
+        return inventory;
+    }
+}
+```
+
+**Startup Output Example:**
+
+```
+[INFO] Koan:backup inventory validation
+[INFO] Koan:backup   included: 12 entities
+[INFO] Koan:backup     Media → encrypt=false, schema=true (via assembly scope)
+[INFO] Koan:backup     User → encrypt=true, schema=true (via [EntityBackup])
+[INFO] Koan:backup     LogEntry → encrypt=false, schema=false (via [EntityBackup])
+[WARN] Koan:backup   uncovered: 2 entities
+[WARN] Koan:backup     UnmarkedEntity → no backup coverage (assembly scope: None)
+[INFO] Koan:backup   excluded: 1 entity (explicit opt-out)
+[INFO] Koan:backup     SearchIndex → reason: "Derived view, rebuild from source"
+```
+
+---
+
 ## Discovery Mechanism
 
 ### Capability Detection
@@ -199,6 +348,7 @@ public class BackupService
 {
     private readonly IServiceProvider _services;
     private readonly IVectorService? _vectorService;
+    private readonly BackupInventory _inventory;
 
     public BackupCapabilities GetCapabilities()
     {
@@ -213,11 +363,10 @@ public class BackupService
             capabilities.AvailableSources.Add("vectors");
         }
 
-        // Discover all Entity<T> types
-        var entityTypes = DiscoverEntityTypes();
-
-        foreach (var entityType in entityTypes)
+        // Use inventory to get included entities only
+        foreach (var policy in _inventory.IncludedEntities)
         {
+            var entityType = policy.EntityType;
             var sources = new List<string> { "data" };
 
             // Check if entity has vectors
@@ -229,7 +378,9 @@ public class BackupService
             capabilities.Entities[entityType.Name] = new EntityBackupInfo
             {
                 FullTypeName = entityType.FullName!,
-                AvailableSources = sources
+                AvailableSources = sources,
+                Encrypt = policy.Encrypt,
+                IncludeSchema = policy.IncludeSchema
             };
         }
 
@@ -248,13 +399,20 @@ GET /backup/capabilities
   "entities": {
     "Media": {
       "fullTypeName": "S5.Recs.Models.Media",
-      "availableSources": ["data", "vectors"]
+      "availableSources": ["data", "vectors"],
+      "encrypt": false,
+      "includeSchema": true
     },
     "User": {
       "fullTypeName": "S5.Recs.Models.User",
-      "availableSources": ["data"]
+      "availableSources": ["data"],
+      "encrypt": true,
+      "includeSchema": true
     }
-  }
+  },
+  "warnings": [
+    "Entity UnmarkedEntity has no backup coverage"
+  ]
 }
 ```
 
@@ -595,11 +753,16 @@ await Backup<Media>.Create(new BackupOptions
 
 ```
 [INFO] Koan:backup system initialized
+[INFO] Koan:backup   inventory validation
+[INFO] Koan:backup     included: 12 entities
+[INFO] Koan:backup       Media → encrypt=false, schema=true (via assembly scope)
+[INFO] Koan:backup       User → encrypt=true, schema=true (via [EntityBackup])
+[INFO] Koan:backup       LogEntry → encrypt=false, schema=false (via [EntityBackup])
+[WARN] Koan:backup     uncovered: 2 entities (assembly scope: None)
+[WARN] Koan:backup       UnmarkedEntity → no backup coverage
+[INFO] Koan:backup     excluded: 1 entity (explicit opt-out)
+[INFO] Koan:backup       SearchIndex → reason: "Derived view, rebuild from source"
 [INFO] Koan:backup   sources: data, vectors
-[INFO] Koan:backup   entities: 3 discovered
-[INFO] Koan:backup     Media → data, vectors
-[INFO] Koan:backup     User → data
-[INFO] Koan:backup     Settings → data
 [INFO] Koan:backup   path: .koan/backups
 ```
 
@@ -632,8 +795,12 @@ src/
 
 | Decision | Rationale |
 |----------|-----------|
+| **Explicit opt-in via attributes** | Prevents silent data loss from unbounded auto-discovery |
+| **Assembly-level scope** | Balances convenience with safety (opt-in all vs explicit decoration) |
+| **Startup inventory** | Early validation catches missing coverage before production |
+| **Manifest integrity first** | Failed backups marked explicitly, restore refuses corrupted data |
+| **Policy metadata in manifest** | Audit trail for encryption, schema, and other policies |
 | **GET /backup/create** | Pragmatism over REST purity - administrative action, not resource |
-| **Discovery over configuration** | Auto-detect capabilities from registered services |
 | **Thin adapters** | Use existing `Data<T>` APIs, no backup-specific adapter code |
 | **Optional constraints** | `IConstraintManager` interface for adapters that support it |
 | **Cache format for vectors** | Enables zero-cost provider migration |
@@ -644,12 +811,16 @@ src/
 
 ## Benefits
 
-1. **Zero Configuration**: Add package → backup capability discovered
-2. **Provider Transparency**: Export from Weaviate, restore to ElasticSearch
-3. **Thin Adapters**: No backup-specific adapter code needed
-4. **Discoverable**: `/capabilities` shows exactly what's available
-5. **Simple DX**: `GET /backup/create` for full backup
-6. **Framework-Aligned**: Uses existing Koan patterns and APIs
+1. **Explicit Intent**: Attributes make backup participation clear and auditable
+2. **Early Validation**: Startup inventory catches missing coverage before data loss
+3. **Flexible Policy**: Per-entity encryption, schema inclusion, and other policies
+4. **Assembly Convenience**: Opt-in all entities with single assembly attribute
+5. **Manifest Integrity**: Failed backups marked explicitly, no silent failures
+6. **Provider Transparency**: Export from Weaviate, restore to ElasticSearch
+7. **Thin Adapters**: No backup-specific adapter code needed
+8. **Discoverable**: `/capabilities` shows exactly what's available
+9. **Simple DX**: `GET /backup/create` for full backup
+10. **Framework-Aligned**: Uses existing Koan patterns and APIs
 
 ---
 
@@ -660,9 +831,11 @@ src/
 - **Incremental backups**: Only changed entities
 - **Compression formats**: `.zip`, `.tar.gz`
 - **Remote storage**: S3, Azure Blob integration
-- **Encryption**: At-rest backup encryption
 - **Scheduled backups**: Via Koan.Scheduling
-- **Backup validation**: Verify integrity before restore
+- **Roslyn analyzers**: Build-time warnings for entities missing `[EntityBackup]` in `BackupScope.None` assemblies
+- **Retention policies**: Per-entity retention via `[EntityBackup(RetentionDays = 30)]`
+- **Partition-aware backup**: Selective backup by partition key
+- **Backup validation**: Verify integrity before restore with checksums
 
 ### Extension Points
 
@@ -694,3 +867,9 @@ public interface IBackupFormat
 ---
 
 **Next Steps**: Implementation in Koan.Data.Backup and Koan.Web.Backup
+
+
+
+
+
+

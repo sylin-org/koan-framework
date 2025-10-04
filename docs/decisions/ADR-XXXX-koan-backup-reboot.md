@@ -1,125 +1,255 @@
 # ADR-XXXX — Rebooting Koan Backup Architecture
 
-**Status**: Proposed  
+**Status**: Accepted  
 **Date**: 2025-10-03  
 **Authors**: Codex (Software Architect)
 
 ## Context
 
-Koan.Data.Backup implements the framework’s vision for zero-configuration backup and restore (docs/design/BACKUP-SYSTEM.md). The implementation delivers streaming exports via `StreamingBackupService`, manifests through `BackupStorageService`, entity discovery via `EntityDiscoveryService`, and restore orchestration using `OptimizedRestoreService`. A “Full Stack Backup/Restore” integration test (`FullStackBackupRestoreTests`) exercises the pipeline against SQLite and MongoDB containers.
+The original Koan backup implementation aimed for “zero configuration” by scanning every `IEntity<>` in the AppDomain and streaming data through `Data<TEntity, TKey>.AllStream`. In practice this produced fragile manifests (empty datasets, missing storage files), silent failures, and restore paths that relied on guesswork. Integration tests continue to fail: manifests report zero items, `StorageFile` is blank, and restore throws when it cannot find the expected ZIP entry.
 
-During recent verification:
-- The integration test fails because no backup archive is found under the expected path and the manifest reports zero exported items.
-- Inspection of backup code reveals path mismatches, discovery gaps, memory-heavy streaming, and brittle provider metadata assumptions.
-- Several stop-gap fixes would not resolve structural risk; a redesign is preferred before exposing backup publicly.
+We need to reboot the subsystem with explicit opt-in, reliable manifests, and guard rails that prevent silent data loss.
 
-## Problems
+## Problems Observed
 
-1. **Incorrect archive naming**
-   - `CreateBackupArchiveAsync` prefixes keys with `"backups/"` (src/Koan.Data.Backup/Storage/BackupStorageService.cs:33-37) while `UploadBackupArchiveAsync` already scopes the container to `"backups"`. Uploaded files end up under `backups/backups/...`, but tests and consumers look for `<base>/backups/<name>.zip`, yielding false negatives and orphaned data.
-
-2. **Discovery and metadata gaps**
-   - `EntityDiscoveryService` invents placeholder `DataAdapterAttribute`/`SourceAdapterAttribute` (src/Koan.Data.Backup/Core/EntityDiscoveryService.cs:242-253) instead of using real Koan metadata. Provider and partition information degrade to `"default"` and `"root"`, meaning the backup never routes to the same partitions used for writes.
-   - Discovery scans every assembly for `IEntity<>` (src/Koan.Data.Backup/Core/EntityDiscoveryService.cs:52-78), including abstract or unused types, but never confirms entities have persisted data. Manifest entries therefore list many types with `ItemCount = 0`.
-
-3. **Non-streaming archive writer**
-   - Backups accumulate an entire ZIP in a single `MemoryStream` before upload, producing quadratic memory growth and preventing streaming to remote providers.
-
-4. **Partition-unaware backup**
-   - `StreamingBackupService` hardcodes `"root"` when exporting data via reflection (src/Koan.Data.Backup/Core/StreamingBackupService.cs:330). Applications using `EntityContext.Partition`, tenant routing, or named sets will lose data.
-
-5. **Incomplete restore contract**
-   - Restore uses reflection-based `UpsertMany` calls without verifying constraints/index restores succeeded or reconciling partitions. Error handling is best-effort, but not transactional. Vector data support is stubbed only in docs.
-
-6. **Test harness divergence**
-   - Integration tests assume the simple `<temp>/backups/...` layout (tests/Koan.Data.Backup.Tests/RealWorld/FullStackBackupRestoreTests.cs:263-270). The mismatch hides logical errors and yields repeated overnight crawler cleanup of misnamed archives.
+1. **Unbounded discovery** — Any `IEntity<>` is considered eligible even if no repository is configured. The backup loop catches exceptions, records `ItemCount = 0`, and continues, leaving operators unaware that nothing was exported.
+2. **Invisible failures** — `EntityBackupInfo.ErrorMessage` is unused; manifests present failed entities as empty datasets and mark the overall backup as completed.
+3. **Restore fragility** — Restore expects `StorageFile` to exist, so empty entries surface later as runtime errors rather than during backup.
+4. **Configuration ambiguity** — There is no way for teams to declare which entities must be backed up, to require encryption, or to opt out intentionally. Documentation still promises “zero configuration,” which now conflicts with reliability goals.
 
 ## Goals
 
-- Provide a resilient, memory-safe backup/restore pipeline that aligns with Koan provider transparency and partition semantics.
-- Produce verifiable manifests with accurate counts and file metadata.
-- Offer predictable archive naming and discovery APIs for operators and tooling.
-- Ground discovery in real Koan metadata; eliminate assumptions about attributes or partitions.
-- Maintain extensibility for vectors, constraint management, and remote storage.
-
-## Proposed Direction
-
-1. **Archive Naming & Storage Contract**
-   - Introduce a `BackupArchiveNaming` helper that consumes manifest metadata (backup name, CreatedAt, id) and produces:
-     - `StorageKey` (relative path within the storage profile, e.g., `fullstack-test/2025/10/03/<timestamp>.zip`).
-     - `DisplayPath` for file system mirrors/tests (e.g., `<base>/backups/<storage key>`).
-   - `CreateBackupArchiveAsync` should return only a filename (no container prefix). Container scoping remains the responsibility of `IStorageService`.
-   - Record the selected storage key inside the manifest (`manifest.StoragePath`) to avoid recomputing paths later.
-
-2. **Discovery Refactor**
-   - Replace reflection-only scanning with `AggregateConfigs` and Koan metadata providers:
-     - Query `AggregateConfigs` cache for active entities (ensures repository has been initialized).
-     - For each entity, gather provider, partition support, and capabilities using `Data<T>` plus `EntityContext` metadata.
-     - Add support for vector-capable entities by querying vector registries.
-   - Cache discovery results with a version stamp so warmup/backup can reuse metadata without rescanning AppDomain.
-
-3. **Streaming Writer Infrastructure**
-   - Swap the single `MemoryStream` with a streaming archive writer:
-     - Option A: `ZipArchive` over a temporary file with chunked uploads to storage.
-     - Option B: Provide a streaming `IStorageProvider` sink (e.g., S3 multipart) and write directly.
-   - Implement a `BackupArchiveWriter` abstraction that streams JSONL chunks (`IAsyncEnumerable<T>`) into per-entity entries while monitoring size and progress.
-   - Capture per-entry metrics (counts, bytes, hashes) incrementally to avoid storing all rows in memory.
-
-4. **Partition & Provider Awareness**
-   - Discovery must enumerate known partitions per entity (from Koan set routing metadata or configuration).
-   - Backup loop iterates partitions: for each entity + partition, set `EntityContext.Partition` (or use appropriate provider override) before streaming data.
-   - Manifest entries should include `Partition`, `Provider`, `StorageFile`, and counts per partition.
-
-5. **Robust Restore**
-   - Extend manifests with schema info, partitions, and optional transformation hints.
-   - During restore, rehydrate per partition, apply `EntityContext.Partition`, and leverage optimized repository hooks for constraint/index management.
-   - Provide dry-run verification: read manifest + metadata without writing to confirm a backup is restorable.
-
-6. **Operator APIs & Tooling**
-   - Expose consistent discovery endpoints (`/backup/capabilities`, `/backup/catalog`) using the new metadata.
-   - Provide CLI/SDK helpers for listing archives and verifying manifests.
-   - Integrate integrity checks (manifest checksum validation, optional hash re-computation) before restore.
-
-## Plan
-
-1. **Foundational Cleanup (Sprint 1)**
-   - Update `BackupArchiveNaming` and storage key handling.
-   - Fix `CreateBackupArchiveAsync` / `UploadBackupArchiveAsync` contract.
-   - Align integration tests with new naming convention and ensure file system storage provider persists `StorageObject.Size`.
-
-2. **Discovery & Metadata (Sprint 2)**
-   - Replace placeholder attributes with real Koan metadata lookups.
-   - Populate manifest with accurate provider, partition, and capability info.
-   - Introduce manifest schema versioning.
-
-3. **Streaming Writer (Sprint 3)**
-   - Implement `BackupArchiveWriter` that supports streaming to disk or provider sinks.
-   - Add progress callbacks per entity/partition.
-   - Stress-test with large datasets to validate memory profile.
-
-4. **Restore Pipeline (Sprint 4)**
-   - Update `OptimizedRestoreService` to iterate manifest entries per partition and use the new metadata.
-   - Enhance error handling and rollback strategies (e.g., staging vs. direct upsert).
-   - Add integrity checks before and after restore.
-
-5. **UX & API Refinement (Sprint 5)**
-   - Update REST endpoints, CLI stubs, and docs to reflect the reworked system.
-   - Provide operator guides for verifying backups and performing restores.
-   - Validate vector support or explicitly flag as future work.
+- Make backup participation explicit and auditable.
+- Surface failures immediately and prevent “successful” manifests with empty data.
+- Retain provider transparency and per-entity policy flex points (encryption, schema snapshots, etc.).
+- Provide tooling to inventory eligible entities at startup and warn when coverage is missing.
+- Lay groundwork for the existing streaming/storage refactors (naming, chunked writers, restore improvements).
 
 ## Decision
 
-- Proceed with a ground-up refactor of Koan.Data.Backup in line with the proposed direction. Short-term hotfixes (path correction alone) are insufficient; adoption should wait until the above plan is complete.
+1. **Attribute-based opt-in**
+   - Introduce `[EntityBackup]` for per-entity policies (e.g., `Encrypt = true`, `IncludeSchema = false`).
+   - Introduce `[assembly: EntityBackupScope]` so modules can opt the entire assembly in (`BackupScope.All`) or require explicit decoration (`BackupScope.None`). Additional assembly defaults (e.g., `EncryptByDefault`) flow down to entities unless overridden.
+
+2. **Startup inventory**
+   - During application boot, `EntityDiscoveryService` gathers all `Entity<>` types via `AggregateConfigs`, applies scope + attributes, and emits an inventory:
+     - Included entities + resolved policy.
+     - Discoverable-but-uncovered entities (warning when opt-in is required).
+   - Expose this inventory in logs, diagnostics, or a dedicated health endpoint so operators see gaps immediately.
+
+3. **Manifest integrity**
+   - `BackupEntityByReflection` records `ErrorMessage` instead of silently returning `ItemCount = 0`. If any entity fails, the manifest `Status` becomes `Failed` and the archive upload short-circuits.
+   - `EntityBackupInfo` always contains a `StorageFile` when successful. Restore skips entries with `ErrorMessage` and surfaces the failure early.
+
+4. **Restore alignment**
+   - `OptimizedRestoreService` honours `ArchiveStorageKey` from the manifest and refuses to proceed when the overall manifest failed.
+   - Restore reports skipped/failed entities explicitly.
+
+5. **Future refactors retained**
+   - The previously planned streaming writer, partition awareness, and manifest extensions remain in scope. Opt-in and failure signalling are prerequisites that unblock those efforts.
 
 ## Consequences
 
-- Backup/restore code will undergo significant change; downstream consumers must expect updated manifest formats and APIs.
-- Integration tests will initially fail; they should be updated once each phase lands.
-- Storage providers and adapters may require minimal updates to surface constraint/optimization hooks.
+- Teams must annotate entities or assemblies intentionally; backups are no longer “magically” enabled. Missing attributes will generate warnings (and can be promoted to errors in strict environments).
+- Documentation and samples must explain the attribute model, inventory output, and how to interpret warnings.
+- Existing integrations relying on automatic discovery need migration guidance (add `[EntityBackup]` or assembly scope attributes).
+- The implementation roadmap now has two tracks: (1) policy/manifest hardening (this ADR) and (2) streaming/storage improvements from the previous proposal.
+
+## Implementation Plan (Incremental)
+
+### Phase 1: Attribute Foundation
+
+**Goal:** Establish opt-in attributes and policy resolution without breaking existing code.
+
+1. **Create attributes** in `Koan.Data.Backup.Attributes`:
+   - `[EntityBackup(Encrypt, IncludeSchema, Enabled, Reason)]` for per-entity policies
+   - `[EntityBackupScope(Mode, EncryptByDefault)]` for assembly-level defaults
+   - `BackupScope` enum: `None` (require explicit), `All` (auto-include)
+
+2. **Extend `EntityDiscoveryService`**:
+   - Add `BuildInventory()` method that:
+     - Scans all `Entity<>` types via `AggregateConfigs`
+     - Reads assembly-level `[EntityBackupScope]` attributes
+     - Reads entity-level `[EntityBackup]` attributes
+     - Resolves effective policy (assembly defaults + entity overrides)
+     - Produces `BackupInventory` with included/excluded/uncovered lists
+   - Add `ResolvePolicy(assemblyScope, entityAttr)` helper
+
+3. **Create inventory models** in `Koan.Data.Backup.Models`:
+   ```csharp
+   public class BackupInventory
+   {
+       public List<EntityBackupPolicy> IncludedEntities { get; set; } = new();
+       public List<EntityBackupPolicy> ExcludedEntities { get; set; } = new();
+       public List<string> Warnings { get; set; } = new();
+   }
+
+   public class EntityBackupPolicy
+   {
+       public Type EntityType { get; set; } = default!;
+       public bool Encrypt { get; set; }
+       public bool IncludeSchema { get; set; } = true;
+       public string Source { get; set; } = ""; // "Assembly" or "Attribute"
+       public string? Reason { get; set; } // For opt-out justification
+   }
+   ```
+
+4. **Startup validation**:
+   - Wire `EntityDiscoveryService.BuildInventory()` into `KoanAutoRegistrar`
+   - Log inventory results during boot (see Boot Report Integration in BACKUP-SYSTEM.md)
+   - Emit warnings for uncovered entities in `BackupScope.None` assemblies
+
+### Phase 2: Manifest Integrity
+
+**Goal:** Ensure failures are explicit and restore operations are safe.
+
+1. **Update `StreamingBackupService`**:
+   - Change backup loop to capture exceptions in `EntityBackupInfo.ErrorMessage`
+   - Mark `BackupManifest.Status = Failed` if any entity fails
+   - Ensure `EntityBackupInfo.ItemCount > 0` and `StorageFile != null` on success
+   - Include policy metadata in `EntityBackupInfo` (encrypt, includeSchema)
+
+2. **Update `EntityBackupInfo` model**:
+   ```csharp
+   public class EntityBackupInfo
+   {
+       // ... existing fields ...
+       public string? ErrorMessage { get; set; } // NEW: Capture failure reason
+       public bool Encrypt { get; set; } // NEW: Policy metadata
+       public bool IncludeSchema { get; set; } = true; // NEW: Policy metadata
+   }
+   ```
+
+3. **Update `OptimizedRestoreService`**:
+   - Check `BackupManifest.Status != Failed` before proceeding
+   - Skip entities with `ErrorMessage != null`, log warning
+   - Fail restore if overall manifest is marked `Failed`
+   - Use `ArchiveStorageKey` from manifest, fallback to legacy naming
+
+4. **Strengthen integration tests**:
+   - Assert `ItemCount > 0` for all included entities
+   - Assert `ErrorMessage == null` for successful backups
+   - Assert `Status = Failed` when entity streaming throws
+   - Test restore rejection of failed manifests
+
+### Phase 3: Policy Enforcement
+
+**Goal:** Apply encryption and schema policies during backup/restore.
+
+1. **Implement encryption support**:
+   - Add `IBackupEncryptor` interface
+   - Wire encryption into `StreamingBackupService` when `policy.Encrypt = true`
+   - Update restore to decrypt when manifest indicates encryption
+   - Document encryption key management (future: integration with Koan.Security)
+
+2. **Implement schema inclusion**:
+   - When `policy.IncludeSchema = false`, skip schema snapshot in backup
+   - Update restore to handle missing schema (assume current schema)
+
+3. **Validation and diagnostics**:
+   - Add `/backup/inventory` endpoint to expose `BackupInventory`
+   - Add health check for uncovered entities
+   - Consider Roslyn analyzer for build-time warnings (future)
+
+### Phase 4: Migration and Documentation
+
+**Goal:** Help teams migrate from auto-discovery to attribute-based opt-in.
+
+1. **Migration guide**:
+   - Document how to add `[assembly: EntityBackupScope(Mode = BackupScope.All)]` for backward compatibility
+   - Provide checklist for teams to review entity coverage
+   - Explain when to use `BackupScope.None` (strict mode)
+
+2. **Update samples and tests**:
+   - Decorate all sample entities with `[EntityBackup]`
+   - Update integration tests to use attributes
+   - Provide examples of encryption and schema policies
+
+3. **Boot report enhancement**:
+   - Ensure inventory output is clear and actionable
+   - Provide guidance on resolving warnings
+
+## Design Details
+
+### Attribute Examples
+
+```csharp
+using Koan.Data.Backup.Attributes;
+
+// Basic opt-in
+[EntityBackup]
+public class Media : Entity<Media> { }
+
+// PII encryption
+[EntityBackup(Encrypt = true)]
+public class User : Entity<User> { }
+
+// Skip schema to reduce size
+[EntityBackup(IncludeSchema = false)]
+public class LogEntry : Entity<LogEntry> { }
+
+// Explicit opt-out with justification
+[EntityBackup(Enabled = false, Reason = "Derived view, rebuild from source")]
+public class SearchIndex : Entity<SearchIndex> { }
+```
+
+### Assembly Scope Examples
+
+```csharp
+// Opt-in all entities by default
+[assembly: EntityBackupScope(Mode = BackupScope.All)]
+
+// Opt-in all with encryption by default
+[assembly: EntityBackupScope(Mode = BackupScope.All, EncryptByDefault = true)]
+
+// Require explicit decoration (strict mode)
+[assembly: EntityBackupScope(Mode = BackupScope.None)]
+```
+
+### Policy Resolution Rules
+
+1. **No assembly scope + No entity attribute** → Warning (not backed up)
+2. **`BackupScope.All` + No entity attribute** → Included (inherit assembly defaults)
+3. **`BackupScope.All` + `[EntityBackup]`** → Included (entity overrides assembly)
+4. **`BackupScope.None` + No entity attribute** → Warning (not backed up)
+5. **`BackupScope.None` + `[EntityBackup]`** → Included (explicit opt-in)
+6. **Any scope + `[EntityBackup(Enabled = false)]`** → Excluded (explicit opt-out, no warning if `Reason` provided)
+
+### Inventory Output Contract
+
+```csharp
+public class BackupInventory
+{
+    // Entities included in backup (via scope or attribute)
+    public List<EntityBackupPolicy> IncludedEntities { get; set; }
+
+    // Entities explicitly excluded (Enabled = false)
+    public List<EntityBackupPolicy> ExcludedEntities { get; set; }
+
+    // Entities without coverage that should warn
+    public List<string> Warnings { get; set; }
+}
+```
+
+**Boot log format:**
+
+```
+[INFO] Koan:backup   included: N entities
+[INFO] Koan:backup     <EntityName> → encrypt=<bool>, schema=<bool> (via <source>)
+[WARN] Koan:backup   uncovered: N entities
+[WARN] Koan:backup     <EntityName> → no backup coverage (assembly scope: <mode>)
+[INFO] Koan:backup   excluded: N entities (explicit opt-out)
+[INFO] Koan:backup     <EntityName> → reason: "<reason>"
+```
 
 ## Open Questions
 
-- What is the preferred remote storage streaming interface (multipart vs. chunked file writes)?
-- How should vector embeddings be serialized for cross-provider restores? (Design mentions caches, but implementation is TBD.)
-- Do we need transaction-like guarantees for restore (e.g., stage all partitions before committing)?
+### Resolved
+- **Analyzers?** Yes, add to Phase 3 roadmap (build-time warnings via Roslyn)
+- **Opt-out UX?** Use `[EntityBackup(Enabled = false, Reason = "...")]` - treated as success (no warning) if reason provided
+- **Module-level defaults?** Use `[assembly: EntityBackupScope(EncryptByDefault = true)]` for simple cases; future ADR for complex retention policies
 
+### Remaining
+- **Encryption key management:** How do we integrate with Koan.Security for key rotation and storage? (Future ADR)
+- **Partition-aware backup:** Should `[EntityBackup]` support partition filters? (Future enhancement)
+- **Incremental backup:** How do we track "last backup" per entity for incremental mode? (Future ADR)
