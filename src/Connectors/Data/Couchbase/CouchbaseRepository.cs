@@ -354,6 +354,22 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
             return count;
         }, ct);
 
+    public Task<long> RemoveAllAsync(RemoveStrategy strategy, CancellationToken ct = default)
+        => ExecuteWithReadinessAsync(async () =>
+        {
+            ct.ThrowIfCancellationRequested();
+            var ctx = await ResolveCollectionAsync(ct).ConfigureAwait(false);
+            var statement = $"DELETE FROM `{ctx.BucketName}`.`{ctx.ScopeName}`.`{ctx.CollectionName}` RETURNING META().id";
+            var count = 0L;
+            await foreach (var _ in ExecuteQueryAsync<dynamic>(ctx, statement, null, null, ct).ConfigureAwait(false))
+            {
+                count++;
+            }
+            // No fast path available - bucket flush requires admin permissions
+            // Optimized and Fast both use same implementation (Safe)
+            return count;
+        }, ct);
+
     public IBatchSet<TEntity, TKey> CreateBatch() => new CouchbaseBatch(this);
 
     public Task<TResult> ExecuteAsync<TResult>(Instruction instruction, CancellationToken ct = default)

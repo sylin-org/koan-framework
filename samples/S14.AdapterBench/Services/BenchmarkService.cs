@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Koan.Data.Abstractions;
 using Koan.Data.Core;
 using S14.AdapterBench.Models;
 
@@ -56,7 +57,7 @@ public class BenchmarkService : IBenchmarkService
         IProgress<BenchmarkProgress>? progress,
         CancellationToken cancellationToken)
     {
-        var totalTests = providers.Count * entityTiers.Count * 3; // 3 test types per tier
+        var totalTests = providers.Count * entityTiers.Count * 6; // 6 test types per tier
         var completedTests = 0;
 
         foreach (var provider in providers)
@@ -85,6 +86,21 @@ public class BenchmarkService : IBenchmarkService
                 var readByIdResult = await RunReadByIdTestAsync(
                     provider, tier, result.EntityCount, progress, completedTests++, totalTests, cancellationToken);
                 providerResult.Tests.Add(readByIdResult);
+
+                // RemoveAll Safe Test
+                var removeAllSafeResult = await RunRemoveAllTestAsync(
+                    provider, tier, result.EntityCount, "Safe", RemoveStrategy.Safe, progress, completedTests++, totalTests, cancellationToken);
+                providerResult.Tests.Add(removeAllSafeResult);
+
+                // RemoveAll Fast Test
+                var removeAllFastResult = await RunRemoveAllTestAsync(
+                    provider, tier, result.EntityCount, "Fast", RemoveStrategy.Fast, progress, completedTests++, totalTests, cancellationToken);
+                providerResult.Tests.Add(removeAllFastResult);
+
+                // RemoveAll Optimized Test
+                var removeAllOptimizedResult = await RunRemoveAllTestAsync(
+                    provider, tier, result.EntityCount, "Optimized", RemoveStrategy.Optimized, progress, completedTests++, totalTests, cancellationToken);
+                providerResult.Tests.Add(removeAllOptimizedResult);
             }
 
             providerStopwatch.Stop();
@@ -100,7 +116,7 @@ public class BenchmarkService : IBenchmarkService
         IProgress<BenchmarkProgress>? progress,
         CancellationToken cancellationToken)
     {
-        var totalTests = entityTiers.Count * 3; // 3 test types per tier (same tests, all providers in parallel)
+        var totalTests = entityTiers.Count * 6; // 6 test types per tier (same tests, all providers in parallel)
         var completedTests = 0;
 
         // Initialize provider results
@@ -134,6 +150,27 @@ public class BenchmarkService : IBenchmarkService
                     .ContinueWith(t => providerResults[i].Tests.Add(t.Result), cancellationToken));
 
             await Task.WhenAll(readByIdTasks);
+            completedTests++;
+
+            var removeAllSafeTasks = providers.Select((p, i) =>
+                RunRemoveAllTestAsync(p, tier, result.EntityCount, "Safe", RemoveStrategy.Safe, progress, completedTests, totalTests, cancellationToken)
+                    .ContinueWith(t => providerResults[i].Tests.Add(t.Result), cancellationToken));
+
+            await Task.WhenAll(removeAllSafeTasks);
+            completedTests++;
+
+            var removeAllFastTasks = providers.Select((p, i) =>
+                RunRemoveAllTestAsync(p, tier, result.EntityCount, "Fast", RemoveStrategy.Fast, progress, completedTests, totalTests, cancellationToken)
+                    .ContinueWith(t => providerResults[i].Tests.Add(t.Result), cancellationToken));
+
+            await Task.WhenAll(removeAllFastTasks);
+            completedTests++;
+
+            var removeAllOptimizedTasks = providers.Select((p, i) =>
+                RunRemoveAllTestAsync(p, tier, result.EntityCount, "Optimized", RemoveStrategy.Optimized, progress, completedTests, totalTests, cancellationToken)
+                    .ContinueWith(t => providerResults[i].Tests.Add(t.Result), cancellationToken));
+
+            await Task.WhenAll(removeAllOptimizedTasks);
             completedTests++;
         }
 
@@ -337,6 +374,84 @@ public class BenchmarkService : IBenchmarkService
         }
 
         return testResult;
+    }
+
+    private async Task<TestResult> RunRemoveAllTestAsync(
+        string provider,
+        string tier,
+        int count,
+        string strategyName,
+        RemoveStrategy strategy,
+        IProgress<BenchmarkProgress>? progress,
+        int completedTests,
+        int totalTests,
+        CancellationToken cancellationToken)
+    {
+        var testResult = new TestResult
+        {
+            TestName = $"RemoveAll ({strategyName})",
+            EntityTier = tier,
+            OperationCount = count,
+            UsedNativeExecution = true
+        };
+
+        try
+        {
+            using (EntityContext.Adapter(provider))
+            {
+                // First, seed data using batch write
+                const int batchSize = 500;
+                for (int batchStart = 0; batchStart < count; batchStart += batchSize)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var batchCount = Math.Min(batchSize, count - batchStart);
+                    var entities = Enumerable.Range(batchStart, batchCount)
+                        .Select(i => CreateEntity(tier, i))
+                        .ToList();
+                    await SaveEntitiesBatchAsync(entities, tier);
+                }
+
+                // Now measure RemoveAll with the specified strategy
+                var stopwatch = Stopwatch.StartNew();
+
+                var deletedCount = await RemoveAllByStrategyAsync(tier, strategy);
+
+                stopwatch.Stop();
+
+                testResult.Duration = stopwatch.Elapsed;
+                // For RemoveAll, ops/sec is based on count removed (or estimated if -1)
+                var effectiveCount = deletedCount == -1 ? count : deletedCount;
+                testResult.OperationsPerSecond = effectiveCount / stopwatch.Elapsed.TotalSeconds;
+
+                progress?.Report(new BenchmarkProgress
+                {
+                    CurrentProvider = provider,
+                    CurrentTest = $"{tier} - RemoveAll ({strategyName})",
+                    TotalTests = totalTests,
+                    CompletedTests = completedTests,
+                    CurrentOperationCount = (int)effectiveCount,
+                    TotalOperations = count,
+                    CurrentOperationsPerSecond = testResult.OperationsPerSecond
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            testResult.Error = ex.Message;
+        }
+
+        return testResult;
+    }
+
+    private async Task<long> RemoveAllByStrategyAsync(string tier, RemoveStrategy strategy)
+    {
+        return tier switch
+        {
+            "Minimal" => await BenchmarkMinimal.RemoveAll(strategy),
+            "Indexed" => await BenchmarkIndexed.RemoveAll(strategy),
+            "Complex" => await BenchmarkComplex.RemoveAll(strategy),
+            _ => 0
+        };
     }
 
     private object CreateEntity(string tier, int index)

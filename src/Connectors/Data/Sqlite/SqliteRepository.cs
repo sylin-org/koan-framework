@@ -42,7 +42,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
     where TKey : notnull
 {
     public QueryCapabilities Capabilities => QueryCapabilities.Linq | QueryCapabilities.String;
-    public WriteCapabilities Writes => WriteCapabilities.BulkUpsert | WriteCapabilities.BulkDelete | WriteCapabilities.AtomicBatch;
+    public WriteCapabilities Writes => WriteCapabilities.BulkUpsert | WriteCapabilities.BulkDelete | WriteCapabilities.AtomicBatch | WriteCapabilities.FastRemove;
 
     private readonly IServiceProvider _sp;
     private readonly SqliteOptions _options;
@@ -703,6 +703,29 @@ internal sealed class SqliteRepository<TEntity, TKey> :
     {
         using var conn = Open();
         return await conn.ExecuteAsync($"DELETE FROM [{TableName}]");
+    }
+
+    public async Task<long> RemoveAllAsync(RemoveStrategy strategy, CancellationToken ct = default)
+    {
+        using var conn = Open();
+
+        // Resolve Optimized strategy based on provider capabilities
+        var effectiveStrategy = strategy == RemoveStrategy.Optimized
+            ? (Writes.HasFlag(WriteCapabilities.FastRemove) ? RemoveStrategy.Fast : RemoveStrategy.Safe)
+            : strategy;
+
+        // SQLite has no TRUNCATE - both strategies use DELETE
+        var countRequest = new CountRequest<TEntity>();
+        var countResult = await CountAsync(countRequest, ct);
+        await conn.ExecuteAsync($"DELETE FROM [{TableName}]", ct);
+
+        if (effectiveStrategy == RemoveStrategy.Fast)
+        {
+            // Fast strategy: reclaim space via VACUUM
+            await conn.ExecuteAsync("VACUUM", ct);
+        }
+
+        return countResult.Value;
     }
 
     public IBatchSet<TEntity, TKey> CreateBatch() => new SqliteBatch(this);

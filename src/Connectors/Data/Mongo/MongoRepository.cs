@@ -64,7 +64,7 @@ internal sealed class MongoRepository<TEntity, TKey> :
     }
 
     public QueryCapabilities Capabilities => QueryCapabilities.Linq;
-    public WriteCapabilities Writes => WriteCapabilities.BulkUpsert | WriteCapabilities.BulkDelete | WriteCapabilities.AtomicBatch;
+    public WriteCapabilities Writes => WriteCapabilities.BulkUpsert | WriteCapabilities.BulkDelete | WriteCapabilities.AtomicBatch | WriteCapabilities.FastRemove;
     public StorageOptimizationInfo OptimizationInfo => _optimizationInfo;
 
     public AdapterReadinessState ReadinessState => _provider.ReadinessState;
@@ -474,6 +474,38 @@ internal sealed class MongoRepository<TEntity, TKey> :
             var collection = await GetCollectionAsync(ct).ConfigureAwait(false);
             var result = await collection.DeleteManyAsync(Builders<TEntity>.Filter.Empty, ct).ConfigureAwait(false);
             return (int)result.DeletedCount;
+        }, ct);
+
+    public Task<long> RemoveAllAsync(RemoveStrategy strategy, CancellationToken ct = default)
+        => ExecuteWithReadinessAsync(async () =>
+        {
+            ct.ThrowIfCancellationRequested();
+            var collection = await GetCollectionAsync(ct).ConfigureAwait(false);
+
+            // Resolve Optimized strategy based on provider capabilities
+            var effectiveStrategy = strategy == RemoveStrategy.Optimized
+                ? (Writes.HasFlag(WriteCapabilities.FastRemove) ? RemoveStrategy.Fast : RemoveStrategy.Safe)
+                : strategy;
+
+            if (effectiveStrategy == RemoveStrategy.Fast)
+            {
+                // Fast path: drop collection and recreate (loses indexes briefly)
+                var database = GetDatabase(collection);
+                var estimatedCount = await collection.EstimatedDocumentCountAsync(cancellationToken: ct).ConfigureAwait(false);
+
+                await database.DropCollectionAsync(_collectionName, ct).ConfigureAwait(false);
+                await database.CreateCollectionAsync(_collectionName, cancellationToken: ct).ConfigureAwait(false);
+
+                // Recreate collection reference and indexes
+                _collection = database.GetCollection<TEntity>(_collectionName);
+                await EnsureIndexesAsync(_collection, ct).ConfigureAwait(false);
+
+                return estimatedCount;
+            }
+
+            // Safe path: deleteMany (fires hooks if registered)
+            var result = await collection.DeleteManyAsync(Builders<TEntity>.Filter.Empty, ct).ConfigureAwait(false);
+            return result.DeletedCount;
         }, ct);
 
     public Task<TResult> ExecuteAsync<TResult>(Instruction instruction, CancellationToken ct = default)

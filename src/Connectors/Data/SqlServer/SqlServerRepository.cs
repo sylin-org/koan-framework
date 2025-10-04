@@ -38,7 +38,7 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
     where TKey : notnull
 {
     public QueryCapabilities Capabilities => QueryCapabilities.Linq | QueryCapabilities.String;
-    public WriteCapabilities Writes => WriteCapabilities.BulkUpsert | WriteCapabilities.BulkDelete | WriteCapabilities.AtomicBatch;
+    public WriteCapabilities Writes => WriteCapabilities.BulkUpsert | WriteCapabilities.BulkDelete | WriteCapabilities.AtomicBatch | WriteCapabilities.FastRemove;
 
     // Storage optimization support
     private readonly StorageOptimizationInfo _optimizationInfo;
@@ -588,6 +588,37 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
     {
         await using var conn = Open();
         return await conn.ExecuteAsync($"DELETE FROM [dbo].[{TableName}]");
+    }
+
+    public async Task<long> RemoveAllAsync(RemoveStrategy strategy, CancellationToken ct = default)
+    {
+        await using var conn = Open();
+
+        // Resolve Optimized strategy based on provider capabilities
+        var effectiveStrategy = strategy == RemoveStrategy.Optimized
+            ? (Writes.HasFlag(WriteCapabilities.FastRemove) ? RemoveStrategy.Fast : RemoveStrategy.Safe)
+            : strategy;
+
+        if (effectiveStrategy == RemoveStrategy.Fast)
+        {
+            // Fast path: TRUNCATE (bypasses hooks, resets identity)
+            try
+            {
+                await conn.ExecuteAsync($"TRUNCATE TABLE [dbo].[{TableName}]", ct);
+                return -1; // TRUNCATE doesn't report count
+            }
+            catch (Microsoft.Data.SqlClient.SqlException ex) when (ex.Number == 4712) // Cannot truncate table referenced by FK
+            {
+                // Foreign key constraint - fall back to DELETE
+                // Silently fall through to safe path
+            }
+        }
+
+        // Safe path: DELETE (fires hooks if registered)
+        var countRequest = new CountRequest<TEntity>();
+        var countResult = await CountAsync(countRequest, ct);
+        await conn.ExecuteAsync($"DELETE FROM [dbo].[{TableName}]", ct);
+        return countResult.Value;
     }
 
     public IBatchSet<TEntity, TKey> CreateBatch() => new MsSqlBatch(this);

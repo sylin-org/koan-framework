@@ -400,11 +400,41 @@ namespace Koan.Data.Core.Model
                 .ConfigureAwait(false);
         }
 
-        public static Task<int> RemoveAll(CancellationToken ct = default)
-            => Data<TEntity, TKey>.DeleteAllAsync(ct);
+        /// <summary>
+        /// Removes all entities using Optimized strategy (framework chooses based on provider capabilities).
+        /// Uses current EntityContext or default partition.
+        /// Provider with FastRemove: Uses Fast (TRUNCATE/DROP). Provider without: Uses Safe (DELETE with hooks).
+        /// </summary>
+        /// <param name="ct">Cancellation token</param>
+        /// <returns>Number of entities removed, or -1 if unknown</returns>
+        public static Task<long> RemoveAll(CancellationToken ct = default)
+            => RemoveAll(RemoveStrategy.Optimized, ct);
 
-        public static Task<int> RemoveAll(DataQueryOptions? options, CancellationToken ct = default)
-            => Data<TEntity, TKey>.DeleteAllAsync(options, ct);
+        /// <summary>
+        /// Removes all entities using the specified strategy.
+        /// Uses current EntityContext or default partition.
+        /// </summary>
+        /// <param name="strategy">Removal strategy (Safe fires hooks, Fast bypasses for performance)</param>
+        /// <param name="ct">Cancellation token</param>
+        /// <returns>Number of entities removed, or -1 if unknown (TRUNCATE doesn't report count)</returns>
+        public static Task<long> RemoveAll(RemoveStrategy strategy, CancellationToken ct = default)
+            => Data<TEntity, TKey>.RemoveAllAsync(strategy, ct);
+
+        /// <summary>
+        /// Removes all entities in the specified partition using the given strategy.
+        /// </summary>
+        /// <param name="strategy">Removal strategy (Safe fires hooks, Fast bypasses for performance)</param>
+        /// <param name="partition">Partition name to target</param>
+        /// <param name="ct">Cancellation token</param>
+        /// <returns>Number of entities removed, or -1 if unknown</returns>
+        public static Task<long> RemoveAll(RemoveStrategy strategy, string partition, CancellationToken ct = default)
+            => Data<TEntity, TKey>.RemoveAllAsync(strategy, partition, ct);
+
+        /// <summary>
+        /// Indicates whether the current provider supports fast removal (TRUNCATE/DROP).
+        /// </summary>
+        public static bool SupportsFastRemove
+            => Data<TEntity, TKey>.WriteCaps.Writes.HasFlag(WriteCapabilities.FastRemove);
 
         // Instance self-remove
         public Task<bool> Remove(CancellationToken ct = default)

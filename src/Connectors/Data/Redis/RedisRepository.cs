@@ -26,7 +26,7 @@ internal sealed class RedisRepository<TEntity, TKey> :
     { _options = options; _muxer = muxer; _logger = lf?.CreateLogger("Koan.Data.Connector.Redis"); }
 
     public QueryCapabilities Capabilities => QueryCapabilities.Linq; // predicate filtering in-memory
-    public WriteCapabilities Writes => default; // no native bulk
+    public WriteCapabilities Writes => WriteCapabilities.FastRemove;
 
     private string Keyspace()
     {
@@ -140,6 +140,37 @@ internal sealed class RedisRepository<TEntity, TKey> :
         var keys = items.Select(e => (RedisKey)$"{Keyspace()}:{e.Id}").ToArray();
         if (keys.Length == 0) return 0;
         return (int)await Db().KeyDeleteAsync(keys);
+    }
+
+    public async Task<long> RemoveAllAsync(RemoveStrategy strategy, CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        var (items, _) = await ScanAll(page: 1, size: int.MaxValue, ct);
+        var keys = items.Select(e => (RedisKey)$"{Keyspace()}:{e.Id}").ToArray();
+        if (keys.Length == 0) return 0;
+
+        // Resolve Optimized strategy based on provider capabilities
+        var effectiveStrategy = strategy == RemoveStrategy.Optimized
+            ? (Writes.HasFlag(WriteCapabilities.FastRemove) ? RemoveStrategy.Fast : RemoveStrategy.Safe)
+            : strategy;
+
+        if (effectiveStrategy == RemoveStrategy.Fast)
+        {
+            // Fast path: UNLINK (async deletion, non-blocking, Redis 4.0+)
+            // Deletes keys in background thread, returns immediately
+            var db = Db();
+            var count = 0L;
+            foreach (var key in keys)
+            {
+                var result = await db.ExecuteAsync("UNLINK", key);
+                count += (long)result;
+            }
+            return count;
+        }
+
+        // Safe path: DEL (synchronous deletion)
+        // Note: Redis doesn't have hooks, so both paths are similar
+        return await Db().KeyDeleteAsync(keys);
     }
 
     public IBatchSet<TEntity, TKey> CreateBatch() => new RedisBatch(this);

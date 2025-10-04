@@ -172,6 +172,18 @@ internal sealed class JsonRepository<TEntity, TKey> :
         return Task.FromResult(deleted);
     }
 
+    public Task<long> RemoveAllAsync(RemoveStrategy strategy, CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        var (name, store) = ResolveNameAndStore();
+        var deleted = store.Count;
+        store.Clear();
+        Persist(name, store);
+        // No fast path available - dictionary clear is already instant
+        // Optimized, Fast, and Safe all use same implementation
+        return Task.FromResult((long)deleted);
+    }
+
     public IBatchSet<TEntity, TKey> CreateBatch() => new JsonBatch(this);
 
     // Instruction execution for fast-path operations (e.g., clear all)

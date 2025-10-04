@@ -183,6 +183,13 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
         var ids = all.Select(e => e.Id);
         return await _inner.DeleteManyAsync(ids, ct).ConfigureAwait(false);
     }
+
+    public async Task<long> RemoveAllAsync(RemoveStrategy strategy, CancellationToken ct = default)
+    {
+        await GuardAsync(ct).ConfigureAwait(false);
+        return await _inner.RemoveAllAsync(strategy, ct).ConfigureAwait(false);
+    }
+
     public IBatchSet<TEntity, TKey> CreateBatch() => new BatchFacade(this);
 
     /// <inheritdoc/>

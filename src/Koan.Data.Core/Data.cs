@@ -111,7 +111,7 @@ public static class Data<TEntity, TKey>
         int? absoluteMaxRecords = null)
     {
         var providedOptions = options ?? new DataQueryOptions();
-        var countStrategy = providedOptions.CountStrategy ?? CountStrategy.Exact;
+        var countStrategy = providedOptions.CountStrategy ?? CountStrategy.Optimized;
         providedOptions = providedOptions.WithCountStrategy(countStrategy);
 
         var repo = Repo;
@@ -298,6 +298,13 @@ public static class Data<TEntity, TKey>
 
     public static Task<int> DeleteAllAsync(DataQueryOptions? options, CancellationToken ct = default)
         => string.IsNullOrWhiteSpace(options?.Partition) ? Repo.DeleteAllAsync(ct) : DeleteAllAsync(options!.Partition!, ct);
+
+    public static Task<long> RemoveAllAsync(RemoveStrategy strategy, CancellationToken ct = default)
+        => Repo.RemoveAllAsync(strategy, ct);
+
+    public static Task<long> RemoveAllAsync(RemoveStrategy strategy, string partition, CancellationToken ct = default)
+    { using var _ = WithPartition(partition); return Repo.RemoveAllAsync(strategy, ct); }
+
     public static Task<TEntity> UpsertAsync(TEntity model, CancellationToken ct = default) => Repo.UpsertAsync(model, ct);
     public static Task<int> UpsertManyAsync(IEnumerable<TEntity> models, CancellationToken ct = default) => Repo.UpsertManyAsync(models, ct);
     public static IBatchSet<TEntity, TKey> Batch() => Repo.CreateBatch();

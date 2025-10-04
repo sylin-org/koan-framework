@@ -16,6 +16,8 @@ public interface IDataRepository<TEntity, TKey> where TEntity : IEntity<TKey>
     Task<int> DeleteManyAsync(IEnumerable<TKey> ids, CancellationToken ct = default);
     // Deletes all entities in the current set; should return the number of deleted records
     Task<int> DeleteAllAsync(CancellationToken ct = default);
+    // Removes all entities using the specified strategy; returns count of deleted records, or -1 if unknown
+    Task<long> RemoveAllAsync(RemoveStrategy strategy, CancellationToken ct = default);
 
     IBatchSet<TEntity, TKey> CreateBatch();
 }

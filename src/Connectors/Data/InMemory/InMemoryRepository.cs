@@ -166,6 +166,16 @@ internal sealed class InMemoryRepository<TEntity, TKey> :
         return Task.FromResult(count);
     }
 
+    public Task<long> RemoveAllAsync(RemoveStrategy strategy, CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        var count = Store.Count;
+        Store.Clear();
+        // No fast path available - dictionary clear is already instant
+        // Optimized, Fast, and Safe all use same implementation
+        return Task.FromResult((long)count);
+    }
+
     // ==================== Batch Operations ====================
 
     public IBatchSet<TEntity, TKey> CreateBatch() => new InMemoryBatchSet(this);

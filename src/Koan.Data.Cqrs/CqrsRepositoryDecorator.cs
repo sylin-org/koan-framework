@@ -72,7 +72,14 @@ internal sealed class CqrsRepositoryDecorator<TEntity, TKey> : IDataRepository<T
     public async Task<int> DeleteAllAsync(CancellationToken ct = default)
     {
         var n = await _routing.GetWriteRepository<TEntity, TKey>().DeleteAllAsync(ct);
-        // Optional: outbox could record a summary event; we’ll skip event flood for delete-all.
+        // Optional: outbox could record a summary event; we'll skip event flood for delete-all.
+        return n;
+    }
+
+    public async Task<long> RemoveAllAsync(RemoveStrategy strategy, CancellationToken ct = default)
+    {
+        var n = await _routing.GetWriteRepository<TEntity, TKey>().RemoveAllAsync(strategy, ct);
+        // Optional: outbox could record a summary event; we'll skip event flood for remove-all.
         return n;
     }
 

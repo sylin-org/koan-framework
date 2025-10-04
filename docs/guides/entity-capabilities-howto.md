@@ -24,6 +24,7 @@ When in doubt, stick to the entity-first patterns above. They keep your code dec
 ## Prerequisites
 
 Add the Koan baseline packages:
+
 ```xml
 <PackageReference Include="Koan.Core" Version="0.6.2" />
 <PackageReference Include="Koan.Data.Core" Version="0.6.2" />
@@ -31,11 +32,13 @@ Add the Koan baseline packages:
 ```
 
 Reference at least one data adapter (SQLite example below):
+
 ```xml
 <PackageReference Include="Koan.Data.Connector.Sqlite" Version="0.6.2" />
 ```
 
 Optionally configure the default source in `appsettings.json` (Koan works without configuration, using sensible defaults):
+
 ```json
 {
   "Koan": {
@@ -63,7 +66,7 @@ Boot the runtime with `builder.Services.AddKoan();` in `Program.cs`. Everything 
 
 **Recipe**
 
-Packages already listed in prerequisites. No special configuration beyond `Koan:Data:Sources:Default`.
+Packages already listed in prerequisites. No special configuration needed.
 
 **Sample**
 
@@ -137,6 +140,97 @@ var result = await Todo.QueryWithCount(
 Console.WriteLine($"Showing {result.Items.Count} of {result.TotalCount}");
 ```
 
+### Count Operations and Strategies
+
+**Concepts**
+
+Koan provides fast count operations with three strategies: Exact (full accuracy), Fast (metadata estimates), and Optimized (framework chooses). Progressive disclosure means `await Entity.Count` works immediately, while explicit control (`Count.Exact()`, `Count.Fast()`) appears when needed. Provider-specific optimizations deliver 1000x+ speedups for large tables using database metadata.
+
+**Recipe**
+
+Same packages as foundations. Providers with statistics metadata (Postgres, SQL Server, MongoDB) support fast counts. Providers without metadata (SQLite, Redis, JSON, InMemory) return exact counts for all strategies.
+
+**Simple Counts**
+
+```csharp
+// Default: framework chooses best strategy (usually optimized)
+var total = await Todo.Count;
+
+// Explicit exact count (guaranteed accuracy, may be slower)
+var exact = await Todo.Count.Exact(ct);
+
+// Explicit fast count (metadata estimate, extremely fast)
+var fast = await Todo.Count.Fast(ct);
+
+// Filtered count with predicate
+var completed = await Todo.Count.Where(t => t.Completed);
+
+// Filtered with explicit strategy
+var urgent = await Todo.Count.Where(t => t.Priority > 3, CountStrategy.Fast, ct);
+
+// Count specific partition
+var archivedCount = await Todo.Count.Partition("archive");
+```
+
+**Performance Characteristics**
+
+| Provider   | Exact Count (10M rows) | Fast Count (10M rows)   | Strategy                              |
+| ---------- | ---------------------- | ----------------------- | ------------------------------------- |
+| PostgreSQL | ~25 seconds            | ~5ms (5000x faster)     | `pg_stat_user_tables.n_live_tup`      |
+| SQL Server | ~20 seconds            | ~1ms (20000x faster)    | `sys.dm_db_partition_stats.row_count` |
+| MongoDB    | ~15 seconds            | ~10ms (1500x faster)    | `estimatedDocumentCount()`            |
+| SQLite     | Full scan              | Full scan (same)        | No metadata available                 |
+| Redis      | O(n) scan              | O(n) scan (same)        | No metadata available                 |
+| JSON       | In-memory count        | In-memory count (same)  | No metadata available                 |
+| InMemory   | Dictionary count       | Dictionary count (same) | No metadata available                 |
+
+**When to Use Each Strategy**
+
+```csharp
+// Pagination UI (fast is fine, exact unnecessary)
+var page = await Todo.Page(pageNumber, pageSize);
+var totalPages = (await Todo.Count.Fast(ct) + pageSize - 1) / pageSize;
+
+// Dashboard summary (estimates acceptable)
+var stats = new {
+    TotalTodos = await Todo.Count.Fast(ct),
+    Completed = await Todo.Count.Where(t => t.Completed, CountStrategy.Fast, ct),
+    Pending = await Todo.Count.Where(t => !t.Completed, CountStrategy.Fast, ct)
+};
+
+// Critical business logic (exact required)
+var exactInventory = await Product.Count.Where(p => p.InStock, CountStrategy.Exact, ct);
+if (exactInventory < threshold)
+    await NotifyRestock();
+
+// Default optimized (framework decides)
+var count = await Todo.Count; // Uses Fast if available, Exact otherwise
+```
+
+**Advanced: CountResult and IsEstimate**
+
+For scenarios requiring awareness of estimate vs exact:
+
+```csharp
+// Access repository directly for CountResult
+var repo = serviceProvider.GetRequiredService<IRepository<Todo, string>>();
+var request = new CountRequest<Todo>();
+var result = await repo.CountAsync(request, ct);
+
+Console.WriteLine($"Count: {result.Value}");
+if (result.IsEstimate)
+    Console.WriteLine("⚠️ This is an estimate from database metadata");
+else
+    Console.WriteLine("✓ This is an exact count");
+
+// Entity API returns long directly (convenience over precision awareness)
+var simple = await Todo.Count; // Returns long, hides IsEstimate flag
+```
+
+**Usage Scenarios**
+
+Applications display pagination controls using fast counts (sub-10ms) instead of blocking on full table scans. Dashboards refresh every few seconds with metadata estimates, reserving exact counts for critical reports. Analytics queries route fast counts to APIs while batch jobs use exact counts for reconciliation.
+
 ---
 
 ## 3. Batch Operations and Lifecycle Hooks
@@ -185,6 +279,226 @@ public static class TodoLifecycle
 **Usage Scenarios**
 
 Domain models enforce required fields and format display text automatically. Batch imports process thousands of records in a single call to prep nightly jobs or migrations.
+
+### Bulk Removal and Strategies
+
+**Concepts**
+
+Koan provides three removal strategies: **Safe** (always fires lifecycle hooks), **Fast** (always bypasses hooks for 10-250x performance), and **Optimized** (capability-based selection). Default `RemoveAll()` uses Optimized: selects Fast on providers with `WriteCapabilities.FastRemove` (Postgres, SQL Server, MongoDB, SQLite, Redis), Safe on others (JSON, InMemory, Couchbase). **Important**: Optimized bypasses hooks on most providers. Use explicit `RemoveStrategy.Safe` when audit trail is required.
+
+**Quick Decision Guide:**
+- **Audit trail required?** → Use `RemoveStrategy.Safe` (always fires hooks)
+- **Test cleanup, temp data?** → Use `RemoveAll()` default (Optimized for speed)
+- **Known no-audit scenario?** → Use `RemoveStrategy.Fast` (explicit bypass)
+
+**Recipe**
+
+Same packages as foundations. Providers with fast removal support (Postgres, SQL Server, MongoDB, SQLite, Redis) expose `WriteCapabilities.FastRemove`. Providers without fast paths (JSON, InMemory, Couchbase) silently fall back to Safe behavior.
+
+**Simple Removal**
+
+```csharp
+// Default: Optimized strategy (framework chooses based on provider capabilities)
+// Postgres/SQL Server/Mongo/SQLite/Redis: Uses Fast (TRUNCATE/DROP/UNLINK)
+// JSON/InMemory/Couchbase: Uses Safe (no fast path available)
+var deletedCount = await Todo.RemoveAll(ct);
+
+// Explicit safe removal (always fires hooks, maintains audit trail)
+// Use when you need audit trail even if provider supports fast removal
+var deletedCount = await Todo.RemoveAll(RemoveStrategy.Safe, ct);
+
+// Explicit fast removal (bypasses hooks, 10-250x faster)
+// Use when you're certain hooks aren't needed
+var deletedCount = await Todo.RemoveAll(RemoveStrategy.Fast, ct);
+
+// Remove from specific partition with Optimized strategy
+var archivedCount = await Todo.RemoveAll(RemoveStrategy.Optimized, "archive", ct);
+
+// Remove using EntityContext (scoped to partition)
+using (EntityContext.Partition("archive"))
+{
+    // Removes from "archive" partition using Optimized strategy
+    // Provider automatically chooses Fast if supported
+    await Todo.RemoveAll(ct);
+}
+
+// Check provider support for fast removal
+if (Todo.SupportsFastRemove)
+{
+    Console.WriteLine("Provider supports TRUNCATE/DROP - Optimized will use Fast");
+}
+else
+{
+    Console.WriteLine("Provider lacks fast path - Optimized will use Safe");
+}
+```
+
+**Performance Characteristics**
+
+| Provider   | Safe (1M rows) | Fast/Optimized (1M rows) | Implementation | Optimized Uses |
+| ---------- | -------------- | ------------------------ | -------------- | -------------- |
+| PostgreSQL | ~45 seconds    | ~200ms (225x faster)     | `TRUNCATE TABLE RESTART IDENTITY` | **Fast** ⚡ |
+| SQL Server | ~38 seconds    | ~150ms (253x faster)     | `TRUNCATE TABLE` | **Fast** ⚡ |
+| MongoDB    | ~52 seconds    | ~300ms (173x faster)     | Drop + recreate indexes | **Fast** ⚡ |
+| SQLite     | ~25 seconds    | ~2s (12.5x faster)       | `DELETE` + `VACUUM` | **Fast** ⚡ |
+| Redis      | ~18 seconds    | ~800ms (22.5x faster)    | `UNLINK` (async) | **Fast** ⚡ |
+| JSON       | ~50ms          | ~50ms (same)             | Dictionary clear | Safe |
+| InMemory   | ~5ms           | ~5ms (same)              | Dictionary clear | Safe |
+| Couchbase  | Standard       | Standard (same)          | DELETE query | Safe |
+
+**Provider-Specific Semantics**
+
+```csharp
+// PostgreSQL/SQL Server: TRUNCATE resets identity counters
+await Product.RemoveAll(RemoveStrategy.Fast, ct);
+// Next insert starts at ID = 1 (identity/sequence reset)
+
+// Foreign key constraints may block TRUNCATE (auto-fallback to DELETE)
+await Order.RemoveAll(RemoveStrategy.Fast, ct);
+// If Orders has FK references, automatically falls back to Safe DELETE
+
+// MongoDB: Brief index loss during drop/recreate
+await Media.RemoveAll(RemoveStrategy.Fast, ct);
+// Collection dropped, recreated with same indexes (milliseconds)
+
+// SQLite: VACUUM reclaims disk space
+await Log.RemoveAll(RemoveStrategy.Fast, ct);
+// DELETE + VACUUM shrinks database file
+
+// Redis: UNLINK is non-blocking
+await Session.RemoveAll(RemoveStrategy.Fast, ct);
+// Keys unlinked immediately, memory freed in background thread
+```
+
+**When to Use Each Strategy**
+
+```csharp
+// ✅ Optimized (default): Best for non-audited bulk cleanup
+[Fact]
+public async Task BulkImportTest()
+{
+    // Optimized uses TRUNCATE on Postgres (fast), DELETE on InMemory (safe fallback)
+    await Todo.RemoveAll(ct);
+    var todos = GenerateTestData(1000);
+    await todos.Save();
+}
+
+// ✅ Optimized: Development/staging environment resets
+public async Task ResetEnvironment()
+{
+    // Automatically uses fastest method available (TRUNCATE/DROP)
+    await Todo.RemoveAll(ct);
+    await SeedData();
+}
+
+// ✅ Safe: Production operations requiring audit trail
+public async Task DeleteTenant(string tenantId)
+{
+    using (EntityContext.Partition($"tenant-{tenantId}"))
+    {
+        // Explicit Safe guarantees audit hooks fire on ALL providers
+        await Order.RemoveAll(RemoveStrategy.Safe, ct);
+        await Customer.RemoveAll(RemoveStrategy.Safe, ct);
+    }
+}
+
+// ✅ Fast: Known scenario where hooks aren't needed
+public async Task PurgeArchivedData()
+{
+    // Explicitly bypass hooks for maximum performance
+    await ArchivedOrder.RemoveAll(RemoveStrategy.Fast, ct);
+    await ArchivedLog.RemoveAll(RemoveStrategy.Fast, ct);
+}
+
+// ✅ Optimized: Temporary data cleanup
+public async Task CleanupTempData()
+{
+    // Framework chooses optimal strategy based on provider
+    await TempFile.RemoveAll(ct);
+}
+```
+
+**Important Warnings**
+
+⚠️ **CRITICAL: Optimized Strategy Bypasses Hooks on Most Providers**
+
+```csharp
+// Default RemoveAll() uses Optimized strategy
+// On Postgres/SQL Server/MongoDB/SQLite/Redis: Optimized = Fast (bypasses hooks!)
+// On JSON/InMemory/Couchbase: Optimized = Safe (fires hooks)
+
+public static class OrderLifecycle
+{
+    public static void Configure(EntityLifecycleBuilder<Order> builder) =>
+        builder.BeforeDelete(async (ctx, next) =>
+        {
+            await AuditLog.RecordDeletion(ctx.Entity);
+            await next();
+        });
+}
+
+// Optimized (default): Hooks BYPASSED on Postgres/SQL Server/Mongo (uses TRUNCATE)
+await Order.RemoveAll(ct); // ✗ Hooks skipped on most providers!
+
+// Explicit Safe: Hooks ALWAYS fire regardless of provider
+await Order.RemoveAll(RemoveStrategy.Safe, ct); // ✓ Hooks fire, audit recorded
+
+// Explicit Fast: Hooks ALWAYS bypassed regardless of provider
+await Order.RemoveAll(RemoveStrategy.Fast, ct); // ✗ Hooks skipped for performance
+```
+
+**When Audit Trail Required:** Always use `RemoveStrategy.Safe` to guarantee hooks fire:
+
+```csharp
+// Production tenant deletion - require audit trail
+public async Task DeleteTenant(string tenantId)
+{
+    using (EntityContext.Partition($"tenant-{tenantId}"))
+    {
+        // Explicit Safe ensures audit hooks fire on ALL providers
+        await Order.RemoveAll(RemoveStrategy.Safe, ct);
+        await Customer.RemoveAll(RemoveStrategy.Safe, ct);
+    }
+}
+```
+
+⚠️ **Return Value May Be -1 (Unknown Count)**
+
+```csharp
+// TRUNCATE doesn't report deleted count in some providers
+var count = await Todo.RemoveAll(RemoveStrategy.Fast, ct);
+if (count == -1)
+{
+    // Postgres/SQL Server TRUNCATE: count unavailable
+    Logger.LogInformation("All todos removed (count unknown)");
+}
+else
+{
+    Logger.LogInformation($"Removed {count} todos");
+}
+```
+
+⚠️ **Permission Requirements Differ**
+
+```csharp
+// TRUNCATE requires ALTER permission (vs DELETE permission for Safe)
+// If user lacks ALTER, TRUNCATE fails → auto-fallback to DELETE
+
+try
+{
+    await Todo.RemoveAll(RemoveStrategy.Fast, ct);
+}
+catch (Exception ex) when (ex.Message.Contains("permission"))
+{
+    // User may have DELETE but not ALTER permission
+    Logger.LogWarning("TRUNCATE failed, using Safe strategy");
+    await Todo.RemoveAll(RemoveStrategy.Safe, ct);
+}
+```
+
+**Usage Scenarios**
+
+Default `RemoveAll()` uses Optimized strategy: TRUNCATE/DROP on capable providers (Postgres, SQL Server, MongoDB, SQLite, Redis) for 10-250x performance, safe DELETE on others (JSON, InMemory, Couchbase). **Critical**: Optimized bypasses lifecycle hooks on most providers. Use explicit `RemoveStrategy.Safe` when audit trails are required. Tests benefit from automatic fast cleanup (200ms vs 45s for 1M records). Framework handles provider differences transparently.
 
 ---
 

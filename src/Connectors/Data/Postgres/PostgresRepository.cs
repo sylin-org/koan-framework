@@ -36,7 +36,7 @@ internal sealed class PostgresRepository<TEntity, TKey> :
     where TKey : notnull
 {
     public QueryCapabilities Capabilities => QueryCapabilities.Linq | QueryCapabilities.String;
-    public WriteCapabilities Writes => WriteCapabilities.AtomicBatch | WriteCapabilities.BulkDelete; // BulkUpsert later via COPY staging
+    public WriteCapabilities Writes => WriteCapabilities.AtomicBatch | WriteCapabilities.BulkDelete | WriteCapabilities.FastRemove;
 
     // Storage optimization support
     private readonly StorageOptimizationInfo _optimizationInfo;
@@ -608,6 +608,37 @@ internal sealed class PostgresRepository<TEntity, TKey> :
     {
         await using var conn = Open();
         return await conn.ExecuteAsync($"DELETE FROM {QualifiedTable}");
+    }
+
+    public async Task<long> RemoveAllAsync(RemoveStrategy strategy, CancellationToken ct = default)
+    {
+        await using var conn = Open();
+
+        // Resolve Optimized strategy based on provider capabilities
+        var effectiveStrategy = strategy == RemoveStrategy.Optimized
+            ? (Writes.HasFlag(WriteCapabilities.FastRemove) ? RemoveStrategy.Fast : RemoveStrategy.Safe)
+            : strategy;
+
+        if (effectiveStrategy == RemoveStrategy.Fast)
+        {
+            // Fast path: TRUNCATE (bypasses hooks, resets sequence)
+            try
+            {
+                await conn.ExecuteAsync($"TRUNCATE TABLE {QualifiedTable} RESTART IDENTITY", ct);
+                return -1; // TRUNCATE doesn't report count
+            }
+            catch (Npgsql.PostgresException ex) when (ex.SqlState == "0A000") // Feature not supported
+            {
+                // Foreign key constraint - fall back to DELETE
+                // Silently fall through to safe path
+            }
+        }
+
+        // Safe path: DELETE (fires hooks if registered)
+        var countRequest = new CountRequest<TEntity>();
+        var countResult = await CountAsync(countRequest, ct);
+        await conn.ExecuteAsync($"DELETE FROM {QualifiedTable}", ct);
+        return countResult.Value;
     }
 
     public IBatchSet<TEntity, TKey> CreateBatch() => new PgBatch(this);
