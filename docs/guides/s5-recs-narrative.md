@@ -52,48 +52,9 @@ public sealed class Media : Entity<Media>
 }
 ```
 
-**Traditional Approach (The Scaffolding Ritual):**
-
-*Most frameworks force you through a setup ritual before you can persist data:*
+**Using the Model:**
 
 ```csharp
-// ❌ Define repository interface
-public interface IMediaRepository {
-    Task<Media> GetAsync(string id);
-    Task SaveAsync(Media media);
-}
-
-// ❌ Implement repository
-public class MediaRepository : IMediaRepository { /* 50 lines */ }
-
-// ❌ Configure DbContext
-public class MediaDbContext : DbContext {
-    public DbSet<Media> Media { get; set; }
-}
-
-// ❌ Register services
-services.AddDbContext<MediaDbContext>();
-services.AddScoped<IMediaRepository, MediaRepository>();
-
-// ❌ Inject dependencies
-public class MediaService(IMediaRepository repo) {
-    public Task Save(Media m) => repo.SaveAsync(m);
-}
-```
-
-**The Promise:** "This decouples you from the database! You can swap implementations!"
-
-**The Reality:** You write 100+ lines of ceremony for theoretical flexibility you rarely use. The repository becomes a pass-through wrapper with no logic.
-
-**Koan's Philosophy: Eliminate Scaffolding, Keep the Benefits**
-
-Koan uses **ActiveRecord pattern** (easy to understand, quick to use) while providing the **decoupling benefits** that EF's rituals propose:
-
-```csharp
-// ✅ Define the entity
-public sealed class Media : Entity<Media> { /* ... */ }
-
-// ✅ Use it immediately (no setup, no DI, no repositories)
 var media = new Media {
     Title = "Kaguya-sama: Love is War",
     Genres = new[] { "Romance", "Comedy" }
@@ -104,16 +65,41 @@ var found = await Media.Get(media.Id);
 var all = await Media.All();
 ```
 
-**You Still Get Decoupling:**
-- **Provider transparent**: MongoDB, SQL Server, Couchbase, PostgreSQL—same code
-- **Testable**: Mock `Entity<T>` behavior via Koan's test harness
-- **Swappable**: Change providers via config, not code rewrite
+Notice something? **`media.Save()`** is a one-liner. No repositories. No DbContext. No dependency injection setup.
 
-**The Difference:**
-- **Traditional:** Write abstraction layers to achieve decoupling
-- **Koan:** Decoupling is built into `Entity<T>`, you just use it
+**Why this approach instead of Entity Framework's repository pattern?**
 
-Zero scaffolding ritual. Maximum productivity. Real provider transparency.
+In traditional EF, you'd write:
+
+```csharp
+// Define repository
+public interface IMediaRepository {
+    Task<Media> GetAsync(string id);
+    Task SaveAsync(Media media);
+}
+
+// Implement it
+public class MediaRepository : IMediaRepository { /* ... */ }
+
+// Configure DI
+services.AddDbContext<MediaDbContext>();
+services.AddScoped<IMediaRepository, MediaRepository>();
+
+// Use it
+public class MediaService(IMediaRepository repo) {
+    public async Task Save(Media m) => await repo.SaveAsync(m);
+}
+```
+
+That's perfectly valid—EF's repository pattern gives you explicit control and clear separation of concerns. But for S5.Recs (and most Koan apps), we chose a simpler path:
+
+**The tradeoff:**
+- **EF approach**: More setup, explicit abstractions, clear boundaries
+- **Koan approach**: Less ceremony, implicit abstractions via `Entity<T>`, faster to build
+
+Koan's `Entity<T>` provides the same provider transparency (swap MongoDB for PostgreSQL via config) without the setup ritual. It's ActiveRecord-style for developer velocity, while still being testable and storage-agnostic under the hood.
+
+For S5.Recs, where we're building quickly and the data layer is straightforward, this choice keeps us moving.
 
 ### Scene 2: The Identity Problem
 
