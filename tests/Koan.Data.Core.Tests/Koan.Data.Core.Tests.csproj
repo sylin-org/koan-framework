@@ -28,7 +28,7 @@
     <ProjectReference Include="..\..\src\Koan.Data.Core\Koan.Data.Core.csproj" />
     <ProjectReference Include="..\..\src\Connectors\Data\Json\Koan.Data.Connector.Json.csproj" />
     <ProjectReference Include="..\..\src\Koan.Data.Abstractions\Koan.Data.Abstractions.csproj" />
-    <ProjectReference Include="..\..\src\Koan.Canon.Core\Koan.Canon.Core.csproj" />
+  <ProjectReference Include="..\..\legacy\Koan.Canon.Legacy.Core\Koan.Canon.Core.csproj" />
     <ProjectReference Include="..\..\src\Connectors\Data\Postgres\Koan.Data.Connector.Postgres.csproj" />
     <ProjectReference Include="..\..\src\Connectors\Data\Sqlite\Koan.Data.Connector.Sqlite.csproj" />
     <ProjectReference Include="..\..\src\Connectors\Data\Mongo\Koan.Data.Connector.Mongo.csproj" />

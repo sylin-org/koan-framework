@@ -10,4 +10,5 @@ public sealed class RelationalMaterializationOptions
     public RelationalDdlPolicy DdlPolicy { get; set; } = RelationalDdlPolicy.AutoCreate;
     public RelationalSchemaMatchingMode SchemaMatching { get; set; } = RelationalSchemaMatchingMode.Relaxed;
     public bool AllowProductionDdl { get; set; } = false;
+    public string? DefaultSchema { get; set; } = "dbo";
 }

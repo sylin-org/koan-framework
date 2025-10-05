@@ -1,13 +1,22 @@
 using System.Diagnostics;
+using System.Threading;
 using Koan.Data.Abstractions;
 using Koan.Data.Core;
+using Microsoft.Extensions.Logging;
 using S14.AdapterBench.Models;
 
 namespace S14.AdapterBench.Services;
 
 public class BenchmarkService : IBenchmarkService
 {
+    private readonly ILogger<BenchmarkService> _logger;
+
     private static readonly string[] DefaultProviders = { "sqlite", "postgres", "mongo", "redis" };
+
+    public BenchmarkService(ILogger<BenchmarkService> logger)
+    {
+        _logger = logger;
+    }
 
     public async Task<BenchmarkResult> RunBenchmarkAsync(
         BenchmarkRequest request,
@@ -18,19 +27,27 @@ public class BenchmarkService : IBenchmarkService
         {
             Mode = request.Mode,
             Scale = request.Scale,
-            EntityCount = GetEntityCount(request.Scale)
+            EntityCount = GetEntityCount(request.Scale, request.CustomEntityCount)
         };
 
         var providers = request.Providers.Count > 0 ? request.Providers : DefaultProviders.ToList();
+        _logger.LogInformation("Starting benchmark run with mode {Mode}, scale {Scale}, entity count {EntityCount}, providers [{Providers}], tiers [{Tiers}]",
+            request.Mode,
+            request.Scale,
+            result.EntityCount,
+            string.Join(", ", providers),
+            string.Join(", ", request.EntityTiers));
 
         try
         {
             if (request.Mode == BenchmarkMode.Sequential)
             {
+                _logger.LogInformation("Executing sequential benchmark across {ProviderCount} providers", providers.Count);
                 await RunSequentialBenchmarkAsync(result, providers, request.EntityTiers, progress, cancellationToken);
             }
             else
             {
+                _logger.LogInformation("Executing parallel benchmark across {ProviderCount} providers", providers.Count);
                 await RunParallelBenchmarkAsync(result, providers, request.EntityTiers, progress, cancellationToken);
             }
 
@@ -39,12 +56,14 @@ public class BenchmarkService : IBenchmarkService
         catch (Exception ex)
         {
             result.Status = BenchmarkStatus.Failed;
-            // Log error - in a real scenario we'd inject ILogger
-            Console.WriteLine($"Benchmark failed: {ex.Message}");
+            var elapsed = DateTime.UtcNow - result.StartedAt;
+            _logger.LogError(ex, "Benchmark run failed after {ElapsedMs} ms", elapsed.TotalMilliseconds);
         }
         finally
         {
             result.CompletedAt = DateTime.UtcNow;
+            var total = result.CompletedAt.Value - result.StartedAt;
+            _logger.LogInformation("Benchmark run finished with status {Status} in {ElapsedSeconds:F2}s", result.Status, total.TotalSeconds);
         }
 
         return result;
@@ -62,6 +81,10 @@ public class BenchmarkService : IBenchmarkService
 
         foreach (var provider in providers)
         {
+            _logger.LogInformation("Provider {Provider} starting sequential benchmark across tiers [{Tiers}]",
+                provider,
+                string.Join(", ", entityTiers));
+
             var providerResult = new ProviderResult
             {
                 ProviderName = provider,
@@ -106,6 +129,10 @@ public class BenchmarkService : IBenchmarkService
             providerStopwatch.Stop();
             providerResult.TotalDuration = providerStopwatch.Elapsed;
             result.ProviderResults.Add(providerResult);
+
+            _logger.LogInformation("Provider {Provider} completed sequential benchmark in {Duration:F2}s",
+                provider,
+                providerStopwatch.Elapsed.TotalSeconds);
         }
     }
 
@@ -116,74 +143,123 @@ public class BenchmarkService : IBenchmarkService
         IProgress<BenchmarkProgress>? progress,
         CancellationToken cancellationToken)
     {
-        var totalTests = entityTiers.Count * 6; // 6 test types per tier (same tests, all providers in parallel)
+        var totalTests = providers.Count * entityTiers.Count * 6; // 6 test types per tier and provider
         var completedTests = 0;
 
-        // Initialize provider results
         var providerResults = providers.Select(p => new ProviderResult
         {
             ProviderName = p,
             IsContainerized = p != "sqlite"
-        }).ToList();
+        }).ToArray();
 
         var overallStopwatch = Stopwatch.StartNew();
 
-        foreach (var tier in entityTiers)
-        {
-            // Run tests in parallel across all providers
-            var singleWriteTasks = providers.Select((p, i) =>
-                RunSingleWriteTestAsync(p, tier, result.EntityCount, progress, completedTests, totalTests, cancellationToken)
-                    .ContinueWith(t => providerResults[i].Tests.Add(t.Result), cancellationToken));
+        var providerTasks = providers.Select((provider, index) =>
+            Task.Run(async () =>
+            {
+                var providerResult = providerResults[index];
+                var providerStopwatch = Stopwatch.StartNew();
 
-            await Task.WhenAll(singleWriteTasks);
-            completedTests++;
+                foreach (var tier in entityTiers)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
 
-            var batchWriteTasks = providers.Select((p, i) =>
-                RunBatchWriteTestAsync(p, tier, result.EntityCount, progress, completedTests, totalTests, cancellationToken)
-                    .ContinueWith(t => providerResults[i].Tests.Add(t.Result), cancellationToken));
+                    _logger.LogInformation("Parallel benchmark starting tier {Tier} for provider {Provider}", tier, provider);
 
-            await Task.WhenAll(batchWriteTasks);
-            completedTests++;
+                    var singleWrite = await RunSingleWriteTestAsync(
+                        provider,
+                        tier,
+                        result.EntityCount,
+                        progress,
+                        Volatile.Read(ref completedTests),
+                        totalTests,
+                        cancellationToken);
+                    providerResult.Tests.Add(singleWrite);
+                    Interlocked.Increment(ref completedTests);
 
-            var readByIdTasks = providers.Select((p, i) =>
-                RunReadByIdTestAsync(p, tier, result.EntityCount, progress, completedTests, totalTests, cancellationToken)
-                    .ContinueWith(t => providerResults[i].Tests.Add(t.Result), cancellationToken));
+                    var batchWrite = await RunBatchWriteTestAsync(
+                        provider,
+                        tier,
+                        result.EntityCount,
+                        progress,
+                        Volatile.Read(ref completedTests),
+                        totalTests,
+                        cancellationToken);
+                    providerResult.Tests.Add(batchWrite);
+                    Interlocked.Increment(ref completedTests);
 
-            await Task.WhenAll(readByIdTasks);
-            completedTests++;
+                    var readById = await RunReadByIdTestAsync(
+                        provider,
+                        tier,
+                        result.EntityCount,
+                        progress,
+                        Volatile.Read(ref completedTests),
+                        totalTests,
+                        cancellationToken);
+                    providerResult.Tests.Add(readById);
+                    Interlocked.Increment(ref completedTests);
 
-            var removeAllSafeTasks = providers.Select((p, i) =>
-                RunRemoveAllTestAsync(p, tier, result.EntityCount, "Safe", RemoveStrategy.Safe, progress, completedTests, totalTests, cancellationToken)
-                    .ContinueWith(t => providerResults[i].Tests.Add(t.Result), cancellationToken));
+                    var removeSafe = await RunRemoveAllTestAsync(
+                        provider,
+                        tier,
+                        result.EntityCount,
+                        "Safe",
+                        RemoveStrategy.Safe,
+                        progress,
+                        Volatile.Read(ref completedTests),
+                        totalTests,
+                        cancellationToken);
+                    providerResult.Tests.Add(removeSafe);
+                    Interlocked.Increment(ref completedTests);
 
-            await Task.WhenAll(removeAllSafeTasks);
-            completedTests++;
+                    var removeFast = await RunRemoveAllTestAsync(
+                        provider,
+                        tier,
+                        result.EntityCount,
+                        "Fast",
+                        RemoveStrategy.Fast,
+                        progress,
+                        Volatile.Read(ref completedTests),
+                        totalTests,
+                        cancellationToken);
+                    providerResult.Tests.Add(removeFast);
+                    Interlocked.Increment(ref completedTests);
 
-            var removeAllFastTasks = providers.Select((p, i) =>
-                RunRemoveAllTestAsync(p, tier, result.EntityCount, "Fast", RemoveStrategy.Fast, progress, completedTests, totalTests, cancellationToken)
-                    .ContinueWith(t => providerResults[i].Tests.Add(t.Result), cancellationToken));
+                    var removeOptimized = await RunRemoveAllTestAsync(
+                        provider,
+                        tier,
+                        result.EntityCount,
+                        "Optimized",
+                        RemoveStrategy.Optimized,
+                        progress,
+                        Volatile.Read(ref completedTests),
+                        totalTests,
+                        cancellationToken);
+                    providerResult.Tests.Add(removeOptimized);
+                    Interlocked.Increment(ref completedTests);
+                }
 
-            await Task.WhenAll(removeAllFastTasks);
-            completedTests++;
+                providerStopwatch.Stop();
+                providerResult.TotalDuration = providerStopwatch.Elapsed;
+            }, cancellationToken)).ToList();
 
-            var removeAllOptimizedTasks = providers.Select((p, i) =>
-                RunRemoveAllTestAsync(p, tier, result.EntityCount, "Optimized", RemoveStrategy.Optimized, progress, completedTests, totalTests, cancellationToken)
-                    .ContinueWith(t => providerResults[i].Tests.Add(t.Result), cancellationToken));
-
-            await Task.WhenAll(removeAllOptimizedTasks);
-            completedTests++;
-        }
+        await Task.WhenAll(providerTasks);
 
         overallStopwatch.Stop();
 
-        // In parallel mode, all providers run for the same wall-clock time (limited by slowest)
-        // Set each provider's TotalDuration to the overall elapsed time
-        foreach (var providerResult in providerResults)
-        {
-            providerResult.TotalDuration = overallStopwatch.Elapsed;
-        }
-
+        // Add all provider results (keep their actual durations, don't override)
         result.ProviderResults.AddRange(providerResults);
+
+        var maxDuration = providerResults.Max(pr => pr.TotalDuration);
+        _logger.LogInformation("Parallel benchmark finished. Total wall-clock time: {WallClockTime:F2}s, slowest provider: {MaxDuration:F2}s",
+            overallStopwatch.Elapsed.TotalSeconds,
+            maxDuration.TotalSeconds);
+
+        // Log individual provider durations for transparency
+        foreach (var pr in providerResults)
+        {
+            _logger.LogInformation("Provider {Provider} completed in {Duration:F2}s", pr.ProviderName, pr.TotalDuration.TotalSeconds);
+        }
     }
 
     private async Task<TestResult> RunSingleWriteTestAsync(
@@ -205,8 +281,10 @@ public class BenchmarkService : IBenchmarkService
 
         try
         {
+            _logger.LogInformation("Provider {Provider} starting {Tier} - {Test} ({Count} operations)", provider, tier, testResult.TestName, count);
             var stopwatch = Stopwatch.StartNew();
 
+            _logger.LogDebug("Switching to provider context: {Provider}", provider);
             using (EntityContext.Adapter(provider))
             {
                 // Create and save entities one at a time
@@ -217,8 +295,12 @@ public class BenchmarkService : IBenchmarkService
                     var entity = CreateEntity(tier, i);
                     await SaveEntityAsync(entity, tier);
 
-                    if (i % 100 == 0)
+                    if (i % 100 == 0 && i > 0)
                     {
+                        var currentOpsPerSec = i / stopwatch.Elapsed.TotalSeconds;
+                        _logger.LogDebug("Provider {Provider} - {Tier} Single Writes: {Current}/{Total} ({OpsPerSec:F0} ops/sec)",
+                            provider, tier, i, count, currentOpsPerSec);
+
                         progress?.Report(new BenchmarkProgress
                         {
                             CurrentProvider = provider,
@@ -227,7 +309,7 @@ public class BenchmarkService : IBenchmarkService
                             CompletedTests = completedTests,
                             CurrentOperationCount = i,
                             TotalOperations = count,
-                            CurrentOperationsPerSecond = i / (stopwatch.Elapsed.TotalSeconds + 0.001)
+                            CurrentOperationsPerSecond = currentOpsPerSec
                         });
                     }
                 }
@@ -236,10 +318,17 @@ public class BenchmarkService : IBenchmarkService
             stopwatch.Stop();
             testResult.Duration = stopwatch.Elapsed;
             testResult.OperationsPerSecond = count / stopwatch.Elapsed.TotalSeconds;
+            _logger.LogInformation("Provider {Provider} finished {Tier} - {Test} in {Duration:F2}s ({OpsPerSecond:F0} ops/sec)",
+                provider,
+                tier,
+                testResult.TestName,
+                stopwatch.Elapsed.TotalSeconds,
+                testResult.OperationsPerSecond);
         }
         catch (Exception ex)
         {
             testResult.Error = ex.Message;
+            _logger.LogError(ex, "Provider {Provider} failed {Tier} - {Test}", provider, tier, testResult.TestName);
         }
 
         return testResult;
@@ -266,19 +355,35 @@ public class BenchmarkService : IBenchmarkService
         {
             const int batchSize = 500;
             var stopwatch = Stopwatch.StartNew();
+            _logger.LogInformation("Provider {Provider} starting {Tier} - {Test} ({Count} operations, batch size {BatchSize})",
+                provider,
+                tier,
+                testResult.TestName,
+                count,
+                batchSize);
 
+            _logger.LogDebug("Switching to provider context: {Provider}", provider);
             using (EntityContext.Adapter(provider))
             {
+                var batchNumber = 0;
                 for (int batchStart = 0; batchStart < count; batchStart += batchSize)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
 
                     var batchCount = Math.Min(batchSize, count - batchStart);
+                    var batchStopwatch = Stopwatch.StartNew();
+
                     var entities = Enumerable.Range(batchStart, batchCount)
                         .Select(i => CreateEntity(tier, i))
                         .ToList();
 
                     await SaveEntitiesBatchAsync(entities, tier);
+                    batchStopwatch.Stop();
+
+                    batchNumber++;
+                    var currentOpsPerSec = (batchStart + batchCount) / stopwatch.Elapsed.TotalSeconds;
+                    _logger.LogDebug("Provider {Provider} - {Tier} Batch #{BatchNum}: saved {Count} entities in {Ms:F0}ms ({OpsPerSec:F0} ops/sec overall)",
+                        provider, tier, batchNumber, batchCount, batchStopwatch.Elapsed.TotalMilliseconds, currentOpsPerSec);
 
                     progress?.Report(new BenchmarkProgress
                     {
@@ -288,7 +393,7 @@ public class BenchmarkService : IBenchmarkService
                         CompletedTests = completedTests,
                         CurrentOperationCount = batchStart + batchCount,
                         TotalOperations = count,
-                        CurrentOperationsPerSecond = (batchStart + batchCount) / (stopwatch.Elapsed.TotalSeconds + 0.001)
+                        CurrentOperationsPerSecond = currentOpsPerSec
                     });
                 }
             }
@@ -296,10 +401,17 @@ public class BenchmarkService : IBenchmarkService
             stopwatch.Stop();
             testResult.Duration = stopwatch.Elapsed;
             testResult.OperationsPerSecond = count / stopwatch.Elapsed.TotalSeconds;
+            _logger.LogInformation("Provider {Provider} finished {Tier} - {Test} in {Duration:F2}s ({OpsPerSecond:F0} ops/sec)",
+                provider,
+                tier,
+                testResult.TestName,
+                stopwatch.Elapsed.TotalSeconds,
+                testResult.OperationsPerSecond);
         }
         catch (Exception ex)
         {
             testResult.Error = ex.Message;
+            _logger.LogError(ex, "Provider {Provider} failed {Tier} - {Test}", provider, tier, testResult.TestName);
         }
 
         return testResult;
@@ -324,6 +436,11 @@ public class BenchmarkService : IBenchmarkService
 
         try
         {
+            _logger.LogInformation("Provider {Provider} starting {Tier} - {Test} ({Count} reads)",
+                provider,
+                tier,
+                testResult.TestName,
+                count);
             List<string> ids;
 
             // First, get the IDs from the entities we wrote
@@ -367,10 +484,17 @@ public class BenchmarkService : IBenchmarkService
             stopwatch.Stop();
             testResult.Duration = stopwatch.Elapsed;
             testResult.OperationsPerSecond = count / stopwatch.Elapsed.TotalSeconds;
+            _logger.LogInformation("Provider {Provider} finished {Tier} - {Test} in {Duration:F2}s ({OpsPerSecond:F0} ops/sec)",
+                provider,
+                tier,
+                testResult.TestName,
+                stopwatch.Elapsed.TotalSeconds,
+                testResult.OperationsPerSecond);
         }
         catch (Exception ex)
         {
             testResult.Error = ex.Message;
+            _logger.LogError(ex, "Provider {Provider} failed {Tier} - {Test}", provider, tier, testResult.TestName);
         }
 
         return testResult;
@@ -397,10 +521,21 @@ public class BenchmarkService : IBenchmarkService
 
         try
         {
+            _logger.LogInformation("Provider {Provider} starting {Tier} - {Test} ({Count} entities)",
+                provider,
+                tier,
+                testResult.TestName,
+                count);
+
+            _logger.LogDebug("Switching to provider context: {Provider}", provider);
             using (EntityContext.Adapter(provider))
             {
                 // First, seed data using batch write
                 const int batchSize = 500;
+                var seedStopwatch = Stopwatch.StartNew();
+                _logger.LogDebug("Provider {Provider} - {Tier} {Test}: Seeding {Count} entities before removal",
+                    provider, tier, testResult.TestName, count);
+
                 for (int batchStart = 0; batchStart < count; batchStart += batchSize)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
@@ -411,12 +546,20 @@ public class BenchmarkService : IBenchmarkService
                     await SaveEntitiesBatchAsync(entities, tier);
                 }
 
+                seedStopwatch.Stop();
+                _logger.LogDebug("Provider {Provider} - {Tier} {Test}: Seeded {Count} entities in {Seconds:F2}s",
+                    provider, tier, testResult.TestName, count, seedStopwatch.Elapsed.TotalSeconds);
+
                 // Now measure RemoveAll with the specified strategy
+                _logger.LogDebug("Provider {Provider} - {Tier} {Test}: Starting removal with strategy {Strategy}",
+                    provider, tier, testResult.TestName, strategyName);
                 var stopwatch = Stopwatch.StartNew();
 
                 var deletedCount = await RemoveAllByStrategyAsync(tier, strategy);
 
                 stopwatch.Stop();
+                _logger.LogDebug("Provider {Provider} - {Tier} {Test}: Removed {Deleted} entities in {Ms:F0}ms",
+                    provider, tier, testResult.TestName, deletedCount == -1 ? count : deletedCount, stopwatch.Elapsed.TotalMilliseconds);
 
                 testResult.Duration = stopwatch.Elapsed;
                 // For RemoveAll, ops/sec is based on count removed (or estimated if -1)
@@ -433,11 +576,20 @@ public class BenchmarkService : IBenchmarkService
                     TotalOperations = count,
                     CurrentOperationsPerSecond = testResult.OperationsPerSecond
                 });
+
+                _logger.LogInformation("Provider {Provider} finished {Tier} - {Test} in {Duration:F2}s (removed {Removed} entities, {OpsPerSecond:F0} ops/sec)",
+                    provider,
+                    tier,
+                    testResult.TestName,
+                    stopwatch.Elapsed.TotalSeconds,
+                    effectiveCount,
+                    testResult.OperationsPerSecond);
             }
         }
         catch (Exception ex)
         {
             testResult.Error = ex.Message;
+            _logger.LogError(ex, "Provider {Provider} failed {Tier} - {Test}", provider, tier, testResult.TestName);
         }
 
         return testResult;
@@ -551,13 +703,22 @@ public class BenchmarkService : IBenchmarkService
         };
     }
 
-    private int GetEntityCount(BenchmarkScale scale)
+    private int GetEntityCount(BenchmarkScale scale, int? customCount = null)
     {
+        if (customCount.HasValue && customCount.Value > 0)
+        {
+            return customCount.Value;
+        }
+
         return scale switch
         {
+            BenchmarkScale.Micro => 100,
             BenchmarkScale.Quick => 1000,
             BenchmarkScale.Standard => 5000,
             BenchmarkScale.Full => 10000,
+            BenchmarkScale.Large => 100000,
+            BenchmarkScale.Massive => 1000000,
+            BenchmarkScale.Custom => customCount ?? 1000,
             _ => 1000
         };
     }

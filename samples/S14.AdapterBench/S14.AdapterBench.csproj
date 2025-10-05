@@ -19,6 +19,9 @@
     <ProjectReference Include="..\..\src\Koan.Data.Abstractions\Koan.Data.Abstractions.csproj" />
     <ProjectReference Include="..\..\src\Koan.Data.Core\Koan.Data.Core.csproj" />
 
+    <!-- Jobs Framework -->
+    <ProjectReference Include="..\..\src\Koan.Jobs.Core\Koan.Jobs.Core.csproj" />
+
     <!-- Data Adapters - all providers we're benchmarking -->
     <ProjectReference Include="..\..\src\Connectors\Data\Sqlite\Koan.Data.Connector.Sqlite.csproj" />
     <ProjectReference Include="..\..\src\Connectors\Data\Postgres\Koan.Data.Connector.Postgres.csproj" />

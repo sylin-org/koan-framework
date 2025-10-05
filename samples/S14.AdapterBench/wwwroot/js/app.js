@@ -3,6 +3,8 @@ const App = {
     selectedProviders: [],
     selectedTiers: [],
     currentMode: 'Sequential',
+    currentJobId: null,
+    pollInterval: null,
 
     async init() {
         await this.loadProviders();
@@ -95,6 +97,11 @@ const App = {
             await this.runBenchmark();
         });
 
+        // Stop benchmark
+        document.getElementById('stopBenchmarkBtn').addEventListener('click', async () => {
+            await this.stopBenchmark();
+        });
+
         // Tab switching
         document.querySelectorAll('.tab-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
@@ -150,34 +157,113 @@ const App = {
         };
 
         try {
-            const results = await API.runBenchmark(request);
+            // Submit the job
+            const jobResponse = await API.runBenchmark(request);
+            this.currentJobId = jobResponse.jobId;
 
-            // Hide progress, show results
-            document.getElementById('progressPanel').style.display = 'none';
-            document.getElementById('runBenchmarkBtn').style.display = 'inline-block';
-            document.getElementById('stopBenchmarkBtn').style.display = 'none';
-
-            // Convert TimeSpan strings to milliseconds for display
-            results.providerResults.forEach(p => {
-                p.totalDuration = this.parseTimeSpan(p.totalDuration);
-                p.tests.forEach(t => {
-                    t.duration = this.parseTimeSpan(t.duration);
-                });
-            });
-
-            results.startedAt = new Date(results.startedAt);
-            results.completedAt = new Date(results.completedAt);
-
-            Results.display(results);
+            // Start polling for status
+            await this.pollJobStatus();
 
         } catch (error) {
             console.error('Benchmark failed:', error);
             alert(`Benchmark failed: ${error.message}`);
 
-            document.getElementById('progressPanel').style.display = 'none';
-            document.getElementById('runBenchmarkBtn').style.display = 'inline-block';
-            document.getElementById('stopBenchmarkBtn').style.display = 'none';
+            this.resetUI();
         }
+    },
+
+    async pollJobStatus() {
+        if (!this.currentJobId) return;
+
+        this.pollInterval = setInterval(async () => {
+            try {
+                const status = await API.getJobStatus(this.currentJobId);
+
+                // Update progress UI
+                this.updateProgress(status);
+
+                // Check if job is complete
+                if (status.status === 'Completed') {
+                    clearInterval(this.pollInterval);
+                    this.pollInterval = null;
+
+                    // Display results
+                    if (status.result) {
+                        // Convert TimeSpan strings to nanoseconds for display
+                        status.result.providerResults.forEach(p => {
+                            p.totalDuration = this.parseTimeSpan(p.totalDuration);
+                            p.tests.forEach(t => {
+                                t.duration = this.parseTimeSpan(t.duration);
+                            });
+                        });
+
+                        status.result.startedAt = new Date(status.result.startedAt);
+                        status.result.completedAt = new Date(status.result.completedAt);
+
+                        Results.display(status.result);
+                    }
+
+                    this.resetUI();
+                } else if (status.status === 'Failed' || status.status === 'Cancelled') {
+                    clearInterval(this.pollInterval);
+                    this.pollInterval = null;
+
+                    alert(`Benchmark ${status.status.toLowerCase()}: ${status.error || 'Unknown error'}`);
+                    this.resetUI();
+                }
+
+            } catch (error) {
+                console.error('Failed to poll job status:', error);
+                clearInterval(this.pollInterval);
+                this.pollInterval = null;
+                alert(`Failed to get job status: ${error.message}`);
+                this.resetUI();
+            }
+        }, 1000); // Poll every second
+    },
+
+    updateProgress(status) {
+        // Update progress bar
+        const progressBar = document.getElementById('progressBar');
+        progressBar.style.width = `${status.progress * 100}%`;
+
+        // Update progress message
+        if (status.progressMessage) {
+            const testLog = document.getElementById('testLog');
+            const logEntry = document.createElement('div');
+            logEntry.className = 'log-entry';
+            logEntry.textContent = `[${new Date().toLocaleTimeString()}] ${status.progressMessage}`;
+            testLog.appendChild(logEntry);
+            testLog.scrollTop = testLog.scrollHeight;
+        }
+    },
+
+    async stopBenchmark() {
+        if (!this.currentJobId) return;
+
+        try {
+            await API.cancelJob(this.currentJobId);
+
+            // Stop polling
+            if (this.pollInterval) {
+                clearInterval(this.pollInterval);
+                this.pollInterval = null;
+            }
+
+            alert('Benchmark cancelled');
+            this.resetUI();
+
+        } catch (error) {
+            console.error('Failed to cancel benchmark:', error);
+            alert(`Failed to cancel benchmark: ${error.message}`);
+        }
+    },
+
+    resetUI() {
+        document.getElementById('progressPanel').style.display = 'none';
+        document.getElementById('runBenchmarkBtn').style.display = 'inline-block';
+        document.getElementById('stopBenchmarkBtn').style.display = 'none';
+        this.currentJobId = null;
     },
 
     parseTimeSpan(timeSpan) {

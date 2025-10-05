@@ -12,6 +12,6 @@
     <FileVersion>0.6.3</FileVersion>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\..\..\Koan.Canon.Core\Koan.Canon.Core.csproj" />
+  <ProjectReference Include="..\..\..\..\Koan.Canon.Legacy.Core\Koan.Canon.Core.csproj" />
   </ItemGroup>
 </Project>

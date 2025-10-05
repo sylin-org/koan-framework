@@ -90,6 +90,10 @@
    href: decisions/index.md
  - name: Support
    href: support/troubleshooting.md
+ - name: Proposals
+   items:
+     - name: Canonization Overhaul (2025)
+       href: proposals/PROP-canon-overhaul-2.md
  - name: Templates
    href: templates/document-template.md
  - name: Archive

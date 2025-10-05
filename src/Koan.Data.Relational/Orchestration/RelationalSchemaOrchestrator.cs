@@ -182,8 +182,9 @@ internal sealed class RelationalSchemaOrchestrator : IRelationalSchemaOrchestrat
 
     private (string schema, string table) ResolveTable(Type entity)
     {
-        // Resolve via StorageNameResolver defaults for relational: dbo schema + registered physical name
-        var schema = "dbo";
+        // Resolve via StorageNameResolver defaults for relational. Allow provider-specific schema overrides via options.
+        var schema = _optionsMonitor.CurrentValue.DefaultSchema;
+        if (string.IsNullOrWhiteSpace(schema)) schema = "dbo";
         var method = typeof(Core.Configuration.StorageNameRegistry).GetMethods()
             .First(m => m.Name == "GetOrCompute" && m.GetGenericArguments().Length == 2);
 

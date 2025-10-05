@@ -238,7 +238,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
     <!-- Core Koan Framework -->
     <ProjectReference Include="..\..\..\..\src\Koan.Core\Koan.Core.csproj" />
     <ProjectReference Include="..\..\..\..\src\Koan.Data.Core\Koan.Data.Core.csproj" />
-    <ProjectReference Include="..\..\..\..\src\Koan.Canon.Core\Koan.Canon.Core.csproj" />
+    <ProjectReference Include="..\..\..\..\legacy\Koan.Canon.Legacy.Core\Koan.Canon.Core.csproj" />
     <ProjectReference Include="..\..\..\..\src\Koan.Messaging\Koan.Messaging.csproj" />
     <ProjectReference Include="..\..\..\..\src\Koan.AI.Contracts\Koan.AI.Contracts.csproj" />
 

@@ -4,7 +4,7 @@
     <ProjectReference Include="..\..\..\src\Koan.Core\Koan.Core.csproj" />
     <ProjectReference Include="..\..\..\src\Koan.Data.Core\Koan.Data.Core.csproj" />
     <ProjectReference Include="..\..\..\src\\Connectors\\Data\\Mongo\Koan.Data.Connector.Mongo.csproj" />
-    <ProjectReference Include="..\..\..\src\Koan.Canon.Core\Koan.Canon.Core.csproj" />
+  <ProjectReference Include="..\..\..\legacy\Koan.Canon.Legacy.Core\Koan.Canon.Core.csproj" />
     <ProjectReference Include="..\..\..\src\Koan.Messaging.Core\Koan.Messaging.Core.csproj" />
     <ProjectReference Include="..\..\..\src\\Connectors\\Messaging\\RabbitMq\Koan.Messaging.Connector.RabbitMq.csproj" />
     <ProjectReference Include="..\..\..\src\Koan.AI.Contracts\Koan.AI.Contracts.csproj" />

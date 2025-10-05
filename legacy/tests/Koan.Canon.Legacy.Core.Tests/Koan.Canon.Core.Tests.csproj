@@ -19,10 +19,10 @@
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.0-rc.1.25451.107" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Koan.Data.Core\Koan.Data.Core.csproj" />
-    <ProjectReference Include="..\..\src\\Connectors\\Data\\Json\Koan.Data.Connector.Json.csproj" />
-    <ProjectReference Include="..\..\src\Koan.Canon.Core\Koan.Canon.Core.csproj" />
-  <ProjectReference Include="..\Koan.Testing\Koan.Testing.csproj" />
+    <ProjectReference Include="..\..\..\src\Koan.Data.Core\Koan.Data.Core.csproj" />
+    <ProjectReference Include="..\..\..\src\\Connectors\\Data\\Json\Koan.Data.Connector.Json.csproj" />
+    <ProjectReference Include="..\..\Koan.Canon.Legacy.Core\Koan.Canon.Core.csproj" />
+  <ProjectReference Include="..\..\..\tests\Koan.Testing\Koan.Testing.csproj" />
   </ItemGroup>
 </Project>
 

@@ -26,5 +26,27 @@ const API = {
         }
 
         return await response.json();
+    },
+
+    async getJobStatus(jobId) {
+        const response = await fetch(`${this.baseUrl}/api/benchmark/status/${jobId}`);
+
+        if (!response.ok) {
+            throw new Error(`Failed to get job status: ${response.statusText}`);
+        }
+
+        return await response.json();
+    },
+
+    async cancelJob(jobId) {
+        const response = await fetch(`${this.baseUrl}/api/benchmark/cancel/${jobId}`, {
+            method: 'POST'
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to cancel job: ${response.statusText}`);
+        }
+
+        return await response.json();
     }
 };

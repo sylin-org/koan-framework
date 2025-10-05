@@ -13,8 +13,8 @@
     <FileVersion>0.6.3</FileVersion>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Koan.Core\Koan.Core.csproj" />
-    <ProjectReference Include="..\Koan.Data.Core\Koan.Data.Core.csproj" />
-    <ProjectReference Include="..\Koan.Messaging.Core\Koan.Messaging.Core.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Core\Koan.Core.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Data.Core\Koan.Data.Core.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Messaging.Core\Koan.Messaging.Core.csproj" />
   </ItemGroup>
 </Project>

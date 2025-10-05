@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 using S14.AdapterBench.Hubs;
+using S14.AdapterBench.Jobs;
 using S14.AdapterBench.Models;
 using S14.AdapterBench.Services;
 
@@ -22,11 +23,80 @@ public class BenchmarkController : ControllerBase
     }
 
     /// <summary>
-    /// Start a new benchmark run with the specified configuration.
-    /// Progress updates are sent via SignalR to subscribed clients.
+    /// Start a new benchmark run as a background job.
+    /// Returns a job ID immediately for polling the status.
+    /// This is the recommended approach for long-running benchmarks.
     /// </summary>
     [HttpPost("run")]
-    public async Task<ActionResult<BenchmarkResult>> RunBenchmark(
+    public async Task<ActionResult<BenchmarkJobResponse>> RunBenchmark(
+        [FromBody] BenchmarkRequest request,
+        CancellationToken cancellationToken)
+    {
+        // Start benchmark as a background job (in-memory, ephemeral)
+        var job = await BenchmarkJob.Start(request, cancellationToken: cancellationToken)
+            .Run(cancellationToken);
+
+        return Ok(new BenchmarkJobResponse
+        {
+            JobId = job.Id,
+            Status = job.Status.ToString(),
+            Message = "Benchmark job started. Use GET /api/benchmark/status/{jobId} to check progress."
+        });
+    }
+
+    /// <summary>
+    /// Get the status and result of a benchmark job.
+    /// Poll this endpoint to track progress and get final results.
+    /// </summary>
+    [HttpGet("status/{jobId}")]
+    public async Task<ActionResult<BenchmarkJobStatusResponse>> GetBenchmarkStatus(
+        string jobId,
+        CancellationToken cancellationToken)
+    {
+        // Create a temporary job instance to call Refresh
+        var tempJob = new BenchmarkJob { Id = jobId };
+        var job = await tempJob.Refresh(cancellationToken);
+
+        if (job == null)
+        {
+            return NotFound(new { Message = $"Benchmark job {jobId} not found" });
+        }
+
+        var response = new BenchmarkJobStatusResponse
+        {
+            JobId = job.Id,
+            Status = job.Status.ToString(),
+            Progress = job.Progress,
+            ProgressMessage = job.ProgressMessage,
+            StartedAt = job.StartedAt,
+            CompletedAt = job.CompletedAt,
+            Duration = job.Duration,
+            Result = job.Result,
+            Error = job.LastError
+        };
+
+        return Ok(response);
+    }
+
+    /// <summary>
+    /// Cancel a running benchmark job.
+    /// </summary>
+    [HttpPost("cancel/{jobId}")]
+    public async Task<ActionResult> CancelBenchmark(
+        string jobId,
+        CancellationToken cancellationToken)
+    {
+        var tempJob = new BenchmarkJob { Id = jobId };
+        await tempJob.Cancel(cancellationToken);
+        return Ok(new { Message = $"Benchmark job {jobId} cancellation requested" });
+    }
+
+    /// <summary>
+    /// Legacy synchronous endpoint - runs benchmark and waits for completion.
+    /// Use POST /api/benchmark/run for better experience with long-running benchmarks.
+    /// </summary>
+    [HttpPost("run-sync")]
+    public async Task<ActionResult<BenchmarkResult>> RunBenchmarkSync(
         [FromBody] BenchmarkRequest request,
         CancellationToken cancellationToken)
     {
