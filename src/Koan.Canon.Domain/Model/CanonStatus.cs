@@ -1,32 +1,25 @@
-﻿namespace Koan.Canon.Domain.Model;
+﻿using System;
+
+namespace Koan.Canon.Domain.Model;
 
 /// <summary>
-/// Represents the lifecycle state of a canonical entity.
+/// Legacy lifecycle enumeration maintained for temporary compatibility. Prefer <see cref="CanonLifecycle"/>.
 /// </summary>
+[Obsolete("Use CanonLifecycle instead. CanonStatus will be removed in a future build.")]
 public enum CanonStatus
 {
-    /// <summary>
-    /// Canonical entity is active and represents the latest assembled view.
-    /// </summary>
-    Active = 0,
+    /// <inheritdoc cref="CanonLifecycle.Active"/>
+    Active = (int)CanonLifecycle.Active,
 
-    /// <summary>
-    /// Canonical entity is pending retirement while a replacement is evaluated.
-    /// </summary>
-    PendingRetirement = 1,
+    /// <inheritdoc cref="CanonLifecycle.PendingRetirement"/>
+    PendingRetirement = (int)CanonLifecycle.PendingRetirement,
 
-    /// <summary>
-    /// Canonical entity has been superseded by a newer canonical identifier.
-    /// </summary>
-    Superseded = 2,
+    /// <inheritdoc cref="CanonLifecycle.Superseded"/>
+    Superseded = (int)CanonLifecycle.Superseded,
 
-    /// <summary>
-    /// Canonical entity is archived and no longer participates in projection updates.
-    /// </summary>
-    Archived = 3,
+    /// <inheritdoc cref="CanonLifecycle.Archived"/>
+    Archived = (int)CanonLifecycle.Archived,
 
-    /// <summary>
-    /// Canonical entity has been withdrawn due to irrecoverable policy or validation failures.
-    /// </summary>
-    Withdrawn = 4
+    /// <inheritdoc cref="CanonLifecycle.Withdrawn"/>
+    Withdrawn = (int)CanonLifecycle.Withdrawn
 }

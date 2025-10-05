@@ -1,117 +1,368 @@
-# S8.Canon Sample
+# S8.Canon - Customer Canonization Sample
 
-This sample demonstrates Koan Flow capabilities for data ingestion, association, and projection across multiple data sources.
+Demonstrates **Canon Runtime** pipeline-based canonization using entity-first patterns.
 
-## Scenarios
+## Overview
 
-### 1. Customer Journey Flow
+This sample shows how raw customer data flows through a canonization pipeline to produce validated, enriched canonical entities:
 
-Demonstrates how data from different touchpoints gets associated to a single customer profile:
+```
+Raw Customer → Validation → Enrichment → Canonical Storage
+```
 
-- **Web Registration**: Customer signs up via website (email + phone)
-- **Social Media**: Customer interacts on social platforms (handle + email)
-- **IoT Device**: Customer's smart device sends telemetry (phone as owner ID)
+### Key Patterns Demonstrated
 
-All three data points should associate to the same reference via shared email/phone keys.
-
-### 2. Multi-Owner Collision
-
-Shows how Flow rejects data when aggregation keys belong to different existing references:
-
-- Creates two separate customer profiles with different emails
-- Attempts to ingest data containing both emails
-- Results in `MULTI_OWNER_COLLISION` rejection
-
-### 3. No-Keys Rejection
-
-Demonstrates rejection when data lacks configured aggregation keys:
-
-- Ingests anonymous session data without email/phone/handle
-- Results in `NO_KEYS` rejection
-
-## API Endpoints
-
-### Ingestion
-
-- `POST /api/ingestion/customer` - Ingest customer registration data
-- `POST /api/ingestion/social` - Ingest social media interactions
-- `POST /api/ingestion/iot` - Ingest IoT device events
-- `POST /api/ingestion/batch` - Batch ingestion endpoint
-
-### Analytics
-
-- `GET /api/analytics/customer-360/{referenceUlid}` - Get unified customer view
-- `GET /api/analytics/pipeline-stats` - Flow pipeline health metrics
-- `GET /api/analytics/rejections` - Rejection analysis for debugging
-
-### Sample Data
-
-- `POST /api/sampledata/customer-journey` - Generate complete customer journey
-- `POST /api/sampledata/collision-scenario` - Generate collision test data
-- `POST /api/sampledata/no-keys-scenario` - Generate rejection test data
-
-### Flow Views (from Koan.Canon.Web)
-
-- `GET /flow/views/canonical` - Canonical projections (unique values per tag)
-- `GET /flow/views/lineage` - Lineage projections (sources per value)
-
-## Quick Start
-
-1. **Start the application**:
-
-   ```bash
-   dotnet run
-   ```
-
-2. **Generate sample customer journey**:
-
-   ```bash
-   curl -X POST http://localhost:5000/api/sampledata/customer-journey
-   ```
-
-3. **Wait for association** (background workers run every ~2-5 seconds)
-
-4. **Check pipeline stats**:
-
-   ```bash
-   curl http://localhost:5000/api/analytics/pipeline-stats
-   ```
-
-5. **View customer 360** (use ULID from `ReferenceItem.Id`, aka ReferenceUlid):
-   ```bash
-   curl http://localhost:5000/api/analytics/customer-360/{referenceUlid}
-   ```
-
-## Configuration
-
-Flow is configured with ubiquitous aggregation tags:
-
-- `email` - Email addresses
-- `phone` - Phone numbers
-- `handle` - Social media handles
-
-See `Program.cs` for CanonOptions configuration.
-
-## Data Flow
-
-1. **Ingest**: Records enter via API → stored in `intake` set
-2. **Associate**: Background worker processes intake → derives reference IDs → moves to `keyed` set
-3. **Project**: Background worker reads keyed records → builds canonical/lineage views → stores in view sets
-
-Rejections are stored in `rejections` with reason codes for debugging.
+1. **CanonEntity<T>** - Entity-first canonical entities with auto GUID v7 IDs
+2. **ICanonPipelineContributor** - Pipeline phase contributors for validation and enrichment
+3. **ICanonRuntime** - Runtime-driven canonization execution
+4. **CanonEntitiesController<T>** - Auto-generated canonization API endpoints
+5. **Auto-Registration** - KoanAutoRegistrar for zero-config module loading
 
 ## Architecture
 
-- Uses JSON adapter for simplicity (file-based storage)
-- Background hosted services handle association and projection
-- TTL purge enabled (30min intervals)
-- Swagger UI available at `/swagger`
+### Customer Entity
 
-## Sample Aggregation Keys
+`Domain/Customer.cs` - Canonical customer entity:
+- Inherits from `CanonEntity<Customer>`
+- Auto GUID v7 ID generation
+- Properties: Email, Phone, FirstName, LastName, DisplayName, AccountTier, Country, Language
+- Entity-first patterns: `Customer.Get()`, `customer.Save()`
 
-All scenarios use shared constants from `Koan.Testing.Flow.FlowTestConstants`:
+### Canonization Pipeline
 
-- Email: `a@example.com`, `b@example.com`
-- Phone: `+1-202-555-0101`, `+1-202-555-0102`
-- Handle: `@alice`, `@bob`
+**Phase 1: Validation** (`Pipeline/CustomerValidationContributor.cs`)
+- Validates required fields (email, first name, last name)
+- Validates email format (regex)
+- Validates phone format (E.164)
+- Normalizes data (lowercase email, trim whitespace, standardize phone)
+- Returns error event if validation fails
 
+**Phase 2: Enrichment** (`Pipeline/CustomerEnrichmentContributor.cs`)
+- Computes `DisplayName` from FirstName + LastName (fallback to email prefix)
+- Computes `AccountTier` based on business rules:
+  - **Premium**: Customers from premium countries (US, GB, DE, FR, JP, AU, CA) with complete profiles
+  - **Standard**: Customers with phone number
+  - **Basic**: Everyone else
+- Sets customer state to Canonical/Ready
+- Adds enrichment metadata tags
+
+### Pipeline Registration
+
+`Pipeline/CustomerPipelineRegistrar.cs` - Implements `ICanonRuntimeConfigurator`:
+- Registers Customer pipeline with validation + enrichment contributors
+- Auto-discovered and registered via `KoanAutoRegistrar`
+
+### API Layer
+
+`Controllers/CustomersController.cs` - Inherits from `CanonEntitiesController<Customer>`:
+- Auto-generated CRUD endpoints
+- Auto-generated canonization endpoint
+- Custom endpoint: `GET /api/canon/customers/by-tier/{tier}`
+
+## Quick Start
+
+### 1. Run the Application
+
+```bash
+dotnet run --project samples/S8.Canon
+```
+
+The API will start at `http://localhost:5000` (or `https://localhost:5001`).
+
+### 2. Explore Swagger UI
+
+Navigate to `http://localhost:5000/swagger` to explore the API.
+
+### 3. Canonize a Customer
+
+**Valid Customer (Premium Tier):**
+
+```bash
+curl -X POST http://localhost:5000/api/canon/customers \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "alice@example.com",
+    "phone": "+1-202-555-0101",
+    "firstName": "Alice",
+    "lastName": "Smith",
+    "country": "US",
+    "language": "en"
+  }'
+```
+
+**Expected Result:**
+```json
+{
+  "entity": {
+    "id": "01JXXXXXXXXXXXXXXXXXXXXXX",
+    "email": "alice@example.com",
+    "phone": "+12025550101",
+    "firstName": "Alice",
+    "lastName": "Smith",
+    "displayName": "Alice Smith",
+    "accountTier": "Premium",
+    "country": "US",
+    "language": "en",
+    "state": {
+      "lifecycle": "Canonical",
+      "readiness": "Ready"
+    }
+  },
+  "outcome": "Canonized",
+  "events": [
+    {
+      "phase": "Validation",
+      "message": "Completed Validation phase."
+    },
+    {
+      "phase": "Aggregation",
+      "message": "Completed Aggregation phase."
+    }
+  ]
+}
+```
+
+**Valid Customer (Standard Tier):**
+
+```bash
+curl -X POST http://localhost:5000/api/canon/customers \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "bob@example.com",
+    "phone": "+44-20-7946-0958",
+    "firstName": "Bob",
+    "lastName": "Jones"
+  }'
+```
+
+**Expected Tier:** `Standard` (has phone but not from premium country)
+
+**Valid Customer (Basic Tier):**
+
+```bash
+curl -X POST http://localhost:5000/api/canon/customers \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "charlie@example.com",
+    "firstName": "Charlie",
+    "lastName": "Brown"
+  }'
+```
+
+**Expected Tier:** `Basic` (no phone number)
+
+### 4. Test Validation Errors
+
+**Missing Required Fields:**
+
+```bash
+curl -X POST http://localhost:5000/api/canon/customers \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "test@example.com"
+  }'
+```
+
+**Expected Error:**
+```json
+{
+  "outcome": "Failed",
+  "events": [
+    {
+      "phase": "Validation",
+      "message": "Customer validation failed",
+      "detail": "FirstName is required; LastName is required"
+    }
+  ]
+}
+```
+
+**Invalid Email Format:**
+
+```bash
+curl -X POST http://localhost:5000/api/canon/customers \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "not-an-email",
+    "firstName": "Test",
+    "lastName": "User"
+  }'
+```
+
+**Expected Error:**
+```json
+{
+  "outcome": "Failed",
+  "events": [
+    {
+      "phase": "Validation",
+      "message": "Customer validation failed",
+      "detail": "Invalid email format: not-an-email"
+    }
+  ]
+}
+```
+
+### 5. Query Customers
+
+**Get All Customers:**
+
+```bash
+curl http://localhost:5000/api/canon/customers
+```
+
+**Get Customer by ID:**
+
+```bash
+curl http://localhost:5000/api/canon/customers/{id}
+```
+
+**Get Customers by Tier:**
+
+```bash
+curl http://localhost:5000/api/canon/customers/by-tier/Premium
+curl http://localhost:5000/api/canon/customers/by-tier/Standard
+curl http://localhost:5000/api/canon/customers/by-tier/Basic
+```
+
+### 6. Advanced Features
+
+**Rebuild Customer Views (Force Reprojection):**
+
+```bash
+curl -X POST http://localhost:5000/api/canon/customers/{id}/rebuild
+```
+
+**Canonize with Custom Options (Headers):**
+
+```bash
+curl -X POST http://localhost:5000/api/canon/customers \
+  -H "Content-Type: application/json" \
+  -H "X-Canon-Origin: web-signup" \
+  -H "X-Correlation-ID: 12345" \
+  -H "X-Canon-Tag-source: registration-form" \
+  -d '{...}'
+```
+
+## Configuration
+
+### Data Storage
+
+Edit `appsettings.json` to change storage provider:
+
+```json
+{
+  "Koan": {
+    "Data": {
+      "Provider": "json",  // or "mongodb", "postgresql", etc.
+      "Json": {
+        "Path": "./data"
+      }
+    }
+  }
+}
+```
+
+### Canon Runtime Options
+
+Configure default canonization options:
+
+```csharp
+// In Program.cs or startup configuration
+builder.Services.AddCanonRuntime(runtime =>
+{
+    runtime.DefaultOptions.StageBehavior = CanonStageBehavior.Immediate;
+    runtime.DefaultOptions.SkipDistribution = false;
+    runtime.RecordCapacity = 10000; // Replay buffer size
+});
+```
+
+## Testing
+
+The sample includes comprehensive test scenarios:
+
+```bash
+# Run all tests
+dotnet test
+
+# Run specific test
+dotnet test --filter "FullyQualifiedName~CustomerCanonicalizationTests"
+```
+
+## Key Concepts
+
+### Entity-First Pattern
+
+```csharp
+// ✅ Correct: Entity-first pattern
+var customer = new Customer
+{
+    Email = "alice@example.com",
+    FirstName = "Alice",
+    LastName = "Smith"
+};
+
+// Save (canonize + persist)
+await customer.Save();
+
+// Get (retrieve by ID)
+var loaded = await Customer.Get(customer.Id);
+
+// Query (all entities)
+var all = await Customer.All();
+```
+
+### Pipeline Contributors
+
+```csharp
+public class MyContributor : ICanonPipelineContributor<Customer>
+{
+    public CanonPipelinePhase Phase => CanonPipelinePhase.Validation;
+
+    public async Task<CanonizationEvent?> ExecuteAsync(
+        CanonPipelineContext<Customer> context,
+        CancellationToken cancellationToken)
+    {
+        // Validate/transform the entity
+        if (IsInvalid(context.Entity))
+        {
+            return new CanonizationEvent
+            {
+                Phase = Phase,
+                Message = "Validation failed",
+                Detail = "..."
+            };
+        }
+
+        // Return null for success (default event generated)
+        return null;
+    }
+}
+```
+
+### Auto-Registration
+
+```csharp
+// Just reference the assembly - pipeline auto-registers
+// No manual service.AddXyz() calls needed!
+
+// KoanAutoRegistrar discovers and registers:
+// - ICanonRuntimeConfigurator implementations
+// - CanonEntity<T> types
+// - Pipeline contributors
+```
+
+## Next Steps
+
+1. **Add More Phases** - Implement contributors for Policy, Projection, Distribution phases
+2. **Add Observers** - Register `ICanonPipelineObserver` for telemetry and auditing
+3. **Multi-Provider** - Test with MongoDB, PostgreSQL, etc. (same code, different storage)
+4. **Custom Controllers** - Extend `CanonEntitiesController<T>` with business-specific endpoints
+5. **Integration Tests** - Add end-to-end tests for complex canonization scenarios
+
+## References
+
+- [Canon Runtime Specification](../../docs/specifications/SPEC-canon-runtime.md)
+- [Canon Runtime Architecture ADR](../../docs/decisions/ARCH-0058-canon-runtime-architecture.md)
+- [Entity Capabilities How-To](../../docs/guides/entity-capabilities-howto.md)
+- [Canon Runtime Migration Plan](../../docs/architecture/canon-runtime-migration.md)

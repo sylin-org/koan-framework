@@ -1,5 +1,9 @@
 ﻿# PROP Canon Overhaul 2: Transport-Agnostic Canonization Engine
 
+> **STATUS: SUPERSEDED** by [ARCH-0058](../decisions/ARCH-0058-canon-runtime-architecture.md)
+> **Implementation**: See [SPEC-canon-runtime.md](../specifications/SPEC-canon-runtime.md)
+> **Retained for**: Historical reference and design rationale
+
 ---
 **Contract**
 - Inputs: Koan canonization requirements, current Koan.Canon codebase constraints, Koan engineering and architecture directives.

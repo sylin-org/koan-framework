@@ -1,30 +1,28 @@
-using Koan.Data.Core; // AddKoan()
-using Koan.Canon;      // Turnkey via Koan.Canon.Web (auto AddKoanCanon)
-using Koan.Canon.Options;
-using Koan.Testing.Flow;
+using Koan.Core.Observability;
+using Koan.Data.Core;
+using Koan.Web.Connector.Swagger;
+using Koan.Web.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Koan base setup (core + data + web)
-builder.Services.AddKoan();
+// Configure Koan framework with web API support
+builder.Services.AddKoan()
+    .AsWebApi();
 
-// Canon runtime is auto-registered by Koan.Canon.Web (turnkey ON by default). Set Koan:Canon:AutoRegister=false to opt out.
-builder.Services.Configure<CanonOptions>(o =>
-{
-    o.AggregationTags = FlowTestConstants.UbiquitousAggregationTags;
-    o.BatchSize = 50;
-    o.PurgeEnabled = true;
-    o.PurgeInterval = TimeSpan.FromMinutes(30);
-});
+// Enable observability (telemetry, metrics, logging)
+builder.Services.AddKoanObservability();
 
-// Controllers (Canon.Web controllers discovered by assembly reference)
-builder.Services.AddControllers();
+// Swagger/OpenAPI is auto-registered via Koan.Web.Connector.Swagger
+// Canon runtime and Customer pipeline are auto-registered via S8.Canon.Initialization.KoanAutoRegistrar
 
 var app = builder.Build();
 
-app.MapControllers();
-app.UseDefaultFiles();
-app.UseStaticFiles();
+// Enable Swagger UI per policy: Dev by default; in non-dev only when Koan__Web__Swagger__Enabled=true
+app.UseKoanSwagger();
+
 app.Run();
 
-
+namespace S8.Canon
+{
+    public partial class Program { }
+}

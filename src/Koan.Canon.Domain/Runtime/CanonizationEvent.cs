@@ -18,9 +18,9 @@ public sealed class CanonizationEvent
     public CanonStageStatus StageStatus { get; init; }
 
     /// <summary>
-    /// Canonical entity status after the phase.
+    /// Canonical entity state after the phase.
     /// </summary>
-    public CanonStatus CanonStatus { get; init; }
+    public CanonState? CanonState { get; init; }
 
     /// <summary>
     /// Timestamp for the event.

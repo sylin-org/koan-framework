@@ -86,6 +86,8 @@
        href: architecture/capability-map.md
      - name: Module Ledger
        href: architecture/module-ledger.md
+      - name: Canon Runtime Migration Plan
+        href: architecture/canon-runtime-migration.md
  - name: Architecture Decisions
    href: decisions/index.md
  - name: Support

@@ -1,4 +1,5 @@
-﻿using Koan.Canon.Domain.Metadata;
+﻿using System;
+using Koan.Canon.Domain.Metadata;
 using Koan.Canon.Domain.Model;
 
 namespace Koan.Canon.Domain.Runtime;
@@ -15,11 +16,12 @@ public sealed class CanonPipelineContext<TModel> : ICanonPipelineContext
     /// <summary>
     /// Initializes a new instance of <see cref="CanonPipelineContext{TModel}"/>.
     /// </summary>
-    public CanonPipelineContext(TModel entity, CanonMetadata metadata, CanonizationOptions options)
+    public CanonPipelineContext(TModel entity, CanonMetadata metadata, CanonizationOptions options, IServiceProvider? services = null)
     {
         Entity = entity ?? throw new ArgumentNullException(nameof(entity));
         Metadata = metadata ?? throw new ArgumentNullException(nameof(metadata));
         Options = options ?? throw new ArgumentNullException(nameof(options));
+        Services = services ?? EmptyServiceProvider.Instance;
     }
 
     /// <summary>
@@ -36,6 +38,11 @@ public sealed class CanonPipelineContext<TModel> : ICanonPipelineContext
     /// Canonization options in effect.
     /// </summary>
     public CanonizationOptions Options { get; private set; }
+
+    /// <summary>
+    /// Service provider for resolving dependencies within contributors.
+    /// </summary>
+    public IServiceProvider Services { get; }
 
     /// <summary>
     /// Associated stage record, if the payload originated from staging.
@@ -102,5 +109,18 @@ public sealed class CanonPipelineContext<TModel> : ICanonPipelineContext
 
         value = default;
         return false;
+    }
+
+    /// <summary>
+    /// Minimal service provider used when no services are available.
+    /// </summary>
+    private sealed class EmptyServiceProvider : IServiceProvider
+    {
+        public static readonly EmptyServiceProvider Instance = new();
+
+        private EmptyServiceProvider() { }
+
+        public object? GetService(Type serviceType)
+            => throw new InvalidOperationException($"No service provider is available in this context. Cannot resolve service of type '{serviceType?.FullName ?? "null"}'.");
     }
 }

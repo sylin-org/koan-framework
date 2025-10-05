@@ -14,6 +14,7 @@ public sealed class CanonMetadata
     private Dictionary<string, CanonPolicySnapshot> _policies = new(StringComparer.OrdinalIgnoreCase);
     private Dictionary<string, string> _tags = new(StringComparer.OrdinalIgnoreCase);
     private CanonLineage _lineage = new();
+    private CanonState _state = CanonState.Default;
 
     /// <summary>
     /// Gets or sets the canonical identifier linked to the metadata.
@@ -86,6 +87,15 @@ public sealed class CanonMetadata
     {
         get => _lineage;
         set => _lineage = value ?? new CanonLineage();
+    }
+
+    /// <summary>
+    /// Canon state snapshot aligned with the owning entity.
+    /// </summary>
+    public CanonState State
+    {
+        get => _state;
+        set => _state = value?.Copy() ?? CanonState.Default;
     }
 
     /// <summary>
@@ -337,7 +347,8 @@ public sealed class CanonMetadata
                 Sources = _sources.ToDictionary(static kvp => kvp.Key, static kvp => kvp.Value.Clone(), StringComparer.OrdinalIgnoreCase),
                 Policies = _policies.ToDictionary(static kvp => kvp.Key, static kvp => kvp.Value.Clone(), StringComparer.OrdinalIgnoreCase),
                 Tags = new Dictionary<string, string>(_tags, StringComparer.OrdinalIgnoreCase),
-                Lineage = _lineage.Clone()
+                Lineage = _lineage.Clone(),
+                State = _state.Copy()
             };
         }
     }
@@ -403,6 +414,10 @@ public sealed class CanonMetadata
             }
 
             _lineage.Merge(incoming._lineage, preferIncoming);
+
+            _state = preferIncoming
+                ? incoming._state.Copy()
+                : _state.Merge(incoming._state, preferIncoming: false);
         }
     }
 }

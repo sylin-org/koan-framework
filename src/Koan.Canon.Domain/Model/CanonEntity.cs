@@ -1,4 +1,5 @@
-﻿using Koan.Canon.Domain.Metadata;
+﻿using System;
+using Koan.Canon.Domain.Metadata;
 using Koan.Data.Core.Model;
 
 namespace Koan.Canon.Domain.Model;
@@ -11,7 +12,7 @@ public abstract class CanonEntity<TModel> : Entity<TModel>
     where TModel : CanonEntity<TModel>, new()
 {
     private CanonMetadata _metadata = new();
-    private CanonStatus _status = CanonStatus.Active;
+    private CanonState _state = CanonState.Default;
 
     /// <summary>
     /// Canon metadata describing sources, policies, and lineage for this entity.
@@ -19,20 +20,53 @@ public abstract class CanonEntity<TModel> : Entity<TModel>
     public CanonMetadata Metadata
     {
         get => _metadata;
-        set => _metadata = value ?? new CanonMetadata();
+        set
+        {
+            _metadata = value ?? new CanonMetadata();
+            _state = _metadata.State.Copy();
+        }
     }
 
     /// <summary>
-    /// Lifecycle state for the canonical entity.
+    /// Current canon state combining lifecycle, readiness, and consumer signals.
     /// </summary>
-    public CanonStatus Status
+    public CanonState State
     {
-        get => _status;
+        get => _state;
         private set
         {
-            _status = value;
+            _state = value ?? CanonState.Default;
+            _metadata.State = _state.Copy();
             _metadata.Touch();
         }
+    }
+
+    /// <summary>
+    /// Convenience accessor for the lifecycle component of <see cref="State"/>.
+    /// </summary>
+    public CanonLifecycle Lifecycle => State.Lifecycle;
+
+    /// <summary>
+    /// Sets the canon state. Prefer helper methods such as <see cref="ApplyState"/> for incremental updates.
+    /// </summary>
+    /// <param name="state">State to apply.</param>
+    public void SetState(CanonState state)
+    {
+        State = state ?? CanonState.Default;
+    }
+
+    /// <summary>
+    /// Applies a transformation to the current state.
+    /// </summary>
+    /// <param name="transform">Transformation delegate.</param>
+    public void ApplyState(Func<CanonState, CanonState> transform)
+    {
+        if (transform is null)
+        {
+            throw new ArgumentNullException(nameof(transform));
+        }
+
+        State = transform(State);
     }
 
     /// <summary>
@@ -69,7 +103,7 @@ public abstract class CanonEntity<TModel> : Entity<TModel>
             throw new ArgumentException("Replacement identifier must be provided.", nameof(replacementId));
         }
 
-        Status = CanonStatus.Superseded;
+        ApplyState(static state => state.WithLifecycle(CanonLifecycle.Superseded));
         Metadata.Lineage.MarkSupersededBy(replacementId, reason);
     }
 
@@ -79,7 +113,7 @@ public abstract class CanonEntity<TModel> : Entity<TModel>
     /// <param name="notes">Optional archival notes.</param>
     public void Archive(string? notes = null)
     {
-        Status = CanonStatus.Archived;
+        ApplyState(static state => state.WithLifecycle(CanonLifecycle.Archived));
         if (!string.IsNullOrWhiteSpace(notes))
         {
             Metadata.SetTag("archive:notes", notes);
@@ -91,7 +125,7 @@ public abstract class CanonEntity<TModel> : Entity<TModel>
     /// </summary>
     public void Restore()
     {
-        Status = CanonStatus.Active;
+        ApplyState(static state => state.WithLifecycle(CanonLifecycle.Active));
         Metadata.RemoveTag("archive:notes");
     }
 
@@ -106,7 +140,7 @@ public abstract class CanonEntity<TModel> : Entity<TModel>
             throw new ArgumentException("Withdrawal reason must be provided.", nameof(reason));
         }
 
-        Status = CanonStatus.Withdrawn;
+        ApplyState(static state => state.WithLifecycle(CanonLifecycle.Withdrawn));
         Metadata.SetTag("withdrawn:reason", reason);
     }
 }

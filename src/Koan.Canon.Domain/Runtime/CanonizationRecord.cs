@@ -14,6 +14,11 @@ public sealed class CanonizationRecord
     public string CanonicalId { get; init; } = string.Empty;
 
     /// <summary>
+    /// CLR type name of the canonical entity.
+    /// </summary>
+    public string EntityType { get; init; } = string.Empty;
+
+    /// <summary>
     /// Pipeline phase that produced the record.
     /// </summary>
     public CanonPipelinePhase Phase { get; init; }
