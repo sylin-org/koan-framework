@@ -22,8 +22,8 @@ public class CanonEntitiesControllerTests
     [Fact]
     public async Task Upsert_ShouldInvokeRuntimeWithParsedOptions()
     {
-        var runtime = new FakeCanonRuntime();
-    var descriptor = new CanonModelDescriptor(typeof(TestCanonEntity), "test-canon", nameof(TestCanonEntity), WebConstants.Routes.CanonPrefix + "/test-canon", isValueObject: false);
+        var runtime = new RecordingCanonRuntime();
+        var descriptor = new CanonModelDescriptor(typeof(TestCanonEntity), "test-canon", nameof(TestCanonEntity), WebConstants.Routes.CanonPrefix + "/test-canon", isValueObject: false);
         var catalog = new CanonModelCatalog(new[] { descriptor });
         var controller = new TestCanonController(runtime, catalog)
         {
@@ -37,16 +37,57 @@ public class CanonEntitiesControllerTests
         payload.Canonical.Name.Should().Be("sample");
         payload.Outcome.Should().Be(CanonizationOutcome.Canonized);
 
-        runtime.LastEntity.Should().BeOfType<TestCanonEntity>();
-        runtime.LastOptions.Should().NotBeNull();
-        runtime.LastOptions!.Origin.Should().Be("ingest");
-        runtime.LastOptions!.ForceRebuild.Should().BeTrue();
-        runtime.LastOptions!.SkipDistribution.Should().BeTrue();
-        runtime.LastOptions!.StageBehavior.Should().Be(CanonStageBehavior.StageOnly);
-        runtime.LastOptions!.RequestedViews.Should().BeEquivalentTo(new[] { "canonical", "lineage" });
-        runtime.LastOptions!.Tags.Should().ContainKey("priority").WhoseValue.Should().Be("high");
-        runtime.LastOptions!.Tags.Should().ContainKey("region").WhoseValue.Should().Be("us");
-        runtime.LastOptions!.CorrelationId.Should().Be("correlation-123");
+        runtime.CanonizeCalls.Should().ContainSingle();
+        runtime.CanonizeCalls[0].Entity.Should().BeOfType<TestCanonEntity>();
+        runtime.CanonizeCalls[0].Options.Should().NotBeNull();
+        runtime.CanonizeCalls[0].Options!.Origin.Should().Be("ingest");
+        runtime.CanonizeCalls[0].Options!.ForceRebuild.Should().BeTrue();
+        runtime.CanonizeCalls[0].Options!.SkipDistribution.Should().BeTrue();
+        runtime.CanonizeCalls[0].Options!.StageBehavior.Should().Be(CanonStageBehavior.StageOnly);
+        runtime.CanonizeCalls[0].Options!.RequestedViews.Should().BeEquivalentTo(new[] { "canonical", "lineage" });
+        runtime.CanonizeCalls[0].Options!.Tags.Should().ContainKey("priority").WhoseValue.Should().Be("high");
+        runtime.CanonizeCalls[0].Options!.Tags.Should().ContainKey("region").WhoseValue.Should().Be("us");
+        runtime.CanonizeCalls[0].Options!.CorrelationId.Should().Be("correlation-123");
+    }
+
+    [Fact]
+    public async Task UpsertMany_ShouldCanonizeEachEntity()
+    {
+        var runtime = new RecordingCanonRuntime();
+        var descriptor = new CanonModelDescriptor(typeof(TestCanonEntity), "test-canon", nameof(TestCanonEntity), WebConstants.Routes.CanonPrefix + "/test-canon", isValueObject: false);
+        var catalog = new CanonModelCatalog(new[] { descriptor });
+        var controller = new TestCanonController(runtime, catalog)
+        {
+            ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
+        };
+
+        var result = await controller.UpsertMany(new[]
+        {
+            new TestCanonEntity { Name = "one" },
+            new TestCanonEntity { Name = "two" }
+        }, CancellationToken.None);
+
+        result.Should().BeOfType<OkObjectResult>();
+        var payload = ((OkObjectResult)result).Value.Should().BeAssignableTo<IEnumerable<CanonEntitiesController<TestCanonEntity>.CanonizationResponse<TestCanonEntity>>>().Subject.ToList();
+        payload.Should().HaveCount(2);
+        runtime.CanonizeCalls.Should().HaveCount(2);
+        runtime.CanonizeCalls.Select(call => ((TestCanonEntity)call.Entity).Name).Should().BeEquivalentTo(new[] { "one", "two" });
+    }
+
+    [Fact]
+    public async Task Upsert_ShouldBubbleRuntimeExceptions()
+    {
+        var runtime = new RecordingCanonRuntime { ExceptionToThrow = new InvalidOperationException("failure") };
+        var descriptor = new CanonModelDescriptor(typeof(TestCanonEntity), "test-canon", nameof(TestCanonEntity), WebConstants.Routes.CanonPrefix + "/test-canon", isValueObject: false);
+        var catalog = new CanonModelCatalog(new[] { descriptor });
+        var controller = new TestCanonController(runtime, catalog)
+        {
+            ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
+        };
+
+        var act = async () => await controller.Upsert(new TestCanonEntity(), CancellationToken.None);
+
+        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("failure");
     }
 
     private static DefaultHttpContext CreateHttpContext()
@@ -70,28 +111,40 @@ public class CanonEntitiesControllerTests
         public string Name { get; set; } = string.Empty;
     }
 
-    private sealed class FakeCanonRuntime : ICanonRuntime
+    private sealed class RecordingCanonRuntime : ICanonRuntime
     {
-        public object? LastEntity { get; private set; }
-        public CanonizationOptions? LastOptions { get; private set; }
+        public List<(object Entity, CanonizationOptions? Options)> CanonizeCalls { get; } = new();
+        public List<(Type EntityType, string CanonicalId, string[]? Views)> RebuildCalls { get; } = new();
+        public List<CanonizationRecord> ReplayRecords { get; } = new();
+        public Exception? ExceptionToThrow { get; set; }
 
         public Task<CanonizationResult<T>> Canonize<T>(T entity, CanonizationOptions? options = null, CancellationToken cancellationToken = default)
             where T : CanonEntity<T>, new()
         {
-            LastEntity = entity;
-            LastOptions = options;
+            if (ExceptionToThrow is not null)
+            {
+                throw ExceptionToThrow;
+            }
+
+            CanonizeCalls.Add((entity, options));
             var metadata = entity.Metadata.Clone();
             return Task.FromResult(new CanonizationResult<T>(entity, CanonizationOutcome.Canonized, metadata, Array.Empty<CanonizationEvent>()));
         }
 
         public Task RebuildViews<T>(string canonicalId, string[]? views = null, CancellationToken cancellationToken = default)
             where T : CanonEntity<T>, new()
-            => Task.CompletedTask;
+        {
+            RebuildCalls.Add((typeof(T), canonicalId, views));
+            return Task.CompletedTask;
+        }
 
         public async IAsyncEnumerable<CanonizationRecord> Replay(DateTimeOffset? from = null, DateTimeOffset? to = null, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
         {
-            await Task.Yield();
-            yield break;
+            foreach (var record in ReplayRecords)
+            {
+                yield return record;
+                await Task.Yield();
+            }
         }
 
         public IDisposable RegisterObserver(ICanonPipelineObserver observer) => new DummyDisposable();

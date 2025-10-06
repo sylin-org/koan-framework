@@ -33,6 +33,7 @@ internal sealed class CanonPipelineDescriptor<TModel> : ICanonPipelineDescriptor
             HasSteps,
             aggregationMetadata.AggregationKeyNames,
             aggregationMetadata.PolicyByName,
+            aggregationMetadata.PolicyDescriptorsByName,
             aggregationMetadata.AuditEnabled);
     }
 

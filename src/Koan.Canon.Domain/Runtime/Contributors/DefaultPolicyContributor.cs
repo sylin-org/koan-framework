@@ -57,13 +57,14 @@ internal sealed class DefaultPolicyContributor<TModel> : ICanonPipelineContribut
         foreach (var pair in _metadata.PolicyByProperty)
         {
             var property = pair.Key;
-            var policy = pair.Value;
+            var descriptor = pair.Value;
+            var policy = descriptor.Kind;
 
             var incomingValue = property.GetValue(context.Entity);
             var existingValue = existingEntity is not null ? property.GetValue(existingEntity) : null;
             var existingFootprint = existingMetadata?.PropertyFootprints.GetValueOrDefault(property.Name);
 
-            var evaluation = EvaluatePolicy(policy, incomingValue, existingValue, existingFootprint, now, arrivalToken, context.Metadata.Origin);
+            var evaluation = EvaluatePolicy(descriptor, incomingValue, existingValue, existingFootprint, now, arrivalToken, context.Metadata.Origin);
             evaluation.Evidence["incoming"] = FormatValue(incomingValue);
             evaluation.Evidence["existing"] = FormatValue(existingValue);
             evaluation.Evidence["selected"] = FormatValue(evaluation.SelectedValue);
@@ -118,6 +119,22 @@ internal sealed class DefaultPolicyContributor<TModel> : ICanonPipelineContribut
     }
 
     private static PolicyEvaluationResult EvaluatePolicy(
+        AggregationPolicyDescriptor descriptor,
+        object? incomingValue,
+        object? existingValue,
+        CanonPropertyFootprint? existingFootprint,
+        DateTimeOffset now,
+        string arrivalToken,
+        string? sourceKey)
+    {
+        return descriptor.Kind switch
+        {
+            AggregationPolicyKind.SourceOfTruth => EvaluateSourceOfTruth(descriptor, incomingValue, existingValue, existingFootprint, now, arrivalToken, sourceKey),
+            _ => EvaluateSimplePolicy(descriptor.Kind, incomingValue, existingValue, existingFootprint, now, arrivalToken, sourceKey)
+        };
+    }
+
+    private static PolicyEvaluationResult EvaluateSimplePolicy(
         AggregationPolicyKind policy,
         object? incomingValue,
         object? existingValue,
@@ -132,8 +149,40 @@ internal sealed class DefaultPolicyContributor<TModel> : ICanonPipelineContribut
             AggregationPolicyKind.Latest => EvaluateLatest(incomingValue, existingValue, existingFootprint, now, arrivalToken, sourceKey),
             AggregationPolicyKind.Min => EvaluateMinMax(incomingValue, existingValue, existingFootprint, now, arrivalToken, sourceKey, preferMin: true),
             AggregationPolicyKind.Max => EvaluateMinMax(incomingValue, existingValue, existingFootprint, now, arrivalToken, sourceKey, preferMin: false),
-            _ => throw new InvalidOperationException($"Policy '{policy}' is not supported.")
+            _ => throw new InvalidOperationException($"Policy '{policy}' is not supported as a fallback.")
         };
+    }
+
+    private static PolicyEvaluationResult EvaluateSourceOfTruth(
+        AggregationPolicyDescriptor descriptor,
+        object? incomingValue,
+        object? existingValue,
+        CanonPropertyFootprint? existingFootprint,
+        DateTimeOffset now,
+        string arrivalToken,
+        string? sourceKey)
+    {
+        var authoritativeIncoming = descriptor.IsAuthoritativeSource(sourceKey);
+        var authoritativeExisting = existingFootprint is not null && descriptor.IsAuthoritativeSource(existingFootprint.SourceKey);
+
+        if (authoritativeIncoming)
+        {
+            var result = PolicyEvaluationResult.FromIncoming(incomingValue, now, arrivalToken, sourceKey);
+            result.Evidence["authority"] = "incoming";
+            return result;
+        }
+
+        if (authoritativeExisting)
+        {
+            var result = PolicyEvaluationResult.FromExisting(existingValue, existingFootprint);
+            result.Evidence["authority"] = "existing";
+            return result;
+        }
+
+        var fallbackResult = EvaluateSimplePolicy(descriptor.Fallback, incomingValue, existingValue, existingFootprint, now, arrivalToken, sourceKey);
+        fallbackResult.Evidence["authority"] = "fallback";
+        fallbackResult.Evidence["fallbackPolicy"] = descriptor.Fallback.ToString();
+        return fallbackResult;
     }
 
     private static PolicyEvaluationResult EvaluateFirst(object? incomingValue, object? existingValue, CanonPropertyFootprint? footprint, DateTimeOffset now, string arrivalToken, string? sourceKey)

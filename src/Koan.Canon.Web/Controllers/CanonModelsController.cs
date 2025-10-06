@@ -61,6 +61,7 @@ public sealed class CanonModelsController : ControllerBase
             metadata?.Phases ?? Array.Empty<CanonPipelinePhase>(),
             aggregationMetadata.AggregationKeyNames,
             metadata?.AggregationPolicies ?? aggregationMetadata.PolicyByName,
+            metadata?.AggregationPolicyDetails ?? aggregationMetadata.PolicyDescriptorsByName,
             metadata?.AuditEnabled ?? aggregationMetadata.AuditEnabled);
 
         return Ok(detail);
@@ -102,5 +103,6 @@ public sealed class CanonModelsController : ControllerBase
         IReadOnlyList<CanonPipelinePhase> Phases,
         IReadOnlyList<string> AggregationKeys,
         IReadOnlyDictionary<string, AggregationPolicyKind> AggregationPolicies,
+        IReadOnlyDictionary<string, AggregationPolicyDescriptor> AggregationPolicyDetails,
         bool AuditEnabled);
 }

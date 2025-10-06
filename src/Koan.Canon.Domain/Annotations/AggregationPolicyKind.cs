@@ -23,5 +23,10 @@ public enum AggregationPolicyKind
     /// <summary>
     /// Chooses the maximum value using natural ordering.
     /// </summary>
-    Max = 3
+    Max = 3,
+
+    /// <summary>
+    /// Prefers contributions from authoritative sources while allowing a fallback policy until authority is observed.
+    /// </summary>
+    SourceOfTruth = 4
 }

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using Koan.Canon.Domain.Metadata;
 
 namespace Koan.Canon.Domain.Runtime;
 
@@ -18,6 +19,7 @@ public sealed record CanonPipelineMetadata
         bool hasSteps,
         IReadOnlyList<string> aggregationKeys,
         IReadOnlyDictionary<string, Annotations.AggregationPolicyKind> aggregationPolicies,
+        IReadOnlyDictionary<string, AggregationPolicyDescriptor> aggregationPolicyDetails,
         bool auditEnabled)
     {
         ModelType = modelType ?? throw new ArgumentNullException(nameof(modelType));
@@ -27,6 +29,9 @@ public sealed record CanonPipelineMetadata
         AggregationPolicies = aggregationPolicies is null
             ? new Dictionary<string, Annotations.AggregationPolicyKind>(StringComparer.OrdinalIgnoreCase)
             : new Dictionary<string, Annotations.AggregationPolicyKind>(aggregationPolicies, StringComparer.OrdinalIgnoreCase);
+        AggregationPolicyDetails = aggregationPolicyDetails is null
+            ? new Dictionary<string, AggregationPolicyDescriptor>(StringComparer.OrdinalIgnoreCase)
+            : new Dictionary<string, AggregationPolicyDescriptor>(aggregationPolicyDetails, StringComparer.OrdinalIgnoreCase);
         AuditEnabled = auditEnabled;
     }
 
@@ -54,6 +59,11 @@ public sealed record CanonPipelineMetadata
     /// Aggregation policies declared on the canonical model keyed by property name.
     /// </summary>
     public IReadOnlyDictionary<string, Annotations.AggregationPolicyKind> AggregationPolicies { get; }
+
+    /// <summary>
+    /// Detailed aggregation policy descriptors keyed by property name.
+    /// </summary>
+    public IReadOnlyDictionary<string, AggregationPolicyDescriptor> AggregationPolicyDetails { get; }
 
     /// <summary>
     /// Indicates whether auditing is enabled for the canonical model.

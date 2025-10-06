@@ -14,6 +14,8 @@
        href: guides/building-apis.md
     - name: Data Modeling
       href: guides/data-modeling.md
+    - name: Canon Capabilities
+      href: guides/canon-capabilities-howto.md
     - name: Garden Cooperative Journal
       href: guides/garden-cooperative-journal.md
      - name: AI Integration

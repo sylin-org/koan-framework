@@ -1,8 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Reflection;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Koan.Canon.Domain.Metadata;
@@ -46,38 +46,50 @@ internal sealed class DefaultAggregationContributor<TModel> : ICanonPipelineCont
         var arrivalToken = ResolveArrivalToken(context);
         context.SetItem(ArrivalTokenContextKey, arrivalToken);
 
-        var compositeKey = BuildAggregationKey(context.Entity);
-        var indexEntry = await context.Persistence.GetIndexAsync(_entityType, compositeKey, cancellationToken).ConfigureAwait(false);
+        var aggregationKey = BuildAggregationKey(context.Entity);
+        var indexLookup = await LoadIndexesAsync(context, aggregationKey, cancellationToken).ConfigureAwait(false);
 
-        var canonicalId = await EnsureCanonicalIdAsync(context, indexEntry, cancellationToken).ConfigureAwait(false);
+        var canonicalId = await EnsureCanonicalIdAsync(context, indexLookup, cancellationToken).ConfigureAwait(false);
         var attributes = BuildIndexAttributes(context, arrivalToken);
 
-        if (indexEntry is null)
+        foreach (var entry in indexLookup)
         {
-            indexEntry = new CanonIndex
+            var index = entry.Value ?? new CanonIndex
             {
                 EntityType = _entityType,
-                Key = compositeKey,
+                Key = entry.Key,
                 Kind = CanonIndexKeyKind.Aggregation
             };
-        }
 
-        indexEntry.Update(canonicalId, context.Metadata.Origin, attributes);
-        await context.Persistence.UpsertIndexAsync(indexEntry, cancellationToken).ConfigureAwait(false);
+            index.Update(canonicalId, context.Metadata.Origin, attributes);
+            await context.Persistence.UpsertIndexAsync(index, cancellationToken).ConfigureAwait(false);
+        }
 
         return null;
     }
 
-    private async Task<string> EnsureCanonicalIdAsync(CanonPipelineContext<TModel> context, CanonIndex? indexEntry, CancellationToken cancellationToken)
+    private async Task<string> EnsureCanonicalIdAsync(
+        CanonPipelineContext<TModel> context,
+        IReadOnlyDictionary<string, CanonIndex?> indexLookup,
+        CancellationToken cancellationToken)
     {
-        if (indexEntry is null)
+        var candidateIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var index in indexLookup.Values)
+        {
+            if (!string.IsNullOrWhiteSpace(index?.CanonicalId))
+            {
+                candidateIds.Add(index!.CanonicalId);
+            }
+        }
+
+        if (candidateIds.Count == 0)
         {
             var assignedId = context.Entity.Id;
             context.Metadata.AssignCanonicalId(assignedId);
             return assignedId;
         }
 
-        var canonicalId = indexEntry.CanonicalId;
+        var canonicalId = candidateIds.OrderBy(static id => id, StringComparer.Ordinal).First();
         if (!string.Equals(context.Entity.Id, canonicalId, StringComparison.OrdinalIgnoreCase))
         {
             context.Entity.Id = canonicalId;
@@ -85,6 +97,38 @@ internal sealed class DefaultAggregationContributor<TModel> : ICanonPipelineCont
 
         context.Metadata.AssignCanonicalId(canonicalId);
         await AttachExistingSnapshotAsync(context, canonicalId, cancellationToken).ConfigureAwait(false);
+
+        if (candidateIds.Count > 1)
+        {
+            var merged = candidateIds
+                .Where(id => !string.Equals(id, canonicalId, StringComparison.OrdinalIgnoreCase))
+                .ToArray();
+
+            if (merged.Length > 0)
+            {
+                foreach (var absorbed in merged)
+                {
+                    context.Metadata.Lineage.MarkSuperseded(absorbed, "identity-union");
+                }
+
+                context.Metadata.Lineage.RecordMetadataUpdate($"identity-union:{string.Join(',', merged)}");
+                var mergedSet = new HashSet<string>(merged, StringComparer.OrdinalIgnoreCase);
+                if (context.Metadata.TryGetTag("identity:merged-from", out var existingTag) && !string.IsNullOrWhiteSpace(existingTag))
+                {
+                    foreach (var token in existingTag.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries))
+                    {
+                        var value = token.Trim();
+                        if (!string.IsNullOrEmpty(value))
+                        {
+                            mergedSet.Add(value);
+                        }
+                    }
+                }
+
+                context.Metadata.SetTag("identity:merged-from", string.Join(',', mergedSet));
+            }
+        }
+
         return canonicalId;
     }
 
@@ -173,28 +217,67 @@ internal sealed class DefaultAggregationContributor<TModel> : ICanonPipelineCont
         return attributes;
     }
 
-    private string BuildAggregationKey(TModel entity)
+    private async ValueTask<IReadOnlyDictionary<string, CanonIndex?>> LoadIndexesAsync(
+        CanonPipelineContext<TModel> context,
+        AggregationKey aggregationKey,
+        CancellationToken cancellationToken)
     {
-        var builder = new StringBuilder();
-        for (var i = 0; i < _keyProperties.Count; i++)
+        var lookup = new Dictionary<string, CanonIndex?>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var token in aggregationKey.Tokens)
         {
-            var property = _keyProperties[i];
+            var index = await context.Persistence.GetIndexAsync(_entityType, token, cancellationToken).ConfigureAwait(false);
+            lookup[token] = index;
+        }
+
+        if (!string.IsNullOrWhiteSpace(aggregationKey.CompositeKey) && !lookup.ContainsKey(aggregationKey.CompositeKey!))
+        {
+            var composite = await context.Persistence.GetIndexAsync(_entityType, aggregationKey.CompositeKey!, cancellationToken).ConfigureAwait(false);
+            lookup[aggregationKey.CompositeKey!] = composite;
+        }
+
+        return lookup;
+    }
+
+    private AggregationKey BuildAggregationKey(TModel entity)
+    {
+        var tokens = new List<string>(_keyProperties.Count);
+        foreach (var property in _keyProperties)
+        {
             var value = property.GetValue(entity);
             if (value is null)
             {
-                throw new InvalidOperationException($"Aggregation key property '{property.Name}' on '{_metadata.ModelType.Name}' produced a null value.");
+                continue;
             }
 
-            if (i > 0)
+            var formatted = Convert.ToString(value, CultureInfo.InvariantCulture);
+            if (string.IsNullOrWhiteSpace(formatted))
             {
-                builder.Append('|');
+                continue;
             }
 
-            builder.Append(property.Name);
-            builder.Append('=');
-            builder.Append(Convert.ToString(value, CultureInfo.InvariantCulture));
+            tokens.Add($"{property.Name}={formatted}");
         }
 
-        return builder.ToString();
+        if (tokens.Count == 0)
+        {
+            var declared = string.Join(", ", _metadata.AggregationKeyNames);
+            throw new InvalidOperationException($"Canonical entity '{_metadata.ModelType.Name}' requires at least one aggregation key value; all declared keys were null or empty ({declared}).");
+        }
+
+        var composite = tokens.Count > 1 ? string.Join('|', tokens) : null;
+        return new AggregationKey(tokens, composite);
+    }
+
+    private readonly struct AggregationKey
+    {
+        public AggregationKey(IReadOnlyList<string> tokens, string? compositeKey)
+        {
+            Tokens = tokens;
+            CompositeKey = compositeKey;
+        }
+
+        public IReadOnlyList<string> Tokens { get; }
+        public string? CompositeKey { get; }
     }
 }

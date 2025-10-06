@@ -41,6 +41,12 @@ Canon (formerly the Flow pillar) orchestrates inbound data, enrichment, and publ
 - `Koan.Canon.Semantic` – semantic streaming pipeline operators.
 - Adapter packages (`Koan.Data.Connector.Postgres`, `Koan.Data.Vector.Redis`, `Koan.Data.Connector.Mongo`, etc.) wired through Koan’s auto-registration.
 
+### Identity Graph & Source-of-Truth Requirements
+
+- **Peer identity graph**: Canon treats every `[AggregationKey]` as an optional peer node. Do **not** model “primary vs secondary” identifiers; payloads may arrive with any subset (email, username, employee IDs, etc.). Canon unions clusters when later payloads bridge previously separate identifiers.
+- **Authority-aware policies**: Regulated properties must designate an authoritative system using the upcoming `AggregationPolicyKind.SourceOfTruth` (e.g., Workday for HR attributes). Provide a fallback policy such as `Latest` until the authority emits data, and log attempted overrides for audit.
+- **Operational posture**: Capture identity merge posture (`auto-union`, `manual-review`) in `CanonizationOptions.Identity`, and surface authoritative mappings in module docs so API consumers know which integration governs each field.
+
 ---
 
 ## Installation

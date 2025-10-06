@@ -6,6 +6,7 @@ using FluentAssertions;
 using Koan.Canon.Domain.Audit;
 using Koan.Canon.Domain.Annotations;
 using Koan.Canon.Domain.Model;
+using Koan.Canon.Domain.Metadata;
 using Koan.Canon.Domain.Runtime;
 using System.Linq;
 using Xunit;
@@ -576,7 +577,7 @@ public class CanonRuntimeTests
     }
 
     [Fact]
-    public async Task Canonize_WithMissingAggregationKey_ShouldThrow()
+    public async Task Canonize_WithPartialAggregationKey_ShouldPersistUsingAvailableToken()
     {
         var persistence = new FakeCanonPersistence();
         var runtime = new CanonRuntimeBuilder()
@@ -591,10 +592,562 @@ public class CanonRuntimeTests
             Name = "laser"
         };
 
-        var act = () => runtime.Canonize(entity);
+        var first = await runtime.Canonize(entity);
+
+        first.Metadata.CanonicalId.Should().NotBeNull();
+        var index = persistence.FindIndex<CompositeDeviceCanon>("TenantId=tenant-42");
+        index.Should().NotBeNull();
+        index!.CanonicalId.Should().Be(first.Canonical.Id);
+
+        var followUp = await runtime.Canonize(new CompositeDeviceCanon
+        {
+            TenantId = "tenant-42",
+            DeviceId = null,
+            Name = "laser-updated"
+        });
+
+        followUp.Canonical.Id.Should().Be(first.Canonical.Id);
+    }
+
+    [Fact]
+    public async Task Canonize_WithIdentityGraph_ShouldUnionCanonicalIds()
+    {
+        var persistence = new FakeCanonPersistence();
+        var runtime = new CanonRuntimeBuilder()
+            .UsePersistence(persistence)
+            .ConfigurePipeline<PersonIdentityCanon>(pipeline =>
+            {
+                pipeline.AddStep(CanonPipelinePhase.Intake, (context, _) =>
+                {
+                    if (!string.IsNullOrWhiteSpace(context.Entity.Source))
+                    {
+                        context.Metadata.SetOrigin(context.Entity.Source!);
+                    }
+
+                    return ValueTask.CompletedTask;
+                });
+            })
+            .Build();
+
+        var first = await runtime.Canonize(new PersonIdentityCanon
+        {
+            Email = "sam@example.com",
+            Username = null,
+            EmployeeId = null,
+            DisplayName = "Sam",
+            Source = "crm"
+        });
+
+        var second = await runtime.Canonize(new PersonIdentityCanon
+        {
+            Email = null,
+            Username = "sammy",
+            EmployeeId = null,
+            DisplayName = "Sammy",
+            Source = "support"
+        });
+
+        first.Canonical.Id.Should().NotBe(second.Canonical.Id);
+
+        var bridge = await runtime.Canonize(new PersonIdentityCanon
+        {
+            Email = "sam@example.com",
+            Username = "sammy",
+            EmployeeId = null,
+            DisplayName = "Samuel",
+            Source = "hr"
+        });
+
+        bridge.Canonical.Id.Should().Be(first.Canonical.Id);
+        bridge.Metadata.Tags.Should().ContainKey("identity:merged-from");
+        bridge.Metadata.Tags["identity:merged-from"].Split(',').Should().Contain(second.Canonical.Id);
+
+        var usernameOnly = await runtime.Canonize(new PersonIdentityCanon
+        {
+            Email = null,
+            Username = "sammy",
+            EmployeeId = null,
+            DisplayName = "Sam duplicate",
+            Source = "support"
+        });
+
+        usernameOnly.Canonical.Id.Should().Be(first.Canonical.Id);
+
+        var emailIndex = persistence.FindIndex<PersonIdentityCanon>("Email=sam@example.com");
+        emailIndex.Should().NotBeNull();
+        emailIndex!.CanonicalId.Should().Be(first.Canonical.Id);
+
+        var usernameIndex = persistence.FindIndex<PersonIdentityCanon>("Username=sammy");
+        usernameIndex.Should().NotBeNull();
+        usernameIndex!.CanonicalId.Should().Be(first.Canonical.Id);
+    }
+
+    [Fact]
+    public async Task Canonize_WithIdentityGraph_ShouldRecordLineageAndNormalizeIndexes()
+    {
+        var persistence = new FakeCanonPersistence();
+        var runtime = new CanonRuntimeBuilder()
+            .UsePersistence(persistence)
+            .ConfigurePipeline<PersonIdentityCanon>(pipeline =>
+            {
+                pipeline.AddStep(CanonPipelinePhase.Intake, (context, _) =>
+                {
+                    if (!string.IsNullOrWhiteSpace(context.Entity.Source))
+                    {
+                        context.Metadata.SetOrigin(context.Entity.Source!);
+                    }
+
+                    return ValueTask.CompletedTask;
+                });
+            })
+            .Build();
+
+        var emailOnly = new PersonIdentityCanon
+        {
+            Id = "zz-canonical",
+            Email = "alpha@example.com",
+            Username = null,
+            EmployeeId = null,
+            DisplayName = "Alpha",
+            Source = "crm"
+        };
+
+        var usernameOnly = new PersonIdentityCanon
+        {
+            Id = "AA-canonical",
+            Email = null,
+            Username = "alpha-user",
+            EmployeeId = null,
+            DisplayName = "User Alpha",
+            Source = "support"
+        };
+
+        var emailResult = await runtime.Canonize(emailOnly, CanonizationOptions.Default with { CorrelationId = "run-email" });
+        var usernameResult = await runtime.Canonize(usernameOnly, CanonizationOptions.Default with { CorrelationId = "run-username" });
+
+        emailResult.Canonical.Id.Should().Be("zz-canonical");
+        usernameResult.Canonical.Id.Should().Be("AA-canonical");
+
+        var bridge = new PersonIdentityCanon
+        {
+            Id = "bridge-id",
+            Email = "alpha@example.com",
+            Username = "alpha-user",
+            EmployeeId = "emp-42",
+            DisplayName = "Alpha Prime",
+            Source = "workday"
+        };
+
+        var bridgeResult = await runtime.Canonize(bridge, CanonizationOptions.Default with { CorrelationId = "run-bridge" });
+
+        bridgeResult.Canonical.Id.Should().Be("AA-canonical");
+        bridgeResult.Metadata.CanonicalId.Should().Be("AA-canonical");
+        bridgeResult.Metadata.Tags.Should().ContainKey("identity:merged-from");
+        bridgeResult.Metadata.Tags["identity:merged-from"].Split(',').Should().Contain("zz-canonical");
+
+        var lineage = bridgeResult.Metadata.Lineage;
+        lineage.Changes.Should().Contain(change => change.Kind == CanonLineageChangeKind.Superseded && change.RelatedId == "zz-canonical");
+        lineage.Changes.Should().Contain(change => change.Kind == CanonLineageChangeKind.MetadataUpdated && change.Notes?.Contains("identity-union:zz-canonical", StringComparison.Ordinal) == true);
+
+        var emailIndex = persistence.FindIndex<PersonIdentityCanon>("Email=alpha@example.com");
+        emailIndex.Should().NotBeNull();
+        emailIndex!.CanonicalId.Should().Be("AA-canonical");
+
+        var usernameIndex = persistence.FindIndex<PersonIdentityCanon>("Username=alpha-user");
+        usernameIndex.Should().NotBeNull();
+        usernameIndex!.CanonicalId.Should().Be("AA-canonical");
+
+        var employeeIndex = persistence.FindIndex<PersonIdentityCanon>("EmployeeId=emp-42");
+        employeeIndex.Should().NotBeNull();
+        employeeIndex!.CanonicalId.Should().Be("AA-canonical");
+
+        var compositeIndex = persistence.FindIndex<PersonIdentityCanon>("Email=alpha@example.com|Username=alpha-user|EmployeeId=emp-42");
+        compositeIndex.Should().NotBeNull();
+        compositeIndex!.CanonicalId.Should().Be("AA-canonical");
+
+        var repeat = await runtime.Canonize(new PersonIdentityCanon
+        {
+            Email = "alpha@example.com",
+            Username = null,
+            EmployeeId = "emp-42",
+            DisplayName = "Alpha Repeat",
+            Source = "crm"
+        }, CanonizationOptions.Default with { CorrelationId = "run-repeat" });
+
+        repeat.Metadata.Tags.Should().ContainKey("identity:merged-from");
+        repeat.Metadata.Tags["identity:merged-from"].Split(',', StringSplitOptions.RemoveEmptyEntries).Should().OnlyContain(id => id == "zz-canonical");
+    }
+
+    [Fact]
+    public async Task Canonize_WithIdentityGraph_WithAllNullKeys_ShouldThrow()
+    {
+        var persistence = new FakeCanonPersistence();
+        var runtime = new CanonRuntimeBuilder()
+            .UsePersistence(persistence)
+            .ConfigurePipeline<PersonIdentityCanon>(_ => { })
+            .Build();
+
+        var payload = new PersonIdentityCanon
+        {
+            Email = null,
+            Username = null,
+            EmployeeId = null,
+            DisplayName = "Null Keys"
+        };
+
+        var act = () => runtime.Canonize(payload);
 
         await act.Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("*Aggregation key property 'DeviceId'*null value*");
+            .WithMessage("*requires at least one aggregation key value; all declared keys were null or empty*");
+    }
+
+    [Fact]
+    public async Task Canonize_WithSourceOfTruthPolicy_ShouldHonorAuthoritativeSource()
+    {
+        var persistence = new FakeCanonPersistence();
+        var runtime = new CanonRuntimeBuilder()
+            .UsePersistence(persistence)
+            .ConfigurePipeline<SourceOfTruthPersonCanon>(pipeline =>
+            {
+                pipeline.AddStep(CanonPipelinePhase.Intake, (context, _) =>
+                {
+                    if (!string.IsNullOrWhiteSpace(context.Entity.Source))
+                    {
+                        context.Metadata.SetOrigin(context.Entity.Source!);
+                    }
+
+                    return ValueTask.CompletedTask;
+                });
+            })
+            .Build();
+
+        var crm = await runtime.Canonize(new SourceOfTruthPersonCanon
+        {
+            EmployeeId = "42",
+            FullName = "CRM Name",
+            Title = "Sales Rep",
+            Source = "crm"
+        });
+
+        crm.Canonical.FullName.Should().Be("CRM Name");
+        var crmFootprint = crm.Metadata.PropertyFootprints[nameof(SourceOfTruthPersonCanon.FullName)];
+        crmFootprint.Evidence.Should().ContainKey("authority").WhoseValue.Should().Be("fallback");
+        crmFootprint.Evidence.Should().ContainKey("fallbackPolicy").WhoseValue.Should().Be(AggregationPolicyKind.First.ToString());
+
+        var workday = await runtime.Canonize(new SourceOfTruthPersonCanon
+        {
+            EmployeeId = "42",
+            FullName = "Workday Name",
+            Title = "Engineer",
+            Source = "workday"
+        });
+
+        workday.Canonical.FullName.Should().Be("Workday Name");
+        var workdayFootprint = workday.Metadata.PropertyFootprints[nameof(SourceOfTruthPersonCanon.FullName)];
+        workdayFootprint.SourceKey.Should().Be("workday");
+        workdayFootprint.Evidence.Should().ContainKey("authority").WhoseValue.Should().Be("incoming");
+        workdayFootprint.Evidence.Should().NotContainKey("fallbackPolicy");
+
+        var crmOverride = await runtime.Canonize(new SourceOfTruthPersonCanon
+        {
+            EmployeeId = "42",
+            FullName = "CRM Override",
+            Title = "Lead",
+            Source = "crm"
+        });
+
+        crmOverride.Canonical.FullName.Should().Be("Workday Name");
+        var overrideFootprint = crmOverride.Metadata.PropertyFootprints[nameof(SourceOfTruthPersonCanon.FullName)];
+        overrideFootprint.SourceKey.Should().Be("workday");
+        overrideFootprint.Evidence.Should().ContainKey("authority").WhoseValue.Should().Be("existing");
+        overrideFootprint.Evidence.Should().NotContainKey("fallbackPolicy");
+    }
+
+    [Fact]
+    public async Task Canonize_WithSourceOfTruthPolicy_ShouldAcceptAnyConfiguredAuthority()
+    {
+        var persistence = new FakeCanonPersistence();
+        var runtime = new CanonRuntimeBuilder()
+            .UsePersistence(persistence)
+            .ConfigurePipeline<MultiAuthorityPersonCanon>(pipeline =>
+            {
+                pipeline.AddStep(CanonPipelinePhase.Intake, (context, _) =>
+                {
+                    if (!string.IsNullOrWhiteSpace(context.Entity.Source))
+                    {
+                        context.Metadata.SetOrigin(context.Entity.Source!);
+                    }
+
+                    return ValueTask.CompletedTask;
+                });
+            })
+            .Build();
+
+        var fallback = await runtime.Canonize(new MultiAuthorityPersonCanon
+        {
+            EmployeeId = "42",
+            FullName = "CRM Name",
+            Source = "crm"
+        }, CanonizationOptions.Default with { CorrelationId = "run-fallback" });
+
+        fallback.Canonical.FullName.Should().Be("CRM Name");
+        var fallbackFootprint = fallback.Metadata.PropertyFootprints[nameof(MultiAuthorityPersonCanon.FullName)];
+        fallbackFootprint.Evidence.Should().ContainKey("authority").WhoseValue.Should().Be("fallback");
+        fallbackFootprint.Evidence.Should().ContainKey("fallbackPolicy").WhoseValue.Should().Be(AggregationPolicyKind.First.ToString());
+
+        var sap = await runtime.Canonize(new MultiAuthorityPersonCanon
+        {
+            EmployeeId = "42",
+            FullName = "SAP Name",
+            Source = "sap"
+        }, CanonizationOptions.Default with { CorrelationId = "run-sap" });
+
+        sap.Canonical.FullName.Should().Be("SAP Name");
+        var sapFootprint = sap.Metadata.PropertyFootprints[nameof(MultiAuthorityPersonCanon.FullName)];
+        sapFootprint.Evidence.Should().ContainKey("authority").WhoseValue.Should().Be("incoming");
+        sapFootprint.Evidence.Should().NotContainKey("fallbackPolicy");
+
+        var workday = await runtime.Canonize(new MultiAuthorityPersonCanon
+        {
+            EmployeeId = "42",
+            FullName = "Workday Name",
+            Source = "workday"
+        }, CanonizationOptions.Default with { CorrelationId = "run-workday" });
+
+        workday.Canonical.FullName.Should().Be("Workday Name");
+        var workdayFootprint = workday.Metadata.PropertyFootprints[nameof(MultiAuthorityPersonCanon.FullName)];
+        workdayFootprint.SourceKey.Should().Be("workday");
+        workdayFootprint.Evidence.Should().ContainKey("authority").WhoseValue.Should().Be("incoming");
+
+        var nonAuthorityNull = await runtime.Canonize(new MultiAuthorityPersonCanon
+        {
+            EmployeeId = "42",
+            FullName = "Support Override",
+            Source = "support"
+        }, CanonizationOptions.Default with { CorrelationId = "run-support" });
+
+        nonAuthorityNull.Canonical.FullName.Should().Be("Workday Name");
+        var supportFootprint = nonAuthorityNull.Metadata.PropertyFootprints[nameof(MultiAuthorityPersonCanon.FullName)];
+        supportFootprint.SourceKey.Should().Be("workday");
+        supportFootprint.Evidence.Should().ContainKey("authority").WhoseValue.Should().Be("existing");
+        supportFootprint.Evidence.Should().NotContainKey("fallbackPolicy");
+    }
+
+    [Fact]
+    public async Task Canonize_WithSourceOfTruthPolicy_LatestFallback_ShouldRespectArrivalOrdering()
+    {
+        var persistence = new FakeCanonPersistence();
+        var runtime = new CanonRuntimeBuilder()
+            .UsePersistence(persistence)
+            .ConfigurePipeline<LatestFallbackPersonCanon>(pipeline =>
+            {
+                pipeline.AddStep(CanonPipelinePhase.Intake, (context, _) =>
+                {
+                    if (!string.IsNullOrWhiteSpace(context.Entity.Source))
+                    {
+                        context.Metadata.SetOrigin(context.Entity.Source!);
+                    }
+
+                    return ValueTask.CompletedTask;
+                });
+            })
+            .Build();
+
+        var first = await runtime.Canonize(new LatestFallbackPersonCanon
+        {
+            EmployeeId = "777",
+            PreferredName = "First",
+            Source = "crm"
+        }, CanonizationOptions.Default with { CorrelationId = "run-1" });
+
+        var firstFootprint = first.Metadata.PropertyFootprints[nameof(LatestFallbackPersonCanon.PreferredName)];
+        firstFootprint.Evidence.Should().ContainKey("authority").WhoseValue.Should().Be("fallback");
+        firstFootprint.Evidence.Should().ContainKey("fallbackPolicy").WhoseValue.Should().Be(AggregationPolicyKind.Latest.ToString());
+
+        var second = await runtime.Canonize(new LatestFallbackPersonCanon
+        {
+            EmployeeId = "777",
+            PreferredName = "Second",
+            Source = "marketing"
+        }, CanonizationOptions.Default with { CorrelationId = "run-2" });
+
+        second.Canonical.PreferredName.Should().Be("Second");
+        var secondFootprint = second.Metadata.PropertyFootprints[nameof(LatestFallbackPersonCanon.PreferredName)];
+        secondFootprint.Evidence.Should().ContainKey("authority").WhoseValue.Should().Be("fallback");
+        secondFootprint.Evidence.Should().ContainKey("fallbackPolicy").WhoseValue.Should().Be(AggregationPolicyKind.Latest.ToString());
+        secondFootprint.Evidence.Should().ContainKey("incoming").WhoseValue.Should().Be("Second");
+
+        var authoritative = await runtime.Canonize(new LatestFallbackPersonCanon
+        {
+            EmployeeId = "777",
+            PreferredName = "Authoritative",
+            Source = "erp"
+        }, CanonizationOptions.Default with { CorrelationId = "run-authority" });
+
+        authoritative.Canonical.PreferredName.Should().Be("Authoritative");
+        var authoritativeFootprint = authoritative.Metadata.PropertyFootprints[nameof(LatestFallbackPersonCanon.PreferredName)];
+        authoritativeFootprint.SourceKey.Should().Be("erp");
+        authoritativeFootprint.Evidence.Should().ContainKey("authority").WhoseValue.Should().Be("incoming");
+        authoritativeFootprint.Evidence.Should().NotContainKey("fallbackPolicy");
+    }
+
+    [Fact]
+    public async Task Canonize_WithSourceOfTruthPolicy_ShouldPreserveAuthoritativeValueWhenNonAuthoritySendsNull()
+    {
+        var persistence = new FakeCanonPersistence();
+        var runtime = new CanonRuntimeBuilder()
+            .UsePersistence(persistence)
+            .ConfigurePipeline<SourceOfTruthPersonCanon>(pipeline =>
+            {
+                pipeline.AddStep(CanonPipelinePhase.Intake, (context, _) =>
+                {
+                    if (!string.IsNullOrWhiteSpace(context.Entity.Source))
+                    {
+                        context.Metadata.SetOrigin(context.Entity.Source!);
+                    }
+
+                    return ValueTask.CompletedTask;
+                });
+            })
+            .Build();
+
+        await runtime.Canonize(new SourceOfTruthPersonCanon
+        {
+            EmployeeId = "91",
+            FullName = "CRM Name",
+            Title = "Rep",
+            Source = "crm"
+        }, CanonizationOptions.Default with { CorrelationId = "run-crm" });
+
+        var authoritative = await runtime.Canonize(new SourceOfTruthPersonCanon
+        {
+            EmployeeId = "91",
+            FullName = "Workday Name",
+            Title = "Engineer",
+            Source = "workday"
+        }, CanonizationOptions.Default with { CorrelationId = "run-workday" });
+
+        var nonAuthorityNull = await runtime.Canonize(new SourceOfTruthPersonCanon
+        {
+            EmployeeId = "91",
+            FullName = null,
+            Title = "Support",
+            Source = "crm"
+        }, CanonizationOptions.Default with { CorrelationId = "run-null" });
+
+        nonAuthorityNull.Canonical.FullName.Should().Be("Workday Name");
+        var footprint = nonAuthorityNull.Metadata.PropertyFootprints[nameof(SourceOfTruthPersonCanon.FullName)];
+        footprint.SourceKey.Should().Be("workday");
+        footprint.Evidence.Should().ContainKey("authority").WhoseValue.Should().Be("existing");
+        footprint.Evidence.Should().NotContainKey("fallbackPolicy");
+        footprint.Evidence.Should().ContainKey("incoming").WhoseValue.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Canonize_WithSourceOfTruthPolicy_WhenAuditingEnabled_ShouldEmitAuthorityEvidence()
+    {
+        var persistence = new FakeCanonPersistence();
+        var auditSink = new RecordingAuditSink();
+        var runtime = new CanonRuntimeBuilder()
+            .UsePersistence(persistence)
+            .UseAuditSink(auditSink)
+            .ConfigurePipeline<AuditedSourceOfTruthCanon>(pipeline =>
+            {
+                pipeline.AddStep(CanonPipelinePhase.Intake, (context, _) =>
+                {
+                    context.Metadata.SetOrigin(context.Entity.Source ?? "unknown");
+                    return ValueTask.CompletedTask;
+                });
+            })
+            .Build();
+
+        var result = await runtime.Canonize(new AuditedSourceOfTruthCanon
+        {
+            EmployeeId = "501",
+            DisplayName = "Authoritative",
+            Source = "workday"
+        }, CanonizationOptions.Default with { CorrelationId = "run-audit" });
+
+        var footprint = result.Metadata.PropertyFootprints[nameof(AuditedSourceOfTruthCanon.DisplayName)];
+        footprint.Evidence.Should().ContainKey("authority").WhoseValue.Should().Be("incoming");
+        footprint.Evidence.Should().NotContainKey("fallbackPolicy");
+
+        auditSink.Entries.Should().ContainSingle();
+        var entry = auditSink.Entries.Single();
+        entry.Policy.Should().Be(AggregationPolicyKind.SourceOfTruth.ToString());
+        entry.Evidence.Should().ContainKey("authority").WhoseValue.Should().Be("incoming");
+    }
+
+    [Fact]
+    public void AggregationMetadata_ShouldExposeFriendlyPolicyHelpers()
+    {
+        var metadata = CanonModelAggregationMetadata.For<SourceOfTruthPersonCanon>();
+
+        metadata.TryGetPolicy(nameof(SourceOfTruthPersonCanon.FullName), out var fullNameDescriptor).Should().BeTrue();
+        fullNameDescriptor.Kind.Should().Be(AggregationPolicyKind.SourceOfTruth);
+        fullNameDescriptor.HasAuthoritativeSources.Should().BeTrue();
+        fullNameDescriptor.AuthoritativeSources.Should().ContainSingle().Which.Should().Be("workday");
+        fullNameDescriptor.Fallback.Should().Be(AggregationPolicyKind.First);
+
+        metadata.GetPolicyOrDefault(nameof(SourceOfTruthPersonCanon.Title))!.Kind.Should().Be(AggregationPolicyKind.Latest);
+        metadata.TryGetPolicy(nameof(SourceOfTruthPersonCanon.Source), out _).Should().BeFalse();
+
+        var typedDescriptor = metadata.GetRequiredPolicy<SourceOfTruthPersonCanon, string?>(person => person.FullName);
+        typedDescriptor.Kind.Should().Be(AggregationPolicyKind.SourceOfTruth);
+
+        metadata.TryGetPolicy<SourceOfTruthPersonCanon, string?>(person => person.Title, out var titleDescriptor).Should().BeTrue();
+        titleDescriptor!.Kind.Should().Be(AggregationPolicyKind.Latest);
+
+        metadata.GetPolicyOrDefault<SourceOfTruthPersonCanon, string?>(person => person.Source).Should().BeNull();
+    }
+
+    [Fact]
+    public void CanonModelAggregationMetadata_ForInvalidSourceOfTruthConfigurations_ShouldThrow()
+    {
+        var scenarios = new (Type ModelType, string Expected)[]
+        {
+            (typeof(BadSourceOfTruthCanonMissingSource), "does not specify any Source or Sources"),
+            (typeof(BadSourceOfTruthCanonWithInvalidFallback), "cannot declare SourceOfTruth policy with SourceOfTruth fallback"),
+            (typeof(BadNonSourcePolicyCanon), "Sources may only be configured for SourceOfTruth")
+        };
+
+        foreach (var (modelType, expectedFragment) in scenarios)
+        {
+            var act = () => CanonModelAggregationMetadata.For(modelType);
+            act.Should().Throw<InvalidOperationException>().WithMessage($"*{expectedFragment}*");
+        }
+    }
+
+    [Fact]
+    public void AggregationMetadataHelpers_ShouldGuardAgainstInvalidUsage()
+    {
+        var metadata = CanonModelAggregationMetadata.For<SourceOfTruthPersonCanon>();
+
+        Action mismatched = () => metadata.GetRequiredPolicy<CompositeDeviceCanon, string?>(device => device.Name);
+        mismatched.Should().Throw<InvalidOperationException>().WithMessage("*cannot be used with model type*");
+
+        Action invalidExpression = () => metadata.TryGetPolicy<SourceOfTruthPersonCanon, string?>(person => person.DisplayName!.ToLowerInvariant(), out _);
+        invalidExpression.Should().Throw<ArgumentException>().WithMessage("*property expression*");
+
+        Action nullMetadata = () => CanonModelAggregationMetadataExtensions.TryGetPolicy<SourceOfTruthPersonCanon, string?>(null!, person => person.FullName, out _);
+        nullMetadata.Should().Throw<ArgumentNullException>().And.ParamName.Should().Be("metadata");
+    }
+
+    [Fact]
+    public void CanonRuntimeBuilder_ShouldExposeAggregationPolicyDetailsInMetadata()
+    {
+        var builder = new CanonRuntimeBuilder()
+            .UsePersistence(new FakeCanonPersistence())
+            .ConfigurePipeline<SourceOfTruthPersonCanon>(_ => { });
+
+        var configuration = builder.BuildConfiguration();
+
+        configuration.PipelineMetadata.Should().ContainKey(typeof(SourceOfTruthPersonCanon));
+        var metadata = configuration.PipelineMetadata[typeof(SourceOfTruthPersonCanon)];
+        metadata.AggregationPolicyDetails.Should().ContainKey(nameof(SourceOfTruthPersonCanon.FullName));
+        var descriptor = metadata.AggregationPolicyDetails[nameof(SourceOfTruthPersonCanon.FullName)];
+        descriptor.Kind.Should().Be(AggregationPolicyKind.SourceOfTruth);
+        descriptor.AuthoritativeSources.Should().ContainSingle().Which.Should().Be("workday");
     }
 
     [Fact]
@@ -868,6 +1421,98 @@ public class CanonRuntimeTests
 
         [AggregationPolicy(AggregationPolicyKind.Latest)]
         public string? Name { get; set; }
+    }
+
+    private sealed class PersonIdentityCanon : CanonEntity<PersonIdentityCanon>
+    {
+        [AggregationKey]
+        public string? Email { get; set; }
+
+        [AggregationKey]
+        public string? Username { get; set; }
+
+        [AggregationKey]
+        public string? EmployeeId { get; set; }
+
+        public string? Source { get; set; }
+
+        [AggregationPolicy(AggregationPolicyKind.Latest)]
+        public string? DisplayName { get; set; }
+    }
+
+    private sealed class SourceOfTruthPersonCanon : CanonEntity<SourceOfTruthPersonCanon>
+    {
+        [AggregationKey]
+        public string? EmployeeId { get; set; }
+
+        public string? Source { get; set; }
+
+        [AggregationPolicy(AggregationPolicyKind.SourceOfTruth, Source = "workday", Fallback = AggregationPolicyKind.First)]
+        public string? FullName { get; set; }
+
+        [AggregationPolicy(AggregationPolicyKind.Latest)]
+        public string? Title { get; set; }
+    }
+
+    private sealed class MultiAuthorityPersonCanon : CanonEntity<MultiAuthorityPersonCanon>
+    {
+        [AggregationKey]
+        public string? EmployeeId { get; set; }
+
+        public string? Source { get; set; }
+
+        [AggregationPolicy(AggregationPolicyKind.SourceOfTruth, Sources = new[] { "workday", "sap" }, Fallback = AggregationPolicyKind.First)]
+        public string? FullName { get; set; }
+    }
+
+    private sealed class LatestFallbackPersonCanon : CanonEntity<LatestFallbackPersonCanon>
+    {
+        [AggregationKey]
+        public string? EmployeeId { get; set; }
+
+        public string? Source { get; set; }
+
+        [AggregationPolicy(AggregationPolicyKind.SourceOfTruth, Source = "erp", Fallback = AggregationPolicyKind.Latest)]
+        public string? PreferredName { get; set; }
+    }
+
+    [Canon(audit: true)]
+    private sealed class AuditedSourceOfTruthCanon : CanonEntity<AuditedSourceOfTruthCanon>
+    {
+        [AggregationKey]
+        public string? EmployeeId { get; set; }
+
+        public string? Source { get; set; }
+
+        [AggregationPolicy(AggregationPolicyKind.SourceOfTruth, Source = "workday", Fallback = AggregationPolicyKind.First)]
+        public string? DisplayName { get; set; }
+    }
+
+    private sealed class BadSourceOfTruthCanonMissingSource : CanonEntity<BadSourceOfTruthCanonMissingSource>
+    {
+        [AggregationKey]
+        public string? EmployeeId { get; set; }
+
+        [AggregationPolicy(AggregationPolicyKind.SourceOfTruth)]
+        public string? FullName { get; set; }
+    }
+
+    private sealed class BadSourceOfTruthCanonWithInvalidFallback : CanonEntity<BadSourceOfTruthCanonWithInvalidFallback>
+    {
+        [AggregationKey]
+        public string? EmployeeId { get; set; }
+
+        [AggregationPolicy(AggregationPolicyKind.SourceOfTruth, Source = "workday", Fallback = AggregationPolicyKind.SourceOfTruth)]
+        public string? FullName { get; set; }
+    }
+
+    private sealed class BadNonSourcePolicyCanon : CanonEntity<BadNonSourcePolicyCanon>
+    {
+        [AggregationKey]
+        public string? EmployeeId { get; set; }
+
+        [AggregationPolicy(AggregationPolicyKind.First, Source = "workday")]
+        public string? FullName { get; set; }
     }
 
     private sealed class FakeCanonPersistence : ICanonPersistence
