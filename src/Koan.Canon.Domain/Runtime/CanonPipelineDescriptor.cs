@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using Koan.Canon.Domain.Metadata;
 using Koan.Canon.Domain.Model;
 
 namespace Koan.Canon.Domain.Runtime;
@@ -17,14 +18,22 @@ internal sealed class CanonPipelineDescriptor<TModel> : ICanonPipelineDescriptor
     private readonly IReadOnlyList<CanonPipelinePhase> _phases;
     private readonly CanonPipelineMetadata _metadata;
 
-    public CanonPipelineDescriptor(IReadOnlyDictionary<CanonPipelinePhase, IReadOnlyList<ICanonPipelineContributor<TModel>>> contributors)
+    public CanonPipelineDescriptor(
+        IReadOnlyDictionary<CanonPipelinePhase, IReadOnlyList<ICanonPipelineContributor<TModel>>> contributors,
+        CanonModelAggregationMetadata aggregationMetadata)
     {
         _contributors = contributors ?? throw new ArgumentNullException(nameof(contributors));
         _phases = contributors.Keys
             .OrderBy(static phase => (int)phase)
             .ToArray();
         HasSteps = _phases.Count > 0;
-        _metadata = new CanonPipelineMetadata(typeof(TModel), _phases, HasSteps);
+        _metadata = new CanonPipelineMetadata(
+            typeof(TModel),
+            _phases,
+            HasSteps,
+            aggregationMetadata.AggregationKeyNames,
+            aggregationMetadata.PolicyByName,
+            aggregationMetadata.AuditEnabled);
     }
 
     public bool HasSteps { get; }

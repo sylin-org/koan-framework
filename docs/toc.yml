@@ -96,6 +96,8 @@
    items:
      - name: Canonization Overhaul (2025)
        href: proposals/PROP-canon-overhaul-2.md
+     - name: Canon Aggregation Contract & Policies
+       href: proposals/PROP-canon-aggregation-contract.md
  - name: Templates
    href: templates/document-template.md
  - name: Archive

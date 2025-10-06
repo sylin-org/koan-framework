@@ -1,4 +1,5 @@
-﻿using FluentAssertions;
+﻿using System;
+using FluentAssertions;
 using Koan.Canon.Domain.Metadata;
 using Koan.Canon.Domain.Model;
 using Xunit;
@@ -99,5 +100,72 @@ public class CanonMetadataTests
         primary.State.Lifecycle.Should().Be(CanonLifecycle.Superseded);
         primary.State.Signals.Should().ContainKey("beta");
         ReferenceEquals(primary.State, incomingState).Should().BeFalse();
+    }
+
+    [Fact]
+    public void Merge_WithPreferIncoming_ShouldReplaceOriginAndStateTimestamp()
+    {
+        var primary = new CanonMetadata();
+        primary.SetOrigin("primary");
+        primary.State = primary.State.WithLifecycle(CanonLifecycle.Active);
+
+        var incoming = new CanonMetadata();
+        incoming.SetOrigin("incoming");
+        incoming.State = incoming.State.WithLifecycle(CanonLifecycle.Withdrawn);
+        var incomingTimestamp = incoming.State.UpdatedAt;
+
+        primary.Merge(incoming, preferIncoming: true);
+
+        primary.Origin.Should().Be("incoming");
+        primary.State.Lifecycle.Should().Be(CanonLifecycle.Withdrawn);
+        primary.State.UpdatedAt.Should().BeAfter(incomingTimestamp.AddMilliseconds(-1));
+    }
+
+    [Fact]
+    public void Merge_ShouldCombineTagsWhenPreferringIncoming()
+    {
+        var primary = new CanonMetadata();
+        primary.SetTag("alpha", "1");
+
+        var incoming = new CanonMetadata();
+        incoming.SetTag("alpha", "2");
+        incoming.SetTag("beta", "3");
+
+        primary.Merge(incoming, preferIncoming: true);
+
+        primary.TryGetTag("alpha", out var alpha).Should().BeTrue();
+        alpha.Should().Be("2");
+        primary.TryGetTag("beta", out var beta).Should().BeTrue();
+        beta.Should().Be("3");
+    }
+
+    [Fact]
+    public void RecordExternalId_ShouldThrowWhenSchemeMissing()
+    {
+        var metadata = new CanonMetadata();
+
+        var act = () => metadata.RecordExternalId(" ", "123");
+
+        act.Should().Throw<ArgumentException>().WithMessage("*Scheme must be provided*");
+    }
+
+    [Fact]
+    public void RecordSource_ShouldThrowWhenKeyMissing()
+    {
+        var metadata = new CanonMetadata();
+
+        var act = () => metadata.RecordSource(string.Empty);
+
+        act.Should().Throw<ArgumentException>().WithMessage("*Source key must be provided*");
+    }
+
+    [Fact]
+    public void SetTag_ShouldThrowWhenKeyMissing()
+    {
+        var metadata = new CanonMetadata();
+
+        var act = () => metadata.SetTag(null!, "value");
+
+        act.Should().Throw<ArgumentException>().WithMessage("*Tag key must be provided*");
     }
 }

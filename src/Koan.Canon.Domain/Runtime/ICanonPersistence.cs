@@ -20,4 +20,14 @@ public interface ICanonPersistence
     /// </summary>
     Task<CanonStage<TModel>> PersistStageAsync<TModel>(CanonStage<TModel> stage, CancellationToken cancellationToken)
         where TModel : CanonEntity<TModel>, new();
+
+    /// <summary>
+    /// Retrieves an aggregation index entry if one exists for the provided key.
+    /// </summary>
+    Task<CanonIndex?> GetIndexAsync(string entityType, string key, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Upserts an aggregation index entry.
+    /// </summary>
+    Task UpsertIndexAsync(CanonIndex index, CancellationToken cancellationToken);
 }

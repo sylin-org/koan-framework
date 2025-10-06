@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using Koan.Canon.Domain.Audit;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
@@ -25,9 +26,13 @@ public static class CanonRuntimeServiceCollectionExtensions
             services.TryAddEnumerable(ServiceDescriptor.Singleton<ICanonRuntimeConfigurator>(new DelegateCanonRuntimeConfigurator(configure)));
         }
 
+        services.TryAddSingleton<ICanonAuditSink, DefaultCanonAuditSink>();
+
         services.TryAddSingleton<CanonRuntimeConfiguration>(sp =>
         {
             var builder = new CanonRuntimeBuilder();
+            var auditSink = sp.GetRequiredService<ICanonAuditSink>();
+            builder.UseAuditSink(auditSink);
             foreach (var configurator in sp.GetServices<ICanonRuntimeConfigurator>())
             {
                 configurator.Configure(builder);

@@ -1,4 +1,5 @@
-﻿using System.Threading;
+﻿using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Koan.Canon.Domain.Model;
 using Koan.Data.Core;
@@ -17,4 +18,13 @@ internal sealed class DefaultCanonPersistence : ICanonPersistence
     public Task<CanonStage<TModel>> PersistStageAsync<TModel>(CanonStage<TModel> stage, CancellationToken cancellationToken)
         where TModel : CanonEntity<TModel>, new()
         => stage.Save(cancellationToken);
+
+    public async Task<CanonIndex?> GetIndexAsync(string entityType, string key, CancellationToken cancellationToken)
+    {
+        var matches = await CanonIndex.Query(index => index.EntityType == entityType && index.Key == key, cancellationToken).ConfigureAwait(false);
+        return matches.FirstOrDefault();
+    }
+
+    public Task UpsertIndexAsync(CanonIndex index, CancellationToken cancellationToken)
+        => CanonIndex.UpsertAsync(index, cancellationToken);
 }

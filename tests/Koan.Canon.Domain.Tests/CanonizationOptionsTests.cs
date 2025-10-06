@@ -1,4 +1,5 @@
-﻿using FluentAssertions;
+﻿using System;
+using FluentAssertions;
 using Koan.Canon.Domain.Runtime;
 using Xunit;
 
@@ -50,5 +51,21 @@ public class CanonizationOptionsTests
 
         options.RequestedViews.Should().NotBeNull();
         options.RequestedViews.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void WithOrigin_ShouldThrowWhenOriginMissing()
+    {
+        var act = () => CanonizationOptions.Default.WithOrigin("   ");
+
+        act.Should().Throw<ArgumentException>();
+    }
+
+    [Fact]
+    public void WithTag_ShouldThrowWhenKeyMissing()
+    {
+        var act = () => CanonizationOptions.Default.WithTag("", "value");
+
+        act.Should().Throw<ArgumentException>();
     }
 }

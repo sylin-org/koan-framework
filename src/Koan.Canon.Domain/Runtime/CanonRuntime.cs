@@ -5,7 +5,9 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
+using Koan.Canon.Domain.Audit;
 using Koan.Canon.Domain.Model;
+using Koan.Canon.Domain.Runtime.Contributors;
 
 namespace Koan.Canon.Domain.Runtime;
 
@@ -21,6 +23,7 @@ public sealed class CanonRuntime : ICanonRuntime
     private readonly int _recordCapacity;
     private readonly ICanonPersistence _persistence;
     private readonly IServiceProvider? _services;
+    private readonly ICanonAuditSink _auditSink;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="CanonRuntime"/> class.
@@ -37,6 +40,7 @@ public sealed class CanonRuntime : ICanonRuntime
         _pipelines = new Dictionary<Type, ICanonPipelineDescriptor>(configuration.Pipelines);
         _persistence = configuration.Persistence;
         _services = services;
+    _auditSink = configuration.AuditSink;
     }
 
     /// <inheritdoc />
@@ -70,7 +74,7 @@ public sealed class CanonRuntime : ICanonRuntime
             }
         }
 
-        var context = new CanonPipelineContext<T>(entity, metadata, effectiveOptions, _services);
+    var context = new CanonPipelineContext<T>(entity, metadata, effectiveOptions, _persistence, _services);
         var observers = SnapshotObservers();
 
         if (effectiveOptions.StageBehavior == CanonStageBehavior.StageOnly)
@@ -141,6 +145,8 @@ public sealed class CanonRuntime : ICanonRuntime
             var resultMetadata = context.Metadata.Clone();
             var reprojectionTriggered = effectiveOptions.ForceRebuild || (effectiveOptions.RequestedViews?.Length > 0);
 
+            await EmitAuditAsync(context, cancellationToken).ConfigureAwait(false);
+
             return new CanonizationResult<T>(canonical, outcome, resultMetadata, events, reprojectionTriggered, effectiveOptions.SkipDistribution);
         }
         catch (Exception ex)
@@ -151,6 +157,30 @@ public sealed class CanonRuntime : ICanonRuntime
             AppendRecord(context, errorEvent, CanonizationOutcome.Failed);
             throw;
         }
+    }
+
+    private async Task EmitAuditAsync<T>(CanonPipelineContext<T> context, CancellationToken cancellationToken)
+        where T : CanonEntity<T>, new()
+    {
+        if (!context.TryGetItem(DefaultPolicyContributor<T>.AuditEntriesContextKey, out List<CanonAuditEntry>? entries) || entries is null || entries.Count == 0)
+        {
+            return;
+        }
+
+        var canonicalId = context.Metadata.CanonicalId ?? context.Entity.Id;
+        var entityType = typeof(T).FullName ?? typeof(T).Name;
+        var origin = context.Metadata.Origin;
+
+        for (var i = 0; i < entries.Count; i++)
+        {
+            var entry = entries[i];
+            entry.CanonicalId = canonicalId;
+            entry.EntityType = string.IsNullOrWhiteSpace(entry.EntityType) ? entityType : entry.EntityType;
+            entry.Source ??= origin;
+            entry.ArrivalToken ??= context.Entity.Id;
+        }
+
+        await _auditSink.WriteAsync(entries, cancellationToken).ConfigureAwait(false);
     }
 
     /// <inheritdoc />

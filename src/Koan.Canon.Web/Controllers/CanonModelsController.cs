@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using Koan.Canon.Domain.Annotations;
+using Koan.Canon.Domain.Metadata;
 using Koan.Canon.Domain.Runtime;
 using Koan.Canon.Web.Catalog;
 using Koan.Canon.Web.Infrastructure;
@@ -48,6 +50,7 @@ public sealed class CanonModelsController : ControllerBase
         }
 
         var metadata = ResolveMetadata(descriptor.ModelType);
+        var aggregationMetadata = CanonModelAggregationMetadata.For(descriptor.ModelType);
         var detail = new CanonModelDetail(
             descriptor.Slug,
             descriptor.DisplayName,
@@ -55,7 +58,10 @@ public sealed class CanonModelsController : ControllerBase
             descriptor.ModelType.FullName ?? descriptor.ModelType.Name,
             descriptor.IsValueObject,
             metadata?.HasSteps ?? false,
-            metadata?.Phases ?? Array.Empty<CanonPipelinePhase>());
+            metadata?.Phases ?? Array.Empty<CanonPipelinePhase>(),
+            aggregationMetadata.AggregationKeyNames,
+            metadata?.AggregationPolicies ?? aggregationMetadata.PolicyByName,
+            metadata?.AuditEnabled ?? aggregationMetadata.AuditEnabled);
 
         return Ok(detail);
     }
@@ -63,12 +69,15 @@ public sealed class CanonModelsController : ControllerBase
     private CanonModelSummary CreateSummary(CanonModelDescriptor descriptor)
     {
         var metadata = ResolveMetadata(descriptor.ModelType);
+        var aggregationMetadata = CanonModelAggregationMetadata.For(descriptor.ModelType);
         return new CanonModelSummary(
             descriptor.Slug,
             descriptor.DisplayName,
             descriptor.Route,
             descriptor.IsValueObject,
-            metadata?.HasSteps ?? false);
+            metadata?.HasSteps ?? false,
+            aggregationMetadata.AggregationKeyNames,
+            metadata?.AuditEnabled ?? aggregationMetadata.AuditEnabled);
     }
 
     private CanonPipelineMetadata? ResolveMetadata(Type modelType)
@@ -79,7 +88,9 @@ public sealed class CanonModelsController : ControllerBase
         string DisplayName,
         string Route,
         bool IsValueObject,
-        bool HasPipeline);
+        bool HasPipeline,
+        IReadOnlyList<string> AggregationKeys,
+        bool AuditEnabled);
 
     public sealed record CanonModelDetail(
         string Slug,
@@ -88,5 +99,8 @@ public sealed class CanonModelsController : ControllerBase
         string Type,
         bool IsValueObject,
         bool HasPipeline,
-        IReadOnlyList<CanonPipelinePhase> Phases);
+        IReadOnlyList<CanonPipelinePhase> Phases,
+        IReadOnlyList<string> AggregationKeys,
+        IReadOnlyDictionary<string, AggregationPolicyKind> AggregationPolicies,
+        bool AuditEnabled);
 }

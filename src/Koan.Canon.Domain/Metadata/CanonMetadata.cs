@@ -12,6 +12,7 @@ public sealed class CanonMetadata
     private Dictionary<string, CanonExternalId> _externalIds = new(StringComparer.OrdinalIgnoreCase);
     private Dictionary<string, CanonSourceAttribution> _sources = new(StringComparer.OrdinalIgnoreCase);
     private Dictionary<string, CanonPolicySnapshot> _policies = new(StringComparer.OrdinalIgnoreCase);
+    private Dictionary<string, CanonPropertyFootprint> _propertyFootprints = new(StringComparer.OrdinalIgnoreCase);
     private Dictionary<string, string> _tags = new(StringComparer.OrdinalIgnoreCase);
     private CanonLineage _lineage = new();
     private CanonState _state = CanonState.Default;
@@ -66,6 +67,17 @@ public sealed class CanonMetadata
         get => _policies;
         set => _policies = value is null
             ? new Dictionary<string, CanonPolicySnapshot>(StringComparer.OrdinalIgnoreCase)
+            : value.ToDictionary(static kvp => kvp.Key, static kvp => kvp.Value.Clone(), StringComparer.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Property-level footprints that capture provenance for merged values.
+    /// </summary>
+    public Dictionary<string, CanonPropertyFootprint> PropertyFootprints
+    {
+        get => _propertyFootprints;
+        set => _propertyFootprints = value is null
+            ? new Dictionary<string, CanonPropertyFootprint>(StringComparer.OrdinalIgnoreCase)
             : value.ToDictionary(static kvp => kvp.Key, static kvp => kvp.Value.Clone(), StringComparer.OrdinalIgnoreCase);
     }
 
@@ -346,6 +358,7 @@ public sealed class CanonMetadata
                 ExternalIds = _externalIds.ToDictionary(static kvp => kvp.Key, static kvp => kvp.Value.Clone(), StringComparer.OrdinalIgnoreCase),
                 Sources = _sources.ToDictionary(static kvp => kvp.Key, static kvp => kvp.Value.Clone(), StringComparer.OrdinalIgnoreCase),
                 Policies = _policies.ToDictionary(static kvp => kvp.Key, static kvp => kvp.Value.Clone(), StringComparer.OrdinalIgnoreCase),
+                PropertyFootprints = _propertyFootprints.ToDictionary(static kvp => kvp.Key, static kvp => kvp.Value.Clone(), StringComparer.OrdinalIgnoreCase),
                 Tags = new Dictionary<string, string>(_tags, StringComparer.OrdinalIgnoreCase),
                 Lineage = _lineage.Clone(),
                 State = _state.Copy()
@@ -402,6 +415,14 @@ public sealed class CanonMetadata
                 if (preferIncoming || !_policies.ContainsKey(pair.Key))
                 {
                     _policies[pair.Key] = pair.Value.Clone();
+                }
+            }
+
+            foreach (var pair in incoming._propertyFootprints)
+            {
+                if (preferIncoming || !_propertyFootprints.ContainsKey(pair.Key))
+                {
+                    _propertyFootprints[pair.Key] = pair.Value.Clone();
                 }
             }
 

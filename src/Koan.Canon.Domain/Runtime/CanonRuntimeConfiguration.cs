@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using Koan.Canon.Domain.Audit;
 
 namespace Koan.Canon.Domain.Runtime;
 
@@ -13,7 +14,8 @@ public sealed class CanonRuntimeConfiguration
         IDictionary<Type, ICanonPipelineDescriptor> pipelines,
         IDictionary<Type, CanonPipelineMetadata> pipelineMetadata,
         int recordCapacity,
-        ICanonPersistence persistence)
+    ICanonPersistence persistence,
+    ICanonAuditSink auditSink)
     {
         if (defaultOptions is null)
         {
@@ -35,7 +37,8 @@ public sealed class CanonRuntimeConfiguration
             throw new ArgumentOutOfRangeException(nameof(recordCapacity), recordCapacity, "Record capacity must be greater than zero.");
         }
 
-        Persistence = persistence ?? throw new ArgumentNullException(nameof(persistence));
+    Persistence = persistence ?? throw new ArgumentNullException(nameof(persistence));
+    AuditSink = auditSink ?? throw new ArgumentNullException(nameof(auditSink));
 
         DefaultOptions = defaultOptions.Copy();
         Pipelines = new Dictionary<Type, ICanonPipelineDescriptor>(pipelines);
@@ -67,4 +70,9 @@ public sealed class CanonRuntimeConfiguration
     /// Persistence strategy used by the runtime.
     /// </summary>
     public ICanonPersistence Persistence { get; }
+
+    /// <summary>
+    /// Audit sink used to persist canonical audit entries.
+    /// </summary>
+    public ICanonAuditSink AuditSink { get; }
 }

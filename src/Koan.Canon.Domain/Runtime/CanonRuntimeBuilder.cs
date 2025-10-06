@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using Koan.Canon.Domain.Audit;
 using Koan.Canon.Domain.Model;
 
 namespace Koan.Canon.Domain.Runtime;
@@ -14,6 +15,7 @@ public sealed class CanonRuntimeBuilder
     private readonly Dictionary<Type, ICanonPipelineDescriptor> _descriptors = new();
     private int _recordCapacity = 1024;
     private ICanonPersistence _persistence = new DefaultCanonPersistence();
+    private ICanonAuditSink _auditSink = new DefaultCanonAuditSink();
 
     /// <summary>
     /// Configures default options used when callers do not supply explicit overrides.
@@ -57,6 +59,15 @@ public sealed class CanonRuntimeBuilder
     }
 
     /// <summary>
+    /// Configures the audit sink used when canonical models opt into auditing.
+    /// </summary>
+    public CanonRuntimeBuilder UseAuditSink(ICanonAuditSink auditSink)
+    {
+        _auditSink = auditSink ?? throw new ArgumentNullException(nameof(auditSink));
+        return this;
+    }
+
+    /// <summary>
     /// Sets the in-memory canonization record retention capacity.
     /// </summary>
     public CanonRuntimeBuilder SetRecordCapacity(int capacity)
@@ -77,7 +88,7 @@ public sealed class CanonRuntimeBuilder
     {
         var descriptors = new Dictionary<Type, ICanonPipelineDescriptor>(_descriptors);
         var metadata = descriptors.ToDictionary(static pair => pair.Key, static pair => pair.Value.Metadata);
-        return new CanonRuntimeConfiguration(_defaultOptions.Copy(), descriptors, metadata, _recordCapacity, _persistence);
+    return new CanonRuntimeConfiguration(_defaultOptions.Copy(), descriptors, metadata, _recordCapacity, _persistence, _auditSink);
     }
 
     /// <summary>

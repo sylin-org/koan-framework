@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Koan.Canon.Domain.Metadata;
 using Koan.Canon.Domain.Model;
 
 namespace Koan.Canon.Domain.Runtime;
@@ -79,13 +80,34 @@ public sealed class CanonPipelineBuilder<TModel>
 
     internal CanonPipelineDescriptor<TModel> Build()
     {
-        var map = new Dictionary<CanonPipelinePhase, IReadOnlyList<ICanonPipelineContributor<TModel>>>(_contributors.Count);
+        var aggregationMetadata = CanonModelAggregationMetadata.For<TModel>();
+        var map = new Dictionary<CanonPipelinePhase, List<ICanonPipelineContributor<TModel>>>(_contributors.Count);
         foreach (var pair in _contributors)
         {
-            map[pair.Key] = pair.Value.ToArray();
+            map[pair.Key] = new List<ICanonPipelineContributor<TModel>>(pair.Value);
         }
 
-        return new CanonPipelineDescriptor<TModel>(map);
+        // Ensure default contributors execute before custom ones.
+        GetOrCreateList(map, CanonPipelinePhase.Aggregation).Insert(0, new Contributors.DefaultAggregationContributor<TModel>(aggregationMetadata));
+
+        if (aggregationMetadata.PolicyByProperty.Count > 0 || aggregationMetadata.AuditEnabled)
+        {
+            GetOrCreateList(map, CanonPipelinePhase.Policy).Insert(0, new Contributors.DefaultPolicyContributor<TModel>(aggregationMetadata));
+        }
+
+        var finalized = map.ToDictionary(static pair => pair.Key, static pair => (IReadOnlyList<ICanonPipelineContributor<TModel>>)pair.Value.ToArray());
+        return new CanonPipelineDescriptor<TModel>(finalized, aggregationMetadata);
+    }
+
+    private static List<ICanonPipelineContributor<TModel>> GetOrCreateList(Dictionary<CanonPipelinePhase, List<ICanonPipelineContributor<TModel>>> map, CanonPipelinePhase phase)
+    {
+        if (!map.TryGetValue(phase, out var list))
+        {
+            list = new List<ICanonPipelineContributor<TModel>>();
+            map[phase] = list;
+        }
+
+        return list;
     }
 
     private sealed class LambdaContributor : ICanonPipelineContributor<TModel>

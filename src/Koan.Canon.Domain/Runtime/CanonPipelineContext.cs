@@ -16,11 +16,12 @@ public sealed class CanonPipelineContext<TModel> : ICanonPipelineContext
     /// <summary>
     /// Initializes a new instance of <see cref="CanonPipelineContext{TModel}"/>.
     /// </summary>
-    public CanonPipelineContext(TModel entity, CanonMetadata metadata, CanonizationOptions options, IServiceProvider? services = null)
+    public CanonPipelineContext(TModel entity, CanonMetadata metadata, CanonizationOptions options, ICanonPersistence persistence, IServiceProvider? services = null)
     {
         Entity = entity ?? throw new ArgumentNullException(nameof(entity));
         Metadata = metadata ?? throw new ArgumentNullException(nameof(metadata));
         Options = options ?? throw new ArgumentNullException(nameof(options));
+        Persistence = persistence ?? throw new ArgumentNullException(nameof(persistence));
         Services = services ?? EmptyServiceProvider.Instance;
     }
 
@@ -43,6 +44,11 @@ public sealed class CanonPipelineContext<TModel> : ICanonPipelineContext
     /// Service provider for resolving dependencies within contributors.
     /// </summary>
     public IServiceProvider Services { get; }
+
+    /// <summary>
+    /// Persistence abstraction for working with canonical storage.
+    /// </summary>
+    public ICanonPersistence Persistence { get; }
 
     /// <summary>
     /// Associated stage record, if the payload originated from staging.

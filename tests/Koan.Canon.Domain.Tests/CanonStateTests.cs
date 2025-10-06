@@ -70,4 +70,43 @@ public class CanonStateTests
         merged.Should().NotBeSameAs(current);
         merged.Signals.Should().ContainKey("note");
     }
+
+    [Fact]
+    public void WithReadiness_ShouldUpdateRequiresAttention()
+    {
+        var state = CanonState.Default;
+
+        state.RequiresAttention.Should().BeFalse();
+
+        var degraded = state.WithReadiness(CanonReadiness.Degraded);
+
+        degraded.RequiresAttention.Should().BeTrue();
+        degraded.Readiness.Should().Be(CanonReadiness.Degraded);
+        state.Readiness.Should().Be(CanonReadiness.Complete);
+    }
+
+    [Fact]
+    public void WithSignal_ShouldUpdateTimestamp()
+    {
+        var state = CanonState.Default;
+        var priorTimestamp = state.UpdatedAt;
+
+        var mutated = state.WithSignal("alert", "yes");
+
+        mutated.UpdatedAt.Should().BeAfter(priorTimestamp);
+        mutated.Signals.Should().ContainKey("alert");
+    }
+
+    [Fact]
+    public void Merge_WhenNotPreferringIncoming_ShouldRetainLifecycle()
+    {
+        var current = CanonState.Default.WithLifecycle(CanonLifecycle.Active).WithSignal("alpha", "1");
+        var incoming = CanonState.Default.WithLifecycle(CanonLifecycle.Withdrawn).WithSignal("alpha", "override").WithSignal("beta", "2");
+
+        var merged = current.Merge(incoming, preferIncoming: false);
+
+        merged.Lifecycle.Should().Be(CanonLifecycle.Active);
+        merged.Signals.Should().ContainKey("alpha").WhoseValue.Should().Be("1");
+        merged.Signals.Should().ContainKey("beta").WhoseValue.Should().Be("2");
+    }
 }
