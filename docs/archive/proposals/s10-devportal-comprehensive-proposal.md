@@ -124,14 +124,15 @@ public class ArticlesController : EntityController<Article>
 ```
 
 Frontend provider switching:
+
 ```javascript
 // wwwroot/js/demo.js - Provider transparency demo
 window.DevPortalDemo = {
-    async switchProvider(provider) {
-        await fetch(`/api/demo/switch-provider/${provider}`, { method: 'POST' });
-        location.reload(); // Reload to show same data, different storage
-    }
-}
+  async switchProvider(provider) {
+    await fetch(`/api/demo/switch-provider/${provider}`, { method: "POST" });
+    location.reload(); // Reload to show same data, different storage
+  },
+};
 ```
 
 ### 2. Bulk Operations Demo
@@ -154,6 +155,7 @@ public async Task<IActionResult> BulkDelete([FromBody] List<string> ids)
 ```
 
 Frontend bulk operations:
+
 ```javascript
 // Bulk import/export demo buttons
 async bulkImportSampleData() {
@@ -184,6 +186,7 @@ public async Task<IActionResult> GetDrafts()
 ```
 
 Frontend set switching:
+
 ```javascript
 // Demonstrate set routing with same entity, different views
 async loadArticles(setName = 'published') {
@@ -265,34 +268,38 @@ wwwroot/
 window.DevPortalApi = {
   // Multi-provider transparency demo
   async switchProvider(provider) {
-    return await fetch(`/api/demo/switch-provider/${provider}`, { method: 'POST' });
+    return await fetch(`/api/demo/switch-provider/${provider}`, {
+      method: "POST",
+    });
   },
 
   // Set routing demo
-  async getArticles(set = 'published') {
-    return await fetch(`/api/articles?set=${set}`).then(r => r.json());
+  async getArticles(set = "published") {
+    return await fetch(`/api/articles?set=${set}`).then((r) => r.json());
   },
 
   // Bulk operations demo
   async bulkImportArticles(articles) {
-    return await fetch('/api/articles/bulk-import', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(articles)
+    return await fetch("/api/articles/bulk-import", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(articles),
     });
   },
 
   // Capability detection demo
   async getProviderCapabilities() {
-    return await fetch('/api/demo/capabilities').then(r => r.json());
+    return await fetch("/api/demo/capabilities").then((r) => r.json());
   },
 
   // Relationship navigation demo
   async getTechnologyWithChildren(id) {
-    const tech = await fetch(`/api/technologies/${id}`).then(r => r.json());
-    const children = await fetch(`/api/technologies/${id}/children`).then(r => r.json());
+    const tech = await fetch(`/api/technologies/${id}`).then((r) => r.json());
+    const children = await fetch(`/api/technologies/${id}/children`).then((r) =>
+      r.json()
+    );
     return { ...tech, children };
-  }
+  },
 };
 ```
 
@@ -372,6 +379,7 @@ public class DemoSeedService
 ### Phase 1: Core Framework Demo (Week 1)
 
 1. **Project Setup**
+
    - Create S10.DevPortal project with clean Koan initialization
    - Configure multi-provider Docker Compose (MongoDB + PostgreSQL)
    - Implement 3 core entities: Article, Technology, Comment
@@ -384,6 +392,7 @@ public class DemoSeedService
 ### Phase 2: Koan Capabilities Showcase (Week 2)
 
 1. **Multi-Provider Transparency**
+
    - Implement provider switching demo endpoints
    - Create frontend buttons to switch storage providers
    - Display provider capabilities and performance differences
@@ -396,6 +405,7 @@ public class DemoSeedService
 ### Phase 3: Relationship & Frontend (Week 3)
 
 1. **Relationship Navigation**
+
    - Implement technology hierarchy with GetChildren<T>()
    - Add threaded comment system with parent/child navigation
    - Create soft relationship demos between technologies
@@ -409,6 +419,7 @@ public class DemoSeedService
 ### Phase 4: Polish & Demo Readiness (Week 4)
 
 1. **Demo Data & Automation**
+
    - Automated demo data seeding
    - Performance comparison displays
    - Boot report and capability detection UI

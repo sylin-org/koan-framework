@@ -11,9 +11,9 @@ validation: 2025-01-17
 
 # Expose MCP over HTTP + SSE
 
-**Document Type**: GUIDE  \
-**Target Audience**: Developers, AI Agents  \
-**Last Updated**: 2025-01-17  \
+**Document Type**: GUIDE \
+**Target Audience**: Developers, AI Agents \
+**Last Updated**: 2025-01-17 \
 **Framework Version**: v0.2.18+
 
 ---
@@ -206,5 +206,5 @@ For staging and production environments:
 
 ---
 
-**Last Validation**: 2025-01-17 by Framework Specialist  \
+**Last Validation**: 2025-01-17 by Framework Specialist \
 **Framework Version Tested**: v0.2.18+

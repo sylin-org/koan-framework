@@ -8,21 +8,22 @@ This sample assumes lightweight evaluation datasets (dozens of documents, indivi
 
 ### **Transformation Overview**
 
-| **Aspect** | **Original Solution** | **S13.DocMind (Koan-Native)** |
-|------------|-------------------|---------------------------|
-| **Architecture** | Traditional .NET with manual DI | Entity-first with auto-registration |
-| **Data Layer** | MongoDB-only, repository pattern | Sample multi-provider patterns (MongoDB + Weaviate core, PostgreSQL/Redis optional) |
-| **AI Integration** | Manual Ollama client | Built-in `AI.Prompt()` and `AI.Embed()` with sample workflows |
-| **APIs** | Manual controller implementation | Auto-generated via `EntityController<T>` |
-| **Processing** | Synchronous with manual orchestration | Flow-driven background orchestration patterns |
-| **Scalability** | Single provider, container-aware | Sample scaling hooks and stretch guidance |
-| **Developer Experience** | Complex setup, manual patterns | "Reference = Intent", zero configuration |
+| **Aspect**               | **Original Solution**                 | **S13.DocMind (Koan-Native)**                                                       |
+| ------------------------ | ------------------------------------- | ----------------------------------------------------------------------------------- |
+| **Architecture**         | Traditional .NET with manual DI       | Entity-first with auto-registration                                                 |
+| **Data Layer**           | MongoDB-only, repository pattern      | Sample multi-provider patterns (MongoDB + Weaviate core, PostgreSQL/Redis optional) |
+| **AI Integration**       | Manual Ollama client                  | Built-in `AI.Prompt()` and `AI.Embed()` with sample workflows                       |
+| **APIs**                 | Manual controller implementation      | Auto-generated via `EntityController<T>`                                            |
+| **Processing**           | Synchronous with manual orchestration | Flow-driven background orchestration patterns                                       |
+| **Scalability**          | Single provider, container-aware      | Sample scaling hooks and stretch guidance                                           |
+| **Developer Experience** | Complex setup, manual patterns        | "Reference = Intent", zero configuration                                            |
 
 ---
 
 ## **Problem Domain Analysis**
 
 ### **Original Solution Capabilities**
+
 The reference document intelligence solution provides sophisticated features:
 
 - **Multi-format Processing**: .txt, .pdf, .docx, images with text extraction
@@ -33,6 +34,7 @@ The reference document intelligence solution provides sophisticated features:
 - **Generation Workflow**: Source documents → requests → runs → results pipeline
 
 ### **Architectural Challenges Identified**
+
 1. **Manual Infrastructure**: 60+ lines of DI registration in `Program.cs`
 2. **Provider Lock-in**: MongoDB-specific implementation patterns
 3. **Complex Orchestration**: Manual service coordination and error handling
@@ -47,6 +49,7 @@ The reference document intelligence solution provides sophisticated features:
 ### **1. Entity-First Data Models**
 
 #### **File Entity (Raw Content + Extracted Text)**
+
 ```csharp
 [DataAdapter("mongodb")] // Document storage optimized for file metadata
 public sealed class File : Entity<File>
@@ -177,6 +180,7 @@ Key design notes:
 - **Vector fields remain optional**: When Weaviate is disabled, the Koan vector attribute is ignored, preserving compatibility with the minimal stack.
 
 #### **Type Entity (Document Classification + AI Instructions)**
+
 ```csharp
 public sealed class Type : Entity<Type>
 {
@@ -205,6 +209,7 @@ public sealed class Type : Entity<Type>
 ```
 
 #### **Analysis Entity (AI-Generated Results)**
+
 ```csharp
 public sealed class Analysis : Entity<Analysis>
 {
@@ -234,6 +239,7 @@ public sealed class Analysis : Entity<Analysis>
 ### **2. AI-First Processing Architecture**
 
 #### **File Analysis Service**
+
 ```csharp
 public class FileAnalysisService
 {
@@ -320,6 +326,7 @@ public class FileAnalysisService
 ```
 
 #### **AI Model Management Service (Following Original gdoc Patterns)**
+
 ```csharp
 public class ModelManagementService
 {
@@ -442,6 +449,7 @@ public class ModelConfiguration
 ### **3. User-Driven Processing Pipeline**
 
 #### **Background Processing Flow Commands**
+
 ```csharp
 public sealed record TypeAssignedCommand : FlowCommand
 {
@@ -471,6 +479,7 @@ public enum ProcessingStage
 ```
 
 #### **File Analysis Orchestrator (User-Triggered)**
+
 ```csharp
 public class FileAnalysisOrchestrator : FlowCommandHandler<TypeAssignedCommand>
 {
@@ -563,6 +572,7 @@ public class FileAnalysisOrchestrator : FlowCommandHandler<TypeAssignedCommand>
 ### **4. Auto-Generated APIs with Koan EntityController**
 
 #### **File API Controller (User-Driven Processing)**
+
 ```csharp
 [Route("api/files")]
 public class FileController : EntityController<File>
@@ -722,6 +732,7 @@ public class AssignTypeRequest
 ```
 
 #### **Type API Controller**
+
 ```csharp
 [Route("api/types")]
 public class TypeController : EntityController<Type>
@@ -767,6 +778,7 @@ public class TypeGenerationRequest
 ```
 
 #### **Model Management API Controller (Matching Original gdoc)**
+
 ```csharp
 [Route("api/models")]
 public class ModelManagementController : ControllerBase
@@ -915,6 +927,7 @@ public class AnalyzeWithModelRequest
 ```
 
 #### **Analysis API Controller**
+
 ```csharp
 [Route("api/analysis")]
 public class AnalysisController : EntityController<Analysis>
@@ -951,16 +964,19 @@ The S13.DocMind sample incorporates the sophisticated model management capabilit
 #### **Key Features Replicated from Original gdoc**
 
 1. **Separate Text and Vision Model Selection**
+
    - Independent model configuration for text processing and image analysis
    - Vision model validation ensures only vision-capable models are used for images
    - Automatic model selection based on content type
 
 2. **Dynamic Model Discovery**
+
    - Browse available models from multiple providers (Ollama, OpenAI, etc.)
    - Filter by installed status, vision capabilities, and provider
    - Model search with name/description filtering
 
 3. **Model Installation Management**
+
    - Install models directly from the UI (similar to `ollama pull`)
    - Remove unused models to manage storage
    - Installation progress tracking
@@ -991,32 +1007,41 @@ graph TD
 
 ```typescript
 // Model selection dropdown population
-const loadAvailableModels = async (type: 'text' | 'vision') => {
-    const response = await fetch(`/api/models/search?onlyInstalled=true&onlyVision=${type === 'vision'}`);
-    const models = await response.json();
-    return models.map(m => ({ value: m.name, label: `${m.name} (${m.size})` }));
+const loadAvailableModels = async (type: "text" | "vision") => {
+  const response = await fetch(
+    `/api/models/search?onlyInstalled=true&onlyVision=${type === "vision"}`
+  );
+  const models = await response.json();
+  return models.map((m) => ({ value: m.name, label: `${m.name} (${m.size})` }));
 };
 
 // File processing with model selection
-const processFileWithModel = async (fileId: string, typeId: string, selectedModel?: string) => {
-    const response = await fetch('/api/models/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            fileId,
-            typeId,
-            modelOverride: selectedModel
-        })
-    });
-    return response.json();
+const processFileWithModel = async (
+  fileId: string,
+  typeId: string,
+  selectedModel?: string
+) => {
+  const response = await fetch("/api/models/analyze", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      fileId,
+      typeId,
+      modelOverride: selectedModel,
+    }),
+  });
+  return response.json();
 };
 
 // Model installation
-const installModel = async (modelName: string, provider: string = 'ollama') => {
-    const response = await fetch(`/api/models/${modelName}/install?provider=${provider}`, {
-        method: 'POST'
-    });
-    return response.json();
+const installModel = async (modelName: string, provider: string = "ollama") => {
+  const response = await fetch(
+    `/api/models/${modelName}/install?provider=${provider}`,
+    {
+      method: "POST",
+    }
+  );
+  return response.json();
 };
 ```
 
@@ -1025,12 +1050,14 @@ const installModel = async (modelName: string, provider: string = 'ollama') => {
 The original gdoc solution uses Ollama's vision models for image analysis. S13.DocMind replicates this with Koan's AI abstraction:
 
 **Original gdoc Image Processing:**
+
 ```csharp
 // From LlmDiagramGraphExtractor.cs
 var resp = await _llm.AnalyzeImageAsync(preprocessed.Base64Image, system, user, ct);
 ```
 
 **S13.DocMind Equivalent:**
+
 ```csharp
 var response = await AI.VisionPrompt(prompt, base64Image)
     .WithModel(selectedVisionModel)
@@ -1051,6 +1078,7 @@ public List<string> GetDefaultVisionIndicators() => new()
 ```
 
 S13.DocMind integrates this through Koan's capability detection:
+
 ```csharp
 var models = await AI.Models.GetAvailable("ollama");
 var visionModels = models.Where(m => m.HasCapability("vision")).ToList();
@@ -1095,9 +1123,11 @@ Based on the original gdoc's Angular frontend patterns:
         <span *ngFor="let tag of model.tags" class="tag">{{tag}}</span>
       </span>
     </div>
-    <button *ngIf="!model.isInstalled"
-            (click)="installModel(model.name)"
-            class="install-btn">
+    <button
+      *ngIf="!model.isInstalled"
+      (click)="installModel(model.name)"
+      class="install-btn"
+    >
       Install Model
     </button>
     <span *ngIf="model.isInstalled" class="installed-badge">Installed</span>
@@ -1108,6 +1138,7 @@ Based on the original gdoc's Angular frontend patterns:
 #### **Performance Considerations**
 
 Following the original gdoc's approach:
+
 - **Model caching**: Installed models are cached for quick selection
 - **Lazy loading**: Model lists loaded on-demand
 - **Provider health checks**: Regular connectivity tests to multiple Ollama instances
@@ -1116,6 +1147,7 @@ Following the original gdoc's approach:
 ### **6. Multi-Provider Data Strategy**
 
 #### **Provider Configuration**
+
 ```csharp
 // appsettings.json - Koan auto-detects and elects providers
 {
@@ -1145,6 +1177,7 @@ Following the original gdoc's approach:
 ```
 
 #### **Strategic Provider Assignment**
+
 ```csharp
 // Provider election happens automatically, but can be influenced:
 
@@ -1165,6 +1198,7 @@ public sealed class ProcessingCache : Entity<ProcessingCache> { }
 ### **6. Bootstrap and Auto-Registration**
 
 #### **Program.cs - Minimal Configuration**
+
 ```csharp
 using DocMind;
 
@@ -1189,6 +1223,7 @@ app.Run();
 ```
 
 #### **Koan Auto-Registrar Implementation**
+
 ```csharp
 // S13.DocMind/KoanAutoRegistrar.cs
 public class KoanAutoRegistrar : IKoanAutoRegistrar
@@ -1230,24 +1265,28 @@ public class KoanAutoRegistrar : IKoanAutoRegistrar
 ## **Key Differentiators & Value Proposition**
 
 ### **1. Development Velocity**
+
 - **80% Less Boilerplate**: Entity definitions replace repository patterns + manual DI
 - **Auto-Generated APIs**: Full CRUD with advanced features (pagination, filtering, relationships)
 - **Zero-Configuration AI**: `AI.Prompt()` and `AI.Embed()` replace custom HTTP clients
 - **"Reference = Intent"**: Adding package references enables capabilities automatically
 
 ### **2. Enterprise Scalability**
+
 - **Multi-Provider Architecture**: Start with MongoDB + Weaviate (core sample), add PostgreSQL/Redis via opt-in packages
 - **Provider Transparency**: Same code works across all storage backends
 - **Event Sourcing**: Complete audit trail with replay capabilities
 - **Container-Native**: Orchestration-aware with automatic environment detection
 
 ### **3. AI-Native Capabilities**
+
 - **Built-in Vector Operations**: Semantic search without custom vector pipeline complexity
 - **LLM Integration**: Unified interface for multiple AI providers
 - **Template Intelligence**: AI-generated templates with similarity matching
 - **Multi-Modal Processing**: Text, images, and structured data processing patterns
 
 ### **4. Operational Excellence**
+
 - **Capability Discovery**: Auto-generated API documentation with provider capabilities
 - **Health Monitoring**: Built-in health checks and performance monitoring
 - **Graceful Degradation**: Provider failover with capability-aware fallbacks
@@ -1258,21 +1297,25 @@ public class KoanAutoRegistrar : IKoanAutoRegistrar
 ## **Migration Strategy & Implementation Roadmap**
 
 ### **Phase 1: Core Entity Migration (Week 1-2)**
+
 - Convert MongoDB models to Koan entities
 - Implement `EntityController<T>` for auto-generated APIs
 - Set up multi-provider configuration with MongoDB primary
 
 ### **Phase 2: AI Integration Enhancement (Week 3-4)**
+
 - Replace custom Ollama client with Koan's AI interface
 - Implement vector storage with Weaviate provider
 - Add template generation and similarity matching
 
 ### **Phase 3: Event Sourcing Implementation (Week 5-6)**
+
 - Implement `FlowEntity` patterns for processing pipeline
 - Add event projections for real-time status tracking
 - Create processing orchestrator with error handling
 
 ### **Phase 4: Advanced Features & Optimization (Week 7-8)**
+
 - Add Redis caching for performance optimization
 - Implement streaming responses for real-time updates
 - Add comprehensive monitoring and observability
@@ -1298,6 +1341,7 @@ This architecture serves as a comprehensive reference implementation for buildin
 ### **1. Technical Prerequisites**
 
 #### **Framework Dependencies**
+
 ```xml
 <!-- S13.DocMind/S13.DocMind.csproj -->
 <Project Sdk="Microsoft.NET.Sdk.Web">
@@ -1346,11 +1390,11 @@ services:
     ports: ["8080:8080"]
     environment:
       QUERY_DEFAULTS_LIMIT: 25
-      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: 'true'
-      PERSISTENCE_DATA_PATH: '/var/lib/weaviate'
-      DEFAULT_VECTORIZER_MODULE: 'none'
-      ENABLE_MODULES: 'backup-filesystem'
-      CLUSTER_HOSTNAME: 'node1'
+      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: "true"
+      PERSISTENCE_DATA_PATH: "/var/lib/weaviate"
+      DEFAULT_VECTORIZER_MODULE: "none"
+      ENABLE_MODULES: "backup-filesystem"
+      CLUSTER_HOSTNAME: "node1"
 
   ollama:
     image: ollama/ollama:latest
@@ -1373,6 +1417,7 @@ Each optional dependency is encapsulated behind Koan adapters so teams can enabl
 ### **2. Core Entity Implementation Specifications**
 
 #### **Document Entity - Complete Implementation**
+
 ```csharp
 namespace S13.DocMind.Models
 {
@@ -1457,6 +1502,7 @@ namespace S13.DocMind.Models
 ```
 
 #### **Event Sourcing Flow Specification**
+
 ```csharp
 namespace S13.DocMind.Flows
 {
@@ -1501,6 +1547,7 @@ namespace S13.DocMind.Flows
 ### **3. AI Integration Specifications**
 
 #### **Document Intelligence Service - Production Ready**
+
 ```csharp
 namespace S13.DocMind.Services
 {
@@ -1632,6 +1679,7 @@ Operational guidance:
 ### **4. Performance & Scalability Specifications**
 
 #### **Performance Benchmarks**
+
 ```csharp
 namespace S13.DocMind.Specifications
 {
@@ -1665,6 +1713,7 @@ namespace S13.DocMind.Specifications
 ```
 
 #### **Caching Strategy**
+
 ```csharp
 namespace S13.DocMind.Infrastructure
 {
@@ -1723,6 +1772,7 @@ namespace S13.DocMind.Infrastructure
 ### **5. Security & Compliance Specifications**
 
 #### **Data Security Requirements**
+
 ```csharp
 namespace S13.DocMind.Security
 {
@@ -1833,6 +1883,7 @@ namespace S13.DocMind.Security
 ### **6. Testing Specifications**
 
 #### **Integration Test Requirements**
+
 ```csharp
 namespace S13.DocMind.Tests.Integration
 {
@@ -1946,9 +1997,10 @@ namespace S13.DocMind.Tests.Integration
 Based on successful patterns from S5.Recs and S8.Canon/S8.Location samples, S13.DocMind provides multiple deployment scenarios:
 
 ##### **Option 1: API with Embedded Client (S5.Recs Pattern)**
+
 ```yaml
 # docker-compose.yml - Simple embedded client in API wwwroot
-version: '3.8'
+version: "3.8"
 services:
   mongodb:
     image: mongo:7
@@ -1989,15 +2041,23 @@ services:
       - "4922:8080"
     environment:
       QUERY_DEFAULTS_LIMIT: 25
-      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: 'true'
-      PERSISTENCE_DATA_PATH: '/var/lib/weaviate'
-      DEFAULT_VECTORIZER_MODULE: 'none'
-      ENABLE_MODULES: 'backup-filesystem'
-      CLUSTER_HOSTNAME: 'node1'
+      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: "true"
+      PERSISTENCE_DATA_PATH: "/var/lib/weaviate"
+      DEFAULT_VECTORIZER_MODULE: "none"
+      ENABLE_MODULES: "backup-filesystem"
+      CLUSTER_HOSTNAME: "node1"
     volumes:
       - weaviate_data:/var/lib/weaviate
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/v1/.well-known/ready"]
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://localhost:8080/v1/.well-known/ready",
+        ]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -2035,7 +2095,7 @@ services:
   # Main API with embedded web client in wwwroot (S5.Recs pattern)
   docmind-api:
     build:
-      context: ../../..  # Build from repo root like S8 samples
+      context: ../../.. # Build from repo root like S8 samples
       dockerfile: samples/S13.DocMind/Dockerfile
     container_name: s13-docmind-api
     environment:
@@ -2067,7 +2127,7 @@ services:
     ports:
       - "4925:4925"
     volumes:
-      - document_storage:/app/storage  # For large document files
+      - document_storage:/app/storage # For large document files
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:4925/health"]
       interval: 30s
@@ -2085,9 +2145,10 @@ volumes:
 ```
 
 ##### **Option 2: Separate Client Container (S8.Location Pattern)**
+
 ```yaml
 # docker-compose.separate-client.yml - Client as separate nginx container
-version: '3.8'
+version: "3.8"
 services:
   # ... same infrastructure services as above ...
 
@@ -2119,11 +2180,19 @@ services:
       dockerfile: Dockerfile
     container_name: s13-docmind-client
     ports:
-      - "4927:80"  # Client on port 4927
+      - "4927:80" # Client on port 4927
     depends_on:
       - docmind-api
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/"]
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://localhost:80/",
+        ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -2133,6 +2202,7 @@ services:
 #### **Dockerfile Configurations**
 
 ##### **API Dockerfile (Based on S8 Pattern)**
+
 ```dockerfile
 # samples/S13.DocMind/Dockerfile
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
@@ -2163,6 +2233,7 @@ ENTRYPOINT ["dotnet", "S13.DocMind.dll"]
 ```
 
 ##### **Separate Client Dockerfile (S8.Location Pattern)**
+
 ```dockerfile
 # samples/S13.DocMind.Client/Dockerfile
 FROM node:20-alpine AS build
@@ -2238,6 +2309,7 @@ CMD ["nginx", "-g", "daemon off;"]
 For embedded client hosting in API wwwroot, the Koan framework auto-wires static files:
 
 ##### **Program.cs Configuration**
+
 ```csharp
 using S13.DocMind;
 
@@ -2268,6 +2340,7 @@ namespace S13.DocMind
 ```
 
 ##### **Client Files in wwwroot Structure**
+
 ```
 samples/S13.DocMind/wwwroot/
 ├── index.html              # Main SPA entry point
@@ -2289,57 +2362,69 @@ samples/S13.DocMind/wwwroot/
 ```
 
 ##### **Client-Side API Integration**
+
 ```javascript
 // wwwroot/js/app.js - API integration with auto-discovery
 class DocMindApi {
-    constructor() {
-        // Auto-detect API base URL (works in both embedded and proxied scenarios)
-        this.baseUrl = window.location.origin;
-        this.apiPath = '/api';
+  constructor() {
+    // Auto-detect API base URL (works in both embedded and proxied scenarios)
+    this.baseUrl = window.location.origin;
+    this.apiPath = "/api";
+  }
+
+  async uploadDocuments(files) {
+    const formData = new FormData();
+    files.forEach((file) => formData.append("files", file));
+
+    const response = await fetch(
+      `${this.baseUrl}${this.apiPath}/documents/upload`,
+      {
+        method: "POST",
+        body: formData,
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`Upload failed: ${response.statusText}`);
     }
 
-    async uploadDocuments(files) {
-        const formData = new FormData();
-        files.forEach(file => formData.append('files', file));
+    return response.json();
+  }
 
-        const response = await fetch(`${this.baseUrl}${this.apiPath}/documents/upload`, {
-            method: 'POST',
-            body: formData
-        });
+  async getDocumentAnalysis(documentId) {
+    const response = await fetch(
+      `${this.baseUrl}${this.apiPath}/documents/${documentId}/analysis`
+    );
+    return response.json();
+  }
 
-        if (!response.ok) {
-            throw new Error(`Upload failed: ${response.statusText}`);
-        }
+  async generateTemplate(prompt) {
+    const response = await fetch(
+      `${this.baseUrl}${this.apiPath}/templates/generate`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt }),
+      }
+    );
+    return response.json();
+  }
 
-        return response.json();
-    }
-
-    async getDocumentAnalysis(documentId) {
-        const response = await fetch(`${this.baseUrl}${this.apiPath}/documents/${documentId}/analysis`);
-        return response.json();
-    }
-
-    async generateTemplate(prompt) {
-        const response = await fetch(`${this.baseUrl}${this.apiPath}/templates/generate`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ prompt })
-        });
-        return response.json();
-    }
-
-    // WebSocket for real-time processing updates
-    connectToProcessingUpdates(documentId, callback) {
-        const ws = new WebSocket(`ws://${window.location.host}/ws/documents/${documentId}/processing`);
-        ws.onmessage = (event) => callback(JSON.parse(event.data));
-        return ws;
-    }
+  // WebSocket for real-time processing updates
+  connectToProcessingUpdates(documentId, callback) {
+    const ws = new WebSocket(
+      `ws://${window.location.host}/ws/documents/${documentId}/processing`
+    );
+    ws.onmessage = (event) => callback(JSON.parse(event.data));
+    return ws;
+  }
 }
 ```
 
 #### **Environment-Specific Configurations**
 
 ##### **Development (docker-compose.yml)**
+
 ```yaml
 # Optimized for development with local Ollama
 environment:
@@ -2355,6 +2440,7 @@ environment:
 ```
 
 ##### **Production (docker-compose.production.yml)**
+
 ```yaml
 # Production with external AI services
 environment:
@@ -2373,6 +2459,7 @@ environment:
 #### **Quick Start Scripts (S8 Pattern)**
 
 ##### **start.sh - Development Startup**
+
 ```bash
 #!/bin/bash
 # samples/S13.DocMind/start.sh
@@ -2411,6 +2498,7 @@ fi
 ```
 
 ##### **stop.sh - Cleanup Script**
+
 ```bash
 #!/bin/bash
 # samples/S13.DocMind/stop.sh
@@ -2432,9 +2520,10 @@ echo "✅ S13.DocMind stopped"
 #### **Container Orchestration (Production)**
 
 The primary sample compose file (`docker-compose.yml`) boots the minimal stack—MongoDB, Weaviate, and Ollama—alongside the API container that mounts a local storage folder. The production variant below illustrates how to layer on optional dependencies (PostgreSQL for auditing, Redis for caching, externalized OpenAI access, object storage services, etc.) when demonstrating advanced scenarios.
+
 ```yaml
 # docker-compose.production.yml
-version: '3.8'
+version: "3.8"
 services:
   docmind-api:
     build:
@@ -2458,8 +2547,8 @@ services:
     deploy:
       replicas: 3
       resources:
-        limits: {cpus: '2.0', memory: 4G}
-        reservations: {cpus: '1.0', memory: 2G}
+        limits: { cpus: "2.0", memory: 4G }
+        reservations: { cpus: "1.0", memory: 2G }
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 30s
@@ -2494,12 +2583,12 @@ services:
     image: semitechnologies/weaviate:1.22.4
     environment:
       QUERY_DEFAULTS_LIMIT: 25
-      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: 'false'
-      AUTHENTICATION_OIDC_ENABLED: 'true'
-      PERSISTENCE_DATA_PATH: '/var/lib/weaviate'
-      DEFAULT_VECTORIZER_MODULE: 'none'
-      ENABLE_MODULES: 'backup-filesystem,offload-s3'
-      CLUSTER_HOSTNAME: 'node1'
+      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: "false"
+      AUTHENTICATION_OIDC_ENABLED: "true"
+      PERSISTENCE_DATA_PATH: "/var/lib/weaviate"
+      DEFAULT_VECTORIZER_MODULE: "none"
+      ENABLE_MODULES: "backup-filesystem,offload-s3"
+      CLUSTER_HOSTNAME: "node1"
     volumes: ["weaviate-data:/var/lib/weaviate"]
 
   # Redis cluster
@@ -2532,6 +2621,7 @@ volumes:
 ```
 
 #### **Health Monitoring Specification**
+
 ```csharp
 namespace S13.DocMind.Health
 {
@@ -2661,6 +2751,7 @@ namespace S13.DocMind.Health
 ### **8. Success Criteria & Acceptance Testing**
 
 #### **Functional Requirements Checklist**
+
 - [ ] **Document Upload**: Support .txt, .pdf, .docx, and image formats up to 10 MB each (stretch: 25 MB with streaming enabled).
 - [ ] **Text Extraction**: Demonstrate ≥95 % accuracy on the curated sample pack; document gaps for edge formats.
 - [ ] **AI Analysis**: Produce structured summaries with confidence scoring and human-review routing.
@@ -2672,6 +2763,7 @@ namespace S13.DocMind.Health
 - [ ] **API Generation**: Expose CRUD APIs with pagination, filtering, and relationship expansion.
 
 #### **Performance Requirements Checklist**
+
 - [ ] **Throughput**: Process 4 documents per minute in sequential demo runs (stretch: 20 with optional load script).
 - [ ] **Concurrency**: Support 3 concurrent users in the base environment (stretch: 15 with scaled resources).
 - [ ] **Response Time**: CRUD API responses under 500 ms (excluding AI work); health endpoints under 200 ms.
@@ -2680,6 +2772,7 @@ namespace S13.DocMind.Health
 - [ ] **Startup Time**: Application ready in under 20 s on a developer laptop.
 
 #### **Security Requirements Checklist**
+
 - [ ] **Data Encryption**: All sensitive content encrypted at rest (filesystem volume encryption by default, object storage SSE when enabled) plus field-level encryption for secrets.
 - [ ] **Audit Logging**: Complete audit trail for all user actions with exportable lineage reports.
 - [ ] **Sensitive Data Classification**: Automated PII/PHI detection with redaction prior to AI prompts.
@@ -2691,6 +2784,7 @@ namespace S13.DocMind.Health
 - [ ] **Authorization**: Role-based access control for documents and templates.
 
 #### **Observability & Cost Checklist**
+
 - [ ] **Tracing**: Distributed traces stitched across upload, Flow worker, and AI calls using OpenTelemetry.
 - [ ] **Metrics**: Dashboards covering queue depth, stage latency, embedding throughput, and AI token spend.
 - [ ] **Logging**: Structured logs with document IDs, review outcomes, and cost annotations.
@@ -2700,6 +2794,7 @@ namespace S13.DocMind.Health
 ### **9. Migration & Rollback Procedures**
 
 #### **Data Migration Strategy**
+
 ```csharp
 namespace S13.DocMind.Migration
 {
@@ -2762,20 +2857,21 @@ namespace S13.DocMind.Migration
 
 #### **Original → Target Component Mapping**
 
-| **Original Component** | **S13.DocMind Target** | **Migration Strategy** | **Reusable Code** |
-|------------------------|------------------------|------------------------|-------------------|
-| `GDoc.Api.Models.UploadedDocument` | `S13.DocMind.Models.File` | Convert to Entity<T>, add extraction state tracking | Property definitions, validation logic |
-| `GDoc.Api.Models.DocumentTypeConfiguration` | `S13.DocMind.Models.Type` | Convert to Entity<T>, add AI extraction prompts | Template structure, validation rules |
-| `GDoc.Api.Models.DocumentationRequest` | `S13.DocMind.Models.Analysis` | Restructure as AI analysis result entity | Context processing logic |
-| `GDoc.Api.Services.DocumentProcessingService` | `S13.DocMind.Services.FileAnalysisService` | Replace with user-driven type assignment | Text extraction methods |
-| `GDoc.Api.Services.LlmService` | Built-in Koan AI interface | Remove custom HTTP client code | Prompt building logic |
-| `GDoc.Api.Repositories.*Repository` | Automatic via Entity<T> patterns | Remove repository classes | Query logic for custom endpoints |
-| `GDoc.Api.Controllers.*Controller` | `EntityController<T>` inheritance | Replace manual CRUD with inheritance | Business logic endpoints |
-| `Program.cs` DI registration | `KoanAutoRegistrar` | Move to auto-registrar pattern | Service configuration logic |
+| **Original Component**                        | **S13.DocMind Target**                     | **Migration Strategy**                              | **Reusable Code**                      |
+| --------------------------------------------- | ------------------------------------------ | --------------------------------------------------- | -------------------------------------- |
+| `GDoc.Api.Models.UploadedDocument`            | `S13.DocMind.Models.File`                  | Convert to Entity<T>, add extraction state tracking | Property definitions, validation logic |
+| `GDoc.Api.Models.DocumentTypeConfiguration`   | `S13.DocMind.Models.Type`                  | Convert to Entity<T>, add AI extraction prompts     | Template structure, validation rules   |
+| `GDoc.Api.Models.DocumentationRequest`        | `S13.DocMind.Models.Analysis`              | Restructure as AI analysis result entity            | Context processing logic               |
+| `GDoc.Api.Services.DocumentProcessingService` | `S13.DocMind.Services.FileAnalysisService` | Replace with user-driven type assignment            | Text extraction methods                |
+| `GDoc.Api.Services.LlmService`                | Built-in Koan AI interface                 | Remove custom HTTP client code                      | Prompt building logic                  |
+| `GDoc.Api.Repositories.*Repository`           | Automatic via Entity<T> patterns           | Remove repository classes                           | Query logic for custom endpoints       |
+| `GDoc.Api.Controllers.*Controller`            | `EntityController<T>` inheritance          | Replace manual CRUD with inheritance                | Business logic endpoints               |
+| `Program.cs` DI registration                  | `KoanAutoRegistrar`                        | Move to auto-registrar pattern                      | Service configuration logic            |
 
 #### **Code Harvesting Guide for Agentic AI**
 
 ##### **1. Text Extraction Logic (High Reuse Potential)**
+
 ```csharp
 // Original: GDoc.Api.Services.Document.FileTextExtractionService
 // Location: references/gdoc/src/GDoc.Api/Services/Document/FileTextExtractionService.cs
@@ -2810,6 +2906,7 @@ namespace S13.DocMind.Services
 ```
 
 ##### **2. Document Type Templates (High Reuse Potential)**
+
 ```csharp
 // Original: GDoc.Api.Models.DocumentTypeConfiguration
 // Location: references/gdoc/src/GDoc.Api/Models/DocumentTypeConfiguration.cs
@@ -2842,6 +2939,7 @@ public sealed class DocumentTemplate : Entity<DocumentTemplate>
 ```
 
 ##### **3. File Processing Workflows (Medium Reuse Potential)**
+
 ```csharp
 // Original: GDoc.Api.Services.DocumentProcessingService
 // Location: references/gdoc/src/GDoc.Api/Services/DocumentProcessingService.cs
@@ -2872,6 +2970,7 @@ namespace S13.DocMind.Services
 ```
 
 ##### **4. AI Prompt Building (High Reuse Potential)**
+
 ```csharp
 // Original: GDoc.Api.Services.LlmService.GenerateDocumentTypeAsync
 // Location: references/gdoc/src/GDoc.Api/Services/LlmService.cs
@@ -2913,6 +3012,7 @@ namespace S13.DocMind.Services
 ```
 
 ##### **5. Event Processing Patterns (Medium Reuse Potential)**
+
 ```csharp
 // Original: GDoc.Api.Services.DocumentProcessingService processing workflow
 // Location: references/gdoc/src/GDoc.Api/Services/DocumentProcessingService.cs
@@ -2962,6 +3062,7 @@ namespace S13.DocMind.Services
 #### **Database Migration Patterns**
 
 ##### **MongoDB Document Transformation**
+
 ```csharp
 // Original MongoDB collections → Koan Entity mapping
 namespace S13.DocMind.Migration
@@ -3017,6 +3118,7 @@ namespace S13.DocMind.Migration
 ```
 
 ##### **Service Registration Migration**
+
 ```csharp
 // Original: Manual DI registration in Program.cs (60+ lines)
 // Target: KoanAutoRegistrar pattern
@@ -3047,6 +3149,7 @@ public class KoanAutoRegistrar : IKoanAutoRegistrar
 #### **API Endpoint Migration Patterns**
 
 ##### **Controller Transformation Guide**
+
 ```csharp
 // Original: Manual CRUD implementation
 // Target: EntityController inheritance
@@ -3136,6 +3239,7 @@ public class DocumentController : EntityController<Document>
 #### **Configuration Migration**
 
 ##### **Connection Strings & Provider Setup**
+
 ```yaml
 # Original: Single MongoDB configuration
 # Migrate FROM:
@@ -3166,6 +3270,7 @@ Koan:
 #### **Code Reuse Checklist for Implementation**
 
 ##### **High Priority (90%+ Reusable)**
+
 - [ ] **Text extraction methods** from `FileTextExtractionService.cs`
 - [ ] **File validation logic** from `DocumentProcessingService.cs`
 - [ ] **Hash computation** and deduplication algorithms
@@ -3174,6 +3279,7 @@ Koan:
 - [ ] **Prompt templates** for document analysis and template generation
 
 ##### **Medium Priority (60-80% Reusable with Adaptation)**
+
 - [ ] **Processing workflow logic** (convert to event-sourced)
 - [ ] **Error handling patterns** and retry mechanisms
 - [ ] **File upload handling** (adapt to Entity<T> patterns)
@@ -3182,6 +3288,7 @@ Koan:
 - [ ] **Health check implementations**
 
 ##### **Low Priority (30-50% Reusable - Patterns Only)**
+
 - [ ] **MongoDB repository patterns** (replace with Entity<T>)
 - [ ] **Manual DI registration** (convert to auto-registration)
 - [ ] **Custom HTTP clients** (replace with Koan AI)
@@ -3190,35 +3297,40 @@ Koan:
 
 #### **Implementation Priority Matrix**
 
-| **Migration Phase** | **Original Components** | **Target Implementation** | **Reuse Strategy** |
-|-------------------|------------------------|--------------------------|-------------------|
-| **Phase 1: Core Entities** | Models/* | Entity<T> definitions | Copy properties, add Koan attributes |
-| **Phase 2: Data Access** | Repositories/* | Remove (auto-generated) | Extract custom query logic only |
-| **Phase 3: Business Logic** | Services/* | Koan-integrated services | Reuse algorithms, replace infrastructure |
-| **Phase 4: APIs** | Controllers/* | EntityController<T> | Keep business endpoints, remove CRUD |
-| **Phase 5: Infrastructure** | Program.cs, configs | KoanAutoRegistrar | Migrate service registrations |
+| **Migration Phase**         | **Original Components** | **Target Implementation** | **Reuse Strategy**                       |
+| --------------------------- | ----------------------- | ------------------------- | ---------------------------------------- |
+| **Phase 1: Core Entities**  | Models/\*               | Entity<T> definitions     | Copy properties, add Koan attributes     |
+| **Phase 2: Data Access**    | Repositories/\*         | Remove (auto-generated)   | Extract custom query logic only          |
+| **Phase 3: Business Logic** | Services/\*             | Koan-integrated services  | Reuse algorithms, replace infrastructure |
+| **Phase 4: APIs**           | Controllers/\*          | EntityController<T>       | Keep business endpoints, remove CRUD     |
+| **Phase 5: Infrastructure** | Program.cs, configs     | KoanAutoRegistrar         | Migrate service registrations            |
 
 This comprehensive mapping ensures agentic AI systems can systematically harvest and transform existing code while maximizing reuse and minimizing reimplementation effort.
 
 ### **11. Troubleshooting Guide**
 
 #### **Common Issues & Solutions**
+
 ```markdown
 # S13.DocMind Troubleshooting Guide
 
 ## Provider Connection Issues
 
 ### MongoDB Connection Failed
+
 **Symptoms**: "Unable to connect to MongoDB" errors in logs
 **Solutions**:
+
 1. Verify connection string format: `mongodb://host:port/database`
 2. Check MongoDB service status: `docker ps | grep mongo`
 3. Validate network connectivity: `telnet mongo-host 27017`
 4. Review MongoDB logs: `docker logs mongo-container`
 
 ### Weaviate Vector Operations Failing
+
 **Symptoms**: Vector similarity searches return empty results
 **Solutions**:
+
 1. Verify Weaviate endpoint accessibility
 2. Check vector dimensions match (1536 for OpenAI embeddings)
 3. Validate vector index configuration
@@ -3227,16 +3339,20 @@ This comprehensive mapping ensures agentic AI systems can systematically harvest
 ## AI Integration Issues
 
 ### Ollama Service Unavailable
+
 **Symptoms**: AI.Prompt() calls timeout or fail
 **Solutions**:
+
 1. Check Ollama container status
 2. Verify model is downloaded: `ollama list`
 3. Test direct API access: `curl http://ollama:11434/api/version`
 4. Review model memory requirements vs available resources
 
 ### OpenAI API Rate Limits
+
 **Symptoms**: 429 rate limit errors in AI processing
 **Solutions**:
+
 1. Implement exponential backoff retry logic
 2. Consider request batching for bulk operations
 3. Monitor API usage in OpenAI dashboard
@@ -3245,8 +3361,10 @@ This comprehensive mapping ensures agentic AI systems can systematically harvest
 ## Performance Issues
 
 ### Slow Document Processing
+
 **Symptoms**: Processing takes longer than 90-second target
 **Solutions**:
+
 1. Check available memory and CPU resources
 2. Review document size (10 MB baseline; stretch goal 25 MB)
 3. Validate AI model performance
@@ -3254,8 +3372,10 @@ This comprehensive mapping ensures agentic AI systems can systematically harvest
 5. Monitor concurrent processing limits and Flow queue depth
 
 ### High Memory Usage
+
 **Symptoms**: Application consuming >1.5 GB RAM during demos
 **Solutions**:
+
 1. Review large document handling
 2. Implement streaming for file processing
 3. Check for memory leaks in AI operations
@@ -3263,6 +3383,7 @@ This comprehensive mapping ensures agentic AI systems can systematically harvest
 ```
 
 **Implementation References:**
+
 - **Core Entity Models**: `/samples/S13.DocMind/Models/`
 - **AI Integration**: `/samples/S13.DocMind/Services/DocumentIntelligenceService.cs`
 - **Flow Entities**: `/samples/S13.DocMind/Flows/`

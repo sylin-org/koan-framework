@@ -25,8 +25,8 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 
         var exporter = new ComposeExporter();
         report.AddSetting("ExporterId", exporter.Id);
-    report.AddSetting("SecretsRefOnly", exporter.Capabilities.SecretsRefOnly.ToString());
-    report.AddSetting("ReadinessProbes", exporter.Capabilities.ReadinessProbes.ToString());
-    report.AddSetting("TlsHints", exporter.Capabilities.TlsHints.ToString());
+        report.AddSetting("SecretsRefOnly", exporter.Capabilities.SecretsRefOnly.ToString());
+        report.AddSetting("ReadinessProbes", exporter.Capabilities.ReadinessProbes.ToString());
+        report.AddSetting("TlsHints", exporter.Capabilities.TlsHints.ToString());
     }
 }

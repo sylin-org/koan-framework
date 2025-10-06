@@ -14,11 +14,13 @@ This proposal defines the implementation of HTTP + Server-Sent Events (SSE) tran
 ### Current Limitations
 
 The existing STDIO transport implementation (Koan v0.6.x) provides:
+
 - ✅ **Local agent integration**: Claude Desktop, Cursor, VS Code agents via subprocess spawning
 - ✅ **Development experience**: Zero-config tool exposure for `[McpEntity]` decorated types
 - ✅ **Service parity**: Shared execution layer with REST/GraphQL via `IEntityEndpointService`
 
 However, STDIO transport has fundamental constraints:
+
 - ❌ **Local-only access**: Requires client to spawn Koan process as child (not suitable for remote/cloud scenarios)
 - ❌ **No authentication**: Relies on OS process trust model
 - ❌ **Single session**: One client per process instance
@@ -62,6 +64,7 @@ src/Koan.Mcp/
 ```
 
 **STDIO Transport Flow:**
+
 ```
 Console.In (stdin)
   → StreamJsonRpc (HeaderDelimitedMessageHandler)
@@ -89,18 +92,18 @@ internal sealed class HttpSseTransport : BackgroundService
 
 ### Infrastructure Gaps
 
-| Component | STDIO | HTTP+SSE | Status |
-|-----------|-------|----------|--------|
-| **Transport Layer** | stdin/stdout streams | HTTP GET (SSE channel) + HTTP POST (JSON-RPC submit) | ❌ Missing |
-| **Message Framing** | HeaderDelimited | SSE events (`data: {...}\n\n`) | ❌ Missing |
-| **Connection Model** | Single session | Multi-client sessions | ❌ Missing |
-| **Authentication** | None (local trust) | Bearer tokens / OAuth | ❌ Missing |
-| **Session Management** | CancellationTokenSource | HttpSseSessionManager | ❌ Missing |
-| **Capability Discovery** | `tools/list` (JSON-RPC) | GET `/mcp/capabilities` | ❌ Missing |
-| **Endpoint Mapping** | N/A | GET `/mcp/sse` + POST `/mcp/rpc` + GET `/mcp/capabilities` | ❌ Missing |
-| **CORS Support** | N/A | Configurable origins | ❌ Missing |
-| **Rate Limiting** | N/A | Per-user limits | ❌ Missing |
-| **Health Monitoring** | ✅ IHealthAggregator | ❌ Not implemented |
+| Component                | STDIO                   | HTTP+SSE                                                   | Status     |
+| ------------------------ | ----------------------- | ---------------------------------------------------------- | ---------- |
+| **Transport Layer**      | stdin/stdout streams    | HTTP GET (SSE channel) + HTTP POST (JSON-RPC submit)       | ❌ Missing |
+| **Message Framing**      | HeaderDelimited         | SSE events (`data: {...}\n\n`)                             | ❌ Missing |
+| **Connection Model**     | Single session          | Multi-client sessions                                      | ❌ Missing |
+| **Authentication**       | None (local trust)      | Bearer tokens / OAuth                                      | ❌ Missing |
+| **Session Management**   | CancellationTokenSource | HttpSseSessionManager                                      | ❌ Missing |
+| **Capability Discovery** | `tools/list` (JSON-RPC) | GET `/mcp/capabilities`                                    | ❌ Missing |
+| **Endpoint Mapping**     | N/A                     | GET `/mcp/sse` + POST `/mcp/rpc` + GET `/mcp/capabilities` | ❌ Missing |
+| **CORS Support**         | N/A                     | Configurable origins                                       | ❌ Missing |
+| **Rate Limiting**        | N/A                     | Per-user limits                                            | ❌ Missing |
+| **Health Monitoring**    | ✅ IHealthAggregator    | ❌ Not implemented                                         |
 
 ## Review Highlights
 
@@ -150,6 +153,7 @@ internal sealed class HttpSseTransport : BackgroundService
 ```
 
 **Flow summary:**
+
 1. Client opens a long-lived `GET /mcp/sse` stream (optionally including an `access_token` query parameter when headers are unavailable). The server responds with a `connected` SSE event containing the generated `sessionId`.
 2. Client submits JSON-RPC requests to `POST /mcp/rpc`, passing the `sessionId` via both `X-Mcp-Session` header and `sessionId` query string. The transport emits `ack` events when a request is accepted and streams results/errors over the same SSE channel using the shared `IMcpTransportDispatcher`.
 3. Tooling and health surfaces discover exposed capabilities via `GET /mcp/capabilities`, a simple JSON document mirroring `tools/list` output and transport metadata for compatibility with mainstream SSE deployment patterns.
@@ -212,6 +216,7 @@ public static class EndpointExtensions
 ```
 
 **Auto-Registration** (via `KoanWebStartupFilter`, sharing the existing routing block):
+
 ```csharp
 public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next)
 {
@@ -894,14 +899,15 @@ public sealed class TrialSite : Entity<TrialSite>
 #### 2. Configuration
 
 **Development (Anonymous Access):**
+
 ```jsonc
 // appsettings.Development.json
 {
   "Koan": {
     "Mcp": {
-      "EnableStdioTransport": true,      // Local Claude Desktop
-      "EnableHttpSseTransport": true,    // Remote IDEs
-      "RequireAuthentication": false,    // ⚠️ Dev only!
+      "EnableStdioTransport": true, // Local Claude Desktop
+      "EnableHttpSseTransport": true, // Remote IDEs
+      "RequireAuthentication": false, // ⚠️ Dev only!
       "EnableCors": true,
       "AllowedOrigins": ["http://localhost:3000"]
     }
@@ -910,14 +916,15 @@ public sealed class TrialSite : Entity<TrialSite>
 ```
 
 **Production (Secure):**
+
 ```jsonc
 // appsettings.Production.json
 {
   "Koan": {
     "Mcp": {
-      "EnableStdioTransport": false,     // Disable local access
+      "EnableStdioTransport": false, // Disable local access
       "EnableHttpSseTransport": true,
-      "RequireAuthentication": true,     // ✅ Enforced
+      "RequireAuthentication": true, // ✅ Enforced
       "HttpSseRoute": "/mcp",
       "MaxConcurrentConnections": 1000,
       "PublishCapabilityEndpoint": true,
@@ -929,12 +936,13 @@ public sealed class TrialSite : Entity<TrialSite>
 ```
 
 **Hybrid (Mixed Auth):**
+
 ```jsonc
 {
   "Koan": {
     "Mcp": {
       "EnableHttpSseTransport": true,
-      "RequireAuthentication": false,    // Global: anonymous OK
+      "RequireAuthentication": false, // Global: anonymous OK
 
       "EntityOverrides": {
         "PublicData": {
@@ -976,15 +984,15 @@ app.Run();
 ```typescript
 // 1. Authenticate (if required)
 async function authenticate(): Promise<string> {
-  const response = await fetch('http://localhost:5110/.testoauth/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+  const response = await fetch("http://localhost:5110/.testoauth/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
-      grant_type: 'client_credentials',
-      client_id: 'mcp-client',
-      client_secret: 'dev-secret',
-      scope: 'clinical:operations'
-    })
+      grant_type: "client_credentials",
+      client_id: "mcp-client",
+      client_secret: "dev-secret",
+      scope: "clinical:operations",
+    }),
   });
   return (await response.json()).access_token;
 }
@@ -1001,33 +1009,46 @@ class KoanMcpClient {
   private requestId = 1;
   private readonly pending = new Map<number, PendingRequest>();
 
-  constructor(private readonly baseUrl: string, private readonly token?: string) {}
+  constructor(
+    private readonly baseUrl: string,
+    private readonly token?: string
+  ) {}
 
   private async ensureConnected(): Promise<void> {
     if (this.eventSource && this.sessionId) {
       return;
     }
 
-    const url = new URL('/mcp/sse', this.baseUrl);
+    const url = new URL("/mcp/sse", this.baseUrl);
     if (this.token) {
-      url.searchParams.set('access_token', this.token);
+      url.searchParams.set("access_token", this.token);
     }
 
-    this.eventSource = new EventSource(url.toString(), { withCredentials: true });
-
-    await new Promise<void>((resolve, reject) => {
-      this.eventSource!.addEventListener('connected', event => {
-        const payload = JSON.parse((event as MessageEvent).data);
-        this.sessionId = payload.sessionId;
-        resolve();
-      }, { once: true });
-
-      this.eventSource!.addEventListener('error', () => {
-        reject(new Error('Failed to establish MCP SSE session.'));
-      }, { once: true });
+    this.eventSource = new EventSource(url.toString(), {
+      withCredentials: true,
     });
 
-    this.eventSource.addEventListener('result', event => {
+    await new Promise<void>((resolve, reject) => {
+      this.eventSource!.addEventListener(
+        "connected",
+        (event) => {
+          const payload = JSON.parse((event as MessageEvent).data);
+          this.sessionId = payload.sessionId;
+          resolve();
+        },
+        { once: true }
+      );
+
+      this.eventSource!.addEventListener(
+        "error",
+        () => {
+          reject(new Error("Failed to establish MCP SSE session."));
+        },
+        { once: true }
+      );
+    });
+
+    this.eventSource.addEventListener("result", (event) => {
       const message = JSON.parse((event as MessageEvent).data);
       const pending = this.pending.get(message.id);
       if (pending) {
@@ -1036,16 +1057,18 @@ class KoanMcpClient {
       }
     });
 
-    this.eventSource.addEventListener('ack', event => {
+    this.eventSource.addEventListener("ack", (event) => {
       const message = JSON.parse((event as MessageEvent).data);
-      console.debug('MCP request acknowledged', message.id);
+      console.debug("MCP request acknowledged", message.id);
     });
 
-    this.eventSource.addEventListener('error', event => {
+    this.eventSource.addEventListener("error", (event) => {
       const message = JSON.parse((event as MessageEvent).data);
       const pending = this.pending.get(message.id ?? 0);
       if (pending) {
-        pending.reject(new Error(message.error?.message ?? 'Unknown MCP error'));
+        pending.reject(
+          new Error(message.error?.message ?? "Unknown MCP error")
+        );
         this.pending.delete(message.id ?? 0);
       }
     });
@@ -1054,37 +1077,37 @@ class KoanMcpClient {
   async callTool(toolName: string, params: any): Promise<any> {
     await this.ensureConnected();
     if (!this.sessionId) {
-      throw new Error('MCP session not established');
+      throw new Error("MCP session not established");
     }
 
     const id = this.requestId++;
     const payload = {
-      jsonrpc: '2.0',
-      method: 'tools/call',
+      jsonrpc: "2.0",
+      method: "tools/call",
       params: { name: toolName, arguments: params },
-      id
+      id,
     };
 
     const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      'X-Mcp-Session': this.sessionId
+      "Content-Type": "application/json",
+      "X-Mcp-Session": this.sessionId,
     };
 
     if (this.token) {
-      headers['Authorization'] = `Bearer ${this.token}`;
+      headers["Authorization"] = `Bearer ${this.token}`;
     }
 
-    const submitUrl = new URL('/mcp/rpc', this.baseUrl);
-    submitUrl.searchParams.set('sessionId', this.sessionId);
+    const submitUrl = new URL("/mcp/rpc", this.baseUrl);
+    submitUrl.searchParams.set("sessionId", this.sessionId);
 
     const completion = new Promise<any>((resolve, reject) => {
       this.pending.set(id, { resolve, reject });
     });
 
     await fetch(submitUrl.toString(), {
-      method: 'POST',
+      method: "POST",
       headers,
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
     });
 
     return completion;
@@ -1093,9 +1116,9 @@ class KoanMcpClient {
 
 // 3. Usage
 const token = await authenticate();
-const client = new KoanMcpClient('http://localhost:5110', token);
+const client = new KoanMcpClient("http://localhost:5110", token);
 
-const sites = await client.callTool('TrialSite_List', { pageSize: 10 });
+const sites = await client.callTool("TrialSite_List", { pageSize: 10 });
 console.log(sites);
 ```
 
@@ -1232,6 +1255,7 @@ public bool RequireAuthentication
 ```
 
 **Behavior:**
+
 - **Production/Container**: Authentication **required** (default)
 - **Development**: Authentication **optional** (default)
 - **Explicit config**: Always respected (override environment detection)
@@ -1242,7 +1266,7 @@ public bool RequireAuthentication
 {
   "Koan": {
     "Mcp": {
-      "RequireAuthentication": true  // Override environment detection
+      "RequireAuthentication": true // Override environment detection
     }
   }
 }
@@ -1268,6 +1292,7 @@ public sealed class SecureData : Entity<SecureData> { }
 ### Security Controls
 
 **CORS Configuration:**
+
 ```csharp
 if (options.EnableCors && options.AllowedOrigins.Any())
 {
@@ -1282,6 +1307,7 @@ if (options.EnableCors && options.AllowedOrigins.Any())
 ```
 
 **Rate Limiting Integration:**
+
 ```csharp
 // Leverage existing Koan.Web rate limiting
 if (options.EnableRateLimiting)
@@ -1291,6 +1317,7 @@ if (options.EnableRateLimiting)
 ```
 
 **TLS Enforcement (Production):**
+
 ```csharp
 if ((KoanEnv.IsProduction || KoanEnv.InContainer) && !httpContext.Request.IsHttps)
 {
@@ -1305,6 +1332,7 @@ if ((KoanEnv.IsProduction || KoanEnv.InContainer) && !httpContext.Request.IsHttp
 ```
 
 **SSE Authentication Guidance:**
+
 - Prefer `Authorization` headers or authenticated cookies whenever possible. When browser-native `EventSource` cannot send headers, allow short-lived `access_token` query parameters only over HTTPS and with rate limiting enabled.
 - The transport rejects query-string tokens when HTTPS is not negotiated in production/container environments.
 - Clients should send both the `X-Mcp-Session` header and the `sessionId` query parameter when posting JSON-RPC payloads to accommodate caches and tracing.
@@ -1336,6 +1364,7 @@ if (!options.RequireAuthentication && (KoanEnv.IsProduction || KoanEnv.InContain
 - [ ] Replace `HttpSseTransport` placeholder with GET `/sse` accept + POST `/rpc` submit flows
 
 **Deliverables:**
+
 - Working `/mcp/sse` stream endpoint
 - `/mcp/rpc` submission endpoint using StreamJsonRpc
 - Multi-client session support with connection limits
@@ -1354,6 +1383,7 @@ if (!options.RequireAuthentication && (KoanEnv.IsProduction || KoanEnv.InContain
 - [ ] Update `KoanMcpAutoRegistrar` to include HTTP+SSE state in boot report
 
 **Deliverables:**
+
 - Configuration model complete (options + overrides)
 - Auto-registration working with boot report coverage
 - Endpoint mapping functional across transports
@@ -1372,6 +1402,7 @@ if (!options.RequireAuthentication && (KoanEnv.IsProduction || KoanEnv.InContain
 - [ ] Add security warning system for insecure configs
 
 **Deliverables:**
+
 - Authentication working (bearer tokens, scopes)
 - CORS configured for SSE + RPC
 - Security warnings operational
@@ -1387,6 +1418,7 @@ if (!options.RequireAuthentication && (KoanEnv.IsProduction || KoanEnv.InContain
 - [ ] Integration with existing Koan observability + boot report
 
 **Deliverables:**
+
 - Health metrics exposed
 - Heartbeat operational
 - Logging integrated
@@ -1404,20 +1436,21 @@ if (!options.RequireAuthentication && (KoanEnv.IsProduction || KoanEnv.InContain
 - [ ] Document security best practices and SSE auth guidance
 
 **Deliverables:**
+
 - Test coverage >80%
 - S12 sample updated
 - Client SDKs documented
 
 ### Effort Estimation
 
-| Phase | Duration | Priority |
-|-------|----------|----------|
-| Core Infrastructure | 5-7 days | Critical |
-| Configuration & Registration | 2-3 days | Critical |
-| Authentication & Security | 3-4 days | High |
-| Monitoring & Diagnostics | 2-3 days | Medium |
-| Testing & Documentation | 3-4 days | Medium |
-| **Total** | **15-21 days** | - |
+| Phase                        | Duration       | Priority |
+| ---------------------------- | -------------- | -------- |
+| Core Infrastructure          | 5-7 days       | Critical |
+| Configuration & Registration | 2-3 days       | Critical |
+| Authentication & Security    | 3-4 days       | High     |
+| Monitoring & Diagnostics     | 2-3 days       | Medium   |
+| Testing & Documentation      | 3-4 days       | Medium   |
+| **Total**                    | **15-21 days** | -        |
 
 **Team Size:** 1-2 senior developers
 **Target Release:** Koan v0.7.0
@@ -1454,12 +1487,15 @@ if (!options.RequireAuthentication && (KoanEnv.IsProduction || KoanEnv.InContain
 ## Open Questions
 
 1. **WebSocket Transport Priority**: Should WebSocket transport (Phase 3) be prioritized over HTTP+SSE, or wait for MCP protocol stability?
+
    - **Recommendation**: Defer WebSocket to Phase 3; HTTP+SSE covers 90% of use cases
 
 2. **Streaming Tool Results**: Should individual tool calls support streaming responses (multiple SSE events per tool)?
+
    - **Recommendation**: Add in Phase 3 as opt-in via `[McpEntity(EnableStreaming = true)]`
 
 3. **Request Batching**: Should HTTP+SSE support batched JSON-RPC requests (multiple tools in one POST)?
+
    - **Recommendation**: Yes, add in Phase 2 as part of dispatcher implementation
 
 4. **Session Persistence**: Should sessions persist across HTTP requests (session ID in query string)?
@@ -1476,6 +1512,7 @@ if (!options.RequireAuthentication && (KoanEnv.IsProduction || KoanEnv.InContain
 ## Appendix: SSE Event Format
 
 ### Connection Event
+
 ```
 event: connected
 data: {"sessionId":"abc123","timestamp":"2025-09-24T10:00:00Z"}
@@ -1483,6 +1520,7 @@ data: {"sessionId":"abc123","timestamp":"2025-09-24T10:00:00Z"}
 ```
 
 ### Result Event
+
 ```
 event: result
 data: {"jsonrpc":"2.0","id":1,"result":{"tools":[{"name":"TrialSite_List","description":"List trial sites"}]}}
@@ -1490,6 +1528,7 @@ data: {"jsonrpc":"2.0","id":1,"result":{"tools":[{"name":"TrialSite_List","descr
 ```
 
 ### Error Event
+
 ```
 event: error
 data: {"jsonrpc":"2.0","id":1,"error":{"code":-32600,"message":"Invalid request"}}
@@ -1497,6 +1536,7 @@ data: {"jsonrpc":"2.0","id":1,"error":{"code":-32600,"message":"Invalid request"
 ```
 
 ### Acknowledgement Event
+
 ```
 event: ack
 data: {"id":1}
@@ -1504,6 +1544,7 @@ data: {"id":1}
 ```
 
 ### Heartbeat Event
+
 ```
 event: heartbeat
 data: {"timestamp":"2025-09-24T10:00:15Z"}
@@ -1511,6 +1552,7 @@ data: {"timestamp":"2025-09-24T10:00:15Z"}
 ```
 
 ### End Event
+
 ```
 event: end
 data: {"timestamp":"2025-09-24T10:00:30Z"}
