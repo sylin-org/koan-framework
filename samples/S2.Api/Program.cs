@@ -8,7 +8,6 @@ using Koan.Web.Connector.Swagger;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddKoan()
-    .AsWebApi()
     .AsProxiedApi()
     .WithRateLimit();
 

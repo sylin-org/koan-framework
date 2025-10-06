@@ -14,7 +14,6 @@ Minimal Program.cs configuration using only framework auto-registration:
 // S10.DevPortal Program.cs - Clean framework initialization
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddKoan()
-    .AsWebApi()
     .AsProxiedApi();
 var app = builder.Build();
 app.Run();

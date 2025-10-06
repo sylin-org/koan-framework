@@ -9,7 +9,6 @@ using S12.MedTrials;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddKoan()
-    .AsWebApi()
     .AsProxiedApi();
 
 builder.Services.AddKoanObservability();

@@ -4,7 +4,7 @@ using Koan.Web.Extensions;
 var builder = WebApplication.CreateBuilder(args);
 
 // Koan web defaults
-builder.Services.AddKoan().AsWebApi().WithExceptionHandler();
+builder.Services.AddKoan().WithExceptionHandler();
 
 // Koan.Web.Auth is auto-registered via Koan auto-bootstrap; explicit call not required.
 

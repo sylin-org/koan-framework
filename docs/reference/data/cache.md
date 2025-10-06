@@ -113,15 +113,15 @@ var todos = await Cache.WithJson<Todo[]>("todo:open:v1")
 
 Available builder helpers:
 
-| Helper | Description |
-| --- | --- |
-| `WithJson<T>(key)` / `WithRecord<T>(key)` | JSON serialization for objects and record types. |
-| `WithString(key)` | UTF-8 string storage. |
-| `WithBinary(key)` | Raw byte arrays or streams. |
-| `WithAbsoluteTtl(ttl)` / `WithSlidingTtl(ttl)` | Expiration control. |
-| `AllowStaleFor(duration)` | Enables stale-while-revalidate when the adapter supports it. |
-| `PublishInvalidation()` | Forces pub/sub messages for Redis-style adapters. |
-| `WithTags(params string[] tags)` | Normalizes and deduplicates tags for selective flushes. |
+| Helper                                         | Description                                                  |
+| ---------------------------------------------- | ------------------------------------------------------------ |
+| `WithJson<T>(key)` / `WithRecord<T>(key)`      | JSON serialization for objects and record types.             |
+| `WithString(key)`                              | UTF-8 string storage.                                        |
+| `WithBinary(key)`                              | Raw byte arrays or streams.                                  |
+| `WithAbsoluteTtl(ttl)` / `WithSlidingTtl(ttl)` | Expiration control.                                          |
+| `AllowStaleFor(duration)`                      | Enables stale-while-revalidate when the adapter supports it. |
+| `PublishInvalidation()`                        | Forces pub/sub messages for Redis-style adapters.            |
+| `WithTags(params string[] tags)`               | Normalizes and deduplicates tags for selective flushes.      |
 
 To probe without fetching the payload, call `await Cache.Exists("todo:open:v1", ct);`.
 
@@ -219,12 +219,12 @@ If the factory exceeds the timeout, additional callers execute their own factori
 
 `CacheInstrumentation` publishes counters via `Meter("Koan.Cache", "0.6.3")`:
 
-| Counter | Description |
-| --- | --- |
-| `koan.cache.hits` | Cache hits per provider |
-| `koan.cache.misses` | Cache misses per provider |
-| `koan.cache.sets` | Successful writes |
-| `koan.cache.removes` | Explicit removals |
+| Counter                    | Description                     |
+| -------------------------- | ------------------------------- |
+| `koan.cache.hits`          | Cache hits per provider         |
+| `koan.cache.misses`        | Cache misses per provider       |
+| `koan.cache.sets`          | Successful writes               |
+| `koan.cache.removes`       | Explicit removals               |
 | `koan.cache.invalidations` | Pub/sub invalidations published |
 
 Inspect adapter capabilities at runtime:

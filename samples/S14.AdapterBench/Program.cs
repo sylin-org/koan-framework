@@ -13,8 +13,7 @@ var sqliteConnectionString = "Data Source=Data/Koan.sqlite;Mode=ReadWriteCreate;
 builder.Configuration["Koan:Data:Sqlite:ConnectionString"] = sqliteConnectionString;
 
 // Koan framework auto-registration
-builder.Services.AddKoan()
-    .AsWebApi();
+builder.Services.AddKoan();
 
 // SignalR for real-time benchmark progress
 builder.Services.AddSignalR();

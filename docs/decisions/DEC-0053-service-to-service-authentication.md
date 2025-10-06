@@ -139,7 +139,7 @@ public async Task<IActionResult> ProcessUserActivity([FromBody] UserActivityEven
 #### Zero Configuration (Default)
 ```csharp
 // Program.cs - No configuration required
-builder.Services.AddKoan().AsWebApi();
+builder.Services.AddKoan();
 
 // Controllers - Just declare services with attributes
 [KoanService("recommendation-service", ProvidedScopes = new[] { "recommendations:read", "recommendations:write" })]

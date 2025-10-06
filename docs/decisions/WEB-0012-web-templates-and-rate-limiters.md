@@ -12,12 +12,12 @@ date: 2025-08-16
 
 Context
 
-- We introduced simple launch templates for ASP.NET Core apps to reduce boilerplate: `AsWebApi()`, `WithExceptionHandler()`, and `WithRateLimit()`.
+- We introduced simple launch templates for ASP.NET Core apps to reduce boilerplate: `AsWebApi()`, `WithExceptionHandler()`, and `WithRateLimit()`. The defaults that `AsWebApi()` enabled are now applied automatically whenever `Koan.Web` is referenced.
 - The rate limiter DI extensions live in Microsoft.AspNetCore.RateLimiting. Bringing that reference into a class library complicates restore and adds an unnecessary dependency for apps that don’t need it.
 
 Decision
 
-- `AsWebApi()` enables controllers, static files, secure headers, and ProblemDetails. It does not register a rate limiter.
+- Referencing `Koan.Web` automatically enables controllers, static files, secure headers, and ProblemDetails; `AsWebApi()` remains as an explicit toggle for legacy hosts but is no longer required.
 - `WithExceptionHandler()` and `WithRateLimit()` only toggle middleware wiring via a shared `WebPipelineOptions` that the startup filter reads.
 - Apps are responsible for registering a limiter via `AddRateLimiter(...)` when they opt in to rate limiting.
 

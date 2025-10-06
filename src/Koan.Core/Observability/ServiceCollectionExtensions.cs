@@ -1,6 +1,8 @@
+using System.IO;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
@@ -29,51 +31,64 @@ public static class ServiceCollectionExtensions
         }
         if (!enabled) return services;
 
+        var loggerFactory = tmp.GetService<ILoggerFactory>();
+        var logger = loggerFactory?.CreateLogger("Koan.Observability");
+
         var entry = System.Reflection.Assembly.GetEntryAssembly();
         var serviceName = entry?.GetName().Name ?? "Koan-app";
         var serviceVersion = entry?.GetName().Version?.ToString() ?? "0.0.0";
         var resource = ResourceBuilder.CreateDefault().AddService(serviceName: serviceName, serviceVersion: serviceVersion, serviceInstanceId: Environment.MachineName);
 
-        if (opts.Traces.Enabled)
+        try
         {
-            services.AddOpenTelemetry().WithTracing(b =>
+            var builder = services.AddOpenTelemetry();
+
+            if (opts.Traces.Enabled)
             {
-                b.SetResourceBuilder(resource)
-                 .AddSource("Koan.Core", "Koan.Data", "Koan.Messaging", "Koan.Web")
-                 .AddAspNetCoreInstrumentation()
-                 .AddHttpClientInstrumentation();
-
-                var rate = Math.Clamp(opts.Traces.SampleRate, 0.0, 1.0);
-                b.SetSampler(new ParentBasedSampler(new TraceIdRatioBasedSampler(rate)));
-
-                if (!string.IsNullOrWhiteSpace(otlpEndpoint))
+                builder.WithTracing(b =>
                 {
-                    b.AddOtlpExporter(o =>
+                    b.SetResourceBuilder(resource)
+                     .AddSource("Koan.Core", "Koan.Data", "Koan.Messaging", "Koan.Web")
+                     .AddAspNetCoreInstrumentation()
+                     .AddHttpClientInstrumentation();
+
+                    var rate = Math.Clamp(opts.Traces.SampleRate, 0.0, 1.0);
+                    b.SetSampler(new ParentBasedSampler(new TraceIdRatioBasedSampler(rate)));
+
+                    if (!string.IsNullOrWhiteSpace(otlpEndpoint))
                     {
-                        o.Endpoint = new Uri(otlpEndpoint);
-                        var headers = opts.Otlp.Headers
-                            ?? Configuration.Read<string?>(cfg, Infrastructure.Constants.Configuration.Otel.Exporter.Otlp.Headers, null);
-                        if (!string.IsNullOrWhiteSpace(headers)) o.Headers = headers;
-                    });
-                }
-            });
+                        b.AddOtlpExporter(o =>
+                        {
+                            o.Endpoint = new Uri(otlpEndpoint);
+                            var headers = opts.Otlp.Headers
+                                ?? Configuration.Read<string?>(cfg, Infrastructure.Constants.Configuration.Otel.Exporter.Otlp.Headers, null);
+                            if (!string.IsNullOrWhiteSpace(headers)) o.Headers = headers;
+                        });
+                    }
+                });
+            }
+
+            if (opts.Metrics.Enabled)
+            {
+                builder.WithMetrics(b =>
+                {
+                    b.SetResourceBuilder(resource)
+                     .AddRuntimeInstrumentation();
+
+                    if (!string.IsNullOrWhiteSpace(otlpEndpoint))
+                    {
+                        b.AddOtlpExporter(o =>
+                        {
+                            o.Endpoint = new Uri(otlpEndpoint);
+                        });
+                    }
+                });
+            }
         }
-
-        if (opts.Metrics.Enabled)
+        catch (Exception ex) when (ex is FileNotFoundException or FileLoadException or TypeLoadException)
         {
-            services.AddOpenTelemetry().WithMetrics(b =>
-            {
-                b.SetResourceBuilder(resource)
-                 .AddRuntimeInstrumentation();
-
-                if (!string.IsNullOrWhiteSpace(otlpEndpoint))
-                {
-                    b.AddOtlpExporter(o =>
-                    {
-                        o.Endpoint = new Uri(otlpEndpoint);
-                    });
-                }
-            });
+            logger?.LogWarning(ex, "OpenTelemetry assemblies not present; disabling Koan observability.");
+            services.Configure<ObservabilityOptions>(o => o.Enabled = false);
         }
 
         return services;

@@ -6,7 +6,6 @@ var builder = WebApplication.CreateBuilder(args);
 
 // S10.DevPortal - Clean framework initialization demonstrating "Reference = Intent"
 builder.Services.AddKoan()
-    .AsWebApi()
     .AsProxiedApi();
 
 // Local services for demo functionality

@@ -11,7 +11,6 @@ using Koan.Web.Extensions.Policies;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddKoan()
-    .AsWebApi()
     .AsProxiedApi()
     .WithRateLimit();
 

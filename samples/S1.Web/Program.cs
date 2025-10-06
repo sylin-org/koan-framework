@@ -6,8 +6,6 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Framework bootstrap
 builder.Services.AddKoan()
-    // Sensible defaults: controllers, static files, secure headers, ProblemDetails
-    .AsWebApi()
     // Toggle middleware
     .WithExceptionHandler()
     .WithRateLimit();

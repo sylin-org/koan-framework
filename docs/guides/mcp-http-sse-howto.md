@@ -88,8 +88,7 @@ using Koan.Web.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddKoan()
-    .AsWebApi();
+builder.Services.AddKoan();
 
 builder.Services.AddKoanMcp(builder.Configuration);
 

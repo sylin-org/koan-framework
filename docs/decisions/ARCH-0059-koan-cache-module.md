@@ -1,4 +1,4 @@
-﻿````markdown
+﻿```markdown
 ---
 id: ARCH-0059
 slug: koan-cache-module
@@ -119,4 +119,4 @@ Cache diagnostics (policy inventory, capability matrices, hit/miss metrics) are 
 - [Koan.Cache implementation](../../src/Koan.Cache)
 - [Redis integration tests](../../tests/Koan.Cache.Adapter.Redis.IntegrationTests)
 - [OPS-0048 Standardized Docker probing for tests](OPS-0048-standardize-docker-probing-for-tests.md)
-````
+```

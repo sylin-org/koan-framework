@@ -31,8 +31,8 @@ public sealed class CacheRepositoryDecoratorTests
     [Fact]
     public void TryDecorate_WithEntityPolicy_WrapsRepository()
     {
-    using var context = CacheTestContext.Create();
-    var registry = CreateRegistry();
+        using var context = CacheTestContext.Create();
+        var registry = CreateRegistry();
 
         var decorator = new CacheRepositoryDecorator(registry, NullLogger<CacheRepositoryDecorator>.Instance);
         var repository = new TestRepository();
@@ -46,8 +46,8 @@ public sealed class CacheRepositoryDecoratorTests
     [Fact]
     public async Task GetAsync_UsesCacheAfterFirstFetch()
     {
-    using var context = CacheTestContext.Create();
-    var registry = CreateRegistry();
+        using var context = CacheTestContext.Create();
+        var registry = CreateRegistry();
 
         var decorator = new CacheRepositoryDecorator(registry, NullLogger<CacheRepositoryDecorator>.Instance);
         var repository = new TestRepository();
@@ -70,8 +70,8 @@ public sealed class CacheRepositoryDecoratorTests
     [Fact]
     public async Task UpsertAndDelete_MaintainCacheEntries()
     {
-    using var context = CacheTestContext.Create();
-    var registry = CreateRegistry();
+        using var context = CacheTestContext.Create();
+        var registry = CreateRegistry();
 
         var decorator = new CacheRepositoryDecorator(registry, NullLogger<CacheRepositoryDecorator>.Instance);
         var repository = new TestRepository();
@@ -412,7 +412,7 @@ public sealed class CacheRepositoryDecoratorTests
         public IReadOnlyList<CachePolicyDescriptor> GetAllPolicies()
             => _policies;
 
-    public bool TryGetPolicy(Type type, [NotNullWhen(true)] out CachePolicyDescriptor? descriptor)
+        public bool TryGetPolicy(Type type, [NotNullWhen(true)] out CachePolicyDescriptor? descriptor)
         {
             if (type == typeof(TestEntity))
             {
@@ -424,7 +424,7 @@ public sealed class CacheRepositoryDecoratorTests
             return false;
         }
 
-    public bool TryGetPolicy(MemberInfo member, [NotNullWhen(true)] out CachePolicyDescriptor? descriptor)
+        public bool TryGetPolicy(MemberInfo member, [NotNullWhen(true)] out CachePolicyDescriptor? descriptor)
         {
             descriptor = null;
             return false;

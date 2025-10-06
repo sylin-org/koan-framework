@@ -158,7 +158,7 @@ public sealed class EntityCacheAccessorTests : IDisposable
     public void Dispose()
     {
         AppHost.Current = null;
-        ( _provider as IDisposable)?.Dispose();
+        (_provider as IDisposable)?.Dispose();
     }
 
     private sealed class SampleEntity : Entity<SampleEntity, Guid>

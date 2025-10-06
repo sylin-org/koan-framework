@@ -65,8 +65,8 @@ internal sealed class CachedRepository<TEntity, TKey> :
         _instructionExecutor = inner as IInstructionExecutor<TEntity>;
         _schemaContributor = inner as ISchemaHealthContributor<TEntity, TKey>;
         _queryCapabilitiesSource = inner as IQueryCapabilities;
-    _writeCapabilitiesSource = inner as IWriteCapabilities;
-    _keyAccessor = static entity => ((IEntity<TKey>)entity).Id;
+        _writeCapabilitiesSource = inner as IWriteCapabilities;
+        _keyAccessor = static entity => ((IEntity<TKey>)entity).Id;
         _entityName = typeof(TEntity).Name;
     }
 

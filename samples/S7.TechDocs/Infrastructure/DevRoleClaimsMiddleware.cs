@@ -1,44 +1,61 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Security.Claims;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace S7.TechDocs.Infrastructure;
 
 /// <summary>
-/// Development-only middleware to enrich the authenticated principal (from TestProvider)
-/// with role claims based on a simple cookie. This keeps identity issuance with Koan.Web.Auth
-/// while allowing us to simulate Roles for the demo.
-/// Cookie format: _s7_roles=Reader|Author|Moderator|Admin (pipe or comma separated). Defaults to Reader.
-/// Cumulative semantics are applied: Reader ⊆ Author ⊆ Moderator ⊆ Admin.
+/// Parses the development role cookie and enriches the authenticated principal.
 /// </summary>
-public sealed class DevRoleClaimsMiddleware(RequestDelegate next, IWebHostEnvironment env)
+public static class DevRoleClaims
 {
-    public async Task Invoke(HttpContext context)
+    private const string RolesCookie = "_s7_roles";
+    private static readonly char[] Delimiters = ['|', ',', ';'];
+
+    public static Task<ClaimsPrincipal> ApplyAsync(IServiceProvider services, ClaimsPrincipal principal)
     {
-        if (env.IsDevelopment())
+        if (principal.Identity?.IsAuthenticated != true || HasAnyRole(principal))
         {
-            var user = context.User;
-            if (user?.Identity?.IsAuthenticated == true)
-            {
-                var rolesCookie = context.Request.Cookies.TryGetValue("_s7_roles", out var v) ? v : null;
-                var roles = ParseRoles(rolesCookie);
-                if (roles.Count > 0 && !HasAnyRole(user))
-                {
-                    var identity = user.Identity as ClaimsIdentity;
-                    foreach (var r in ExpandCumulative(roles))
-                    {
-                        identity!.AddClaim(new Claim(ClaimTypes.Role, r));
-                    }
-                }
-            }
+            return Task.FromResult(principal);
         }
 
-        await next(context);
+        var accessor = services.GetRequiredService<IHttpContextAccessor>();
+        var context = accessor.HttpContext;
+        if (context is null)
+        {
+            return Task.FromResult(principal);
+        }
+
+        var rolesCookie = context.Request.Cookies.TryGetValue(RolesCookie, out var value) ? value : null;
+        var roles = ParseRoles(rolesCookie);
+        if (roles.Count == 0)
+        {
+            return Task.FromResult(principal);
+        }
+
+        var identity = principal.Identity as ClaimsIdentity ?? new ClaimsIdentity(principal.Identity);
+        if (identity != principal.Identity)
+        {
+            principal.AddIdentity(identity);
+        }
+
+        foreach (var role in ExpandCumulative(roles))
+        {
+            identity.AddClaim(new Claim(ClaimTypes.Role, role));
+        }
+
+        return Task.FromResult(principal);
     }
 
     private static HashSet<string> ParseRoles(string? raw)
     {
         var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         if (string.IsNullOrWhiteSpace(raw)) return set;
-        foreach (var part in raw.Split(new[] { '|', ',', ';' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        foreach (var part in raw.Split(Delimiters, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
         {
             set.Add(part);
         }
@@ -50,7 +67,6 @@ public sealed class DevRoleClaimsMiddleware(RequestDelegate next, IWebHostEnviro
 
     private static IEnumerable<string> ExpandCumulative(HashSet<string> input)
     {
-        // Cumulative: Admin -> Moderator -> Author -> Reader
         if (input.Contains(Constants.Roles.Admin))
         {
             yield return Constants.Roles.Admin;

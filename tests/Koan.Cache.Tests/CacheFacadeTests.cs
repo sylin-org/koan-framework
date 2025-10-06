@@ -34,13 +34,13 @@ public sealed class CacheFacadeTests : IDisposable
     public async Task Exists_DelegatesToClient()
     {
         _client.ExistsResult = true;
-    using var cts = new CancellationTokenSource();
+        using var cts = new CancellationTokenSource();
 
         var result = await Cache.Exists("alpha", cts.Token);
 
         result.Should().BeTrue();
         _client.ExistsCalls.Should().Be(1);
-    _client.LastExistsKey.Should().Be(new CacheKey("alpha"));
+        _client.LastExistsKey.Should().Be(new CacheKey("alpha"));
         _client.LastExistsOptions.Should().NotBeNull();
         _client.LastExistsToken.Should().Be(cts.Token);
     }
@@ -86,8 +86,8 @@ public sealed class CacheFacadeTests : IDisposable
 
         removed.Should().Be(2);
         _client.FlushCalls.Should().Be(1);
-    _client.LastFlushTags.Should().NotBeNull();
-    _client.LastFlushTags.Should().BeEquivalentTo("Foo", "bar", "baz");
+        _client.LastFlushTags.Should().NotBeNull();
+        _client.LastFlushTags.Should().BeEquivalentTo("Foo", "bar", "baz");
     }
 
     [Fact]

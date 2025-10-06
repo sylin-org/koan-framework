@@ -2245,7 +2245,6 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Single line enables Koan with auto-static file serving (S5 pattern)
 builder.Services.AddKoan()
-    .AsWebApi()           // Enables API controllers
     .AsProxiedApi()       // Enables reverse proxy support
     .WithRateLimit();     // Adds rate limiting
 

@@ -11,6 +11,7 @@
     <FileVersion>0.6.3</FileVersion>
   </PropertyGroup>
   <ItemGroup>
+  <ProjectReference Include="..\..\..\..\Koan.Core\Koan.Core.csproj" />
   <ProjectReference Include="..\..\..\..\Koan.Orchestration.Abstractions\Koan.Orchestration.Abstractions.csproj" />
   </ItemGroup>
 </Project>

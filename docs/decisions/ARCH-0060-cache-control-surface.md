@@ -1,4 +1,4 @@
-﻿````markdown
+﻿```markdown
 ---
 id: ARCH-0060
 slug: cache-control-surface
@@ -68,4 +68,4 @@ All new public helpers drop the `Async` suffix while remaining asynchronous unde
 - Adapters beyond memory/Redis must implement `ExistsAsync` when ported to the new contract; capability documents should be updated accordingly.
 - Future work may introduce structured responses (e.g., per-tag counts) once we have consumer scenarios beyond binary counts.
 - Admin tooling can now layer on these helpers without touching provider APIs directly.
-````
+```

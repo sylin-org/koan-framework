@@ -37,7 +37,7 @@ Koan’s Data pillar unifies persistence across SQL, NoSQL, JSON, and vector dat
 
 **Core packages**: `Koan.Data.Core`, adapter-specific packages (for example `Koan.Data.Connector.Postgres`, `Koan.Data.Connector.MongoDB`, `Koan.Data.Connector.Redis`, `Koan.Data.Vector.Redis`).
 
-➤ **Caching**: See the [Koan Cache Reference](./cache.md) for fluent builders, tag invalidation, and policy-driven caching that integrates with `Entity<TEntity>`. 
+➤ **Caching**: See the [Koan Cache Reference](./cache.md) for fluent builders, tag invalidation, and policy-driven caching that integrates with `Entity<TEntity>`.
 
 ---
 
@@ -294,8 +294,8 @@ All direct commands respect configured connections, logging, and retry policies.
 
 ## Provider Matrix
 
-| Provider   | Package               | Primary Use Case                        |
-| ---------- | --------------------- | --------------------------------------- |
+| Provider   | Package                         | Primary Use Case                        |
+| ---------- | ------------------------------- | --------------------------------------- |
 | SQLite     | `Koan.Data.Connector.Sqlite`    | Local development, embedded deployments |
 | Postgres   | `Koan.Data.Connector.Postgres`  | Production relational workloads         |
 | SQL Server | `Koan.Data.Connector.SqlServer` | Legacy and enterprise relational        |
@@ -339,4 +339,3 @@ export Koan__Data__Postgres__ConnectionString="Host=prod;Database=app"
 - [Entity Lifecycle Events](./entity-lifecycle-events.md)
 - [Flow Pillar Reference](../flow/index.md) for ingestion pipelines and semantic augmentation
 - [AI Pillar Reference](../ai/index.md) for embedding generation and retrieval-augmented generation
-

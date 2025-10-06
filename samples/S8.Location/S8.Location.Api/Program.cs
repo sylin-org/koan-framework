@@ -1,10 +1,11 @@
-using S8.Location.Core.Models;
+using Koan.Canon;
+using Koan.Data.Core;
+using Koan.Web.Connector.Swagger;
+using Koan.Web.Extensions;
 using S8.Location.Core.Interceptors;
+using S8.Location.Core.Models;
 using S8.Location.Core.Orchestration;
 using S8.Location.Core.Services;
-using Koan.Data.Core;
-using Koan.Canon;
-using Koan.Web.Connector.Swagger;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -30,8 +31,6 @@ if (!Koan.Core.KoanEnv.InContainer)
     return;
 }
 
-builder.Services.AddControllers();
-builder.Services.AddRouting();
 builder.Services.AddKoanSwagger(builder.Configuration);
 
 var app = builder.Build();
@@ -61,14 +60,6 @@ app.Lifetime.ApplicationStarted.Register(async () =>
     }
 });
 
-if (app.Environment.IsDevelopment())
-{
-    app.UseDeveloperExceptionPage();
-}
-
-app.MapControllers();
-app.UseDefaultFiles();
-app.UseStaticFiles();
 app.UseKoanSwagger();
 
 app.Run();

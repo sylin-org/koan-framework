@@ -6,6 +6,8 @@ namespace Koan.Orchestration.Connector.Docker;
 
 public sealed partial class DockerProvider : IHostingProvider
 {
+    private const string DockerCli = "docker";
+
     public string Id => "docker";
     public int Priority => 100; // Windows-first default
 
@@ -13,7 +15,7 @@ public sealed partial class DockerProvider : IHostingProvider
     {
         try
         {
-            var (code, _, err) = await Run("docker", "version --format '{{.Server.Version}}'", ct);
+            var (code, _, err) = await Run(DockerCli, "version --format '{{.Server.Version}}'", ct);
             if (code == 0) return (true, null);
             return (false, string.IsNullOrWhiteSpace(err) ? "docker not available" : err.Trim());
         }
@@ -26,7 +28,7 @@ public sealed partial class DockerProvider : IHostingProvider
     public async Task Up(string composePath, Profile profile, RunOptions options, CancellationToken ct = default)
     {
         var detach = options.Detach ? "-d" : string.Empty;
-        var (_, _, err) = await Run("docker", $"compose -f \"{composePath}\" up {detach}", ct);
+        var (_, _, err) = await Run(DockerCli, $"compose -f \"{composePath}\" up {detach}", ct);
         if (!string.IsNullOrWhiteSpace(err))
         {
             // docker writes a lot to stderr even on success; don't fail solely on err content.
@@ -73,7 +75,7 @@ public sealed partial class DockerProvider : IHostingProvider
     {
         try
         {
-            var (code, stdout, _) = await Run("docker", $"compose -f \"{composePath}\" ps --format json", ct);
+            var (code, stdout, _) = await Run(DockerCli, $"compose -f \"{composePath}\" ps --format json", ct);
             if (code != 0 || string.IsNullOrWhiteSpace(stdout)) return new();
             return ParseComposePsJson(stdout);
         }
@@ -86,7 +88,7 @@ public sealed partial class DockerProvider : IHostingProvider
     public async Task Down(string composePath, StopOptions options, CancellationToken ct = default)
     {
         var vols = options.RemoveVolumes ? "-v" : string.Empty;
-        await Run("docker", $"compose -f \"{composePath}\" down {vols}", ct);
+        await Run(DockerCli, $"compose -f \"{composePath}\" down {vols}", ct);
     }
 
     public async IAsyncEnumerable<string> Logs(LogsOptions options, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
@@ -95,7 +97,7 @@ public sealed partial class DockerProvider : IHostingProvider
         var follow = options.Follow ? "-f" : string.Empty;
         var tail = options.Tail is { } t ? $"--tail {t}" : string.Empty;
         var since = string.IsNullOrWhiteSpace(options.Since) ? string.Empty : $"--since \"{options.Since}\"";
-        await foreach (var line in Stream("docker", $"compose logs {follow} {tail} {since} {svc}", ct))
+        await foreach (var line in Stream(DockerCli, $"compose logs {follow} {tail} {since} {svc}", ct))
         {
             yield return line;
         }
@@ -107,7 +109,7 @@ public sealed partial class DockerProvider : IHostingProvider
         string stdout = string.Empty;
         try
         {
-            var res = await Run("docker", "compose ps --format json", ct);
+            var res = await Run(DockerCli, "compose ps --format json", ct);
             code = res.ExitCode;
             stdout = res.StdOut;
         }
@@ -119,7 +121,7 @@ public sealed partial class DockerProvider : IHostingProvider
             ? ParseComposePsJson(stdout)
             : new List<(string Service, string State, string? Health)>();
         var (ok, _) = await IsAvailableAsync(ct);
-        var engineVer = ok ? (await Run("docker", "version --format '{{.Server.Version}}'", ct)).StdOut.Trim() : "";
+        var engineVer = ok ? (await Run(DockerCli, "version --format '{{.Server.Version}}'", ct)).StdOut.Trim() : "";
         return new ProviderStatus(Id, engineVer, services);
     }
 
@@ -127,7 +129,7 @@ public sealed partial class DockerProvider : IHostingProvider
     {
         try
         {
-            var (code, outText, _) = await Run("docker", "compose ps --format json", ct);
+            var (code, outText, _) = await Run(DockerCli, "compose ps --format json", ct);
             if (code != 0 || string.IsNullOrWhiteSpace(outText)) return Array.Empty<PortBinding>();
             return ParseComposePsPorts(outText);
         }
@@ -142,13 +144,13 @@ public sealed partial class DockerProvider : IHostingProvider
 
     static string GetVersionSafe()
     {
-        try { return Run("docker", "version --format '{{.Server.Version}}'", CancellationToken.None).GetAwaiter().GetResult().StdOut.Trim(); }
+        try { return Run(DockerCli, "version --format '{{.Server.Version}}'", CancellationToken.None).GetAwaiter().GetResult().StdOut.Trim(); }
         catch { return string.Empty; }
     }
 
     static string GetEndpointSafe()
     {
-        try { return Run("docker", "context show", CancellationToken.None).GetAwaiter().GetResult().StdOut.Trim(); }
+        try { return Run(DockerCli, "context show", CancellationToken.None).GetAwaiter().GetResult().StdOut.Trim(); }
         catch { return string.Empty; }
     }
 

@@ -6,8 +6,7 @@ using Koan.Web.Extensions;
 var builder = WebApplication.CreateBuilder(args);
 
 // Configure Koan framework with web API support
-builder.Services.AddKoan()
-    .AsWebApi();
+builder.Services.AddKoan();
 
 // Enable observability (telemetry, metrics, logging)
 builder.Services.AddKoanObservability();

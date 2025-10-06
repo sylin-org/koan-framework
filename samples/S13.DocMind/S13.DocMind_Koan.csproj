@@ -12,15 +12,22 @@
 
   <ItemGroup>
     <!-- Core Koan Framework -->
-    <ProjectReference Include="..\..\src\Koan.Core\Koan.Core.csproj" />
-    <ProjectReference Include="..\..\src\Koan.Data.Vector\Koan.Data.Vector.csproj" />
-    <ProjectReference Include="..\..\src\Koan.Web\Koan.Web.csproj" />
-    <ProjectReference Include="..\..\src\Koan.AI\Koan.AI.csproj" />
-    <ProjectReference Include="..\..\src\Koan.Mcp\Koan.Mcp.csproj" />
+  <ProjectReference Include="..\..\src\Koan.Core\Koan.Core.csproj" />
+  <ProjectReference Include="..\..\src\Koan.Core.Adapters\Koan.Core.Adapters.csproj" />
+  <ProjectReference Include="..\..\src\Koan.Web\Koan.Web.csproj" />
+  <ProjectReference Include="..\..\src\Koan.Web.Extensions\Koan.Web.Extensions.csproj" />
+  <ProjectReference Include="..\..\src\Connectors\Web\Swagger\Koan.Web.Connector.Swagger.csproj" />
+  <ProjectReference Include="..\..\src\Koan.Data.Core\Koan.Data.Core.csproj" />
+  <ProjectReference Include="..\..\src\Koan.Data.Vector.Abstractions\Koan.Data.Vector.Abstractions.csproj" />
+  <ProjectReference Include="..\..\src\Koan.Data.Vector\Koan.Data.Vector.csproj" />
+  <ProjectReference Include="..\..\src\Koan.AI\Koan.AI.csproj" />
+  <ProjectReference Include="..\..\src\Koan.AI.Contracts\Koan.AI.Contracts.csproj" />
+  <ProjectReference Include="..\..\src\Koan.AI.Web\Koan.AI.Web.csproj" />
+  <ProjectReference Include="..\..\src\Koan.Mcp\Koan.Mcp.csproj" />
 
     <!-- Provider Projects - Auto-registered when referenced -->
-    <ProjectReference Include="..\..\src\Connectors\Data\Mongo\Koan.Data.Connector.Mongo.csproj" />
-    <ProjectReference Include="..\..\src\Connectors\Data\Vector\Weaviate\Koan.Data.Vector.Connector.Weaviate.csproj" />
+  <ProjectReference Include="..\..\src\Connectors\Data\Mongo\Koan.Data.Connector.Mongo.csproj" />
+  <ProjectReference Include="..\..\src\Connectors\Data\Vector\Weaviate\Koan.Data.Vector.Connector.Weaviate.csproj" />
 
     <!-- Document Processing -->
     <PackageReference Include="PdfPig" Version="0.1.11" />

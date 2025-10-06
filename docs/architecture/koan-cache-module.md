@@ -100,17 +100,17 @@ public class TodoProjectionService
 
 ### Fluent Helpers
 
-| Helper                         | Purpose                                                               |
-| ------------------------------ | --------------------------------------------------------------------- |
-| `Cache.WithJson(key)`          | JSON-serializes complex objects using configured serializer.          |
-| `Cache.WithBinary(key)`        | Stores raw bytes or streams for files.                                |
-| `Cache.WithString(key)`        | Optimized path for UTF-8 text content.                                |
-| `Cache.WithRecord<TItem>(key)` | Strongly typed upsert/merge using custom serializers.                 |
-| `.For(TimeSpan ttl)`           | Sets relative expiration.                                             |
-| `.Tag(params string[] tags)`   | Adds cache tags for selective invalidation.                           |
-| `.AllowStaleUntil(TimeSpan)`   | Enables "stale-while-revalidate" behaviors when provider supports it. |
-| `.PublishInvalidation()`       | Forces adapters supporting pub/sub to emit invalidation messages.     |
-| `.Exists(ct)`                  | Lightweight probe that returns `true` when the key is currently cached. |
+| Helper                         | Purpose                                                                       |
+| ------------------------------ | ----------------------------------------------------------------------------- |
+| `Cache.WithJson(key)`          | JSON-serializes complex objects using configured serializer.                  |
+| `Cache.WithBinary(key)`        | Stores raw bytes or streams for files.                                        |
+| `Cache.WithString(key)`        | Optimized path for UTF-8 text content.                                        |
+| `Cache.WithRecord<TItem>(key)` | Strongly typed upsert/merge using custom serializers.                         |
+| `.For(TimeSpan ttl)`           | Sets relative expiration.                                                     |
+| `.Tag(params string[] tags)`   | Adds cache tags for selective invalidation.                                   |
+| `.AllowStaleUntil(TimeSpan)`   | Enables "stale-while-revalidate" behaviors when provider supports it.         |
+| `.PublishInvalidation()`       | Forces adapters supporting pub/sub to emit invalidation messages.             |
+| `.Exists(ct)`                  | Lightweight probe that returns `true` when the key is currently cached.       |
 | `Cache.Exists(key)`            | Global probe without building an entry instance; returns a `ValueTask<bool>`. |
 
 The fluent builder returns a `CacheEntry<T>` that supports `GetAsync`, `GetOrAddAsync`, `SetAsync`, `RemoveAsync`, `TouchAsync`, and the new `Exists` probe. All methods accept `CancellationToken` to stay aligned with Koan data calls.
@@ -241,11 +241,11 @@ Configuration-bound policies hydrate from strongly typed options (`CacheOptions`
 
 ### Mutation Invalidation Patterns
 
-| Surface                | Operation(s)                         | Eviction behaviour                                                                                                     |
-| ---------------------- | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
-| `Entity<T>` instances  | `Save()` (create/update), `Delete()` | `EntityLifecycleEvents.AfterSave/AfterDelete` resolve the policy key template, remove the concrete key, and flush tags |
-| `EntityController<T>`  | `POST/PUT/PATCH/DELETE` actions       | `CachePolicyFilter` translates route data into cache keys/tags and evicts immediately after the action completes        |
-| Instruction handlers   | Custom upserts/deletes               | `CacheInstructionInterceptor` consumes handler metadata, invokes `Cache.RemoveAsync`, and optionally clears tag sets    |
+| Surface               | Operation(s)                         | Eviction behaviour                                                                                                     |
+| --------------------- | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
+| `Entity<T>` instances | `Save()` (create/update), `Delete()` | `EntityLifecycleEvents.AfterSave/AfterDelete` resolve the policy key template, remove the concrete key, and flush tags |
+| `EntityController<T>` | `POST/PUT/PATCH/DELETE` actions      | `CachePolicyFilter` translates route data into cache keys/tags and evicts immediately after the action completes       |
+| Instruction handlers  | Custom upserts/deletes               | `CacheInstructionInterceptor` consumes handler metadata, invokes `Cache.RemoveAsync`, and optionally clears tag sets   |
 
 Upserts piggyback on `Entity<T>.Save()`, so the same lifecycle hook covers both create and update paths without extra wiring. Tag-based policies ensure related list queries or projections fall out of cache alongside the primary key entry. Future adapters must exercise mutation tests to verify that compare-and-exchange flows still trigger the eviction pipeline when writes succeed.
 
