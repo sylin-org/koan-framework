@@ -115,7 +115,7 @@ public class CanonEntitiesController<TModel> : EntityController<TModel>
             }
         }
 
-    if (query.TryGetValue("views", out var viewsValue) && !StringValues.IsNullOrEmpty(viewsValue))
+        if (query.TryGetValue("views", out var viewsValue) && !StringValues.IsNullOrEmpty(viewsValue))
         {
             var views = viewsValue
         .SelectMany(static value => (value ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
@@ -127,7 +127,7 @@ public class CanonEntitiesController<TModel> : EntityController<TModel>
             }
         }
 
-        #pragma warning disable CS8602 // Query keys and headers are populated by ASP.NET and never null for reachable entries.
+#pragma warning disable CS8602 // Query keys and headers are populated by ASP.NET and never null for reachable entries.
         foreach (var kvp in query)
         {
             var rawKey = kvp.Key;
@@ -187,7 +187,7 @@ public class CanonEntitiesController<TModel> : EntityController<TModel>
                 }
             }
         }
-        #pragma warning restore CS8602
+#pragma warning restore CS8602
 
         return options;
     }

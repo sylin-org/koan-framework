@@ -45,7 +45,7 @@ public sealed class CanonRuntimeBuilder
 
         var builder = new CanonPipelineBuilder<TModel>();
         configure(builder);
-    _descriptors[typeof(TModel)] = builder.Build();
+        _descriptors[typeof(TModel)] = builder.Build();
         return this;
     }
 
@@ -88,7 +88,7 @@ public sealed class CanonRuntimeBuilder
     {
         var descriptors = new Dictionary<Type, ICanonPipelineDescriptor>(_descriptors);
         var metadata = descriptors.ToDictionary(static pair => pair.Key, static pair => pair.Value.Metadata);
-    return new CanonRuntimeConfiguration(_defaultOptions.Copy(), descriptors, metadata, _recordCapacity, _persistence, _auditSink);
+        return new CanonRuntimeConfiguration(_defaultOptions.Copy(), descriptors, metadata, _recordCapacity, _persistence, _auditSink);
     }
 
     /// <summary>

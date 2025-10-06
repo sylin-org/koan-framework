@@ -44,7 +44,7 @@ public sealed class AggregationPolicyAttribute : Attribute
         {
             if (Sources.Length == 0)
             {
-                return new[] { Source }; 
+                return new[] { Source };
             }
 
             return new[] { Source }

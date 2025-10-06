@@ -12,6 +12,7 @@ validation:
 ---
 
 > **Contract**
+>
 > - **Inputs:** Current Koan framework architecture (data, canon, web, AI, orchestration modules) and prevailing alternatives across enterprise platforms, cloud-native stacks, and open-source composites.
 > - **Outputs:** Expert assessment of Koan's strengths, gaps, and viability compared with those alternatives, including architectural and operational considerations.
 > - **Stakeholders:** Solution architects, platform leads, product strategists.
@@ -32,30 +33,30 @@ Koan is a modular, code-first application framework for greenfield teams that wa
 
 ### Enterprise Application Platforms (ServiceNow, Salesforce Platform, SAP BTP)
 
-| Aspect | Koan | Enterprise Suites |
-|--------|------|-------------------|
-| **Integration posture** | Self-hosted, code-first .NET runtime | Managed SaaS platforms with packaged apps and marketplaces |
-| **Customization vs. productivity** | Full C# control, minimal scaffolding | Rapid app builders, WYSIWYG tooling, prebuilt workflows |
-| **Data mastery** | Canon module with deterministic policies, no built-in stewardship UI | Mature MDM modules, governance dashboards, compliance tooling |
-| **AI story** | Connector-based, choose-your-own models | Bundled proprietary AI (Einstein, Now Assist) |
-| **Cost** | Open-source; pay for engineering + infrastructure | High licensing, but includes hosting, support, compliance |
+| Aspect                             | Koan                                                                 | Enterprise Suites                                             |
+| ---------------------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------- |
+| **Integration posture**            | Self-hosted, code-first .NET runtime                                 | Managed SaaS platforms with packaged apps and marketplaces    |
+| **Customization vs. productivity** | Full C# control, minimal scaffolding                                 | Rapid app builders, WYSIWYG tooling, prebuilt workflows       |
+| **Data mastery**                   | Canon module with deterministic policies, no built-in stewardship UI | Mature MDM modules, governance dashboards, compliance tooling |
+| **AI story**                       | Connector-based, choose-your-own models                              | Bundled proprietary AI (Einstein, Now Assist)                 |
+| **Cost**                           | Open-source; pay for engineering + infrastructure                    | High licensing, but includes hosting, support, compliance     |
 
 ### Cloud-Native Stacks (AWS, Azure, GCP)
 
-| Aspect | Koan | Cloud Primitives |
-|--------|------|-----------------|
-| **Scope** | Opinionated app framework with cohesive patterns | Collection of managed services (Lambda, DynamoDB, etc.) |
-| **Operational model** | You host and operate the runtime | Provider runs infrastructure; pay-per-use |
-| **Integration** | Leverages cloud services via connectors | Requires composing services manually |
-| **AI/ML** | Vector abstractions and AI modules | Full MLOps suites (SageMaker, Vertex, Azure ML) |
+| Aspect                | Koan                                             | Cloud Primitives                                        |
+| --------------------- | ------------------------------------------------ | ------------------------------------------------------- |
+| **Scope**             | Opinionated app framework with cohesive patterns | Collection of managed services (Lambda, DynamoDB, etc.) |
+| **Operational model** | You host and operate the runtime                 | Provider runs infrastructure; pay-per-use               |
+| **Integration**       | Leverages cloud services via connectors          | Requires composing services manually                    |
+| **AI/ML**             | Vector abstractions and AI modules               | Full MLOps suites (SageMaker, Vertex, Azure ML)         |
 
 ### Open-Source Composites (ASP.NET Core + EF Core + MassTransit + Apache Atlas)
 
-| Aspect | Koan | DIY Stack |
-|--------|------|-----------|
-| **Assembly effort** | Unified conventions and modules out of the box | High integration effort, choose each component |
-| **Consistency** | Enforced architecture rules and docs | Risk of drift without governance |
-| **Feature depth** | Strong Canon runtime, adequate web/data layers | Individual components may be deeper, but disparate |
+| Aspect              | Koan                                           | DIY Stack                                          |
+| ------------------- | ---------------------------------------------- | -------------------------------------------------- |
+| **Assembly effort** | Unified conventions and modules out of the box | High integration effort, choose each component     |
+| **Consistency**     | Enforced architecture rules and docs           | Risk of drift without governance                   |
+| **Feature depth**   | Strong Canon runtime, adequate web/data layers | Individual components may be deeper, but disparate |
 
 ## Platform Strengths
 

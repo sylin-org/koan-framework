@@ -22,11 +22,13 @@ The runtime discovers these attributes at startup, wires the default aggregation
 ## Problem Statement
 
 ### DX & Implementation Gaps
+
 - Aggregation requires bespoke contributors per model; no declarative way to mark aggregation keys.
 - Merge semantics (last write wins, minima/maxima) live in handwritten code, increasing drift and test burden.
 - Opting into auditing demands manual observers, persistence, and documentation updates.
 
 ### Data & Governance Gaps
+
 - Multi-source merges are error-prone; canonical entities often duplicate or lose external IDs.
 - Lack of consistent policy metadata limits lineage, reconciliation, and analytics.
 - Auditing is uneven, undermining compliance posture for regulated domains.
@@ -36,12 +38,14 @@ The runtime discovers these attributes at startup, wires the default aggregation
 ## Proposal Details
 
 ### Minimal Canon Contract
+
 - **Model Opt-in**: `public sealed class Device : CanonEntity<Device> { ... }`.
 - **Aggregation**: Annotate one or more properties with `[AggregationKey]`. The runtime composes composite keys by property order.
 - **Invocation**: `await device.Canonize("crm")` remains the primary DX—no transport scaffolding required.
 - **Validation**: Startup throws or logs a high-severity warning when a `CanonEntity<T>` lacks `[AggregationKey]`.
 
 ### Aggregation Pipeline Enhancements
+
 1. **Metadata Discovery**
    - `CanonRuntimeBuilder` scans assemblies for `[AggregationKey]`, `[AggregationPolicy]`, and `[Canon]`.
    - Captured metadata flows into `CanonModelDescriptor` & `CanonRuntimeConfiguration`.
@@ -53,6 +57,7 @@ The runtime discovers these attributes at startup, wires the default aggregation
    - Store per-property arrival metadata in `CanonMetadata.PropertyFootprints` for policy evaluation and audit.
 
 ### Aggregation Policies
+
 - **Attribute**: `[AggregationPolicy(AggregationPolicyKind.Latest)]` on properties requiring managed merges.
 - **Default**: Properties without an explicit attribute implicitly use `Latest`, retaining prior behavior while allowing opt-in overrides.
 - **Policies**:
@@ -63,6 +68,7 @@ The runtime discovers these attributes at startup, wires the default aggregation
 - **Telemetry**: Policy decisions (previous value, incoming value, winner, policy, arrival token) captured in structured logs and optional audit sinks.
 
 ### Auditing Toggle
+
 - **Attribute**: `[Canon(Audit: true)]` placed on the canonical type.
 - **Behavior**:
   - Persist detailed change records (before/after snapshots, policy decisions) alongside `CanonizationRecord`.
@@ -70,6 +76,7 @@ The runtime discovers these attributes at startup, wires the default aggregation
   - Allow retention/config overrides through `CanonOptions` or environment configuration.
 
 ### Developer Experience Summary
+
 ```csharp
 [Canon(Audit: true)]
 public sealed class Device : CanonEntity<Device>
@@ -97,6 +104,7 @@ var device = new Device
 
 await device.Canonize("source-crm");
 ```
+
 - `.Canonize()` merges multi-source payloads automatically.
 - `.SendForCanonization()` / staging paths remain available for transport-driven apps.
 - Observers and policies are centrally discoverable.
@@ -104,6 +112,7 @@ await device.Canonize("source-crm");
 ---
 
 ## Architecture & Data Implications
+
 - **Runtime Metadata**: Extend `CanonModelDescriptor` with `AggregationKeys`, `AggregationPolicies`, and `AuditEnabled` flags.
 - **CanonIndex**: Support multiple aggregation entries per canonical ID; index entries include arrival token and source metadata.
 - **CanonMetadata**: Add `PropertyFootprints` capturing `{ property, lastValue, sourceKey, arrivalToken }`.
@@ -113,6 +122,7 @@ await device.Canonize("source-crm");
 ---
 
 ## Implementation Plan
+
 1. **Attribute & Metadata Layer**
    - Introduce `[AggregationKey]`, `[AggregationPolicy]`, `[Canon]`, and policy enum in `Koan.Canon.Domain`.
    - Extend metadata scanning and descriptors to capture attribute data.
@@ -133,6 +143,7 @@ await device.Canonize("source-crm");
 ---
 
 ## Current Implementation Delta
+
 - **Annotations**: No runtime attributes exist today for aggregation keys, policies, or audit toggles. Models rely on bespoke contributors instead of declarative metadata.
 - **Runtime Metadata**: `CanonRuntimeBuilder`, `CanonPipelineMetadata`, and `CanonRuntimeConfiguration` expose only pipeline phases. Aggregation keys, policy maps, audit flags, arrival tokens, and property footprints are not yet discovered or stored.
 - **Default Contributors**: The aggregation merge logic in tests/samples is handcrafted. There is no built-in contributor for composite key resolution, deterministic policy evaluation, or canonical index maintenance.
@@ -143,6 +154,7 @@ await device.Canonize("source-crm");
 ---
 
 ## Next Steps
+
 1. **Introduce Attribute Layer**: Add `[AggregationKey]`, `[AggregationPolicy]`, `[Canon]`, and `AggregationPolicyKind`, including validation and default (`Latest`) semantics.
 2. **Metadata Discovery & Configuration**: Extend runtime startup to scan assemblies, populate enriched descriptors (keys, policies, audit flags), and surface them through configuration and web catalog APIs.
 3. **Default Runtime Contributors**: Implement built-in aggregation/policy contributors with arrival token handling, policy registry, and audit hooks; refactor samples/tests to exercise the new path.
@@ -152,6 +164,7 @@ await device.Canonize("source-crm");
 ---
 
 ## Risks & Mitigations
+
 - **Type Support for Min/Max**: Limit to well-known types; document extension hook for custom comparers.
 - **Arrival Token Consistency**: Standardize GUID v7 generation for staging and transport layers; fallback timestamps recorded in UTC.
 - **Performance Overhead**: Policy evaluation adds minor cost; leverage caching and guard logs to INFO level only when auditing is enabled.
@@ -160,6 +173,7 @@ await device.Canonize("source-crm");
 ---
 
 ## Open Questions
+
 - Should `AggregationPolicy` accept custom strategy types for domain-specific merges?
 - Do we require per-property audit suppression even when `[Canon(Audit: true)]` is set?
 - How should we surface healing workflows when aggregation conflicts cannot be auto-resolved by policy?

@@ -467,4 +467,3 @@ public async Task DevicePipeline_ShouldPersistProjection()
 - [Messaging Reference](../messaging/index.md)
 - [Semantic Pipelines Playbook](../../guides/semantic-pipelines.md)
 - [DX-0041 Consolidation ADR](../../decisions/DX-0041-docs-consolidation.md)
-

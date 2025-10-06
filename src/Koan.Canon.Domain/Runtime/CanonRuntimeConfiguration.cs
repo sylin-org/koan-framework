@@ -37,8 +37,8 @@ public sealed class CanonRuntimeConfiguration
             throw new ArgumentOutOfRangeException(nameof(recordCapacity), recordCapacity, "Record capacity must be greater than zero.");
         }
 
-    Persistence = persistence ?? throw new ArgumentNullException(nameof(persistence));
-    AuditSink = auditSink ?? throw new ArgumentNullException(nameof(auditSink));
+        Persistence = persistence ?? throw new ArgumentNullException(nameof(persistence));
+        AuditSink = auditSink ?? throw new ArgumentNullException(nameof(auditSink));
 
         DefaultOptions = defaultOptions.Copy();
         Pipelines = new Dictionary<Type, ICanonPipelineDescriptor>(pipelines);

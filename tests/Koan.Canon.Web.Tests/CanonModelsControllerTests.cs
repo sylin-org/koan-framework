@@ -21,10 +21,10 @@ public class CanonModelsControllerTests
     [Fact]
     public void GetAll_ShouldReturnSummaries()
     {
-    var descriptor = new CanonModelDescriptor(typeof(TestCanonEntity), "test", "Test", WebConstants.Routes.CanonPrefix + "/test", isValueObject: false);
-    var catalog = new CanonModelCatalog(new[] { descriptor });
-    var metadata = new CanonPipelineMetadata(typeof(TestCanonEntity), new[] { CanonPipelinePhase.Intake }, hasSteps: true, new[] { nameof(TestCanonEntity.ExternalId) }, new Dictionary<string, AggregationPolicyKind>(), auditEnabled: false);
-    var configuration = new CanonRuntimeConfiguration(CanonizationOptions.Default, new Dictionary<Type, ICanonPipelineDescriptor>(), new Dictionary<Type, CanonPipelineMetadata> { [typeof(TestCanonEntity)] = metadata }, 10, new StubPersistence(), new NullAuditSink());
+        var descriptor = new CanonModelDescriptor(typeof(TestCanonEntity), "test", "Test", WebConstants.Routes.CanonPrefix + "/test", isValueObject: false);
+        var catalog = new CanonModelCatalog(new[] { descriptor });
+        var metadata = new CanonPipelineMetadata(typeof(TestCanonEntity), new[] { CanonPipelinePhase.Intake }, hasSteps: true, new[] { nameof(TestCanonEntity.ExternalId) }, new Dictionary<string, AggregationPolicyKind>(), auditEnabled: false);
+        var configuration = new CanonRuntimeConfiguration(CanonizationOptions.Default, new Dictionary<Type, ICanonPipelineDescriptor>(), new Dictionary<Type, CanonPipelineMetadata> { [typeof(TestCanonEntity)] = metadata }, 10, new StubPersistence(), new NullAuditSink());
 
         var controller = new CanonModelsController(catalog, configuration);
 
@@ -32,7 +32,7 @@ public class CanonModelsControllerTests
 
         result.Result.Should().BeAssignableTo<OkObjectResult>();
         var summaries = ((OkObjectResult)result.Result!).Value.Should().BeAssignableTo<IEnumerable<CanonModelsController.CanonModelSummary>>().Subject.ToList();
-    summaries.Should().ContainSingle(summary => summary.Slug == "test" && summary.HasPipeline && summary.AggregationKeys.Contains(nameof(TestCanonEntity.ExternalId)));
+        summaries.Should().ContainSingle(summary => summary.Slug == "test" && summary.HasPipeline && summary.AggregationKeys.Contains(nameof(TestCanonEntity.ExternalId)));
     }
 
     [Fact]
@@ -56,17 +56,17 @@ public class CanonModelsControllerTests
         result.Result.Should().BeAssignableTo<OkObjectResult>();
         var detail = ((OkObjectResult)result.Result!).Value.Should().BeOfType<CanonModelsController.CanonModelDetail>().Subject;
         detail.Slug.Should().Be("test");
-    detail.Phases.Should().BeEquivalentTo(new[] { CanonPipelinePhase.Intake, CanonPipelinePhase.Validation });
-    detail.AggregationKeys.Should().Contain(nameof(TestCanonEntity.ExternalId));
-    detail.AggregationPolicies.Should().ContainKey(nameof(TestCanonEntity.DisplayName));
-    detail.AuditEnabled.Should().BeTrue();
+        detail.Phases.Should().BeEquivalentTo(new[] { CanonPipelinePhase.Intake, CanonPipelinePhase.Validation });
+        detail.AggregationKeys.Should().Contain(nameof(TestCanonEntity.ExternalId));
+        detail.AggregationPolicies.Should().ContainKey(nameof(TestCanonEntity.DisplayName));
+        detail.AuditEnabled.Should().BeTrue();
     }
 
     [Fact]
     public void GetBySlug_WithUnknownSlug_ShouldReturnNotFound()
     {
-    var catalog = new CanonModelCatalog(Array.Empty<CanonModelDescriptor>());
-    var configuration = new CanonRuntimeConfiguration(CanonizationOptions.Default, new Dictionary<Type, ICanonPipelineDescriptor>(), new Dictionary<Type, CanonPipelineMetadata>(), 10, new StubPersistence(), new NullAuditSink());
+        var catalog = new CanonModelCatalog(Array.Empty<CanonModelDescriptor>());
+        var configuration = new CanonRuntimeConfiguration(CanonizationOptions.Default, new Dictionary<Type, ICanonPipelineDescriptor>(), new Dictionary<Type, CanonPipelineMetadata>(), 10, new StubPersistence(), new NullAuditSink());
 
         var controller = new CanonModelsController(catalog, configuration);
 

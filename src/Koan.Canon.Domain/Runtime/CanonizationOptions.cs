@@ -95,9 +95,9 @@ public sealed record CanonizationOptions
             throw new ArgumentException("Tag key must be provided.", nameof(key));
         }
 
-            var copy = Copy();
-            copy.Tags[key] = value;
-            return copy;
+        var copy = Copy();
+        copy.Tags[key] = value;
+        return copy;
     }
 
     /// <summary>
@@ -110,7 +110,7 @@ public sealed record CanonizationOptions
             throw new ArgumentException("Origin must be provided.", nameof(origin));
         }
 
-            return Copy() with { Origin = origin };
+        return Copy() with { Origin = origin };
     }
 
     /// <summary>
@@ -129,7 +129,7 @@ public sealed record CanonizationOptions
             throw new ArgumentNullException(nameof(views));
         }
 
-            return Copy() with { RequestedViews = views.Length == 0 ? Array.Empty<string>() : views.ToArray() };
+        return Copy() with { RequestedViews = views.Length == 0 ? Array.Empty<string>() : views.ToArray() };
     }
 
     private static Dictionary<string, string?> BuildMergedTags(IReadOnlyDictionary<string, string?> primary, IReadOnlyDictionary<string, string?> fallback)

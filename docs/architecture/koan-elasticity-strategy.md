@@ -12,6 +12,7 @@ validation:
 ---
 
 > **Contract**
+>
 > - **Inputs:** Koan runtime patterns (Entity<T>, Canon, AppHost, Auto-Registrar, messaging connectors), current hosting assumptions, and common elastic workloads (API, background jobs, AI enrichment).
 > - **Outputs:** Architecture analysis of what Koan already enables, what is missing, and a roadmap for truly elastic deployments (auto-scaling, work distribution, data affinity, resiliency).
 > - **Stakeholders:** Framework architects, platform engineering, SRE leads.
@@ -105,19 +106,23 @@ Elastic scaling depends on moving work away from single nodes.
 ## Framework Enhancements Roadmap
 
 1. **Queue Abstraction Layer**
+
    - Define `IElasticQueue<T>` with ack/retry semantics and back-pressure metrics.
    - Provide base implementations (in-memory for dev, RabbitMQ/Azure Service Bus for production).
    - Update Canon pipelines and background job templates to use the abstraction.
 
 2. **Elastic Job Host**
+
    - Create a `Koan.Workers` module with auto-registrar support for job definitions (`IElasticJob`).
    - Provide CLI tooling to list jobs, trigger replays, and monitor status.
 
 3. **Distributed Coordination Utilities**
+
    - Add `ElasticMutex` and `ElasticLease` primitives built on distributed stores.
    - Offer `Entity<T>.WithLease()` helpers for operations needing exclusive access.
 
 4. **Horizontal Scaling Guides & Samples**
+
    - Extend documentation with a Kubernetes deployment guide, including Canon worker scaling examples.
    - Ship samples demonstrating multi-instance message processing and AI enrichment scaling (e.g., using `samples/S8.Canon`).
 

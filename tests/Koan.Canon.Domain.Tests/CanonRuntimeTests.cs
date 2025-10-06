@@ -145,7 +145,8 @@ public class CanonRuntimeTests
             .WithStageBehavior(CanonStageBehavior.StageOnly)
             .WithOrigin("stage-test")
             .WithTag("priority", "high"))
-            with { CorrelationId = "corr-123" };
+            with
+        { CorrelationId = "corr-123" };
 
         var result = await runtime.Canonize(entity, options);
 
@@ -1207,7 +1208,7 @@ public class CanonRuntimeTests
         Action mismatched = () => metadata.GetRequiredPolicy<CompositeDeviceCanon, string?>(device => device.Name);
         mismatched.Should().Throw<InvalidOperationException>().WithMessage("*cannot be used with model type*");
 
-    Action invalidExpression = () => metadata.TryGetPolicy<SourceOfTruthPersonCanon, string?>(person => person.FullName!.ToLowerInvariant(), out _);
+        Action invalidExpression = () => metadata.TryGetPolicy<SourceOfTruthPersonCanon, string?>(person => person.FullName!.ToLowerInvariant(), out _);
         invalidExpression.Should().Throw<ArgumentException>().WithMessage("*property expression*");
 
         Action nullMetadata = () => CanonModelAggregationMetadataExtensions.TryGetPolicy<SourceOfTruthPersonCanon, string?>(null!, person => person.FullName, out _);
@@ -1255,7 +1256,7 @@ public class CanonRuntimeTests
             records.Add(record);
         }
 
-    records.Should().HaveCount(9);
+        records.Should().HaveCount(9);
         records.Select(r => r.OccurredAt).Should().BeInAscendingOrder();
     }
 

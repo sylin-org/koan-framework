@@ -40,7 +40,7 @@ public sealed class CanonRuntime : ICanonRuntime
         _pipelines = new Dictionary<Type, ICanonPipelineDescriptor>(configuration.Pipelines);
         _persistence = configuration.Persistence;
         _services = services;
-    _auditSink = configuration.AuditSink;
+        _auditSink = configuration.AuditSink;
     }
 
     /// <inheritdoc />
@@ -74,7 +74,7 @@ public sealed class CanonRuntime : ICanonRuntime
             }
         }
 
-    var context = new CanonPipelineContext<T>(entity, metadata, effectiveOptions, _persistence, _services);
+        var context = new CanonPipelineContext<T>(entity, metadata, effectiveOptions, _persistence, _services);
         var observers = SnapshotObservers();
 
         if (effectiveOptions.StageBehavior == CanonStageBehavior.StageOnly)

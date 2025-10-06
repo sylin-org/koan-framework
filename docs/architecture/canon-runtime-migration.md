@@ -21,22 +21,26 @@
 **Status as of 2025-10-05**: M1 ✅ Complete | M2 ✅ Complete | M3 ⏳ Pending | M4 ⏳ Pending | M5 ⏳ Pending
 
 1. **M1 — Runtime Core** ✅ **COMPLETE**
+
    - Implement the execution engine that drives stage behaviors using `CanonPipelineContext`.
    - Deliver persistence adapters for canon entities and metadata using Koan entity statics.
    - Provide smoke tests that execute a two-stage pipeline end-to-end.
 
 2. **M2 — Web & API Surfaces**
+
    - Rebuild canon controllers on top of the new runtime following MVC conventions.
    - Generate OpenAPI descriptions and update API reference docs.
    - Switch S8.Canon to the new endpoints and delete its legacy wiring.
    - ✅ Controller package (`Koan.Canon.Web`) registered with auto-discovery (Oct 2025).
 
 3. **M3 — Adapter Modernization**
+
    - Port critical adapters (Dapr runtime connector, projection services) to consume the new runtime contracts.
    - Validate provider capability negotiation (streaming vs. paged) and document the expected behavior for the new stack.
    - Add integration tests for each adapter path.
 
 4. **M4 — Sample & Test Migration**
+
    - Update all canon-enabled samples (S8, S9, S14) to reference `Koan.Canon.Domain` instead of legacy projects.
    - Expand automated tests to cover multi-stage pipelines, observers, and failure scenarios.
    - Remove legacy sample instructions and replace them with the new workflow.
@@ -50,6 +54,7 @@
 ### M1 & M2 Completion Notes (2025-10-05)
 
 **M1 Achievements**:
+
 - Full runtime pipeline execution with 6 phases (Intake → Validation → Aggregation → Policy → Projection → Distribution)
 - 21 passing domain tests covering entities, state, metadata, and runtime
 - `IServiceProvider` support in `CanonPipelineContext` for contributor dependency injection
@@ -58,6 +63,7 @@
 - In-memory replay with configurable capacity
 
 **M2 Achievements**:
+
 - Generic canon controllers with auto-discovery (`CanonEntitiesController<T>`)
 - Discovery endpoint (`/api/canon/models`) exposing pipeline metadata
 - Admin operations (`GET /api/canon/admin/records`, `POST /api/canon/admin/{slug}/rebuild`)

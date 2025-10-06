@@ -14,6 +14,7 @@ validation:
 # Koan Canon Capabilities: End-to-End Guide
 
 > **Contract**
+>
 > - **Inputs:** Koan application with `builder.Services.AddKoan()` and Koan data packages installed.
 > - **Outputs:** Canon runtime configured with aggregation policies (including Source-of-Truth authorities), streaming identity graph resolution, audit, replay, and HTTP surfaces.
 > - **Error Modes:** Missing aggregation keys, misconfigured Source-of-Truth declarations, lineage union conflicts, audit sink failures, replay capacity truncation.
@@ -159,12 +160,12 @@ Applications receive employee fragments from HR (email only), badge systems (emp
 
 ### When to Use Each Policy
 
-| Policy | Use When | Example |
-|--------|----------|---------|
-| **Latest** | Field changes frequently, last write wins | Display names, phone numbers, preferences |
-| **First** | Field is immutable after initial set | Account creation date, original source system |
-| **Min/Max** | Numeric boundaries matter | Earliest hire date, highest salary, max credit limit |
-| **SourceOfTruth** | Compliance requires authoritative source | Legal names, titles, SSN, regulatory fields |
+| Policy            | Use When                                  | Example                                              |
+| ----------------- | ----------------------------------------- | ---------------------------------------------------- |
+| **Latest**        | Field changes frequently, last write wins | Display names, phone numbers, preferences            |
+| **First**         | Field is immutable after initial set      | Account creation date, original source system        |
+| **Min/Max**       | Numeric boundaries matter                 | Earliest hire date, highest salary, max credit limit |
+| **SourceOfTruth** | Compliance requires authoritative source  | Legal names, titles, SSN, regulatory fields          |
 
 **Quick Decision Tree**
 
@@ -379,12 +380,12 @@ if (result.Outcome == CanonizationOutcome.RequiresReview)
 
 **Performance Characteristics**
 
-| Scenario | Lookups | Write Operations | Typical Duration |
-|----------|---------|------------------|------------------|
-| Single key match | 1 index read | 1 canonical write | ~5ms |
-| Composite key (3 keys) | 3 index reads | 1 canonical + 3 index writes | ~15ms |
-| Identity union (2 IDs) | 6 index reads | 2 canonical reads + 1 merge write + 6 index updates | ~50ms |
-| Complex union (5 IDs) | 15 index reads | 5 canonical reads + 1 merge write + 15 index updates | ~120ms |
+| Scenario               | Lookups        | Write Operations                                     | Typical Duration |
+| ---------------------- | -------------- | ---------------------------------------------------- | ---------------- |
+| Single key match       | 1 index read   | 1 canonical write                                    | ~5ms             |
+| Composite key (3 keys) | 3 index reads  | 1 canonical + 3 index writes                         | ~15ms            |
+| Identity union (2 IDs) | 6 index reads  | 2 canonical reads + 1 merge write + 6 index updates  | ~50ms            |
+| Complex union (5 IDs)  | 15 index reads | 5 canonical reads + 1 merge write + 15 index updates | ~120ms           |
 
 **Best Practices**
 
@@ -632,14 +633,14 @@ Applications reject payloads missing required keys (Validation) before wasting c
 
 ### Pipeline Execution Order and Timing
 
-| Phase | Purpose | Typical Duration | Example Use |
-|-------|---------|------------------|-------------|
-| **Intake** | Record source, correlations | <1ms | Tag origin, capture batch ID |
-| **Validation** | Reject invalid payloads | 1-2ms | Check required keys, format validation |
-| **Aggregation** | Resolve canonical ID | 5-50ms | Load indexes, union identities |
-| **Policy** | Resolve field conflicts | 2-10ms | Apply Latest, SourceOfTruth, Min/Max |
-| **Projection** | Mark view updates | <1ms | Tag for search index rebuild |
-| **Distribution** | Publish events | Variable | Send to message bus, webhooks |
+| Phase            | Purpose                     | Typical Duration | Example Use                            |
+| ---------------- | --------------------------- | ---------------- | -------------------------------------- |
+| **Intake**       | Record source, correlations | <1ms             | Tag origin, capture batch ID           |
+| **Validation**   | Reject invalid payloads     | 1-2ms            | Check required keys, format validation |
+| **Aggregation**  | Resolve canonical ID        | 5-50ms           | Load indexes, union identities         |
+| **Policy**       | Resolve field conflicts     | 2-10ms           | Apply Latest, SourceOfTruth, Min/Max   |
+| **Projection**   | Mark view updates           | <1ms             | Tag for search index rebuild           |
+| **Distribution** | Publish events              | Variable         | Send to message bus, webhooks          |
 
 **Edge Considerations**
 
@@ -699,12 +700,12 @@ Applications query indexes to route upstream data: "Does `Email=bob@example.com`
 
 ### Index Lookup Performance
 
-| Operation | Typical Duration | Example |
-|-----------|------------------|---------|
-| Single key lookup | ~2ms | `FindIndex("Email=alice@example.com")` |
-| Composite key lookup | ~5ms | `FindIndex("Email=...\|Username=...\|EmployeeId=...")` |
-| Index write (single key) | ~3ms | Automatic during canonization |
-| Index rewrite (union) | ~50ms per ID | After identity merge (6 indexes × 2 IDs) |
+| Operation                | Typical Duration | Example                                                |
+| ------------------------ | ---------------- | ------------------------------------------------------ |
+| Single key lookup        | ~2ms             | `FindIndex("Email=alice@example.com")`                 |
+| Composite key lookup     | ~5ms             | `FindIndex("Email=...\|Username=...\|EmployeeId=...")` |
+| Index write (single key) | ~3ms             | Automatic during canonization                          |
+| Index rewrite (union)    | ~50ms per ID     | After identity merge (6 indexes × 2 IDs)               |
 
 **Edge Considerations**
 
@@ -767,15 +768,15 @@ Applications skip distribution during backfill operations—still canonize and a
 
 ### Options Quick Reference
 
-| Option | Purpose | Example |
-|--------|---------|---------|
-| **Origin** | Identify source system | `WithOrigin("workday")` |
-| **CorrelationId** | Link to business event | `with { CorrelationId = batchJobId }` |
-| **Tags** | Custom metadata | `WithTag("priority", "high")` |
-| **StageBehavior** | Defer canonization | `WithStageBehavior(StageOnly)` |
-| **RequestedViews** | Trigger view rebuilds | `WithRequestedViews("summary", "exports")` |
-| **SkipDistribution** | Suppress event publishing | `with { SkipDistribution = true }` |
-| **Identity.MergePosture** | Control union behavior | `AutoUnion` vs `RequireManualReview` |
+| Option                    | Purpose                   | Example                                    |
+| ------------------------- | ------------------------- | ------------------------------------------ |
+| **Origin**                | Identify source system    | `WithOrigin("workday")`                    |
+| **CorrelationId**         | Link to business event    | `with { CorrelationId = batchJobId }`      |
+| **Tags**                  | Custom metadata           | `WithTag("priority", "high")`              |
+| **StageBehavior**         | Defer canonization        | `WithStageBehavior(StageOnly)`             |
+| **RequestedViews**        | Trigger view rebuilds     | `WithRequestedViews("summary", "exports")` |
+| **SkipDistribution**      | Suppress event publishing | `with { SkipDistribution = true }`         |
+| **Identity.MergePosture** | Control union behavior    | `AutoUnion` vs `RequireManualReview`       |
 
 **Edge Considerations**
 
@@ -831,15 +832,15 @@ Applications POST payloads to `/api/canon/persons` to trigger canonicalization (
 
 ### Canon Controller Endpoints
 
-| Endpoint | Method | Purpose | Response |
-|----------|--------|---------|----------|
-| `/api/canon/persons` | GET | List canonical records | Paged list with metadata |
-| `/api/canon/persons/{id}` | GET | Get canonical record | Full entity + metadata |
-| `/api/canon/persons` | POST | Canonize payload | CanonizationResult (ID, outcome, footprints) |
-| `/api/canon/persons/{id}` | PUT | Update and re-canonize | Updated canonical record |
-| `/api/canon/persons/{id}` | DELETE | Remove canonical record | Success status |
-| `/api/canon/persons/metadata` | GET | Aggregation policy details | Policy descriptors (authorities, fallbacks) |
-| `/api/canon/persons/history` | GET | Replay canonization events | Streamed event log |
+| Endpoint                      | Method | Purpose                    | Response                                     |
+| ----------------------------- | ------ | -------------------------- | -------------------------------------------- |
+| `/api/canon/persons`          | GET    | List canonical records     | Paged list with metadata                     |
+| `/api/canon/persons/{id}`     | GET    | Get canonical record       | Full entity + metadata                       |
+| `/api/canon/persons`          | POST   | Canonize payload           | CanonizationResult (ID, outcome, footprints) |
+| `/api/canon/persons/{id}`     | PUT    | Update and re-canonize     | Updated canonical record                     |
+| `/api/canon/persons/{id}`     | DELETE | Remove canonical record    | Success status                               |
+| `/api/canon/persons/metadata` | GET    | Aggregation policy details | Policy descriptors (authorities, fallbacks)  |
+| `/api/canon/persons/history`  | GET    | Replay canonization events | Streamed event log                           |
 
 **Real-World Example**
 

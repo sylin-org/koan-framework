@@ -19,7 +19,7 @@ public sealed class CanonModelCatalog : ICanonModelCatalog
             throw new ArgumentNullException(nameof(descriptors));
         }
 
-    _all = descriptors.OfType<CanonModelDescriptor>().ToArray();
+        _all = descriptors.OfType<CanonModelDescriptor>().ToArray();
 
         _bySlug = new ConcurrentDictionary<string, CanonModelDescriptor>(StringComparer.OrdinalIgnoreCase);
         _byType = new ConcurrentDictionary<Type, CanonModelDescriptor>();

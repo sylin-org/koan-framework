@@ -15,7 +15,7 @@ public class DefaultPolicyContributorTests
     [Fact]
     public async Task Canonize_WithMinPolicy_ShouldRetainExistingLowerValue()
     {
-    var persistence = new PolicyTestPersistence();
+        var persistence = new PolicyTestPersistence();
         var runtime = new CanonRuntimeBuilder()
             .UsePersistence(persistence)
             .ConfigurePipeline<PolicySampleCanon>(pipeline =>
@@ -47,7 +47,7 @@ public class DefaultPolicyContributorTests
     [Fact]
     public async Task Canonize_WithMaxPolicy_ShouldSelectIncomingHigherValue()
     {
-    var persistence = new PolicyTestPersistence();
+        var persistence = new PolicyTestPersistence();
         var runtime = new CanonRuntimeBuilder()
             .UsePersistence(persistence)
             .ConfigurePipeline<PolicySampleCanon>(pipeline =>
@@ -79,7 +79,7 @@ public class DefaultPolicyContributorTests
     [Fact]
     public async Task Canonize_WithLatestPolicyAndFutureExistingTimestamp_ShouldKeepExistingValue()
     {
-    var persistence = new PolicyTestPersistence();
+        var persistence = new PolicyTestPersistence();
         var runtime = new CanonRuntimeBuilder()
             .UsePersistence(persistence)
             .ConfigurePipeline<PolicySampleCanon>(pipeline =>

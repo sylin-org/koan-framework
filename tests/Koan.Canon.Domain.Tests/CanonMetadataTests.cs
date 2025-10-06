@@ -82,7 +82,7 @@ public class CanonMetadataTests
         primary.Merge(incoming, preferIncoming: false);
 
         primary.State.Lifecycle.Should().Be(CanonLifecycle.Active);
-    primary.State.Signals.Should().ContainKeys("alpha", "beta");
+        primary.State.Signals.Should().ContainKeys("alpha", "beta");
     }
 
     [Fact]
