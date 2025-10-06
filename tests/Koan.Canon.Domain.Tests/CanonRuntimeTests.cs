@@ -8,6 +8,12 @@ using Koan.Canon.Domain.Annotations;
 using Koan.Canon.Domain.Model;
 using Koan.Canon.Domain.Metadata;
 using Koan.Canon.Domain.Runtime;
+using Koan.Core.Hosting.App;
+using Koan.Data.Abstractions;
+using Koan.Data.Core;
+using Koan.Data.Core.Direct;
+using Koan.Data.Vector.Abstractions;
+using Microsoft.Extensions.DependencyInjection;
 using System.Linq;
 using Xunit;
 
@@ -58,6 +64,71 @@ public class CanonRuntimeTests
         result.Events.Should().OnlyContain(evt => evt.CanonState != null && evt.CanonState.Lifecycle == CanonLifecycle.Active);
         result.Metadata.Tags.Should().ContainKey("validated");
         entity.Metadata.HasCanonicalId.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Canonize_InstanceShortcut_ShouldResolveRuntimeFromAppHost()
+    {
+        var persistence = new FakeCanonPersistence();
+        var runtime = new CanonRuntimeBuilder()
+            .UsePersistence(persistence)
+            .ConfigurePipeline<TestCanonEntity>(_ => { })
+            .Build();
+
+        using var services = new ServiceCollection()
+            .AddSingleton<ICanonRuntime>(runtime)
+            .BuildServiceProvider();
+
+        var previous = AppHost.Current;
+        try
+        {
+            AppHost.Current = services;
+
+            var entity = new TestCanonEntity { Name = "shortcut" };
+
+            var result = await entity.Canonize(origin: "hr");
+
+            persistence.CanonicalSaveCount.Should().Be(1);
+            result.Metadata.Origin.Should().Be("hr");
+        }
+        finally
+        {
+            AppHost.Current = previous;
+        }
+    }
+
+    [Fact]
+    public async Task Canonize_InstanceShortcut_ShouldApplyOptionCustomization()
+    {
+        var persistence = new FakeCanonPersistence();
+        var runtime = new CanonRuntimeBuilder()
+            .UsePersistence(persistence)
+            .ConfigurePipeline<TestCanonEntity>(_ => { })
+            .Build();
+
+        using var services = new ServiceCollection()
+            .AddSingleton<ICanonRuntime>(runtime)
+            .BuildServiceProvider();
+
+        var previous = AppHost.Current;
+        try
+        {
+            AppHost.Current = services;
+
+            var entity = new TestCanonEntity { Name = "shortcut-tags" };
+
+            var result = await entity.Canonize(
+                origin: "sap",
+                configure: opts => opts.WithTag("priority", "high"));
+
+            persistence.CanonicalSaveCount.Should().Be(1);
+            result.Metadata.Origin.Should().Be("sap");
+            result.Metadata.Tags.Should().ContainKey("priority").WhoseValue.Should().Be("high");
+        }
+        finally
+        {
+            AppHost.Current = previous;
+        }
     }
 
     [Fact]
@@ -613,6 +684,7 @@ public class CanonRuntimeTests
     public async Task Canonize_WithIdentityGraph_ShouldUnionCanonicalIds()
     {
         var persistence = new FakeCanonPersistence();
+        using var appHost = persistence.AttachToAppHost();
         var runtime = new CanonRuntimeBuilder()
             .UsePersistence(persistence)
             .ConfigurePipeline<PersonIdentityCanon>(pipeline =>
@@ -686,6 +758,7 @@ public class CanonRuntimeTests
     public async Task Canonize_WithIdentityGraph_ShouldRecordLineageAndNormalizeIndexes()
     {
         var persistence = new FakeCanonPersistence();
+        using var appHost = persistence.AttachToAppHost();
         var runtime = new CanonRuntimeBuilder()
             .UsePersistence(persistence)
             .ConfigurePipeline<PersonIdentityCanon>(pipeline =>
@@ -747,7 +820,10 @@ public class CanonRuntimeTests
 
         var lineage = bridgeResult.Metadata.Lineage;
         lineage.Changes.Should().Contain(change => change.Kind == CanonLineageChangeKind.Superseded && change.RelatedId == "zz-canonical");
-        lineage.Changes.Should().Contain(change => change.Kind == CanonLineageChangeKind.MetadataUpdated && change.Notes?.Contains("identity-union:zz-canonical", StringComparison.Ordinal) == true);
+        lineage.Changes.Should().Contain(change =>
+            change.Kind == CanonLineageChangeKind.MetadataUpdated &&
+            change.Notes != null &&
+            change.Notes.Contains("identity-union:zz-canonical", StringComparison.Ordinal));
 
         var emailIndex = persistence.FindIndex<PersonIdentityCanon>("Email=alpha@example.com");
         emailIndex.Should().NotBeNull();
@@ -805,6 +881,7 @@ public class CanonRuntimeTests
     public async Task Canonize_WithSourceOfTruthPolicy_ShouldHonorAuthoritativeSource()
     {
         var persistence = new FakeCanonPersistence();
+        using var appHost = persistence.AttachToAppHost();
         var runtime = new CanonRuntimeBuilder()
             .UsePersistence(persistence)
             .ConfigurePipeline<SourceOfTruthPersonCanon>(pipeline =>
@@ -867,6 +944,7 @@ public class CanonRuntimeTests
     public async Task Canonize_WithSourceOfTruthPolicy_ShouldAcceptAnyConfiguredAuthority()
     {
         var persistence = new FakeCanonPersistence();
+        using var appHost = persistence.AttachToAppHost();
         var runtime = new CanonRuntimeBuilder()
             .UsePersistence(persistence)
             .ConfigurePipeline<MultiAuthorityPersonCanon>(pipeline =>
@@ -937,6 +1015,7 @@ public class CanonRuntimeTests
     public async Task Canonize_WithSourceOfTruthPolicy_LatestFallback_ShouldRespectArrivalOrdering()
     {
         var persistence = new FakeCanonPersistence();
+        using var appHost = persistence.AttachToAppHost();
         var runtime = new CanonRuntimeBuilder()
             .UsePersistence(persistence)
             .ConfigurePipeline<LatestFallbackPersonCanon>(pipeline =>
@@ -995,6 +1074,7 @@ public class CanonRuntimeTests
     public async Task Canonize_WithSourceOfTruthPolicy_ShouldPreserveAuthoritativeValueWhenNonAuthoritySendsNull()
     {
         var persistence = new FakeCanonPersistence();
+        using var appHost = persistence.AttachToAppHost();
         var runtime = new CanonRuntimeBuilder()
             .UsePersistence(persistence)
             .ConfigurePipeline<SourceOfTruthPersonCanon>(pipeline =>
@@ -1047,6 +1127,7 @@ public class CanonRuntimeTests
     public async Task Canonize_WithSourceOfTruthPolicy_WhenAuditingEnabled_ShouldEmitAuthorityEvidence()
     {
         var persistence = new FakeCanonPersistence();
+        using var appHost = persistence.AttachToAppHost();
         var auditSink = new RecordingAuditSink();
         var runtime = new CanonRuntimeBuilder()
             .UsePersistence(persistence)
@@ -1126,7 +1207,7 @@ public class CanonRuntimeTests
         Action mismatched = () => metadata.GetRequiredPolicy<CompositeDeviceCanon, string?>(device => device.Name);
         mismatched.Should().Throw<InvalidOperationException>().WithMessage("*cannot be used with model type*");
 
-        Action invalidExpression = () => metadata.TryGetPolicy<SourceOfTruthPersonCanon, string?>(person => person.DisplayName!.ToLowerInvariant(), out _);
+    Action invalidExpression = () => metadata.TryGetPolicy<SourceOfTruthPersonCanon, string?>(person => person.FullName!.ToLowerInvariant(), out _);
         invalidExpression.Should().Throw<ArgumentException>().WithMessage("*property expression*");
 
         Action nullMetadata = () => CanonModelAggregationMetadataExtensions.TryGetPolicy<SourceOfTruthPersonCanon, string?>(null!, person => person.FullName, out _);
@@ -1521,19 +1602,32 @@ public class CanonRuntimeTests
         public int StageSaveCount { get; private set; }
         public object? LastStage { get; private set; }
         public object? LastCanonical { get; private set; }
+
         private readonly Dictionary<(string EntityType, string Key), CanonIndex> _indices = new();
+        private readonly Dictionary<(Type EntityType, string Id), object> _canonicals = new();
 
         public Task<TModel> PersistCanonicalAsync<TModel>(TModel entity, CancellationToken cancellationToken)
             where TModel : CanonEntity<TModel>, new()
         {
+            if (entity is null)
+            {
+                throw new ArgumentNullException(nameof(entity));
+            }
+
             CanonicalSaveCount++;
             LastCanonical = entity;
+            _canonicals[(typeof(TModel), entity.Id)] = entity;
             return Task.FromResult(entity);
         }
 
         public Task<CanonStage<TModel>> PersistStageAsync<TModel>(CanonStage<TModel> stage, CancellationToken cancellationToken)
             where TModel : CanonEntity<TModel>, new()
         {
+            if (stage is null)
+            {
+                throw new ArgumentNullException(nameof(stage));
+            }
+
             StageSaveCount++;
             LastStage = stage;
             return Task.FromResult(stage);
@@ -1550,6 +1644,11 @@ public class CanonRuntimeTests
 
         public Task UpsertIndexAsync(CanonIndex index, CancellationToken cancellationToken)
         {
+            if (index is null)
+            {
+                throw new ArgumentNullException(nameof(index));
+            }
+
             _indices[(index.EntityType, index.Key)] = index;
             return Task.CompletedTask;
         }
@@ -1558,6 +1657,256 @@ public class CanonRuntimeTests
         {
             var entityType = typeof(TModel).FullName ?? typeof(TModel).Name;
             return _indices.TryGetValue((entityType, key), out var index) ? index : null;
+        }
+
+        public IDisposable AttachToAppHost()
+            => new AppHostScope(this);
+
+        private object? TryGet(Type entityType, string id)
+        {
+            if (string.IsNullOrWhiteSpace(id))
+            {
+                return null;
+            }
+
+            return _canonicals.TryGetValue((entityType, id), out var entity) ? entity : null;
+        }
+
+        private IReadOnlyList<object> List(Type entityType)
+        {
+            return _canonicals
+                .Where(pair => pair.Key.EntityType == entityType)
+                .Select(pair => pair.Value)
+                .ToList();
+        }
+
+        private int DeleteMany(Type entityType, IEnumerable<string> ids)
+        {
+            var count = 0;
+            foreach (var id in ids)
+            {
+                if (_canonicals.Remove((entityType, id)))
+                {
+                    count++;
+                }
+            }
+
+            return count;
+        }
+
+        private int DeleteAll(Type entityType)
+        {
+            var keys = _canonicals.Keys.Where(pair => pair.EntityType == entityType).ToList();
+            for (var i = 0; i < keys.Count; i++)
+            {
+                _canonicals.Remove(keys[i]);
+            }
+
+            return keys.Count;
+        }
+
+        private IServiceProvider BuildServiceProvider()
+        {
+            return new ServiceCollection()
+                .AddSingleton<IDataService>(new InMemoryDataService(this))
+                .BuildServiceProvider();
+        }
+
+        private sealed class AppHostScope : IDisposable
+        {
+            private readonly IServiceProvider _provider;
+            private readonly IServiceProvider? _previous;
+
+            public AppHostScope(FakeCanonPersistence owner)
+            {
+                _previous = AppHost.Current;
+                _provider = owner.BuildServiceProvider();
+                AppHost.Current = _provider;
+            }
+
+            public void Dispose()
+            {
+                AppHost.Current = _previous;
+
+                if (_provider is IDisposable disposable)
+                {
+                    disposable.Dispose();
+                }
+            }
+        }
+
+        private sealed class InMemoryDataService : IDataService
+        {
+            private readonly FakeCanonPersistence _owner;
+
+            public InMemoryDataService(FakeCanonPersistence owner)
+            {
+                _owner = owner;
+            }
+
+            public IDataRepository<TEntity, TKey> GetRepository<TEntity, TKey>()
+                where TEntity : class, IEntity<TKey>
+                where TKey : notnull
+            {
+                if (typeof(TKey) != typeof(string))
+                {
+                    throw new NotSupportedException("The test data service only supports string keys.");
+                }
+
+                return new InMemoryRepository<TEntity, TKey>(_owner);
+            }
+
+            public IDirectSession Direct(string? source = null, string? adapter = null)
+            {
+                throw new NotSupportedException("Direct sessions are not available in canon runtime tests.");
+            }
+
+            public IVectorSearchRepository<TEntity, TKey>? TryGetVectorRepository<TEntity, TKey>()
+                where TEntity : class, IEntity<TKey>
+                where TKey : notnull
+            {
+                return null;
+            }
+        }
+
+        private sealed class InMemoryRepository<TEntity, TKey> : IDataRepository<TEntity, TKey>
+            where TEntity : class, IEntity<TKey>
+            where TKey : notnull
+        {
+            private readonly FakeCanonPersistence _owner;
+
+            public InMemoryRepository(FakeCanonPersistence owner)
+            {
+                _owner = owner;
+            }
+
+            public Task<TEntity?> GetAsync(TKey id, CancellationToken ct = default)
+            {
+                if (id is not string key)
+                {
+                    throw new NotSupportedException("The test data service only supports string identifiers.");
+                }
+
+                var entity = _owner.TryGet(typeof(TEntity), key) as TEntity;
+                return Task.FromResult(entity);
+            }
+
+            public Task<IReadOnlyList<TEntity>> QueryAsync(object? query, CancellationToken ct = default)
+            {
+                var results = _owner.List(typeof(TEntity)).OfType<TEntity>().ToList();
+                return Task.FromResult<IReadOnlyList<TEntity>>(results);
+            }
+
+            public Task<CountResult> CountAsync(CountRequest<TEntity> request, CancellationToken ct = default)
+            {
+                var count = _owner.List(typeof(TEntity)).Count;
+                return Task.FromResult(CountResult.Exact(count));
+            }
+
+            public Task<TEntity> UpsertAsync(TEntity model, CancellationToken ct = default)
+            {
+                if (model is null)
+                {
+                    throw new ArgumentNullException(nameof(model));
+                }
+
+                if (model.Id is null)
+                {
+                    throw new InvalidOperationException("Models must have an identifier before being stored.");
+                }
+
+                if (model.Id is not string key)
+                {
+                    throw new NotSupportedException("The test data service only supports string identifiers.");
+                }
+
+                _owner._canonicals[(typeof(TEntity), key)] = model;
+                return Task.FromResult(model);
+            }
+
+            public Task<bool> DeleteAsync(TKey id, CancellationToken ct = default)
+            {
+                if (id is not string key)
+                {
+                    throw new NotSupportedException("The test data service only supports string identifiers.");
+                }
+
+                var removed = _owner._canonicals.Remove((typeof(TEntity), key));
+                return Task.FromResult(removed);
+            }
+
+            public Task<int> UpsertManyAsync(IEnumerable<TEntity> models, CancellationToken ct = default)
+            {
+                if (models is null)
+                {
+                    throw new ArgumentNullException(nameof(models));
+                }
+
+                var count = 0;
+                foreach (var model in models)
+                {
+                    if (model is null)
+                    {
+                        continue;
+                    }
+
+                    var identifier = model.Id;
+                    if (identifier is null)
+                    {
+                        continue;
+                    }
+
+                    if (identifier is not string key)
+                    {
+                        throw new NotSupportedException("The test data service only supports string identifiers.");
+                    }
+
+                    _owner._canonicals[(typeof(TEntity), key)] = model;
+                    count++;
+                }
+
+                return Task.FromResult(count);
+            }
+
+            public Task<int> DeleteManyAsync(IEnumerable<TKey> ids, CancellationToken ct = default)
+            {
+                if (ids is null)
+                {
+                    throw new ArgumentNullException(nameof(ids));
+                }
+
+                var buffer = new List<string>();
+                foreach (var candidate in ids)
+                {
+                    if (candidate is string key)
+                    {
+                        buffer.Add(key);
+                        continue;
+                    }
+
+                    throw new NotSupportedException("The test data service only supports string identifiers.");
+                }
+
+                var count = _owner.DeleteMany(typeof(TEntity), buffer);
+                return Task.FromResult(count);
+            }
+
+            public Task<int> DeleteAllAsync(CancellationToken ct = default)
+            {
+                var count = _owner.DeleteAll(typeof(TEntity));
+                return Task.FromResult(count);
+            }
+
+            public Task<long> RemoveAllAsync(RemoveStrategy strategy, CancellationToken ct = default)
+            {
+                var count = _owner.DeleteAll(typeof(TEntity));
+                return Task.FromResult((long)count);
+            }
+
+            public IBatchSet<TEntity, TKey> CreateBatch()
+            {
+                throw new NotSupportedException("Batch operations are not supported in the canon runtime tests.");
+            }
         }
     }
 

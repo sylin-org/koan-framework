@@ -1,6 +1,11 @@
 ﻿using System;
+using System.Threading;
+using System.Threading.Tasks;
 using Koan.Canon.Domain.Metadata;
+using Koan.Canon.Domain.Runtime;
+using Koan.Core.Hosting.App;
 using Koan.Data.Core.Model;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Koan.Canon.Domain.Model;
 
@@ -142,5 +147,48 @@ public abstract class CanonEntity<TModel> : Entity<TModel>
 
         ApplyState(static state => state.WithLifecycle(CanonLifecycle.Withdrawn));
         Metadata.SetTag("withdrawn:reason", reason);
+    }
+
+    /// <summary>
+    /// Canonizes the current entity using the globally registered <see cref="ICanonRuntime"/>.
+    /// </summary>
+    /// <param name="origin">Optional origin identifier applied to the canonization request.</param>
+    /// <param name="configure">Optional delegate to customize <see cref="CanonizationOptions"/>.</param>
+    /// <param name="cancellationToken">Cancellation token for the canonization operation.</param>
+    public Task<CanonizationResult<TModel>> Canonize(
+        string? origin = null,
+        Func<CanonizationOptions, CanonizationOptions>? configure = null,
+        CancellationToken cancellationToken = default)
+    {
+        var runtime = ResolveRuntime();
+
+        CanonizationOptions? options = null;
+
+        if (!string.IsNullOrWhiteSpace(origin))
+        {
+            options = (options ?? CanonizationOptions.Default).WithOrigin(origin!);
+        }
+
+        if (configure is not null)
+        {
+            var baseOptions = options ?? CanonizationOptions.Default;
+            var configured = configure(baseOptions.Copy())
+                ?? throw new InvalidOperationException("Canonization options delegate must return an instance.");
+            options = configured;
+        }
+
+        return runtime.Canonize((TModel)this, options, cancellationToken);
+    }
+
+    private static ICanonRuntime ResolveRuntime()
+    {
+        var services = AppHost.Current ?? throw new InvalidOperationException("AppHost.Current is not set. Ensure builder.Services.AddKoan() executes during startup.");
+        var runtime = services.GetService<ICanonRuntime>();
+        if (runtime is null)
+        {
+            throw new InvalidOperationException("ICanonRuntime is not registered. Ensure builder.Services.AddKoan() wires Canon runtime services.");
+        }
+
+        return runtime;
     }
 }

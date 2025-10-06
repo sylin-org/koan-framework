@@ -84,6 +84,7 @@ Start with `Latest` (last write wins) for fields like display names and phone nu
 - Choose policies: `Latest` (simplest), `Min`/`Max` (numeric boundaries), `First` (immutable), or `SourceOfTruth` (authority required).
 - For Source-of-Truth, provide `Source = "workday"` (single authority) or `Sources = new[] { "workday", "sap" }` (multi-authority) and pick a `Fallback` policy for pre-authority data.
 - Optionally add `[Canon(audit: true)]` to capture policy footprints and change evidence for compliance dashboards.
+- Canonize payloads with `await person.Canonize(origin: "workday")`; pass `opts => opts.WithTag("priority", "high")` when you need extra context.
 
 **Simple Example: Latest-Wins Profile**
 
@@ -110,7 +111,7 @@ var hrPayload = new PersonCanon
     DisplayName = "Alice Smith",
     PhoneNumber = "555-1001"
 };
-await runtime.Canonize(hrPayload, CanonizationOptions.Default.WithOrigin("hr"));
+await hrPayload.Canonize(origin: "hr");
 
 var crmPayload = new PersonCanon
 {
@@ -118,7 +119,7 @@ var crmPayload = new PersonCanon
     DisplayName = "Alice S.",      // Latest wins
     PhoneNumber = null             // Nulls don't overwrite
 };
-await runtime.Canonize(crmPayload, CanonizationOptions.Default.WithOrigin("crm"));
+await crmPayload.Canonize(origin: "crm");
 
 // Result: DisplayName = "Alice S.", PhoneNumber = "555-1001" (preserved)
 ```
@@ -204,7 +205,7 @@ public string? LegalName { get; set; }
 
 // If CRM sends a legal name, Canon rejects it silently and logs the attempt
 var crmPayload = new PersonCanon { Email = "bob@example.com", LegalName = "Bobby" };
-await runtime.Canonize(crmPayload, CanonizationOptions.Default.WithOrigin("crm"));
+await crmPayload.Canonize(origin: "crm");
 // Result: LegalName remains null or previous Workday value, audit shows "crm attempted override"
 ```
 
@@ -252,8 +253,7 @@ public string? Field { get; set; }
 **Authority Evidence in Action**
 
 ```csharp
-var options = CanonizationOptions.Default.WithOrigin("workday");
-var result = await runtime.Canonize(hrPayload, options);
+var result = await hrPayload.Canonize(origin: "workday");
 
 var nameFootprint = result.Metadata.PropertyFootprints[nameof(PersonCanon.LegalName)];
 Console.WriteLine($"Policy: {nameFootprint.Policy}");
@@ -261,8 +261,7 @@ Console.WriteLine($"Authority: {nameFootprint.Evidence["authority"]}");
 // Output: Policy: SourceOfTruth, Authority: incoming
 
 // Later, CRM tries to override
-var crmOptions = CanonizationOptions.Default.WithOrigin("crm");
-var crmResult = await runtime.Canonize(crmPayload, crmOptions);
+var crmResult = await crmPayload.Canonize(origin: "crm");
 var crmFootprint = crmResult.Metadata.PropertyFootprints[nameof(PersonCanon.LegalName)];
 Console.WriteLine($"Authority: {crmFootprint.Evidence["authority"]}");
 // Output: Authority: existing (Workday value preserved, CRM rejected)
@@ -306,12 +305,12 @@ var hrPayload = new PersonCanon
     Email = "alice@example.com",
     EmployeeId = "31991"
 };
-await runtime.Canonize(hrPayload, opts.WithOrigin("hr"));
+await hrPayload.Canonize(origin: "hr");
 // Creates canonical ID: abc, indexes: Email=alice@... → abc, EmployeeId=31991 → abc
 
 // Day 2: Badge system sends only employee ID (matches existing)
 var badgePayload = new PersonCanon { EmployeeId = "31991" };
-await runtime.Canonize(badgePayload, opts.WithOrigin("badge"));
+await badgePayload.Canonize(origin: "badge");
 // Resolves to same canonical ID: abc (via EmployeeId index)
 
 // Day 3: CRM sends username + email (email matches, username is new)
@@ -320,7 +319,7 @@ var crmPayload = new PersonCanon
     Email = "alice@example.com",
     Username = "asmith"
 };
-await runtime.Canonize(crmPayload, opts.WithOrigin("crm"));
+await crmPayload.Canonize(origin: "crm");
 // Adds new edge: Username=asmith → abc
 
 // Day 4: Legacy system sends conflicting data (username points to different ID)
@@ -329,7 +328,7 @@ var legacyPayload = new PersonCanon
     Username = "asmith",  // Points to ID abc
     EmployeeId = "99999"  // Previously pointed to ID xyz
 };
-await runtime.Canonize(legacyPayload, opts.WithOrigin("legacy"));
+await legacyPayload.Canonize(origin: "legacy");
 // Canon detects split identity:
 // - Lowest ID wins: abc survives
 // - xyz marked Superseded
@@ -370,7 +369,7 @@ var manualOptions = CanonizationOptions.Default with
     Identity = new IdentityOptions { MergePosture = MergePosture.RequireManualReview }
 };
 
-var result = await runtime.Canonize(conflictPayload, manualOptions);
+var result = await conflictPayload.Canonize(configure: _ => manualOptions);
 if (result.Outcome == CanonizationOutcome.RequiresReview)
 {
     // Park for analyst: "EmployeeId=31991 and Username=asmith point to different IDs"
@@ -680,7 +679,7 @@ var person = new PersonCanon
     FullName = "Sheriff Woody"
 };
 
-var result = await runtime.Canonize(person, options);
+var result = await person.Canonize(configure: _ => options);
 
 var indexKey = $"Email={person.Email}|Username={person.Username}|EmployeeId={person.EmployeeId}";
 var index = persistence.FindIndex<PersonCanon>(indexKey);
@@ -750,7 +749,7 @@ var stageOptions = CanonizationOptions.Default
     .WithStageBehavior(CanonStageBehavior.StageOnly)
     with { CorrelationId = "batch-queue" };
 
-var stageResult = await runtime.Canonize(device, stageOptions);
+var stageResult = await device.Canonize(configure: _ => stageOptions);
 if (stageResult.Outcome == CanonizationOutcome.Parked)
 {
     Console.WriteLine("Deferred canonicalization for manual review.");

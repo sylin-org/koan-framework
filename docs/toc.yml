@@ -88,6 +88,10 @@
        href: architecture/capability-map.md
      - name: Module Ledger
        href: architecture/module-ledger.md
+     - name: Koan Elasticity Strategy
+       href: architecture/koan-elasticity-strategy.md
+     - name: Koan Platform Comparative Analysis
+       href: architecture/koan-platform-comparative-analysis.md
       - name: Canon Runtime Migration Plan
         href: architecture/canon-runtime-migration.md
  - name: Architecture Decisions
