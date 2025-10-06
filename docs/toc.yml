@@ -1,23 +1,23 @@
- - name: Home
-   href: index.md
- - name: Getting Started
-   href: getting-started/overview.md
-   items:
+- name: Home
+  href: index.md
+- name: Getting Started
+  href: getting-started/overview.md
+  items:
      - name: Getting Started Hub
        href: getting-started/overview.md
      - name: Enterprise Adoption
        href: getting-started/enterprise-adoption.md
- - name: Developer Guides
+- name: Developer Guides
    href: guides/README.md
    items:
      - name: Building APIs
        href: guides/building-apis.md
-    - name: Data Modeling
-      href: guides/data-modeling.md
-    - name: Canon Capabilities
-      href: guides/canon-capabilities-howto.md
-    - name: Garden Cooperative Journal
-      href: guides/garden-cooperative-journal.md
+     - name: Data Modeling
+       href: guides/data-modeling.md
+     - name: Canon Capabilities
+       href: guides/canon-capabilities-howto.md
+     - name: Garden Cooperative Journal
+       href: guides/garden-cooperative-journal.md
      - name: AI Integration
        href: guides/ai-integration.md
      - name: Authentication Setup
@@ -32,14 +32,14 @@
        href: guides/deep-dive/auto-provisioning-system.md
      - name: Bootstrap Lifecycle
        href: guides/deep-dive/bootstrap-lifecycle.md
-    - name: Engineering
-      href: engineering/index.md
-      items:
-        - name: Packaging Policy
-          href: engineering/packaging.md
-        - name: Auth Controller Discovery Regression
-          href: engineering/auth-controller-discovery.md
- - name: Case Studies
+     - name: Engineering
+       href: engineering/index.md
+       items:
+         - name: Packaging Policy
+           href: engineering/packaging.md
+         - name: Auth Controller Discovery Regression
+           href: engineering/auth-controller-discovery.md
+- name: Case Studies
    href: case-studies/s13-docmind/index.md
    items:
      - name: S13.DocMind Overview
@@ -50,7 +50,7 @@
        href: case-studies/s13-docmind/ai-pipeline.md
      - name: Operations & Diagnostics
        href: case-studies/s13-docmind/operations-and-diagnostics.md
- - name: API Reference
+- name: API Reference
    href: api/index.md
    items:
      - name: Core
@@ -60,6 +60,8 @@
        items:
          - name: Entity Lifecycle Events
            href: reference/data/entity-lifecycle-events.md
+            - name: Cache
+              href: reference/data/cache.md
      - name: Web
        href: reference/web/index.md
        items:
@@ -71,11 +73,11 @@
        href: reference/messaging/index.md
      - name: Storage
        href: reference/storage/index.md
-    - name: Canon
-      href: reference/canon/index.md
+     - name: Canon
+       href: reference/canon/index.md
      - name: Orchestration
        href: reference/orchestration/index.md
- - name: Architecture
+- name: Architecture
    href: architecture/principles.md
    items:
      - name: Framework Principles
@@ -92,9 +94,13 @@
        href: architecture/koan-elasticity-strategy.md
      - name: Koan Platform Comparative Analysis
        href: architecture/koan-platform-comparative-analysis.md
-      - name: Canon Runtime Migration Plan
-        href: architecture/canon-runtime-migration.md
- - name: Architecture Decisions
+     - name: Koan Cache Module
+       href: architecture/koan-cache-module.md
+     - name: Adapter and Orchestration Registration
+       href: architecture/adapter-and-orchestration-registration.md
+     - name: Canon Runtime Migration Plan
+       href: architecture/canon-runtime-migration.md
+- name: Architecture Decisions
    href: decisions/index.md
  - name: Support
    href: support/troubleshooting.md

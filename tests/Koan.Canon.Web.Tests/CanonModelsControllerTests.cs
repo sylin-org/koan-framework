@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using FluentAssertions;
 using Koan.Canon.Domain.Annotations;
 using Koan.Canon.Domain.Audit;
+using Koan.Canon.Domain.Metadata;
 using Koan.Canon.Domain.Model;
 using Koan.Canon.Domain.Runtime;
 using Koan.Canon.Web.Catalog;
@@ -23,7 +24,14 @@ public class CanonModelsControllerTests
     {
         var descriptor = new CanonModelDescriptor(typeof(TestCanonEntity), "test", "Test", WebConstants.Routes.CanonPrefix + "/test", isValueObject: false);
         var catalog = new CanonModelCatalog(new[] { descriptor });
-        var metadata = new CanonPipelineMetadata(typeof(TestCanonEntity), new[] { CanonPipelinePhase.Intake }, hasSteps: true, new[] { nameof(TestCanonEntity.ExternalId) }, new Dictionary<string, AggregationPolicyKind>(), auditEnabled: false);
+        var metadata = new CanonPipelineMetadata(
+            typeof(TestCanonEntity),
+            new[] { CanonPipelinePhase.Intake },
+            hasSteps: true,
+            new[] { nameof(TestCanonEntity.ExternalId) },
+            new Dictionary<string, AggregationPolicyKind>(),
+            new Dictionary<string, AggregationPolicyDescriptor>(),
+            auditEnabled: false);
         var configuration = new CanonRuntimeConfiguration(CanonizationOptions.Default, new Dictionary<Type, ICanonPipelineDescriptor>(), new Dictionary<Type, CanonPipelineMetadata> { [typeof(TestCanonEntity)] = metadata }, 10, new StubPersistence(), new NullAuditSink());
 
         var controller = new CanonModelsController(catalog, configuration);
@@ -46,6 +54,13 @@ public class CanonModelsControllerTests
             hasSteps: true,
             new[] { nameof(TestCanonEntity.ExternalId) },
             new Dictionary<string, AggregationPolicyKind> { [nameof(TestCanonEntity.DisplayName)] = AggregationPolicyKind.Latest },
+            new Dictionary<string, AggregationPolicyDescriptor>
+            {
+                [nameof(TestCanonEntity.DisplayName)] = new AggregationPolicyDescriptor(
+                    AggregationPolicyKind.Latest,
+                    Array.Empty<string>(),
+                    AggregationPolicyKind.Latest)
+            },
             auditEnabled: true);
         var configuration = new CanonRuntimeConfiguration(CanonizationOptions.Default, new Dictionary<Type, ICanonPipelineDescriptor>(), new Dictionary<Type, CanonPipelineMetadata> { [typeof(TestCanonEntity)] = metadata }, 10, new StubPersistence(), new NullAuditSink());
 

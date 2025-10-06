@@ -14,6 +14,7 @@
     <ProjectReference Include="..\Koan.Data.Vector.Abstractions\Koan.Data.Vector.Abstractions.csproj" />
     <ProjectReference Include="..\Koan.Core\Koan.Core.csproj" />
     <ProjectReference Include="..\Koan.Core.Adapters\Koan.Core.Adapters.csproj" />
+    <ProjectReference Include="..\Koan.Cache.Abstractions\Koan.Cache.Abstractions.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.0-rc.1.25451.107" />

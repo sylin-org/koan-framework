@@ -7,7 +7,6 @@ using Koan.Core;
 using Koan.Core.Modules;
 using Koan.Core.Orchestration;
 using Koan.Core.Orchestration.Abstractions;
-using Microsoft.Extensions.Logging;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Naming;
 using Koan.Data.Vector.Abstractions;
@@ -23,8 +22,6 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 
     public void Initialize(IServiceCollection services)
     {
-        var logger = services.BuildServiceProvider().GetService<Microsoft.Extensions.Logging.ILoggerFactory>()?.CreateLogger("Koan.Data.Vector.Connector.Weaviate.Initialization.KoanAutoRegistrar");
-        logger?.Log(LogLevel.Debug, "Koan.Data.Vector.Connector.Weaviate KoanAutoRegistrar loaded.");
         services.AddKoanOptions<WeaviateOptions>(Infrastructure.Constants.Configuration.Section);
 
         services.AddSingleton<IConfigureOptions<WeaviateOptions>, WeaviateOptionsConfigurator>();

@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Koan.Data.Abstractions;
 using Koan.Data.Core;
+using Koan.Testing.Redis;
 using Xunit;
 
 namespace Koan.Data.Connector.Redis.IntegrationTests;

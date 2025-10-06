@@ -49,8 +49,10 @@ public sealed class DataService(IServiceProvider sp) : IDataService
         var guard = sp.GetRequiredService<EntitySchemaGuard<TEntity, TKey>>();
         var facade = new RepositoryFacade<TEntity, TKey>(repo, manager, guard);
 
-        _cache[key] = facade;
-        return facade;
+        var decorated = ApplyDecorators(typeof(TEntity), typeof(TKey), facade, sp);
+
+        _cache[key] = decorated;
+        return decorated;
     }
 
     /// <inheritdoc />
@@ -124,4 +126,33 @@ public sealed class DataService(IServiceProvider sp) : IDataService
         return repo;
     }
     // Provider resolution is now handled by TypeConfigs
+
+    private static IDataRepository<TEntity, TKey> ApplyDecorators<TEntity, TKey>(
+        Type entityType,
+        Type keyType,
+        IDataRepository<TEntity, TKey> repository,
+        IServiceProvider services)
+        where TEntity : class, IEntity<TKey>
+        where TKey : notnull
+    {
+        var decorators = services.GetService<IEnumerable<Decorators.IDataRepositoryDecorator>>();
+        if (decorators is null)
+        {
+            return repository;
+        }
+
+        object current = repository;
+
+        foreach (var decorator in decorators)
+        {
+            var result = decorator.TryDecorate(entityType, keyType, current, services);
+            if (result is not null)
+            {
+                current = result;
+            }
+        }
+
+        return (IDataRepository<TEntity, TKey>)current;
+    }
+
 }

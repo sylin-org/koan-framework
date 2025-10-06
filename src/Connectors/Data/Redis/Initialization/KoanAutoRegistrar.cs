@@ -24,9 +24,6 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar, IKoanAspireRegistrar
 
     public void Initialize(IServiceCollection services)
     {
-        var logger = services.BuildServiceProvider().GetService<Microsoft.Extensions.Logging.ILoggerFactory>()?.CreateLogger("Koan.Data.Connector.Redis.Initialization.KoanAutoRegistrar");
-        logger?.Log(LogLevel.Debug, "Koan.Data.Connector.Redis KoanAutoRegistrar loaded.");
-
         services.AddKoanOptions<RedisOptions>();
         services.AddSingleton<IConfigureOptions<RedisOptions>, RedisOptionsConfigurator>();
         services.TryAddSingleton<IStorageNameResolver, DefaultStorageNameResolver>();
@@ -42,10 +39,10 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar, IKoanAspireRegistrar
         services.AddSingleton<IDataAdapterFactory, RedisAdapterFactory>();
 
         // Only register connection multiplexer if Redis is available or in Aspire context
-        RegisterConnectionMultiplexer(services, logger);
+        RegisterConnectionMultiplexer(services);
     }
 
-    private void RegisterConnectionMultiplexer(IServiceCollection services, ILogger? logger)
+    private void RegisterConnectionMultiplexer(IServiceCollection services)
     {
         services.AddSingleton<IConnectionMultiplexer>(sp =>
         {
@@ -56,6 +53,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar, IKoanAspireRegistrar
                 cs = KoanEnv.InContainer ? Infrastructure.Constants.Discovery.DefaultCompose : Infrastructure.Constants.Discovery.DefaultLocal;
             }
 
+            var logger = sp.GetService<ILogger<KoanAutoRegistrar>>();
             logger?.LogDebug("Attempting Redis connection to: {ConnectionString}", cs);
             try
             {
@@ -63,7 +61,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar, IKoanAspireRegistrar
             }
             catch (RedisConnectionException ex)
             {
-                logger?.LogError("Redis connection failed: {Message}", ex.Message);
+                logger?.LogError(ex, "Redis connection failed: {Message}", ex.Message);
                 throw new InvalidOperationException($"Redis is not available. Connection string: {cs}. " +
                     "Ensure Redis is running or use the Aspire AppHost for managed Redis.", ex);
             }

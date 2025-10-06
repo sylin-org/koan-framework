@@ -1,0 +1,17 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>Koan.Cache.Adapter.Redis</AssemblyName>
+    <RootNamespace>Koan.Cache.Adapter.Redis</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Koan.Cache\Koan.Cache.csproj" />
+    <ProjectReference Include="..\Koan.Cache.Abstractions\Koan.Cache.Abstractions.csproj" />
+    <ProjectReference Include="..\Connectors\Data\Redis\Koan.Data.Connector.Redis.csproj" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.0-rc.1.25451.107" />
+    <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.0-rc.1.25451.107" />
+  </ItemGroup>
+</Project>

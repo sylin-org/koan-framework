@@ -56,6 +56,10 @@
       href: ARCH-0055-koan-aspire-integration-approval.md
     - name: ARCH-0056 Koan.Canon pillar renaming
       href: ARCH-0056-koan-canon-pillar-renaming.md
+    - name: ARCH-0059 Koan Cache module and adapters
+      href: ARCH-0059-koan-cache-module.md
+    - name: ARCH-0060 Cache control surface helpers
+      href: ARCH-0060-cache-control-surface.md
 - name: Data (DATA)
   items:
     - name: DATA-0002 Query capabilities flag

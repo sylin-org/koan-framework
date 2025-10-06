@@ -37,6 +37,8 @@ Koan’s Data pillar unifies persistence across SQL, NoSQL, JSON, and vector dat
 
 **Core packages**: `Koan.Data.Core`, adapter-specific packages (for example `Koan.Data.Connector.Postgres`, `Koan.Data.Connector.MongoDB`, `Koan.Data.Connector.Redis`, `Koan.Data.Vector.Redis`).
 
+➤ **Caching**: See the [Koan Cache Reference](./cache.md) for fluent builders, tag invalidation, and policy-driven caching that integrates with `Entity<TEntity>`. 
+
 ---
 
 ## Modeling Quick Start

@@ -177,6 +177,12 @@ public class QueryWithCountTests
         public Task<int> UpsertManyAsync(IEnumerable<StubEntity> models, CancellationToken ct = default) => throw new NotImplementedException();
         public Task<int> DeleteManyAsync(IEnumerable<string> ids, CancellationToken ct = default) => throw new NotImplementedException();
         public Task<int> DeleteAllAsync(CancellationToken ct = default) => throw new NotImplementedException();
+        public Task<long> RemoveAllAsync(RemoveStrategy strategy, CancellationToken ct = default)
+        {
+            var count = _items.Count;
+            _items.Clear();
+            return Task.FromResult((long)count);
+        }
         public IBatchSet<StubEntity, string> CreateBatch() => throw new NotImplementedException();
     }
 

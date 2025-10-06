@@ -6,6 +6,7 @@ using Koan.Data.Abstractions;
 using Koan.Data.Core;
 using Koan.Data.Core.Model;
 using Koan.Testing;
+using Koan.Testing.Redis;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;

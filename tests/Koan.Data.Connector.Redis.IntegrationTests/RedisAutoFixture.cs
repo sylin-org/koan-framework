@@ -33,7 +33,11 @@ public sealed class RedisAutoFixture : IAsyncLifetime
 
         Environment.SetEnvironmentVariable("TESTCONTAINERS_RYUK_DISABLED", "true");
         var probe = await DockerEnvironment.ProbeAsync();
-        if (!probe.Available) { return; }
+        if (!probe.Available)
+        {
+            Console.Error.WriteLine($"RedisAutoFixture: Docker unavailable. {probe.Message}");
+            return;
+        }
         _dockerEndpoint = probe.Endpoint;
 
         // Start a Redis container
@@ -50,11 +54,14 @@ public sealed class RedisAutoFixture : IAsyncLifetime
             await _container.StartAsync();
             var hostPort = _container.GetMappedPublicPort(6379);
             ConnectionString = $"localhost:{hostPort}";
+            Console.Error.WriteLine($"RedisAutoFixture: Started redis container via {_dockerEndpoint} on localhost:{hostPort}.");
         }
-        catch
+        catch (Exception ex)
         {
             // On some Windows/Docker setups, attaching/hijacking can fail. Mark unavailable to skip tests.
+            Console.Error.WriteLine($"RedisAutoFixture: Failed to start container. {ex}");
             ConnectionString = null;
+            _container = null;
         }
     }
 

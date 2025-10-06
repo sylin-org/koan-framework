@@ -4,8 +4,8 @@ domain: platform
 title: "Koan Modules Reference"
 audience: [developers, architects]
 status: draft
-last_updated: 2025-10-02
-framework_version: v0.6.2
+last_updated: 2025-10-06
+framework_version: v0.6.3
 validation:
   status: not-yet-tested
   scope: docs/reference/modules-overview.md
@@ -89,6 +89,11 @@ Use this reference when you plan a Koan solution and need to understand which mo
 - **Purpose**: backup orchestration for data + web surfaces.
 - **How to use**: reference `Koan.Data.Backup` for data export jobs; `Koan.Web.Backup` exposes HTTP endpoints.
 - **When to use**: compliance or DR pipelines needing database snapshots through Koan primitives.
+
+### Koan.Cache
+- **Purpose**: fluent caching client, policy registry, and adapter system (memory, Redis) aligned with `Entity<TEntity>` patterns.
+- **How to use**: reference `Koan.Cache`; its auto-registrar invokes `AddKoanCache()` for you. Add provider packages (for example `Koan.Cache.Adapter.Redis`) and configure `Cache:Provider` plus adapter settings. Use `Cache.WithJson(...)`, `Cache.Tags(...)`, and `Entity<TEntity,TKey>.Cache` for policy-driven invalidation.
+- **When to use**: memoizing expensive queries, broadcasting cache invalidations across web nodes, or coordinating stale-while-revalidate flows in background jobs.
 
 ### Koan.Data.Vector & Koan.Data.Vector.Abstractions
 - **Purpose**: vector store integration (semantic search, embedding storage).

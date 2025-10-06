@@ -2,7 +2,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 using Koan.Core;
 using Koan.Core.Modules;
 using Koan.Data.Abstractions;
@@ -17,8 +16,6 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 
     public void Initialize(IServiceCollection services)
     {
-        var logger = services.BuildServiceProvider().GetService<Microsoft.Extensions.Logging.ILoggerFactory>()?.CreateLogger("Koan.Data.Connector.Json.Initialization.KoanAutoRegistrar");
-    logger?.Log(LogLevel.Debug, "Koan.Data.Connector.Json KoanAutoRegistrar loaded.");
         // Bind options from config and register adapter + health contributor
         services.AddKoanOptions<JsonDataOptions>();
         services.AddSingleton<Microsoft.Extensions.Options.IConfigureOptions<JsonDataOptions>, JsonDataOptionsConfigurator>();

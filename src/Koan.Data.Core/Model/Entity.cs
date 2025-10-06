@@ -17,7 +17,7 @@ namespace Koan.Data.Core.Model
 {
 
     // Domain-centric CRTP base with static conveniences, independent of data namespace
-    public abstract class Entity<TEntity, TKey> : IEntity<TKey>
+    public abstract partial class Entity<TEntity, TKey> : IEntity<TKey>
         where TEntity : class, Koan.Data.Abstractions.IEntity<TKey>
         where TKey : notnull
     {

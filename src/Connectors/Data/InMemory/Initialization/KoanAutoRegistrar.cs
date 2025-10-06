@@ -5,7 +5,6 @@ using Koan.Data.Abstractions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 
 namespace Koan.Data.Connector.InMemory.Initialization;
 
@@ -20,9 +19,6 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 
     public void Initialize(IServiceCollection services)
     {
-        var logger = services.BuildServiceProvider().GetService<ILoggerFactory>()?.CreateLogger("Koan.Data.Connector.InMemory.Initialization.KoanAutoRegistrar");
-        logger?.Log(LogLevel.Debug, "Koan.Data.Connector.InMemory KoanAutoRegistrar loaded.");
-
         // Register singleton data store (ensures data persists across repository instances)
         services.AddSingleton<InMemoryDataStore>();
 
