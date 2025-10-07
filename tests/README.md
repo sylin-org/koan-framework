@@ -26,7 +26,26 @@ provides an opinionated, parallel-friendly structure for every suite.
   Suites/
     Core/
       Unit/
-        Koan.Tests.Core.Unit/     # First migrated suite (Core module unit specs)
+        Koan.Tests.Core.Unit/
+    Data/
+      Core/
+        Koan.Tests.Data.Core/
+      Connector.SqlServer/
+        Koan.Data.Connector.SqlServer.Tests/
+    Canon/
+      Unit/
+        Koan.Tests.Canon.Unit/
+      Integration/
+        Koan.Tests.Canon.Integration/
+    AI/
+      Unit/
+        Koan.Tests.AI.Unit/
+    Cache/
+      Unit/
+        Koan.Tests.Cache.Unit/
+    S2/
+      Integration/
+        Koan.Tests.S2.Api/
 ```
 
 ## Adding a Suite
@@ -36,6 +55,21 @@ provides an opinionated, parallel-friendly structure for every suite.
 3. Describe suite requirements in `testsuite.yaml` and keep specs under `Specs/<Feature>/`.
 4. Use the `TestPipeline` facade for every scenario to keep Arrange/Act/Assert explicit and
    automatically register fixtures via `WithFixture`.
+
+## Running suites
+
+Koan’s primary solution (`Koan.sln`) now references only the greenfield suites and shared harness. Run the full
+portfolio or any subset directly from the solution root:
+
+```pwsh
+dotnet test Koan.sln
+```
+
+For targeted validation, invoke an individual suite project:
+
+```pwsh
+dotnet test tests/Suites/Data/Core/Koan.Tests.Data.Core/Koan.Tests.Data.Core.csproj
+```
 
 ## Infrastructure helpers
 

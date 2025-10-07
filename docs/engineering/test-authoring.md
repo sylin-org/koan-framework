@@ -41,6 +41,7 @@
 - **Always use `TestPipeline`**: Arrange via `.UsingServiceProvider()` or fixtures, Act through asynchronous delegates, and assert with the provided context. Avoid inline `new TestContext()` calls.
 - **Pass the suite’s `ITestOutputHelper`** so failures surface contextual logs.
 - **Leverage shared fixtures**: Docker, Redis, Postgres, and Mongo helpers already exist under `tests/Shared/Koan.Testing/Infrastructure`; reuse them rather than spinning new containers manually.
+- **Reset framework caches**: When specs mutate entity metadata (events, adapters, partitions), call the provided hooks (`EntityEventTestHooks.Reset<TEntity, TKey>()`, `TestHooks.ResetDataConfigs()`) during Arrange to prevent cross-test leakage.
 - **Stream and pagination defaults**: Honor data access guardrails—use `Entity<T>.AllStream(...)` or paging helpers in data-heavy specs.
 - **No hard sleeps**: When timing matters, drive time through harness abstractions (e.g., inject clock services or expose purge timestamps) instead of `Task.Delay`.
 - **Validate deterministic outputs**: When the spec relies on generated IDs, capture them from events or metadata before assertions so tests stay stable.
@@ -78,21 +79,33 @@ public Task Some_behavior()
 - Document required environment variables in the fixture summary and ensure they respect Docker probe fallbacks (see `DockerEnvironment`).
 - Reject fixtures that duplicate framework services—prefer registering actual module services and exercising real pipelines.
 
+### Data core runtime fixture
+
+- Use `DataCoreRuntimeFixture` (under `tests/Suites/Data/Core/Koan.Tests.Data.Core/Support`) when a suite needs a fully wired `Koan.Data` runtime with file-backed JSON storage, optional SQLite, and temp root isolation.
+- Acquire it via `TestPipeline.For(...).Using<DataCoreRuntimeFixture>(...)`, then call `BindHost()` before asserting behaviors that rely on ambient `AppHost.Current`.
+- Dispose partitions through the provided `UsePartition` lease to guarantee clean teardown and temp directory cleanup.
+
 ## Validation workflow
 
-1. Run the suite locally:
+1. Run the consolidated solution tests when possible:
+
+  ```pwsh
+  dotnet test Koan.sln
+  ```
+
+2. Run the suite locally:
 
    ```pwsh
    dotnet test tests/Suites/<Pillar>/<Scope>/<ProjectName>/<ProjectName>.csproj
    ```
 
-2. If the suite has integration dependencies (Docker, external services), run with diagnostics enabled:
+3. If the suite has integration dependencies (Docker, external services), run with diagnostics enabled:
 
    ```pwsh
    dotnet test tests/Suites/<Pillar>/<Scope>/<ProjectName>/<ProjectName>.csproj --logger "trx;LogFileName=TestResults.trx"
    ```
 
-3. For documentation updates, execute `scripts/build-docs.ps1 -Strict` to keep references valid.
+4. For documentation updates, execute `scripts/build-docs.ps1 -Strict` to keep references valid.
 
 Capture results in commit messages or PR descriptions so reviewers see the validation evidence.
 
