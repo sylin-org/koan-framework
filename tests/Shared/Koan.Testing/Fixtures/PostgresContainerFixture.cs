@@ -1,4 +1,13 @@
-﻿using System.Net.Sockets;
+﻿using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
+using System.Net;
+using System.Net.Sockets;
+using System.Reflection;
+using System.Runtime.InteropServices;
+using System.Threading;
+using System.Threading.Tasks;
 using DotNet.Testcontainers;
 using DotNet.Testcontainers.Builders;
 using DotNet.Testcontainers.Containers;
@@ -18,6 +27,8 @@ public sealed class PostgresContainerFixture : IAsyncDisposable, IInitializableF
     private const string DockerFixtureDefaultKey = "docker";
 
     private TestcontainersContainer? _container;
+    private string? _cliContainerId;
+    private string? _dockerEndpoint;
 
     public PostgresContainerFixture(string dockerFixtureKey = DockerFixtureDefaultKey, string database = DefaultDatabase)
     {
@@ -79,7 +90,6 @@ public sealed class PostgresContainerFixture : IAsyncDisposable, IInitializableF
         Environment.SetEnvironmentVariable(RyukVariable, "true");
         context.Diagnostics.Debug("postgres.fixture.ryuk.disabled", new { variable = RyukVariable });
 
-        var endpoint = dockerFixture.Endpoint;
         var password = DefaultPassword;
         var builder = new TestcontainersBuilder<TestcontainersContainer>()
             .WithImage("postgres:16-alpine")
@@ -90,18 +100,22 @@ public sealed class PostgresContainerFixture : IAsyncDisposable, IInitializableF
             .WithPortBinding(DefaultPort, assignRandomHostPort: true)
             .WithWaitStrategy(Wait.ForUnixContainer().UntilPortIsAvailable(DefaultPort));
 
+        _dockerEndpoint = dockerFixture.Endpoint;
+        var endpoint = _dockerEndpoint;
         if (!string.IsNullOrWhiteSpace(endpoint))
         {
             builder = builder.WithDockerEndpoint(endpoint);
         }
 
-        _container = builder.Build();
-        context.Diagnostics.Info("postgres.fixture.container.create", new { image = "postgres:16-alpine", endpoint });
-
+        TestcontainersContainer? container = null;
         try
         {
-            await _container.StartAsync(context.Cancellation).ConfigureAwait(false);
-            var mappedPort = _container.GetMappedPublicPort(DefaultPort);
+            container = builder.Build();
+            _container = container;
+            context.Diagnostics.Info("postgres.fixture.container.create", new { image = "postgres:16-alpine", endpoint });
+
+            await container.StartAsync(context.Cancellation).ConfigureAwait(false);
+            var mappedPort = container.GetMappedPublicPort(DefaultPort);
             var connection = new NpgsqlConnectionStringBuilder
             {
                 Host = "localhost",
@@ -118,17 +132,53 @@ public sealed class PostgresContainerFixture : IAsyncDisposable, IInitializableF
                 throw new InvalidOperationException("Unable to open connection to Postgres container.");
             }
 
-            ConnectionString = connection;
+            ConnectionString = Normalize(connection);
             IsAvailable = true;
             UnavailableReason = null;
             context.Diagnostics.Info("postgres.fixture.container.started", new { host = "localhost", port = mappedPort });
+            return;
+        }
+        catch (Exception ex) when (IsTestcontainersMissingMethod(ex, out var mmex))
+        {
+            var missingMessage = mmex?.Message ?? ex.Message;
+            context.Diagnostics.Warn("postgres.fixture.testcontainers.missingmethod", new { message = missingMessage });
+            await DisposeContainerSilentlyAsync(container).ConfigureAwait(false);
+
+            var (ok, connection, failureReason) = await TryStartWithDockerCliAsync(context, password).ConfigureAwait(false);
+            if (ok && connection is not null)
+            {
+                ConnectionString = connection;
+                IsAvailable = true;
+                UnavailableReason = null;
+                return;
+            }
+
+            UnavailableReason = failureReason ?? "Failed to start Postgres container via Docker CLI fallback.";
+            return;
         }
         catch (Exception ex)
         {
             UnavailableReason = $"Failed to start Postgres container: {ex.GetType().Name}: {ex.Message}";
             context.Diagnostics.Error("postgres.fixture.container.failed", new { message = ex.Message }, ex);
-            await DisposeContainerSilentlyAsync().ConfigureAwait(false);
+            await DisposeContainerSilentlyAsync(container).ConfigureAwait(false);
+            return;
         }
+    }
+
+    private static bool IsTestcontainersMissingMethod(Exception ex, out MissingMethodException? missingMethod)
+    {
+        missingMethod = ex as MissingMethodException ?? ex.InnerException as MissingMethodException ?? (ex as TargetInvocationException)?.InnerException as MissingMethodException;
+        if (missingMethod is not null)
+        {
+            return true;
+        }
+
+        if (ex is TargetInvocationException tie && tie.InnerException is not null)
+        {
+            return IsTestcontainersMissingMethod(tie.InnerException, out missingMethod);
+        }
+
+        return false;
     }
 
     public async ValueTask DisposeAsync()
@@ -302,31 +352,302 @@ public sealed class PostgresContainerFixture : IAsyncDisposable, IInitializableF
         }
     }
 
-    private async ValueTask DisposeContainerSilentlyAsync()
+    private async ValueTask DisposeContainerSilentlyAsync(TestcontainersContainer? container = null)
     {
-        if (_container is null)
+        var target = container ?? _container;
+        if (target is not null)
+        {
+            try
+            {
+                await target.StopAsync().ConfigureAwait(false);
+            }
+            catch
+            {
+                // ignored
+            }
+
+            try
+            {
+                await target.DisposeAsync().ConfigureAwait(false);
+            }
+            catch
+            {
+                // ignored
+            }
+        }
+
+        if (ReferenceEquals(target, _container))
+        {
+            _container = null;
+        }
+
+        await StopCliContainerAsync().ConfigureAwait(false);
+    }
+
+    private async Task<(bool ok, string? connectionString, string? failureReason)> TryStartWithDockerCliAsync(TestContext context, string password)
+    {
+        var containerName = $"koan-postgres-{Guid.NewGuid():N}";
+        var runArgs = $"run --rm -d --name {containerName} -e POSTGRES_PASSWORD={password} -e POSTGRES_USER={DefaultUsername} -e POSTGRES_DB={Database} -p 127.0.0.1::{DefaultPort} postgres:16-alpine";
+        var (runOk, runStdout, runStderr, runExitCode) = await RunDockerCommandAsync(runArgs, context.Cancellation).ConfigureAwait(false);
+
+        if (!runOk)
+        {
+            context.Diagnostics.Warn("postgres.fixture.dockercli.run.failed", new { exitCode = runExitCode, stdout = Truncate(runStdout), stderr = Truncate(runStderr) });
+            return (false, null, $"docker run failed (exit {runExitCode})");
+        }
+
+        _cliContainerId = containerName;
+
+        var portOk = false;
+        string portStdout = string.Empty;
+        string portStderr = string.Empty;
+        var portExitCode = 0;
+
+        for (var attempt = 0; attempt < 5 && !portOk; attempt++)
+        {
+            (portOk, portStdout, portStderr, portExitCode) = await RunDockerCommandAsync($"port {containerName} {DefaultPort}/tcp", context.Cancellation).ConfigureAwait(false);
+            if (portOk && !string.IsNullOrWhiteSpace(portStdout))
+            {
+                break;
+            }
+
+            portOk = false;
+
+            try
+            {
+                await Task.Delay(200, context.Cancellation).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
+        }
+
+        if (!portOk || string.IsNullOrWhiteSpace(portStdout))
+        {
+            context.Diagnostics.Warn("postgres.fixture.dockercli.port.failed", new { exitCode = portExitCode, stdout = Truncate(portStdout), stderr = Truncate(portStderr) });
+            await StopCliContainerAsync().ConfigureAwait(false);
+            return (false, null, "Failed to determine published Postgres port from docker CLI");
+        }
+
+        var hostPort = ParseDockerPortOutput(portStdout);
+        if (hostPort == 0)
+        {
+            context.Diagnostics.Warn("postgres.fixture.dockercli.port.parse", new { stdout = Truncate(portStdout) });
+            await StopCliContainerAsync().ConfigureAwait(false);
+            return (false, null, "Unable to parse published Postgres port from docker CLI output");
+        }
+
+        var connection = new NpgsqlConnectionStringBuilder
+        {
+            Host = "127.0.0.1",
+            Port = hostPort,
+            Database = Database,
+            Username = DefaultUsername,
+            Password = password,
+            Timeout = 3,
+            KeepAlive = 0
+        }.ConnectionString;
+
+        var opened = false;
+        for (var attempt = 0; attempt < 60 && !context.Cancellation.IsCancellationRequested; attempt++)
+        {
+            if (await CanOpenAsync(connection, context.Cancellation).ConfigureAwait(false))
+            {
+                opened = true;
+                break;
+            }
+
+            try
+            {
+                await Task.Delay(500, context.Cancellation).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
+        }
+
+        if (!opened)
+        {
+            context.Diagnostics.Warn("postgres.fixture.dockercli.connect.timeout", new { port = hostPort });
+            await DumpDockerLogsAsync(containerName, context.Cancellation, context).ConfigureAwait(false);
+            await StopCliContainerAsync().ConfigureAwait(false);
+            return (false, null, $"Postgres container did not accept connections on localhost:{hostPort} within timeout");
+        }
+
+        var normalized = Normalize(connection);
+        ConnectionString = normalized;
+        IsAvailable = true;
+        UnavailableReason = null;
+        context.Diagnostics.Info("postgres.fixture.dockercli.started", new { container = containerName, host = "localhost", port = hostPort });
+        return (true, normalized, null);
+    }
+
+    private async Task<(bool ok, string stdout, string stderr, int exitCode)> RunDockerCommandAsync(string arguments, CancellationToken cancellation)
+    {
+        var psi = CreateDockerProcessStartInfo(arguments);
+        Process? process = null;
+
+        try
+        {
+            process = Process.Start(psi);
+            if (process is null)
+            {
+                return (false, string.Empty, "Failed to start docker process", -1);
+            }
+
+            var stdoutTask = process.StandardOutput.ReadToEndAsync();
+            var stderrTask = process.StandardError.ReadToEndAsync();
+            await Task.WhenAll(stdoutTask, stderrTask, process.WaitForExitAsync(cancellation)).ConfigureAwait(false);
+
+            return (process.ExitCode == 0, await stdoutTask.ConfigureAwait(false), await stderrTask.ConfigureAwait(false), process.ExitCode);
+        }
+        catch (OperationCanceledException)
+        {
+            if (process is { HasExited: false })
+            {
+                try
+                {
+                    process.Kill(entireProcessTree: true);
+                }
+                catch
+                {
+                    // ignored
+                }
+            }
+
+            return (false, string.Empty, "Cancelled", -1);
+        }
+        catch (Exception ex)
+        {
+            return (false, string.Empty, ex.Message, -1);
+        }
+        finally
+        {
+            process?.Dispose();
+        }
+    }
+
+    private ProcessStartInfo CreateDockerProcessStartInfo(string arguments)
+    {
+        var fileName = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "docker.exe" : "docker";
+        var psi = new ProcessStartInfo
+        {
+            FileName = fileName,
+            Arguments = arguments,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+
+        if (!string.IsNullOrWhiteSpace(_dockerEndpoint) && !IsLocalNamedPipe(_dockerEndpoint))
+        {
+            psi.Environment["DOCKER_HOST"] = NormalizeDockerEndpointForCli(_dockerEndpoint!);
+        }
+
+        return psi;
+    }
+
+    private static bool IsLocalNamedPipe(string endpoint)
+        => endpoint.StartsWith("npipe://", StringComparison.OrdinalIgnoreCase);
+
+    private static string NormalizeDockerEndpointForCli(string endpoint)
+    {
+        if (string.IsNullOrWhiteSpace(endpoint))
+        {
+            return endpoint;
+        }
+
+        if (endpoint.StartsWith("npipe://./", StringComparison.OrdinalIgnoreCase))
+        {
+            var suffix = endpoint["npipe://./".Length..];
+            return "npipe:////./" + suffix.TrimStart('/');
+        }
+
+        return endpoint;
+    }
+
+    private static int ParseDockerPortOutput(string output)
+    {
+        if (string.IsNullOrWhiteSpace(output))
+        {
+            return 0;
+        }
+
+        var lines = output.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+        foreach (var line in lines)
+        {
+            var trimmed = line.Trim();
+            var colonIndex = trimmed.LastIndexOf(':');
+            if (colonIndex < 0)
+            {
+                continue;
+            }
+
+            var segment = trimmed[(colonIndex + 1)..];
+            if (int.TryParse(segment, out var port))
+            {
+                return port;
+            }
+        }
+
+        return 0;
+    }
+
+    private static string Truncate(string? value, int max = 256)
+    {
+        if (string.IsNullOrEmpty(value))
+        {
+            return string.Empty;
+        }
+
+        return value.Length <= max ? value : value[..max] + "…";
+    }
+
+    private async Task DumpDockerLogsAsync(string containerName, CancellationToken cancellation, TestContext context)
+    {
+        if (string.IsNullOrWhiteSpace(containerName))
         {
             return;
         }
 
         try
         {
-            await _container.StopAsync().ConfigureAwait(false);
+            var (ok, stdout, stderr, exitCode) = await RunDockerCommandAsync($"logs {containerName}", cancellation).ConfigureAwait(false);
+            if (!ok)
+            {
+                context.Diagnostics.Debug("postgres.fixture.dockercli.logs.failed", new { exitCode, stderr = Truncate(stderr), stdout = Truncate(stdout) });
+                return;
+            }
+
+            context.Diagnostics.Info("postgres.fixture.dockercli.logs", new { container = containerName, logs = Truncate(stdout, 1024) });
         }
         catch
         {
             // ignored
+        }
+    }
+
+    private async ValueTask StopCliContainerAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_cliContainerId))
+        {
+            return;
         }
 
         try
         {
-            await _container.DisposeAsync().ConfigureAwait(false);
+            await RunDockerCommandAsync($"rm -f {_cliContainerId}", CancellationToken.None).ConfigureAwait(false);
         }
         catch
         {
             // ignored
         }
-
-        _container = null;
+        finally
+        {
+            _cliContainerId = null;
+        }
     }
 }

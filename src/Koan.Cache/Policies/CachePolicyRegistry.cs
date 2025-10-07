@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
@@ -7,6 +6,7 @@ using System.Linq;
 using System.Reflection;
 using Koan.Cache.Abstractions.Policies;
 using Microsoft.Extensions.Logging;
+using System.IO;
 
 namespace Koan.Cache.Policies;
 
@@ -84,7 +84,7 @@ internal sealed class CachePolicyRegistry : ICachePolicyRegistry
                     continue;
                 }
 
-                var typeAttributes = type.GetCustomAttributes<CachePolicyAttribute>(inherit: true).ToArray();
+                var typeAttributes = GetCachePolicyAttributes(type, type.FullName ?? type.Name ?? type.ToString()).ToArray();
                 if (typeAttributes.Length > 0)
                 {
                     var descriptors = typeAttributes.Select(attr => CreateDescriptor(attr, null, type)).ToImmutableArray();
@@ -97,7 +97,7 @@ internal sealed class CachePolicyRegistry : ICachePolicyRegistry
 
                 foreach (var member in type.GetMembers(BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly))
                 {
-                    var memberAttributes = member.GetCustomAttributes<CachePolicyAttribute>(inherit: true).ToArray();
+                    var memberAttributes = GetCachePolicyAttributes(member, $"{type.FullName ?? type.Name}.{member.Name}").ToArray();
                     if (memberAttributes.Length == 0)
                     {
                         continue;
@@ -117,6 +117,20 @@ internal sealed class CachePolicyRegistry : ICachePolicyRegistry
 
         _logger.LogInformation("Cache policy registry rebuilt. {TypePolicyCount} type policies, {MemberPolicyCount} member policies.",
             _typePolicies.Count, _memberPolicies.Count);
+    }
+
+    private IEnumerable<CachePolicyAttribute> GetCachePolicyAttributes(MemberInfo target, string targetName)
+    {
+        try
+        {
+            return target.GetCustomAttributes(typeof(CachePolicyAttribute), inherit: true)
+                .OfType<CachePolicyAttribute>();
+        }
+        catch (Exception ex) when (ex is TypeLoadException or ReflectionTypeLoadException or FileNotFoundException or FileLoadException or BadImageFormatException)
+        {
+            _logger.LogWarning(ex, "Skipping cache policy attributes for {Target} due to reflection failure: {Message}", targetName, ex.Message);
+            return Array.Empty<CachePolicyAttribute>();
+        }
     }
 
     private static CachePolicyDescriptor CreateDescriptor(CachePolicyAttribute attribute, MemberInfo? member, Type? declaringType)

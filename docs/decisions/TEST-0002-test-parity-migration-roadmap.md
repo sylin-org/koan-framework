@@ -30,6 +30,7 @@ Update this section as work ships. Use `[x]` when done, `[ ]` when pending, and 
 - [x] Migrate provider-agnostic specs (lifecycle events, partition routing, cross-provider moves, vector resolution) into `Suites/Data/Core` (`Koan.Tests.Data.Core`).
 - [x] Recreate backup/export flow tests with deterministic seed packs (`EntityTransferDsl` spec, Koan.Tests.Data.Core).
 - [ ] Stand up connector suites for InMemory, Json, Mongo, Postgres, Redis, Sqlite, Backup, and Weaviate (capabilities, CRUD, bulk/health).
+	- [x] InMemory (`tests/Suites/Data/Connector.InMemory/Koan.Data.Connector.InMemory.Tests`) – CRUD, partition isolation, batch, instructions, and capability probes.
 
 ### Web
 - [ ] Port Canon admin/entities/models controller specs using TestPipeline HTTP harnesses.
@@ -52,8 +53,8 @@ Update this section as work ships. Use `[x]` when done, `[ ]` when pending, and 
 - [ ] Recreate media transcoding, metadata extraction, and fallback tests on the new platform.
 
 ### Cache
-- [ ] Add specs for `CacheSingleflightRegistry`, `CacheValue`, and `MemoryCacheStore`.
-- [ ] Restore Redis adapter integration coverage using shared Docker fixtures.
+- [x] Add specs for `CacheSingleflightRegistry`, `CacheValue`, and `MemoryCacheStore` (live under `Koan.Tests.Cache.Unit/Specs`).
+- [x] Restore Redis adapter integration coverage using shared Docker fixtures (`Koan.Cache.Adapter.Redis.Tests`).
 
 ### Canon
 - [ ] Port remaining domain tests (observer notifications, AppHost shortcuts, requested view reprojection, skip distribution, option validation) into `Suites/Canon/Unit`.

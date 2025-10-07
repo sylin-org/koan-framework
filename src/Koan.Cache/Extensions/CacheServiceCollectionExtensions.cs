@@ -49,11 +49,12 @@ public static class CacheServiceCollectionExtensions
 
         services.TryAddSingleton<ICacheScopeAccessor, CacheScopeAccessor>();
         services.TryAddSingleton<CacheSingleflightRegistry>();
-        services.TryAddSingleton<CacheClient>();
-        services.TryAddSingleton<ICacheClient>(sp => sp.GetRequiredService<CacheClient>());
-        services.TryAddSingleton<ICacheReader>(sp => sp.GetRequiredService<CacheClient>());
-        services.TryAddSingleton<ICacheWriter>(sp => sp.GetRequiredService<CacheClient>());
-        services.TryAddSingleton<ICachePolicyRegistry, CachePolicyRegistry>();
+    services.TryAddSingleton<CacheClient>();
+    services.TryAddSingleton<ICacheClient>(sp => sp.GetRequiredService<CacheClient>());
+    services.TryAddSingleton<ICacheReader>(sp => sp.GetRequiredService<CacheClient>());
+    services.TryAddSingleton<ICacheWriter>(sp => sp.GetRequiredService<CacheClient>());
+    services.TryAddSingleton<CachePolicyRegistry>();
+    services.TryAddSingleton<ICachePolicyRegistry>(sp => sp.GetRequiredService<CachePolicyRegistry>());
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IDataRepositoryDecorator, CacheRepositoryDecorator>());
 
         services.TryAddEnumerable(ServiceDescriptor.Singleton<ICacheSerializer, JsonCacheSerializer>());

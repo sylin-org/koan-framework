@@ -73,6 +73,37 @@ public Task Some_behavior()
         .RunAsync();
 ```
 
+### Resolver + discovery scenarios
+
+- **Contract**
+  - **Inputs**: Discovery target assemblies (for example `Koan.Cache.Adapter.*`), the resolver under test, and a suite that already references the concrete adapter packages.
+  - **Outputs**: Deterministic assertions proving the resolver locates known registrars, rejects unknown adapters, and tolerates mixed casing.
+  - **Failure modes**: Forgetting to reference adapter assemblies (registrars never load), omitting an explicit `typeof(SomeRegistrar)` to trigger JIT loading, or skipping negative-path coverage.
+  - **Success criteria**: Each resolver spec primes assemblies explicitly, verifies happy + error paths, and exercises case-insensitive lookup semantics.
+
+- **Prime discovery explicitly**: Call `_ = typeof(MyAdapterRegistrar);` inside the spec before resolving to make sure trim/linker friendly builds don’t skip static constructors.
+- **Reference every adapter package**: The spec project (`*.csproj`) must include `ProjectReference` entries for each adapter you expect the resolver to discover; otherwise DependencyContext won’t surface them.
+- **Cover the edges**:
+  - Success for each in-box adapter (`memory`, `redis`, etc.).
+  - Case variance (`"MeMoRy"`) to enforce ordinal-insensitive behavior.
+  - Unknown adapter names throwing `InvalidOperationException` with the canonical message.
+- **Keep specs short**: Use the standard `TestPipeline` harness with `.Assert(...)` and return `ValueTask.CompletedTask` so resolver tests run instantly without external fixtures.
+
+```csharp
+[Fact]
+public Task Resolve_returns_redis_registrar()
+    => TestPipeline.For<CacheAdapterResolverSpec>(_output, nameof(Resolve_returns_redis_registrar))
+        .Assert(_ =>
+        {
+            _ = typeof(RedisCacheAdapterRegistrar);
+
+            var registrar = CacheAdapterResolver.Resolve("redis");
+            registrar.Should().BeOfType<RedisCacheAdapterRegistrar>();
+            return ValueTask.CompletedTask;
+        })
+        .RunAsync();
+```
+
 ## Guardrails for new fixtures
 
 - Place reusable fixtures under `tests/Shared/Koan.Testing/Fixtures` and expose convenience extensions in `Pipeline/` to keep spec bodies terse.

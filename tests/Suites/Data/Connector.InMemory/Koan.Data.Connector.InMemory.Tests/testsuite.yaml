@@ -1,0 +1,5 @@
+﻿suite: Koan.Data.Connector.InMemory.Tests
+lane: fast
+scope: connector
+module: Data.Connector.InMemory
+description: Fast coverage for the in-memory data connector validating CRUD, partition routing, batch operations, and instruction execution.

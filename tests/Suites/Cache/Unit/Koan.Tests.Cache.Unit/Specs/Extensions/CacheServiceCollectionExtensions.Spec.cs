@@ -1,9 +1,8 @@
 ﻿using Koan.Cache.Abstractions.Adapters;
-using Koan.Cache.Abstractions.Primitives;
 using Koan.Cache.Abstractions.Stores;
+using Koan.Cache.Adapter.Memory.Stores;
 using Koan.Cache.Extensions;
 using Koan.Cache.Options;
-using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -31,12 +30,11 @@ public sealed class CacheServiceCollectionExtensionsSpec
             var services = new ServiceCollection();
             services.AddLogging();
             services.AddKoanCache(configuration);
-            services.AddSingleton<ICacheAdapterRegistrar, TestMemoryAdapterRegistrar>();
             services.AddKoanCacheAdapter("memory", configuration);
 
             using var provider = services.BuildServiceProvider();
             var store = provider.GetRequiredService<ICacheStore>();
-            store.ProviderName.Should().Be("memory");
+            store.Should().BeOfType<MemoryCacheStore>();
 
             var options = provider.GetRequiredService<IOptions<CacheOptions>>().Value;
             options.Provider.Should().Be("memory");
@@ -72,7 +70,6 @@ public sealed class CacheServiceCollectionExtensionsSpec
             var services = new ServiceCollection();
             services.AddLogging();
             services.AddKoanCache(configuration);
-            services.AddSingleton<ICacheAdapterRegistrar, TestMemoryAdapterRegistrar>();
             services.AddKoanCacheAdapter("memory", configuration);
 
             using var provider = services.BuildServiceProvider();
@@ -88,42 +85,4 @@ public sealed class CacheServiceCollectionExtensionsSpec
                 return ValueTask.CompletedTask;
             })
             .RunAsync();
-}
-
-internal sealed class TestMemoryAdapterRegistrar : ICacheAdapterRegistrar
-{
-    public string Name => "memory";
-
-    public void Register(IServiceCollection services, IConfiguration configuration)
-    {
-        services.AddSingleton<ICacheStore, TestMemoryCacheStore>();
-    }
-}
-
-internal sealed class TestMemoryCacheStore : ICacheStore
-{
-    public string ProviderName => "memory";
-
-    public CacheCapabilities Capabilities { get; } = CacheCapabilities.None;
-
-    public ValueTask<CacheFetchResult> FetchAsync(CacheKey key, CacheEntryOptions options, CancellationToken ct)
-        => throw new NotSupportedException();
-
-    public ValueTask SetAsync(CacheKey key, CacheValue value, CacheEntryOptions options, CancellationToken ct)
-        => throw new NotSupportedException();
-
-    public ValueTask<bool> RemoveAsync(CacheKey key, CancellationToken ct)
-        => throw new NotSupportedException();
-
-    public ValueTask TouchAsync(CacheKey key, CacheEntryOptions options, CancellationToken ct)
-        => throw new NotSupportedException();
-
-    public ValueTask PublishInvalidationAsync(CacheKey key, CacheEntryOptions options, CancellationToken ct)
-        => throw new NotSupportedException();
-
-    public IAsyncEnumerable<TaggedCacheKey> EnumerateByTagAsync(string tag, CancellationToken ct)
-        => throw new NotSupportedException();
-
-    public ValueTask<bool> ExistsAsync(CacheKey key, CancellationToken ct)
-        => throw new NotSupportedException();
 }

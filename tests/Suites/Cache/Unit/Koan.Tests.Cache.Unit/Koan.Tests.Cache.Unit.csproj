@@ -20,5 +20,6 @@
     <ProjectReference Include="..\..\..\..\..\src\Koan.Cache\Koan.Cache.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Koan.Cache.Abstractions\Koan.Cache.Abstractions.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Koan.Cache.Adapter.Memory\Koan.Cache.Adapter.Memory.csproj" />
+    <ProjectReference Include="..\..\..\..\..\src\Koan.Cache.Adapter.Redis\Koan.Cache.Adapter.Redis.csproj" />
   </ItemGroup>
 </Project>
