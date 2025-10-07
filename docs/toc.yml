@@ -39,6 +39,8 @@
            href: engineering/packaging.md
          - name: Auth Controller Discovery Regression
            href: engineering/auth-controller-discovery.md
+         - name: Test Authoring Guidance
+           href: engineering/test-authoring.md
 - name: Case Studies
    href: case-studies/s13-docmind/index.md
    items:

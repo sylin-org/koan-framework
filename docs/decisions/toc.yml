@@ -270,6 +270,8 @@
   items:
     - name: TEST-0001 Koan testing platform realignment
       href: TEST-0001-koan-testing-platform.md
+    - name: TEST-0002 Test parity migration roadmap
+      href: TEST-0002-test-parity-migration-roadmap.md
 - name: Developer Experience (DX)
   items:
     - name: DX-0028 Service project naming and conventions
