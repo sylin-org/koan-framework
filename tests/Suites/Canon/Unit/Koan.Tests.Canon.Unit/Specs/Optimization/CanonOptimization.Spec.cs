@@ -1,4 +1,7 @@
-﻿namespace Koan.Tests.Canon.Unit.Specs.Optimization;
+﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+
+namespace Koan.Tests.Canon.Unit.Specs.Optimization;
 
 public sealed class CanonOptimizationSpec
 {
@@ -85,6 +88,81 @@ public sealed class CanonOptimizationSpec
                 monitor.RecordMetrics("canonize", TimeSpan.FromMilliseconds(120), 250, 75 * 1024 * 1024);
 
                 await Task.Delay(TimeSpan.FromMilliseconds(120), ctx.Cancellation).ConfigureAwait(false);
+            })
+            .RunAsync();
+
+    [Fact]
+    public Task Service_registration_registers_core_components()
+        => TestPipeline.For<CanonOptimizationSpec>(_output, nameof(Service_registration_registers_core_components))
+            .Act(async ctx =>
+            {
+                var services = new ServiceCollection();
+                services.AddLogging(builder => builder.SetMinimumLevel(LogLevel.Debug));
+
+                services.AddCanonOptimizations(options =>
+                {
+                    options.Features.EnablePerformanceMonitoring.Should().BeTrue();
+                });
+
+                await using var provider = services.BuildServiceProvider();
+
+                var options = provider.GetRequiredService<CanonOptimizationOptions>();
+                options.Should().NotBeNull();
+
+                var processor = provider.GetRequiredService<AdaptiveBatchProcessor>();
+                processor.Should().NotBeNull();
+
+                var monitor = provider.GetRequiredService<CanonPerformanceMonitor>();
+                monitor.Should().NotBeNull();
+
+                var hostedServices = provider.GetServices<IHostedService>();
+                hostedServices.Should().ContainSingle(s => s.GetType().Name.Contains("CanonPerformanceMonitoringHostedService", StringComparison.Ordinal));
+
+                return;
+            })
+            .RunAsync();
+
+    [Fact]
+    public Task Production_registration_applies_preset()
+        => TestPipeline.For<CanonOptimizationSpec>(_output, nameof(Production_registration_applies_preset))
+            .Act(async ctx =>
+            {
+                var services = new ServiceCollection();
+                services.AddLogging();
+
+                services.AddCanonOptimizationsForProduction();
+
+                await using var provider = services.BuildServiceProvider();
+                var options = provider.GetRequiredService<CanonOptimizationOptions>();
+
+                options.Features.UseOptimizedProjectionWorker.Should().BeTrue();
+                options.Performance.DefaultBatchSize.Should().Be(2000);
+                options.Performance.MaxBatchSize.Should().Be(10000);
+                options.Monitoring.ReportingInterval.Should().Be(TimeSpan.FromSeconds(15));
+
+                return;
+            })
+            .RunAsync();
+
+    [Fact]
+    public Task Development_registration_uses_conservative_defaults()
+        => TestPipeline.For<CanonOptimizationSpec>(_output, nameof(Development_registration_uses_conservative_defaults))
+            .Act(async ctx =>
+            {
+                var services = new ServiceCollection();
+                services.AddLogging();
+
+                services.AddCanonOptimizationsForDevelopment();
+
+                await using var provider = services.BuildServiceProvider();
+                var options = provider.GetRequiredService<CanonOptimizationOptions>();
+
+                options.Features.UseOptimizedProjectionWorker.Should().BeFalse();
+                options.Performance.DefaultBatchSize.Should().Be(500);
+                options.Performance.MaxBatchSize.Should().Be(2000);
+                options.Monitoring.ReportingInterval.Should().Be(TimeSpan.FromSeconds(30));
+
+                return;
             })
             .RunAsync();
 }

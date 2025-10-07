@@ -73,6 +73,82 @@ public sealed class CanonRuntimeFlowSpec
             })
             .RunAsync();
 
+    [Fact]
+    public Task Stage_only_requests_forward_tags_to_stage_metadata()
+        => TestPipeline.For<CanonRuntimeFlowSpec>(_output, nameof(Stage_only_requests_forward_tags_to_stage_metadata))
+            .UsingServiceProvider(ServicesKey, ConfigureServices)
+            .Arrange(ctx =>
+            {
+                using var scope = ctx.CreateServiceScope(ServicesKey);
+                var runtime = scope.ServiceProvider.GetRequiredService<ICanonRuntime>();
+                var persistence = scope.ServiceProvider.GetRequiredService<ICanonPersistence>() as InMemoryCanonPersistence
+                    ?? throw new InvalidOperationException("In-memory persistence not registered");
+                ctx.SetItem("runtime", runtime);
+                ctx.SetItem("persistence", persistence);
+            })
+            .Act(ctx =>
+            {
+                var overrideOptions = CanonizationOptions.Default.WithTag("tenant", "acme");
+                return ExecuteCanonizationAsync(ctx, CanonStageBehavior.StageOnly, "tagged", overrideOptions);
+            })
+            .Assert(ctx =>
+            {
+                var persistence = ctx.GetRequiredItem<InMemoryCanonPersistence>("persistence");
+                persistence.StageRecords.Should().NotBeEmpty();
+                var stage = persistence.StageRecords.Last();
+                var nonNullStage = stage ?? throw new InvalidOperationException("Expected stage record.");
+                Dictionary<string, string?> metadata = nonNullStage.Metadata!;
+                if (!metadata.TryGetValue("tenant", out var tenantRaw))
+                {
+                    throw new InvalidOperationException("Expected tenant metadata.");
+                }
+
+                string tenant = tenantRaw ?? throw new InvalidOperationException("Expected tenant metadata.");
+                tenant.Should().Be("acme");
+
+                if (!metadata.TryGetValue("runtime:stage-behavior", out var behaviorRaw))
+                {
+                    throw new InvalidOperationException("Expected stage behavior metadata.");
+                }
+
+                string behavior = behaviorRaw ?? throw new InvalidOperationException("Expected stage behavior metadata.");
+                behavior.Should().Be(CanonStageBehavior.StageOnly.ToString());
+                return ValueTask.CompletedTask;
+            })
+            .RunAsync();
+
+    [Fact]
+    public Task Replay_returns_canonization_records_in_phase_order()
+        => TestPipeline.For<CanonRuntimeFlowSpec>(_output, nameof(Replay_returns_canonization_records_in_phase_order))
+            .UsingServiceProvider(ServicesKey, ConfigureServices)
+            .Arrange(ctx =>
+            {
+                using var scope = ctx.CreateServiceScope(ServicesKey);
+                var runtime = scope.ServiceProvider.GetRequiredService<ICanonRuntime>();
+                ctx.SetItem("runtime", runtime);
+            })
+            .Act(async ctx =>
+            {
+                await ExecuteCanonizationAsync(ctx, CanonStageBehavior.Immediate, "replay-1").ConfigureAwait(false);
+                await ExecuteCanonizationAsync(ctx, CanonStageBehavior.Immediate, "replay-2").ConfigureAwait(false);
+            })
+            .Assert(async ctx =>
+            {
+                var runtime = ctx.GetRequiredItem<ICanonRuntime>("runtime");
+                var records = new List<CanonizationRecord>();
+                await foreach (var record in runtime.Replay(cancellationToken: ctx.Cancellation))
+                {
+                    records.Add(record);
+                }
+
+                records.Should().NotBeEmpty();
+                records.Should().BeInAscendingOrder(r => r.OccurredAt);
+                records.Should().AllSatisfy(record => record.Event.Should().NotBeNull());
+                var phases = records.Select(r => r.Event!.Phase).ToList();
+                phases.Should().OnlyContain(phase => Enum.IsDefined(typeof(CanonPipelinePhase), phase));
+            })
+            .RunAsync();
+
     private static void ConfigureServices(TestContext ctx, IServiceCollection services)
     {
         services.AddLogging();
@@ -98,7 +174,7 @@ public sealed class CanonRuntimeFlowSpec
         });
     }
 
-    private static async ValueTask ExecuteCanonizationAsync(TestContext ctx, CanonStageBehavior behavior, string origin)
+    private static async ValueTask ExecuteCanonizationAsync(TestContext ctx, CanonStageBehavior behavior, string origin, CanonizationOptions? overrideOptions = null)
     {
         var runtime = ctx.GetRequiredItem<ICanonRuntime>("runtime");
         var email = $"{origin}-{ctx.ExecutionId:N}@example.com";
@@ -113,6 +189,11 @@ public sealed class CanonRuntimeFlowSpec
         var options = CanonizationOptions.Default
             .WithOrigin(origin)
             .WithStageBehavior(behavior);
+
+        if (overrideOptions is not null)
+        {
+            options = CanonizationOptions.Merge(overrideOptions, options);
+        }
 
         var result = await runtime.Canonize(entity, options, ctx.Cancellation).ConfigureAwait(false);
         ctx.SetItem("result", result);
