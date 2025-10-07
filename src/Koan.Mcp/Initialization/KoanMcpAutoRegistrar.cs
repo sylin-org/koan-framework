@@ -58,5 +58,28 @@ public sealed class KoanMcpAutoRegistrar : IKoanAutoRegistrar
         {
             report.AddSetting("DeniedEntities", string.Join(',', denied));
         }
+
+        // Code mode settings
+        var exposure = section.GetValue<string?>("Exposure");
+        report.AddSetting("Exposure", exposure ?? "Auto (default)");
+
+        var codeSection = section.GetSection("CodeMode");
+        var codeModeEnabled = codeSection.GetValue("Enabled", true);
+        report.AddSetting("CodeModeEnabled", codeModeEnabled.ToString());
+
+        if (codeModeEnabled)
+        {
+            var runtime = codeSection.GetValue("Runtime", "Jint");
+            report.AddSetting("CodeModeRuntime", runtime);
+
+            var sandboxSection = codeSection.GetSection("Sandbox");
+            var cpuMs = sandboxSection.GetValue("CpuMilliseconds", 2000);
+            var memoryMb = sandboxSection.GetValue("MemoryMegabytes", 64);
+            var maxRecursion = sandboxSection.GetValue("MaxRecursionDepth", 100);
+
+            report.AddSetting("SandboxCpuMs", cpuMs.ToString());
+            report.AddSetting("SandboxMemoryMb", memoryMb.ToString());
+            report.AddSetting("SandboxMaxRecursion", maxRecursion.ToString());
+        }
     }
 }

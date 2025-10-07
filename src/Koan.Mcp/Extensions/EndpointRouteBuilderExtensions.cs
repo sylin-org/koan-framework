@@ -1,4 +1,5 @@
 using System;
+using Koan.Mcp.CodeMode.Sdk;
 using Koan.Mcp.Diagnostics;
 using Koan.Mcp.Hosting;
 using Koan.Mcp.Options;
@@ -70,6 +71,27 @@ public static class EndpointRouteBuilderExtensions
             })
             .WithName("KoanMcpCapabilities")
             .WithMetadata(new ProducesResponseTypeAttribute(typeof(McpCapabilityDocument), StatusCodes.Status200OK, "application/json"));
+        }
+
+        // SDK definitions endpoint for code mode
+        var codeModeOptions = services.GetService<IOptions<CodeModeOptions>>()?.Value;
+        if (codeModeOptions?.Enabled == true && codeModeOptions.PublishSdkEndpoint)
+        {
+            var sdkGenerator = services.GetService<TypeScriptSdkGenerator>();
+            var registry = services.GetService<McpEntityRegistry>();
+
+            if (sdkGenerator is not null && registry is not null)
+            {
+                group.MapGet("sdk/definitions", context =>
+                {
+                    var definitions = sdkGenerator.GenerateDefinitions(registry.Registrations);
+                    context.Response.ContentType = "application/typescript";
+                    return context.Response.WriteAsync(definitions, context.RequestAborted);
+                })
+                .WithName("KoanMcpSdkDefinitions")
+                .WithMetadata(new ProducesResponseTypeAttribute(typeof(string), StatusCodes.Status200OK, "application/typescript"))
+                .ExcludeFromDescription();
+            }
         }
 
         return endpoints;

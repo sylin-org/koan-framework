@@ -1,4 +1,6 @@
 using System;
+using Koan.Mcp.CodeMode.Execution;
+using Koan.Mcp.CodeMode.Sdk;
 using Koan.Mcp.Diagnostics;
 using Koan.Mcp.Execution;
 using Koan.Mcp.Hosting;
@@ -42,6 +44,13 @@ public static class ServiceCollectionExtensions
         services.TryAddSingleton<IMcpCapabilityReporter, HttpSseCapabilityReporter>();
 
         services.AddCors();
+
+        // Code mode services
+        services.AddOptions<CodeModeOptions>().BindConfiguration("Koan:Mcp:CodeMode");
+        services.AddOptions<SandboxOptions>().BindConfiguration("Koan:Mcp:CodeMode:Sandbox");
+        services.TryAddSingleton<ICodeExecutor, JintCodeExecutor>();
+        services.TryAddSingleton<TypeScriptSdkGenerator>();
+        services.TryAddScoped<KoanSdkBindings>();
 
         return services;
     }
