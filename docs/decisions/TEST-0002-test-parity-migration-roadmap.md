@@ -23,12 +23,12 @@ Adopt a pillar-first migration program that completes Core, Data, Web, AI, Jobs,
 Update this section as work ships. Use `[x]` when done, `[ ]` when pending, and annotate blockers inline (e.g., `[#123 blocked: waiting on fixture]`).
 
 ### Core
-- [ ] Validate options extension edge cases under `Suites/Core/Unit` (covers `OptionsExtensionsTests`).
-- [ ] Add `JsonUtilities` error-path regression specs mirroring legacy coverage.
+- [x] Validate options extension edge cases under `Suites/Core/Unit` (covers `OptionsExtensionsTests`).
+- [x] Add `JsonUtilities` error-path regression specs mirroring legacy coverage.
 
 ### Data
-- [ ] Migrate provider-agnostic specs (lifecycle events, partition routing, cross-provider moves, vector resolution) into `Suites/Data/Core`.
-- [ ] Recreate backup/export flow tests with deterministic seed packs.
+- [x] Migrate provider-agnostic specs (lifecycle events, partition routing, cross-provider moves, vector resolution) into `Suites/Data/Core` (`Koan.Tests.Data.Core`).
+- [x] Recreate backup/export flow tests with deterministic seed packs (`EntityTransferDsl` spec, Koan.Tests.Data.Core).
 - [ ] Stand up connector suites for InMemory, Json, Mongo, Postgres, Redis, Sqlite, Backup, and Weaviate (capabilities, CRUD, bulk/health).
 
 ### Web

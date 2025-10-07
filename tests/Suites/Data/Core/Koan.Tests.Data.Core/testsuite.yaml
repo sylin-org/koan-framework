@@ -1,0 +1,5 @@
+﻿suite: Koan.Tests.Data.Core
+lane: fast
+scope: core
+module: Koan.Data
+description: Provider-agnostic Koan.Data coverage for lifecycle events, routing, provider selection, and vector resolution.

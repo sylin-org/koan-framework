@@ -1,0 +1,15 @@
+﻿global using FluentAssertions;
+global using Koan.Data.Abstractions;
+global using Koan.Data.Core;
+global using Koan.Testing.Contracts;
+global using Koan.Testing.Extensions;
+global using Koan.Testing.Fixtures;
+global using Koan.Testing.Pipeline;
+global using System;
+global using System.Collections.Generic;
+global using System.IO;
+global using System.Linq;
+global using System.Threading;
+global using System.Threading.Tasks;
+global using Xunit;
+global using Xunit.Abstractions;
