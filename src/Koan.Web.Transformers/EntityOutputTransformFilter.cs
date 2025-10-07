@@ -1,3 +1,4 @@
+using System.Collections;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 
@@ -34,30 +35,28 @@ internal sealed class EntityOutputTransformFilter : IAsyncResultFilter
         if (string.IsNullOrWhiteSpace(accepts)) { await next(); return; }
         var acceptValues = accepts.Split(',').Select(s => s.Trim()).ToArray();
 
-        var method = typeof(ITransformerRegistry).GetMethod(nameof(ITransformerRegistry.ResolveForOutput))!.MakeGenericMethod(targetType);
-        var match = method.Invoke(_registry, new object?[] { acceptValues });
-        if (match is null) { await next(); return; }
-
-        // Invoke transformer
-        var contentTypeProp = match.GetType().GetProperty("ContentType")!;
-        var transformerObj = match.GetType().GetProperty("Transformer")!.GetValue(match)!;
-        var contentType = (string)contentTypeProp.GetValue(match)!;
+        var selection = _registry.ResolveForOutput(targetType, acceptValues);
+        if (selection is null) { await next(); return; }
 
         object transformed;
         if (isEnumerable)
         {
-            var mi = transformerObj.GetType().GetMethod("TransformManyAsync")!;
-            transformed = await (Task<object>)mi.Invoke(transformerObj, new object?[] { or.Value, context.HttpContext })!;
+            if (or.Value is not IEnumerable enumerable)
+            {
+                await next();
+                return;
+            }
+
+            transformed = await selection.Invoker.TransformManyAsync(enumerable, context.HttpContext).ConfigureAwait(false);
         }
         else
         {
-            var mi = transformerObj.GetType().GetMethod("TransformAsync")!;
-            transformed = await (Task<object>)mi.Invoke(transformerObj, new object?[] { or.Value, context.HttpContext })!;
+            transformed = await selection.Invoker.TransformAsync(or.Value!, context.HttpContext).ConfigureAwait(false);
         }
         // Set the negotiated content type so MVC doesn't re-serialize as JSON
         var result = new ObjectResult(transformed) { StatusCode = or.StatusCode };
         result.ContentTypes.Clear();
-        result.ContentTypes.Add(contentType);
+        result.ContentTypes.Add(selection.ContentType);
         context.Result = result;
         await next();
     }

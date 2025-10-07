@@ -1,0 +1,5 @@
+﻿suite: Koan.Tests.S2.Api
+lane: docker
+scope: integration
+module: S2.Api
+description: Integration coverage for S2.Api sample against MongoDB data provider using Koan.Testing harness.

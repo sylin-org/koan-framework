@@ -1,0 +1,5 @@
+﻿suite: Koan.Tests.Canon.Integration
+lane: docker
+scope: integration
+module: Koan.Canon
+description: Integration coverage for Canon runtime flows using staged payloads and persistence adapters.

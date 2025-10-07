@@ -1,0 +1,5 @@
+﻿suite: Koan.Tests.Core.Unit
+lane: fast
+scope: unit
+module: Koan.Core
+description: Unit specifications for core utilities and option helpers.

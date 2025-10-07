@@ -1,0 +1,5 @@
+﻿suite: Koan.Tests.Canon.Unit
+lane: fast
+scope: unit
+module: Koan.Canon
+description: Unit specifications for Koan canon metadata and runtime using the shared testing pipeline.

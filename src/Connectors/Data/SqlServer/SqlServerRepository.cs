@@ -17,6 +17,7 @@ using Koan.Data.Relational.Linq;
 using Koan.Data.Relational.Orchestration;
 using System.Linq.Expressions;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Serialization;
 
 namespace Koan.Data.Connector.SqlServer;
 
@@ -53,6 +54,7 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
     private readonly int _maxPageSize;
     private readonly ILogger _logger;
     private readonly JsonSerializerSettings _json;
+    private static readonly CamelCaseNamingStrategy CamelCase = new();
     private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, bool> _healthyCache = new(StringComparer.Ordinal);
 
     public SqlServerRepository(IServiceProvider sp, SqlServerOptions options, IStorageNameResolver resolver)
@@ -855,6 +857,43 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
     private string RewriteWhereForProjection(string whereSql)
     {
         var projections = ProjectionResolver.Get(typeof(TEntity));
+        var columnMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Id"] = "[Id]",
+            ["Json"] = "[Json]"
+        };
+
+        foreach (var projection in projections)
+        {
+            var column = $"[{projection.ColumnName}]";
+            columnMap[projection.Property.Name] = column;
+            var camel = CamelCase.GetPropertyName(projection.Property.Name, hasSpecifiedName: false);
+            columnMap[camel] = column;
+        }
+
+        string BuildJsonAccessor(string token)
+        {
+            var camel = CamelCase.GetPropertyName(token, hasSpecifiedName: false);
+            return $"JSON_VALUE([Json], '$.{camel}')";
+        }
+
+        string BuildColumnOrJson(string token)
+        {
+            if (columnMap.TryGetValue(token, out var column))
+            {
+                if (string.Equals(token, "Id", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(token, "Json", StringComparison.OrdinalIgnoreCase))
+                {
+                    return column;
+                }
+
+                var json = BuildJsonAccessor(token);
+                return $"COALESCE({column}, {json})";
+            }
+
+            return BuildJsonAccessor(token);
+        }
+
         bool hasBrackets = whereSql.IndexOf('[', StringComparison.Ordinal) >= 0;
         if (hasBrackets)
         {
@@ -864,23 +903,11 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
                 m =>
                 {
                     var prop = m.Groups["prop"].Value;
-                    var proj = projections.FirstOrDefault(p => string.Equals(p.ColumnName, prop, StringComparison.Ordinal) || string.Equals(p.Property.Name, prop, StringComparison.Ordinal));
-                    if (proj is not null) return $"[{proj.ColumnName}]";
-                    return $"JSON_VALUE([Json], '$.{prop}')";
+                    return BuildColumnOrJson(prop);
                 });
         }
 
-        var map = projections.ToDictionary(p => p.Property.Name, p => $"[{p.ColumnName}]", StringComparer.Ordinal);
         whereSql = System.Text.RegularExpressions.Regex.Replace(whereSql, "\n|\r", " ");
-        foreach (var kv in map)
-        {
-            var ident = kv.Key;
-            var col = kv.Value;
-            whereSql = System.Text.RegularExpressions.Regex.Replace(
-                whereSql,
-                $"\\b{System.Text.RegularExpressions.Regex.Escape(ident)}\\b",
-                col);
-        }
         whereSql = System.Text.RegularExpressions.Regex.Replace(
             whereSql,
             "(?<![@:])\\b([A-Za-z_][A-Za-z0-9_]*)\\b",
@@ -910,9 +937,10 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
                     case "DESC":
                         return token;
                 }
-                if (map.ContainsKey(token)) return map[token];
-                return $"JSON_VALUE([Json], '$.{token}')";
+
+                return BuildColumnOrJson(token);
             });
+
         return whereSql;
     }
 

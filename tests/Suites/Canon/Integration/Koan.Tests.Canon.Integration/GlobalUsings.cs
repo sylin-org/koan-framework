@@ -1,0 +1,16 @@
+﻿global using FluentAssertions;
+global using Koan.Canon.Domain.Annotations;
+global using Koan.Canon.Domain.Audit;
+global using Koan.Canon.Domain.Metadata;
+global using Koan.Canon.Domain.Model;
+global using Koan.Canon.Domain.Runtime;
+global using Koan.Data.Core;
+global using Koan.Testing.Contracts;
+global using Koan.Testing.Extensions;
+global using Koan.Testing.Fixtures;
+global using Koan.Testing.Pipeline;
+global using Microsoft.Extensions.DependencyInjection;
+global using System;
+global using System.Threading.Tasks;
+global using Xunit;
+global using Xunit.Abstractions;
