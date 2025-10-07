@@ -68,3 +68,4 @@ node_modules/
 /samples/**/ps.json
 /.sora
 /samples/S5.Recs/.Koan/cache
+/tests.old
