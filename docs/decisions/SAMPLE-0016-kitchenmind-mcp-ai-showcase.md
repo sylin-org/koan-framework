@@ -1,4 +1,4 @@
-# SAMPLE-0016 - KitchenMind: AI-Powered Meal Planning Sample
+# SAMPLE-0016 - PantryPal: AI-Powered Meal Planning Sample
 
 Status: Approved
 Date: 2025-10-07
@@ -24,7 +24,7 @@ Owners: Koan AI Platform, Koan.Mcp Team, Sample Applications
 
 ## Decision
 
-Create **S16.KitchenMind**: An AI-powered meal planning and pantry management application showcasing:
+Create **S16.PantryPal**: An AI-powered meal planning and pantry management application showcasing:
 
 ### Core Features
 

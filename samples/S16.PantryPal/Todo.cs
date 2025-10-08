@@ -1,7 +1,7 @@
 using Koan.Data.Core.Model;
 using Koan.Mcp;
 
-namespace S16.McpCodeMode;
+namespace S16.PantryPal;
 
 [McpEntity(Name = "Todo", Description = "Task management entity")]
 public sealed class Todo : Entity<Todo>

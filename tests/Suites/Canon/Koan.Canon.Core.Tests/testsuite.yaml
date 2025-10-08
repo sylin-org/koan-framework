@@ -1,0 +1,8 @@
+﻿# Canon Core Test Suite
+id: canon-core
+name: Canon Core
+category: canon
+status: in-progress
+description: |
+  Test suite for Koan.Canon.Core covering observer notifications, AppHost shortcuts, view reprojection, skip distribution, option validation, and controller/API specs.
+  Uses TestPipeline for integration and regression coverage.

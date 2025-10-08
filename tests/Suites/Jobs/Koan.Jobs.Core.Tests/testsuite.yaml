@@ -1,0 +1,8 @@
+﻿# Jobs Core Test Suite
+id: jobs-core
+name: Jobs Core
+category: jobs
+status: in-progress
+description: |
+  Test suite for Koan.Jobs.Core covering scheduler, cron parsing, worker lifecycle, retry/backoff, and orchestrated job execution.
+  Uses TestPipeline for integration and regression coverage.

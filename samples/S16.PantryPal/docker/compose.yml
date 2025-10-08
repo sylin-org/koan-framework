@@ -1,0 +1,66 @@
+name: koan-s16-pantrypal
+services:
+  api:
+    build:
+      context: ../../..
+      dockerfile: samples/S16.PantryPal/Dockerfile
+    image: koan-s16-pantrypal:dev
+    ports:
+      - "5016:5016"
+    environment:
+      ASPNETCORE_ENVIRONMENT: "Development"
+      ASPNETCORE_URLS: "http://+:5016"
+      Koan__Web__ExposeObservabilitySnapshot: "true"
+      Koan__Data__Default: "mongodb"
+
+      # AI Configuration (Ollama for vision)
+      Koan__Ai__AutoDiscoveryEnabled: "true"
+      Koan__Ai__AllowDiscoveryInNonDev: "true"
+      Koan_AI_OLLAMA_URLS: "http://host.docker.internal:11434"
+      Koan__Ai__Services__Ollama__0__Id: "ollama"
+      Koan__Ai__Services__Ollama__0__BaseUrl: "http://ollama:11434"
+      Koan__Ai__Services__Ollama__0__DefaultModel: "llava"
+      Koan__Ai__Services__Ollama__0__Enabled: "false"  # Use auto-discovery
+      Koan__Ai__Ollama__RequiredModels__0: "llava"  # Vision model
+
+      # MCP Configuration
+      Koan__Mcp__EnableStdioTransport: "false"
+      Koan__Mcp__EnableHttpSseTransport: "true"
+      Koan__Mcp__HttpSseRoute: "/mcp"
+      Koan__Mcp__RequireAuthentication: "false"
+      Koan__Mcp__Exposure: "full"
+      Koan__Mcp__CodeMode__Enabled: "true"
+      Koan__Mcp__CodeMode__PublishSdkEndpoint: "true"
+
+    volumes:
+      - ../.Koan/Data:/app/data
+      - ../.Koan/cache:/app/cache
+      - ../.Koan/photos:/app/photos  # Pantry photos storage
+    depends_on:
+      mongo:
+        condition: service_healthy
+      ollama:
+        condition: service_started
+
+  mongo:
+    image: mongo:latest
+    container_name: pantrypal-mongo
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - ../.Koan/Data/mongo:/data/db
+    ports:
+      - "4916:27017"
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: pantrypal-ollama
+    volumes:
+      - ../.Koan/Data/ollama-models:/root/.ollama
+    ports:
+      - "5017:11434"
+
+volumes: {}

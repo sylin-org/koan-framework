@@ -15,7 +15,7 @@ app.MapKoanMcpEndpoints();
 
 app.Run();
 
-namespace S16.McpCodeMode
+namespace S16.PantryPal
 {
     public partial class Program { }
 }

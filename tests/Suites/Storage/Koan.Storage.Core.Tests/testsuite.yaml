@@ -1,0 +1,8 @@
+﻿# Storage Core Test Suite
+id: storage-core
+name: Storage Core
+category: storage
+status: in-progress
+description: |
+  Test suite for Koan.Storage.Core covering lifecycle, metadata propagation, error handling, and cross-provider behavior.
+  Uses TestPipeline for integration and regression coverage.

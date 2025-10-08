@@ -5,7 +5,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>preview</LangVersion>
-    <RootNamespace>S16.McpCodeMode</RootNamespace>
+    <RootNamespace>S16.PantryPal</RootNamespace>
   </PropertyGroup>
 
   <PropertyGroup>

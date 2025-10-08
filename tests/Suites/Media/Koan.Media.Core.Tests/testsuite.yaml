@@ -1,0 +1,8 @@
+﻿# Media Core Test Suite
+id: media-core
+name: Media Core
+category: media
+status: in-progress
+description: |
+  Test suite for Koan.Media.Core covering transcoding, metadata extraction, and fallback tests.
+  Uses TestPipeline for integration and regression coverage.
