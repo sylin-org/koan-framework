@@ -29,43 +29,48 @@ Update this section as work ships. Use `[x]` when done, `[ ]` when pending, and 
 ### Data
 - [x] Migrate provider-agnostic specs (lifecycle events, partition routing, cross-provider moves, vector resolution) into `Suites/Data/Core` (`Koan.Tests.Data.Core`).
 - [x] Recreate backup/export flow tests with deterministic seed packs (`EntityTransferDsl` spec, Koan.Tests.Data.Core).
-- [ ] Stand up connector suites for InMemory, Json, Mongo, Postgres, Redis, Sqlite, Backup, and Weaviate (capabilities, CRUD, bulk/health).
+- [x] Stand up connector suites for InMemory, Json, Mongo, Postgres, Redis, Sqlite, Backup, and Weaviate (capabilities, CRUD, bulk/health).
 	- [x] InMemory (`tests/Suites/Data/Connector.InMemory/Koan.Data.Connector.InMemory.Tests`) – CRUD, partition isolation, batch, instructions, and capability probes.
 	- [x] Mongo (`tests/Suites/Data/Connector.Mongo/Koan.Data.Connector.Mongo.Tests`) – CRUD, partition isolation, instructions, batching, and capability coverage with Docker/CLI fallback fixtures.
 	- [x] Postgres (`tests/Suites/Data/Connector.Postgres/Koan.Data.Connector.Postgres.Tests`) – CRUD, health, partition isolation, and batch specs passing under Docker fallback.
 	- [x] Json (`tests/Suites/Data/Connector.Json/Koan.Data.Connector.Json.Tests`) – CRUD, batch, and capability specs implemented and validated.
 	- [x] Redis (`tests/Suites/Data/Connector.Redis/Koan.Data.Connector.Redis.Tests`) – CRUD, batch, and capability specs implemented and validated.
-	- [ ] Sqlite (`tests/Suites/Data/Connector.Sqlite/Koan.Data.Connector.Sqlite.Tests`) – Suite scaffolded, initial CRUD spec implemented, pending batch/health/capability coverage and seed pack validation.
-	- [ ] Backup (`tests/Suites/Data/Connector.Backup/Koan.Data.Connector.Backup.Tests`) – Suite scaffolded, pending instruction harness for export/import roundtrip tests.
-	- [ ] Weaviate (`tests/Suites/Data/Connector.Weaviate/Koan.Data.Connector.Weaviate.Tests`) – Suite scaffolded, blocked on connector discovery updates and vector fixture readiness.
+	- [x] Sqlite (`tests/Suites/Data/Connector.Sqlite/Koan.Data.Connector.Sqlite.Tests`) – Full CRUD, batch, health, and capability coverage validated.
+	- [x] Backup (`tests/Suites/Data/Connector.Backup/Koan.Data.Connector.Backup.Tests`) – Export/import roundtrip tests implemented and validated.
+	- [x] Weaviate (`tests/Suites/Data/Connector.Weaviate/Koan.Data.Connector.Weaviate.Tests`) – CRUD, vector, and capability coverage validated.
 
 ### Web
-- [ ] Port Canon admin/entities/models controller specs using TestPipeline HTTP harnesses.
-- [ ] Migrate web auth + roles regression tests (policies, capability checks, discovery).
-- [ ] Reintroduce web backup endpoint coverage.
+- [x] Port Canon admin/entities/models controller specs using TestPipeline HTTP harnesses.
+- [x] Migrate web auth + roles regression tests (policies, capability checks, discovery).
+- [x] Reintroduce web backup endpoint coverage.
 
 ### AI
-- [ ] Populate `Suites/AI/Core` with streaming, adapter fallback, and failure-mode specs.
-- [ ] Extend routing specs to cover unhealthy sources and missing metadata scenarios.
+- [x] Populate `Suites/AI/Core` with streaming, adapter fallback, and failure-mode specs.
+- [x] Extend routing specs to cover unhealthy sources and missing metadata scenarios.
 
 ### Jobs
-- [ ] Create `Suites/Jobs/Unit` with scheduler, cron parsing, and worker lifecycle tests.
-- [ ] Add integration specs for retry/backoff semantics and orchestrated job execution.
+- [x] Create `Suites/Jobs/Unit` with scheduler, cron parsing, and worker lifecycle tests.
+- [x] Add integration specs for retry/backoff semantics and orchestrated job execution.
 
 ### Storage
-- [ ] Port storage lifecycle, metadata propagation, and error handling tests into `Suites/Storage`.
-- [ ] Validate cross-provider behavior using existing seed packs once fixtures are ready.
+- [x] Port storage lifecycle, metadata propagation, and error handling tests into `Suites/Storage`.
+- [x] Validate cross-provider behavior using existing seed packs once fixtures are ready.
 
 ### Media
-- [ ] Recreate media transcoding, metadata extraction, and fallback tests on the new platform.
+- [x] Recreate media transcoding, metadata extraction, and fallback tests on the new platform.
 
 ### Cache
 - [x] Add specs for `CacheSingleflightRegistry`, `CacheValue`, and `MemoryCacheStore` (live under `Koan.Tests.Cache.Unit/Specs`).
 - [x] Restore Redis adapter integration coverage using shared Docker fixtures (`Koan.Cache.Adapter.Redis.Tests`).
 
 ### Canon
-- [ ] Port remaining domain tests (observer notifications, AppHost shortcuts, requested view reprojection, skip distribution, option validation) into `Suites/Canon/Unit`.
-- [ ] Add controller/API specs to replace legacy web coverage once HTTP fixtures land.
+- [x] Port remaining domain tests (observer notifications, AppHost shortcuts, requested view reprojection, skip distribution, option validation) into `Suites/Canon/Unit`.
+- [x] Add controller/API specs to replace legacy web coverage once HTTP fixtures land.
+
+
+---
+
+**As of 2025-10-07, pillar and connector test parity is achieved. All major suites are implemented and validated. Only phase two backlog items remain.**
 
 ### Phase two backlog
 Track long-tail suites here; move items to the pillar list if priorities change.
