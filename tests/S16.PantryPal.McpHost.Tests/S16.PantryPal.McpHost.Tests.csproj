@@ -1,0 +1,19 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+  <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <!-- NOTE: Standard test host; containerized S16 MCP host removes need for TestServer. -->
+  </PropertyGroup>
+  <ItemGroup>
+  <!-- Align version with other MCP/code mode test suites to avoid NU1603 mismatch -->
+  <!-- Removed Microsoft.AspNetCore.Mvc.Testing; dockerized fixture runs real container instead of TestServer -->
+  <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+  <!-- Pin to versions actually present on feed: xunit 2.9.0; keep runner at 2.8.2 if resolvable else bump too -->
+  <PackageReference Include="xunit" Version="2.9.0" />
+  <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+    <PackageReference Include="FluentAssertions" Version="6.12.0" />
+    <PackageReference Include="coverlet.collector" Version="6.0.0" />
+  </ItemGroup>
+  <!-- Black-box: no project references; container image built separately with its own target framework (net10). -->
+</Project>

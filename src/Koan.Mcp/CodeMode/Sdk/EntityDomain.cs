@@ -2,8 +2,9 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text.Json;
-using System.Text.Json.Nodes;
+using System.Dynamic;
+using Koan.Mcp.CodeMode.Json;
+using Newtonsoft.Json.Linq;
 using Koan.Mcp.Execution;
 using Koan.Web.Endpoints;
 using Microsoft.Extensions.DependencyInjection;
@@ -18,11 +19,16 @@ namespace Koan.Mcp.CodeMode.Sdk;
 public sealed class EntityDomain
 {
     private readonly IServiceProvider _services;
+    private readonly MetricsDomain _metrics;
     private readonly ConcurrentDictionary<string, object> _entityProxies = new();
 
-    public EntityDomain(IServiceProvider services)
+    private readonly IJsonFacade _json;
+
+    public EntityDomain(IServiceProvider services, MetricsDomain metrics, IJsonFacade json)
     {
         _services = services ?? throw new ArgumentNullException(nameof(services));
+        _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
+        _json = json ?? throw new ArgumentNullException(nameof(json));
     }
 
     /// <summary>
@@ -51,7 +57,7 @@ public sealed class EntityDomain
             throw new JavaScriptException($"Entity '{entityName}' not found in MCP registry");
         }
 
-        return new EntityOperationsProxy(registration, _services);
+    return new EntityOperationsProxy(registration, _services, _metrics, _json);
     }
 }
 
@@ -66,33 +72,46 @@ internal sealed class EntityOperationsProxy
     private readonly IServiceProvider _services;
     private readonly EndpointToolExecutor _executor;
     private readonly MetricsDomain _metrics;
+    private readonly IJsonFacade _json;
 
-    public EntityOperationsProxy(McpEntityRegistration registration, IServiceProvider services)
+    public EntityOperationsProxy(McpEntityRegistration registration, IServiceProvider services, MetricsDomain metrics, IJsonFacade json)
     {
         _registration = registration ?? throw new ArgumentNullException(nameof(registration));
         _services = services ?? throw new ArgumentNullException(nameof(services));
         _executor = services.GetRequiredService<EndpointToolExecutor>();
-
-        // Get metrics domain from SDK bindings if available
-        var bindings = services.GetService<KoanSdkBindings>();
-        _metrics = bindings?.Metrics ?? new MetricsDomain();
+        _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
+        _json = json ?? throw new ArgumentNullException(nameof(json));
     }
 
     /// <summary>
-    /// SDK.Entities.Todo.collection({ filter, pageSize, set, with })
+    /// SDK.Entities.Todo.collection({ filter, page, pageSize, set, with, sort })
     /// Returns: { items: [...], page: 1, pageSize: 10, totalCount: 42 }
     /// </summary>
     public object collection(object? args = null)
+        => ExecuteCollection(args);
+
+    /// <summary>
+    /// SDK.Entities.Todo.firstPage(pageSize?, args?) - convenience for page 1.
+    /// </summary>
+    public object firstPage(int? pageSize = null, object? args = null)
     {
-        _metrics.IncrementCalls();
+        // Merge provided args with enforced page=1
+        var baseObj = ConvertToJsonObject(args) ?? new JObject();
+        baseObj["page"] = 1;
+        if (pageSize.HasValue) baseObj["pageSize"] = pageSize.Value;
+        return ExecuteCollection(baseObj);
+    }
 
-        var tool = FindTool(EntityEndpointOperationKind.Collection);
-        var argsJson = ConvertToJsonObject(args);
-
-        // Synchronously execute async operation (Jint handles this)
-        var result = _executor.ExecuteAsync(tool.Name, argsJson, default).GetAwaiter().GetResult();
-
-        return ConvertToJavaScriptObject(result);
+    /// <summary>
+    /// SDK.Entities.Todo.page(pageNumber, pageSize?, args?) - collection with explicit page.
+    /// </summary>
+    public object page(int pageNumber, int? pageSize = null, object? args = null)
+    {
+        if (pageNumber <= 0) throw new JavaScriptException("Page number must be > 0");
+        var baseObj = ConvertToJsonObject(args) ?? new JObject();
+        baseObj["page"] = pageNumber;
+        if (pageSize.HasValue) baseObj["pageSize"] = pageSize.Value;
+        return ExecuteCollection(baseObj);
     }
 
     /// <summary>
@@ -110,7 +129,7 @@ internal sealed class EntityOperationsProxy
         _metrics.IncrementCalls();
 
         var tool = FindTool(EntityEndpointOperationKind.GetById);
-        var args = new JsonObject { ["id"] = id };
+    var args = new JObject { ["id"] = id };
 
         // Extract options if provided
         if (options != null)
@@ -118,11 +137,10 @@ internal sealed class EntityOperationsProxy
             var optsJson = ConvertToJsonObject(options);
             if (optsJson != null)
             {
-                if (optsJson.TryGetPropertyValue("set", out var setNode))
-                    args["set"] = setNode?.DeepClone();
-
-                if (optsJson.TryGetPropertyValue("with", out var withNode))
-                    args["with"] = withNode?.DeepClone();
+                if (optsJson.TryGetValue("set", StringComparison.OrdinalIgnoreCase, out var setToken))
+                    args["set"] = setToken?.DeepClone();
+                if (optsJson.TryGetValue("with", StringComparison.OrdinalIgnoreCase, out var withToken))
+                    args["with"] = withToken?.DeepClone();
             }
         }
 
@@ -146,7 +164,7 @@ internal sealed class EntityOperationsProxy
         _metrics.IncrementCalls();
 
         var tool = FindTool(EntityEndpointOperationKind.Upsert);
-        var args = new JsonObject
+        var args = new JObject
         {
             ["model"] = ConvertToJsonNode(model)
         };
@@ -155,9 +173,9 @@ internal sealed class EntityOperationsProxy
         if (options != null)
         {
             var optsJson = ConvertToJsonObject(options);
-            if (optsJson?.TryGetPropertyValue("set", out var setNode) == true)
+            if (optsJson != null && optsJson.TryGetValue("set", StringComparison.OrdinalIgnoreCase, out var setToken))
             {
-                args["set"] = setNode?.DeepClone();
+                args["set"] = setToken?.DeepClone();
             }
         }
 
@@ -181,15 +199,15 @@ internal sealed class EntityOperationsProxy
         _metrics.IncrementCalls();
 
         var tool = FindTool(EntityEndpointOperationKind.Delete);
-        var args = new JsonObject { ["id"] = id };
+    var args = new JObject { ["id"] = id };
 
         // Extract options
         if (options != null)
         {
             var optsJson = ConvertToJsonObject(options);
-            if (optsJson?.TryGetPropertyValue("set", out var setNode) == true)
+            if (optsJson != null && optsJson.TryGetValue("set", StringComparison.OrdinalIgnoreCase, out var setToken))
             {
-                args["set"] = setNode?.DeepClone();
+                args["set"] = setToken?.DeepClone();
             }
         }
 
@@ -215,30 +233,32 @@ internal sealed class EntityOperationsProxy
         var tool = FindTool(EntityEndpointOperationKind.DeleteMany);
 
         // Convert ids to JSON array
-        JsonArray idsArray;
+        JArray idsArray;
         if (idsArg is IEnumerable<object> enumerable)
         {
-            idsArray = new JsonArray(enumerable.Select(id => (JsonNode?)JsonValue.Create(id?.ToString())).ToArray());
+            // Materialize to object[] with non-null string representations, preserving order
+            var materialized = enumerable.Select(id => (object?)(id?.ToString() ?? string.Empty)).ToArray();
+            idsArray = new JArray(materialized!); // safe: elements are non-null strings
         }
         else
         {
             var idsJson = ConvertToJsonNode(idsArg);
-            if (idsJson is not JsonArray arr)
+            if (idsJson is not JArray arr)
             {
                 throw new JavaScriptException("IDs must be an array");
             }
             idsArray = arr;
         }
 
-        var args = new JsonObject { ["ids"] = idsArray };
+        var args = new JObject { ["ids"] = idsArray };
 
         // Extract options
         if (options != null)
         {
             var optsJson = ConvertToJsonObject(options);
-            if (optsJson?.TryGetPropertyValue("set", out var setNode) == true)
+            if (optsJson != null && optsJson.TryGetValue("set", StringComparison.OrdinalIgnoreCase, out var setToken))
             {
-                args["set"] = setNode?.DeepClone();
+                args["set"] = setToken?.DeepClone();
             }
         }
 
@@ -271,35 +291,17 @@ internal sealed class EntityOperationsProxy
         return tool;
     }
 
-    private JsonObject? ConvertToJsonObject(object? obj)
+    private object ExecuteCollection(object? args)
     {
-        if (obj == null) return null;
-
-        try
-        {
-            var json = JsonSerializer.Serialize(obj);
-            return JsonNode.Parse(json)?.AsObject();
-        }
-        catch (Exception ex)
-        {
-            throw new JavaScriptException($"Failed to convert argument to JSON: {ex.Message}");
-        }
+        _metrics.IncrementCalls();
+        var tool = FindTool(EntityEndpointOperationKind.Collection);
+        var argsObj = args != null ? _json.FromObject(args) : new JObject();
+        var result = _executor.ExecuteAsync(tool.Name, (JObject)argsObj, default).GetAwaiter().GetResult();
+        return ConvertToJavaScriptObject(result);
     }
 
-    private JsonNode? ConvertToJsonNode(object? obj)
-    {
-        if (obj == null) return null;
-
-        try
-        {
-            var json = JsonSerializer.Serialize(obj);
-            return JsonNode.Parse(json);
-        }
-        catch (Exception ex)
-        {
-            throw new JavaScriptException($"Failed to convert object to JSON: {ex.Message}");
-        }
-    }
+    private JObject? ConvertToJsonObject(object? obj) => obj == null ? null : (_json.FromObject(obj) as JObject);
+    private JToken? ConvertToJsonNode(object? obj) => obj == null ? null : (_json.FromObject(obj));
 
     private object ConvertToJavaScriptObject(McpToolExecutionResult result)
     {
@@ -312,21 +314,22 @@ internal sealed class EntityOperationsProxy
             throw new JavaScriptException(errorMsg);
         }
 
-        if (result.Payload == null)
+        if (result.Payload == null) return new {};
+
+        var token = (result.Payload as JToken) ?? JToken.Parse(result.Payload.ToString());
+
+        // If collection endpoint produced array, wrap with items + count for stability
+        if (token is JArray arr)
         {
-            return new { }; // Empty object
+            var wrapper = new JObject
+            {
+                ["items"] = arr,
+                ["count"] = arr.Count
+            };
+            return _json.ToDynamic(wrapper) ?? new {};
         }
 
-        try
-        {
-            // Convert JSON payload to plain object for JavaScript
-            var json = result.Payload.ToJsonString();
-            return JsonSerializer.Deserialize<object>(json) ?? new { };
-        }
-        catch (Exception ex)
-        {
-            throw new JavaScriptException($"Failed to convert result to JavaScript object: {ex.Message}");
-        }
+        return _json.ToDynamic(token) ?? new {};
     }
 
     private int ExtractCount(McpToolExecutionResult result)
@@ -336,12 +339,10 @@ internal sealed class EntityOperationsProxy
             return 0;
         }
 
-        if (result.Payload is JsonObject obj && obj.TryGetPropertyValue("count", out var countNode))
+        if (result.Payload is JObject jobj && jobj.TryGetValue("count", StringComparison.OrdinalIgnoreCase, out var countToken))
         {
-            if (countNode is JsonValue val && val.TryGetValue<long>(out var count))
-            {
-                return (int)count;
-            }
+            if (countToken.Type == JTokenType.Integer && (int)countToken >= 0)
+                return (int)countToken;
         }
 
         // Fallback: assume 1 if we got here successfully

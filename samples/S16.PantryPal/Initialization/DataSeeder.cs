@@ -34,7 +34,7 @@ public class DataSeeder : IKoanInitializer
 
                 foreach (var recipe in recipes)
                 {
-                    await Data<Recipe>.Upsert(recipe);
+                    await recipe.Save();
                     seededCount++;
                 }
 
@@ -58,7 +58,7 @@ public class DataSeeder : IKoanInitializer
                     PreferBatchCooking = true
                 };
 
-                await Data<UserProfile>.Upsert(profile);
+                await profile.Save();
                 Console.WriteLine("[PantryPal] Created demo user profile");
 
                 // Create sample pantry items
@@ -112,7 +112,7 @@ public class DataSeeder : IKoanInitializer
 
                 foreach (var item in sampleItems)
                 {
-                    await Data<PantryItem>.Upsert(item);
+                    await item.Save();
                 }
 
                 Console.WriteLine($"[PantryPal] Created {sampleItems.Length} sample pantry items");

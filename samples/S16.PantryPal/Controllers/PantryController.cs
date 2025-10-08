@@ -38,7 +38,7 @@ public class PantryController(
             ProcessingStatus = "processing"
         };
 
-        await Data<PantryPhoto>.Upsert(photoRecord);
+    await photoRecord.Save();
 
         // Save photo to storage
         var photoPath = Path.Combine("photos", Path.GetFileName(photoRecord.StoragePath));
@@ -70,7 +70,7 @@ public class PantryController(
         photoRecord.ProcessingTimeMs = result.ProcessingTimeMs;
         photoRecord.Metrics = result.Metrics;
 
-        await Data<PantryPhoto>.Upsert(photoRecord);
+    await photoRecord.Save();
 
         return Ok(new
         {
@@ -138,7 +138,7 @@ public class PantryController(
                 }
             };
 
-            await Data<PantryItem>.Upsert(item);
+            await item.Save();
             confirmedItems.Add(item);
 
             // Learn from user corrections
@@ -185,24 +185,25 @@ public class PantryController(
         [FromQuery] bool? expiringOnly = null,
         CancellationToken ct = default)
     {
-        var items = await PantryItem.All();
+        // Materialize to List to support subsequent filtered reassignments without IEnumerable/IReadOnlyList mismatch
+        var items = (await PantryItem.All()).ToList();
 
         if (!string.IsNullOrWhiteSpace(query))
         {
             var lowerQuery = query.ToLowerInvariant();
-            items = items.Where(i => i.Name.ToLowerInvariant().Contains(lowerQuery));
+            items = items.Where(i => i.Name.ToLowerInvariant().Contains(lowerQuery)).ToList();
         }
 
         if (!string.IsNullOrWhiteSpace(category))
-            items = items.Where(i => i.Category.Equals(category, StringComparison.OrdinalIgnoreCase));
+            items = items.Where(i => i.Category.Equals(category, StringComparison.OrdinalIgnoreCase)).ToList();
 
         if (!string.IsNullOrWhiteSpace(status))
-            items = items.Where(i => i.Status.Equals(status, StringComparison.OrdinalIgnoreCase));
+            items = items.Where(i => i.Status.Equals(status, StringComparison.OrdinalIgnoreCase)).ToList();
 
         if (expiringOnly == true)
         {
             var soon = DateTime.UtcNow.AddDays(7);
-            items = items.Where(i => i.ExpiresAt.HasValue && i.ExpiresAt.Value <= soon);
+            items = items.Where(i => i.ExpiresAt.HasValue && i.ExpiresAt.Value <= soon).ToList();
         }
 
         return Ok(items.OrderBy(i => i.ExpiresAt).ThenBy(i => i.Name).ToList());

@@ -5,7 +5,7 @@ namespace Koan.Mcp.CodeMode.Sdk;
 /// <summary>
 /// Internal metrics tracking for code execution.
 /// </summary>
-internal sealed class MetricsDomain
+public sealed class MetricsDomain
 {
     private int _totalCalls;
 

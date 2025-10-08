@@ -2,10 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text.Encodings.Web;
-using System.Text.Json;
-using System.Text.Json.Nodes;
-using System.Text.Json.Serialization;
+using Newtonsoft.Json.Linq;
 using System.Threading;
 using Koan.Web.Attributes;
 using Koan.Web.Endpoints;
@@ -15,32 +12,29 @@ using Microsoft.AspNetCore.JsonPatch;
 using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
-using JsonException = System.Text.Json.JsonException;
+using JsonException = Newtonsoft.Json.JsonException;
 
 namespace Koan.Mcp.Execution;
 
 public sealed class RequestTranslator
 {
-    private static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web)
+    private static readonly JsonSerializerSettings SerializerSettings = new()
     {
-        PropertyNameCaseInsensitive = true,
-        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-        NumberHandling = JsonNumberHandling.AllowReadingFromString
+        NullValueHandling = NullValueHandling.Ignore
     };
 
     public RequestTranslation Translate(
         IServiceProvider services,
         McpEntityRegistration registration,
         McpToolDefinition tool,
-        JsonObject? arguments,
+    JObject? arguments,
         CancellationToken cancellationToken)
     {
         if (services is null) throw new ArgumentNullException(nameof(services));
         if (registration is null) throw new ArgumentNullException(nameof(registration));
         if (tool is null) throw new ArgumentNullException(nameof(tool));
 
-        var args = arguments ?? new JsonObject();
+    var args = arguments ?? new JObject();
         var builder = services.GetRequiredService<EntityRequestContextBuilder>();
         var context = BuildContext(builder, args, cancellationToken);
 
@@ -91,7 +85,7 @@ public sealed class RequestTranslator
         };
     }
 
-    private static EntityCollectionRequest BuildCollectionRequest(EntityRequestContext context, JsonObject args)
+    private static EntityCollectionRequest BuildCollectionRequest(EntityRequestContext context, JObject args)
     {
         var defaultPolicy = PaginationPolicy.FromAttribute(new PaginationAttribute(), PaginationSafetyBounds.Default);
         var forcePagination = ReadBool(args, "forcePagination") ?? false;
@@ -116,7 +110,7 @@ public sealed class RequestTranslator
         };
     }
 
-    private static EntityQueryRequest BuildQueryRequest(EntityRequestContext context, JsonObject args)
+    private static EntityQueryRequest BuildQueryRequest(EntityRequestContext context, JObject args)
     {
         return new EntityQueryRequest
         {
@@ -128,7 +122,7 @@ public sealed class RequestTranslator
         };
     }
 
-    private object BuildGetByIdRequest(McpEntityRegistration registration, EntityRequestContext context, JsonObject args)
+    private object BuildGetByIdRequest(McpEntityRegistration registration, EntityRequestContext context, JObject args)
     {
         var requestType = typeof(EntityGetByIdRequest<>).MakeGenericType(registration.KeyType);
         var request = Activator.CreateInstance(requestType)!;
@@ -141,7 +135,7 @@ public sealed class RequestTranslator
         return request;
     }
 
-    private object BuildUpsertRequest(McpEntityRegistration registration, EntityRequestContext context, JsonObject args)
+    private object BuildUpsertRequest(McpEntityRegistration registration, EntityRequestContext context, JObject args)
     {
         var requestType = typeof(EntityUpsertRequest<>).MakeGenericType(registration.EntityType);
         var request = Activator.CreateInstance(requestType)!;
@@ -153,7 +147,7 @@ public sealed class RequestTranslator
         return request;
     }
 
-    private object BuildUpsertManyRequest(McpEntityRegistration registration, EntityRequestContext context, JsonObject args)
+    private object BuildUpsertManyRequest(McpEntityRegistration registration, EntityRequestContext context, JObject args)
     {
         var requestType = typeof(EntityUpsertManyRequest<>).MakeGenericType(registration.EntityType);
         var request = Activator.CreateInstance(requestType)!;
@@ -164,7 +158,7 @@ public sealed class RequestTranslator
         return request;
     }
 
-    private object BuildDeleteRequest(McpEntityRegistration registration, EntityRequestContext context, JsonObject args)
+    private object BuildDeleteRequest(McpEntityRegistration registration, EntityRequestContext context, JObject args)
     {
         var requestType = typeof(EntityDeleteRequest<>).MakeGenericType(registration.KeyType);
         var request = Activator.CreateInstance(requestType)!;
@@ -176,7 +170,7 @@ public sealed class RequestTranslator
         return request;
     }
 
-    private object BuildDeleteManyRequest(McpEntityRegistration registration, EntityRequestContext context, JsonObject args)
+    private object BuildDeleteManyRequest(McpEntityRegistration registration, EntityRequestContext context, JObject args)
     {
         var requestType = typeof(EntityDeleteManyRequest<>).MakeGenericType(registration.KeyType);
         var request = Activator.CreateInstance(requestType)!;
@@ -187,7 +181,7 @@ public sealed class RequestTranslator
         return request;
     }
 
-    private static EntityDeleteByQueryRequest BuildDeleteByQueryRequest(EntityRequestContext context, JsonObject args)
+    private static EntityDeleteByQueryRequest BuildDeleteByQueryRequest(EntityRequestContext context, JObject args)
     {
         var query = ReadString(args, "query");
         if (string.IsNullOrWhiteSpace(query))
@@ -203,7 +197,7 @@ public sealed class RequestTranslator
         };
     }
 
-    private object BuildPatchRequest(McpEntityRegistration registration, EntityRequestContext context, JsonObject args)
+    private object BuildPatchRequest(McpEntityRegistration registration, EntityRequestContext context, JObject args)
     {
         var requestType = typeof(EntityPatchRequest<,>).MakeGenericType(registration.EntityType, registration.KeyType);
         var request = Activator.CreateInstance(requestType)!;
@@ -217,7 +211,7 @@ public sealed class RequestTranslator
         return request;
     }
 
-    private static EntityRequestContext BuildContext(EntityRequestContextBuilder builder, JsonObject args, CancellationToken cancellationToken)
+    private static EntityRequestContext BuildContext(EntityRequestContextBuilder builder, JObject args, CancellationToken cancellationToken)
     {
         var options = new QueryOptions();
 
@@ -242,77 +236,60 @@ public sealed class RequestTranslator
             options.Sort.Add(ParseSort(sort!));
         }
 
-        if (args.TryGetPropertyValue("extras", out var extrasNode) && extrasNode is JsonObject extrasObj)
+        if (args.TryGetValue("extras", StringComparison.OrdinalIgnoreCase, out var extrasNode) && extrasNode is JObject extrasObj)
         {
-            foreach (var kv in extrasObj)
+            foreach (var kv in extrasObj.Properties())
             {
-                if (kv.Value is JsonValue value && value.TryGetValue(out string? stringValue))
-                {
-                    options.Extras[kv.Key] = stringValue ?? string.Empty;
-                }
-                else if (kv.Value is not null)
-                {
-                    options.Extras[kv.Key] = kv.Value.ToJsonString();
-                }
+                var val = kv.Value;
+                if (val.Type == JTokenType.String)
+                    options.Extras[kv.Name] = val.Value<string>() ?? string.Empty;
+                else if (val.Type != JTokenType.Null)
+                    options.Extras[kv.Name] = val.ToString(Newtonsoft.Json.Formatting.None);
             }
         }
 
         return builder.Build(options, cancellationToken);
     }
 
-    private static JsonNode? TryGet(JsonObject args, string property)
+    private static JToken? TryGet(JObject args, string property)
     {
-        return args.TryGetPropertyValue(property, out var node) ? node : null;
+        return args.TryGetValue(property, StringComparison.OrdinalIgnoreCase, out var node) ? node : null;
     }
 
-    private static string? ReadString(JsonObject args, string property)
+    private static string? ReadString(JObject args, string property)
     {
-        return TryGet(args, property) is JsonValue value && value.TryGetValue(out string? result) ? result : null;
+        return TryGet(args, property)?.Type == JTokenType.String ? TryGet(args, property)!.Value<string>() : TryGet(args, property)?.ToString();
     }
 
-    private static bool? ReadBool(JsonObject args, string property)
+    private static bool? ReadBool(JObject args, string property)
     {
-        return TryGet(args, property) is JsonValue value && value.TryGetValue(out bool result) ? result : null;
-    }
-
-    private static int? ReadInt(JsonObject args, string property)
-    {
-        if (TryGet(args, property) is not JsonValue value)
-        {
-            return null;
-        }
-
-        if (value.TryGetValue(out int intValue))
-        {
-            return intValue;
-        }
-
-        if (value.TryGetValue(out string? stringValue) && int.TryParse(stringValue, out intValue))
-        {
-            return intValue;
-        }
-
+        if (TryGet(args, property) is JValue v && v.Type == JTokenType.Boolean) return v.Value<bool>();
+        if (TryGet(args, property) is JValue v2 && v2.Type == JTokenType.String && bool.TryParse(v2.Value<string>(), out var b)) return b;
         return null;
     }
 
-    private static IReadOnlyDictionary<string, string?> BuildQueryParameters(JsonObject args)
+    private static int? ReadInt(JObject args, string property)
     {
-        if (!args.TryGetPropertyValue("extras", out var extrasNode) || extrasNode is not JsonObject extras)
+        var token = TryGet(args, property);
+        if (token == null) return null;
+        if (token.Type == JTokenType.Integer) return token.Value<int>();
+        if (token.Type == JTokenType.String && int.TryParse(token.Value<string>(), out var i)) return i;
+        return null;
+    }
+
+    private static IReadOnlyDictionary<string, string?> BuildQueryParameters(JObject args)
+    {
+        if (!args.TryGetValue("extras", StringComparison.OrdinalIgnoreCase, out var extrasNode) || extrasNode is not JObject extras)
         {
             return new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
         }
 
         var dict = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
-        foreach (var kv in extras)
+        foreach (var prop in extras.Properties())
         {
-            if (kv.Value is JsonValue jsonValue && jsonValue.TryGetValue(out string? str))
-            {
-                dict[kv.Key] = str;
-            }
-            else if (kv.Value is not null)
-            {
-                dict[kv.Key] = kv.Value.ToJsonString();
-            }
+            var val = prop.Value;
+            if (val.Type == JTokenType.String) dict[prop.Name] = val.Value<string>();
+            else if (val.Type != JTokenType.Null) dict[prop.Name] = val.ToString(Newtonsoft.Json.Formatting.None);
         }
 
         return dict;
@@ -337,47 +314,54 @@ public sealed class RequestTranslator
         property?.SetValue(target, value);
     }
 
-    private static object ConvertValue(JsonNode node, Type targetType)
+    private static object ConvertValue(JToken node, Type targetType)
     {
-        if (targetType == typeof(string) && node is JsonValue strValue && strValue.TryGetValue(out string? strResult))
-        {
-            return strResult ?? string.Empty;
-        }
+        if (targetType == typeof(string)) return node.Type == JTokenType.String ? (node.Value<string>() ?? string.Empty) : node.ToString();
 
         if (targetType.IsEnum)
         {
-            var enumText = node is JsonValue enumValue && enumValue.TryGetValue(out string? enumString)
-                ? enumString
-                : node.ToJsonString().Trim('"');
-            return Enum.Parse(targetType, enumText, ignoreCase: true);
+            var enumText = node.Type == JTokenType.String ? node.Value<string>() : node.ToString();
+            if (string.IsNullOrWhiteSpace(enumText))
+                throw new JsonException($"Enum value missing for target type {targetType.Name}.");
+            try
+            {
+                return Enum.Parse(targetType, enumText, ignoreCase: true);
+            }
+            catch (Exception ex)
+            {
+                throw new JsonException($"Unable to parse enum value '{enumText}' for {targetType.Name}: {ex.Message}");
+            }
         }
 
         if (targetType == typeof(Guid))
         {
-            var text = node is JsonValue guidValue && guidValue.TryGetValue(out string? guidString) ? guidString : node.ToJsonString().Trim('"');
-            return Guid.Parse(text!);
+            var text = node.Type == JTokenType.String ? node.Value<string>() : node.ToString();
+            if (string.IsNullOrWhiteSpace(text))
+                throw new JsonException("Guid value missing or empty.");
+            if (!Guid.TryParse(text, out var g))
+                throw new JsonException($"Invalid Guid value '{text}'.");
+            return g;
         }
-
-        return node.Deserialize(targetType, SerializerOptions)
-               ?? throw new JsonException($"Unable to convert value to {targetType.Name}.");
+        try { return node.ToObject(targetType) ?? throw new JsonException($"Unable to convert value to {targetType.Name}."); }
+        catch (Exception ex) { throw new JsonException($"Unable to convert value to {targetType.Name}: {ex.Message}"); }
     }
 
-    private static object ConvertEntity(JsonNode node, Type entityType)
+    private static object ConvertEntity(JToken node, Type entityType)
     {
-        return node.Deserialize(entityType, SerializerOptions)
-               ?? throw new JsonException($"Unable to deserialize payload as {entityType.Name}.");
+        try { return node.ToObject(entityType) ?? throw new JsonException($"Unable to deserialize payload as {entityType.Name}."); }
+        catch (Exception ex) { throw new JsonException($"Unable to deserialize payload as {entityType.Name}: {ex.Message}"); }
     }
 
-    private static object ConvertEntityCollection(JsonNode node, Type entityType)
+    private static object ConvertEntityCollection(JToken node, Type entityType)
     {
         var listType = typeof(List<>).MakeGenericType(entityType);
-        return node.Deserialize(listType, SerializerOptions)
-               ?? throw new JsonException($"Unable to deserialize collection payload as {entityType.Name} list.");
+        try { return node.ToObject(listType) ?? throw new JsonException($"Unable to deserialize collection payload as {entityType.Name} list."); }
+        catch (Exception ex) { throw new JsonException($"Unable to deserialize collection payload as {entityType.Name} list: {ex.Message}"); }
     }
 
-    private static object ConvertKeyCollection(JsonNode node, Type keyType)
+    private static object ConvertKeyCollection(JToken node, Type keyType)
     {
-        if (node is not JsonArray array)
+        if (node is not JArray array)
         {
             throw new JsonException("Expected an array of identifiers.");
         }
@@ -397,9 +381,9 @@ public sealed class RequestTranslator
         return list;
     }
 
-    private static object ConvertPatchDocument(JsonNode node, Type entityType)
+    private static object ConvertPatchDocument(JToken node, Type entityType)
     {
-        var json = node.ToJsonString();
+        var json = node.ToString(Newtonsoft.Json.Formatting.None);
         var settings = new JsonSerializerSettings
         {
             ContractResolver = new CamelCasePropertyNamesContractResolver()

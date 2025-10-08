@@ -1,6 +1,6 @@
 using S16.PantryPal.Models;
 
-namespace S16.PantryPal.Data;
+namespace S16.PantryPal.SeedData;
 
 /// <summary>
 /// Seed data with 50+ recipes across cuisines (Italian, Mexican, Thai, American).

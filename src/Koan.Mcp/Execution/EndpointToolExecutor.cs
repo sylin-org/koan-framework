@@ -1,11 +1,12 @@
 using System;
-using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
 using Koan.Web.Endpoints;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using JsonException = System.Text.Json.JsonException;
+using Newtonsoft.Json.Linq;
+using Newtonsoft.Json;
+using JsonException = Newtonsoft.Json.JsonException;
 
 namespace Koan.Mcp.Execution;
 
@@ -31,11 +32,11 @@ public sealed class EndpointToolExecutor
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    public async Task<McpToolExecutionResult> ExecuteAsync(string toolName, JsonObject? arguments, CancellationToken cancellationToken)
+    public async Task<McpToolExecutionResult> ExecuteAsync(string toolName, JObject? arguments, CancellationToken cancellationToken)
     {
         if (!_registry.TryGetTool(toolName, out var registration, out var tool))
         {
-            return McpToolExecutionResult.Failure("tool_not_found", $"Tool '{toolName}' is not registered.");
+            return McpToolExecutionResult.Failure(CodeMode.Execution.CodeModeErrorCodes.ToolNotFound, $"Tool '{toolName}' is not registered.");
         }
 
         using var scope = _scopeFactory.CreateScope();
@@ -49,7 +50,7 @@ public sealed class EndpointToolExecutor
                 registration.EntityType.Name,
                 registration.KeyType.Name);
             return McpToolExecutionResult.Failure(
-                "service_unavailable",
+                CodeMode.Execution.CodeModeErrorCodes.ServiceUnavailable,
                 $"Entity endpoint service for '{registration.DisplayName}' is not available.");
         }
 
@@ -62,12 +63,12 @@ public sealed class EndpointToolExecutor
         catch (JsonException ex)
         {
             _logger.LogWarning(ex, "Invalid JSON payload for tool {Tool}.", toolName);
-            var diagnostics = new JsonObject
+            var diagnostics = new JObject
             {
                 ["tool"] = toolName,
                 ["reason"] = "invalid_payload"
             };
-            return McpToolExecutionResult.Failure("invalid_payload", ex.Message, diagnostics);
+            return McpToolExecutionResult.Failure(CodeMode.Execution.CodeModeErrorCodes.InvalidPayload, ex.Message, diagnostics);
         }
         catch (OperationCanceledException)
         {
@@ -76,12 +77,12 @@ public sealed class EndpointToolExecutor
         catch (Exception ex)
         {
             _logger.LogError(ex, "Unhandled error while executing MCP tool {Tool}.", toolName);
-            var diagnostics = new JsonObject
+            var diagnostics = new JObject
             {
                 ["tool"] = toolName,
                 ["reason"] = "execution_error"
             };
-            return McpToolExecutionResult.Failure("execution_error", ex.Message, diagnostics);
+            return McpToolExecutionResult.Failure(CodeMode.Execution.CodeModeErrorCodes.ExecutionError, ex.Message, diagnostics);
         }
     }
 

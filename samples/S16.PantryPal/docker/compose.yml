@@ -12,8 +12,7 @@ services:
       ASPNETCORE_URLS: "http://+:5016"
       Koan__Web__ExposeObservabilitySnapshot: "true"
       Koan__Data__Default: "mongodb"
-
-      # AI Configuration (Ollama for vision)
+      # AI Configuration (Ollama for vision) - retained in API layer
       Koan__Ai__AutoDiscoveryEnabled: "true"
       Koan__Ai__AllowDiscoveryInNonDev: "true"
       Koan_AI_OLLAMA_URLS: "http://host.docker.internal:11434"
@@ -22,15 +21,6 @@ services:
       Koan__Ai__Services__Ollama__0__DefaultModel: "llava"
       Koan__Ai__Services__Ollama__0__Enabled: "false"  # Use auto-discovery
       Koan__Ai__Ollama__RequiredModels__0: "llava"  # Vision model
-
-      # MCP Configuration
-      Koan__Mcp__EnableStdioTransport: "false"
-      Koan__Mcp__EnableHttpSseTransport: "true"
-      Koan__Mcp__HttpSseRoute: "/mcp"
-      Koan__Mcp__RequireAuthentication: "false"
-      Koan__Mcp__Exposure: "full"
-      Koan__Mcp__CodeMode__Enabled: "true"
-      Koan__Mcp__CodeMode__PublishSdkEndpoint: "true"
 
     volumes:
       - ../.Koan/Data:/app/data
@@ -41,6 +31,29 @@ services:
         condition: service_healthy
       ollama:
         condition: service_started
+
+  mcp:
+    build:
+      context: ../../..
+      dockerfile: samples/S16.PantryPal.McpHost/Dockerfile
+    image: koan-s16-pantrypal-mcp:dev
+    ports:
+      - "5026:5026"
+    environment:
+      ASPNETCORE_ENVIRONMENT: "Development"
+      ASPNETCORE_URLS: "http://+:5026"
+      # MCP-specific configuration
+      Koan__Mcp__EnableStdioTransport: "false"
+      Koan__Mcp__EnableHttpSseTransport: "true"
+      Koan__Mcp__HttpSseRoute: "/mcp"
+      Koan__Mcp__RequireAuthentication: "false"
+      Koan__Mcp__Exposure: "full"
+      Koan__Mcp__CodeMode__Enabled: "true"
+      Koan__Mcp__CodeMode__PublishSdkEndpoint: "true"
+    depends_on:
+      api:
+        condition: service_started
+
 
   mongo:
     image: mongo:latest

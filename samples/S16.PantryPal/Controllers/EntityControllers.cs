@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using S16.PantryPal.Models;
 using Koan.Web.Controllers;
+using Koan.Web.Attributes;
 
 namespace S16.PantryPal.Controllers;
 
@@ -10,6 +11,7 @@ public class RecipeController : EntityController<Recipe, string> { }
 
 [ApiController]
 [Route("api/data/pantry")]
+ [Pagination(Mode = PaginationMode.On, DefaultSize = 25, MaxSize = 200, IncludeCount = true, DefaultSort = "-ExpiresAt,Name")]
 public class PantryItemController : EntityController<PantryItem, string> { }
 
 [ApiController]

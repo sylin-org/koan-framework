@@ -10,24 +10,97 @@ PantryPal demonstrates how AI naturally enhances applications when solving probl
 
 ## Quick Start
 
+dotnet run --project samples/S16.PantryPal
 ```bash
-# From repository root
+# From repository root (development direct run of API only)
 dotnet run --project samples/S16.PantryPal
 
-# Or use the start script
+# Recommended: run full split stack (API + dedicated MCP host + Mongo + optional Ollama)
 ./samples/S16.PantryPal/start.bat
 ```
 
-The app starts with:
+The stack (split architecture) starts with:
+- API service on port 5016 (REST + vision controllers)
+- MCP host service on port 5026 (MCP HTTP/SSE + Code Mode + SDK definitions)
+- Mongo (primary data store) and optional Ollama (vision model auto-discovery)
 - 50+ seeded recipes (Italian, Mexican, Thai, American)
-- Sample pantry items
-- Demo user profile
-- Mock vision service (no AI setup required)
+- Sample pantry items & demo user profile
+- Mock vision service (no AI model pull required by default)
 
-Access:
-- **API**: http://localhost:5000
-- **MCP SDK**: http://localhost:5000/mcp/sdk/definitions
-- **Swagger**: http://localhost:5000/swagger
+Access / Endpoints:
+- **API (Swagger)**: http://localhost:5016/swagger
+- **MCP SDK (.d.ts)**: http://localhost:5026/mcp/sdk/definitions
+- **MCP SSE Base**: http://localhost:5026/mcp
+- **API Health**: http://localhost:5016/healthz (if exposed)
+- **MCP Health**: http://localhost:5026/healthz
+
+### Architecture Note (Embedded vs Split)
+
+Historically this sample co-hosted MCP and REST in one process. It now demonstrates production-aligned separation:
+
+| Concern | Split Benefit |
+|---------|---------------|
+| Resource Isolation | Code Mode CPU/memory spikes do not degrade REST latency |
+| Scaling | Independent horizontal scaling & autoscaling policies |
+| Security Blast Radius | Script sandbox faults cannot crash API process |
+| Deployment Cadence | Upgrade MCP runtime without redeploying controllers |
+| Observability | Clear service-level metrics & logs |
+| Quota Tuning | Different CPU ms / memory ceilings per service |
+
+For minimal demos you can still run only the API project (MCP disabled). For teaching best practices we keep the split default.
+
+### Code Mode: Fetch SDK & Execute Script
+
+Fetch generated TypeScript definition (includes integrity footer):
+
+```bash
+curl -s http://localhost:5026/mcp/sdk/definitions > koan-sdk.d.ts
+tail -n 3 koan-sdk.d.ts  # shows integrity-sha256 footer
+```
+
+List tools (Stream JSON-RPC over HTTP SSE negotiated internally – simplified example using POST tools/list):
+
+```bash
+curl -s -X POST http://localhost:5026/mcp/rpc \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":"1","method":"tools/list"}' | jq
+```
+
+Execute a Code Mode script that returns top 3 recipe names:
+
+```bash
+cat <<'EOF' > script.js
+const recipes = SDK.Entities.Recipe.collection({ pageSize: 3 });
+SDK.Out.answer(JSON.stringify(recipes.items.map(r => r.name)));
+EOF
+
+curl -s -X POST http://localhost:5026/mcp/rpc \
+  -H "Content-Type: application/json" \
+  -d @<(echo '{"jsonrpc":"2.0","id":"2","method":"tools/call","params":{"name":"koan.code.execute","arguments":{"code":'"'$(jq -Rs . < script.js)'"'}}}') | jq
+```
+
+Expected response fragment:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": "2",
+  "result": {
+    "content": [ { "type": "text", "text": "[\"Classic Spaghetti Carbonara\", ...]" } ]
+  }
+}
+```
+
+### Development Summary
+
+| Scenario | Command |
+|----------|---------|
+| Run split stack | `./samples/S16.PantryPal/start.bat` |
+| Only API (quick iterate) | `dotnet run --project samples/S16.PantryPal` |
+| Rebuild MCP host | `dotnet run --project samples/S16.PantryPal.McpHost` |
+| Fetch SDK (watch diff) | `curl -s http://localhost:5026/mcp/sdk/definitions > sdk.d.ts` |
+| Run unit tests (services + ingestion) | `dotnet test tests/S16.PantryPal.Tests/S16.PantryPal.Tests.csproj` |
+
+> Integrity footer enables detecting generation drift & tampering; hash covers the content segment prior to the footer line.
 
 ## Core Features
 
@@ -179,6 +252,9 @@ SDK.Out.answer(JSON.stringify({
 
 **Code Mode**: 1 roundtrip with full logic
 
+### 5. Semantic Search (Planned)
+`POST /api/pantry-semantic/query` currently returns 501 (placeholder). Future work: vector / embedding powered natural language intent → structured filter translation. See `TECHNICAL.md` for roadmap.
+
 ## Entity Model
 
 ```csharp
@@ -199,22 +275,31 @@ All entities support:
 
 ## API Endpoints
 
-### Pantry Management
-- `POST /api/pantry/upload` - Upload photo for vision processing
-- `POST /api/pantry/confirm/{photoId}` - Confirm detections, add to pantry
-- `GET /api/pantry/search` - Search by name, category, expiring soon
-- `GET /api/pantry/stats` - Pantry statistics and insights
+### Pantry Management (Domain Endpoints)
+- `POST /api/pantry-ingestion/upload` - Upload photo for vision processing
+- `POST /api/pantry-ingestion/confirm/{photoId}` - Confirm detections, add to pantry
+- `GET /api/pantry-insights/stats` - Pantry statistics and insights
+
+Generic entity querying (filter/paging) now replaces the former custom search:
+- `GET /api/data/pantry?filter={"Status":"available"}`
+- `GET /api/data/pantry?filter={"Category":"produce","Status":"available"}&page=1&pageSize=25`
+- `GET /api/data/pantry?filter={"ExpiresAt":{"$lte":"2025-10-15T00:00:00Z"}}`
+Use `sort=-ExpiresAt,Name` for compound ordering and `all=true` (when policy Optional) to bypass paging.
 
 ### Meal Planning
 - `POST /api/meals/suggest` - Get recipe suggestions
 - `POST /api/meals/plan` - Create multi-day meal plan
 - `POST /api/meals/shopping/{planId}` - Generate shopping list
 
-### Entity CRUD
-- `GET /api/data/recipes` - List all recipes
-- `GET /api/data/recipes/{id}` - Get recipe by ID
-- `POST /api/data/recipes` - Create/update recipe
-- Similar for: `/pantry`, `/mealplans`, `/shopping`, `/profiles`
+### Entity CRUD (Provided by EntityController)
+- `GET /api/data/recipes` / `{id}` / POST / bulk / patch
+- Same pattern for: `pantry`, `mealplans`, `shopping`, `profiles`, `photos`, `visionsettings`
+Supports:
+- Pagination: `page`, `pageSize`, `all=true`
+- Filtering: `filter={...}` or free-text `q=` (provider-dependent)
+- Sorting: `sort=Field,-OtherField`
+- Relationship expansion: `with=relatedEntity`
+- Shape/view selection: `output=dict` `view=compact`
 
 ## MCP Code Mode Scripts
 
@@ -363,6 +448,18 @@ private bool TryParseCustomFormat(string input, out ParsedItemData result)
 
 **Self-Reporting**: Bootstrap reports show provider elections and capabilities
 
+See `TECHNICAL.md` for deeper layering and extension guidance.
+
+## Testing
+
+Focused unit tests cover service orchestration logic and ingestion flow (direct controller invocation with fakes).
+
+```bash
+dotnet test tests/S16.PantryPal.Tests/S16.PantryPal.Tests.csproj -c Debug
+```
+
+Add integration tests later for full HTTP + persistence provider scenarios.
+
 ## Related Samples
 
 - **S12.MedTrials**: Traditional MCP entity tools
@@ -398,11 +495,41 @@ private bool TryParseCustomFormat(string input, out ParsedItemData result)
 ### Documentation
 - "Behind the scenes" docs are provided both as in-code (g1c1-style) comments and as comprehensive in-folder documentation for developers.
 
+
 ### Testing & Roadmap
 - Advanced/integration tests are targeted for v1.1.
 - Production goal: pilot/fully functional prototype, mobile-first for photos, no regulatory compliance required.
 
 For architectural rationale and more, see `/docs/decisions/SAMPLE-0016-kitchenmind-mcp-ai-showcase.md`.
+
+## Agentic AI + Code-Mode MCP Integration: Findings & Proposals (2025-10-07)
+
+### Findings
+- The value of S16 is maximized when the AI pipeline can reason over, discover, and orchestrate workflows using a code-enabled MCP service.
+- Current Koan.Mcp exposes entities and tools as discrete operations, but does not yet provide a TypeScript/JS code-mode surface for agentic AI.
+- The code-mode pattern (see Cloudflare, OpenAI, Anthropic) enables the agent to compose multi-step workflows in a single script, reducing roundtrips and improving reliability.
+- Koan.Mcp’s zero-config, entity-first design is a strong foundation for this, but needs a code-mode execution endpoint, SDK surface, and capability registry.
+
+### Proposals
+1. **Enhance Koan.Mcp with Code-Mode Support:**
+  - Add an `executeCode` endpoint that runs agent-authored TS/JS code in a secure sandbox, with access to a minimal, typed SDK (Entities, Out, etc.).
+  - Auto-generate the SDK surface from registered entities/tools, and expose it as a `.d.ts` for agent prompt context.
+  - Expose a machine-readable capability registry for agentic discovery.
+  - Enforce quotas, audit, and validate all code runs for safety and observability.
+
+2. **Integrate S16 with Code-Mode MCP:**
+  - Register all S16 entities and workflows as MCP tools.
+  - The AI pipeline queries the MCP registry, receives the SDK, and crafts code-mode scripts to fulfill user intents (e.g., meal planning, pantry updates).
+  - Demo multi-step workflows as single code-mode scripts, showing agentic reasoning and orchestration.
+
+3. **DX & Documentation:**
+  - Document the code-mode surface, SDK types, and example scripts in S16 and Koan.Mcp docs.
+  - Provide developer samples and golden scenarios for testing and validation.
+
+### Opportunities for Koan.Mcp
+- Become a reference implementation for agentic, code-enabled orchestration in modern AI systems.
+- Maintain Koan’s “just works” DX: zero-config, strong defaults, and extensibility.
+- Lead in security, observability, and developer experience for code-mode MCP.
 
 ## License
 

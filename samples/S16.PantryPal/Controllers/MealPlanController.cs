@@ -1,6 +1,8 @@
 using Koan.Data.Core;
 using Microsoft.AspNetCore.Mvc;
 using S16.PantryPal.Models;
+using S16.PantryPal.Services;
+using S16.PantryPal.Contracts;
 
 namespace S16.PantryPal.Controllers;
 
@@ -10,172 +12,33 @@ namespace S16.PantryPal.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/meals")]
-public class MealsController : ControllerBase
+public class MealsController(IMealPlanningService service) : ControllerBase
 {
-    /// <summary>
-    /// Suggest recipes based on available pantry items and preferences.
-    /// </summary>
     [HttpPost("suggest")]
-    public async Task<IActionResult> SuggestRecipes(
-        [FromBody] SuggestRecipesRequest request,
-        CancellationToken ct = default)
+    public async Task<IActionResult> SuggestRecipes([FromBody] SuggestRecipesRequest request, CancellationToken ct = default)
     {
-        var pantryItems = await PantryItem.All();
-        var availableItems = pantryItems
-            .Where(i => i.Status == "available")
-            .ToList();
-
-        var recipes = await Recipe.All();
-
-        // Filter by dietary restrictions
-        if (request.DietaryRestrictions?.Length > 0)
-        {
-            recipes = recipes.Where(r =>
-                request.DietaryRestrictions.All(restriction =>
-                    r.DietaryTags.Contains(restriction, StringComparer.OrdinalIgnoreCase)));
-        }
-
-        // Filter by cooking time
-        if (request.MaxCookingMinutes.HasValue)
-        {
-            recipes = recipes.Where(r => r.TotalTimeMinutes <= request.MaxCookingMinutes.Value).ToList();
-        }
-
-        // Score recipes by ingredient availability
-        var scoredRecipes = recipes.Select(recipe =>
-        {
-            var requiredIngredients = recipe.Ingredients.Length;
-            var availableIngredients = recipe.Ingredients.Count(ingredient =>
-                availableItems.Any(item =>
-                    item.Name.Contains(ingredient.Name, StringComparison.OrdinalIgnoreCase) ||
-                    ingredient.Name.Contains(item.Name, StringComparison.OrdinalIgnoreCase)));
-
-            var availabilityScore = requiredIngredients > 0
-                ? (float)availableIngredients / requiredIngredients
-                : 0f;
-
-            var ratingScore = recipe.AverageRating / 5f;
-            var popularityScore = Math.Min(recipe.TimesCooked / 100f, 1f);
-
-            var totalScore = (availabilityScore * 0.6f) + (ratingScore * 0.3f) + (popularityScore * 0.1f);
-
-            return new
-            {
-                recipe,
-                score = totalScore,
-                availabilityScore,
-                missingIngredients = recipe.Ingredients
-                    .Where(ingredient => !availableItems.Any(item =>
-                        item.Name.Contains(ingredient.Name, StringComparison.OrdinalIgnoreCase) ||
-                        ingredient.Name.Contains(item.Name, StringComparison.OrdinalIgnoreCase)))
-                    .Select(i => i.Name)
-                    .ToArray()
-            };
-        })
-        .OrderByDescending(r => r.score)
-        .Take(request.Limit ?? 20)
-        .ToList();
-
-        return Ok(scoredRecipes);
+        var scored = await service.SuggestRecipesAsync(request, ct);
+        return Ok(scored);
     }
 
-    /// <summary>
-    /// Create meal plan for specified date range.
-    /// </summary>
     [HttpPost("plan")]
-    public async Task<IActionResult> CreateMealPlan(
-        [FromBody] CreateMealPlanRequest request,
-        CancellationToken ct = default)
+    public async Task<IActionResult> CreateMealPlan([FromBody] CreateMealPlanRequest request, CancellationToken ct = default)
     {
-        var plan = new MealPlan
-        {
-            UserId = request.UserId,
-            StartDate = request.StartDate,
-            EndDate = request.EndDate,
-            PlannedMeals = request.Meals
-        };
-
-        await plan.Save();
-
+        var plan = await service.CreateMealPlanAsync(request, ct);
         return Ok(new { planId = plan.Id, plan });
     }
 
-    /// <summary>
-    /// Generate shopping list from meal plan.
-    /// </summary>
     [HttpPost("shopping/{planId}")]
-    public async Task<IActionResult> GenerateShoppingList(
-        string planId,
-        CancellationToken ct = default)
+    public async Task<IActionResult> GenerateShoppingList(string planId, CancellationToken ct = default)
     {
-        var plan = await MealPlan.Get(planId);
-        if (plan == null)
-            return NotFound(new { error = "Meal plan not found" });
-
-        var pantryItems = (await PantryItem.All()).Where(i => i.Status == "available").ToList();
-        var neededItems = new List<ShoppingItem>();
-
-        foreach (var meal in plan.PlannedMeals)
+        try
         {
-            var recipe = await Recipe.Get(meal.RecipeId);
-            if (recipe == null)
-                continue;
-
-            foreach (var ingredient in recipe.Ingredients)
-            {
-                // Check if we have this ingredient in pantry
-                var available = pantryItems.FirstOrDefault(p =>
-                    p.Name.Contains(ingredient.Name, StringComparison.OrdinalIgnoreCase) ||
-                    ingredient.Name.Contains(p.Name, StringComparison.OrdinalIgnoreCase));
-
-                if (available == null || available.Quantity < ingredient.Amount)
-                {
-                    var needed = neededItems.FirstOrDefault(n => n.Name == ingredient.Name);
-                    if (needed != null)
-                    {
-                        needed.Quantity += ingredient.Amount - (available?.Quantity ?? 0);
-                    }
-                    else
-                    {
-                        neededItems.Add(new ShoppingItem
-                        {
-                            Name = ingredient.Name,
-                            Quantity = ingredient.Amount - (available?.Quantity ?? 0),
-                            Unit = ingredient.Unit,
-                            Category = available?.Category ?? "uncategorized",
-                            IsPurchased = false
-                        });
-                    }
-                }
-            }
+            var result = await service.GenerateShoppingListAsync(planId, ct);
+            return Ok(new { listId = result.List.Id, items = result.Items });
         }
-
-        var shoppingList = new ShoppingList
+        catch (InvalidOperationException ex)
         {
-            Name = $"Shopping for {plan.StartDate:MMM dd} - {plan.EndDate:MMM dd}",
-            MealPlanId = planId,
-            Items = neededItems.ToArray(),
-            Status = "active"
-        };
-
-        await Data<ShoppingList>.Upsert(shoppingList);
-
-        return Ok(new { listId = shoppingList.Id, items = neededItems });
+            return NotFound(new { error = ex.Message });
+        }
     }
-}
-
-public class SuggestRecipesRequest
-{
-    public string? UserId { get; set; }
-    public string[]? DietaryRestrictions { get; set; }
-    public int? MaxCookingMinutes { get; set; }
-    public int? Limit { get; set; } = 20;
-}
-
-public class CreateMealPlanRequest
-{
-    public string? UserId { get; set; }
-    public DateTime StartDate { get; set; }
-    public DateTime EndDate { get; set; }
-    public PlannedMeal[] Meals { get; set; } = Array.Empty<PlannedMeal>();
 }

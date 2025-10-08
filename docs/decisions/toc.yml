@@ -50,6 +50,8 @@
       href: ARCH-0052-core-ids-and-json-merge-policy.md
     - name: ARCH-0053 Flow pillar – entity-first and auto-registrar
       href: ARCH-0053-Koan-flow-pillar-entity-first-and-auto-registrar.md
+    - name: S16-0001 PantryPal entity-first refactor
+      href: S16-0001-pantrypal-entity-first-refactor.md
     - name: ARCH-0054 Framework positioning – container native
       href: ARCH-0054-framework-positioning-container-native.md
     - name: ARCH-0055 Koan Aspire integration approval
@@ -60,6 +62,8 @@
       href: ARCH-0059-koan-cache-module.md
     - name: ARCH-0060 Cache control surface helpers
       href: ARCH-0060-cache-control-surface.md
+    - name: ARCH-0061 JSON layer unification on Newtonsoft
+      href: ARCH-0061-json-layer-unification-newtonsoft-over-stj.md
 - name: Data (DATA)
   items:
     - name: DATA-0002 Query capabilities flag

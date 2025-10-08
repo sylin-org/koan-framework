@@ -1,11 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text.Json.Nodes;
+using Newtonsoft.Json.Linq;
 using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using Koan.Mcp.CodeMode.Execution;
+using Koan.Mcp.CodeExecution;
 using Koan.Mcp.CodeMode.Sdk;
 using Koan.Mcp.Execution;
 using Koan.Mcp.Options;
@@ -23,7 +24,7 @@ public sealed class McpRpcHandler
     private readonly ILogger<McpRpcHandler> _logger;
     private readonly IServiceProvider _services;
     private readonly IOptions<McpServerOptions> _serverOptions;
-    private readonly ICodeExecutor? _codeExecutor;
+    private readonly Koan.Mcp.CodeExecution.ICodeExecutor? _codeExecutor;
 
     public McpRpcHandler(
         McpEntityRegistry registry,
@@ -39,7 +40,7 @@ public sealed class McpRpcHandler
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
         // Code executor is optional - may not be available if code mode is disabled
-        _codeExecutor = services.GetService<ICodeExecutor>();
+    _codeExecutor = services.GetService<Koan.Mcp.CodeExecution.ICodeExecutor>();
     }
 
     [JsonRpcMethod("tools/list")]
@@ -53,6 +54,9 @@ public sealed class McpRpcHandler
         {
             var codeModeTool = CreateCodeExecutionTool();
             toolsList.Add(codeModeTool);
+            // Syntax validation tool (lightweight) – does not execute code, only parses
+            var validateTool = CreateCodeValidationTool();
+            toolsList.Add(validateTool);
         }
 
         // Add entity tools if enabled
@@ -88,6 +92,11 @@ public sealed class McpRpcHandler
         {
             return await ExecuteCodeAsync(parameters.Arguments, cancellationToken).ConfigureAwait(false);
         }
+        // Handle code validation tool
+        if (parameters.Name == "koan.code.validate")
+        {
+            return ExecuteCodeValidation(parameters.Arguments);
+        }
 
         // Handle traditional entity tools
         var result = await _executor.ExecuteAsync(parameters.Name, parameters.Arguments, cancellationToken).ConfigureAwait(false);
@@ -120,35 +129,53 @@ public sealed class McpRpcHandler
             }
         }
 
-        // Default: Auto mode (falls back to Full for safety)
-        // In production, could detect client capabilities from initialize handshake
-        return McpExposureMode.Auto;
+        // Default: Auto mode. For now we TREAT Auto as Full until client capability
+        // detection is implemented (handshake inspection). This ensures legacy MCP
+        // clients still see both code + entity tools instead of an empty set.
+        // TODO(S16): Implement handshake capability detection and choose Code or Tools
+        // dynamically; then return McpExposureMode.Auto here and handle mapping in caller.
+        return McpExposureMode.Full;
     }
 
     private ToolDescriptor CreateCodeExecutionTool()
     {
-        var inputSchema = new JsonObject
+        var inputSchema = new JObject
         {
             ["type"] = "object",
-            ["properties"] = new JsonObject
+            ["properties"] = new JObject
             {
-                ["code"] = new JsonObject
+                ["code"] = new JObject
                 {
                     ["type"] = "string",
                     ["description"] = "JavaScript code to execute. Has access to SDK.Entities.* and SDK.Out.* namespaces."
                 },
-                ["language"] = new JsonObject
+                ["language"] = new JObject
                 {
                     ["type"] = "string",
-                    ["enum"] = new JsonArray { "javascript" },
+                    ["enum"] = new JArray { "javascript" },
                     ["description"] = "Language of the code (currently only 'javascript' is supported).",
                     ["default"] = "javascript"
+                },
+                ["entryFunction"] = new JObject
+                {
+                    ["type"] = "string",
+                    ["description"] = "Optional entry function to invoke after evaluating code (defaults to run())."
+                },
+                ["set"] = new JObject
+                {
+                    ["type"] = "string",
+                    ["description"] = "Optional entity projection set for default operations."
+                },
+                ["correlationId"] = new JObject
+                {
+                    ["type"] = "string",
+                    ["description"] = "Optional correlation identifier used for tracing/auditing."
                 }
             },
-            ["required"] = new JsonArray { "code" }
+            ["required"] = new JArray { "code" }
         };
 
-        var metadata = new JsonObject
+        var metadata = new JObject
         {
             ["codeMode"] = true,
             ["runtime"] = "Jint",
@@ -164,7 +191,78 @@ public sealed class McpRpcHandler
         };
     }
 
-    private async Task<ToolsCallResult> ExecuteCodeAsync(JsonObject? arguments, CancellationToken cancellationToken)
+    private ToolDescriptor CreateCodeValidationTool()
+    {
+        var inputSchema = new JObject
+        {
+            ["type"] = "object",
+            ["properties"] = new JObject
+            {
+                ["code"] = new JObject
+                {
+                    ["type"] = "string",
+                    ["description"] = "JavaScript source to validate for basic syntax issues. No execution occurs."
+                },
+                ["language"] = new JObject
+                {
+                    ["type"] = "string",
+                    ["enum"] = new JArray { "javascript" },
+                    ["default"] = "javascript"
+                }
+            },
+            ["required"] = new JArray { "code" }
+        };
+        var metadata = new JObject
+        {
+            ["codeMode"] = true,
+            ["validation"] = true,
+            ["runtime"] = "Jint"
+        };
+        return new ToolDescriptor
+        {
+            Name = "koan.code.validate",
+            Description = "Validate JavaScript code for syntax errors before execution.",
+            InputSchema = inputSchema,
+            Metadata = metadata
+        };
+    }
+
+    private ToolsCallResult ExecuteCodeValidation(JObject? arguments)
+    {
+        if (_codeExecutor is not JintCodeExecutor jint)
+        {
+            return new ToolsCallResult
+            {
+                Success = false,
+                ErrorCode = CodeMode.Execution.CodeModeErrorCodes.ExecutionError,
+                ErrorMessage = "Validation unavailable: code executor not present"
+            };
+        }
+        if (arguments == null || !arguments.TryGetValue("code", StringComparison.OrdinalIgnoreCase, out var codeNode))
+        {
+            return new ToolsCallResult
+            {
+                Success = true,
+                Result = new JObject { ["valid"] = false, ["error"] = "Missing required 'code' parameter" }
+            };
+        }
+        var code = codeNode?.Value<string>() ?? string.Empty;
+        if (jint.ValidateSyntax(code, out var error))
+        {
+            return new ToolsCallResult
+            {
+                Success = true,
+                Result = new JObject { ["valid"] = true }
+            };
+        }
+        return new ToolsCallResult
+        {
+            Success = true,
+            Result = new JObject { ["valid"] = false, ["error"] = error ?? "Unknown validation error" }
+        };
+    }
+
+    private async Task<ToolsCallResult> ExecuteCodeAsync(JObject? arguments, CancellationToken cancellationToken)
     {
         if (_codeExecutor == null)
         {
@@ -177,7 +275,7 @@ public sealed class McpRpcHandler
         }
 
         // Extract code from arguments
-        if (arguments == null || !arguments.TryGetPropertyValue("code", out var codeNode))
+        if (arguments == null || !arguments.TryGetValue("code", StringComparison.OrdinalIgnoreCase, out var codeNode))
         {
             return new ToolsCallResult
             {
@@ -186,8 +284,7 @@ public sealed class McpRpcHandler
                 ErrorMessage = "Missing required 'code' parameter"
             };
         }
-
-        var code = codeNode?.GetValue<string>();
+        var code = codeNode?.Value<string>();
         if (string.IsNullOrWhiteSpace(code))
         {
             return new ToolsCallResult
@@ -204,33 +301,28 @@ public sealed class McpRpcHandler
             using var scope = _services.CreateScope();
             var bindings = scope.ServiceProvider.GetRequiredService<KoanSdkBindings>();
 
-            // Execute code
-            var result = await _codeExecutor.ExecuteAsync(code, bindings, cancellationToken).ConfigureAwait(false);
+            // Build execution request from arguments
+            var request = BuildExecutionRequest(arguments!, code);
+
+            // Execute code via unified executor (bindings are created internally in implementation; we keep existing for side-effects if needed in future)
+            var result = await _codeExecutor.ExecuteAsync(request, cancellationToken).ConfigureAwait(false);
 
             if (result.Success)
             {
-                // Convert execution result to MCP tool result
-                var resultPayload = new JsonObject
+                var resultPayload = new JObject
                 {
-                    ["output"] = result.Output,
-                    ["metrics"] = new JsonObject
+                    ["text"] = result.TextResponse,
+                    ["logs"] = new JArray(result.Logs.Select(l => JValue.CreateString(l)) ),
+                    ["diagnostics"] = new JObject
                     {
-                        ["executionMs"] = result.Metrics.ExecutionMs,
-                        ["memoryMb"] = result.Metrics.MemoryMb,
-                        ["entityCalls"] = result.Metrics.EntityCalls
+                        ["sdkCalls"] = result.Diagnostics.SdkCalls,
+                        ["cpuMs"] = result.Diagnostics.CpuMs,
+                        ["memoryBytes"] = result.Diagnostics.MemoryBytes,
+                        ["scriptLength"] = result.Diagnostics.ScriptLength,
+                        ["startedUtc"] = result.Diagnostics.StartedUtc,
+                        ["completedUtc"] = result.Diagnostics.CompletedUtc
                     }
                 };
-
-                // Add logs if any
-                if (result.Logs.Count > 0)
-                {
-                    resultPayload["logs"] = new JsonArray(
-                        result.Logs.Select(log => (JsonNode)new JsonObject
-                        {
-                            ["level"] = log.Level,
-                            ["message"] = log.Message
-                        }).ToArray());
-                }
 
                 return new ToolsCallResult
                 {
@@ -240,19 +332,20 @@ public sealed class McpRpcHandler
             }
             else
             {
-                // Execution failed
-                var diagnostics = new JsonObject
+                var diagnostics = new JObject
                 {
-                    ["errorCode"] = result.ErrorCode,
-                    ["line"] = result.ErrorLine,
-                    ["column"] = result.ErrorColumn
+                    ["errorCode"] = result.Error?.Type,
+                    ["message"] = result.Error?.Message,
+                    ["sdkCalls"] = result.Diagnostics.SdkCalls,
+                    ["cpuMs"] = result.Diagnostics.CpuMs,
+                    ["scriptLength"] = result.Diagnostics.ScriptLength
                 };
 
                 return new ToolsCallResult
                 {
                     Success = false,
-                    ErrorCode = result.ErrorCode ?? "execution_failed",
-                    ErrorMessage = result.ErrorMessage ?? "Code execution failed",
+                    ErrorCode = result.Error?.Type ?? "execution_failed",
+                    ErrorMessage = result.Error?.Message ?? "Code execution failed",
                     Diagnostics = diagnostics
                 };
             }
@@ -270,13 +363,27 @@ public sealed class McpRpcHandler
         }
     }
 
+    private static CodeExecutionRequest BuildExecutionRequest(JObject arguments, string code)
+    {
+        string? TryGetString(string name)
+            => arguments.TryGetValue(name, StringComparison.OrdinalIgnoreCase, out var node) ? node?.Value<string>() : null;
+
+        return new CodeExecutionRequest(
+            Source: code,
+            Language: TryGetString("language"),
+            EntryFunction: TryGetString("entryFunction"),
+            UserId: null,
+            Set: TryGetString("set"),
+            CorrelationId: TryGetString("correlationId"));
+    }
+
     public sealed class ToolsCallParams
     {
         [JsonPropertyName("name")]
         public required string Name { get; init; }
 
         [JsonPropertyName("arguments")]
-        public JsonObject? Arguments { get; init; }
+    public JObject? Arguments { get; init; }
     }
 
     public sealed class ToolsListResponse
@@ -297,27 +404,27 @@ public sealed class McpRpcHandler
         public string? Description { get; init; }
 
         [JsonPropertyName("input_schema")]
-        public required JsonObject InputSchema { get; init; }
+    public required JObject InputSchema { get; init; }
 
         [JsonPropertyName("metadata")]
-        public required JsonObject Metadata { get; init; }
+    public required JObject Metadata { get; init; }
 
         public static ToolDescriptor From(McpEntityRegistration registration, McpToolDefinition tool)
         {
-            var metadata = new JsonObject
+            var metadata = new JObject
             {
                 ["entity"] = registration.DisplayName,
                 ["operation"] = tool.Operation.ToString(),
                 ["returnsCollection"] = tool.ReturnsCollection,
                 ["isMutation"] = tool.IsMutation,
-                ["requiredScopes"] = new JsonArray(tool.RequiredScopes.Select(scope => (JsonNode)scope).ToArray())
+                ["requiredScopes"] = new JArray(tool.RequiredScopes.Select(scope => JValue.CreateString(scope)))
             };
 
             return new ToolDescriptor
             {
                 Name = tool.Name,
                 Description = tool.Description,
-                InputSchema = (JsonObject)tool.InputSchema.DeepClone(),
+                InputSchema = tool.InputSchema,
                 Metadata = metadata
             };
         }
@@ -325,28 +432,13 @@ public sealed class McpRpcHandler
 
     public sealed class ToolsCallResult
     {
-        [JsonPropertyName("success")]
         public bool Success { get; init; }
-
-        [JsonPropertyName("result")]
-        public JsonNode? Result { get; init; }
-
-        [JsonPropertyName("short_circuit")]
-        public JsonNode? ShortCircuit { get; init; }
-
-        [JsonPropertyName("headers")]
-        public JsonObject Headers { get; init; } = new();
-
-        [JsonPropertyName("warnings")]
-        public JsonArray Warnings { get; init; } = new();
-
-        [JsonPropertyName("diagnostics")]
-        public JsonObject Diagnostics { get; init; } = new();
-
-        [JsonPropertyName("error_code")]
+        public JToken? Result { get; init; }
+        public JToken? ShortCircuit { get; init; }
+        public JObject Headers { get; init; } = new();
+        public JArray Warnings { get; init; } = new();
+        public JObject Diagnostics { get; init; } = new();
         public string? ErrorCode { get; init; }
-
-        [JsonPropertyName("error_message")]
         public string? ErrorMessage { get; init; }
 
         public static ToolsCallResult FromExecution(string toolName, McpToolExecutionResult execution)
@@ -363,10 +455,9 @@ public sealed class McpRpcHandler
                     Diagnostics = execution.Diagnostics
                 };
             }
-
-            var diagnostics = execution.Diagnostics.DeepClone().AsObject();
+            var diagnostics = (execution.Diagnostics.DeepClone() as JObject) ?? new JObject();
             diagnostics["tool"] = toolName;
-            diagnostics["error"] = execution.ErrorCode ?? "execution_error";
+            diagnostics["error"] = execution.ErrorCode ?? CodeMode.Execution.CodeModeErrorCodes.ExecutionError;
 
             return new ToolsCallResult
             {
@@ -374,14 +465,14 @@ public sealed class McpRpcHandler
                 Headers = ToJsonObject(execution.Headers),
                 Warnings = ToJsonArray(execution.Warnings),
                 Diagnostics = diagnostics,
-                ErrorCode = execution.ErrorCode ?? "execution_error",
+                ErrorCode = execution.ErrorCode ?? CodeMode.Execution.CodeModeErrorCodes.ExecutionError,
                 ErrorMessage = execution.ErrorMessage
             };
         }
 
-        private static JsonObject ToJsonObject(IReadOnlyDictionary<string, string> headers)
+        private static JObject ToJsonObject(IReadOnlyDictionary<string, string> headers)
         {
-            var obj = new JsonObject();
+            var obj = new JObject();
             foreach (var kv in headers)
             {
                 obj[kv.Key] = kv.Value;
@@ -389,9 +480,9 @@ public sealed class McpRpcHandler
             return obj;
         }
 
-        private static JsonArray ToJsonArray(IReadOnlyList<string> warnings)
+        private static JArray ToJsonArray(IReadOnlyList<string> warnings)
         {
-            var arr = new JsonArray();
+            var arr = new JArray();
             foreach (var warning in warnings)
             {
                 arr.Add(warning);

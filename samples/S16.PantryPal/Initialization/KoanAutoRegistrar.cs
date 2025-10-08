@@ -13,5 +13,8 @@ public class KoanAutoRegistrar : IKoanInitializer
     {
         // Vision and parsing services
         services.AddPantryVision();
+        services.AddScoped<IPantryConfirmationService, PantryConfirmationService>();
+        services.AddScoped<IPantryInsightsService, PantryInsightsService>();
+        services.AddScoped<IMealPlanningService, MealPlanningService>();
     }
 }

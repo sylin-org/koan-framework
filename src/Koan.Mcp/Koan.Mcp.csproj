@@ -13,7 +13,9 @@
     <PackageReference Include="StreamJsonRpc" Version="2.22.11" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
     <PackageReference Include="Microsoft.AspNetCore.JsonPatch" Version="9.0.9" />
-    <PackageReference Include="Jint" Version="4.4.1" />
+  <PackageReference Include="Jint" Version="4.4.1" />
+  <!-- Explicitly include Acornima to satisfy deps manifest when running tests under net10 preview -->
+  <PackageReference Include="Acornima" Version="1.2.0" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Koan.Core\Koan.Core.csproj" />

@@ -1,4 +1,5 @@
 using System;
+using Koan.Mcp.CodeMode.Json;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Koan.Mcp.CodeMode.Sdk;
@@ -11,12 +12,12 @@ public sealed class KoanSdkBindings
 {
     private readonly IServiceProvider _services;
 
-    public KoanSdkBindings(IServiceProvider services)
+    public KoanSdkBindings(IServiceProvider services, IJsonFacade json)
     {
         _services = services ?? throw new ArgumentNullException(nameof(services));
-        Entities = new EntityDomain(services);
-        Out = new OutputDomain();
         Metrics = new MetricsDomain();
+        Entities = new EntityDomain(services, Metrics, json);
+        Out = new OutputDomain();
     }
 
     /// <summary>
