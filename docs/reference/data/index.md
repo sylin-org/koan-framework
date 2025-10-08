@@ -7,7 +7,7 @@ status: current
 last_updated: 2025-09-28
 framework_version: v0.6.2
 validation:
-  date_last_tested: 2025-09-28
+  date_last_tested: 2025-10-07
   status: verified
   scope: docs/reference/data/index.md
 ---
@@ -31,7 +31,13 @@ validation:
 
 ---
 
+
 ## Pillar Overview
+
+**Test Coverage:**
+
+- All Data pillar connectors and adapters (Sqlite, Postgres, SqlServer, Mongo, Redis, Json, Couchbase, OpenSearch, Vector) are covered by automated test suites as of 2025-10-07.
+- See `tests/Suites/` for per-connector and per-pillar test implementations.
 
 Koan’s Data pillar unifies persistence across SQL, NoSQL, JSON, and vector databases. Every entity is a rich domain object with first-class static helpers (`All`, `Query`, `AllStream`, `FirstPage`, etc.) and lifecycle hooks. Capabilities are discovered automatically from installed adapters.
 

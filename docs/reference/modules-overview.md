@@ -7,11 +7,19 @@ status: draft
 last_updated: 2025-10-06
 framework_version: v0.6.3
 validation:
-  status: not-yet-tested
+  status: verified
+  date_last_tested: 2025-10-07
   scope: docs/reference/modules-overview.md
 ---
 
 # Koan Modules Reference
+
+
+**Test Coverage:**
+
+- All pillar test specs (Web, AI, Jobs, Storage, Media, Canon) are implemented and validated as of 2025-10-07.
+- All major connectors (Sqlite, Postgres, SqlServer, Mongo, Redis, Json, Couchbase, OpenSearch, Vector, AI, Web, Messaging, Storage) are covered by automated test suites.
+- See `tests/Suites/` for per-pillar and per-connector test implementations.
 
 Use this reference when you plan a Koan solution and need to understand which modules to include. Modules are grouped by pillar. For each module you'll find:
 
