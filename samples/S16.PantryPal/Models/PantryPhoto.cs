@@ -1,5 +1,6 @@
 using Koan.Data.Core.Model;
 using Koan.Mcp;
+using S16.PantryPal.Services;
 
 namespace S16.PantryPal.Models;
 
@@ -18,6 +19,7 @@ public sealed class PantryPhoto : Entity<PantryPhoto>
     public string StoragePath { get; set; } = "";
 
     public string? ThumbnailPath { get; set; }
+    public string OriginalFileName { get; set; } = "";
     public int Width { get; set; }
     public int Height { get; set; }
     public long FileSizeBytes { get; set; }
@@ -26,6 +28,7 @@ public sealed class PantryPhoto : Entity<PantryPhoto>
     // Capture Metadata
     // ==========================================
 
+    public string? UploadedBy { get; set; }
     public DateTime CapturedAt { get; set; } = DateTime.UtcNow;
 
     /// <summary>How photo was captured: camera, upload, bulk</summary>
@@ -49,6 +52,8 @@ public sealed class PantryPhoto : Entity<PantryPhoto>
 
     public PantryDetection[] Detections { get; set; } = Array.Empty<PantryDetection>();
     public int DetectionCount { get; set; }
+    public int ProcessingTimeMs { get; set; }
+    public VisionMetrics? Metrics { get; set; }
 
     // ==========================================
     // User Actions
@@ -64,6 +69,8 @@ public sealed class PantryPhoto : Entity<PantryPhoto>
 /// </summary>
 public class PantryDetection
 {
+    public string Id { get; set; } = Guid.NewGuid().ToString();
+
     // ==========================================
     // Bounding Box (for UI highlighting)
     // ==========================================

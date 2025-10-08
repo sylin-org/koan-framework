@@ -1,262 +1,380 @@
-# S16 MCP Code Mode Sample
+# S16 PantryPal: AI-Powered Meal Planning
 
-This sample demonstrates Koan.Mcp's **Code Mode** capabilities, which allow LLM agents to write JavaScript programs that execute multiple entity operations in a single roundtrip, dramatically reducing token usage and latency.
+**Vision-based pantry management + intelligent meal suggestions + MCP code mode orchestration**
 
-## Overview
+PantryPal demonstrates how AI naturally enhances applications when solving problems humans can't:
+- **Computer Vision**: Detects grocery items from photos, extracting quantities and expiration dates
+- **Natural Language**: Parses flexible input like "5 lbs, expires in a week"
+- **Personalization**: Learns from user ratings to improve recipe suggestions
+- **Multi-Entity Orchestration**: MCP Code Mode handles complex workflows in single roundtrips
 
-Traditional MCP uses individual tool calls for each operation. Code Mode provides a TypeScript-documented JavaScript SDK that lets agents write programs like:
+## Quick Start
 
-```javascript
-// Traditional MCP: 3 separate tool calls
-// 1. Todo.collection()
-// 2. Todo.upsert(newTodo)
-// 3. Todo.collection() again
+```bash
+# From repository root
+dotnet run --project samples/S16.PantryPal
 
-// Code Mode: 1 execution with multiple operations
-const todos = SDK.Entities.Todo.collection({ filter: { isCompleted: false } });
-const highPriority = todos.items.filter(t => t.priority === "high");
-
-if (highPriority.length > 5) {
-  SDK.Out.warn(`You have ${highPriority.length} high-priority tasks!`);
-}
-
-const newTodo = SDK.Entities.Todo.upsert({
-  title: "Review high-priority tasks",
-  priority: "urgent",
-  isCompleted: false
-});
-
-SDK.Out.answer(`Created task: ${newTodo.title}. You have ${todos.totalCount} total tasks.`);
+# Or use the start script
+./samples/S16.PantryPal/start.bat
 ```
 
-## Key Features
+The app starts with:
+- 50+ seeded recipes (Italian, Mexican, Thai, American)
+- Sample pantry items
+- Demo user profile
+- Mock vision service (no AI setup required)
 
-- **40-60% Token Reduction**: Multi-step workflows execute in one roundtrip
-- **Synchronous Interface**: Simple API (no async/await complexity for LLMs)
-- **Full CRUD**: collection, getById, upsert, delete, deleteMany
-- **Dataset Routing**: Multi-tenant support via `set` parameter
-- **Relationship Expansion**: Eager loading via `with` parameter
-- **Sandbox Security**: CPU time, memory, and recursion limits
-- **TypeScript Definitions**: Type-safe SDK documentation for LLMs at `/mcp/sdk/definitions`
+Access:
+- **API**: http://localhost:5000
+- **MCP SDK**: http://localhost:5000/mcp/sdk/definitions
+- **Swagger**: http://localhost:5000/swagger
+
+## Core Features
+
+### 1. Vision-Powered Pantry Management
+
+Upload grocery photos → AI detects items with bounding boxes → Confirm and add to pantry
+
+**Multi-Candidate Detection**: AI provides top 3 alternatives for each item, you pick the right one.
+
+```http
+POST /api/pantry/upload
+Content-Type: multipart/form-data
+
+photo=@groceries.jpg
+```
+
+**Response**: Detections with bounding boxes and confidence scores
+```json
+{
+  "photoId": "abc123",
+  "detections": [
+    {
+      "boundingBox": { "x": 50, "y": 100, "width": 200, "height": 150 },
+      "candidates": [
+        { "name": "chicken breast", "confidence": 0.95 },
+        { "name": "chicken thigh", "confidence": 0.78 }
+      ]
+    }
+  ]
+}
+```
+
+### 2. Natural Language Input Parsing
+
+Flexible quantity and expiration parsing:
+
+- **ISO dates**: `"2025-10-15"`
+- **Relative**: `"in 3 days"`, `"next month"`, `"tomorrow"`
+- **Month names**: `"March 15"`, `"Oct 10"`
+- **Fractions**: `"1/2 cup"`, `"3 1/2 lbs"`
+- **Flexible units**: `"lb"`, `"pounds"`, `"can"`, `"jar"`, `"whole"`
+
+```http
+POST /api/pantry/confirm/{photoId}
+{
+  "confirmations": [
+    {
+      "detectionId": "det1",
+      "selectedCandidateId": "cand1",
+      "userInput": "2 lbs, expires next week"
+    }
+  ]
+}
+```
+
+Parser extracts:
+```json
+{
+  "quantity": 2,
+  "unit": "lbs",
+  "expiresAt": "2025-10-14T00:00:00Z",
+  "confidence": "High"
+}
+```
+
+### 3. Intelligent Meal Suggestions
+
+AI suggests recipes based on:
+- Available pantry items
+- Dietary restrictions
+- Cooking time constraints
+- User ratings and history
+
+```http
+POST /api/meals/suggest
+{
+  "userId": "user1",
+  "dietaryRestrictions": ["vegetarian"],
+  "maxCookingMinutes": 45
+}
+```
+
+**Response**: Scored recipes with availability analysis
+```json
+{
+  "recipe": {
+    "name": "Penne Arrabbiata",
+    "availabilityScore": 0.85,
+    "missingIngredients": ["red chili flakes"]
+  },
+  "score": 0.78
+}
+```
+
+### 4. MCP Code Mode Orchestration
+
+Complex workflows execute in single roundtrip:
+
+**Example: Photo Upload → Inventory Update → Recipe Suggestions**
+
+```javascript
+// MCP Code Mode script
+const photo = SDK.Entities.PantryPhoto.getById(photoId);
+const pantry = SDK.Entities.PantryItem.collection();
+
+// Process each detection
+photo.detections.forEach(detection => {
+  const item = detection.candidates[0]; // Top AI pick
+
+  // Check for duplicates
+  const existing = pantry.items.find(p =>
+    p.name.toLowerCase() === item.name.toLowerCase()
+  );
+
+  if (existing) {
+    // Update quantity
+    SDK.Entities.PantryItem.upsert({
+      id: existing.id,
+      quantity: existing.quantity + 1
+    });
+  } else {
+    // Create new item
+    SDK.Entities.PantryItem.upsert({
+      name: item.name,
+      category: item.category,
+      quantity: 1,
+      unit: item.defaultUnit,
+      status: "available"
+    });
+  }
+});
+
+// Get updated pantry
+const updated = SDK.Entities.PantryItem.collection();
+
+// Suggest recipes using new items
+const recipes = SDK.Entities.Recipe.collection({
+  pageSize: 5
+});
+
+SDK.Out.answer(JSON.stringify({
+  itemsAdded: photo.detections.length,
+  totalPantryItems: updated.totalCount,
+  suggestedRecipes: recipes.items.map(r => r.name)
+}));
+```
+
+**Traditional MCP**: 10+ roundtrips (get photo, check duplicates per item, upsert items, get pantry, get recipes)
+
+**Code Mode**: 1 roundtrip with full logic
+
+## Entity Model
+
+```csharp
+[McpEntity] Recipe           // 50+ recipes with nutrition, instructions
+[McpEntity] PantryItem       // Inventory with vision metadata
+[McpEntity] MealPlan         // Scheduled meals with user feedback
+[McpEntity] ShoppingList     // Auto-generated from meal plans
+[McpEntity] UserProfile      // Preferences, goals, dietary restrictions
+[McpEntity] PantryPhoto      // Photos with AI detection results
+[McpEntity] VisionSettings   // User vision preferences
+```
+
+All entities support:
+- Full CRUD via `EntityController<T>`
+- MCP Code Mode via `SDK.Entities.{Name}`
+- Multi-tenant routing via `set` parameter
+- Relationship expansion via `with` parameter
+
+## API Endpoints
+
+### Pantry Management
+- `POST /api/pantry/upload` - Upload photo for vision processing
+- `POST /api/pantry/confirm/{photoId}` - Confirm detections, add to pantry
+- `GET /api/pantry/search` - Search by name, category, expiring soon
+- `GET /api/pantry/stats` - Pantry statistics and insights
+
+### Meal Planning
+- `POST /api/meals/suggest` - Get recipe suggestions
+- `POST /api/meals/plan` - Create multi-day meal plan
+- `POST /api/meals/shopping/{planId}` - Generate shopping list
+
+### Entity CRUD
+- `GET /api/data/recipes` - List all recipes
+- `GET /api/data/recipes/{id}` - Get recipe by ID
+- `POST /api/data/recipes` - Create/update recipe
+- Similar for: `/pantry`, `/mealplans`, `/shopping`, `/profiles`
+
+## MCP Code Mode Scripts
+
+Located in `Scripts/` folder:
+
+1. **simple-dinner.js** - Basic meal suggestion
+2. **smart-suggest.js** - Context-aware with waste reduction
+3. **week-planning.js** - Week planning with optimization
+4. **meal-prep.js** - Sunday meal prep timeline
+5. **grocery-haul.js** - Photo processing workflow
+
+Execute via:
+```http
+POST /mcp/rpc
+{
+  "method": "tools/call",
+  "params": {
+    "name": "koan.code.execute",
+    "arguments": {
+      "code": "/* script content */"
+    }
+  }
+}
+```
+
+## Vision Processing Pipeline
+
+```
+Photo Upload
+    ↓
+AI Detection (Ollama llava / Mock)
+    ↓
+Bounding Box Generation
+    ↓
+Multi-Candidate Results (top 3 per item)
+    ↓
+User Selection & Natural Language Input
+    ↓
+Parser → Structured Data
+    ↓
+Pantry Item Created
+```
+
+**Mock Vision Service** (default): Returns realistic detections without AI infrastructure
+
+**Production**: Replace with `OllamaVisionService` or `OpenAIVisionService`
+
+```csharp
+// In Initialization/KoanAutoRegistrar.cs
+services.AddSingleton<IPantryVisionService, OllamaVisionService>();
+```
 
 ## Configuration
 
-### Exposure Modes
+### Vision Service
+```json
+{
+  "Vision": {
+    "Provider": "mock",  // or "ollama", "openai"
+    "MinConfidence": 0.5,
+    "MaxDetectionsPerPhoto": 20
+  }
+}
+```
 
-The `Exposure` setting controls what's exposed to MCP clients:
-
-- **`auto`** (default): Detect client capabilities, fallback to full
-- **`code`**: Code execution only (token optimized)
-- **`tools`**: Traditional entity tools only (legacy)
-- **`full`**: Both code and tools (maximum compatibility)
-
-### Sandbox Settings
-
+### MCP Code Mode
 ```json
 {
   "Koan": {
     "Mcp": {
       "CodeMode": {
         "Enabled": true,
-        "Runtime": "Jint",
-        "Sandbox": {
-          "CpuMilliseconds": 2000,
-          "MemoryMegabytes": 64,
-          "MaxRecursionDepth": 100
-        }
+        "CpuMilliseconds": 3000,
+        "MemoryMegabytes": 128
       }
     }
   }
 }
 ```
 
-## Running
+## Progressive Complexity
 
-From the repository root:
+**Level 1: Basic** - Manual pantry, simple suggestions
 
-```powershell
-pwsh ./scripts/cli-run.ps1 S16.McpCodeMode
-```
+**Level 2: Vision** - Photo upload, AI detection, confirmation UI
 
-Or with .NET CLI:
+**Level 3: Smart** - Context-aware suggestions (expiring items, macros)
 
-```bash
-dotnet run --project samples/S16.McpCodeMode
-```
+**Level 4: Planning** - Week planning with budget/nutrition optimization
 
-## Endpoints
+**Level 5: Advanced** - Meal prep workflows, batch cooking
 
-- **STDIO Transport**: `koan.code.execute` tool available via stdin/stdout
-- **HTTP+SSE Transport**: `POST /mcp/rpc` with `tools/call` method
-- **SDK Definitions**: `GET /mcp/sdk/definitions` - TypeScript SDK for LLM guidance
-- **Capabilities**: `GET /mcp/capabilities` - Server capability discovery
+## Development Tips
 
-## Example Usage
+### Adding New Recipes
 
-### TypeScript SDK Definitions
-
-```bash
-curl http://localhost:5000/mcp/sdk/definitions
-```
-
-Returns TypeScript definitions:
-
-```typescript
-declare namespace Koan {
-  namespace Entities {
-    interface Todo {
-      id: string;
-      title: string;
-      description?: string;
-      isCompleted: boolean;
-      priority: string;
-      createdAt: string;
-      completedAt?: string;
-    }
-
-    interface ITodoOperations {
-      collection(params?: {
-        filter?: any;
-        pageSize?: number;
-        set?: string;
-        with?: string
-      }): {
-        items: Todo[];
-        page: number;
-        pageSize: number;
-        totalCount: number
-      };
-
-      getById(id: string, options?: {
-        set?: string;
-        with?: string
-      }): Todo;
-
-      upsert(model: Todo, options?: {
-        set?: string
-      }): Todo;
-
-      delete(id: string, options?: {
-        set?: string
-      }): number;
-
-      deleteMany(ids: string[], options?: {
-        set?: string
-      }): number;
-    }
-
-    const Todo: ITodoOperations;
-  }
-
-  namespace Out {
-    function answer(text: string): void;
-    function info(message: string): void;
-    function warn(message: string): void;
-  }
-}
-```
-
-### Code Execution via HTTP
-
-```bash
-curl -X POST http://localhost:5000/mcp/rpc \
-  -H "Content-Type: application/json" \
-  -d '{
-    "jsonrpc": "2.0",
-    "method": "tools/call",
-    "params": {
-      "name": "koan.code.execute",
-      "arguments": {
-        "code": "const todos = SDK.Entities.Todo.collection(); SDK.Out.answer(\`Found ${todos.totalCount} todos\`);"
-      }
+```csharp
+// In Data/RecipeSeedData.cs
+new Recipe
+{
+    Name = "Your Recipe",
+    Cuisines = new[] { "Italian" },
+    PrepTimeMinutes = 20,
+    Ingredients = new[] {
+        new RecipeIngredient { Name = "pasta", Amount = 1, Unit = "lbs" }
     },
-    "id": 1
-  }'
+    Steps = new[] { "Step 1...", "Step 2..." }
+}
 ```
 
-Response:
+### Custom Vision Provider
 
-```json
+```csharp
+public class CustomVisionService : IPantryVisionService
 {
-  "jsonrpc": "2.0",
-  "result": {
-    "success": true,
-    "result": {
-      "output": "Found 5 todos",
-      "metrics": {
-        "executionMs": 45,
-        "memoryMb": 2.3,
-        "entityCalls": 1
-      }
+    public async Task<VisionProcessingResult> ProcessPhotoAsync(...)
+    {
+        // Your AI logic here
+        return new VisionProcessingResult
+        {
+            Success = true,
+            Detections = detections,
+            ProcessingTimeMs = elapsedMs
+        };
     }
-  },
-  "id": 1
 }
 ```
 
-## Token Savings Example
+### Natural Language Parser Extensions
 
-### Traditional MCP (3 roundtrips)
-
-```
-User: "Create a task and tell me my stats"
-
-Agent → tools/call Todo.collection
-Server → { items: [...], totalCount: 10 }
-
-Agent → tools/call Todo.upsert { title: "New task" }
-Server → { id: "123", title: "New task" }
-
-Agent → tools/call Todo.collection { filter: { isCompleted: false } }
-Server → { items: [...], totalCount: 5 }
-
-Agent → User: "Created 'New task'. You have 10 total tasks, 5 incomplete."
-```
-
-Total: ~2,400 tokens (estimated)
-
-### Code Mode (1 roundtrip)
-
-```
-User: "Create a task and tell me my stats"
-
-Agent → tools/call koan.code.execute
+```csharp
+// Extend PantryInputParser for new patterns
+private bool TryParseCustomFormat(string input, out ParsedItemData result)
 {
-  "code": `
-    const all = SDK.Entities.Todo.collection();
-    const incomplete = all.items.filter(t => !t.isCompleted);
-
-    const newTodo = SDK.Entities.Todo.upsert({
-      title: "New task",
-      isCompleted: false
-    });
-
-    SDK.Out.answer(
-      \`Created '\${newTodo.title}'. You have \${all.totalCount} total tasks, \${incomplete.length} incomplete.\`
-    );
-  `
+    // Add your parsing logic
 }
-
-Server → {
-  success: true,
-  result: {
-    output: "Created 'New task'. You have 10 total tasks, 5 incomplete."
-  }
-}
-
-Agent → User: [forwards output]
 ```
 
-Total: ~1,100 tokens (estimated)
+## Architecture Highlights
 
-**Savings: ~54% reduction** in this workflow
+**Entity-First Development**: `Todo.Get(id)`, `todo.Save()` patterns
 
-## Architecture Decision
+**Multi-Provider Ready**: SQLite → Postgres/MongoDB with zero code changes
 
-See [AI-0014: MCP Code Mode](../../docs/decisions/AI-0014-mcp-code-mode.md) for the full technical design and rationale.
+**Auto-Registration**: Adding package reference automatically enables features
+
+**Self-Reporting**: Bootstrap reports show provider elections and capabilities
 
 ## Related Samples
 
-- **S12.MedTrials.McpService**: Traditional MCP entity tools
-- **S13.DocMind**: Vector search + MCP integration
-- **S14.AdapterBench**: Multi-provider data adapter benchmarking
+- **S12.MedTrials**: Traditional MCP entity tools
+- **S13.DocMind**: Vector search + AI integration
+- **S14.AdapterBench**: Multi-provider benchmarking
+
+## Related Decisions
+
+- **AI-0014**: MCP Code Mode - Technical foundation
+- **DATA-0078**: Vector Export for Migration
+- **SAMPLE-0016**: This sample's architecture decision
+
+## License
+
+Part of Koan Framework - see root LICENSE file

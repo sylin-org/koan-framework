@@ -10,8 +10,13 @@ namespace S16.PantryPal.Models;
 [McpEntity(Name = "ShoppingList", Description = "Shopping lists with store organization and budget tracking")]
 public sealed class ShoppingList : Entity<ShoppingList>
 {
+    public string Name { get; set; } = "";
+
+    /// <summary>Reference to meal plan this list was generated from</summary>
+    public string? MealPlanId { get; set; }
+
     /// <summary>Week or period this list is for</summary>
-    public DateTime CreatedFor { get; set; }
+    public DateTime CreatedFor { get; set; } = DateTime.UtcNow;
 
     /// <summary>Status: active, purchased, archived</summary>
     public string Status { get; set; } = "active";
@@ -31,8 +36,8 @@ public class ShoppingItem
     public decimal Quantity { get; set; }
     public string Unit { get; set; } = "";
 
-    /// <summary>Store section for organization (e.g., produce, meat, dairy, pantry)</summary>
-    public string StoreSection { get; set; } = "";
+    /// <summary>Item category for organization (e.g., produce, meat, dairy, pantry)</summary>
+    public string Category { get; set; } = "";
 
     public bool IsPurchased { get; set; }
     public decimal EstimatedPrice { get; set; }

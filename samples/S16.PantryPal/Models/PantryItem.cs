@@ -22,8 +22,14 @@ public sealed class PantryItem : Entity<PantryItem>
     /// <summary>Unit of measurement (e.g., lbs, oz, whole, can)</summary>
     public string Unit { get; set; } = "";
 
+    /// <summary>Item category (e.g., produce, dairy, meat, canned, pantry)</summary>
+    public string Category { get; set; } = "uncategorized";
+
     /// <summary>Storage location: pantry, fridge, freezer</summary>
     public string Location { get; set; } = "pantry";
+
+    /// <summary>Item status: available, expired, consumed, wasted</summary>
+    public string Status { get; set; } = "available";
 
     public DateTime? ExpiresAt { get; set; }
     public DateTime AddedAt { get; set; } = DateTime.UtcNow;
@@ -42,11 +48,8 @@ public sealed class PantryItem : Entity<PantryItem>
     /// <summary>Reference to PantryPhoto if added via vision</summary>
     public string? SourcePhotoId { get; set; }
 
-    /// <summary>AI detection confidence (0.0-1.0)</summary>
-    public float? DetectionConfidence { get; set; }
-
-    /// <summary>User confirmed AI detection</summary>
-    public bool IsVerified { get; set; }
+    /// <summary>Vision metadata if added via photo detection</summary>
+    public VisionMetadata? VisionMetadata { get; set; }
 
     // ==========================================
     // Product Details (from vision/barcode)
@@ -55,4 +58,15 @@ public sealed class PantryItem : Entity<PantryItem>
     public string? Brand { get; set; }
     public string? Barcode { get; set; }
     public string? ProductImageUrl { get; set; }
+}
+
+/// <summary>
+/// Vision processing metadata for items added via photo detection.
+/// </summary>
+public class VisionMetadata
+{
+    public string? SourcePhotoId { get; set; }
+    public string? DetectionId { get; set; }
+    public float Confidence { get; set; }
+    public bool WasUserCorrected { get; set; }
 }

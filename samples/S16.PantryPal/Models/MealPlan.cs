@@ -4,24 +4,31 @@ using Koan.Mcp;
 namespace S16.PantryPal.Models;
 
 /// <summary>
-/// Planned or cooked meals with user feedback for AI learning.
-/// Tracks nutrition consumption and user ratings.
+/// Multi-day meal plan with scheduled meals and nutrition tracking.
 /// </summary>
-[McpEntity(Name = "MealPlan", Description = "Planned and cooked meals with user feedback and ratings")]
+[McpEntity(Name = "MealPlan", Description = "Multi-day meal plans with scheduled meals")]
 public sealed class MealPlan : Entity<MealPlan>
 {
-    // ==========================================
-    // Recipe Reference
-    // ==========================================
+    public string? UserId { get; set; }
+    public DateTime StartDate { get; set; }
+    public DateTime EndDate { get; set; }
 
+    /// <summary>Planned meals within the date range</summary>
+    public PlannedMeal[] PlannedMeals { get; set; } = Array.Empty<PlannedMeal>();
+
+    public decimal EstimatedCost { get; set; }
+    public string Status { get; set; } = "active";
+}
+
+/// <summary>
+/// Individual planned or cooked meal with user feedback.
+/// </summary>
+public class PlannedMeal
+{
     public string RecipeId { get; set; } = "";
 
-    /// <summary>Denormalized for quick access without joins</summary>
+    /// <summary>Denormalized for quick access</summary>
     public string RecipeName { get; set; } = "";
-
-    // ==========================================
-    // Scheduling
-    // ==========================================
 
     public DateTime ScheduledFor { get; set; }
 
@@ -30,31 +37,15 @@ public sealed class MealPlan : Entity<MealPlan>
 
     public int Servings { get; set; }
 
-    // ==========================================
-    // Status Tracking
-    // ==========================================
-
     /// <summary>Status: planned, prepped, cooked, skipped</summary>
     public string Status { get; set; } = "planned";
 
     public DateTime? CookedAt { get; set; }
 
-    // ==========================================
-    // User Feedback (AI Learning)
-    // ==========================================
-
-    /// <summary>User rating (1-5 stars)</summary>
+    // User Feedback
     public int? Rating { get; set; }
-
     public string? Notes { get; set; }
-
-    /// <summary>User tags (e.g., "too spicy", "kid-approved", "make again")</summary>
     public string[] Tags { get; set; } = Array.Empty<string>();
 
-    // ==========================================
-    // Actual Consumption
-    // ==========================================
-
-    /// <summary>Actual servings consumed (may differ from planned)</summary>
     public int ActualServings { get; set; }
 }
