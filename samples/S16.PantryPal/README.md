@@ -369,11 +369,40 @@ private bool TryParseCustomFormat(string input, out ParsedItemData result)
 - **S13.DocMind**: Vector search + AI integration
 - **S14.AdapterBench**: Multi-provider benchmarking
 
+
 ## Related Decisions
 
 - **AI-0014**: MCP Code Mode - Technical foundation
 - **DATA-0078**: Vector Export for Migration
 - **SAMPLE-0016**: This sample's architecture decision
+
+## Recent Decisions & Roadmap (2025-10-07)
+
+### Auth & User Experience
+- **Test Auth** is always enabled (see S5.Recs pattern). If no user is signed in, the UI defaults to browse-only mode.
+- Multi-user supported; multi-tenant is not in scope for this sample.
+
+### Batch Operations
+- Batch operations (e.g., photo detection, pantry updates) accept partial success. Failures are reported per item.
+
+### Vision/Model Extensibility
+- Vision provider selection is extensible (see Ollama adapter, DocMind for multi-model usage).
+- Entity relationships (e.g., ingredient substitutions, user preferences) are being added for richer scenarios.
+
+### Media Pipeline
+- Detected ingredient images are cropped and saved locally using the Storage pipeline for visual reference.
+
+### Pagination & Streaming
+- All in-memory entity queries are being refactored: web UI uses paging, backend uses streaming for large data.
+
+### Documentation
+- "Behind the scenes" docs are provided both as in-code (g1c1-style) comments and as comprehensive in-folder documentation for developers.
+
+### Testing & Roadmap
+- Advanced/integration tests are targeted for v1.1.
+- Production goal: pilot/fully functional prototype, mobile-first for photos, no regulatory compliance required.
+
+For architectural rationale and more, see `/docs/decisions/SAMPLE-0016-kitchenmind-mcp-ai-showcase.md`.
 
 ## License
 

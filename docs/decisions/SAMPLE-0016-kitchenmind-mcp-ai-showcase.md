@@ -1,5 +1,15 @@
 # SAMPLE-0016 - PantryPal: AI-Powered Meal Planning Sample
 
+## 2025-10-07 Decisions & Roadmap Update
+
+- **Test Auth**: Always enabled (S5.Recs pattern). If no user is signed in, UI is browse-only. Multi-user supported; multi-tenant not in scope.
+- **Batch Operations**: Accept partial success for batch operations; failures reported per item.
+- **Vision/Model Extensibility**: Vision provider selection is extensible (see Ollama adapter, DocMind for multi-model usage). Entity relationships (ingredient substitutions, user preferences) are being added.
+- **Media Pipeline**: Detected ingredient images are cropped and saved locally using the Storage pipeline.
+- **Pagination & Streaming**: Refactor in-memory queries—web UI uses paging, backend uses streaming for large data.
+- **Documentation**: "Behind the scenes" docs provided as in-code (g1c1-style) comments and comprehensive in-folder docs.
+- **Testing & Roadmap**: Advanced/integration tests targeted for v1.1. Production goal: pilot/functional prototype, mobile-first for photos, no compliance required.
+
 Status: Approved
 Date: 2025-10-07
 Owners: Koan AI Platform, Koan.Mcp Team, Sample Applications

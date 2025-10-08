@@ -1,3 +1,30 @@
+# Findings and Recommendations (2025-10-07)
+
+This section summarizes best practices and recommendations for maximizing the value of Koan's entity and automation features, based on a deep review of current and planned usage in sample applications like PantryPal.
+
+## Key Koan Features to Prefer
+
+- **Entity<T> Patterns:** Use static and instance methods (`All`, `Get`, `Save`, `Remove`, `Page`, `Query`, etc.) for all data access. Prefer `EntityController<T>` for CRUD APIs to minimize boilerplate and maximize consistency.
+- **Querying, Pagination, and Streaming:** Use `Page`, `FirstPage`, and `QueryStream`/`AllStream` for large datasets and web UI pagination. Use `QueryWithCount` for efficient UI pagination controls. Use LINQ and string queries for flexible filtering.
+- **Batch Operations:** Use `List<T>.Save()` and `Entity.Batch()` for bulk persistence and updates. Leverage lifecycle hooks (`BeforeUpsert`, `AfterLoad`, etc.) for validation and projections.
+- **Bulk Removal Strategies:** Use `RemoveAll()` with the appropriate strategy (`Safe`, `Fast`, `Optimized`) for test cleanup, production, or audit scenarios.
+- **Context Routing:** Use `EntityContext.Partition`, `EntityContext.Source`, and `EntityContext.Adapter` for multi-user, analytics, or provider-specific routing.
+- **Provider Capabilities:** Check and adapt to provider capabilities (e.g., `SupportsFastRemove`, LINQ support) for optimal performance and compatibility.
+- **Pipelines and Jobs:** Use Koan Flow pipelines and Jobs for orchestrating multi-step or background operations (e.g., media processing, batch imports).
+- **Self-Reporting and Diagnostics:** Use Koan’s self-reporting features to surface provider elections, capabilities, and diagnostics in logs or UI.
+
+## Application Guidance
+
+- Refactor all in-memory queries to use `Page`, `QueryStream`, or `AllStream`.
+- Use `EntityController<T>` for all CRUD endpoints.
+- Implement batch operations and lifecycle hooks for bulk updates and validation.
+- Use context routing for user-specific or analytics scenarios.
+- Leverage provider capability checks to optimize for the current backend.
+- For media and vision pipelines, use Koan Jobs or Flow for background/cascading work.
+- Document and demonstrate these patterns in both code and developer docs.
+
+**Summary:**
+Rely on Koan’s entity, controller, pipeline, and job abstractions for all core behaviors. Avoid custom repositories, manual paging, or ad-hoc background work. Use the patterns and recipes in this guide as the canonical reference for all new features and documentation.
 ---
 type: GUIDE
 domain: data
