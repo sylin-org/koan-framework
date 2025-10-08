@@ -1,3 +1,4 @@
+using Koan.Data.Core;
 using Microsoft.AspNetCore.Mvc;
 using S16.PantryPal.Models;
 using S16.PantryPal.Services;
@@ -37,7 +38,7 @@ public class PantryController(
             ProcessingStatus = "processing"
         };
 
-        await photoRecord.Save();
+        await Data<PantryPhoto>.Upsert(photoRecord);
 
         // Save photo to storage
         var photoPath = Path.Combine("photos", Path.GetFileName(photoRecord.StoragePath));
@@ -69,7 +70,7 @@ public class PantryController(
         photoRecord.ProcessingTimeMs = result.ProcessingTimeMs;
         photoRecord.Metrics = result.Metrics;
 
-        await photoRecord.Save();
+        await Data<PantryPhoto>.Upsert(photoRecord);
 
         return Ok(new
         {
@@ -137,7 +138,7 @@ public class PantryController(
                 }
             };
 
-            await item.Save();
+            await Data<PantryItem>.Upsert(item);
             confirmedItems.Add(item);
 
             // Learn from user corrections
@@ -204,7 +205,7 @@ public class PantryController(
             items = items.Where(i => i.ExpiresAt.HasValue && i.ExpiresAt.Value <= soon);
         }
 
-        return Ok(items.OrderBy(i => i.ExpiresAt).ThenBy(i => i.Name));
+        return Ok(items.OrderBy(i => i.ExpiresAt).ThenBy(i => i.Name).ToList());
     }
 
     /// <summary>

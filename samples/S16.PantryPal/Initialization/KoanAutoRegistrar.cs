@@ -1,5 +1,4 @@
 using Koan.Core;
-using Koan.Core.Initialization;
 using Microsoft.Extensions.DependencyInjection;
 using S16.PantryPal.Services;
 
@@ -10,7 +9,7 @@ namespace S16.PantryPal.Initialization;
 /// </summary>
 public class KoanAutoRegistrar : IKoanInitializer
 {
-    public void Register(IServiceCollection services, IKoanEnv env)
+    public void Initialize(IServiceCollection services)
     {
         // Vision and parsing services
         services.AddPantryVision();

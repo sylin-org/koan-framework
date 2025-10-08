@@ -58,8 +58,12 @@ provides an opinionated, parallel-friendly structure for every suite.
 
 ## Running suites
 
-Koan’s primary solution (`Koan.sln`) now references only the greenfield suites and shared harness. Run the full
-portfolio or any subset directly from the solution root:
+            Integration/
+              Koan.Tests.S2.Api/
+        Samples/
+          Koan.Samples.McpService.Tests/
+          Koan.Samples.DocMind.Tests/
+          Koan.Samples.PantryPal.Tests/
 
 ```pwsh
 dotnet test Koan.sln
@@ -68,6 +72,17 @@ dotnet test Koan.sln
 For targeted validation, invoke an individual suite project:
 
 ```pwsh
+
+    ### Sample Suite Coverage (as of 2025-10-07)
+
+    - **MCP Sample Suite**: `Koan.Samples.McpService.Tests` (S12.MedTrials.McpService)
+      - Initial health check test for `/health` endpoint.
+    - **DocMind Sample Suite**: `Koan.Samples.DocMind.Tests` (S13.DocMind)
+      - Initial health check test for `/health` endpoint.
+    - **PantryPal/Recipes Sample Suite**: `Koan.Samples.PantryPal.Tests` (S16.PantryPal)
+      - Initial health check test for `/health` endpoint.
+
+    Next: Add scenario/integration tests for each sample suite covering endpoints, flows, and sample-specific behaviors.
 dotnet test tests/Suites/Data/Core/Koan.Tests.Data.Core/Koan.Tests.Data.Core.csproj
 ```
 

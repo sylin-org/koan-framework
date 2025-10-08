@@ -1,3 +1,4 @@
+using Koan.Data.Core;
 using Microsoft.AspNetCore.Mvc;
 using S16.PantryPal.Models;
 
@@ -37,7 +38,7 @@ public class MealsController : ControllerBase
         // Filter by cooking time
         if (request.MaxCookingMinutes.HasValue)
         {
-            recipes = recipes.Where(r => r.TotalTimeMinutes <= request.MaxCookingMinutes.Value);
+            recipes = recipes.Where(r => r.TotalTimeMinutes <= request.MaxCookingMinutes.Value).ToList();
         }
 
         // Score recipes by ingredient availability
@@ -127,19 +128,19 @@ public class MealsController : ControllerBase
                     p.Name.Contains(ingredient.Name, StringComparison.OrdinalIgnoreCase) ||
                     ingredient.Name.Contains(p.Name, StringComparison.OrdinalIgnoreCase));
 
-                if (available == null || available.Quantity < ingredient.Quantity)
+                if (available == null || available.Quantity < ingredient.Amount)
                 {
                     var needed = neededItems.FirstOrDefault(n => n.Name == ingredient.Name);
                     if (needed != null)
                     {
-                        needed.Quantity += ingredient.Quantity - (available?.Quantity ?? 0);
+                        needed.Quantity += ingredient.Amount - (available?.Quantity ?? 0);
                     }
                     else
                     {
                         neededItems.Add(new ShoppingItem
                         {
                             Name = ingredient.Name,
-                            Quantity = ingredient.Quantity - (available?.Quantity ?? 0),
+                            Quantity = ingredient.Amount - (available?.Quantity ?? 0),
                             Unit = ingredient.Unit,
                             Category = available?.Category ?? "uncategorized",
                             IsPurchased = false
@@ -157,7 +158,7 @@ public class MealsController : ControllerBase
             Status = "active"
         };
 
-        await shoppingList.Save();
+        await Data<ShoppingList>.Upsert(shoppingList);
 
         return Ok(new { listId = shoppingList.Id, items = neededItems });
     }

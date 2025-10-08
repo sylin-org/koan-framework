@@ -72,10 +72,14 @@ Update this section as work ships. Use `[x]` when done, `[ ]` when pending, and 
 
 **As of 2025-10-07, pillar and connector test parity is achieved. All major suites are implemented and validated. Only phase two backlog items remain.**
 
+
 ### Phase two backlog
 Track long-tail suites here; move items to the pillar list if priorities change.
 - [ ] Orchestration (CLI, Docker/Podman connectors, Compose renderer, E2E scenarios).
 - [ ] Secrets (core and Vault connector).
-- [ ] MCP, Recipes, DocMind sample suites.
+- [x] MCP, DocMind, PantryPal/Recipes sample suite scaffolding (2025-10-07):
+	- Test projects created: `Koan.Samples.McpService.Tests`, `Koan.Samples.DocMind.Tests`, `Koan.Samples.PantryPal.Tests`.
+	- Initial health check tests implemented and validated (see test projects).
+	- Next: Add scenario/integration coverage for endpoints, flows, and sample-specific behaviors.
 - [ ] Sample app integrations beyond S2 (S0, S1, S4, S6, S13).
 - [ ] Any additional helpers or diagnostics worth preserving from `tests.old` after pillar parity.

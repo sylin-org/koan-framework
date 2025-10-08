@@ -1,7 +1,7 @@
 using Koan.Core;
-using Koan.Core.Initialization;
+using Koan.Data.Core;
 using Microsoft.Extensions.DependencyInjection;
-using S16.PantryPal.Data;
+using S16.PantryPal.SeedData;
 using S16.PantryPal.Models;
 
 namespace S16.PantryPal.Initialization;
@@ -11,16 +11,12 @@ namespace S16.PantryPal.Initialization;
 /// </summary>
 public class DataSeeder : IKoanInitializer
 {
-    public async void Register(IServiceCollection services, IKoanEnv env)
+    public void Initialize(IServiceCollection services)
     {
-        // Seed data only in development
-        if (!env.IsDevelopment)
-            return;
-
         // Use a background task to seed data after app starts
         _ = Task.Run(async () =>
         {
-            await Task.Delay(2000); // Wait for app to fully start
+            await Task.Delay(3000); // Wait for app to fully start
 
             try
             {
@@ -38,7 +34,7 @@ public class DataSeeder : IKoanInitializer
 
                 foreach (var recipe in recipes)
                 {
-                    await recipe.Save();
+                    await Data<Recipe>.Upsert(recipe);
                     seededCount++;
                 }
 
@@ -62,7 +58,7 @@ public class DataSeeder : IKoanInitializer
                     PreferBatchCooking = true
                 };
 
-                await profile.Save();
+                await Data<UserProfile>.Upsert(profile);
                 Console.WriteLine("[PantryPal] Created demo user profile");
 
                 // Create sample pantry items
@@ -116,7 +112,7 @@ public class DataSeeder : IKoanInitializer
 
                 foreach (var item in sampleItems)
                 {
-                    await item.Save();
+                    await Data<PantryItem>.Upsert(item);
                 }
 
                 Console.WriteLine($"[PantryPal] Created {sampleItems.Length} sample pantry items");
