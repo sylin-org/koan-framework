@@ -28,4 +28,5 @@
     <ProjectReference Include="..\..\src\Connectors\Data\Mongo\Koan.Data.Connector.Mongo.csproj" />
     <ProjectReference Include="..\..\src\Connectors\Data\Redis\Koan.Data.Connector.Redis.csproj" />
   </ItemGroup>
+
 </Project>

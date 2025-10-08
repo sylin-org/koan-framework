@@ -7,10 +7,10 @@
     <UserSecretsId>dotnet-S9.Location.Adapter.Crm-6d848bf7-eb1f-44ef-adb0-19bffe3673e9</UserSecretsId>
   </PropertyGroup>
 
-  <ItemGroup>
-    <FrameworkReference Include="Microsoft.AspNetCore.App" />
-  </ItemGroup>
 
   <ItemGroup>
+    <!-- Bring in generic host + logging abstractions explicitly -->
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.0" />
   </ItemGroup>
 </Project>

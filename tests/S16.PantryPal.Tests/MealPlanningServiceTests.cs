@@ -1,19 +1,23 @@
 ﻿using FluentAssertions;
 using S16.PantryPal.Services;
 using S16.PantryPal.Models;
+using Koan.Data.Core.Model;
 using S16.PantryPal.Contracts;
 
 namespace S16.PantryPal.Tests;
 
+[Collection("KoanHost")]
 public class MealPlanningServiceTests
 {
     [Fact]
     public async Task SuggestRecipes_ShouldScoreAndLimit()
     {
-        await new PantryItem { Name = "pasta", Status = "available" }.Save();
-        await new PantryItem { Name = "tomato", Status = "available" }.Save();
+    var p1 = new PantryItem { Name = "pasta", Status = "available" };
+    await p1.Save();
+    var p2 = new PantryItem { Name = "tomato", Status = "available" };
+    await p2.Save();
 
-        await new Recipe
+        var r = new Recipe
         {
             Name = "Pasta Pomodoro",
             Ingredients = new [] { new RecipeIngredient { Name = "pasta", Amount = 1, Unit = "whole" }, new RecipeIngredient { Name = "tomato", Amount = 1, Unit = "whole" } },
@@ -21,7 +25,8 @@ public class MealPlanningServiceTests
             TotalTimeMinutes = 30,
             AverageRating = 4.5f,
             TimesCooked = 50
-        }.Save();
+        };
+        await r.Save();
 
         var svc = new MealPlanningService();
         var result = await svc.SuggestRecipesAsync(new SuggestRecipesRequest { DietaryRestrictions = new []{"vegetarian"}, MaxCookingMinutes = 45, Limit = 5 });

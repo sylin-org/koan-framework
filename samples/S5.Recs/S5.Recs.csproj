@@ -30,8 +30,5 @@
     <ProjectReference Include="..\..\src\Koan.Web.Backup\Koan.Web.Backup.csproj" />
     <ProjectReference Include="..\..\src\Koan.Web.Extensions\Koan.Web.Extensions.csproj" />
   </ItemGroup>
-  <ItemGroup>
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
-  </ItemGroup>
 </Project>
 

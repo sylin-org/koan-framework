@@ -34,13 +34,15 @@ public class PantryItemController : EntityController<PantryItem, string> {}
 (Example not applied globally to keep sample defaults minimal.)
 
 ## Future Extensions
-- Semantic / vector-backed search (`/api/pantry-semantic/query`)
 - Relationship expansion examples (`with=recipe` once relationships established)
 - AI-driven substitution recommendations
+- Embedding cache invalidation on PantryItem mutation
+- Moderation / EXIF strip pre-ingestion
 
 ## Testing Strategy
 - Unit tests target service orchestration logic (confirmation, insights, meal planning).
 - Integration tests (separate project) can exercise entity controller surface + vision ingestion workflow.
+ - Pagination policy enforcement tests deferred post-MVP; controller attribute documents intent (MaxSize=200) and connector-level clamping covers safety.
 
 ## Error Handling
 Controllers return simple `{ error: "..." }` payloads for clarity. Enhancements (error codes, trace IDs) can be added when a common error envelope lands in core.
@@ -49,7 +51,7 @@ Controllers return simple `{ error: "..." }` payloads for clarity. Enhancements 
 Sample omits authentication for brevity; add an auth filter or middleware for protected operations when integrating with identity.
 
 ## Storage & Vision
-Image bytes stored locally under `photos/`. For multi-instance deployments, replace with external blob storage service & inject abstraction.
+Photo persistence uses `IPhotoStorage` (wrapper over Koan.Storage). Keys are GUID v7 with `photos/` prefix. Thumbnails deliberately omitted to keep sample lean (noise vs learning value). Default `photos` profile uses local provider; swap to cloud by updating `Koan:Storage:Profiles`. Vector search (semantic+lexical hybrid) engages automatically when a vector provider is configured; otherwise service degrades to lexical filtering with header `X-Search-Degraded: true`.
 
 ## Decision References
 See ADR `S16-0001-pantrypal-entity-first-refactor.md` for rationale behind the refactor.

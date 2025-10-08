@@ -29,5 +29,6 @@
     <ProjectReference Include="..\..\src\\Connectors\\Web\\Auth\\Test\Koan.Web.Auth.Connector.Test.csproj" />
     <ProjectReference Include="..\..\src\Koan.Web.Auth.Services\Koan.Web.Auth.Services.csproj" />
   </ItemGroup>
+
 </Project>
 

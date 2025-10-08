@@ -2,22 +2,24 @@
 using S16.PantryPal.Services;
 using S16.PantryPal.Models;
 using S16.PantryPal.Contracts;
+using Koan.Data.Core.Model;
 
 namespace S16.PantryPal.Tests;
 
+[Collection("KoanHost")]
 public class PantryConfirmationServiceTests
 {
     private sealed class FakeVisionService : IPantryVisionService
     {
         public Task<VisionProcessingResult> ProcessPhotoAsync(string photoId, Stream image, VisionProcessingOptions options, CancellationToken ct = default) =>
-            Task.FromResult(new VisionProcessingResult { Success = true, Detections = Array.Empty<VisionDetection>(), ProcessingTimeMs = 10 });
+            Task.FromResult(new VisionProcessingResult { Success = true, Detections = Array.Empty<PantryDetection>(), ProcessingTimeMs = 10 });
 
-        public Task LearnFromCorrectionAsync(string original, string corrected, string userInput, CancellationToken ct = default) => Task.CompletedTask;
+        public Task LearnFromCorrectionAsync(string originalName, string correctedName, string? correctedQuantity, CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 
     private sealed class FakeParser : IPantryInputParser
     {
-        public ParsedItemData? ParseInput(string input) => new ParsedItemData { Quantity = 2, Unit = "lbs", ExpiresAt = DateTime.UtcNow.AddDays(5) };
+    public ParsedItemData ParseInput(string input, ParserContext? context = null) => new ParsedItemData { Quantity = 2, Unit = "lbs", ExpiresAt = DateTime.UtcNow.AddDays(5) };
     }
 
     [Fact]
@@ -27,11 +29,11 @@ public class PantryConfirmationServiceTests
         {
             Detections = new []
             {
-                new VisionDetection
+                new PantryDetection
                 {
                     Id = "d1",
                     ParsedData = new ParsedItemData{ Quantity = 1, Unit = "unit" },
-                    Candidates = new [] { new VisionCandidate { Id = "c1", Name = "apple", Confidence = 0.9f, DefaultUnit = "whole" } }
+                    Candidates = new [] { new DetectionCandidate { Id = "c1", Name = "apple", Confidence = 0.9f, DefaultUnit = "whole" } }
                 }
             }
         };

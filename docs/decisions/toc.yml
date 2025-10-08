@@ -64,6 +64,8 @@
       href: ARCH-0060-cache-control-surface.md
     - name: ARCH-0061 JSON layer unification on Newtonsoft
       href: ARCH-0061-json-layer-unification-newtonsoft-over-stj.md
+    - name: ARCH-0062 S8 legacy snapshot removal and sample streamline
+      href: ARCH-0062-s8-legacy-snapshot-removal-and-sample-streamline.md
 - name: Data (DATA)
   items:
     - name: DATA-0002 Query capabilities flag

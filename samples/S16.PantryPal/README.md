@@ -108,6 +108,43 @@ Expected response fragment:
 
 Upload grocery photos → AI detects items with bounding boxes → Confirm and add to pantry
 
+Photo persistence now uses a thin abstraction (`IPhotoStorage`) over Koan.Storage. This decouples ingestion from physical filesystem paths and enables future swap to S3 / Azure Blob / cold-tier providers without controller changes. Configure via:
+
+```json
+// appsettings.json (optional override of defaults)
+{
+  "S16": {
+    "Photos": {
+      "Profile": "",           // blank -> use storage DefaultProfile
+      "Container": "pantry-photos",
+      "Prefix": "photos/"       // object key namespace
+    }
+  }
+}
+```
+
+Storage profile/container resolution follows Koan.Storage rules (DefaultProfile or single-profile fallback). Uploaded photo keys are GUID v7 (time-orderable) prefixed with `photos/`.
+
+> Note: Thumbnail generation was intentionally removed to keep the sample lean and focused on vision + orchestration concepts. Re-introduce via an image pipeline (resizer service + background job) if demonstrating media processing patterns.
+
+Example consolidated storage section (current sample default):
+```json
+{
+  "Koan:Storage": {
+    "Profiles": {
+      "photos": { "Provider": "local", "Container": "pantry-photos" }
+    },
+    "DefaultProfile": "photos",
+    "FallbackMode": "SingleProfileOnly"
+  },
+  "S16": {
+    "Photos": { "Profile": "photos", "Container": "pantry-photos", "Prefix": "photos/" }
+  }
+}
+```
+
+Vector Search: Add `Koan.Data.Vector` provider configuration (e.g., pgvector / in-memory) to enable semantic+lexical hybrid search. If unavailable, service degrades to lexical filtering with `X-Search-Degraded: true` header.
+
 **Multi-Candidate Detection**: AI provides top 3 alternatives for each item, you pick the right one.
 
 ```http
@@ -252,8 +289,14 @@ SDK.Out.answer(JSON.stringify({
 
 **Code Mode**: 1 roundtrip with full logic
 
-### 5. Semantic Search (Planned)
-`POST /api/pantry-semantic/query` currently returns 501 (placeholder). Future work: vector / embedding powered natural language intent → structured filter translation. See `TECHNICAL.md` for roadmap.
+### 5. Semantic + Lexical Search
+Implemented lightweight hybrid search endpoint:
+```
+GET /api/pantry/search?q=milk+apple&topK=25
+```
+Response includes `X-Search-Degraded` header ("1" when vector/hybrid unavailable and lexical fallback used). Matches on `Name`, `Category`, `Status` fields; clamps `topK` (default 25, max 200).
+
+Vector provider optional—if embeddings are configured the service blends vector + keyword; otherwise it degrades gracefully.
 
 ## Entity Model
 
@@ -393,6 +436,46 @@ services.AddSingleton<IPantryVisionService, OllamaVisionService>();
 **Level 5: Advanced** - Meal prep workflows, batch cooking
 
 ## Development Tips
+
+### Ingestion Hardening Summary
+Recent enhancements:
+* File validation: size + extension whitelist
+* Duplicate suppression per photo (detections already confirmed ignored)
+* Shelf-life inference: category-based default expiration (configurable in `S16:Ingestion`)
+* Structured error responses (400 validation / 404 missing photo)
+
+`IngestionOptions` (env prefix `S16__Ingestion__`):
+```json
+{
+  "S16": {
+    "Ingestion": {
+      "MaxUploadBytes": 5242880,
+      "AllowedExtensions": [".jpg", ".jpeg", ".png", ".webp"],
+      "DefaultShelfLifeDaysByCategory": { "produce":5, "dairy":7, "bakery":3, "meat":3 }
+    }
+  }
+}
+```
+
+### Flight-Once Seeding
+`PantrySeedHostedService` inserts baseline pantry items if store empty at boot; idempotent and safe under concurrency.
+
+### Container & Compose
+Build and run with the provided multi-stage `Dockerfile` and compose file:
+```bash
+docker compose -f samples/S16.PantryPal/docker/docker-compose.yml up --build
+```
+Service: http://localhost:8080
+
+### MVP Operational Checklist
+- [ ] Pagination default (25) & clamp (200)
+- [ ] Ingestion upload + confirm creates items
+- [ ] Duplicate detections ignored
+- [ ] Shelf-life inferred when missing expiration
+- [ ] Search returns items & sets `X-Search-Degraded`
+- [ ] Meal suggestions produce scored results
+- [ ] Seed ran once (subsequent boots skip)
+- [ ] Container responds on 8080
 
 ### Adding New Recipes
 

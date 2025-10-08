@@ -1,4 +1,5 @@
 ﻿using Koan.Data.Core;
+using Microsoft.Extensions.Options;
 using Microsoft.AspNetCore.Mvc;
 using S16.PantryPal.Infrastructure;
 using S16.PantryPal.Models;
@@ -9,9 +10,15 @@ namespace S16.PantryPal.Controllers;
 
 [ApiController]
 [Route(PantryRoutes.IngestionBase)]
-public class PantryIngestionController(IPantryVisionService visionService, IPantryInputParser inputParser, IPantryConfirmationService confirmationService)
+public class PantryIngestionController(
+    IPantryVisionService visionService,
+    IPantryInputParser inputParser,
+    IPantryConfirmationService confirmationService,
+    IPhotoStorage photoStorage,
+    IOptions<IngestionOptions>? ingestionOptions = null)
     : ControllerBase
 {
+    private readonly IngestionOptions _opts = ingestionOptions?.Value ?? new();
     [HttpPost("upload")]
     public async Task<IActionResult> UploadPhoto(
         [FromForm] IFormFile photo,
@@ -20,26 +27,32 @@ public class PantryIngestionController(IPantryVisionService visionService, IPant
         [FromForm] string? userId = null,
         CancellationToken ct = default)
     {
-        if (photo == null || photo.Length == 0)
+        if (photo == null)
             return BadRequest(new { error = "Photo is required" });
+        if (photo.Length == 0)
+            return BadRequest(new { error = "Photo is empty" });
+        if (photo.Length > _opts.MaxUploadBytes)
+            return BadRequest(new { error = $"Photo exceeds max size {_opts.MaxUploadBytes} bytes" });
+        var ext = Path.GetExtension(photo.FileName).ToLowerInvariant();
+        if (_opts.AllowedExtensions.Count > 0 && !_opts.AllowedExtensions.Contains(ext))
+            return BadRequest(new { error = $"File type '{ext}' not allowed" });
+
+        // Persist photo through storage abstraction
+        await using var uploadStream = photo.OpenReadStream();
+        var storageKey = await photoStorage.StoreAsync(uploadStream, photo.FileName, photo.ContentType, ct);
 
         var photoRecord = new PantryPhoto
         {
             OriginalFileName = photo.FileName,
-            StoragePath = $"photos/{Guid.NewGuid()}{Path.GetExtension(photo.FileName)}",
+            StoragePath = storageKey,
             UploadedBy = userId,
             ProcessingStatus = "processing"
         };
         await photoRecord.Save();
 
-        var photoPath = Path.Combine("photos", Path.GetFileName(photoRecord.StoragePath));
-        Directory.CreateDirectory(Path.GetDirectoryName(photoPath)!);
-        await using (var stream = new FileStream(photoPath, FileMode.Create))
-        {
-            await photo.CopyToAsync(stream, ct);
-        }
+        using var imageStream = await photoStorage.OpenReadAsync(storageKey, ct);
 
-        using var imageStream = System.IO.File.OpenRead(photoPath);
+        // Thumbnails intentionally omitted (noise for MVP). A future enhancement could plug an image pipeline here.
         var options = new VisionProcessingOptions
         {
             DetectQuantities = detectQuantities,
@@ -49,7 +62,23 @@ public class PantryIngestionController(IPantryVisionService visionService, IPant
 
         var result = await visionService.ProcessPhotoAsync(photoRecord.Id, imageStream, options, ct);
 
-        photoRecord.ProcessingStatus = result.Success ? "completed" : "failed";
+        // Idempotency / duplicate avoidance (basic): remove detections that already became pantry items for same photo
+        if (result.Detections is { Length: >0 })
+        {
+            var existingItems = await PantryItem.Query(p => p.SourcePhotoId == photoRecord.Id, ct);
+            var existingNames = existingItems.Select(i => (i.Name ?? string.Empty).Trim().ToLowerInvariant()).ToHashSet();
+            foreach (var d in result.Detections)
+            {
+                // Use top candidate as canonical name for duplicate detection
+                var candidateName = d.Candidates.FirstOrDefault()?.Name;
+                if (!string.IsNullOrWhiteSpace(candidateName) && existingNames.Contains(candidateName.Trim().ToLowerInvariant()))
+                {
+                    d.Status = "duplicate";
+                }
+            }
+        }
+
+    photoRecord.ProcessingStatus = result.Success ? "completed" : "failed";
         photoRecord.Detections = result.Detections;
         photoRecord.ProcessingTimeMs = result.ProcessingTimeMs;
         photoRecord.Metrics = result.Metrics;
@@ -70,6 +99,16 @@ public class PantryIngestionController(IPantryVisionService visionService, IPant
         try
         {
             var confirmed = await confirmationService.ConfirmDetectionsAsync(photoId, request.Confirmations, visionService, inputParser, ct);
+
+            // Shelf-life inference (post-confirm) for items missing ExpiresAt
+            foreach (var item in confirmed)
+            {
+                if (item.ExpiresAt == null && _opts.DefaultShelfLifeDaysByCategory.TryGetValue((item.Category ?? string.Empty).ToLowerInvariant(), out var days) && days > 0)
+                {
+                    item.ExpiresAt = DateTime.UtcNow.AddDays(days);
+                    await item.Save();
+                }
+            }
             return Ok(new
             {
                 confirmed = confirmed.Count,

@@ -18,7 +18,6 @@ public sealed class PantryPhoto : Entity<PantryPhoto>
     /// <summary>Koan.Storage path to original photo</summary>
     public string StoragePath { get; set; } = "";
 
-    public string? ThumbnailPath { get; set; }
     public string OriginalFileName { get; set; } = "";
     public int Width { get; set; }
     public int Height { get; set; }

@@ -6,11 +6,27 @@ using S16.PantryPal.Controllers;
 using S16.PantryPal.Services;
 using S16.PantryPal.Models;
 using S16.PantryPal.Contracts;
+using Koan.Data.Core.Model;
 
 namespace S16.PantryPal.Tests;
 
+[Collection("KoanHost")]
 public class IngestionFlowTests
 {
+    private sealed class FakePhotoStorage : IPhotoStorage
+    {
+        private readonly Dictionary<string, byte[]> _store = new();
+        public Task<string> StoreAsync(Stream content, string originalFileName, string? contentType, CancellationToken ct = default)
+        {
+            using var ms = new MemoryStream();
+            content.CopyTo(ms);
+            var key = $"photos/{Guid.NewGuid()}{Path.GetExtension(originalFileName)}";
+            _store[key] = ms.ToArray();
+            return Task.FromResult(key);
+        }
+        public Task<Stream> OpenReadAsync(string key, CancellationToken ct = default)
+            => Task.FromResult<Stream>(new MemoryStream(_store[key]));
+    }
     private sealed class FakeVision : IPantryVisionService
     {
         public Task<VisionProcessingResult> ProcessPhotoAsync(string photoId, Stream image, VisionProcessingOptions options, CancellationToken ct = default)
@@ -21,22 +37,22 @@ public class IngestionFlowTests
                 ProcessingTimeMs = 12,
                 Detections = new []
                 {
-                    new VisionDetection
+                    new PantryDetection
                     {
                         Id = "d1",
-                        Candidates = new [] { new VisionCandidate { Id = "c1", Name = "banana", Confidence = 0.88f, DefaultUnit = "whole" } },
+                        Candidates = new [] { new DetectionCandidate { Id = "c1", Name = "banana", Confidence = 0.88f, DefaultUnit = "whole" } },
                         ParsedData = new ParsedItemData { Quantity = 1, Unit = "whole" }
                     }
                 }
             });
         }
 
-        public Task LearnFromCorrectionAsync(string original, string corrected, string userInput, CancellationToken ct = default) => Task.CompletedTask;
+        public Task LearnFromCorrectionAsync(string originalName, string correctedName, string? correctedQuantity, CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 
     private sealed class FakeParser : IPantryInputParser
     {
-        public ParsedItemData? ParseInput(string input) => new ParsedItemData { Quantity = 3, Unit = "whole", ExpiresAt = DateTime.UtcNow.AddDays(4) };
+    public ParsedItemData ParseInput(string input, ParserContext? context = null) => new ParsedItemData { Quantity = 3, Unit = "whole", ExpiresAt = DateTime.UtcNow.AddDays(4) };
     }
 
     [Fact]
@@ -46,7 +62,8 @@ public class IngestionFlowTests
         var parser = new FakeParser();
         var confirm = new PantryConfirmationService();
 
-        var controller = new PantryIngestionController(vision, parser, confirm)
+        var photoStorage = new FakePhotoStorage();
+        var controller = new PantryIngestionController(vision, parser, confirm, photoStorage)
         {
             ControllerContext = new ControllerContext
             {
@@ -67,9 +84,9 @@ public class IngestionFlowTests
         var photoId = (string?)uploadResult!.Value!.GetType().GetProperty("photoId")?.GetValue(uploadResult.Value!)!;
         photoId.Should().NotBeNullOrEmpty();
 
-        var confirmRequest = new ConfirmDetectionsRequest
+        var confirmRequest = new S16.PantryPal.Contracts.ConfirmDetectionsRequest
         {
-            Confirmations = new [] { new DetectionConfirmation { DetectionId = "d1", UserInput = "3 whole" } }
+            Confirmations = new [] { new S16.PantryPal.Contracts.DetectionConfirmation { DetectionId = "d1", UserInput = "3 whole" } }
         };
 
         var confirmResult = await controller.ConfirmDetections(photoId, confirmRequest, CancellationToken.None) as OkObjectResult;

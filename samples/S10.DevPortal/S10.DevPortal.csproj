@@ -18,4 +18,5 @@
     <ProjectReference Include="..\..\src\\Connectors\\Data\\Postgres\Koan.Data.Connector.Postgres.csproj" />
     <ProjectReference Include="..\..\src\\Connectors\\Data\\Sqlite\Koan.Data.Connector.Sqlite.csproj" />
   </ItemGroup>
+ 
 </Project>

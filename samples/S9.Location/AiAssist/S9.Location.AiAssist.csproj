@@ -7,10 +7,9 @@
     <UserSecretsId>dotnet-S9.Location.AiAssist-f91a86c4-8c2e-4eb5-b6a3-af9a712b1324</UserSecretsId>
   </PropertyGroup>
 
-  <ItemGroup>
-    <FrameworkReference Include="Microsoft.AspNetCore.App" />
-  </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.0" />
   </ItemGroup>
 </Project>

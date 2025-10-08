@@ -1,0 +1,17 @@
+﻿version: '3.9'
+services:
+  pantry:
+    build:
+      context: ../..
+      dockerfile: samples/S16.PantryPal/Dockerfile
+    image: s16.pantrypal:latest
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      S16__Ingestion__MaxUploadBytes: 5242880
+    ports:
+      - "8080:8080"
+    volumes:
+      - pantry_photos:/app/photos
+    restart: unless-stopped
+volumes:
+  pantry_photos: {}
