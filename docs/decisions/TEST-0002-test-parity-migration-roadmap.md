@@ -31,6 +31,13 @@ Update this section as work ships. Use `[x]` when done, `[ ]` when pending, and 
 - [x] Recreate backup/export flow tests with deterministic seed packs (`EntityTransferDsl` spec, Koan.Tests.Data.Core).
 - [ ] Stand up connector suites for InMemory, Json, Mongo, Postgres, Redis, Sqlite, Backup, and Weaviate (capabilities, CRUD, bulk/health).
 	- [x] InMemory (`tests/Suites/Data/Connector.InMemory/Koan.Data.Connector.InMemory.Tests`) – CRUD, partition isolation, batch, instructions, and capability probes.
+	- [x] Mongo (`tests/Suites/Data/Connector.Mongo/Koan.Data.Connector.Mongo.Tests`) – CRUD, partition isolation, instructions, batching, and capability coverage with Docker/CLI fallback fixtures.
+	- [x] Postgres (`tests/Suites/Data/Connector.Postgres/Koan.Data.Connector.Postgres.Tests`) – CRUD, health, partition isolation, and batch specs passing under Docker fallback.
+	- [ ] Json – pending port, requires refreshed file-based fixture story.
+	- [ ] Redis – blocked on aligning new adapter harness with cache suite outputs.
+	- [ ] Sqlite – awaiting refreshed seed packs.
+	- [ ] Backup – needs new instruction harness.
+	- [ ] Weaviate – waiting on connector discovery updates.
 
 ### Web
 - [ ] Port Canon admin/entities/models controller specs using TestPipeline HTTP harnesses.

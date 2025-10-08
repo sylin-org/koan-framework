@@ -1,0 +1,5 @@
+﻿suite: Koan.Data.Connector.Json.Tests
+lane: fast
+scope: connector
+module: Data.Connector.Json
+description: Fast coverage for the JSON data connector validating CRUD, partition routing, batching, instructions, and capability probes.
