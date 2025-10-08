@@ -33,11 +33,11 @@ Update this section as work ships. Use `[x]` when done, `[ ]` when pending, and 
 	- [x] InMemory (`tests/Suites/Data/Connector.InMemory/Koan.Data.Connector.InMemory.Tests`) – CRUD, partition isolation, batch, instructions, and capability probes.
 	- [x] Mongo (`tests/Suites/Data/Connector.Mongo/Koan.Data.Connector.Mongo.Tests`) – CRUD, partition isolation, instructions, batching, and capability coverage with Docker/CLI fallback fixtures.
 	- [x] Postgres (`tests/Suites/Data/Connector.Postgres/Koan.Data.Connector.Postgres.Tests`) – CRUD, health, partition isolation, and batch specs passing under Docker fallback.
-	- [ ] Json – pending port, requires refreshed file-based fixture story.
-	- [ ] Redis – blocked on aligning new adapter harness with cache suite outputs.
-	- [ ] Sqlite – awaiting refreshed seed packs.
-	- [ ] Backup – needs new instruction harness.
-	- [ ] Weaviate – waiting on connector discovery updates.
+	- [x] Json (`tests/Suites/Data/Connector.Json/Koan.Data.Connector.Json.Tests`) – CRUD, batch, and capability specs implemented and validated.
+	- [x] Redis (`tests/Suites/Data/Connector.Redis/Koan.Data.Connector.Redis.Tests`) – CRUD, batch, and capability specs implemented and validated.
+	- [ ] Sqlite (`tests/Suites/Data/Connector.Sqlite/Koan.Data.Connector.Sqlite.Tests`) – Suite scaffolded, initial CRUD spec implemented, pending batch/health/capability coverage and seed pack validation.
+	- [ ] Backup (`tests/Suites/Data/Connector.Backup/Koan.Data.Connector.Backup.Tests`) – Suite scaffolded, pending instruction harness for export/import roundtrip tests.
+	- [ ] Weaviate (`tests/Suites/Data/Connector.Weaviate/Koan.Data.Connector.Weaviate.Tests`) – Suite scaffolded, blocked on connector discovery updates and vector fixture readiness.
 
 ### Web
 - [ ] Port Canon admin/entities/models controller specs using TestPipeline HTTP harnesses.

@@ -1,0 +1,8 @@
+﻿# Backup Connector Test Suite
+id: connector-backup
+name: Backup Connector
+category: data-connector
+status: in-progress
+description: |
+  Test suite for Koan.Data.Connector.Backup covering backup/export flows, instruction harness, and capability probes.
+  Mirrors patterns from Core and InMemory connector suites.
