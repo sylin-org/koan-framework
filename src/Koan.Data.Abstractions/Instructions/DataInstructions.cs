@@ -7,4 +7,5 @@ public static class DataInstructions
 {
     public const string EnsureCreated = "data.ensureCreated";
     public const string Clear = "data.clear";
+    public const string Patch = "data.patch";
 }

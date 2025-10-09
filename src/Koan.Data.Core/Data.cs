@@ -305,6 +305,61 @@ public static class Data<TEntity, TKey>
     public static Task<long> RemoveAllAsync(RemoveStrategy strategy, string partition, CancellationToken ct = default)
     { using var _ = WithPartition(partition); return Repo.RemoveAllAsync(strategy, ct); }
 
+    /// <summary>
+    /// Applies a patch to an entity by id using a transport-agnostic PatchRequest.
+    /// Tries adapter instruction execution (data.patch), else performs read-modify-upsert locally.
+    /// </summary>
+    public static async Task<TEntity?> PatchAsync(
+        Koan.Data.Abstractions.Instructions.PatchRequest<TKey, TEntity> request,
+        MergePatchNullPolicy? mergeNulls = null,
+        PartialJsonNullPolicy? partialNulls = null,
+        CancellationToken ct = default)
+    {
+        var repo = Repo;
+        if (repo is Koan.Data.Abstractions.Instructions.IInstructionExecutor<TEntity> exec)
+        {
+            try
+            {
+                var result = await exec.ExecuteAsync<TEntity?>(new Koan.Data.Abstractions.Instructions.Instruction(Koan.Data.Abstractions.Instructions.DataInstructions.Patch, request), ct).ConfigureAwait(false);
+                return result;
+            }
+            catch (NotSupportedException) { /* fall back */ }
+        }
+
+        var current = await repo.GetAsync(request.Id, ct).ConfigureAwait(false);
+        if (current is null) return null;
+        var m = mergeNulls ?? MergePatchNullPolicy.SetDefault;
+        var p = partialNulls ?? PartialJsonNullPolicy.SetNull;
+        var applicator = Koan.Data.Core.Patch.PatchApplicators.Create<TEntity, TKey>(request.Kind, request.Payload!, m, p);
+        applicator.Apply(current);
+        return await repo.UpsertAsync(current, ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Applies canonical patch operations to an entity by id.
+    /// Attempts adapter execution (data.patch) with the payload; otherwise read-modify-upsert.
+    /// </summary>
+    public static async Task<TEntity?> PatchAsync(
+        Koan.Data.Abstractions.Instructions.PatchPayload<TKey> payload,
+        CancellationToken ct = default)
+    {
+        var repo = Repo;
+        if (repo is Koan.Data.Abstractions.Instructions.IInstructionExecutor<TEntity> exec)
+        {
+            try
+            {
+                var result = await exec.ExecuteAsync<TEntity?>(new Koan.Data.Abstractions.Instructions.Instruction(Koan.Data.Abstractions.Instructions.DataInstructions.Patch, payload), ct).ConfigureAwait(false);
+                if (result is not null) return result;
+            }
+            catch (NotSupportedException) { /* fallback */ }
+        }
+
+        var current = await repo.GetAsync(payload.Id, ct).ConfigureAwait(false);
+        if (current is null) return null;
+        Koan.Data.Core.Patch.PatchOpsExecutor.Apply<TEntity, TKey>(current, payload);
+        return await repo.UpsertAsync(current, ct).ConfigureAwait(false);
+    }
+
     public static Task<TEntity> UpsertAsync(TEntity model, CancellationToken ct = default) => Repo.UpsertAsync(model, ct);
     public static Task<int> UpsertManyAsync(IEnumerable<TEntity> models, CancellationToken ct = default) => Repo.UpsertManyAsync(models, ct);
     public static IBatchSet<TEntity, TKey> Batch() => Repo.CreateBatch();

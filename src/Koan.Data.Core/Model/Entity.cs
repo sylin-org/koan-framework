@@ -430,6 +430,92 @@ namespace Koan.Data.Core.Model
         public static Task<long> RemoveAll(RemoveStrategy strategy, string partition, CancellationToken ct = default)
             => Data<TEntity, TKey>.RemoveAllAsync(strategy, partition, ct);
 
+        // --- Patch convenience statics (DX sugar, normalize to canonical PatchOps) ---
+        // Null → null semantics (application/json partial JSON)
+        public static Task<TEntity?> Patch(TKey id, object partial, Koan.Data.Abstractions.Instructions.PartialJsonNullPolicy? nulls = null, CancellationToken ct = default)
+        {
+            if (partial is null) throw new ArgumentNullException(nameof(partial));
+            var ops = new List<Koan.Data.Abstractions.Instructions.PatchOp>();
+            // Use Newtonsoft for consistent token walking used elsewhere
+            var jt = Newtonsoft.Json.Linq.JToken.FromObject(partial);
+            void Walk(Newtonsoft.Json.Linq.JToken token, string basePath)
+            {
+                if (token is Newtonsoft.Json.Linq.JObject obj)
+                {
+                    foreach (var p in obj.Properties())
+                    {
+                        var path = basePath + "/" + p.Name;
+                        if (p.Value.Type == Newtonsoft.Json.Linq.JTokenType.Object)
+                        {
+                            Walk(p.Value, path);
+                        }
+                        else if (p.Value.Type == Newtonsoft.Json.Linq.JTokenType.Null)
+                        {
+                            ops.Add(new Koan.Data.Abstractions.Instructions.PatchOp("replace", path, null, Newtonsoft.Json.Linq.JValue.CreateNull()));
+                        }
+                        else
+                        {
+                            ops.Add(new Koan.Data.Abstractions.Instructions.PatchOp("replace", path, null, p.Value.DeepClone()));
+                        }
+                    }
+                }
+                else
+                {
+                    ops.Add(new Koan.Data.Abstractions.Instructions.PatchOp("replace", basePath, null, token.DeepClone()));
+                }
+            }
+            Walk(jt, "");
+            ops = ops.Select(o => o with { Path = o.Path.StartsWith('/') ? o.Path : "/" + o.Path.TrimStart('/') }).ToList();
+            var options = new Koan.Data.Abstractions.Instructions.PatchOptions(
+                Koan.Data.Abstractions.Instructions.MergePatchNullPolicy.SetDefault,
+                nulls ?? Koan.Data.Abstractions.Instructions.PartialJsonNullPolicy.SetNull,
+                Koan.Data.Abstractions.Instructions.ArrayBehavior.Replace);
+            var payload = new Koan.Data.Abstractions.Instructions.PatchPayload<TKey>(id, null, null, "partial-json", ops, options);
+            return Data<TEntity, TKey>.PatchAsync(payload, ct);
+        }
+
+        // Null → default semantics (application/merge-patch+json)
+        public static Task<TEntity?> PatchMerge(TKey id, object delta, Koan.Data.Abstractions.Instructions.MergePatchNullPolicy? nulls = null, CancellationToken ct = default)
+        {
+            if (delta is null) throw new ArgumentNullException(nameof(delta));
+            var jt = Newtonsoft.Json.Linq.JToken.FromObject(delta);
+            var ops = new List<Koan.Data.Abstractions.Instructions.PatchOp>();
+            void Walk(Newtonsoft.Json.Linq.JToken token, string basePath)
+            {
+                if (token is Newtonsoft.Json.Linq.JObject obj)
+                {
+                    foreach (var p in obj.Properties())
+                    {
+                        var path = basePath + "/" + p.Name;
+                        if (p.Value.Type == Newtonsoft.Json.Linq.JTokenType.Object)
+                        {
+                            Walk(p.Value, path);
+                        }
+                        else if (p.Value.Type == Newtonsoft.Json.Linq.JTokenType.Null)
+                        {
+                            ops.Add(new Koan.Data.Abstractions.Instructions.PatchOp("remove", path, null, null));
+                        }
+                        else
+                        {
+                            ops.Add(new Koan.Data.Abstractions.Instructions.PatchOp("replace", path, null, p.Value.DeepClone()));
+                        }
+                    }
+                }
+                else
+                {
+                    ops.Add(new Koan.Data.Abstractions.Instructions.PatchOp("replace", basePath, null, token.DeepClone()));
+                }
+            }
+            Walk(jt, "");
+            ops = ops.Select(o => o with { Path = o.Path.StartsWith('/') ? o.Path : "/" + o.Path.TrimStart('/') }).ToList();
+            var options = new Koan.Data.Abstractions.Instructions.PatchOptions(
+                nulls ?? Koan.Data.Abstractions.Instructions.MergePatchNullPolicy.SetDefault,
+                Koan.Data.Abstractions.Instructions.PartialJsonNullPolicy.SetNull,
+                Koan.Data.Abstractions.Instructions.ArrayBehavior.Replace);
+            var payload = new Koan.Data.Abstractions.Instructions.PatchPayload<TKey>(id, null, null, "merge-patch", ops, options);
+            return Data<TEntity, TKey>.PatchAsync(payload, ct);
+        }
+
         /// <summary>
         /// Indicates whether the current provider supports fast removal (TRUNCATE/DROP).
         /// </summary>
