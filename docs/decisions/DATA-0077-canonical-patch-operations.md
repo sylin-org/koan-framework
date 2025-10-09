@@ -18,9 +18,9 @@ Koan previously supported only RFC 6902 (application/json-patch+json) on entity 
 
 - A single, transport-agnostic patch contract that works over HTTP and non-HTTP (e.g., MQ, jobs) without leaking web-specific types
 - First-class support for three PATCH formats at the HTTP edge:
-  1) application/json (partial JSON)
-  2) application/merge-patch+json (RFC 7386)
-  3) application/json-patch+json (RFC 6902)
+  1. application/json (partial JSON)
+  2. application/merge-patch+json (RFC 7386)
+  3. application/json-patch+json (RFC 6902)
 - Clear and configurable null semantics for merge/partial
 - Provider transparency with optional pushdown where adapters can apply patch ops atomically
 
@@ -31,6 +31,7 @@ Adopt a canonical patch block built from a simple envelope plus a list of operat
 Contract (canonical):
 
 - PatchPayload<TKey>
+
   - id: TKey
   - set?: string (partition)
   - etag?: string (If-Match concurrency)
@@ -84,12 +85,14 @@ Policies (KoanWebOptions):
 ## Consequences
 
 Positive:
+
 - One ubiquitous patch block for HTTP/MQ/Jobs; simple for hooks and tests
 - Standards-compliant at the edge while remaining provider-agnostic internally
 - Adapters can optionally implement atomic patch ops; others automatically fallback
 - Clear, configurable null semantics; arrays are consistent (replace by default)
 
 Negative/risks:
+
 - JSON Patch `test` op requires atomic semantics to be meaningful; if unsupported by adapter, it should fail clearly (capability advertised)
 - Identity mutation is deliberately excluded from PATCH to avoid integrity pitfalls; requires explicit rename command if needed
 
@@ -103,11 +106,11 @@ Success criteria: ops applied per semantics; hooks/transformers run; headers pop
 
 ## Edge cases
 
-1) Non-nullable with merge null: defaults to default(T) (configurable)
-2) Arrays: always replaced in merge/partial; use 6902 for granular array ops
-3) Dictionaries: merge-patch null removes key; partial-json follows null policy
-4) JSON Patch `test`: only valid when adapter can atomically evaluate + apply
-5) Attempts to patch `/id`: rejected by default
+1. Non-nullable with merge null: defaults to default(T) (configurable)
+2. Arrays: always replaced in merge/partial; use 6902 for granular array ops
+3. Dictionaries: merge-patch null removes key; partial-json follows null policy
+4. JSON Patch `test`: only valid when adapter can atomically evaluate + apply
+5. Attempts to patch `/id`: rejected by default
 
 ## References
 

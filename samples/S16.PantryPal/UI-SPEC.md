@@ -1,6 +1,6 @@
 ﻿# S16 PantryPal — UI Specification (AngularJS + Tailwind)
 
-Calm Utility UI for a single-page AngularJS app using `ngRoute` with hash-based routing. Mobile-first with responsive density. Entity-first REST surface is primary (api/data/* with q, filter, sort, page, pageSize, with, view); actions are verb routes under api/action/*.
+Calm Utility UI for a single-page AngularJS app using `ngRoute` with hash-based routing. Mobile-first with responsive density. Entity-first REST surface is primary (api/data/_ with q, filter, sort, page, pageSize, with, view); actions are verb routes under api/action/_.
 
 ## Routes
 
@@ -41,7 +41,7 @@ Calm Utility UI for a single-page AngularJS app using `ngRoute` with hash-based 
 - Data: `GET /api/data/{model}?filter={...}&q=&page=&pageSize=&sort=&with=&view=`
   - pageSize default 50
   - Use q for hybrid search (semantic+lexical when available)
-  - with is supported; with=* allowed (use judiciously)
+  - with is supported; with=\* allowed (use judiciously)
 - Actions:
   - `POST /api/action/pantry/upload` (multipart)
   - `POST /api/action/pantry/confirm/{photoId}`
@@ -50,58 +50,70 @@ Calm Utility UI for a single-page AngularJS app using `ngRoute` with hash-based 
 ## #/dashboard
 
 Frame
+
 - Header bar: app name, global search with JSON filter toggle (modal)
 - Quick Actions: FAB [Add via Camera]; overflow includes [Upload]
 - Sections (stack)
-  1) Expiring Soon (card list, max 5)
-  2) Suggested Meals (carousel of 3)
-  3) Insights Mini (sparkline + totals)
+  1. Expiring Soon (card list, max 5)
+  2. Suggested Meals (carousel of 3)
+  3. Insights Mini (sparkline + totals)
 
 Bindings
+
 - Expiring Soon: `GET /api/data/pantry?filter={"ExpiresAt":{"$lte":"<ISO+7days>"},"Status":"available"}&page=1&pageSize=5&sort=ExpiresAt`
 - Suggested Meals: `POST /api/meals/suggest` (mock allowed)
 - Insights mini: `GET /api/pantry-insights/stats`
 - Degraded chip if any above returns `X-Search-Degraded: 1`
 
 States
+
 - Loading skeletons; Empty and Error banners with retry
 
 A11y
+
 - FAB aria-label; carousel operable via keyboard; chips described via aria-labels
 
 ## #/pantry (Inventory)
 
 Controls
+
 - Search (q=) input; JSON filter editor (modal)
 - Filter chips: Category, Status, “Expiring <7d” (writes filter JSON)
 - Sort dropdown: ExpiresAt↑↓, Name↑↓, Category↑↓ (writes sort)
 
 Layout
+
 - Mobile: 2-col card grid, infinite scroll
 - Desktop: 3–4 cols; show pager when desktop or when any filter active
 
 Card
+
 - Title (name), category chip, status chip
 - Qty stepper (optimistic) and unit; `PATCH /api/data/pantry/{id}` partial
 - Expires chip (color by threshold); optional photo thumb
 - [Edit] opens side drawer with full details; [More] includes delete (confirm)
 
 Banners
+
 - Degraded chip near search if header present
 
 States
+
 - Loading skeleton grid; Empty prompt to Capture/Upload; Error banner
 
 A11y
+
 - Stepper controls keyboard operable; drawer focus trapping; visible focus rings
 
 ## #/capture → #/review → #/confirm/:photoId
 
 #/capture
+
 - CTAs: [Take Photo] and [Upload Photo]; camera permission handling; recent photos tray
 - On success (upload): navigate to `#/review?photoId=...`
 
 #/review
+
 - Photo canvas with bounding boxes; select opens right drawer
 - Drawer
   - Top candidates (3 chips with confidences)
@@ -110,33 +122,41 @@ A11y
 - Build confirmations[] in local state
 
 #/confirm/:photoId
+
 - POST `/api/action/pantry/confirm/{photoId}` with confirmations[]
 - Success summary: items created/updated, duplicates suppressed, shelf-life notes
 - Actions: [Add another] and [Go to Pantry]
 
 A11y
+
 - Boxes focusable with visible outlines; drawer and modal keyboard navigable; Escape closes
 
 ## #/meals (Suggest & Plan)
 
 Controls
+
 - DietaryRestrictions multiselect; maxCookingMinutes slider; CTA [Suggest meals]
 
 Results
+
 - Recipe cards with score, availability; missingIngredients chips; CTA [Add to Plan]
 
 Planner
+
 - Days columns with droppable slots; total time indicator; CTA [Generate Shopping List]
 
 APIs
+
 - POST `/api/meals/suggest`
 - POST `/api/meals/plan`
 - POST `/api/meals/shopping/{planId}`
 
 States
+
 - Loading, Empty, Partial success table for plan/shopping
 
 A11y
+
 - Drag-drop keyboard equivalent via [Move] menu; ARIA live announcements
 
 ## #/shopping-list
@@ -146,6 +166,7 @@ A11y
 - Empty: “Nothing missing — great job!”
 
 A11y
+
 - Group headings; checkbox labels; keyboard access for bulk and export
 
 ## #/insights
@@ -155,20 +176,24 @@ A11y
 - Degraded/empty visuals; toggle “Show data table” for each chart
 
 A11y
+
 - Charts have aria-label and data table toggles; keyboard navigable segments
 
 ## #/behind-the-scenes (Koan)
 
 Sections
-1) Entity-first patterns: curl snippets for current route params (CRUD, paging, filter JSON, sort, q, with)
-2) Capability matrix: list features visible (e.g., “EntityController<T> • paging, filter, sort, q, with”)
-3) Requests: last 3 API calls (redacted), include headers like `X-Search-Degraded`
-4) Environment: test auth status, paging defaults
+
+1. Entity-first patterns: curl snippets for current route params (CRUD, paging, filter JSON, sort, q, with)
+2. Capability matrix: list features visible (e.g., “EntityController<T> • paging, filter, sort, q, with”)
+3. Requests: last 3 API calls (redacted), include headers like `X-Search-Degraded`
+4. Environment: test auth status, paging defaults
 
 Bindings
+
 - `$http` interceptor feeds a ring buffer; copy-to-clipboard on snippets
 
 A11y
+
 - Code blocks selectable; copy buttons have aria-label and success announcements
 
 ## Koan Capabilities Overlay

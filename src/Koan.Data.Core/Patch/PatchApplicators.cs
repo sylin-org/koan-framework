@@ -86,7 +86,7 @@ public sealed class MergePatchApplicator<TEntity> : IPatchApplicator<TEntity>
         // Don't allow Id overwrite
         srcObj.Remove("Id");
         var destObj = JObject.FromObject(dest);
-    destObj.Merge(srcObj, new JsonMergeSettings { MergeArrayHandling = MergeArrayHandling.Replace, MergeNullValueHandling = MergeNullValueHandling.Merge });
+        destObj.Merge(srcObj, new JsonMergeSettings { MergeArrayHandling = MergeArrayHandling.Replace, MergeNullValueHandling = MergeNullValueHandling.Merge });
         using var reader = destObj.CreateReader();
         var serializer = Newtonsoft.Json.JsonSerializer.CreateDefault();
         serializer.Populate(reader, dest);
@@ -154,7 +154,7 @@ public sealed class PartialJsonApplicator<TEntity> : IPatchApplicator<TEntity>
         var srcObj = JObject.FromObject(src);
         srcObj.Remove("Id");
         var destObj = JObject.FromObject(dest);
-    destObj.Merge(srcObj, new JsonMergeSettings { MergeArrayHandling = MergeArrayHandling.Replace, MergeNullValueHandling = MergeNullValueHandling.Merge });
+        destObj.Merge(srcObj, new JsonMergeSettings { MergeArrayHandling = MergeArrayHandling.Replace, MergeNullValueHandling = MergeNullValueHandling.Merge });
         using var reader = destObj.CreateReader();
         var serializer = Newtonsoft.Json.JsonSerializer.CreateDefault();
         serializer.Populate(reader, dest);

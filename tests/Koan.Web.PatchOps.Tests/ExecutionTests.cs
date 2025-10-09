@@ -115,11 +115,11 @@ public class ExecutionTests
         };
         var payload = new PatchPayload<string>(e.Id, null, null, "ops", ops, new PatchOptions());
         PatchOpsExecutor.Apply<DummyEntity, string>(e, payload);
-    var newChild = e.Sub.Bag["newChild"] as JObject;
-    newChild.Should().NotBeNull();
-    var deeper = newChild!["deeper"];
-    deeper.Should().NotBeNull();
-    deeper!.Value<int>().Should().Be(1);
+        var newChild = e.Sub.Bag["newChild"] as JObject;
+        newChild.Should().NotBeNull();
+        var deeper = newChild!["deeper"];
+        deeper.Should().NotBeNull();
+        deeper!.Value<int>().Should().Be(1);
     }
 
     [Fact]
@@ -133,12 +133,12 @@ public class ExecutionTests
         };
         var payload = new PatchPayload<string>(e.Id, null, null, "ops", ops, new PatchOptions());
         PatchOpsExecutor.Apply<DummyEntity, string>(e, payload);
-    var slash = e.Props["a/b"];
-    slash.Should().NotBeNull();
-    slash!.Value<string>().Should().Be("slash");
-    var tilde = e.Props["a~b"];
-    tilde.Should().NotBeNull();
-    tilde!.Value<string>().Should().Be("tilde");
+        var slash = e.Props["a/b"];
+        slash.Should().NotBeNull();
+        slash!.Value<string>().Should().Be("slash");
+        var tilde = e.Props["a~b"];
+        tilde.Should().NotBeNull();
+        tilde!.Value<string>().Should().Be("tilde");
     }
 
     [Fact]
@@ -147,8 +147,8 @@ public class ExecutionTests
         var e = new DummyEntity { Name = "A", Sub = new Sub { Note = "n" } };
         var copy = new PatchOp("copy", "/name", "/sub/note", default);
         var payload = new PatchPayload<string>(e.Id, null, null, "ops", new[] { copy }, new PatchOptions());
-    var act = () => PatchOpsExecutor.Apply<DummyEntity, string>(e, payload);
-    act.Should().Throw<NotSupportedException>();
+        var act = () => PatchOpsExecutor.Apply<DummyEntity, string>(e, payload);
+        act.Should().Throw<NotSupportedException>();
     }
 
     [Fact]
@@ -157,8 +157,8 @@ public class ExecutionTests
         var e = new DummyEntity { Sub = new Sub { Note = "hi" } };
         var op = new PatchOp("replace", "/sub/note/leaf", null, new JValue("x"));
         var payload = new PatchPayload<string>(e.Id, null, null, "ops", new[] { op }, new PatchOptions());
-    var act = () => PatchOpsExecutor.Apply<DummyEntity, string>(e, payload);
-    act.Should().Throw<Newtonsoft.Json.JsonReaderException>();
+        var act = () => PatchOpsExecutor.Apply<DummyEntity, string>(e, payload);
+        act.Should().Throw<Newtonsoft.Json.JsonReaderException>();
     }
 
     [Fact]

@@ -17,17 +17,20 @@ Owners: Koan AI Platform, Koan.Mcp Team, Sample Applications
 ## Context
 
 **Problem**: While AI-0014 delivered MCP Code Mode technical capabilities, we need a compelling sample application that demonstrates:
+
 - **Natural AI integration** where AI solves problems that humans can't (vision, semantic search, personalization)
 - **MCP code mode orchestration** handling multi-entity workflows in single roundtrips
 - **Premium UX/DX** showing best practices for Koan + AI applications
 - **Realistic domain** that's immediately understandable and valuable
 
 **Why Traditional Samples Fall Short**:
+
 - Task boards/sprint trackers: Enterprise-focused, don't leverage AI naturally
 - Generic CRUD demos: Miss the "AI magic" that makes modern apps compelling
 - Toy examples: Don't demonstrate real-world complexity
 
 **Target Audience**:
+
 - Developers evaluating Koan Framework for AI-powered applications
 - Teams building consumer-facing AI products
 - Architects designing multi-provider, entity-first systems with AI integration
@@ -39,6 +42,7 @@ Create **S16.PantryPal**: An AI-powered meal planning and pantry management appl
 ### Core Features
 
 **1. Vision-Powered Pantry Management**
+
 - Upload photos of grocery items
 - AI detects items, quantities, expiration dates via computer vision + OCR
 - Multi-candidate selection with natural language input parsing
@@ -46,6 +50,7 @@ Create **S16.PantryPal**: An AI-powered meal planning and pantry management appl
 - Automatic duplicate detection and inventory updates
 
 **2. Intelligent Meal Planning**
+
 - AI suggests recipes based on pantry contents, nutrition goals, preferences
 - Multi-day planning with budget optimization
 - Waste reduction (use items expiring soon)
@@ -53,12 +58,14 @@ Create **S16.PantryPal**: An AI-powered meal planning and pantry management appl
 - Learning from user ratings and corrections
 
 **3. Natural Language Understanding**
+
 - Parse inputs like "5 lbs, expires in a week" or "expires next month"
 - Flexible date parsing (ISO dates, relative dates, month names)
 - Real-time preview of parsed data with warnings
 - Smart defaults based on item category
 
 **4. MCP Code Mode Orchestration**
+
 - Complex workflows in single executions (photo → detection → pantry update → recipe suggestions)
 - Multi-entity aggregations (pantry + meals + nutrition + budget)
 - Conditional logic (if expiring soon, suggest recipes; if over budget, flag)
@@ -84,6 +91,7 @@ Create **S16.PantryPal**: An AI-powered meal planning and pantry management appl
 ### AI Integration Points
 
 **1. Vision Pipeline**
+
 ```
 Photo Upload → AI Detection (Ollama llava / GPT-4 Vision)
             → OCR (Tesseract)
@@ -93,6 +101,7 @@ Photo Upload → AI Detection (Ollama llava / GPT-4 Vision)
 ```
 
 **2. Natural Language Parser**
+
 ```csharp
 IPantryInputParser.ParseInput("5 lbs, expires in a week")
 → { quantity: 5, unit: "lbs", expiresAt: DateTime(+7days) }
@@ -105,6 +114,7 @@ Supports:
 ```
 
 **3. Meal Suggestions** (AI + MCP Orchestration)
+
 ```javascript
 // MCP code mode gathers context in one execution
 const pantry = SDK.Entities.PantryItem.collection();
@@ -126,12 +136,14 @@ const todaysNutrition = /* aggregate from today's meals */;
 ### Developer Experience
 
 **Seeded Data**:
+
 - 50+ recipes across cuisines (Italian, Mexican, Thai, American)
 - Categorized by difficulty, meal type, dietary tags
 - Realistic nutrition data and prep times
 - Sample pantry items with expiration dates
 
 **Code Mode Scripts** (5 examples):
+
 1. Simple dinner suggestion (basic)
 2. Smart suggestion with waste reduction (intermediate)
 3. Week planning with optimization (advanced)
@@ -139,6 +151,7 @@ const todaysNutrition = /* aggregate from today's meals */;
 5. Grocery haul processing (vision integration)
 
 **Documentation**:
+
 - Progressive complexity README
 - API endpoint documentation
 - Vision pipeline architecture diagrams
@@ -150,17 +163,20 @@ const todaysNutrition = /* aggregate from today's meals */;
 ### Why This Domain?
 
 **AI is Essential (Not Bolted On)**:
+
 - Vision: Humans can't parse photos into structured data at scale
 - Personalization: AI learns preferences from rating history
 - Planning: Multi-constraint optimization (nutrition + budget + time + variety)
 - Semantic search: "something creamy and comforting" → recipe matching
 
 **MCP Code Mode is Essential**:
+
 - Photo processing: Check duplicates, update inventory, suggest recipes (4+ entity operations)
 - Meal planning: Aggregate pantry, check history, calculate nutrition, generate shopping list (6+ operations)
 - Learning: User corrections need to update VisionSettings, create feedback records, trigger retraining
 
 **Real-World Value**:
+
 - Universal problem: Everyone asks "what's for dinner?"
 - Immediate utility: Reduces food waste, saves money, improves nutrition
 - Engaging: Visual interface, personalized results, learning over time
@@ -168,17 +184,20 @@ const todaysNutrition = /* aggregate from today's meals */;
 ### Technology Stack
 
 **AI Services**:
+
 - Vision: Ollama (llava) for local dev, OpenAI Vision for production
 - OCR: Tesseract for expiration date reading
 - Barcode: ZXing for product lookup
 - Embeddings: Recipe semantic search (future: vector DB integration)
 
 **Data Storage**:
+
 - SQLite for local dev (simple setup)
 - Multi-provider ready (Postgres, MongoDB, etc.)
 - Koan.Storage for photo persistence
 
 **Frontend** (SPA):
+
 - AngularJS + Tailwind; hash-based routing (ngRoute)
 - Photo upload component
 - Bounding box visualization with side drawer + NL modal
@@ -188,12 +207,14 @@ const todaysNutrition = /* aggregate from today's meals */;
 ## Implementation Phases
 
 ### Phase 1: Core Entities & Basic Features ✅
+
 - [ ] Entity model (Recipe, PantryItem, MealPlan, UserProfile, ShoppingList)
 - [ ] Seed data (50+ recipes, sample pantry)
 - [ ] Basic meal suggestion (no AI)
 - [ ] Manual pantry management
 
 ### Phase 2: Vision Integration 🎯
+
 - [ ] PantryPhoto entity
 - [ ] Upload API + storage
 - [ ] Ollama llava integration for item detection
@@ -202,6 +223,7 @@ const todaysNutrition = /* aggregate from today's meals */;
 - [ ] Detection editor with selection
 
 ### Phase 3: Natural Language Parser 🎯
+
 - [ ] IPantryInputParser implementation
 - [ ] Quantity parsing (various units)
 - [ ] Expiration parsing (ISO, relative, month names)
@@ -209,6 +231,7 @@ const todaysNutrition = /* aggregate from today's meals */;
 - [ ] Parse warnings and confidence scoring
 
 ### Phase 4: MCP Orchestration Scripts
+
 - [ ] Photo processing workflow
 - [ ] Smart meal suggestion with context
 - [ ] Week planning optimization
@@ -216,6 +239,7 @@ const todaysNutrition = /* aggregate from today's meals */;
 - [ ] Grocery haul batch processing
 
 ### Phase 5: Learning & Polish
+
 - [ ] User correction tracking
 - [ ] AI model fine-tuning from feedback
 - [ ] Recipe rating influence
@@ -225,18 +249,21 @@ const todaysNutrition = /* aggregate from today's meals */;
 ## Success Metrics
 
 **Developer Experience**:
+
 - ✅ Working sample in <5 minutes (`dotnet run`)
 - ✅ Clear progression from basic → advanced usage
 - ✅ Copy-pasteable code mode scripts
 - ✅ Well-documented AI integration points
 
 **Technical Demonstration**:
+
 - ✅ Vision AI processing with <2s latency
 - ✅ 4+ entity operations in single MCP execution
 - ✅ Natural language parsing with 90%+ accuracy
 - ✅ Multi-provider data patterns (SQLite → Postgres migration path)
 
 **User Experience**:
+
 - ✅ Intuitive photo upload flow
 - ✅ Interactive bounding box selection
 - ✅ Flexible natural language input
@@ -247,6 +274,7 @@ const todaysNutrition = /* aggregate from today's meals */;
 ### Positive
 
 **Demonstrates Framework Capabilities**:
+
 - Entity-first patterns with real-world complexity
 - Multi-provider data architecture
 - AI service abstraction (Koan.AI)
@@ -254,6 +282,7 @@ const todaysNutrition = /* aggregate from today's meals */;
 - MCP code mode orchestration at scale
 
 **Provides Developer Templates**:
+
 - Vision pipeline implementation
 - Natural language parsing patterns
 - Multi-entity workflow orchestration
@@ -261,6 +290,7 @@ const todaysNutrition = /* aggregate from today's meals */;
 - Progressive complexity UX
 
 **Marketing & Education**:
+
 - Compelling demo for sales/evangelism
 - Tutorial for AI + Koan integration
 - Reference for premium UX patterns
@@ -269,12 +299,14 @@ const todaysNutrition = /* aggregate from today's meals */;
 ### Negative
 
 **Complexity**:
+
 - More sophisticated than simple CRUD samples
 - Requires AI service configuration (Ollama/OpenAI)
 - Vision processing adds latency considerations
 - Learning curves: vision, NLP, multi-entity orchestration
 
 **Maintenance**:
+
 - AI models evolve (llava updates, GPT-4 Vision changes)
 - Vision accuracy depends on model quality
 - Seed data maintenance (recipe database)
@@ -283,12 +315,14 @@ const todaysNutrition = /* aggregate from today's meals */;
 ### Mitigation Strategies
 
 **Complexity Management**:
+
 - Progressive disclosure: Start with basic features, layer advanced
 - Excellent documentation with diagrams
 - Pre-configured defaults (works with Ollama out of box)
 - Graceful degradation (manual input if vision fails)
 
 **Maintenance**:
+
 - Abstract AI providers (IVisionService, IOcrService)
 - Versioned seed data with migration scripts
 - Minimal UI dependencies (vanilla JS where possible)
@@ -315,16 +349,16 @@ const existingPantry = SDK.Entities.PantryItem.collection();
 const updates = [];
 const newItems = [];
 
-photo.detections.forEach(detection => {
-  const existing = existingPantry.items.find(item =>
-    item.name.toLowerCase() === detection.itemName.toLowerCase()
+photo.detections.forEach((detection) => {
+  const existing = existingPantry.items.find(
+    (item) => item.name.toLowerCase() === detection.itemName.toLowerCase()
   );
 
   if (existing) {
     // Update quantity
     SDK.Entities.PantryItem.upsert({
       id: existing.id,
-      quantity: existing.quantity + (detection.detectedQuantity || 1)
+      quantity: existing.quantity + (detection.detectedQuantity || 1),
     });
     updates.push(existing.name);
   } else {
@@ -332,11 +366,11 @@ photo.detections.forEach(detection => {
     SDK.Entities.PantryItem.upsert({
       name: detection.itemName,
       quantity: detection.detectedQuantity || 1,
-      unit: detection.detectedUnit || 'whole',
+      unit: detection.detectedUnit || "whole",
       expiresAt: detection.detectedExpiration,
-      source: 'photo',
+      source: "photo",
       sourcePhotoId: photoId,
-      detectionConfidence: detection.confidence
+      detectionConfidence: detection.confidence,
     });
     newItems.push(detection.itemName);
   }
@@ -345,14 +379,16 @@ photo.detections.forEach(detection => {
 // Suggest recipes using new items
 const recipes = SDK.Entities.Recipe.collection({
   filter: { ingredients_contains_any: newItems },
-  pageSize: 3
+  pageSize: 3,
 });
 
-SDK.Out.answer(JSON.stringify({
-  added: newItems.length,
-  updated: updates.length,
-  suggestions: recipes.items.map(r => r.name)
-}));
+SDK.Out.answer(
+  JSON.stringify({
+    added: newItems.length,
+    updated: updates.length,
+    suggestions: recipes.items.map((r) => r.name),
+  })
+);
 ```
 
 ### Natural Language Input

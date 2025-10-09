@@ -46,11 +46,12 @@ See also:
 Entity controllers accept all three PATCH formats and normalize them to canonical operations. Do not declare inline endpoints; use MVC controllers.
 
 DX defaults and guardrails:
+
 - The route id is canonical. If a client includes `id` in the body, it must match the route id. Mismatch returns 400 with code `web.patch.idMismatch`.
 - Optional per-request policy overrides via query:
   - `?nulls=default|null|ignore|reject`
   - or granular: `?mergeNulls=default|reject`, `?partialNulls=null|ignore|reject`
-  See `Koan.Web.Infrastructure.KoanWebConstants.Query`.
+    See `Koan.Web.Infrastructure.KoanWebConstants.Query`.
 
 ### RFC 6902 (application/json-patch+json)
 
@@ -60,8 +61,8 @@ PATCH /api/todos/{id}
 Content-Type: application/json-patch+json
 
 [
-  { "op": "replace", "path": "/title", "value": "Buy oat milk" },
-  { "op": "remove",  "path": "/notes/archived" }
+{ "op": "replace", "path": "/title", "value": "Buy oat milk" },
+{ "op": "remove", "path": "/notes/archived" }
 ]
 
 Notes:
@@ -120,6 +121,7 @@ Policy:
 - `PartialJsonNullPolicy` controls whether `null` sets null, is ignored, or rejected
 
 Per-request override examples:
+
 - `PATCH /api/todos/123?partialNulls=ignore` with body `{ "title": null }` → null ignored; `title` unchanged.
 - `PATCH /api/todos/123?mergeNulls=reject` with body `{ "count": null }` (merge-patch) → reject when `count` is non-nullable.
 
@@ -150,13 +152,13 @@ Example (replace title and remove a nested flag):
 // inside a domain service
 var payload = new PatchPayload<string>
 {
-    Id = todoId,
-    Ops =
-    [
-        new PatchOp("replace", "/title", value: "Buy oat milk"),
-        new PatchOp("remove", "/notes/archived")
-    ],
-    Options = PatchOptions.Default
+Id = todoId,
+Ops =
+[
+new PatchOp("replace", "/title", value: "Buy oat milk"),
+new PatchOp("remove", "/notes/archived")
+],
+Options = PatchOptions.Default
 };
 
 await Data<Todo, string>.PatchAsync(payload, ct);

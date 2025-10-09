@@ -97,12 +97,12 @@ public class NormalizationTests
         payload.Ops.Should().HaveCount(2);
         payload.Ops[0].Op.Should().Be("replace");
         payload.Ops[0].Path.Should().Be("/name");
-    payload.Ops[0].Value.Should().NotBeNull();
-    payload.Ops[0].Value!.Type.Should().Be(JTokenType.String);
-    payload.Ops[0].Value!.Value<string>().Should().Be("Leo");
+        payload.Ops[0].Value.Should().NotBeNull();
+        payload.Ops[0].Value!.Type.Should().Be(JTokenType.String);
+        payload.Ops[0].Value!.Value<string>().Should().Be("Leo");
         payload.Ops[1].Op.Should().Be("remove");
         payload.Ops[1].Path.Should().Be("/bio");
-    payload.Ops[1].Value.Should().BeNull();
+        payload.Ops[1].Value.Should().BeNull();
     }
 
     [Fact]

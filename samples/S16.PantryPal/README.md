@@ -22,7 +22,7 @@ Single SPA under `wwwroot/` (no `mockup/` directory). All templates, controllers
 
 Rationale
 
-1) One authoritative SPA (no redirects/drift) 2) No duplicate resources 3) Clear path to real HTTP by swapping `api.js` internals 4) Mobile-first layout, desktop density where appropriate
+1. One authoritative SPA (no redirects/drift) 2) No duplicate resources 3) Clear path to real HTTP by swapping `api.js` internals 4) Mobile-first layout, desktop density where appropriate
 
 Developer Notes
 
