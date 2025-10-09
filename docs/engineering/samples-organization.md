@@ -28,15 +28,16 @@ Numbering and Naming
 Standard Layout (per family)
 
 SXX.Name/
-- API/               # Web API app (controllers, Models, Services, start.bat)
-- Web/               # UI-first app (optional)
-- MCP/               # MCP host/service (optional)
-- AppHost/           # Aspire AppHost (optional)
-- Core/              # Shared domain/contracts (optional)
-- Tools/             # Utilities/CLI (optional)
-- Infra/             # Infra/adapters/showcases (optional)
-- Docs/              # Family docs and local READMEs (optional)
-- README.md          # Family overview: purpose, components, how to run
+
+- API/ # Web API app (controllers, Models, Services, start.bat)
+- Web/ # UI-first app (optional)
+- MCP/ # MCP host/service (optional)
+- AppHost/ # Aspire AppHost (optional)
+- Core/ # Shared domain/contracts (optional)
+- Tools/ # Utilities/CLI (optional)
+- Infra/ # Infra/adapters/showcases (optional)
+- Docs/ # Family docs and local READMEs (optional)
+- README.md # Family overview: purpose, components, how to run
 
 Required Conventions (DX)
 
@@ -53,8 +54,8 @@ Streaming and Data Access in Samples
 
 Migration Guidance
 
-1) Create the family root folder (e.g., `S16.PantryPal/`).
-2) Move each related sibling into a subfolder with the correct role:
+1. Create the family root folder (e.g., `S16.PantryPal/`).
+2. Move each related sibling into a subfolder with the correct role:
    - `S16.PantryPal` → `S16.PantryPal/API`
    - `S16.PantryPal.McpHost` → `S16.PantryPal/MCP`
    - `S12.MedTrials` → `S12.MedTrials/API`
@@ -62,9 +63,9 @@ Migration Guidance
    - `S12.MedTrials.McpService` → `S12.MedTrials/MCP`
    - `S13.DocMind` → `S13.DocMind/API`
    - `S13.DocMind.Tools` → `S13.DocMind/Tools`
-3) Ensure each moved subproject still builds and runs via its `start.bat`.
-4) Add a family-level `README.md` that describes components and how they relate.
-5) Update docs links that referenced old paths. Prefer relative links from `docs/` to `samples/` families.
+3. Ensure each moved subproject still builds and runs via its `start.bat`.
+4. Add a family-level `README.md` that describes components and how they relate.
+5. Update docs links that referenced old paths. Prefer relative links from `docs/` to `samples/` families.
 
 Edge Cases
 
