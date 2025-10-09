@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using Microsoft.AspNetCore.JsonPatch;
 using Koan.Web.Attributes;
+using Koan.Data.Abstractions.Instructions;
 
 namespace Koan.Web.Endpoints;
 
@@ -95,7 +96,9 @@ public sealed class EntityPatchRequest<TEntity, TKey> where TEntity : class
 {
     public required EntityRequestContext Context { get; init; }
     public required TKey Id { get; init; }
-    public required JsonPatchDocument<TEntity> Patch { get; init; }
+    // Generalized patch support
+    public object? Patch { get; init; }
+    public PatchKind Kind { get; init; }
     public string? Set { get; init; }
     public string? Accept { get; init; }
 }

@@ -19,6 +19,9 @@ using Koan.Web.Endpoints;
 using Koan.Web.Hooks;
 using Koan.Web.Infrastructure;
 using System.Net.Mime;
+using Microsoft.Extensions.Options;
+using Koan.Web.Options;
+using Koan.Data.Abstractions.Instructions;
 
 namespace Koan.Web.Controllers;
 
@@ -54,14 +57,7 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
     private EntityRequestContextBuilder ContextBuilder => HttpContext.RequestServices.GetRequiredService<EntityRequestContextBuilder>();
 
     protected virtual string GetDisplay(TEntity e)
-    {
-        var t = e!.GetType();
-        var name = t.GetProperty("Name")?.GetValue(e) as string
-                   ?? t.GetProperty("Title")?.GetValue(e) as string
-                   ?? t.GetProperty("Label")?.GetValue(e) as string
-                   ?? e.ToString();
-        return name ?? string.Empty;
-    }
+        => e?.ToString() ?? string.Empty;
 
     private EntityRequestContext CreateRequestContext(QueryOptions options, CancellationToken ct)
         => ContextBuilder.Build(options, ct, HttpContext, HttpContext?.User);
@@ -542,24 +538,177 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
     }
 
     [HttpPatch("{id}")]
-    public virtual async Task<IActionResult> Patch([FromRoute] TKey id, [FromBody] JsonPatchDocument<TEntity> patch, CancellationToken ct)
+    [Consumes(Infrastructure.KoanWebConstants.ContentTypes.ApplicationJsonPatch)]
+    public virtual async Task<IActionResult> PatchJsonPatch([FromRoute] TKey id, [FromBody] JsonPatchDocument<TEntity> body, CancellationToken ct)
+        => await PatchNormalized(id, NormalizeFromJsonPatch(id, body), ct);
+
+    [HttpPatch("{id}")]
+    [Consumes(Infrastructure.KoanWebConstants.ContentTypes.ApplicationMergePatch)]
+    public virtual async Task<IActionResult> PatchMerge([FromRoute] TKey id, [FromBody] Newtonsoft.Json.Linq.JToken body, CancellationToken ct)
+        => await PatchNormalized(id, NormalizeFromMergePatch(id, body), ct);
+
+    [HttpPatch("{id}")]
+    [Consumes(Infrastructure.KoanWebConstants.ContentTypes.ApplicationJson)]
+    public virtual async Task<IActionResult> PatchPartial([FromRoute] TKey id, [FromBody] Newtonsoft.Json.Linq.JToken body, CancellationToken ct)
+        => await PatchNormalized(id, NormalizeFromPartialJson(id, body), ct);
+
+    private async Task<IActionResult> PatchNormalized(TKey id, Koan.Data.Abstractions.Instructions.PatchPayload<TKey> payload, CancellationToken ct)
     {
         if (!CanWrite) return Forbid();
         var options = BuildOptions();
         var context = CreateRequestContext(options, ct);
         var query = HttpContext.Request.Query;
-        var request = new EntityPatchRequest<TEntity, TKey>
+        var set = query.TryGetValue(Koan.Web.Infrastructure.KoanWebConstants.Query.Set, out var setVal) ? setVal.ToString() : null;
+        using var _ = EntityContext.Partition(string.IsNullOrWhiteSpace(set) ? null : set);
+
+        // Validate route id vs payload id (defense-in-depth if future clients send id in payload)
+        if (payload.Id is not null && !Equals(payload.Id, id))
+        {
+            return BadRequest(new { code = Koan.Web.Infrastructure.KoanWebConstants.Codes.Patch.IdMismatch, message = "Route id does not match payload id." });
+        }
+
+        // Apply per-request null policy overrides via querystring (optional DX sugar)
+        // ?nulls=default|null|ignore|reject or granular: ?mergeNulls=default|reject, ?partialNulls=null|ignore|reject
+        var optsOverride = TryBuildPatchOptionsOverride(query);
+        if (optsOverride is not null)
+        {
+            payload = payload with { Options = optsOverride };
+        }
+
+        var updated = await Koan.Data.Core.Data<TEntity, TKey>.PatchAsync(payload, ct);
+        if (updated is null) return NotFound();
+
+        var request = new EntityGetByIdRequest<TKey>
         {
             Context = context,
             Id = id,
-            Patch = patch,
-            Set = query.TryGetValue("set", out var setVal) ? setVal.ToString() : null,
+            Set = set,
             Accept = HttpContext.Request.Headers["Accept"].ToString()
         };
-        var result = await EndpointService.PatchAsync(request);
+        var result = await EndpointService.GetByIdAsync(request);
         ApplyResponseMetadata(result);
         if (result.IsShortCircuited) return ResolveShortCircuit(result);
         return PrepareResponse(result.Payload ?? result.Model);
+    }
+
+    private Koan.Data.Abstractions.Instructions.PatchPayload<TKey> NormalizeFromJsonPatch(TKey id, JsonPatchDocument<TEntity> doc)
+    {
+        var ops = doc.Operations.Select(o => new Koan.Data.Abstractions.Instructions.PatchOp(
+            o.op,
+            o.path,
+            o.from,
+            o.value is null ? null : Newtonsoft.Json.Linq.JToken.FromObject(o.value))
+        ).ToList();
+        return new Koan.Data.Abstractions.Instructions.PatchPayload<TKey>(id, null, null, "json-patch", ops, BuildPatchOptions());
+    }
+
+    private Koan.Data.Abstractions.Instructions.PatchPayload<TKey> NormalizeFromMergePatch(TKey id, Newtonsoft.Json.Linq.JToken body)
+        => NormalizeObjectToOps(id, body, kindHint: "merge-patch", mergeSemantics: true);
+
+    private Koan.Data.Abstractions.Instructions.PatchPayload<TKey> NormalizeFromPartialJson(TKey id, Newtonsoft.Json.Linq.JToken body)
+        => NormalizeObjectToOps(id, body, kindHint: "partial-json", mergeSemantics: false);
+
+    private Koan.Data.Abstractions.Instructions.PatchPayload<TKey> NormalizeObjectToOps(TKey id, Newtonsoft.Json.Linq.JToken body, string kindHint, bool mergeSemantics)
+    {
+        var ops = new List<Koan.Data.Abstractions.Instructions.PatchOp>();
+        void Walk(Newtonsoft.Json.Linq.JToken token, string basePath)
+        {
+            if (token is Newtonsoft.Json.Linq.JObject obj)
+            {
+                foreach (var p in obj.Properties())
+                {
+                    var path = basePath + "/" + p.Name;
+                    if (p.Value.Type == Newtonsoft.Json.Linq.JTokenType.Object)
+                    {
+                        Walk(p.Value, path);
+                    }
+                    else if (p.Value.Type == Newtonsoft.Json.Linq.JTokenType.Null)
+                    {
+                        if (mergeSemantics)
+                            ops.Add(new Koan.Data.Abstractions.Instructions.PatchOp("remove", path, null, null));
+                        else
+                            ops.Add(new Koan.Data.Abstractions.Instructions.PatchOp("replace", path, null, Newtonsoft.Json.Linq.JValue.CreateNull()));
+                    }
+                    else
+                    {
+                        ops.Add(new Koan.Data.Abstractions.Instructions.PatchOp("replace", path, null, p.Value.DeepClone()));
+                    }
+                }
+            }
+            else
+            {
+                // primitives/arrays at root -> replace entire document path
+                ops.Add(new Koan.Data.Abstractions.Instructions.PatchOp("replace", basePath, null, token.DeepClone()));
+            }
+        }
+
+        Walk(body, "");
+        // Ensure pointers start at root ('/prop')
+        ops = ops.Select(o => o with { Path = o.Path.StartsWith('/') ? o.Path : "/" + o.Path.TrimStart('/') }).ToList();
+        return new Koan.Data.Abstractions.Instructions.PatchPayload<TKey>(id, null, null, kindHint, ops, BuildPatchOptions());
+    }
+
+    private Koan.Data.Abstractions.Instructions.PatchOptions BuildPatchOptions()
+    {
+        var opts = HttpContext?.RequestServices?.GetService(typeof(IOptions<Koan.Web.Options.KoanWebOptions>)) as IOptions<Koan.Web.Options.KoanWebOptions>;
+        var mergePolicy = opts?.Value.MergePatchNullsForNonNullable ?? Koan.Data.Abstractions.Instructions.MergePatchNullPolicy.SetDefault;
+        var partialPolicy = opts?.Value.PartialJsonNulls ?? Koan.Data.Abstractions.Instructions.PartialJsonNullPolicy.SetNull;
+        return new Koan.Data.Abstractions.Instructions.PatchOptions(mergePolicy, partialPolicy, Koan.Data.Abstractions.Instructions.ArrayBehavior.Replace);
+    }
+
+    private Koan.Data.Abstractions.Instructions.PatchOptions? TryBuildPatchOptionsOverride(Microsoft.AspNetCore.Http.IQueryCollection query)
+    {
+        // Read global override first
+        Koan.Data.Abstractions.Instructions.MergePatchNullPolicy? merge = null;
+        Koan.Data.Abstractions.Instructions.PartialJsonNullPolicy? partial = null;
+
+        if (query.TryGetValue(Koan.Web.Infrastructure.KoanWebConstants.Query.Nulls, out var global))
+        {
+            var val = global.ToString().Trim().ToLowerInvariant();
+            switch (val)
+            {
+                case "default":
+                    merge = Koan.Data.Abstractions.Instructions.MergePatchNullPolicy.SetDefault;
+                    break;
+                case "reject":
+                    merge = Koan.Data.Abstractions.Instructions.MergePatchNullPolicy.Reject;
+                    partial = Koan.Data.Abstractions.Instructions.PartialJsonNullPolicy.Reject;
+                    break;
+                case "null":
+                    partial = Koan.Data.Abstractions.Instructions.PartialJsonNullPolicy.SetNull;
+                    break;
+                case "ignore":
+                    partial = Koan.Data.Abstractions.Instructions.PartialJsonNullPolicy.Ignore;
+                    break;
+            }
+        }
+
+        if (query.TryGetValue(Koan.Web.Infrastructure.KoanWebConstants.Query.MergeNulls, out var mergeStr))
+        {
+            var val = mergeStr.ToString().Trim().ToLowerInvariant();
+            merge = val == "reject"
+                ? Koan.Data.Abstractions.Instructions.MergePatchNullPolicy.Reject
+                : Koan.Data.Abstractions.Instructions.MergePatchNullPolicy.SetDefault;
+        }
+
+        if (query.TryGetValue(Koan.Web.Infrastructure.KoanWebConstants.Query.PartialNulls, out var partialStr))
+        {
+            var val = partialStr.ToString().Trim().ToLowerInvariant();
+            partial = val switch
+            {
+                "ignore" => Koan.Data.Abstractions.Instructions.PartialJsonNullPolicy.Ignore,
+                "reject" => Koan.Data.Abstractions.Instructions.PartialJsonNullPolicy.Reject,
+                _ => Koan.Data.Abstractions.Instructions.PartialJsonNullPolicy.SetNull
+            };
+        }
+
+        if (merge is null && partial is null) return null;
+        // Fill the other policy with current defaults to avoid nulls
+        var defaults = BuildPatchOptions();
+        return new Koan.Data.Abstractions.Instructions.PatchOptions(
+            merge ?? defaults.MergeNulls,
+            partial ?? defaults.PartialNulls,
+            defaults.Arrays);
     }
 }
 

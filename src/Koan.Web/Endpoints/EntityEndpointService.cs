@@ -11,6 +11,7 @@ using Microsoft.Extensions.Logging;
 using Koan.Data.Abstractions;
 using Koan.Data.Core;
 using Koan.Data.Core.Model;
+using Koan.Data.Abstractions.Instructions;
 using Koan.Web.Filtering;
 using Koan.Web.Hooks;
 using Koan.Web.Infrastructure;
@@ -396,7 +397,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
 
         var hookContext = _hookPipeline.CreateContext(context);
 
-        await _hookPipeline.BeforePatchAsync(hookContext, request.Id?.ToString() ?? string.Empty, request.Patch);
+    await _hookPipeline.BeforePatchAsync(hookContext, request.Id?.ToString() ?? string.Empty, request.Patch!);
 
         using var _ = EntityContext.Partition(string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
         var original = await Data<TEntity, TKey>.GetAsync(request.Id!, context.CancellationToken);
@@ -406,7 +407,30 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         }
 
         var working = await Data<TEntity, TKey>.GetAsync(request.Id!, context.CancellationToken);
-        request.Patch.ApplyTo(working!);
+        if (working is null)
+        {
+            return new EntityModelResult<TEntity>(context, null, null, new NotFoundResult());
+        }
+
+        // Apply generalized patch
+        if (request.Patch is Microsoft.AspNetCore.JsonPatch.JsonPatchDocument<TEntity> jp)
+        {
+            jp.ApplyTo(working);
+        }
+        else if (request.Patch is Newtonsoft.Json.Linq.JToken jt)
+        {
+            var opts = context.HttpContext?.RequestServices.GetService(typeof(Microsoft.Extensions.Options.IOptions<Koan.Web.Options.KoanWebOptions>)) as Microsoft.Extensions.Options.IOptions<Koan.Web.Options.KoanWebOptions>;
+            var mergePolicy = opts?.Value.MergePatchNullsForNonNullable ?? MergePatchNullPolicy.SetDefault;
+            var partialPolicy = opts?.Value.PartialJsonNulls ?? PartialJsonNullPolicy.SetNull;
+            Koan.Data.Abstractions.Instructions.IPatchApplicator<TEntity> applicator = request.Kind == PatchKind.MergePatch7386
+                ? new Koan.Data.Core.Patch.MergePatchApplicator<TEntity>(jt, mergePolicy)
+                : new Koan.Data.Core.Patch.PartialJsonApplicator<TEntity>(jt, partialPolicy);
+            applicator.Apply(working);
+        }
+        else
+        {
+            return new EntityModelResult<TEntity>(context, null, null, new BadRequestObjectResult(new { error = "Unsupported patch payload" }));
+        }
         var idProp = typeof(TEntity).GetProperty("Id");
         if (idProp is not null)
         {

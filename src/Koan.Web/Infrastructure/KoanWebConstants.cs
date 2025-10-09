@@ -5,8 +5,19 @@ namespace Koan.Web.Infrastructure;
 /// </summary>
 public static class KoanWebConstants
 {
+    public static class ContentTypes
+    {
+        public const string ApplicationJson = "application/json";
+        public const string ApplicationJsonPatch = "application/json-patch+json";
+        public const string ApplicationMergePatch = "application/merge-patch+json";
+    }
+
     public static class Codes
     {
+        public static class Patch
+        {
+            public const string IdMismatch = "web.patch.idMismatch";
+        }
         public static class Moderation
         {
             // Stable error codes for moderation flows
@@ -70,5 +81,20 @@ public static class KoanWebConstants
         }
 
         public const string Audit = "audit"; // global audit snapshots (when enabled)
+    }
+
+    public static class Query
+    {
+        // General-purpose null policy override for PATCH endpoints
+        // For merge-patch: values = "default" | "reject"
+        // For partial-json: values = "null" | "ignore" | "reject"
+        public const string Nulls = "nulls";
+
+        // Specific overrides (take precedence when provided)
+        public const string MergeNulls = "mergeNulls";     // values: "default" | "reject"
+        public const string PartialNulls = "partialNulls"; // values: "null" | "ignore" | "reject"
+
+        // Common set/partition selector already used across endpoints
+        public const string Set = "set";
     }
 }
