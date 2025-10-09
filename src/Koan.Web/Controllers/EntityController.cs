@@ -19,7 +19,7 @@ using Koan.Web.Endpoints;
 using Koan.Web.Hooks;
 using Koan.Web.Infrastructure;
 using System.Net.Mime;
-using Microsoft.Extensions.Options;
+// using Microsoft.Extensions.Options; // duplicate removed
 using Koan.Web.Options;
 using Koan.Data.Abstractions.Instructions;
 
@@ -559,7 +559,7 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
         var context = CreateRequestContext(options, ct);
         var query = HttpContext.Request.Query;
         var set = query.TryGetValue(Koan.Web.Infrastructure.KoanWebConstants.Query.Set, out var setVal) ? setVal.ToString() : null;
-        using var _ = EntityContext.Partition(string.IsNullOrWhiteSpace(set) ? null : set);
+        using var _ = EntityContext.With(partition: string.IsNullOrWhiteSpace(set) ? null : set);
 
         // Validate route id vs payload id (defense-in-depth if future clients send id in payload)
         if (payload.Id is not null && !Equals(payload.Id, id))

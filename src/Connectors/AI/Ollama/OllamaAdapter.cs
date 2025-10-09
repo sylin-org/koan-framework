@@ -766,9 +766,10 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
     {
         await using var stream = await resp.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
         using var reader = new StreamReader(stream, Encoding.UTF8);
-        while (!reader.EndOfStream && !ct.IsCancellationRequested)
+        while (!ct.IsCancellationRequested)
         {
             var line = await reader.ReadLineAsync().ConfigureAwait(false);
+            if (line is null) break; // EOF
             if (string.IsNullOrWhiteSpace(line))
             {
                 continue;

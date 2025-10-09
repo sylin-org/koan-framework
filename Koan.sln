@@ -391,6 +391,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "S16.PantryPal.McpHost", "sa
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "S16.PantryPal", "samples\S16.PantryPal\S16.PantryPal.csproj", "{63E5A924-11AC-4EA1-985C-24EFA8EDACE8}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Web.PatchOps.Tests", "tests\Koan.Web.PatchOps.Tests\Koan.Web.PatchOps.Tests.csproj", "{572B4F05-D867-4F6C-835B-9E59C9B266D3}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -581,8 +583,6 @@ Global
 		{E2EEE413-E717-48AA-9FFC-3DEEE9D094E5}.Release|x64.Build.0 = Release|Any CPU
 		{E2EEE413-E717-48AA-9FFC-3DEEE9D094E5}.Release|x86.ActiveCfg = Release|Any CPU
 		{E2EEE413-E717-48AA-9FFC-3DEEE9D094E5}.Release|x86.Build.0 = Release|Any CPU
-		{AC9030DF-F916-4553-96AC-FCD855624963}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		# Removed legacy S8.Canon.Adapters.Bms project configs
 		{6C2E474B-2C2E-4A3E-840C-ADC9E68EC60D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{6C2E474B-2C2E-4A3E-840C-ADC9E68EC60D}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{6C2E474B-2C2E-4A3E-840C-ADC9E68EC60D}.Debug|x64.ActiveCfg = Debug|Any CPU
@@ -595,9 +595,6 @@ Global
 		{6C2E474B-2C2E-4A3E-840C-ADC9E68EC60D}.Release|x64.Build.0 = Release|Any CPU
 		{6C2E474B-2C2E-4A3E-840C-ADC9E68EC60D}.Release|x86.ActiveCfg = Release|Any CPU
 		{6C2E474B-2C2E-4A3E-840C-ADC9E68EC60D}.Release|x86.Build.0 = Release|Any CPU
-		# Removed legacy S8.Canon.Shared project configs
-		# Removed legacy S8.Canon.Adapters.Oem project configs
-		# Removed legacy S8.Canon.Api project configs
 		{99078753-C119-4F74-9FBB-AAA6A509A35B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{99078753-C119-4F74-9FBB-AAA6A509A35B}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{99078753-C119-4F74-9FBB-AAA6A509A35B}.Debug|x64.ActiveCfg = Debug|Any CPU
@@ -622,7 +619,6 @@ Global
 		{90D4FAE4-2465-4114-ABD1-6AFE16EBD23F}.Release|x64.Build.0 = Release|Any CPU
 		{90D4FAE4-2465-4114-ABD1-6AFE16EBD23F}.Release|x86.ActiveCfg = Release|Any CPU
 		{90D4FAE4-2465-4114-ABD1-6AFE16EBD23F}.Release|x86.Build.0 = Release|Any CPU
-		# Removed legacy S8.Canon aggregator project configs
 		{20A6381C-DA0C-4139-8233-99AC35A04130}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{20A6381C-DA0C-4139-8233-99AC35A04130}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{20A6381C-DA0C-4139-8233-99AC35A04130}.Debug|x64.ActiveCfg = Debug|Any CPU
@@ -1799,6 +1795,18 @@ Global
 		{63E5A924-11AC-4EA1-985C-24EFA8EDACE8}.Release|x64.Build.0 = Release|Any CPU
 		{63E5A924-11AC-4EA1-985C-24EFA8EDACE8}.Release|x86.ActiveCfg = Release|Any CPU
 		{63E5A924-11AC-4EA1-985C-24EFA8EDACE8}.Release|x86.Build.0 = Release|Any CPU
+		{572B4F05-D867-4F6C-835B-9E59C9B266D3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{572B4F05-D867-4F6C-835B-9E59C9B266D3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{572B4F05-D867-4F6C-835B-9E59C9B266D3}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{572B4F05-D867-4F6C-835B-9E59C9B266D3}.Debug|x64.Build.0 = Debug|Any CPU
+		{572B4F05-D867-4F6C-835B-9E59C9B266D3}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{572B4F05-D867-4F6C-835B-9E59C9B266D3}.Debug|x86.Build.0 = Debug|Any CPU
+		{572B4F05-D867-4F6C-835B-9E59C9B266D3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{572B4F05-D867-4F6C-835B-9E59C9B266D3}.Release|Any CPU.Build.0 = Release|Any CPU
+		{572B4F05-D867-4F6C-835B-9E59C9B266D3}.Release|x64.ActiveCfg = Release|Any CPU
+		{572B4F05-D867-4F6C-835B-9E59C9B266D3}.Release|x64.Build.0 = Release|Any CPU
+		{572B4F05-D867-4F6C-835B-9E59C9B266D3}.Release|x86.ActiveCfg = Release|Any CPU
+		{572B4F05-D867-4F6C-835B-9E59C9B266D3}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -1994,6 +2002,7 @@ Global
 		{CF377745-B629-4463-9D3E-C507B065B589} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{B7F70B61-54C8-47C1-BAEF-57AD24DF098D} = {5D20AA90-6969-D8BD-9DCD-8634F4692FDA}
 		{63E5A924-11AC-4EA1-985C-24EFA8EDACE8} = {5D20AA90-6969-D8BD-9DCD-8634F4692FDA}
+		{572B4F05-D867-4F6C-835B-9E59C9B266D3} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {669C5778-BFAE-4972-B427-0AFF99562045}

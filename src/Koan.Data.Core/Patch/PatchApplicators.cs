@@ -10,9 +10,9 @@ public static class PatchApplicators
     /// <summary>
     /// Creates an applicator for the given patch kind and payload.
     /// Payload formats:
-    ///  - JsonPatch6902: JsonPatchDocument<TEntity>
-    ///  - MergePatch7386: JToken (object)
-    ///  - PartialJson: JToken (object)
+    ///  - JsonPatch6902: <c>JsonPatchDocument&lt;TEntity&gt;</c>
+    ///  - MergePatch7386: <c>JToken</c> (object)
+    ///  - PartialJson: <c>JToken</c> (object)
     /// </summary>
     public static IPatchApplicator<TEntity> Create<TEntity, TKey>(PatchKind kind, object payload, MergePatchNullPolicy mergeNulls, PartialJsonNullPolicy partialNulls)
         where TEntity : class, IEntity<TKey>
@@ -42,6 +42,7 @@ public sealed class MergePatchApplicator<TEntity> : IPatchApplicator<TEntity>
 
     public void Apply(TEntity target)
     {
+        if (target is null) throw new ArgumentNullException(nameof(target));
         var targetObj = JObject.FromObject(target);
         ApplyMerge(targetObj, _patch);
         var updated = targetObj.ToObject<TEntity>()!;
@@ -81,6 +82,8 @@ public sealed class MergePatchApplicator<TEntity> : IPatchApplicator<TEntity>
 
     private static void Copy(TEntity src, TEntity dest)
     {
+        if (src is null) throw new ArgumentNullException(nameof(src));
+        if (dest is null) throw new ArgumentNullException(nameof(dest));
         // Use JObject round-trip to avoid reflection trim warnings and preserve mapping
         var srcObj = JObject.FromObject(src);
         // Don't allow Id overwrite
@@ -101,6 +104,7 @@ public sealed class PartialJsonApplicator<TEntity> : IPatchApplicator<TEntity>
 
     public void Apply(TEntity target)
     {
+        if (target is null) throw new ArgumentNullException(nameof(target));
         if (_patch.Type != JTokenType.Object) throw new ArgumentException("Partial JSON payload must be an object");
         var targetObj = JObject.FromObject(target);
         ApplyPartial(targetObj, (JObject)_patch);
@@ -151,6 +155,8 @@ public sealed class PartialJsonApplicator<TEntity> : IPatchApplicator<TEntity>
 
     private static void Copy(TEntity src, TEntity dest)
     {
+        if (src is null) throw new ArgumentNullException(nameof(src));
+        if (dest is null) throw new ArgumentNullException(nameof(dest));
         var srcObj = JObject.FromObject(src);
         srcObj.Remove("Id");
         var destObj = JObject.FromObject(dest);

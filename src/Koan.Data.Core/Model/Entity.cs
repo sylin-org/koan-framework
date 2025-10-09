@@ -114,16 +114,14 @@ namespace Koan.Data.Core.Model
         // Counts
         // Simple: await Entity.Count → defaults to optimized
         // Explicit: await Entity.Count.Exact(ct), await Entity.Count.Fast(ct)
-        public static EntityCountAccessor<TEntity, TKey> Count { get; } = new();
+        public static EntityCountAccessor Count { get; } = new();
 
         /// <summary>
         /// Awaitable count accessor with fluent API.
         /// Simple: await Todo.Count (defaults to optimized)
         /// Explicit: await Todo.Count.Exact(ct), await Todo.Count.Fast(ct)
         /// </summary>
-        public sealed class EntityCountAccessor<TEntity, TKey>
-            where TEntity : class, IEntity<TKey>
-            where TKey : notnull
+        public sealed class EntityCountAccessor
         {
             // Default: await Entity.Count → Optimized strategy
             public System.Runtime.CompilerServices.TaskAwaiter<long> GetAwaiter()

@@ -81,7 +81,9 @@ internal sealed class MongoOptionsConfigurator : AdapterOptionsConfigurator<Mong
 
         options.Database = ReadProviderConfiguration(options.Database,
             Infrastructure.Constants.Configuration.Keys.Database,
-            Infrastructure.Constants.Configuration.Keys.AltDatabase);
+            Infrastructure.Constants.Configuration.Keys.AltDatabase)
+            ?? options.Database
+            ?? string.Empty;
 
         KoanLog.ConfigInfo(Logger, LogActions.Config, LogOutcomeValues.Final,
             ("connection", options.ConnectionString ?? "(null)"),
