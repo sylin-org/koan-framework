@@ -1,0 +1,34 @@
+﻿<section class="space-y-6 md:space-y-8" aria-label="Pantry">
+  <div class="flex items-center gap-2">
+    <input type="search" class="w-full md:w-96 rounded-xl bg-white ring-1 ring-gray-200 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary-400" placeholder="Search pantry (q=)" ng-model="vm.q" ng-keydown="$event.key==='Enter' && vm.onSearch()">
+    <button class="rounded-full px-3 py-1.5 text-xs font-medium ring-1" ng-class="{'bg-amber-50 text-amber-700 ring-amber-200': true}" ng-click="vm.toggleExpSoon()">Expiring &lt; 7d</button>
+    <div class="relative">
+      <button class="rounded-xl px-4 py-2 bg-white text-gray-900 ring-1 ring-gray-200 hover:bg-gray-50" ng-click="vm.sortBy('ExpiresAt')">Sort: Expires</button>
+    </div>
+    <degraded-chip show="vm.degraded"></degraded-chip>
+  </div>
+
+  <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4" infinite-scroll="vm.load()" busy="vm.loading">
+    <div ng-repeat="it in vm.items" class="bg-white rounded-2xl shadow-sm p-4 relative transition-shadow hover:shadow translate-y-0 hover:translate-y-[1px]">
+      <div class="font-medium truncate text-gray-900">{{it.name}}</div>
+      <div class="text-sm text-gray-500">{{it.category}}</div>
+      <div class="mt-2 flex items-center gap-2"><qty-stepper item="it"></qty-stepper><span class="text-xs text-gray-500">{{it.unit}}</span></div>
+      <div class="mt-1 text-xs"><span class="rounded-full px-2.5 py-0.5 font-medium ring-1" ng-class="{'bg-rose-50 text-rose-700 ring-rose-200': it.expiresSoon, 'bg-amber-50 text-amber-700 ring-amber-200': it.expiresIn7, 'bg-emerald-50 text-emerald-700 ring-emerald-200': !it.expiresSoon && !it.expiresIn7}">Expires {{it.expiresAt | date}}</span></div>
+      <button class="absolute top-2 right-2 text-xs text-gray-500 hover:text-gray-700" ng-click="vm.edit(it)" aria-label="Edit">Edit</button>
+      <cap-overlay-pill ng-if="$root.ui.capOverlay" text="data/pantry" detail="GET /api/data/pantry?page=...&pageSize=50&sort=...&q=...&filter=..."></cap-overlay-pill>
+    </div>
+  </div>
+
+  <div class="text-center text-sm text-gray-500" ng-if="vm.loading">
+    <div class="mx-auto max-w-3xl grid grid-cols-2 md:grid-cols-3 gap-3 animate-pulse">
+      <div class="h-24 md:h-28 bg-gray-200 rounded-2xl"></div>
+      <div class="h-24 md:h-28 bg-gray-200 rounded-2xl"></div>
+      <div class="h-24 md:h-28 bg-gray-200 rounded-2xl hidden md:block"></div>
+    </div>
+  </div>
+  <div class="text-center text-sm text-gray-500" ng-if="!vm.loading && vm.items.length===0">No items yet — try Capture or Upload.</div>
+  <div class="hidden md:flex items-center justify-between text-sm text-gray-600">
+    <div>Page size: <span class="inline-flex items-center gap-1 rounded-lg ring-1 ring-gray-200 px-2 py-1">{{vm.pageSize}}</span></div>
+    <div class="inline-flex items-center gap-2"><button class="rounded-xl px-3 py-1 bg-white ring-1 ring-gray-200">Prev</button><button class="rounded-xl px-3 py-1 bg-white ring-1 ring-gray-200">Next</button></div>
+  </div>
+</section>

@@ -1,0 +1,19 @@
+﻿<section class="space-y-6 md:space-y-8" aria-label="Review Detections">
+  <div class="bg-white rounded-2xl shadow-sm p-4 md:p-6">
+    <div class="text-sm text-gray-600">Photo {{vm.photoId}}</div>
+    <div class="mt-3 h-64 bg-gray-100 rounded-2xl ring-1 ring-gray-200 flex items-center justify-center text-gray-600">Photo + boxes preview</div>
+  </div>
+  <div class="bg-white rounded-2xl shadow-sm p-4 md:p-6">
+    <h3 class="text-lg font-medium">Detections</h3>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+      <div class="rounded-2xl ring-1 ring-gray-200 p-3" ng-repeat="d in vm.detections" tabindex="0" ng-class="{'ring-2 ring-primary-500': vm.selected===d}" ng-click="vm.select(d)">
+        <div class="font-medium text-gray-900">{{d.candidates[0].name}} ({{d.candidates[0].confidence*100 | number:0}}%)</div>
+        <div class="mt-2 flex gap-1 flex-wrap -mx-0.5">
+          <button class="mx-0.5 px-2.5 py-0.5 text-xs rounded-full ring-1 ring-gray-200 bg-gray-100 text-gray-700 hover:bg-gray-50" ng-repeat="c in d.candidates" ng-click="vm.chooseCandidate(d,c)">{{c.name}} ({{c.confidence*100|number:0}}%)</button>
+        </div>
+        <button class="mt-2 text-xs text-primary-700" ng-click="vm.openNl(d)">Adjust details…</button>
+      </div>
+    </div>
+    <div class="mt-4"><button class="inline-flex items-center gap-2 rounded-xl px-4 py-2 bg-primary-600 text-white hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-400" ng-click="vm.toConfirm()">Continue</button></div>
+  </div>
+</section>

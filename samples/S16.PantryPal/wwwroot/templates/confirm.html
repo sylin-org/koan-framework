@@ -1,0 +1,21 @@
+﻿<section class="space-y-6 md:space-y-8" aria-label="Confirm">
+  <div class="bg-white rounded-2xl shadow-sm p-4 md:p-6">
+    <div class="text-sm text-gray-600">Photo {{vm.photoId}}</div>
+    <div class="mt-3">
+      <div class="text-sm text-gray-500">Review pending items and confirm.</div>
+      <ul class="list-disc ml-5 mt-3 text-sm text-gray-700">
+        <li ng-repeat="c in vm.pending">{{c.selectedCandidateId}} — {{c.userInput}}</li>
+      </ul>
+      <div class="mt-4 flex flex-wrap gap-2">
+        <button class="inline-flex items-center gap-2 rounded-xl px-4 py-2 bg-primary-600 text-white hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-400" ng-click="vm.submit()" ng-disabled="vm.submitting">Submit</button>
+        <button class="rounded-xl px-4 py-2 bg-white text-gray-900 ring-1 ring-gray-200 hover:bg-gray-50" ng-click="vm.addAnother()">Add another</button>
+        <button class="rounded-xl px-4 py-2 bg-white text-gray-900 ring-1 ring-gray-200 hover:bg-gray-50" ng-click="vm.goPantry()">Go to Pantry</button>
+      </div>
+      <div class="mt-3 text-sm text-gray-600" ng-if="vm.results">
+        <span class="rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 bg-emerald-50 text-emerald-700 ring-emerald-200">Success</span>
+        <span class="ml-2">Updated: {{vm.results.updated||0}}, Created: {{vm.results.created||0}}</span>
+        <span class="ml-2 text-gray-500">(duplicates suppressed)</span>
+      </div>
+    </div>
+  </div>
+</section>

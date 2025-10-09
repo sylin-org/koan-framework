@@ -1,0 +1,22 @@
+﻿<section class="space-y-3" aria-label="Insights">
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+    <div class="bg-white rounded-2xl shadow-sm p-4">
+      <div class="text-3xl font-semibold text-gray-900">{{(vm.stats && vm.stats.totalItems) || 0}}</div>
+      <div class="text-sm text-gray-500">Total items</div>
+    </div>
+    <div class="bg-white rounded-2xl shadow-sm p-4">
+      <div class="text-3xl font-semibold text-gray-900">{{(vm.stats && vm.stats.expiringSoon) || 0}}</div>
+      <div class="text-sm text-gray-500">Expiring &lt; 7d</div>
+    </div>
+    <div class="bg-white rounded-2xl shadow-sm p-4">
+      <div class="text-3xl font-semibold text-gray-900">{{(vm.stats && vm.stats.lowStock) || 0}}</div>
+      <div class="text-sm text-gray-500">Low stock</div>
+    </div>
+  </div>
+  <div class="bg-white rounded-2xl shadow-sm p-4">
+    <div class="text-sm text-gray-500 mb-2">Trends (placeholder)</div>
+    <div class="h-32 bg-gray-100 rounded"></div>
+    <a class="mt-2 inline-block text-sm text-primary-700" href="#">View table</a>
+  </div>
+</section>
+</section>

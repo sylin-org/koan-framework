@@ -1,33 +1,66 @@
-# S16 PantryPal: AI-Powered Meal Planning
+# S16 PantryPal: AI‑Powered Meal Planning
 
-**Vision-based pantry management + intelligent meal suggestions + MCP code mode orchestration**
+Vision-based pantry management + intelligent meal suggestions + MCP Code Mode orchestration.
 
-PantryPal demonstrates how AI naturally enhances applications when solving problems humans can't:
-- **Computer Vision**: Detects grocery items from photos, extracting quantities and expiration dates
-- **Natural Language**: Parses flexible input like "5 lbs, expires in a week"
-- **Personalization**: Learns from user ratings to improve recipe suggestions
-- **Multi-Entity Orchestration**: MCP Code Mode handles complex workflows in single roundtrips
+PantryPal demonstrates Koan’s entity-first patterns with practical AI:
+
+- Computer Vision: Detect grocery items from photos with bounding boxes and confidences
+- Natural Language: Parse inputs like “5 lbs, expires in a week” into structured data
+- Personalization: Improve recipe suggestions from user feedback
+- Orchestration: MCP Code Mode composes multi-entity workflows in a single execution
+
+## Unified Frontend (AngularJS + Tailwind) SPA
+
+Single SPA under `wwwroot/` (no `mockup/` directory). All templates, controllers, directives, and service-layer abstractions are first-class:
+
+- Angular module: `wwwroot/js/app.js` (hash routing via `ngRoute`)
+- Controllers: `wwwroot/js/controllers.js` (navigation, pantry, capture → review → confirm, insights, meals)
+- Components: `wwwroot/js/components.js` (cards, drawers, detection grid, toasts)
+- Service layer: `wwwroot/js/api.js` (in-memory simulation; easy swap to HTTP clients)
+- Templates: `wwwroot/templates/*.html` (dashboard, pantry, capture, review, confirm, meals, shopping, insights)
+- Styling: Tailwind CDN (Calm Utility: neutral bg, subtle elevation, primary accents)
+
+Rationale
+
+1) One authoritative SPA (no redirects/drift) 2) No duplicate resources 3) Clear path to real HTTP by swapping `api.js` internals 4) Mobile-first layout, desktop density where appropriate
+
+Developer Notes
+
+- Local state is namespaced (e.g., `pantry_items_v1`) for safe version bumps
+- Capture workflow state machine: `camera → review → confirm`
+- Bounding box rendering and per-candidate selection are UI-only; server reflects production ingestion shape
+- Heavy logic (aggregation, AI simulation) is isolated in services for future replacement with real APIs
+
+Edge Cases (handled gracefully)
+
+- Empty pantry and insights zero-states
+- Large inventories (responsive grid; infinite scroll; desktop pager)
+- Camera permission denied (upload fallback)
+- Degraded semantic search: shows “Semantic offline — using lexical” chip when applicable
+- Mobile bottom nav + FAB; desktop top nav and optional left rail
 
 ## Quick Start
 
 dotnet run --project samples/S16.PantryPal
+
 ```bash
-# From repository root (development direct run of API only)
+# From repository root (API only for quick iteration)
 dotnet run --project samples/S16.PantryPal
 
-# Recommended: run full split stack (API + dedicated MCP host + Mongo + optional Ollama)
+# Recommended: run split stack (API + dedicated MCP host + Mongo + optional Ollama)
 ./samples/S16.PantryPal/start.bat
 ```
 
 The stack (split architecture) starts with:
-- API service on port 5016 (REST + vision controllers)
-- MCP host service on port 5026 (MCP HTTP/SSE + Code Mode + SDK definitions)
-- Mongo (primary data store) and optional Ollama (vision model auto-discovery)
-- 50+ seeded recipes (Italian, Mexican, Thai, American)
-- Sample pantry items & demo user profile
-- Mock vision service (no AI model pull required by default)
+
+- API service on 5016 (REST controllers)
+- MCP host on 5026 (MCP HTTP/SSE + Code Mode + SDK definitions)
+- Mongo as primary store; optional Ollama (vision model auto-discovery)
+- 50+ seeded recipes; sample pantry items; demo profile
+- Mock vision service enabled by default
 
 Access / Endpoints:
+
 - **API (Swagger)**: http://localhost:5016/swagger
 - **MCP SDK (.d.ts)**: http://localhost:5026/mcp/sdk/definitions
 - **MCP SSE Base**: http://localhost:5026/mcp
@@ -38,14 +71,14 @@ Access / Endpoints:
 
 Historically this sample co-hosted MCP and REST in one process. It now demonstrates production-aligned separation:
 
-| Concern | Split Benefit |
-|---------|---------------|
-| Resource Isolation | Code Mode CPU/memory spikes do not degrade REST latency |
-| Scaling | Independent horizontal scaling & autoscaling policies |
-| Security Blast Radius | Script sandbox faults cannot crash API process |
-| Deployment Cadence | Upgrade MCP runtime without redeploying controllers |
-| Observability | Clear service-level metrics & logs |
-| Quota Tuning | Different CPU ms / memory ceilings per service |
+| Concern               | Split Benefit                                           |
+| --------------------- | ------------------------------------------------------- |
+| Resource Isolation    | Code Mode CPU/memory spikes do not degrade REST latency |
+| Scaling               | Independent horizontal scaling & autoscaling policies   |
+| Security Blast Radius | Script sandbox faults cannot crash API process          |
+| Deployment Cadence    | Upgrade MCP runtime without redeploying controllers     |
+| Observability         | Clear service-level metrics & logs                      |
+| Quota Tuning          | Different CPU ms / memory ceilings per service          |
 
 For minimal demos you can still run only the API project (MCP disabled). For teaching best practices we keep the split default.
 
@@ -80,31 +113,34 @@ curl -s -X POST http://localhost:5026/mcp/rpc \
 ```
 
 Expected response fragment:
+
 ```json
 {
   "jsonrpc": "2.0",
   "id": "2",
   "result": {
-    "content": [ { "type": "text", "text": "[\"Classic Spaghetti Carbonara\", ...]" } ]
+    "content": [
+      { "type": "text", "text": "[\"Classic Spaghetti Carbonara\", ...]" }
+    ]
   }
 }
 ```
 
 ### Development Summary
 
-| Scenario | Command |
-|----------|---------|
-| Run split stack | `./samples/S16.PantryPal/start.bat` |
-| Only API (quick iterate) | `dotnet run --project samples/S16.PantryPal` |
-| Rebuild MCP host | `dotnet run --project samples/S16.PantryPal.McpHost` |
-| Fetch SDK (watch diff) | `curl -s http://localhost:5026/mcp/sdk/definitions > sdk.d.ts` |
+| Scenario                              | Command                                                            |
+| ------------------------------------- | ------------------------------------------------------------------ |
+| Run split stack                       | `./samples/S16.PantryPal/start.bat`                                |
+| Only API (quick iterate)              | `dotnet run --project samples/S16.PantryPal`                       |
+| Rebuild MCP host                      | `dotnet run --project samples/S16.PantryPal.McpHost`               |
+| Fetch SDK (watch diff)                | `curl -s http://localhost:5026/mcp/sdk/definitions > sdk.d.ts`     |
 | Run unit tests (services + ingestion) | `dotnet test tests/S16.PantryPal.Tests/S16.PantryPal.Tests.csproj` |
 
 > Integrity footer enables detecting generation drift & tampering; hash covers the content segment prior to the footer line.
 
 ## Core Features
 
-### 1. Vision-Powered Pantry Management
+### 1) Vision-Powered Pantry Management (api/action)
 
 Upload grocery photos → AI detects items with bounding boxes → Confirm and add to pantry
 
@@ -115,9 +151,9 @@ Photo persistence now uses a thin abstraction (`IPhotoStorage`) over Koan.Storag
 {
   "S16": {
     "Photos": {
-      "Profile": "",           // blank -> use storage DefaultProfile
+      "Profile": "", // blank -> use storage DefaultProfile
       "Container": "pantry-photos",
-      "Prefix": "photos/"       // object key namespace
+      "Prefix": "photos/" // object key namespace
     }
   }
 }
@@ -128,6 +164,7 @@ Storage profile/container resolution follows Koan.Storage rules (DefaultProfile 
 > Note: Thumbnail generation was intentionally removed to keep the sample lean and focused on vision + orchestration concepts. Re-introduce via an image pipeline (resizer service + background job) if demonstrating media processing patterns.
 
 Example consolidated storage section (current sample default):
+
 ```json
 {
   "Koan:Storage": {
@@ -138,23 +175,28 @@ Example consolidated storage section (current sample default):
     "FallbackMode": "SingleProfileOnly"
   },
   "S16": {
-    "Photos": { "Profile": "photos", "Container": "pantry-photos", "Prefix": "photos/" }
+    "Photos": {
+      "Profile": "photos",
+      "Container": "pantry-photos",
+      "Prefix": "photos/"
+    }
   }
 }
 ```
 
-Vector Search: Add `Koan.Data.Vector` provider configuration (e.g., pgvector / in-memory) to enable semantic+lexical hybrid search. If unavailable, service degrades to lexical filtering with `X-Search-Degraded: true` header.
+Hybrid Search via q= (entity-first): Add `Koan.Data.Vector` provider configuration (pgvector/in-memory) to enable semantic+lexical blending when using `q=` on data endpoints. If unavailable, responses include `X-Search-Degraded: 1` and the UI shows a chip.
 
-**Multi-Candidate Detection**: AI provides top 3 alternatives for each item, you pick the right one.
+Multi-Candidate Detection: AI provides top 3 alternatives for each item, user selects the correct one.
 
 ```http
-POST /api/pantry/upload
+POST /api/action/pantry/upload
 Content-Type: multipart/form-data
 
 photo=@groceries.jpg
 ```
 
 **Response**: Detections with bounding boxes and confidence scores
+
 ```json
 {
   "photoId": "abc123",
@@ -170,7 +212,7 @@ photo=@groceries.jpg
 }
 ```
 
-### 2. Natural Language Input Parsing
+### 2) Natural Language Input Parsing
 
 Flexible quantity and expiration parsing:
 
@@ -181,7 +223,7 @@ Flexible quantity and expiration parsing:
 - **Flexible units**: `"lb"`, `"pounds"`, `"can"`, `"jar"`, `"whole"`
 
 ```http
-POST /api/pantry/confirm/{photoId}
+POST /api/action/pantry/confirm/{photoId}
 {
   "confirmations": [
     {
@@ -194,6 +236,7 @@ POST /api/pantry/confirm/{photoId}
 ```
 
 Parser extracts:
+
 ```json
 {
   "quantity": 2,
@@ -203,9 +246,10 @@ Parser extracts:
 }
 ```
 
-### 3. Intelligent Meal Suggestions
+### 3) Intelligent Meal Suggestions
 
 AI suggests recipes based on:
+
 - Available pantry items
 - Dietary restrictions
 - Cooking time constraints
@@ -221,6 +265,7 @@ POST /api/meals/suggest
 ```
 
 **Response**: Scored recipes with availability analysis
+
 ```json
 {
   "recipe": {
@@ -232,7 +277,7 @@ POST /api/meals/suggest
 }
 ```
 
-### 4. MCP Code Mode Orchestration
+### 4) MCP Code Mode Orchestration
 
 Complex workflows execute in single roundtrip:
 
@@ -244,19 +289,19 @@ const photo = SDK.Entities.PantryPhoto.getById(photoId);
 const pantry = SDK.Entities.PantryItem.collection();
 
 // Process each detection
-photo.detections.forEach(detection => {
+photo.detections.forEach((detection) => {
   const item = detection.candidates[0]; // Top AI pick
 
   // Check for duplicates
-  const existing = pantry.items.find(p =>
-    p.name.toLowerCase() === item.name.toLowerCase()
+  const existing = pantry.items.find(
+    (p) => p.name.toLowerCase() === item.name.toLowerCase()
   );
 
   if (existing) {
     // Update quantity
     SDK.Entities.PantryItem.upsert({
       id: existing.id,
-      quantity: existing.quantity + 1
+      quantity: existing.quantity + 1,
     });
   } else {
     // Create new item
@@ -265,7 +310,7 @@ photo.detections.forEach(detection => {
       category: item.category,
       quantity: 1,
       unit: item.defaultUnit,
-      status: "available"
+      status: "available",
     });
   }
 });
@@ -275,28 +320,25 @@ const updated = SDK.Entities.PantryItem.collection();
 
 // Suggest recipes using new items
 const recipes = SDK.Entities.Recipe.collection({
-  pageSize: 5
+  pageSize: 5,
 });
 
-SDK.Out.answer(JSON.stringify({
-  itemsAdded: photo.detections.length,
-  totalPantryItems: updated.totalCount,
-  suggestedRecipes: recipes.items.map(r => r.name)
-}));
+SDK.Out.answer(
+  JSON.stringify({
+    itemsAdded: photo.detections.length,
+    totalPantryItems: updated.totalCount,
+    suggestedRecipes: recipes.items.map((r) => r.name),
+  })
+);
 ```
 
 **Traditional MCP**: 10+ roundtrips (get photo, check duplicates per item, upsert items, get pantry, get recipes)
 
 **Code Mode**: 1 roundtrip with full logic
 
-### 5. Semantic + Lexical Search
-Implemented lightweight hybrid search endpoint:
-```
-GET /api/pantry/search?q=milk+apple&topK=25
-```
-Response includes `X-Search-Degraded` header ("1" when vector/hybrid unavailable and lexical fallback used). Matches on `Name`, `Category`, `Status` fields; clamps `topK` (default 25, max 200).
+### 5) Search (q= on api/data)
 
-Vector provider optional—if embeddings are configured the service blends vector + keyword; otherwise it degrades gracefully.
+Use `q=` on entity data endpoints (no custom `/pantry/search`). Providers may blend semantic + lexical. When vectors are unavailable, responses include `X-Search-Degraded: 1` and the UI surfaces a “Semantic offline — using lexical” chip.
 
 ## Entity Model
 
@@ -311,38 +353,42 @@ Vector provider optional—if embeddings are configured the service blends vecto
 ```
 
 All entities support:
-- Full CRUD via `EntityController<T>`
+
+- CRUD via `EntityController<T>`
 - MCP Code Mode via `SDK.Entities.{Name}`
-- Multi-tenant routing via `set` parameter
-- Relationship expansion via `with` parameter
+- Multi-tenant routing via `set`
+- Relationship expansion via `with` (with `*` allowed; use judiciously)
 
 ## API Endpoints
 
-### Pantry Management (Domain Endpoints)
-- `POST /api/pantry-ingestion/upload` - Upload photo for vision processing
-- `POST /api/pantry-ingestion/confirm/{photoId}` - Confirm detections, add to pantry
-- `GET /api/pantry-insights/stats` - Pantry statistics and insights
+### Data (Entity-First)
 
-Generic entity querying (filter/paging) now replaces the former custom search:
-- `GET /api/data/pantry?filter={"Status":"available"}`
-- `GET /api/data/pantry?filter={"Category":"produce","Status":"available"}&page=1&pageSize=25`
-- `GET /api/data/pantry?filter={"ExpiresAt":{"$lte":"2025-10-15T00:00:00Z"}}`
-Use `sort=-ExpiresAt,Name` for compound ordering and `all=true` (when policy Optional) to bypass paging.
+- `GET /api/data/pantry?filter={...}&q=&page=&pageSize=&sort=&with=&view=`
+- Same for: `recipes`, `mealplans`, `shopping`, `profiles`, `photos`, `visionsettings`
+
+Notes:
+
+- Default `pageSize=50` across the app (UI omits a selector; desktop shows pager when filters are active).
+- Use `q=` for hybrid search signals; degraded vector sets `X-Search-Degraded: 1` on responses.
+- Prefer minimal `with` on listings; use `with=*` only for developer scenarios.
+- For small, targeted edits use `PATCH /api/data/{model}/{id}` (partial update). Pantry qty/unit steppers are optimistic and PATCH partial fields.
+
+### Actions (Verbs)
+
+- `POST /api/action/pantry/upload` — Upload photo (multipart) for vision processing
+- `POST /api/action/pantry/confirm/{photoId}` — Confirm detections, add to pantry
+- `GET  /api/pantry-insights/stats` — Pantry statistics and insights (read-only)
 
 ### Meal Planning
+
 - `POST /api/meals/suggest` - Get recipe suggestions
 - `POST /api/meals/plan` - Create multi-day meal plan
 - `POST /api/meals/shopping/{planId}` - Generate shopping list
 
-### Entity CRUD (Provided by EntityController)
-- `GET /api/data/recipes` / `{id}` / POST / bulk / patch
-- Same pattern for: `pantry`, `mealplans`, `shopping`, `profiles`, `photos`, `visionsettings`
-Supports:
-- Pagination: `page`, `pageSize`, `all=true`
-- Filtering: `filter={...}` or free-text `q=` (provider-dependent)
-- Sorting: `sort=Field,-OtherField`
-- Relationship expansion: `with=relatedEntity`
-- Shape/view selection: `output=dict` `view=compact`
+### Entity Controller Surface
+
+- Common params: `page`, `pageSize`, `all=true`, `filter={...}`, `q=`, `sort=Field,-OtherField`, `with=relatedEntity`, `view=compact`, `output=dict`
+- Writes: prefer `PATCH` for partial updates; `POST` for create (full object)
 
 ## MCP Code Mode Scripts
 
@@ -355,6 +401,7 @@ Located in `Scripts/` folder:
 5. **grocery-haul.js** - Photo processing workflow
 
 Execute via:
+
 ```http
 POST /mcp/rpc
 {
@@ -386,9 +433,9 @@ Parser → Structured Data
 Pantry Item Created
 ```
 
-**Mock Vision Service** (default): Returns realistic detections without AI infrastructure
+Mock Vision Service (default): realistic detections without AI infra
 
-**Production**: Replace with `OllamaVisionService` or `OpenAIVisionService`
+Production: Replace with `OllamaVisionService` or `OpenAIVisionService`
 
 ```csharp
 // In Initialization/KoanAutoRegistrar.cs
@@ -398,10 +445,11 @@ services.AddSingleton<IPantryVisionService, OllamaVisionService>();
 ## Configuration
 
 ### Vision Service
+
 ```json
 {
   "Vision": {
-    "Provider": "mock",  // or "ollama", "openai"
+    "Provider": "mock", // or "ollama", "openai"
     "MinConfidence": 0.5,
     "MaxDetectionsPerPhoto": 20
   }
@@ -409,6 +457,7 @@ services.AddSingleton<IPantryVisionService, OllamaVisionService>();
 ```
 
 ### MCP Code Mode
+
 ```json
 {
   "Koan": {
@@ -438,41 +487,54 @@ services.AddSingleton<IPantryVisionService, OllamaVisionService>();
 ## Development Tips
 
 ### Ingestion Hardening Summary
+
 Recent enhancements:
-* File validation: size + extension whitelist
-* Duplicate suppression per photo (detections already confirmed ignored)
-* Shelf-life inference: category-based default expiration (configurable in `S16:Ingestion`)
-* Structured error responses (400 validation / 404 missing photo)
+
+- File validation: size + extension whitelist
+- Duplicate suppression per photo (detections already confirmed ignored)
+- Shelf-life inference: category-based default expiration (`S16:Ingestion`)
+- Structured error responses (400 validation / 404 missing photo)
 
 `IngestionOptions` (env prefix `S16__Ingestion__`):
+
 ```json
 {
   "S16": {
     "Ingestion": {
       "MaxUploadBytes": 5242880,
       "AllowedExtensions": [".jpg", ".jpeg", ".png", ".webp"],
-      "DefaultShelfLifeDaysByCategory": { "produce":5, "dairy":7, "bakery":3, "meat":3 }
+      "DefaultShelfLifeDaysByCategory": {
+        "produce": 5,
+        "dairy": 7,
+        "bakery": 3,
+        "meat": 3
+      }
     }
   }
 }
 ```
 
 ### Flight-Once Seeding
+
 `PantrySeedHostedService` inserts baseline pantry items if store empty at boot; idempotent and safe under concurrency.
 
 ### Container & Compose
+
 Build and run with the provided multi-stage `Dockerfile` and compose file:
+
 ```bash
 docker compose -f samples/S16.PantryPal/docker/docker-compose.yml up --build
 ```
+
 Service: http://localhost:8080
 
 ### MVP Operational Checklist
-- [ ] Pagination default (25) & clamp (200)
+
+- [ ] Pagination default (50) & reasonable clamp
 - [ ] Ingestion upload + confirm creates items
 - [ ] Duplicate detections ignored
 - [ ] Shelf-life inferred when missing expiration
-- [ ] Search returns items & sets `X-Search-Degraded`
+- [ ] Search returns items & sets `X-Search-Degraded` when degraded
 - [ ] Meal suggestions produce scored results
 - [ ] Seed ran once (subsequent boots skip)
 - [ ] Container responds on 8080
@@ -531,7 +593,7 @@ private bool TryParseCustomFormat(string input, out ParsedItemData result)
 
 **Self-Reporting**: Bootstrap reports show provider elections and capabilities
 
-See `TECHNICAL.md` for deeper layering and extension guidance.
+See `TECHNICAL.md` for deeper layering and extension guidance. For the full UI/UX and AngularJS binding details, see `UI-SPEC.md` in this folder.
 
 ## Testing
 
@@ -549,7 +611,6 @@ Add integration tests later for full HTTP + persistence provider scenarios.
 - **S13.DocMind**: Vector search + AI integration
 - **S14.AdapterBench**: Multi-provider benchmarking
 
-
 ## Related Decisions
 
 - **AI-0014**: MCP Code Mode - Technical foundation
@@ -559,27 +620,33 @@ Add integration tests later for full HTTP + persistence provider scenarios.
 ## Recent Decisions & Roadmap (2025-10-07)
 
 ### Auth & User Experience
-- **Test Auth** is always enabled (see S5.Recs pattern). If no user is signed in, the UI defaults to browse-only mode.
-- Multi-user supported; multi-tenant is not in scope for this sample.
+
+- Test Auth is always enabled (see S5.Recs). If no user is signed in, the UI is browse-only. Write actions (upload, confirm, qty edits) are disabled.
+- Multi-user supported; multi-tenant not in scope for this sample.
 
 ### Batch Operations
+
 - Batch operations (e.g., photo detection, pantry updates) accept partial success. Failures are reported per item.
 
 ### Vision/Model Extensibility
+
 - Vision provider selection is extensible (see Ollama adapter, DocMind for multi-model usage).
 - Entity relationships (e.g., ingredient substitutions, user preferences) are being added for richer scenarios.
 
 ### Media Pipeline
+
 - Detected ingredient images are cropped and saved locally using the Storage pipeline for visual reference.
 
 ### Pagination & Streaming
+
 - All in-memory entity queries are being refactored: web UI uses paging, backend uses streaming for large data.
 
 ### Documentation
+
 - "Behind the scenes" docs are provided both as in-code (g1c1-style) comments and as comprehensive in-folder documentation for developers.
 
-
 ### Testing & Roadmap
+
 - Advanced/integration tests are targeted for v1.1.
 - Production goal: pilot/fully functional prototype, mobile-first for photos, no regulatory compliance required.
 
@@ -588,28 +655,34 @@ For architectural rationale and more, see `/docs/decisions/SAMPLE-0016-kitchenmi
 ## Agentic AI + Code-Mode MCP Integration: Findings & Proposals (2025-10-07)
 
 ### Findings
+
 - The value of S16 is maximized when the AI pipeline can reason over, discover, and orchestrate workflows using a code-enabled MCP service.
 - Current Koan.Mcp exposes entities and tools as discrete operations, but does not yet provide a TypeScript/JS code-mode surface for agentic AI.
 - The code-mode pattern (see Cloudflare, OpenAI, Anthropic) enables the agent to compose multi-step workflows in a single script, reducing roundtrips and improving reliability.
 - Koan.Mcp’s zero-config, entity-first design is a strong foundation for this, but needs a code-mode execution endpoint, SDK surface, and capability registry.
 
 ### Proposals
+
 1. **Enhance Koan.Mcp with Code-Mode Support:**
-  - Add an `executeCode` endpoint that runs agent-authored TS/JS code in a secure sandbox, with access to a minimal, typed SDK (Entities, Out, etc.).
-  - Auto-generate the SDK surface from registered entities/tools, and expose it as a `.d.ts` for agent prompt context.
-  - Expose a machine-readable capability registry for agentic discovery.
-  - Enforce quotas, audit, and validate all code runs for safety and observability.
+
+- Add an `executeCode` endpoint that runs agent-authored TS/JS code in a secure sandbox, with access to a minimal, typed SDK (Entities, Out, etc.).
+- Auto-generate the SDK surface from registered entities/tools, and expose it as a `.d.ts` for agent prompt context.
+- Expose a machine-readable capability registry for agentic discovery.
+- Enforce quotas, audit, and validate all code runs for safety and observability.
 
 2. **Integrate S16 with Code-Mode MCP:**
-  - Register all S16 entities and workflows as MCP tools.
-  - The AI pipeline queries the MCP registry, receives the SDK, and crafts code-mode scripts to fulfill user intents (e.g., meal planning, pantry updates).
-  - Demo multi-step workflows as single code-mode scripts, showing agentic reasoning and orchestration.
+
+- Register all S16 entities and workflows as MCP tools.
+- The AI pipeline queries the MCP registry, receives the SDK, and crafts code-mode scripts to fulfill user intents (e.g., meal planning, pantry updates).
+- Demo multi-step workflows as single code-mode scripts, showing agentic reasoning and orchestration.
 
 3. **DX & Documentation:**
-  - Document the code-mode surface, SDK types, and example scripts in S16 and Koan.Mcp docs.
-  - Provide developer samples and golden scenarios for testing and validation.
+
+- Document the code-mode surface, SDK types, and example scripts in S16 and Koan.Mcp docs.
+- Provide developer samples and golden scenarios for testing and validation.
 
 ### Opportunities for Koan.Mcp
+
 - Become a reference implementation for agentic, code-enabled orchestration in modern AI systems.
 - Maintain Koan’s “just works” DX: zero-config, strong defaults, and extensibility.
 - Lead in security, observability, and developer experience for code-mode MCP.

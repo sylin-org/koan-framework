@@ -1,0 +1,18 @@
+﻿<section class="space-y-6 md:space-y-8" aria-label="Behind the Scenes">
+  <div class="bg-white rounded-2xl shadow-sm p-4">
+    <h2 class="text-lg font-medium mb-2">Entity-first patterns</h2>
+    <pre class="text-xs font-mono bg-gray-900 text-gray-100 p-3 rounded-lg overflow-auto">GET /api/data/pantry?filter=...&q=...&page=1&pageSize=50&sort=...
+PATCH /api/data/pantry/{id}
+POST /api/action/pantry/upload
+POST /api/action/pantry/confirm/{photoId}</pre>
+  </div>
+  <div class="bg-white rounded-2xl shadow-sm p-4">
+    <h2 class="text-lg font-medium mb-2">Recent requests</h2>
+    <div class="text-xs overflow-x-auto space-y-2">
+      <div ng-repeat="c in vm.calls" class="p-2 rounded ring-1 ring-gray-200">
+        <div class="font-mono text-gray-900">{{c.cfg.method}} {{c.cfg.url}}</div>
+        <div class="text-gray-500">Degraded: {{c.degraded}}</div>
+      </div>
+    </div>
+  </div>
+</section>
