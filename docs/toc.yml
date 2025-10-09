@@ -39,6 +39,8 @@
      - name: Engineering
        href: engineering/index.md
        items:
+         - name: Samples Organization
+           href: engineering/samples-organization.md
          - name: Packaging Policy
            href: engineering/packaging.md
          - name: Auth Controller Discovery Regression

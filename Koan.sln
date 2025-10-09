@@ -105,7 +105,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "S1.Web", "samples\S1.Web\S1
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "S10.DevPortal", "samples\S10.DevPortal\S10.DevPortal.csproj", "{C127904B-9195-4E8E-A7B4-3CB2766FE2CA}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "S12.MedTrials.Core", "samples\S12.MedTrials.Core\S12.MedTrials.Core.csproj", "{B1BFDAB7-669F-4F80-B24B-F5124548F8B0}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "S12.MedTrials.Core", "samples\S12.MedTrials\Core\S12.MedTrials.Core.csproj", "{B1BFDAB7-669F-4F80-B24B-F5124548F8B0}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Data.Vector", "src\Koan.Data.Vector\Koan.Data.Vector.csproj", "{62781D28-87A7-4E3B-8AD3-7B036C7B2779}"
 EndProject
@@ -115,7 +115,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.AI", "src\Koan.AI\Koan
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Mcp", "src\Koan.Mcp\Koan.Mcp.csproj", "{207C0CBA-5E0A-49E0-8F59-AD778E260480}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "S12.MedTrials.McpService", "samples\S12.MedTrials.McpService\S12.MedTrials.McpService.csproj", "{E65524E1-A0DC-4F9D-BEC4-0B7120C02FCE}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "S12.MedTrials.McpService", "samples\S12.MedTrials\MCP\S12.MedTrials.McpService.csproj", "{E65524E1-A0DC-4F9D-BEC4-0B7120C02FCE}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Vector", "Vector", "{50016D06-9933-125F-84C4-B9F9B90C374B}"
 EndProject
@@ -141,13 +141,13 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Web.Auth.Connector.Tes
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Web.Auth.Services", "src\Koan.Web.Auth.Services\Koan.Web.Auth.Services.csproj", "{4129BB4C-4C3B-46EB-BEBA-AA56DB28BAB4}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "S12.MedTrials", "samples\S12.MedTrials\S12.MedTrials.csproj", "{58CFFBBA-7B1F-48BA-9801-406146137E80}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "S12.MedTrials", "samples\S12.MedTrials\API\S12.MedTrials.csproj", "{58CFFBBA-7B1F-48BA-9801-406146137E80}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "S13.DocMind.Tools", "samples\S13.DocMind.Tools\S13.DocMind.Tools.csproj", "{951D6917-BF6D-4578-851C-670452073809}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "S13.DocMind.Tools", "samples\S13.DocMind\Tools\S13.DocMind.Tools.csproj", "{951D6917-BF6D-4578-851C-670452073809}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "S13.DocMind", "samples\S13.DocMind\S13.DocMind.csproj", "{D7E6D724-D410-4ACC-A40E-F2F3D731165C}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "S13.DocMind", "samples\S13.DocMind\API\S13.DocMind.csproj", "{D7E6D724-D410-4ACC-A40E-F2F3D731165C}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "S13.DocMind_Koan", "samples\S13.DocMind\S13.DocMind_Koan.csproj", "{34CE408A-1CB8-485F-BE49-F37D0387CFCF}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "S13.DocMind_Koan", "samples\S13.DocMind\API\S13.DocMind_Koan.csproj", "{34CE408A-1CB8-485F-BE49-F37D0387CFCF}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "S14.AdapterBench", "samples\S14.AdapterBench\S14.AdapterBench.csproj", "{3E25DBC1-E73C-43C7-A516-7247EFD0ED42}"
 EndProject
@@ -331,7 +331,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Web.Auth.Roles", "src\
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Web.Transformers", "src\Koan.Web.Transformers\Koan.Web.Transformers.csproj", "{55F45976-541F-47BE-9180-E05BDCA75807}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "S2.Api", "samples\S2.Api\S2.Api.csproj", "{B89D941D-B87E-4C60-815C-6C0BB68A876A}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "S2.Api", "samples\S2\API\S2.Api.csproj", "{B89D941D-B87E-4C60-815C-6C0BB68A876A}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{0AB3BF05-4346-4AA6-1389-037BE0695223}"
 EndProject
@@ -387,9 +387,9 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Tests.Cache.Unit", "te
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "S16.PantryPal.McpHost.Tests", "tests\S16.PantryPal.McpHost.Tests\S16.PantryPal.McpHost.Tests.csproj", "{CF377745-B629-4463-9D3E-C507B065B589}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "S16.PantryPal.McpHost", "samples\S16.PantryPal.McpHost\S16.PantryPal.McpHost.csproj", "{B7F70B61-54C8-47C1-BAEF-57AD24DF098D}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "S16.PantryPal.McpHost", "samples\S16.PantryPal\MCP\S16.PantryPal.McpHost.csproj", "{B7F70B61-54C8-47C1-BAEF-57AD24DF098D}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "S16.PantryPal", "samples\S16.PantryPal\S16.PantryPal.csproj", "{63E5A924-11AC-4EA1-985C-24EFA8EDACE8}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "S16.PantryPal", "samples\S16.PantryPal\API\S16.PantryPal.csproj", "{63E5A924-11AC-4EA1-985C-24EFA8EDACE8}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Web.PatchOps.Tests", "tests\Koan.Web.PatchOps.Tests\Koan.Web.PatchOps.Tests.csproj", "{572B4F05-D867-4F6C-835B-9E59C9B266D3}"
 EndProject

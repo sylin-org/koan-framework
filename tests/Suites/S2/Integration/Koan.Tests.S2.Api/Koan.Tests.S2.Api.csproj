@@ -22,6 +22,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\..\Shared\Koan.Testing\Koan.Testing.csproj" />
-    <ProjectReference Include="..\..\..\..\..\samples\S2.Api\S2.Api.csproj" />
+  <ProjectReference Include="..\..\..\..\..\samples\S2\API\S2.Api.csproj" />
   </ItemGroup>
 </Project>

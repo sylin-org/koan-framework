@@ -3,7 +3,7 @@ services:
   pantry:
     build:
       context: ../..
-      dockerfile: samples/S16.PantryPal/Dockerfile
+      dockerfile: samples/S16.PantryPal/API/Dockerfile
     image: s16.pantrypal:latest
     environment:
       ASPNETCORE_ENVIRONMENT: Development
@@ -11,6 +11,6 @@ services:
     ports:
       - "8080:8080"
     volumes:
-      - ../.Koan/Data/photos:/app/photos
+      - ./.Koan/Data/photos:/app/photos
     restart: unless-stopped
 volumes: {}

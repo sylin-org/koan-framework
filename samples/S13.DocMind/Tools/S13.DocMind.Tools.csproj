@@ -7,7 +7,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\S13.DocMind\S13.DocMind.csproj" />
+    <ProjectReference Include="..\API\S13.DocMind.csproj" />
   </ItemGroup>
 
   <ItemGroup>

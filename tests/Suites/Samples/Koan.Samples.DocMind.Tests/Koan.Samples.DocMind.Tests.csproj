@@ -8,7 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\..\..\..\samples\S13.DocMind\S13.DocMind.csproj" />
+  <ProjectReference Include="..\..\..\..\..\samples\S13.DocMind\API\S13.DocMind.csproj" />
     <ProjectReference Include="..\..\..\Shared\Koan.Testing\Koan.Testing.csproj" />
   </ItemGroup>
 

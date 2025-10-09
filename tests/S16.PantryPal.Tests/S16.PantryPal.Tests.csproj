@@ -6,7 +6,7 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\samples\S16.PantryPal\S16.PantryPal.csproj" />
+  <ProjectReference Include="..\..\samples\S16.PantryPal\API\S16.PantryPal.csproj" />
     <ProjectReference Include="..\..\src\Connectors\Data\InMemory\Koan.Data.Connector.InMemory.csproj" />
   </ItemGroup>
   <ItemGroup>

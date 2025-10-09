@@ -10,7 +10,7 @@ services:
     ports:
       - "4910:27017"
     volumes:
-      - mongo_data:/data/db
+      - ../.Koan/Data/mongo:/data/db
 
   rabbitmq:
     image: rabbitmq:3-management
@@ -27,7 +27,7 @@ services:
       timeout: 5s
       retries: 10
     volumes:
-      - rabbitmq_data:/var/lib/rabbitmq
+      - ../.Koan/Data/rabbitmq:/var/lib/rabbitmq
 
 # Ollama running on host - no container needed
 
@@ -108,6 +108,4 @@ services:
       timeout: 10s
       retries: 3
 
-volumes:
-  mongo_data:
-  rabbitmq_data:
+volumes: {}

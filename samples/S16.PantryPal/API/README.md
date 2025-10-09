@@ -1,18 +1,4 @@
-# S16.PantryPal — Sample Family
-
-Components
-
-- API/ — PantryPal HTTP API (controllers, models, services)
-- MCP/ — Move target for MCP host (previously S16.PantryPal.McpHost)
-
-Run
-
-- API: open `API/` and run `start.bat`.
-
-Notes
-
-- Uses Entity<T> patterns and controllers per Koan conventions.
-- See family-level docs under `docs/engineering/samples-organization.md` for layout details.# S16 PantryPal: AI‑Powered Meal Planning
+# S16 PantryPal: AI‑Powered Meal Planning
 
 Vision-based pantry management + intelligent meal suggestions + MCP Code Mode orchestration.
 

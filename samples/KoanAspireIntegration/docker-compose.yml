@@ -1,4 +1,4 @@
-version: '3.8'
+ 
 
 services:
   # PostgreSQL Database
@@ -12,7 +12,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - ./.Koan/Data/postgres:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
@@ -26,7 +26,7 @@ services:
     ports:
       - "6379:6379"
     volumes:
-      - redis_data:/data
+      - ./.Koan/Data/redis:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -60,9 +60,7 @@ services:
       retries: 3
       start_period: 40s
 
-volumes:
-  postgres_data:
-  redis_data:
+ 
 
 networks:
   default:

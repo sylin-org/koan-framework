@@ -1,4 +1,4 @@
-version: '3.9'
+ 
 services:
   mongo:
     image: mongo:7
@@ -10,7 +10,7 @@ services:
   api:
     build:
       context: ../..
-      dockerfile: samples/S2.Api/Dockerfile
+      dockerfile: samples/S2/API/Dockerfile
     environment:
       ASPNETCORE_URLS: http://+:5054
       ConnectionStrings__Default: mongodb://mongo:27017

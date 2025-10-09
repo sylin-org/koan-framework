@@ -7,6 +7,6 @@ services:
     ports:
       - "${HOST_PORT:-5044}:5044"
     volumes:
-      # Persist JSON data on host
-      - ./data:/app/data
+      # Persist JSON data in sample-local .Koan folder
+      - ./.Koan/Data:/app/data
     restart: unless-stopped

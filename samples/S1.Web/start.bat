@@ -1,20 +1,31 @@
 @echo off
-setlocal
-REM Simple start for S1.Web: optional URL, run in foreground (shows logs), open browser after short delay.
+setlocal enableextensions
 
-set "URL=%~1"
-if "%URL%"=="" set "URL=http://localhost:5044"
+set "ROOT=%~dp0"
+pushd "%ROOT%" >nul
 
-pushd "%~dp0"
+set "PROJECT_NAME=koan-s1-web"
+set "COMPOSE_FILE=docker\compose.yml"
+set "OPEN_URL=http://localhost:5044"
 
-REM Best-effort: stop any previous published EXE (safe to ignore failures)
-taskkill /F /IM "S1.Web.exe" /T >nul 2>nul
+where docker >nul 2>nul || (
+	echo Docker is required but not found in PATH.
+	popd & exit /b 1
+)
 
-REM Open the browser after a short delay; avoid complex health checks for simplicity
-start "" cmd /c "timeout /t 2 >nul & start "" "%URL%""
+for /f "tokens=*" %%i in ('docker compose version 2^>nul') do set HAS_DOCKER_COMPOSE=1
+if defined HAS_DOCKER_COMPOSE (
+	docker compose -p %PROJECT_NAME% -f "%COMPOSE_FILE%" build || (popd & exit /b 1)
+	docker compose -p %PROJECT_NAME% -f "%COMPOSE_FILE%" up -d || (popd & exit /b 1)
+) else (
+	where docker-compose >nul 2>nul || (
+		echo docker-compose is not available. Please update Docker Desktop or install docker-compose.
+		popd & exit /b 1
+	)
+	docker-compose -p %PROJECT_NAME% -f "%COMPOSE_FILE%" build || (popd & exit /b 1)
+	docker-compose -p %PROJECT_NAME% -f "%COMPOSE_FILE%" up -d || (popd & exit /b 1)
+)
 
-echo Running S1.Web at %URL% (press Ctrl+C to stop). Logs will appear below.
-dotnet run -p:UseAppHost=false --urls "%URL%"
-
+start "" "%OPEN_URL%" >nul 2>&1
 popd
-endlocal
+exit /b 0

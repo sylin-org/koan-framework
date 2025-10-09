@@ -33,7 +33,7 @@ services:
   ollama:
     image: "ollama/ollama:latest"
     volumes:
-      - ./Data/ollama:/root/.ollama
+      - ./.Koan/Data/ollama:/root/.ollama
     healthcheck:
       test: ["CMD-SHELL", "(curl -fsS http://ollama:11434/api/tags || wget -q -O- http://ollama:11434/api/tags || bash -lc 'exec 3<>/dev/tcp/ollama/11434') >/dev/null 2>&1 || exit 1"]
       interval: 5s
@@ -44,7 +44,7 @@ services:
   couchbase:
     image: "public.ecr.aws/docker/library/couchbase:latest"
     volumes:
-      - ./Data/couchbase:/opt/couchbase/var
+      - ./.Koan/Data/couchbase:/opt/couchbase/var
     networks:
       - Koan_internal
   weaviate:
@@ -57,7 +57,7 @@ services:
       CLUSTER_HOSTNAME: "node1"
       RAFT_BOOTSTRAP_EXPECT: "1"
     volumes:
-      - ./Data/weaviate:/var/lib/weaviate
+      - ./.Koan/Data/weaviate:/var/lib/weaviate
     healthcheck:
       test: ["CMD-SHELL", "(curl -fsS http://weaviate:8080/v1/.well-known/ready || wget -q -O- http://weaviate:8080/v1/.well-known/ready || bash -lc 'exec 3<>/dev/tcp/weaviate/8080') >/dev/null 2>&1 || exit 1"]
       interval: 5s

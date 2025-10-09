@@ -6,8 +6,8 @@
     <AssemblyName>S16.PantryPal.McpHost</AssemblyName>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\S16.PantryPal\S16.PantryPal.csproj" />
-    <ProjectReference Include="..\..\src\Koan.Mcp\Koan.Mcp.csproj" />
-    <ProjectReference Include="..\..\src\Koan.Web\Koan.Web.csproj" />
+    <ProjectReference Include="..\API\S16.PantryPal.csproj" />
+    <ProjectReference Include="..\..\..\src\Koan.Mcp\Koan.Mcp.csproj" />
+    <ProjectReference Include="..\..\..\src\Koan.Web\Koan.Web.csproj" />
   </ItemGroup>
 </Project>

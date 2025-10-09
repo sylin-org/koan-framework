@@ -2,7 +2,7 @@ services:
   app:
     build:
       context: ../..
-      dockerfile: samples/S13.DocMind/Dockerfile
+      dockerfile: samples/S13.DocMind/API/Dockerfile
     image: s13-docmind:dev
     container_name: api
     ports:
@@ -36,7 +36,7 @@ services:
     ports:
       - "5121:27017"
     volumes:
-      - mongo_data:/data/db
+      - ./.Koan/Data/mongo:/data/db
     environment:
       MONGO_INITDB_DATABASE: s13docmind
     healthcheck:
@@ -61,7 +61,7 @@ services:
       CLUSTER_HOSTNAME: "node1"
       RAFT_BOOTSTRAP_EXPECT: "1"
     volumes:
-      - weaviate_data:/var/lib/weaviate
+      - ./.Koan/Data/weaviate:/var/lib/weaviate
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/v1/.well-known/ready"]
       interval: 10s
@@ -75,7 +75,7 @@ services:
     ports:
       - "5123:11434"
     volumes:
-      - ollama_models:/root/.ollama
+      - ./.Koan/Data/ollama-models:/root/.ollama
     environment:
       - OLLAMA_MODELS_DIR=/root/.ollama
     healthcheck:
@@ -86,13 +86,7 @@ services:
       start_period: 60s
     restart: unless-stopped
 
-volumes:
-  mongo_data:
-    name: s13_docmind_mongo_data
-  weaviate_data:
-    name: s13_docmind_weaviate_data
-  ollama_models:
-    name: s13_docmind_ollama_models
+volumes: {}
 
 networks:
   default:

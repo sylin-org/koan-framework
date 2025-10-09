@@ -1,70 +1,31 @@
 @echo off
-echo S10.DevPortal - Koan Framework Capabilities Demo
-echo ================================================
+setlocal enableextensions
 
-echo.
-echo Starting multi-provider demo stack...
-echo - API: http://localhost:5090
-echo - MongoDB: localhost:5091
-echo - PostgreSQL: localhost:5092
-echo - Redis: localhost:5093
-echo.
+set "ROOT=%~dp0"
+pushd "%ROOT%" >nul
 
-REM Check if Docker is running
-docker version >nul 2>&1
-if %errorlevel% neq 0 (
-    echo ERROR: Docker is not running or not installed.
-    echo Please start Docker Desktop and try again.
-    pause
-    exit /b 1
+set "PROJECT_NAME=koan-s10-devportal"
+set "COMPOSE_FILE=docker\compose.yml"
+set "OPEN_URL=http://localhost:5090"
+
+where docker >nul 2>nul || (
+    echo Docker is required but not found in PATH.
+    popd & exit /b 1
 )
 
-REM Navigate to docker directory
-cd docker
+for /f "tokens=*" %%i in ('docker compose version 2^>nul') do set HAS_DOCKER_COMPOSE=1
+if defined HAS_DOCKER_COMPOSE (
+    docker compose -p %PROJECT_NAME% -f "%COMPOSE_FILE%" build || (popd & exit /b 1)
+    docker compose -p %PROJECT_NAME% -f "%COMPOSE_FILE%" up -d || (popd & exit /b 1)
+) else (
+    where docker-compose >nul 2>nul || (
+        echo docker-compose is not available. Please update Docker Desktop or install docker-compose.
+        popd & exit /b 1
+    )
+    docker-compose -p %PROJECT_NAME% -f "%COMPOSE_FILE%" build || (popd & exit /b 1)
+    docker-compose -p %PROJECT_NAME% -f "%COMPOSE_FILE%" up -d || (popd & exit /b 1)
+)
 
-REM Stop any existing containers
-echo Stopping existing containers...
-docker compose down
-
-REM Pull latest images
-echo Pulling latest images...
-docker compose pull
-
-REM Build and start the stack
-echo Building and starting services...
-docker compose up --build -d
-
-REM Wait for services to be ready
-echo.
-echo Waiting for services to start...
-timeout /t 10 /nobreak >nul
-
-REM Check service health
-echo.
-echo Checking service health...
-docker compose ps
-
-echo.
-echo ================================================
-echo S10.DevPortal is starting up!
-echo.
-echo Application: http://localhost:5090
-echo MongoDB:     localhost:5091
-echo PostgreSQL:  localhost:5092
-echo Redis:       localhost:5093
-echo.
-echo To stop: docker compose down
-echo To view logs: docker compose logs -f api
-echo ================================================
-
-REM Open browser
-start http://localhost:5090
-
-REM Return to original directory
-cd ..
-
-echo.
-echo Press any key to view real-time logs...
-pause >nul
-cd docker
-docker compose logs -f api
+start "" "%OPEN_URL%" >nul 2>&1
+popd
+exit /b 0
