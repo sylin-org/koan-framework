@@ -8,14 +8,16 @@
      - name: Enterprise Adoption
        href: getting-started/enterprise-adoption.md
 - name: Developer Guides
-   href: guides/README.md
-   items:
+  href: guides/README.md
+  items:
      - name: Building APIs
        href: guides/building-apis.md
      - name: Data Modeling
        href: guides/data-modeling.md
      - name: Canon Capabilities
        href: guides/canon-capabilities-howto.md
+     - name: Patch Capabilities
+       href: guides/patch-capabilities-howto.md
      - name: Garden Cooperative Journal
        href: guides/garden-cooperative-journal.md
      - name: AI Integration
@@ -44,8 +46,8 @@
          - name: Test Authoring Guidance
            href: engineering/test-authoring.md
 - name: Case Studies
-   href: case-studies/s13-docmind/index.md
-   items:
+  href: case-studies/s13-docmind/index.md
+  items:
      - name: S13.DocMind Overview
        href: case-studies/s13-docmind/index.md
      - name: Data and Domain Model
@@ -54,9 +56,9 @@
        href: case-studies/s13-docmind/ai-pipeline.md
      - name: Operations & Diagnostics
        href: case-studies/s13-docmind/operations-and-diagnostics.md
-- name: API Reference
-   href: api/index.md
-   items:
+ - name: API
+  href: api/index.md
+  items:
      - name: Core
        href: reference/core/index.md
      - name: Data
@@ -64,13 +66,15 @@
        items:
          - name: Entity Lifecycle Events
            href: reference/data/entity-lifecycle-events.md
-            - name: Cache
-              href: reference/data/cache.md
+         - name: Cache
+           href: reference/data/cache.md
      - name: Web
        href: reference/web/index.md
        items:
          - name: Pagination Attribute Reference
            href: reference/web/pagination-attribute.md
+     - name: PATCH formats and normalization
+       href: api/patch-normalization.md
      - name: AI
        href: reference/ai/index.md
      - name: Messaging
@@ -105,18 +109,18 @@
      - name: Canon Runtime Migration Plan
        href: architecture/canon-runtime-migration.md
 - name: Architecture Decisions
-   href: decisions/index.md
- - name: Support
-   href: support/troubleshooting.md
- - name: Proposals
-   items:
+  href: decisions/index.md
+- name: Support
+  href: support/troubleshooting.md
+- name: Proposals
+  items:
      - name: Canonization Overhaul (2025)
        href: proposals/PROP-canon-overhaul-2.md
      - name: Canon Aggregation Contract & Policies
        href: proposals/PROP-canon-aggregation-contract.md
- - name: Templates
-   href: templates/document-template.md
- - name: Archive
-   href: archive/README.md
- - name: Contributing
-   href: ../CONTRIBUTING.md
+- name: Templates
+  href: templates/document-template.md
+- name: Archive
+  href: archive/README.md
+- name: Contributing
+  href: ../CONTRIBUTING.md

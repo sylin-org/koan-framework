@@ -154,6 +154,8 @@
       href: DATA-0075-entity-schema-guard-and-provisioning-reset.md
     - name: DATA-0076 Mongo `_id` index governance
       href: DATA-0076-mongo-id-index-governance.md
+    - name: DATA-0077 Canonical patch operations
+      href: DATA-0077-canonical-patch-operations.md
 - name: Web (WEB)
   items:
     - name: WEB-0010 Separate AI web surface
