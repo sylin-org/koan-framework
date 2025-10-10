@@ -8,7 +8,7 @@ pushd "%SCRIPT_DIR%"
 REM Build the API image and bring up the stack detached, then wait and launch the app.
 set COMPOSE_FILE=docker\compose.yml
 set PROJECT_NAME=koan-s16-pantrypal
-set API_URL=http://localhost:5016/swagger/index.html
+set API_URL=http://localhost:5016/
 set MCP_SDK_URL=http://localhost:5026/mcp/sdk/definitions
 set OPEN_URL=http://localhost:5016
 
@@ -23,12 +23,12 @@ for /f "tokens=*" %%i in ('docker compose version 2^>nul') do set HAS_DOCKER_COM
 if defined HAS_DOCKER_COMPOSE_CLI (
   echo Using "docker compose" CLI
   docker compose -p %PROJECT_NAME% -f %COMPOSE_FILE% build || goto :error
-  docker compose -p %PROJECT_NAME% -f %COMPOSE_FILE% up -d || goto :error
+  docker compose -p %PROJECT_NAME% -f %COMPOSE_FILE% up -d --remove-orphans || goto :error
 ) else (
   where docker-compose >nul 2>nul || goto :nolegacy
   echo Using legacy "docker-compose" CLI
   docker-compose -p %PROJECT_NAME% -f %COMPOSE_FILE% build || goto :error
-  docker-compose -p %PROJECT_NAME% -f %COMPOSE_FILE% up -d || goto :error
+  docker-compose -p %PROJECT_NAME% -f %COMPOSE_FILE% up -d --remove-orphans || goto :error
 )
 
 echo Waiting for API to be ready at %API_URL% ...

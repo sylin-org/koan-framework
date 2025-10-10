@@ -1,3 +1,16 @@
+---
+type: GUIDE
+domain: framework
+title: "Guides Index"
+audience: [developers, architects]
+status: current
+last_updated: 2025-10-09
+framework_version: v0.6.3
+validation:
+	status: not-yet-tested
+	scope: docs/guides/README.md
+---
+
 # Koan Framework Guides
 
 **Comprehensive documentation for developers working with the Koan Framework.**

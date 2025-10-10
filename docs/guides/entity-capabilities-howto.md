@@ -1,5 +1,18 @@
 # Findings and Recommendations (2025-10-07)
 
+---
+type: GUIDE
+domain: data
+title: "Entity Capabilities How-To"
+audience: [developers, architects]
+status: draft
+last_updated: 2025-10-02
+framework_version: v0.6.3
+validation:
+    status: not-yet-tested
+    scope: docs/guides/entity-capabilities-howto.md
+---
+
 This section summarizes best practices and recommendations for maximizing the value of Koan's entity and automation features, based on a deep review of current and planned usage in sample applications like PantryPal.
 
 ## Key Koan Features to Prefer
@@ -25,18 +38,7 @@ This section summarizes best practices and recommendations for maximizing the va
 
 **Summary:**
 Rely on Koan’s entity, controller, pipeline, and job abstractions for all core behaviors. Avoid custom repositories, manual paging, or ad-hoc background work. Use the patterns and recipes in this guide as the canonical reference for all new features and documentation.
----
-type: GUIDE
-domain: data
-title: "Entity Capabilities How-To"
-audience: [developers, architects]
-status: draft
-last_updated: 2025-10-02
-framework_version: v0.6.2
-validation:
-  status: not-yet-tested
-  scope: docs/guides/entity-capabilities-howto.md
----
+<!-- Front-matter normalized above; removed duplicate block. -->
 
 # Koan Entity Capabilities: End-to-End Guide
 

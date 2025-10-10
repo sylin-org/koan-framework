@@ -1,3 +1,16 @@
+---
+type: GUIDE
+domain: data
+title: "Koan Backup System Migration Guide"
+audience: [developers, architects]
+status: current
+last_updated: 2025-10-09
+framework_version: v0.6.3
+validation:
+    status: not-yet-tested
+    scope: docs/guides/BACKUP-MIGRATION-GUIDE.md
+---
+
 # Koan Backup System Migration Guide
 
 **Version:** 1.0

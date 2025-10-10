@@ -4,7 +4,7 @@ domain: web
 title: "Web Pillar Reference"
 audience: [developers, architects, ai-agents]
 last_updated: 2025-09-28
-framework_version: v0.6.2
+framework_version: v0.6.3
 status: current
 validation:
   date_last_tested: 2025-09-28
@@ -87,7 +87,7 @@ public class ProductsController : EntityController<Product>
     [HttpPost("{id}/activate")]
     public async Task<IActionResult> Activate(string id)
     {
-        var product = await Product.ById(id);
+  var product = await Product.Get(id);
         if (product is null) return NotFound();
 
         product.IsActive = true;

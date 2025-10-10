@@ -28,10 +28,14 @@
        href: guides/performance.md
      - name: Semantic Pipelines
        href: guides/semantic-pipelines.md
+     - name: Entity access and streaming
+       href: guides/data/entity-access-and-streaming.md
      - name: MCP over HTTP + SSE
        href: guides/mcp-http-sse-howto.md
-     - name: MCP Code Mode Preflight
-       href: guides/mcp-code-mode-preflight.md
+     - name: Docs build and lint
+       href: engineering/docs-build-and-lint.md
+     - name: Aspire Integration
+       href: guides/aspire-integration.md
      - name: Auto-Provisioning System
        href: guides/deep-dive/auto-provisioning-system.md
      - name: Bootstrap Lifecycle
@@ -58,8 +62,8 @@
        href: case-studies/s13-docmind/ai-pipeline.md
      - name: Operations & Diagnostics
        href: case-studies/s13-docmind/operations-and-diagnostics.md
- - name: API
-  href: api/index.md
+- name: Reference
+  href: reference/index.md
   items:
      - name: Core
        href: reference/core/index.md
@@ -75,12 +79,18 @@
        items:
          - name: Pagination Attribute Reference
            href: reference/web/pagination-attribute.md
+     - name: Web HTTP API
+       href: reference/web/http-api.md
+     - name: OpenAPI generation
+       href: reference/web/openapi-generation.md
      - name: PATCH formats and normalization
        href: api/patch-normalization.md
      - name: AI
        href: reference/ai/index.md
      - name: Messaging
        href: reference/messaging/index.md
+     - name: Flow
+       href: reference/flow/index.md
      - name: Storage
        href: reference/storage/index.md
      - name: Canon
@@ -88,8 +98,8 @@
      - name: Orchestration
        href: reference/orchestration/index.md
 - name: Architecture
-   href: architecture/principles.md
-   items:
+  href: architecture/principles.md
+  items:
      - name: Framework Principles
        href: architecture/principles.md
      - name: Pagination Refactor Plan

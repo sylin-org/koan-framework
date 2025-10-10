@@ -5,7 +5,7 @@ title: "Messaging Pillar Reference"
 audience: [developers, architects, ai-agents]
 status: current
 last_updated: 2025-09-28
-framework_version: v0.6.2
+framework_version: v0.6.3
 validation:
   date_last_tested: 2025-09-28
   status: verified
@@ -564,7 +564,7 @@ public async Task Should_Process_Order_Command()
     await processor.ProcessPendingAsync();
 
     // Assert
-    var order = await Order.ById("TEST-001");
+    var order = await Order.Get("TEST-001");
     Assert.AreEqual(OrderStatus.Processing, order.Status);
 }
 ```

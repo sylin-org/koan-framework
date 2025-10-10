@@ -78,7 +78,6 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddKoan();
 
 var app = builder.Build();
-app.UseKoan();
 app.Run();
 ```
 

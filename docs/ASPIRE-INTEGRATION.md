@@ -1,4 +1,19 @@
+---
+type: ARCHITECTURE
+domain: architecture
+title: "Koan-Aspire Integration: Orchestration-Aware Architecture"
+audience: [architects, developers]
+status: draft
+last_updated: 2025-10-09
+framework_version: v0.6.3
+validation:
+  status: not-yet-tested
+  scope: docs/ASPIRE-INTEGRATION.md
+---
+
 # Koan-Aspire Integration: Orchestration-Aware Architecture
+
+> Note: Looking for the short, actionable setup? See the concise guide at `docs/guides/aspire-integration.md`. This page is a deep-dive reference and may be split/archived in a future cleanup per ARCH-0063.
 
 ## Developer's Guide to Koan/Aspire Orchestration
 

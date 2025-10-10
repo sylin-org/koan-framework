@@ -1,4 +1,17 @@
-﻿# Test authoring guidance
+﻿---
+type: ENGINEERING
+domain: engineering
+title: "Test authoring guidance"
+audience: [developers, maintainers]
+status: current
+last_updated: 2025-10-09
+framework_version: v0.6.3
+validation:
+  status: drafted
+  scope: docs/engineering/test-authoring.md
+---
+
+# Test authoring guidance
 
 ## Contract
 - **Scope**: Creating or migrating tests into the greenfield Koan testing platform located under `tests/`.

@@ -1,4 +1,16 @@
 ﻿---
+type: ENGINEERING
+domain: engineering
+title: "MCP Code Mode Preflight"
+audience: [developers]
+status: draft
+last_updated: 2025-10-09
+framework_version: v0.6.3
+validation:
+  status: not-yet-tested
+  scope: docs/guides/mcp-code-mode-preflight.md
+---
+---
 title: "MCP Code Mode Preflight Patterns"
 ---
 

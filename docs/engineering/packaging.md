@@ -1,4 +1,17 @@
-﻿# NuGet packaging policy
+﻿---
+type: ENGINEERING
+domain: engineering
+title: "NuGet packaging policy"
+audience: [developers, maintainers]
+status: current
+last_updated: 2025-10-09
+framework_version: v0.6.3
+validation:
+	status: drafted
+	scope: docs/engineering/packaging.md
+---
+
+# NuGet packaging policy
 
 ## Contract
 - **Scope**: All projects under `src/` that produce NuGet packages or dotnet tools.

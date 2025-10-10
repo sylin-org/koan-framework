@@ -290,7 +290,7 @@ public class ProductService
         if (_cache.TryGetValue(cacheKey, out Product? cached))
             return cached;
 
-        var product = await Product.ById(id);
+    var product = await Product.Get(id);
         if (product != null)
         {
             _cache.Set(cacheKey, product, TimeSpan.FromMinutes(5));
@@ -486,7 +486,7 @@ var activeUsers = await User.Where(u => u.IsActive);
 var orders = await Order.All();
 foreach (var order in orders)
 {
-    var user = await User.ById(order.UserId); // N queries
+    var user = await User.Get(order.UserId); // N queries
 }
 
 // Right: Batch loading or include patterns

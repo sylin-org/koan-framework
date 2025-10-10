@@ -5,7 +5,7 @@ title: "AI Pillar Reference"
 audience: [developers, architects, ai-agents]
 status: current
 last_updated: 2025-09-28
-framework_version: v0.6.2
+framework_version: v0.6.3
 validation:
   date_last_tested: 2025-09-28
   status: verified
@@ -251,7 +251,7 @@ public class DocumentProcessor : BackgroundService
     {
         await this.On<DocumentUploaded>(async evt =>
         {
-            var document = await Document.ById(evt.DocumentId);
+            var document = await Document.Get(evt.DocumentId);
             if (document is null) return;
 
             var embedding = await _ai.EmbedAsync(new AiEmbeddingRequest { Input = document.Content });
@@ -488,7 +488,7 @@ public class DocumentProcessor : BackgroundService
     {
         await this.On<DocumentUploaded>(async evt =>
         {
-            var document = await Document.ById(evt.DocumentId);
+            var document = await Document.Get(evt.DocumentId);
             if (document == null) return;
 
             // Generate embedding

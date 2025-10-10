@@ -68,7 +68,7 @@ public class ProductsController : EntityController<Product>
     [HttpPost("{id}/image")]
     public async Task<IActionResult> UploadImage(string id, IFormFile file, CancellationToken ct)
     {
-        var product = await Product.ById(id, ct);
+    var product = await Product.Get(id, ct);
         if (product is null) return NotFound();
 
         var image = await ProductImage.UploadAsync(file, ct);
@@ -152,7 +152,7 @@ public async Task<IActionResult> Refund(string id, [FromBody] RefundRequest requ
 {
     try
     {
-        var order = await Order.ById(id, ct);
+    var order = await Order.Get(id, ct);
         if (order is null) return NotFound();
 
         await order.ProcessRefund(request.Amount, request.Reason, ct);

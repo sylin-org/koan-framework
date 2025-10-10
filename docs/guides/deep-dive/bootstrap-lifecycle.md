@@ -1,9 +1,19 @@
+---
+type: ARCHITECTURE
+domain: framework
+title: "Bootstrap Lifecycle - Deep Dive"
+audience: [developers, architects]
+status: current
+last_updated: 2025-01-27
+framework_version: v0.6.3
+validation:
+    status: not-yet-tested
+    scope: docs/guides/deep-dive/bootstrap-lifecycle.md
+---
+
 # Bootstrap Lifecycle - Deep Dive
 
-**Document Type**: ARCHITECTURE
-**Target Audience**: Framework Contributors, DevOps Engineers
-**Last Updated**: 2025-01-27
-**Framework Version**: v0.2.18+
+<!-- Previous inline metadata kept above has been normalized into front-matter. -->
 
 ---
 

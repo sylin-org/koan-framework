@@ -1,3 +1,16 @@
+---
+type: REF
+domain: web
+title: "Pagination System Reference"
+audience: [developers, architects]
+status: current
+last_updated: 2025-10-09
+framework_version: v0.6.3
+validation:
+    status: drafted
+    scope: docs/reference/web/pagination-attribute.md
+---
+
 # Pagination system reference
 
 **Contract**

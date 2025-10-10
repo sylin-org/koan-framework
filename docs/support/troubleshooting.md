@@ -5,7 +5,7 @@ title: "Koan Troubleshooting Hub"
 audience: [developers, support-engineers, ai-agents]
 status: current
 last_updated: 2025-09-28
-framework_version: v0.6.2
+framework_version: v0.6.3
 validation:
   date_last_tested: 2025-09-28
   status: verified
@@ -301,7 +301,7 @@ Set provider budgets and retry envelopes:
 
 ---
 
-## Flow Pipelines & Automation
+## Flow & Pipeline Health
 
 ### Stage Diagnostics
 

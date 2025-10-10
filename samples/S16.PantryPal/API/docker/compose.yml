@@ -2,8 +2,8 @@ name: koan-s16-pantrypal
 services:
   api:
     build:
-      context: ../../..
-      dockerfile: samples/S16.PantryPal/Dockerfile
+      context: ../../../../
+      dockerfile: samples/S16.PantryPal/API/Dockerfile
     image: koan-s16-pantrypal:dev
     ports:
       - "5016:5016"
@@ -34,8 +34,8 @@ services:
 
   mcp:
     build:
-      context: ../../..
-      dockerfile: samples/S16.PantryPal.McpHost/Dockerfile
+      context: ../../../../
+      dockerfile: samples/S16.PantryPal/MCP/Dockerfile
     image: koan-s16-pantrypal-mcp:dev
     ports:
       - "5026:5026"

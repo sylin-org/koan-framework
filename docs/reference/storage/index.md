@@ -4,9 +4,12 @@ domain: storage
 title: "Storage Pillar Reference"
 audience: [developers, architects, ai-agents]
 last_updated: 2025-01-17
-framework_version: "v0.2.18+"
+framework_version: v0.6.3
 status: current
-validation: 2025-01-17
+validation:
+  date_last_tested: 2025-01-17
+  status: verified
+  scope: docs/reference/storage/index.md
 ---
 
 # Storage Pillar Reference
@@ -14,7 +17,7 @@ validation: 2025-01-17
 **Document Type**: REFERENCE
 **Target Audience**: Developers, Architects
 **Last Updated**: 2025-01-17
-**Framework Version**: v0.2.18+
+**Framework Version**: v0.6.3
 
 ---
 
@@ -91,14 +94,14 @@ public class FilesController : ControllerBase
     [HttpGet("{id}")]
     public async Task<IActionResult> Get(string id)
     {
-        var document = await Document.ById(id);
+  var document = await Document.Get(id);
         return document == null ? NotFound() : Ok(document);
     }
 
     [HttpGet("{id}/download")]
     public async Task<IActionResult> Download(string id)
     {
-        var document = await Document.ById(id);
+  var document = await Document.Get(id);
         if (document == null) return NotFound();
 
         var stream = await _storage.OpenAsync(document);
@@ -443,7 +446,7 @@ public class FileArchiveService
     // Move to cold storage
     public async Task ArchiveFile(string fileId)
     {
-        var file = await Document.ById(fileId);
+  var file = await Document.Get(fileId);
         if (file == null) return;
 
         await _storage.MoveTo(
@@ -461,7 +464,7 @@ public class FileArchiveService
     // Copy for backup
     public async Task BackupFile(string fileId)
     {
-        var file = await Document.ById(fileId);
+  var file = await Document.Get(fileId);
         if (file == null) return;
 
         await _storage.CopyTo(
@@ -475,7 +478,7 @@ public class FileArchiveService
     // Transfer with custom logic
     public async Task TransferFile(string fileId, string targetProfile, bool deleteSource = false)
     {
-        var file = await Document.ById(fileId);
+  var file = await Document.Get(fileId);
         if (file == null) return;
 
         await _storage.TransferToProfileAsync(
@@ -503,7 +506,7 @@ public class FileArchiveService
 [HttpGet("{id}/stream")]
 public async Task<IActionResult> StreamFile(string id, [FromHeader] string? range = null)
 {
-    var document = await Document.ById(id);
+  var document = await Document.Get(id);
     if (document == null) return NotFound();
 
     if (!string.IsNullOrEmpty(range) && range.StartsWith("bytes="))

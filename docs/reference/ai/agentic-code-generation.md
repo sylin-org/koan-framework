@@ -4,7 +4,7 @@ domain: ai
 title: "Agentic AI Code Generation Reference"
 audience: [developers, ai-engineers, ai-agents]
 last_updated: 2025-02-15
-framework_version: "v0.2.18+"
+framework_version: v0.6.3
 status: current
 validation: 2025-02-15
 replaces: []
@@ -272,7 +272,7 @@ jobs to background processors with relaxed budgets. |
 - [AI Pillar Reference](index.md)
 - [AI Integration Guide](../../guides/ai-integration.md)
 - [AI-0013 - S12.MedTrials sample adoption](../../decisions/AI-0013-s12-medtrials-sample.md)
-- [S12.MedTrials Proposal](../../proposals/s12-medtrials-sample-proposal.md)
+- [S12.MedTrials Proposal](../../archive/proposals/s12-medtrials-sample-proposal.md)
 
 ## Validation Checklist
 

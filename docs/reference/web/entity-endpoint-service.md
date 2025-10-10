@@ -4,8 +4,11 @@ domain: web
 title: "Entity Endpoint Service"
 audience: [developers, architects, ai-agents]
 last_updated: 2025-09-24
-framework_version: "v0.2.18+"
+framework_version: v0.6.3
 status: current
+validation:
+    status: drafted
+    scope: docs/reference/web/entity-endpoint-service.md
 ---
 
 # Entity Endpoint Service
@@ -13,7 +16,7 @@ status: current
 **Document Type**: Reference Guide
 **Target Audience**: Developers, Architects, AI Agents
 **Last Updated**: 2025-09-24
-**Framework Version**: v0.2.18+
+**Framework Version**: v0.6.3
 
 ---
 

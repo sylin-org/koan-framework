@@ -1,8 +1,8 @@
 ﻿---
-type: ANALYSIS
+type: ARCHITECTURE
 domain: architecture
 title: "Koan Elasticity Strategy"
-audience: [architects, platform]
+audience: [architects, technical-leads]
 status: draft
 last_updated: 2025-10-06
 framework_version: v0.6.2

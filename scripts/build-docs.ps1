@@ -5,6 +5,10 @@ param(
   [switch]$Serve,
   [int]$Port = 8080,
   [switch]$Strict,
+  [switch]$FullSite, # when set, build root docfx.json after API build
+  [switch]$RunLint,  # when set, run docs-lint.ps1 against docs folder
+  [string[]]$LintExclude = @('docs/archive/**','docs/proposals/**','docs/external/**','docs/migration/**'),
+  [switch]$LintFailOnWarning,
   [ValidateSet('Verbose', 'Info', 'Warning', 'Error')]
   [string]$LogLevel = 'Warning'
 )
@@ -315,6 +319,105 @@ try {
     $serveArgs = @('serve', $targetDest)
     if ($Port -gt 0) { $serveArgs += @('--port', $Port) }
     & $docfx @serveArgs | Write-Host
+  }
+
+  # Optional: Build full site using root docfx.json to catch cross-doc issues
+  if ($FullSite) {
+    Write-Heading "Building FULL docs site (root docfx.json)"
+    $rootConfig = Join-Path $repoRootPath 'docfx.json'
+    Assert-FileExists $rootConfig
+    $fullOutDir = Join-Path (Split-Path -Parent $rootConfig) 'artifacts/other/website/docs'
+    if ($Clean -and (Test-Path $fullOutDir)) { Remove-Item -Recurse -Force $fullOutDir }
+    $fullLog = Join-Path $artifactsRoot "build-full-$stamp.log"
+    $rootArgs = @('build', $rootConfig, '--logLevel', $LogLevel)
+    $fullOutput = & $docfx @rootArgs 2>&1 | Tee-Object -FilePath $fullLog
+    if ($LASTEXITCODE -ne 0) {
+      Write-Error "Full-site DocFX build failed. See log: $fullLog"
+      exit 1
+    }
+    if ($Strict) {
+      $sum = $fullOutput | Select-String -Pattern '\\b(\\d+)\\s+warning\\(s\\)'
+      $count = 0
+      if ($sum) { $count = ($sum.Matches | ForEach-Object { [int]$_.Groups[1].Value } | Measure-Object -Sum).Sum }
+      $warnLines = ($fullOutput | Select-String -Pattern '^(\\s*)?warning\\b' -CaseSensitive:$false).Count
+      $eff = if ($count -gt 0) { $count } else { $warnLines }
+      if ($eff -gt 0) {
+        Write-Error "Full-site DocFX reported $eff warning(s) with Strict mode. See log: $fullLog"
+        exit 1
+      }
+    }
+    Write-Host "Full-site build complete. Log: $fullLog"
+  }
+
+  # Optional: Run docs linter for front-matter, links, and terms
+  if ($RunLint) {
+    Write-Heading "Running docs linter (docs-lint.ps1)"
+    $lintScript = Join-Path $repoRootPath 'scripts/docs-lint.ps1'
+    if (Test-Path $lintScript) {
+      # Lint only active docs surfaces; exclude ADRs/archives/design/specs by default
+      $excludes = @(
+        'docs/reference/_generated/**',
+        'docs/archive/**',
+        'docs/decisions/**',
+        'docs/design/**',
+        'docs/examples/**',
+        'docs/specifications/**',
+        'docs/sessions/**',
+        'docs/templates/**',
+        'docs/architecture/**',
+        'docs/migration/**',
+        'docs/proposals/**',
+        'docs/external/**'
+      )
+      $lintParams = @{
+        Roots   = @('docs/reference', 'docs/support', 'docs/getting-started')
+        Exclude = $excludes + @('docs/_inventory.md')
+        Output  = 'list'
+      }
+      # Enable TOC validation; in CI (GitHub Actions), require YAML module or fail
+      $inCI = $false
+      if ($env:GITHUB_ACTIONS -and $env:GITHUB_ACTIONS -eq 'true') { $inCI = $true }
+      $yamlOk = $false
+      try {
+        if (Get-Command ConvertFrom-Yaml -ErrorAction SilentlyContinue) { $yamlOk = $true }
+        else { Import-Module powershell-yaml -ErrorAction Stop | Out-Null; $yamlOk = $true }
+      }
+      catch { $yamlOk = $false }
+      if ($yamlOk) {
+        $lintParams['ValidateToc'] = $true
+      }
+      else {
+        if ($inCI) {
+          Write-Error "TOC validation prerequisites missing in CI (powershell-yaml). Install the module in CI before running."
+          exit 1
+        }
+        else {
+          Write-Host "TOC validation skipped (powershell-yaml not installed)." -ForegroundColor Yellow
+        }
+      }
+      if ($LintFailOnWarning) { $lintParams['FailOnWarning'] = $true }
+      & $lintScript @lintParams
+      if ($LASTEXITCODE -ne 0) {
+        Write-Error "Docs lint failed. See output above."
+        exit 1
+      }
+
+      # Phase 2: Non-gating lint over Guides for visibility; will be made gating after remediation
+      Write-Heading "Running docs linter (Guides, non-gating)"
+      $lintGuides = @{
+        Roots   = @('docs/guides')
+        Exclude = $excludes
+        Output  = 'list'
+      }
+      # TOC validation not relevant for per-root run; skip
+      & $lintScript @lintGuides
+      if ($LASTEXITCODE -ne 0) {
+        Write-Warning "Guides lint reported issues (non-gating). Review output above."
+      }
+    }
+    else {
+      Write-Warning "docs-lint.ps1 not found; skipping lint"
+    }
   }
 }
 finally {

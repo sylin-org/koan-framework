@@ -1,4 +1,17 @@
-﻿# S5.Recs Narrative Rewrite Guide
+﻿---
+type: GUIDE
+domain: platform
+title: "S5.Recs: Rewrite Guide"
+audience: [developers, architects]
+status: draft
+last_updated: 2025-10-09
+framework_version: v0.6.3
+validation:
+   status: not-yet-tested
+   scope: docs/guides/s5-recs-narrative-REWRITE-GUIDE.md
+---
+
+# S5.Recs Narrative Rewrite Guide
 
 ## Voice & Tone: "The Contemplative Architect's Walk"
 

@@ -1,11 +1,11 @@
 ---
 type: REF
-domain: canon
+domain: framework
 title: "Canon Pillar Reference"
 audience: [developers, architects, ai-agents]
 status: current
 last_updated: 2025-09-28
-framework_version: v0.6.2
+framework_version: v0.6.3
 validation:
   date_last_tested: 2025-09-28
   status: verified
@@ -466,4 +466,4 @@ public async Task DevicePipeline_ShouldPersistProjection()
 - [AI Pillar Reference](../ai/index.md)
 - [Messaging Reference](../messaging/index.md)
 - [Semantic Pipelines Playbook](../../guides/semantic-pipelines.md)
-- [DX-0041 Consolidation ADR](../../decisions/DX-0041-docs-consolidation.md)
+- [DX-0041 Consolidation ADR](../../decisions/DX-0041-docs-pillar-consolidation.md)

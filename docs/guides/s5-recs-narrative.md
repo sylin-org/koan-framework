@@ -1,15 +1,19 @@
+---
+type: GUIDE
+domain: platform
+title: "S5.Recs: Intelligent Media Recommendations"
+audience: [developers, architects]
+status: current
+last_updated: 2025-10-09
+framework_version: v0.6.3
+validation:
+  status: not-yet-tested
+  scope: docs/guides/s5-recs-narrative.md
+---
+
 # S5.Recs: Building an Intelligent Media Recommendation Engine
 
 **A Progressive Journey from Entity Storage to Semantic Search to Personalized AI**
-
-```yaml
-type: NARRATIVE
-domain: sample-applications
-title: "S5.Recs: Intelligent Media Recommendations"
-audience: [beginners, intermediate-developers, solution-architects]
-status: active
-framework_version: v0.6.3
-```
 
 ---
 
