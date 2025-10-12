@@ -1,5 +1,7 @@
 # **S13.DocMind: AI-Native Document Intelligence Platform**
 
+> **Status**: Misaligned — the shipping sample under `samples/S13.DocMind` uses `SourceDocument`, `SemanticTypeProfile`, and related models that differ substantially from the File/Type/Analysis design captured here.
+
 ## **Executive Summary**
 
 **S13.DocMind** is a guided sample that showcases how the Koan Framework stitches together data, flow, and AI capabilities to build an AI-native document intelligence experience. Rather than prescribing an enterprise migration, it walks readers through the architectural patterns and building blocks they can reuse when crafting their own solutions.

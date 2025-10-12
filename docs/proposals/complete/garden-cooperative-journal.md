@@ -3,16 +3,18 @@ type: PROPOSAL
 domain: docs
 title: "Garden Cooperative Journal How-To"
 audience: [developers, architects, ai-agents]
-status: current
+status: implemented
 last_updated: 2025-09-30
 framework_version: v0.6.2
 validation:
   date_last_reviewed: 2025-09-30
-  status: in-progress
+  status: published
   scope: docs/proposals/garden-cooperative-journal.md
 ---
 
 # Garden Cooperative Journal How-To Spec
+
+> **Implementation Evidence**: Sample `samples/guides/g1c1.GardenCoop` delivers the Chapter 1 experience with console host, AngularJS client, and supporting automation.
 
 ## Narrative posture
 

@@ -1,6 +1,7 @@
 # Proposal: Fast Count Optimization Strategy
 
-**Status**: Draft  
+**Status**: Implemented
+**Implementation Evidence**: `CountStrategy` and capability-aware repository logic now live in `Koan.Data.Core` and provider connectors, enabling the fast/optimized count paths described below.
 **Date**: 2025-10-04  
 **Author**: Framework Analysis  
 **Related**: DATA-0002 (Query Capabilities), entity-capabilities-howto.md gaps analysis
