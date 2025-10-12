@@ -1,6 +1,7 @@
 ﻿# Proposal: Canon Aggregation Contract & Policies
 
-**Status**: Draft  
+**Status**: Implemented
+**Implementation Evidence**: Koan.Canon ships the aggregation attributes, metadata scanning, default contributors, and auditing support described here (see `Koan.Canon.Domain` runtime and web catalog surfaces).
 **Date**: 2025-10-05  
 **Authors**: Framework Architecture & Data Working Group  
 **Related**: ARCH-0058 (Canon Runtime Architecture), DATA-0061 (Pagination & Streaming)

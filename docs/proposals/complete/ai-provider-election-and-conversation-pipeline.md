@@ -1,6 +1,7 @@
 # AI Provider Election & Conversation Pipeline Proposal
 
-**Status**: Draft  
+**Status**: Implemented
+**Implementation Evidence**: AI adapter election metadata, the conversation builder, and streaming updates are available under `src/Koan.AI` and its contracts as described.
 **Author**: Platform Architecture  
 **Date**: 2024-11-05  
 **Version**: 0.1

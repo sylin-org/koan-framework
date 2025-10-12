@@ -1,6 +1,7 @@
 # Unified Adapter Framework Proposal
 
-**Status**: Draft
+**Status**: Implemented
+**Implementation Evidence**: The Koan.Core.Adapters package, base adapter classes, capability system, and orchestration bridge outlined here now ship in `src/Koan.Core.Adapters`.
 **Author**: Technical Analysis
 **Date**: 2024-09-22
 **Version**: 1.0

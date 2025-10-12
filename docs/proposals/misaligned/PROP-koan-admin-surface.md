@@ -1,6 +1,7 @@
 ﻿# Proposal: Koan Admin Surfaces & LaunchKit Function
 
-**Status**: Draft  
+**Status**: Misaligned
+**Reality Check**: No `Koan.Console.Admin` or `Koan.Web.Admin` projects exist in `src/`, and no runtime surfaces implement these behaviors yet.
 **Date**: 2025-10-11  
 **Authors**: Framework Architecture Working Group  
 **Related**: ARCH-0043 (Lightweight Parity Roadmap), DATA-0061 (Pagination & Streaming), WEB-0035 (EntityController Transformers)

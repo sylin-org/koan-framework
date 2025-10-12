@@ -1,6 +1,8 @@
 ﻿# PROP Canon Overhaul 2: Transport-Agnostic Canonization Engine
 
 > **STATUS: SUPERSEDED** by [ARCH-0058](../decisions/ARCH-0058-canon-runtime-architecture.md) > **Implementation**: See [SPEC-canon-runtime.md](../specifications/SPEC-canon-runtime.md) > **Retained for**: Historical reference and design rationale
+>
+> **Verification (2025-10)**: The modular runtime, pipeline contributors, and transport-agnostic surface ship in `src/Koan.Canon.Domain` with web exposure via `src/Koan.Canon.Web`.
 
 ---
 

@@ -1,9 +1,10 @@
 # Koan.Data.Connector.Couchbase – Capability Delta Assessment
 
-**Status**: Draft  \
+**Status**: Implemented  \
 **Author**: Repo AI Assistant  \
 **Date**: 2024-10-31  \
-**Version**: 0.1
+**Version**: 1.0 (verified)
+**Implementation Evidence**: `Koan.Data.Connector.Couchbase` now includes transactions, LINQ translation, bulk parallelism, and readiness/health capabilities matching this delta assessment.
 
 ---
 
