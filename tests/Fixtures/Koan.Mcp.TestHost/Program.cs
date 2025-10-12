@@ -1,9 +1,8 @@
 ﻿using Koan.Core;
-using Koan.Mcp.Extensions;
-using Koan.Web.Extensions;
-using Koan.Mcp.Options;
 using Koan.Mcp;
-using Koan.Data.Core;
+using Koan.Mcp.Extensions;
+using Koan.Mcp.Options;
+using Koan.Web.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 

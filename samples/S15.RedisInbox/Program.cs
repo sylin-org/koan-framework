@@ -1,7 +1,7 @@
-﻿using Koan.Core.Observability;
-using Koan.Data.Core; // Needed for AddKoan()
-using Koan.Web.Connector.Swagger;
+﻿using Koan.Core;
+using Koan.Core.Observability;
 using Koan.Service.Inbox.Connector.Redis;
+using Koan.Web.Connector.Swagger;
 
 var builder = WebApplication.CreateBuilder(args);
 

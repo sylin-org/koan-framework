@@ -9,7 +9,6 @@ using Koan.Mcp.TestHost.Models;
 using Koan.Mcp.TestHost.Controllers;
 using Koan.Web.Controllers;
 using Koan.Mcp;
-using Koan.Data.Core;
 using Microsoft.AspNetCore.Builder;
 using Koan.Web.Endpoints;
 using Newtonsoft.Json;

@@ -1,7 +1,7 @@
-﻿using Koan.Web.Connector.Swagger;
-using Koan.Web.Extensions;
+﻿using Koan.Core;
 using Koan.Core.Observability;
-using Koan.Data.Core;
+using Koan.Web.Connector.Swagger;
+using Koan.Web.Extensions;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;

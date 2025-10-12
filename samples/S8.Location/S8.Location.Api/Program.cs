@@ -1,4 +1,5 @@
 using Koan.Canon;
+using Koan.Core;
 using Koan.Data.Core;
 using Koan.Web.Connector.Swagger;
 using Koan.Web.Extensions;

@@ -1,6 +1,6 @@
-﻿using Koan.Mcp.Extensions;
+﻿using Koan.Core;
+using Koan.Mcp.Extensions;
 using Koan.Web.Extensions;
-using Koan.Data.Core; // for AddKoan()
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;

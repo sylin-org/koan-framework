@@ -1,6 +1,5 @@
 using Koan.Core;
 using Koan.Core.Modules;
-using Koan.Data.Core;
 using Koan.Web.Extensions;
 using Microsoft.Data.Sqlite;
 using S14.AdapterBench.Services;

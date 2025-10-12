@@ -1,7 +1,7 @@
 using System.IO;
 using Koan.AI.Web;
+using Koan.Core;
 using Koan.Core.Observability;
-using Koan.Data.Core;
 using Koan.Data.Vector;
 using Koan.Web.Extensions;
 using Koan.Web.Connector.Swagger;

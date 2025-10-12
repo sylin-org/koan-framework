@@ -1,4 +1,4 @@
-using Koan.Data.Core;
+using Koan.Core;
 using Koan.Web.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);

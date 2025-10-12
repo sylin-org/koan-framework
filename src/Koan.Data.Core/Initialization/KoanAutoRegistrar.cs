@@ -13,8 +13,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 
     public void Initialize(IServiceCollection services)
     {
-        // Core wiring is triggered by AddKoan()/AddKoanDataCore via host code; nothing to do here.
-        // We intentionally avoid double-registering since AddKoan() is the canonical entry point.
+        // Registration handled by KoanDataCoreInitializer; explicit AddKoanDataCore() keeps compatibility for manual layering.
     }
 
     public void Describe(Koan.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)

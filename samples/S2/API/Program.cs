@@ -1,5 +1,5 @@
+using Koan.Core;
 using Koan.Core.Observability;
-using Koan.Data.Core;
 using Koan.Messaging;
 using Koan.Web.Extensions;
 using Koan.Web.Extensions.GenericControllers;

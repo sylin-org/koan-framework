@@ -1,4 +1,4 @@
-using Koan.Data.Core;
+using Koan.Core;
 using Koan.Web.Extensions;
 using System.Threading.RateLimiting;
 

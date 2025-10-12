@@ -1,4 +1,4 @@
-using Koan.Data.Core;
+using Koan.Core;
 using Koan.Web.Extensions;
 using S10.DevPortal.Services;
 

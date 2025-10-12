@@ -1,6 +1,6 @@
 using Koan.AI.Web;
+using Koan.Core;
 using Koan.Core.Observability;
-using Koan.Data.Core;
 using Koan.Data.Vector;
 using Koan.Mcp.Extensions;
 using Koan.Web.Extensions;
