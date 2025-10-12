@@ -26,10 +26,10 @@ public class TestPipelineFixture : KoanTestPipelineFixtureBase
 
     protected override void ConfigureTestServices(IServiceCollection services)
     {
-    services.AddKoan().AsProxiedApi();
+        services.AddKoan().AsProxiedApi();
         services.AddKoanMcp();
         services.AddKoanWeb();
-    // No need to register KoanSdkBindings; executor constructs it per invocation.
+        // No need to register KoanSdkBindings; executor constructs it per invocation.
         services.Configure<McpServerOptions>(o =>
         {
             o.Exposure = McpExposureMode.Full;
