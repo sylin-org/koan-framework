@@ -27,9 +27,28 @@ Foundation layer providing auto-registration, health checks, configuration, and 
 
 **Package**: `Koan.Core`
 
+## Guard Utilities
+
+Fluent, zero-allocation parameter validation with natural language syntax.
+
+```csharp
+string title = userInput.Must().NotBe.Blank();
+int priority = userPriority.Must().Be.InRange(1, 5);
+string email = userEmail.Must().Be.ValidEmail();
+```
+
+**Features:**
+- Natural language: `value.Must().NotBe.Blank()`, `value.Must().Be.Between(1, 10, RangeType.Inclusive)`
+- Automatic parameter name capture via `CallerArgumentExpression`
+- Zero heap allocations (`ref struct` pattern)
+- Type-safe extension methods
+- Comprehensive validation: nulls, blanks, ranges, emails, URLs, enums, collections
+
+➤ **[Guard Utilities Reference](guard-utilities.md)**
+
 ## Semantic Streaming Pipelines
 
-Koan’s semantic pipelines are now documented inside the Flow pillar, alongside intake stages and controller guidance. Use that reference as the canonical source for DSL syntax, AI integration, branching, and performance patterns.
+Koan's semantic pipelines are now documented inside the Flow pillar, alongside intake stages and controller guidance. Use that reference as the canonical source for DSL syntax, AI integration, branching, and performance patterns.
 
 ➤ **[Flow Pillar – Semantic Pipelines](../flow/index.md#semantic-pipelines)**
 
