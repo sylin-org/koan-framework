@@ -1,20 +1,39 @@
 ﻿# Proposal: Koan Admin Surfaces & LaunchKit Function
 
-**Status**: Completed  
+**Status**: Draft  
 **Date**: 2025-10-11  
 **Authors**: Framework Architecture Working Group  
 **Related**: ARCH-0043 (Lightweight Parity Roadmap), DATA-0061 (Pagination & Streaming), WEB-0035 (EntityController Transformers)
 
 ---
 
+## Contract
+
+- **Inputs**: Koan hosts referencing the future `Koan.Console.Admin` and/or `Koan.Web.Admin` modules, configuration delivered via `Koan:Admin:*`, and existing capability discovery services.
+- **Outputs**: Console and web surfaces that surface capability diagnostics, LaunchKit bundle exports, and discovery manifests gated by environment policy.
+- **Error modes**: Missing module references (surfaces never activate), misconfigured prefixes, unauthorized access attempts, destructive actions requested without opt-in.
+- **Success criteria**: Turnkey admin UI available in Development by default, explicit gating for higher environments, bundle exports reflecting live configuration, diagnostics mirroring adapter readiness.
+
+### Edge Cases
+
+- Development hosts running under the Koan CLI must suppress the console takeover unless explicitly requested.
+- Reverse proxies that block dot-prefixed routes require prefix overrides without breaking discovery URLs.
+- Production deployments must refuse activation when `AllowInProduction` is false even if modules are referenced.
+- Destructive operations (fixture purge, queue reset) must double-gate on configuration and policy.
+- Absent providers (e.g., vector adapter offline) should surface degraded status without crashing the admin surfaces.
+
+---
+
 ## Executive Summary
 
-Koan developers need a cohesive way to inspect runtime capabilities, validate adapter wiring, and generate production-ready configuration bundles without hand assembling tooling. This proposal introduces **Koan.Admin**, composed of two entry points:
+Koan developers still lack a cohesive way to inspect runtime capabilities or produce LaunchKit bundles without stitching together logs, diagnostics, and scripts. The Koan repository does not yet contain any `Koan.Console.Admin` or `Koan.Web.Admin` implementation, and no sample wires an admin module. This proposal captures the **target design** so engineering can prioritize the missing work.
 
-- **Koan.Console.Admin** — a console takeover module that renders an interactive admin UI for capability inspection, adapter validation, and the LaunchKit preparation function without exposing a shell prompt.
-- **Koan.Web.Admin** — a controller-first dashboard that visualizes capabilities, runs diagnostics, and lets teams download configuration artifacts.
+We intend to ship two surfaces:
 
-By default Koan.Admin activates only in non-production environments; production enablement requires explicit opt-in via `KoanEnv.AllowMagicInProduction` or targeted configuration. All HTTP surfaces live under a configurable system namespace that defaults to `/.koan/admin`, avoiding collisions while staying discoverable.
+- **Koan.Console.Admin** — a console takeover module that renders an interactive admin UI for capability inspection, adapter validation, and LaunchKit bundle preparation.
+- **Koan.Web.Admin** — a controller-first dashboard that visualizes capabilities, runs diagnostics, and provides bundle downloads under a configurable namespace (`/.koan/admin` by default).
+
+Activation remains development-first, with explicit gating for staging and production. Until the modules land, the admin experience remains unavailable; this proposal tracks the deliverables required to move it forward.
 
 ---
 
@@ -51,25 +70,31 @@ By default Koan.Admin activates only in non-production environments; production 
 
 ## Proposed Architecture
 
-### Module Composition
+### Current State Audit
 
-| Module               | Purpose                                                                                                                                                                                                                                               | Deployment Scope                                                                                                                                                                                                                                                                           |
+- No `Koan.Web.Admin` project exists under `src/` or `samples/`.
+- No console takeover package or registrar implements the behaviors described here.
+- Configuration sections such as `Koan:Admin` are not read by any shipping host.
+- Samples like `S7.ContentPlatform` or `S13.DocMind` do not reference admin modules.
+
+The remainder of this section outlines the modules we still need to implement.
+
+### Module Composition (Target)
+
+| Module               | Purpose                                                                                                                                                                                                                                               | Notes                                                                                                                                                                                                                                                                                      |
 | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `Koan.Console.Admin` | Console takeover UI (paired with the web dashboard) that renders capability panels, adapter validation flows, LaunchKit bundle preparation steps, fixture orchestration, a persistent log viewer, and report export without exposing a command shell. | Lights up only when a console/hosted app references the `Koan.Console.Admin` package at runtime (e.g., g1c1); Koan CLI hosts detect the module but suppress the takeover by default to keep CLI output clean. Automated flows should continue to use Koan.Compose or dedicated CI tooling. |
-| `Koan.Web.Admin`     | ASP.NET Core controller area serving dashboards, diagnostics APIs, and download endpoints for generated artifacts. Ships with a pre-built admin client served from the module's `wwwroot`, ensuring the UI and API are delivered as a single bundle.  | Added when projects reference the package and call `services.AddKoanAdminWeb()`.                                                                                                                                                                                                           |
-| Shared services      | `CapabilitiesSurveyor`, `LaunchKitGenerator`, `SchemaVerifier`, `ManifestPublisher`, `AdminAuthorizationFilter`.                                                                                                                                      | Registered by both modules to ensure consistent behavior.                                                                                                                                                                                                                                  |
+| `Koan.Console.Admin` | Console takeover UI paired with LaunchKit export, capability inspection, and diagnostics panels without exposing a command shell.                                                                                                                     | Requires a new assembly, registrar, and ANSI-safe UI composition. Must detect Koan CLI hosting to avoid takeover unless explicitly requested.                                                                                                                                            |
+| `Koan.Web.Admin`     | ASP.NET Core controller area (likely under `src/Koan.Web.Admin`) serving dashboards, diagnostics APIs, and download endpoints. Ships with a bundled client in `wwwroot`.                                                                              | Depends on `Koan.Web` conventions, attribute routing, and the configurable prefix. Needs integration tests covering prefix overrides and policy enforcement.                                                                                                                               |
+| Shared services      | `CapabilitiesSurveyor`, `LaunchKitGenerator`, `SchemaVerifier`, `ManifestPublisher`, `AdminAuthorizationFilter`.                                                                                                                                      | To be placed in a shared project (e.g., `Koan.Admin.Core`) so both surfaces stay in sync. These services do not exist today and must be implemented alongside telemetry hooks.                                                                                                             |
 
-The LaunchKit function is intentionally small in scope: it assembles application launch kits (Compose, appsettings, Aspire fragments, OpenAPI clients) based on the active host configuration so teams can export the same bundles from either surface.
+Both modules should consume a unified `KoanAdminOptions` configuration model that centralizes enabling flags, prefix resolution, and policy settings. An options type is not yet present in the repository.
 
-Both modules read a unified `KoanAdminOptions` configuration model.
+### Activation & Guardrails (Target)
 
-### Activation & Guardrails
-
-- Default activation condition: `KoanEnv.IsDevelopment` is true.  
-  `Koan:Admin:Enabled` (bool) can override the default.
-- Production enablement requires either `KoanEnv.AllowMagicInProduction` or `Koan:Admin:AllowInProduction` coupled with explicit authorization policy.
-- Destructive operations (`fixtures purge`, job requeue, etc.) require `Koan:Admin:DestructiveOps = true` and always respect policy + allowlist.
-- When the Koan CLI hosts a process (e.g., `koan run`), module registrars detect the CLI shim and automatically suppress the console takeover to avoid output conflicts unless an explicit `--admin-console` flag is provided.
+- Default activation when `KoanEnv.IsDevelopment` is true, with `Koan:Admin:Enabled` overriding for other environments.
+- Production access requires explicit `AllowInProduction` plus an authorization policy;
+- Destructive actions (fixtures purge, job requeue) require `Koan:Admin:DestructiveOps = true` and policy gates.
+- Koan CLI detection must keep console takeover opt-in (`--admin-console`). Implementation detail: add host metadata so the registrar can check `KoanHostContext.IsCliHost`.
 
 ---
 
@@ -116,37 +141,16 @@ If the prefix is changed, the manifest and both admin UIs reflect the new paths 
 
 ---
 
-## Koan.Console.Admin Experience
+### Koan.Console.Admin Experience (Target)
 
-Koan.Console.Admin is a runtime-only console takeover: applications must explicitly reference the package to enable it. The module’s `IKoanAutoRegistrar` evaluates environment state (development vs. production, Koan CLI hosting, explicit configuration) before turning on the takeover experience. When an app such as `g1c1` passes those checks, the Koan host replaces the default console output with a full-screen admin UI that launches immediately—no shell prompt, no command verbs to memorize. The global Koan CLI can launch the same UI when explicitly requested, but it suppresses the takeover by default and never exposes discrete commands; hosts without the package never see the takeover experience.
+Koan.Console.Admin currently exists only on paper. The implementation must:
 
-### Console UX Principles
+1. Provide an `IKoanAutoRegistrar` that evaluates environment policy, Koan CLI hosting, and explicit configuration flags before enabling takeover.
+2. Render an ANSI-safe UI offering parity with the web dashboard: overview, provider health, LaunchKit export, log stream, job monitor, and export hub.
+3. Stream Koan host logs through the existing redaction pipeline before they reach the admin UI.
+4. Cache discovery snapshots on disk (e.g., `.koan/admin/cache`) to speed up reloads while respecting opt-out options.
 
-- **Parity first**: every insight and action exposed in Koan.Web.Admin must surface in the console UI as a dedicated panel or modal. Feature releases ship both surfaces together, keeping layout and data contracts aligned.
-- **Immersive terminal UI**: the takeover experience renders color-coded tables, sparkline charts, and status badges using ANSI-safe output. Layouts auto-detect terminal dimensions, with toggleable minimal mode for low-bandwidth remotes.
-- **Live telemetry ribbon**: a dockable log viewport stays visible (bottom or side pane) to stream host application logs with severity coloring, quick filters, and pause/scroll controls.
-- **Navigation without typing**: keyboard shortcuts (e.g., `1` for Overview, `2` for Providers, `F6` for LaunchKit bundles) shift between panels, while modal dialogs guide deeper flows. Breadcrumbs and quick previews reduce context switching.
-- **Guided wizards**: LaunchKit bundle preparation, fixture orchestration, and schema verification run via wizard modals that validate inputs, preview artifacts, and support backtracking before committing changes.
-- **Session continuity**: the module caches the latest discovery snapshot under `.koan/admin/cache`, allowing panels to render instantly on subsequent launches and enabling offline artifact generation where data permits.
-- **Accessible by design**: high-contrast palettes meet WCAG ratios, focus cues support screen readers, and a text-only mode swaps visual grids for key-value lists.
-- **Automation touchpoints**: export triggers provide JSON/YAML artifacts and machine-friendly exit codes (e.g., from `Esc` → `Export` → `Save JSON`), enabling CI agents to capture diagnostics without invoking a shell.
-
-### Console Panels & Actions
-
-The console UI presents a curated set of panels that mirror the web dashboard. Examples include:
-
-| Panel                 | Purpose                                                                                                         | Key Interactions                                                                                               |
-| --------------------- | --------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| **Overview**          | Summarizes modules, versions, admin URLs (respecting path prefix), and Koan environment flags.                  | Real-time status badges, frame-by-frame health sparklines, banner alerts for risky configurations.             |
-| **Provider Health**   | Visualizes adapter validations for data providers, messaging brokers, and AI connectors.                        | Drill into failure modals, retry probes, view remediation playbooks.                                           |
-| **Set Explorer**      | Displays available data sets/partitions, default routing, and pagination posture.                               | Toggle between tree and tabular views, flag sets missing pagination attributes.                                |
-| **LaunchKit Bundles** | Prepares launch kits (Compose, appsettings, Aspire fragments, OpenAPI clients) aligned with detected providers. | Wizard-driven selections, diff previews, export queue with download tokens.                                    |
-| **Fixture Ops**       | Manages deterministic fixture seeding and purging with safeguards.                                              | Dual-key confirmation for destructive actions, progress bars, dry-run previews.                                |
-| **Job Monitor**       | Surfaces scheduled jobs/flows with live telemetry.                                                              | Pause/continue controls when authorized, historical run charts, queue depth indicators.                        |
-| **Log Stream**        | Provides a dedicated tab/window for tailing host application logs alongside admin telemetry.                    | Severity-colored entries, structured property peek, filter/save/export controls, quick jump to related panels. |
-| **Export Hub**        | Exports capability reports, dashboard snapshots, and manifest bundles.                                          | Choose JSON/YAML, send to clipboard or file, attach optional annotations.                                      |
-
-The console takeover respects the configured route prefix, displaying exact admin URLs alongside QR codes or copy helpers so operators can jump into the web dashboard when available.
+Design sketches from the original proposal remain valid; engineering still needs to translate them into a working console experience.
 
 ---
 
@@ -175,9 +179,11 @@ The web UI assets (SPA/TUI hybrid) are emitted into the package `wwwroot`, so co
 
 ---
 
-## Configuration & Usage Examples
+### Configuration & Usage Examples (Target)
 
-### Development Defaults
+The following configuration patterns remain aspirational until the modules exist. They illustrate the expected contract so downstream work can align the options binder and registrar behavior.
+
+#### Development Defaults
 
 ```jsonc
 // appsettings.Development.json
@@ -200,10 +206,8 @@ The web UI assets (SPA/TUI hybrid) are emitted into the package `wwwroot`, so co
 }
 ```
 
-The optional `Koan:Admin:Logging` section scopes which categories appear in the Log Stream and defines redaction keys applied before entries reach the console viewer or any export paths.
-
 ```csharp
-// Initialization/KoanAdminAutoRegistrar.cs
+// Initialization/KoanAdminAutoRegistrar.cs (to be implemented)
 public sealed class KoanAdminAutoRegistrar : IKoanAutoRegistrar
 {
     public string ModuleName => "AdminSample";
@@ -224,9 +228,9 @@ public sealed class KoanAdminAutoRegistrar : IKoanAutoRegistrar
 }
 ```
 
-Module registrars own the onboarding logic: the console/web packages register their own `IKoanAutoRegistrar` implementations to evaluate environment conditions, disable the console UI when hosted by the Koan CLI, and honor configuration overrides.
+Module registrars will own onboarding logic once the packages ship. Until then, the snippet above serves as scaffolding guidance.
 
-### Staging Example
+#### Staging Example
 
 ```jsonc
 // appsettings.Staging.json
@@ -246,7 +250,7 @@ Module registrars own the onboarding logic: the console/web packages register th
 }
 ```
 
-### Production Opt-In
+#### Production Opt-In
 
 ```jsonc
 {
@@ -278,12 +282,12 @@ Module registrars own the onboarding logic: the console/web packages register th
 ## Implementation Plan
 
 1. **Options & Routing** — Introduce `KoanAdminOptions` with validation, register prefix-aware route constants, extend module `IKoanAutoRegistrar` implementations, and add startup warnings for unsafe configurations.
-2. **Shared Services** — Implement capability surveyor, generator, schema verifier, manifest publisher, and authorization helpers.
-3. **Console Module** — Build the takeover UI layer atop shared services, delivering rich ANSI-aware panels, dockable log streams, wizard flows, and export paths while maintaining machine-readable capture points for automation.
-4. **Web Module** — Build controller area under the resolved prefix, bundle the admin client into the package `wwwroot` (single bundle delivery), compose Razor/Blazor/React (implementation TBD) views, and reuse shared services for data retrieval.
-5. **Documentation** — Publish reference docs, LaunchKit usage notes, and security checklist. Register ADR `WEB-Admin-0001` to record guardrails.
+2. **Shared Services** — Build capability surveyor, LaunchKit generator, schema verifier, manifest publisher, and authorization helpers in a shared assembly.
+3. **Console Module** — Create the takeover UI atop shared services, including ANSI layout, log streaming, parity panels, and automation hooks.
+4. **Web Module** — Ship controller area and bundled client, reusing shared services for data retrieval; add prefix-aware routing tests and policy enforcement checks.
+5. **Documentation & ADR** — Publish reference docs, security checklist, and ADR `WEB-Admin-0001` once the initial implementation lands.
 6. **Samples** — Update at least one sample (e.g., `samples/S7.ContentPlatform`) to include admin modules in Development mode, showcasing LaunchKit bundle preparation.
-7. **Testing** — Add integration tests covering prefix overrides, discovery manifest content, and adapter validation flows.
+7. **Testing** — Add integration tests covering prefix overrides, discovery manifest content, adapter validation flows, and destructive-operation gating.
 
 ---
 
