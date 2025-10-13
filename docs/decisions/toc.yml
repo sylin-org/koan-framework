@@ -192,6 +192,8 @@
       href: WEB-0051-auth-provider-discovery-and-election.md
     - name: WEB-0060 Flow messaging refactor
       href: WEB-0060-flow-messaging-refactor.md
+    - name: WEB-0061 Koan Admin surface refresh
+      href: WEB-0061-koan-admin-surface-refresh.md
 - name: Flow (FLOW)
   items:
     - name: FLOW-0070 Flow commands bus

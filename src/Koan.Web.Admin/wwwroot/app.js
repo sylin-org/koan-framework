@@ -1,12 +1,20 @@
 const STATUS_ENDPOINT = 'api/status';
+const HEALTH_ENDPOINT = 'api/health';
 const LAUNCHKIT_METADATA_ENDPOINT = 'api/launchkit/metadata';
 const LAUNCHKIT_BUNDLE_ENDPOINT = 'api/launchkit/bundle';
+const REFRESH_INTERVAL_MS = 30000;
 
 const environmentContainer = document.querySelector('.environment-content');
+const capabilitiesContainer = document.querySelector('.capabilities-content');
 const modulesContainer = document.querySelector('.modules-content');
 const healthContainer = document.querySelector('.health-content');
+const notesContainer = document.querySelector('.notes-content');
 const launchKitContainer = document.querySelector('.launchkit-content');
 const generatedAtElement = document.getElementById('generated-at');
+const refreshButton = document.getElementById('refresh-btn');
+const autoRefreshToggle = document.getElementById('auto-refresh');
+
+let refreshTimer;
 
 async function fetchJson(url) {
   const response = await fetch(url, {
@@ -28,87 +36,226 @@ async function safeReadText(response) {
 }
 
 function renderEnvironment(environment) {
-  const processStart = new Date(environment.processStart ?? environment.ProcessStart ?? Date.now());
+  const processStartRaw = environment?.processStart ?? environment?.ProcessStart;
+  const processStart = processStartRaw ? new Date(processStartRaw) : new Date();
   const uptimeMs = Date.now() - processStart.getTime();
-  const uptime = formatUptime(Math.max(0, uptimeMs));
 
   environmentContainer.innerHTML = '';
 
-  const envLine = document.createElement('div');
-  envLine.innerHTML = `
-    <span class="chip">${environment.environmentName}</span>
-    <span class="chip">Uptime: ${uptime}</span>
+  const primary = document.createElement('div');
+  primary.className = 'chip-row';
+  primary.innerHTML = `
+    <span class="chip">${environment?.environmentName ?? 'Unknown environment'}</span>
+    <span class="chip">Uptime: ${formatUptime(Math.max(0, uptimeMs))}</span>
   `;
-  environmentContainer.appendChild(envLine);
+  environmentContainer.appendChild(primary);
 
-  const flags = document.createElement('div');
-  flags.innerHTML = `
-    <span class="chip">Dev: ${environment.isDevelopment ? 'Yes' : 'No'}</span>
-    <span class="chip">Prod: ${environment.isProduction ? 'Yes' : 'No'}</span>
-    <span class="chip">Staging: ${environment.isStaging ? 'Yes' : 'No'}</span>
-    <span class="chip">CI: ${environment.isCi ? 'Yes' : 'No'}</span>
-    <span class="chip">Container: ${environment.inContainer ? 'Yes' : 'No'}</span>
+  const meta = document.createElement('div');
+  meta.className = 'chip-row';
+  meta.innerHTML = `
+    <span class="chip">Dev: ${environment?.isDevelopment ? 'Yes' : 'No'}</span>
+    <span class="chip">Prod: ${environment?.isProduction ? 'Yes' : 'No'}</span>
+    <span class="chip">Staging: ${environment?.isStaging ? 'Yes' : 'No'}</span>
+    <span class="chip">CI: ${environment?.isCi ? 'Yes' : 'No'}</span>
+    <span class="chip">Container: ${environment?.inContainer ? 'Yes' : 'No'}</span>
   `;
-  environmentContainer.appendChild(flags);
+  environmentContainer.appendChild(meta);
 }
 
-function renderModules(manifestSummary) {
+function renderCapabilities(features) {
+  capabilitiesContainer.innerHTML = '';
+  if (!features) {
+    capabilitiesContainer.innerHTML = '<p class="loading">Feature snapshot unavailable.</p>';
+    return;
+  }
+
+  const flagGrid = document.createElement('div');
+  flagGrid.className = 'capability-grid';
+
+  const flags = [
+    { label: 'Web UI', value: features.webEnabled },
+    { label: 'Console', value: features.consoleEnabled },
+    { label: 'Manifest API', value: features.manifestExposed },
+    { label: 'Destructive operations', value: features.allowDestructiveOperations },
+    { label: 'Log transcript download', value: features.allowLogTranscriptDownload },
+    { label: 'LaunchKit', value: features.launchKitEnabled },
+    { label: 'Dot prefix allowed', value: features.dotPrefixAllowedInCurrentEnvironment }
+  ];
+
+  flags.forEach(flag => {
+    const item = document.createElement('div');
+    item.className = 'capability-item';
+    item.innerHTML = `
+      <span>${flag.label}</span>
+      <span class="badge ${flag.value ? 'on' : 'off'}">${flag.value ? 'Enabled' : 'Disabled'}</span>
+    `;
+    flagGrid.appendChild(item);
+  });
+
+  capabilitiesContainer.appendChild(flagGrid);
+
+  if (features.routes) {
+    const routes = document.createElement('div');
+    routes.className = 'routes';
+    routes.innerHTML = `
+      <div><strong>UI root</strong><span>${features.routes.rootPath ?? '/'}</span></div>
+      <div><strong>API root</strong><span>${features.routes.apiPath ?? '/api'}</span></div>
+      <div><strong>LaunchKit</strong><span>${features.routes.launchKitPath ?? '/api/launchkit'}</span></div>
+      <div><strong>Health</strong><span>${features.routes.healthPath ?? '/api/health'}</span></div>
+    `;
+    capabilitiesContainer.appendChild(routes);
+  }
+}
+
+function renderModules(modules, manifestSummary) {
   modulesContainer.innerHTML = '';
-  if (!manifestSummary || !Array.isArray(manifestSummary.modules) || manifestSummary.modules.length === 0) {
+  const source = Array.isArray(modules) && modules.length ? modules : manifestSummary?.modules;
+
+  if (!source || !source.length) {
     modulesContainer.innerHTML = '<p class="loading">No modules reported yet.</p>';
     return;
   }
 
-  manifestSummary.modules.forEach(module => {
-    const row = document.createElement('div');
+  source.forEach(module => {
+    const details = document.createElement('details');
+    details.className = 'module-item';
+
+    const summary = document.createElement('summary');
     const version = module.version ? `v${module.version}` : 'unversioned';
-    row.innerHTML = `
-      <div><strong>${module.name}</strong> <span class="chip">${version}</span></div>
-      <div class="muted">Settings: ${module.settingCount} • Notes: ${module.noteCount}</div>
+    const noteCount = Array.isArray(module.notes) ? module.notes.length : module.noteCount ?? 0;
+    const settingCount = Array.isArray(module.settings) ? module.settings.length : module.settingCount ?? 0;
+    summary.innerHTML = `
+      <span class="module-name">${module.name}</span>
+      <span class="module-meta">${version} · ${settingCount} settings · ${noteCount} notes</span>
     `;
-    modulesContainer.appendChild(row);
+    details.appendChild(summary);
+
+    const inner = document.createElement('div');
+    inner.className = 'module-body';
+
+    const settingsList = Array.isArray(module.settings) && module.settings.length
+      ? module.settings.map(setting => `
+          <div class="module-setting">
+            <span class="key">${setting.key}</span>
+            <span class="value ${setting.secret ? 'secret' : ''}">${setting.value ?? ''}</span>
+            ${setting.secret ? '<span class="tag">secret</span>' : ''}
+          </div>
+        `).join('')
+      : '<p class="muted">No settings captured.</p>';
+
+    const notesList = Array.isArray(module.notes) && module.notes.length
+      ? `<ul class="module-notes">${module.notes.map(note => `<li>${note}</li>`).join('')}</ul>`
+      : '<p class="muted">No notes recorded.</p>';
+
+    inner.innerHTML = `
+      <div class="module-section">
+        <h3>Settings</h3>
+        ${settingsList}
+      </div>
+      <div class="module-section">
+        <h3>Notes</h3>
+        ${notesList}
+      </div>
+    `;
+
+    details.appendChild(inner);
+    modulesContainer.appendChild(details);
   });
 }
 
 function renderHealth(health) {
   healthContainer.innerHTML = '';
-  if (!health || !Array.isArray(health.components) || health.components.length === 0) {
-    healthContainer.innerHTML = '<p class="loading">No health components registered.</p>';
+  if (!health) {
+    healthContainer.innerHTML = '<p class="loading">Health snapshot unavailable.</p>';
     return;
   }
 
-  const grid = document.createElement('div');
-  grid.className = 'health-grid';
+  const overall = document.createElement('div');
+  overall.className = `overall ${statusClass((health.overall ?? '').toString())}`;
+  const computed = health.computedAtUtc ? new Date(health.computedAtUtc) : null;
+  overall.innerHTML = `
+    <span class="badge ${statusClass((health.overall ?? '').toString())}">${health.overall ?? 'Unknown'}</span>
+    <span>${computed ? `Computed ${computed.toLocaleString()}` : 'No timestamp available'}</span>
+  `;
+  healthContainer.appendChild(overall);
+
+  if (!Array.isArray(health.components) || !health.components.length) {
+    const empty = document.createElement('p');
+    empty.className = 'loading';
+    empty.textContent = 'No health components registered.';
+    healthContainer.appendChild(empty);
+    return;
+  }
 
   health.components.forEach(component => {
-    const item = document.createElement('div');
-    const status = (component.status ?? '').toString().toLowerCase();
-    item.className = `health-item ${statusClass(status)}`;
-    item.innerHTML = `
-      <span>${component.component}</span>
-      <span>${component.status}</span>
-    `;
-    grid.appendChild(item);
-  });
+    const detail = document.createElement('details');
+    detail.className = 'health-item';
+    detail.open = component.status?.toString().toLowerCase().includes('unhealthy');
 
-  healthContainer.appendChild(grid);
+    const summary = document.createElement('summary');
+    const status = (component.status ?? '').toString();
+    summary.innerHTML = `
+      <span class="health-name">${component.component}</span>
+      <span class="badge ${statusClass(status.toLowerCase())}">${status}</span>
+    `;
+    detail.appendChild(summary);
+
+    const body = document.createElement('div');
+    body.className = 'health-body';
+
+    if (component.message) {
+      const message = document.createElement('p');
+      message.className = 'health-message';
+      message.textContent = component.message;
+      body.appendChild(message);
+    }
+
+    const timestamp = component.timestampUtc ? new Date(component.timestampUtc) : null;
+    const stamp = document.createElement('p');
+    stamp.className = 'muted';
+    stamp.textContent = timestamp ? `Observed ${timestamp.toLocaleString()}` : 'Timestamp unavailable';
+    body.appendChild(stamp);
+
+    const facts = component.facts && Object.keys(component.facts).length
+      ? Object.entries(component.facts).map(([key, value]) => `<div><span class="fact-key">${key}</span><span>${value}</span></div>`).join('')
+      : '<p class="muted">No diagnostic facts supplied.</p>';
+
+    const factBlock = document.createElement('div');
+    factBlock.className = 'health-facts';
+    factBlock.innerHTML = facts;
+    body.appendChild(factBlock);
+
+    detail.appendChild(body);
+    healthContainer.appendChild(detail);
+  });
 }
 
-function statusClass(status) {
-  if (status.includes('healthy') || status.includes('up')) {
-    return 'success';
+function renderNotes(notes, modules) {
+  notesContainer.innerHTML = '';
+  const entries = Array.isArray(notes) && notes.length
+    ? notes
+    : (Array.isArray(modules) ? modules.flatMap(module => (module.notes ?? []).map(note => ({ module: module.name, note }))) : []);
+
+  if (!entries.length) {
+    notesContainer.innerHTML = '<p class="loading">No startup notes recorded.</p>';
+    return;
   }
-  if (status.includes('degraded') || status.includes('warn')) {
-    return 'warn';
-  }
-  return 'error';
+
+  const list = document.createElement('ul');
+  list.className = 'notes-list';
+  entries.forEach(entry => {
+    const item = document.createElement('li');
+    item.innerHTML = `<strong>${entry.module}</strong><span>${entry.note}</span>`;
+    list.appendChild(item);
+  });
+  notesContainer.appendChild(list);
 }
 
 async function renderLaunchKit(status) {
   launchKitContainer.innerHTML = '';
 
-  if (!status.features?.launchKitEnabled) {
-    launchKitContainer.innerHTML = '<p class="launchkit-disabled">LaunchKit is disabled for this host.</p>';
+  if (!status?.features?.launchKitEnabled) {
+    launchKitContainer.innerHTML = '<p class="launchkit-disabled">LaunchKit is disabled for this host. Set Koan:Admin:EnableLaunchKit=true to enable bundle generation.</p>';
     return;
   }
 
@@ -125,8 +272,9 @@ function buildLaunchKitForm(metadata) {
   const form = document.createElement('form');
   form.className = 'launchkit-form';
 
-  const profileLabel = document.createElement('label');
-  profileLabel.textContent = 'Profile';
+  const profileField = document.createElement('label');
+  profileField.className = 'field';
+  profileField.innerHTML = '<span>Profile</span>';
   const profileSelect = document.createElement('select');
   const profiles = metadata.availableProfiles && metadata.availableProfiles.length
     ? metadata.availableProfiles
@@ -140,38 +288,45 @@ function buildLaunchKitForm(metadata) {
     }
     profileSelect.appendChild(option);
   });
-  profileLabel.appendChild(profileSelect);
-  form.appendChild(profileLabel);
+  profileField.appendChild(profileSelect);
+  form.appendChild(profileField);
 
   const toggles = [
-    { id: 'include-appsettings', prop: 'includeAppSettings', label: 'Appsettings bundle', enabled: metadata.supportsAppSettings, checked: metadata.supportsAppSettings },
-    { id: 'include-compose', prop: 'includeCompose', label: 'Docker Compose bundle', enabled: metadata.supportsCompose, checked: metadata.supportsCompose },
-    { id: 'include-aspire', prop: 'includeAspire', label: 'Aspire manifest', enabled: metadata.supportsAspire, checked: metadata.supportsAspire },
-    { id: 'include-manifest', prop: 'includeManifest', label: 'Diagnostic manifest', enabled: metadata.supportsManifest, checked: metadata.supportsManifest },
-    { id: 'include-readme', prop: 'includeReadme', label: 'README guidance', enabled: metadata.supportsReadme, checked: metadata.supportsReadme }
+    { id: 'include-appsettings', prop: 'includeAppSettings', label: 'Appsettings bundle', description: 'Exports environment scoped configuration files.', supported: metadata.supportsAppSettings },
+    { id: 'include-compose', prop: 'includeCompose', label: 'Docker Compose bundle', description: 'Generates docker-compose assets for local orchestration.', supported: metadata.supportsCompose },
+    { id: 'include-aspire', prop: 'includeAspire', label: 'Aspire manifest', description: 'Adds Aspire manifest files for AppHost projects.', supported: metadata.supportsAspire },
+    { id: 'include-manifest', prop: 'includeManifest', label: 'Diagnostic manifest', description: 'Includes the sanitized Koan Admin manifest summary.', supported: metadata.supportsManifest },
+    { id: 'include-readme', prop: 'includeReadme', label: 'README guidance', description: 'Adds walkthrough README tailored to the selected profile.', supported: metadata.supportsReadme }
   ];
 
-  const checkboxGroup = document.createElement('div');
+  const toggleGroup = document.createElement('div');
+  toggleGroup.className = 'toggle-group';
   toggles.forEach(toggle => {
     const wrapper = document.createElement('label');
-    wrapper.innerHTML = `<input type="checkbox" id="${toggle.id}" ${toggle.enabled && toggle.checked ? 'checked' : ''} ${toggle.enabled ? '' : 'disabled'} /> ${toggle.label}`;
-    checkboxGroup.appendChild(wrapper);
+    wrapper.className = toggle.supported ? 'toggle-option' : 'toggle-option disabled';
+    wrapper.innerHTML = `
+      <input type="checkbox" id="${toggle.id}" ${toggle.supported ? 'checked' : 'disabled'} />
+      <div>
+        <span>${toggle.label}</span>
+        <small>${toggle.description}</small>
+      </div>
+    `;
+    toggleGroup.appendChild(wrapper);
   });
-  form.appendChild(checkboxGroup);
+  form.appendChild(toggleGroup);
 
   const openApiSection = document.createElement('div');
+  openApiSection.className = 'openapi';
   if (metadata.openApiClientTemplates?.length) {
-    const heading = document.createElement('label');
-    heading.textContent = 'OpenAPI Clients';
-    openApiSection.appendChild(heading);
-
+    openApiSection.innerHTML = '<p class="section-title">OpenAPI clients</p>';
     metadata.openApiClientTemplates.forEach(client => {
       const wrapper = document.createElement('label');
-      wrapper.innerHTML = `<input type="checkbox" value="${client}" checked /> ${client}`;
+      wrapper.className = 'toggle-option';
+      wrapper.innerHTML = `<input type="checkbox" value="${client}" checked /><div><span>${client}</span></div>`;
       openApiSection.appendChild(wrapper);
     });
   } else {
-    openApiSection.innerHTML = '<p class="loading">No OpenAPI client templates configured.</p>';
+    openApiSection.innerHTML = '<p class="muted">No OpenAPI client templates configured.</p>';
   }
   form.appendChild(openApiSection);
 
@@ -181,8 +336,7 @@ function buildLaunchKitForm(metadata) {
   form.appendChild(submit);
 
   const message = document.createElement('p');
-  message.className = 'launchkit-message loading';
-  message.textContent = '';
+  message.className = 'launchkit-message';
   form.appendChild(message);
 
   form.addEventListener('submit', async event => {
@@ -227,7 +381,7 @@ function buildPayload(profileSelect, toggles, openApiSection) {
 
   toggles.forEach(toggle => {
     const input = document.getElementById(toggle.id);
-    if (input) {
+    if (input && !input.disabled) {
       payload[toggle.prop] = input.checked;
     }
   });
@@ -284,26 +438,94 @@ function renderGeneratedAt(manifestSummary) {
     generatedAtElement.textContent = '';
     return;
   }
-  const generatedAt = new Date(manifestSummary.generatedAtUtc ?? manifestSummary.GeneratedAtUtc ?? Date.now());
-  generatedAtElement.textContent = `Summary generated ${generatedAt.toLocaleString()}`;
+  const generatedAt = manifestSummary.generatedAtUtc ?? manifestSummary.GeneratedAtUtc;
+  const timestamp = generatedAt ? new Date(generatedAt) : new Date();
+  generatedAtElement.textContent = `Summary generated ${timestamp.toLocaleString()}`;
 }
 
-async function init() {
+function statusClass(status) {
+  const normalized = status.toLowerCase();
+  if (normalized.includes('fail') || normalized.includes('down') || normalized.includes('unhealthy')) {
+    return 'error';
+  }
+  if (normalized.includes('healthy') || normalized.includes('up')) {
+    return 'success';
+  }
+  if (normalized.includes('degraded') || normalized.includes('warn')) {
+    return 'warn';
+  }
+  return 'warn';
+}
+
+function clearRefreshTimer() {
+  if (refreshTimer) {
+    clearInterval(refreshTimer);
+    refreshTimer = undefined;
+  }
+}
+
+async function refreshStatus(manual = false) {
   try {
+    if (manual && refreshButton) {
+      refreshButton.disabled = true;
+    }
+
     const status = await fetchJson(STATUS_ENDPOINT);
     renderEnvironment(status.environment);
-    renderModules(status.manifest);
+    renderCapabilities(status.features);
+    renderModules(status.modules, status.manifest);
     renderHealth(status.health);
+    renderNotes(status.startupNotes, status.modules);
     renderGeneratedAt(status.manifest);
     await renderLaunchKit(status);
   } catch (err) {
     console.error(err);
     const message = `<p class="error">Unable to load admin status. ${err.message}</p>`;
     environmentContainer.innerHTML = message;
+    capabilitiesContainer.innerHTML = '';
     modulesContainer.innerHTML = '';
     healthContainer.innerHTML = '';
+    notesContainer.innerHTML = '';
     launchKitContainer.innerHTML = '';
+  } finally {
+    if (manual && refreshButton) {
+      refreshButton.disabled = false;
+    }
   }
 }
 
-init();
+async function refreshHealthOnly() {
+  try {
+    const health = await fetchJson(HEALTH_ENDPOINT);
+    renderHealth(health);
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+function enableAutoRefresh(enabled) {
+  clearRefreshTimer();
+  if (!enabled) {
+    return;
+  }
+
+  refreshTimer = setInterval(() => {
+    refreshStatus(false);
+    refreshHealthOnly();
+  }, REFRESH_INTERVAL_MS);
+}
+
+if (refreshButton) {
+  refreshButton.addEventListener('click', () => refreshStatus(true));
+}
+
+if (autoRefreshToggle) {
+  autoRefreshToggle.addEventListener('change', event => {
+    enableAutoRefresh(event.target.checked);
+    if (event.target.checked) {
+      refreshStatus(false);
+    }
+  });
+}
+
+refreshStatus(false);

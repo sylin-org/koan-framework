@@ -8,13 +8,28 @@
 </head>
 <body>
   <header>
-    <h1>Koan Admin Dashboard</h1>
-    <p class="subtitle">Runtime diagnostics &amp; LaunchKit exports</p>
+    <div class="header-row">
+      <div>
+        <h1>Koan Admin Dashboard</h1>
+        <p class="subtitle">Runtime diagnostics, feature visibility, LaunchKit exports</p>
+      </div>
+      <div class="toolbar">
+        <label class="toggle">
+          <input type="checkbox" id="auto-refresh" />
+          <span>Auto-refresh</span>
+        </label>
+        <button id="refresh-btn" type="button">Refresh</button>
+      </div>
+    </div>
   </header>
   <main>
     <section id="environment" class="card">
       <h2>Environment</h2>
       <div class="content environment-content"></div>
+    </section>
+    <section id="capabilities" class="card">
+      <h2>Capabilities</h2>
+      <div class="content capabilities-content"></div>
     </section>
     <section id="modules" class="card">
       <h2>Modules</h2>
@@ -23,6 +38,10 @@
     <section id="health" class="card">
       <h2>Health</h2>
       <div class="content health-content"></div>
+    </section>
+    <section id="notes" class="card">
+      <h2>Startup Notes</h2>
+      <div class="content notes-content"></div>
     </section>
     <section id="launchkit" class="card">
       <h2>LaunchKit Bundles</h2>

@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Koan.Admin.Contracts;
@@ -16,6 +19,7 @@ namespace Koan.Web.Admin.Controllers;
 [ApiExplorerSettings(GroupName = "KoanAdmin")]
 public sealed class KoanAdminStatusController : ControllerBase
 {
+    private const string SecretMask = "********";
     private readonly IKoanAdminFeatureManager _features;
     private readonly IKoanAdminManifestService _manifest;
 
@@ -38,7 +42,23 @@ public sealed class KoanAdminStatusController : ControllerBase
         var summary = manifest.ToSummary();
         var health = manifest.Health;
 
-        var response = new KoanAdminStatusResponse(Koan.Core.KoanEnv.CurrentSnapshot, snapshot, summary, health);
+        var modules = manifest.Modules
+            .OrderBy(m => m.Name, StringComparer.OrdinalIgnoreCase)
+            .Select(m =>
+            {
+                var settings = m.Settings
+                    .Select(s => new KoanAdminModuleSurfaceSetting(s.Key, s.Secret ? SecretMask : s.Value, s.Secret))
+                    .ToList();
+                var notes = m.Notes.ToList();
+                return new KoanAdminModuleSurface(m.Name, m.Version, settings, notes);
+            })
+            .ToList();
+
+        var startupNotes = modules
+            .SelectMany(m => m.Notes.Select(note => new KoanAdminStartupNote(m.Name, note)))
+            .ToList();
+
+        var response = new KoanAdminStatusResponse(Koan.Core.KoanEnv.CurrentSnapshot, snapshot, summary, health, modules, startupNotes);
         return Ok(response);
     }
 
