@@ -515,7 +515,7 @@ public static class AddKoanGraphQlExtensions
                 IReadOnlyList<TEntity> items;
                 long total = 0;
 
-                using (var _set = EntityContext.Partition(null))
+                using (var _set = EntityContext.Partition(null!))
                 {
                     if (!string.IsNullOrWhiteSpace(filterJson) && repo is ILinqQueryRepository<TEntity, string> lrepo)
                     {

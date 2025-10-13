@@ -8,8 +8,6 @@
   <ItemGroup>
     <ProjectReference Include="..\..\..\src\Koan.Data.Core\Koan.Data.Core.csproj" />
   <ProjectReference Include="..\..\..\src\\Connectors\\Data\\Mongo\Koan.Data.Connector.Mongo.csproj" />
-    <ProjectReference Include="..\..\..\legacy\Koan.Canon.Legacy.Core\Koan.Canon.Core.csproj" />
-    <ProjectReference Include="..\..\..\legacy\Koan.Canon.Legacy.Web\Koan.Canon.Web.csproj" />
   <ProjectReference Include="..\..\..\src\\Connectors\\Web\\Swagger\Koan.Web.Connector.Swagger.csproj" />
     <ProjectReference Include="..\S8.Canon.Shared\S8.Canon.Shared.csproj" />
   <ProjectReference Include="..\..\..\src\Koan.Messaging.Core\Koan.Messaging.Core.csproj" />

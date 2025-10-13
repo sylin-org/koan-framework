@@ -188,6 +188,8 @@
       href: WEB-0049-role-attribution-layer-and-claims-transformation.md
     - name: WEB-0050 S8 Flow IoT sample and SSE monitor
       href: WEB-0050-s8-flow-iot-sample-and-sse-monitor.md
+    - name: WEB-0051 Auth provider discovery and election
+      href: WEB-0051-auth-provider-discovery-and-election.md
     - name: WEB-0060 Flow messaging refactor
       href: WEB-0060-flow-messaging-refactor.md
 - name: Flow (FLOW)

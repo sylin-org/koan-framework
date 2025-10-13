@@ -18,7 +18,8 @@ internal sealed class GoogleProviderContributor : IAuthProviderContributor
                 Icon = "/icons/google.svg",
                 Authority = "https://accounts.google.com",
                 Scopes = new[] { "openid", "email", "profile" },
-                Enabled = true
+                Enabled = true,
+                Priority = 200
             }
         };
     }

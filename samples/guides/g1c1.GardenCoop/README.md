@@ -17,6 +17,7 @@ pwsh ./start.ps1    # optional helper, or just `dotnet run`
 - The console prints lifecycle notes ("Sending email (fake)") when reminders activate.
 - Open the browser dashboard, toggle the sensor loop, or post readings manually.
 - Flip to the **Admin** tab to inspect sensors, their GUID serials, and rebind them to plots without reflashing hardware.
+- When the admin view needs auth, Koan auto-elects the in-process TestProvider and redirects to `/.testoauth/authorize`; no appsettings are required in Development.
 - Close the console window or press Ctrl+C to shut down.
 
 ## Key ingredients

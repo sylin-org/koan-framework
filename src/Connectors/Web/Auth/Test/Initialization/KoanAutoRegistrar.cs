@@ -3,7 +3,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Authentication;
 using Koan.Core;
 using Koan.Core.Modules;
 using Koan.Web.Auth.Providers;
@@ -25,12 +24,6 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         services.AddSingleton<DevTokenStore>();
         services.AddKoanOptions<TestProviderOptions>(TestProviderOptions.SectionPath);
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IAuthProviderContributor, TestProviderContributor>());
-
-        // Configure TestProvider as default challenge scheme for development
-        services.Configure<AuthenticationOptions>(options =>
-        {
-            options.DefaultChallengeScheme = "Test";
-        });
 
         // Ensure MVC discovers TestProvider controllers
         services.AddKoanControllersFrom<StaticController>();

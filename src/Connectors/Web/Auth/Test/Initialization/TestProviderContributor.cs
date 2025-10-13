@@ -25,7 +25,8 @@ internal sealed class TestProviderContributor(IConfiguration cfg, IHostEnvironme
                 ClientId = o.ClientId,
                 ClientSecret = o.ClientSecret,
                 Scopes = new[] { "identify", "email" },
-                Enabled = true
+                Enabled = true,
+                Priority = env.IsDevelopment() ? 25 : -100
             }
         };
     }

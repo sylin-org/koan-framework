@@ -4,6 +4,9 @@ setlocal
 set "SCRIPT_DIR=%~dp0"
 pushd "%SCRIPT_DIR%"
 
+set "DOTNET_ENVIRONMENT=Development"
+set "ASPNETCORE_ENVIRONMENT=Development"
+
 set "DOTNET_CMD=dotnet run --project ""g1c1.GardenCoop.csproj"""
 if "%~1"=="" (
     rem no additional arguments

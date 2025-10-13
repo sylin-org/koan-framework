@@ -1,7 +1,8 @@
 ﻿using g1c1.GardenCoop.Hosting;
-using Microsoft.AspNetCore.Builder;
 using Koan.Core;
 using Koan.Core.Hosting.App;
+using Koan.Web.Extensions;
+using Microsoft.AspNetCore.Builder;
 
 var builder = WebApplication.CreateBuilder(args);
 

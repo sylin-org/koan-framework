@@ -104,12 +104,18 @@ public sealed class CanonModelAggregationMetadata
             throw new ArgumentNullException(nameof(property));
         }
 
-        if (PolicyByProperty.TryGetValue(property, out descriptor))
+        if (PolicyByProperty.TryGetValue(property, out descriptor!))
         {
             return true;
         }
 
-        return PolicyDescriptorsByName.TryGetValue(property.Name, out descriptor);
+        if (PolicyDescriptorsByName.TryGetValue(property.Name, out descriptor!))
+        {
+            return true;
+        }
+
+        descriptor = null!;
+        return false;
     }
 
     /// <summary>
@@ -123,7 +129,13 @@ public sealed class CanonModelAggregationMetadata
             return false;
         }
 
-        return PolicyDescriptorsByName.TryGetValue(propertyName, out descriptor);
+        if (PolicyDescriptorsByName.TryGetValue(propertyName, out descriptor!))
+        {
+            return true;
+        }
+
+        descriptor = null!;
+        return false;
     }
 
     /// <summary>

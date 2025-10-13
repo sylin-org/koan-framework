@@ -314,7 +314,7 @@ internal sealed class SeedService : ISeedService
 
         try
         {
-            using (EntityContext.Partition(null))
+            using (EntityContext.Partition(null!))
             {
                 var repo = dataSvc.GetRepository<Media, string>();
                 var result = await repo.CountAsync(new CountRequest<Media>(), ct);
@@ -328,7 +328,7 @@ internal sealed class SeedService : ISeedService
 
         try
         {
-            using (EntityContext.Partition(null))
+            using (EntityContext.Partition(null!))
             {
                 if (Vector<Media>.IsAvailable)
                 {
@@ -785,12 +785,12 @@ internal sealed class SeedService : ISeedService
                                     var contentHash = EmbeddingCache.ComputeContentHash(embeddingText);
                                     await _embeddingCache.SetAsync(contentHash, modelId, embedding, typeof(Media).FullName!, ct);
                                 }
-                                catch (InvalidOperationException ex)
+                                catch (InvalidOperationException)
                                 {
                                     envelope.Metadata["vector:affected"] = 0;
                                     Interlocked.Increment(ref failures);
                                 }
-                                catch (Exception ex)
+                                catch (Exception)
                                 {
                                     envelope.Metadata["vector:affected"] = 0;
                                     Interlocked.Increment(ref failures);

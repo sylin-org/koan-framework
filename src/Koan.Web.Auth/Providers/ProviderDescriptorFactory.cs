@@ -4,7 +4,7 @@ namespace Koan.Web.Auth.Providers;
 
 internal static class ProviderDescriptorFactory
 {
-    public static ProviderDescriptor Create(string id, string name, string protocol, bool enabled, string state, string? icon, string[]? scopes)
+    public static ProviderDescriptor Create(string id, string name, string protocol, bool enabled, string state, string? icon, string[]? scopes, int priority)
     {
         string? challenge = protocol is AuthConstants.Protocols.Oidc or AuthConstants.Protocols.OAuth2
             ? $"/auth/{id}/challenge"
@@ -20,7 +20,8 @@ internal static class ProviderDescriptorFactory
             Icon = icon,
             ChallengeUrl = challenge,
             MetadataUrl = metadata,
-            Scopes = scopes
+            Scopes = scopes,
+            Priority = priority
         };
     }
 }

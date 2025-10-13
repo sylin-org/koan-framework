@@ -10,4 +10,9 @@ public sealed class KoanAdminAuthorizationOptions
     public string Policy { get; set; } = KoanAdminDefaults.Policy;
 
     public string[] AllowedNetworks { get; set; } = Array.Empty<string>();
+
+    /// <summary>
+    /// When true (default), Koan.Web.Admin auto-creates a permissive policy in Development if none is registered.
+    /// </summary>
+    public bool AutoCreateDevelopmentPolicy { get; set; } = true;
 }

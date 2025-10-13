@@ -217,7 +217,7 @@ public static class BeExtensions
     /// <example>
     /// <code>
     /// var percentage = score.Must.Be.AtMost(100);
-    /// // percentage is guaranteed <= 100
+    /// // percentage is guaranteed &lt;= 100
     /// </code>
     /// </example>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

@@ -99,7 +99,7 @@ internal sealed class KoanAdminAuthorizationFilter : IAsyncAuthorizationFilter
             return false;
         }
 
-        if (!IPAddress.TryParse(parts[0], out network))
+        if (!IPAddress.TryParse(parts[0], out network!))
         {
             return false;
         }

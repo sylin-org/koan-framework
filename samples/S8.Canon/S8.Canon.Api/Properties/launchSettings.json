@@ -1,0 +1,12 @@
+{
+  "profiles": {
+    "S8.Canon.Api": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "applicationUrl": "https://localhost:63323;http://localhost:63324"
+    }
+  }
+}
