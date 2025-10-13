@@ -1,3 +1,4 @@
+using System.Linq;
 using Koan.Admin.Options;
 using Koan.Admin.Services;
 using Koan.Core.Modules;
@@ -22,6 +23,7 @@ public static class ServiceCollectionExtensions
         services.TryAddSingleton<IKoanAdminRouteProvider, KoanAdminRouteProvider>();
         services.TryAddSingleton<IKoanAdminFeatureManager, KoanAdminFeatureManager>();
         services.TryAddSingleton<IKoanAdminManifestService, KoanAdminManifestService>();
+        services.TryAddSingleton<IKoanAdminLaunchKitService, KoanAdminLaunchKitService>();
 
         return services;
     }

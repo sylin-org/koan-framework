@@ -5,12 +5,15 @@
     <Nullable>enable</Nullable>
     <Description>Web dashboard surface for Koan Admin: prefix-aware routing, diagnostics APIs, and LaunchKit scaffolding.</Description>
     <PackageTags>$(CommonPackageTags);admin;dashboard;diagnostics;launchkit</PackageTags>
-    <Version>0.1.0</Version>
-    <AssemblyVersion>0.1.0</AssemblyVersion>
-    <FileVersion>0.1.0</FileVersion>
+    <Version>0.2.0</Version>
+    <AssemblyVersion>0.2.0</AssemblyVersion>
+    <FileVersion>0.2.0</FileVersion>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Koan.Admin\Koan.Admin.csproj" />
     <ProjectReference Include="..\Koan.Web\Koan.Web.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="wwwroot\**\*.*" LogicalName="Koan.Web.Admin.wwwroot.%(RecursiveDir)%(Filename)%(Extension)" />
   </ItemGroup>
 </Project>

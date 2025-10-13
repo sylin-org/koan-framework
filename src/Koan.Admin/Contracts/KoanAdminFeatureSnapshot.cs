@@ -7,6 +7,7 @@ public sealed record KoanAdminFeatureSnapshot(
     bool ManifestExposed,
     bool AllowDestructiveOperations,
     bool AllowLogTranscriptDownload,
+    bool LaunchKitEnabled,
     KoanAdminRouteMap Routes,
     string PathPrefix,
     bool DotPrefixAllowedInCurrentEnvironment
