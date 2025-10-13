@@ -6,7 +6,13 @@ public sealed record KoanAdminModuleSurface(
     string Name,
     string? Version,
     IReadOnlyList<KoanAdminModuleSurfaceSetting> Settings,
-    IReadOnlyList<string> Notes
+    IReadOnlyList<string> Notes,
+    string Pillar,
+    string PillarClass,
+    string ModuleClass,
+    string Icon,
+    string ColorHex,
+    string ColorRgb
 );
 
 public sealed record KoanAdminModuleSurfaceSetting(

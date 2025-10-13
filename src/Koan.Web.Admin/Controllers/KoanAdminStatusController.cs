@@ -42,15 +42,32 @@ public sealed class KoanAdminStatusController : ControllerBase
         var summary = manifest.ToSummary();
         var health = manifest.Health;
 
+        var styles = KoanAdminModuleStyleResolver.ResolveAll(manifest.Modules);
+        var styleLookup = styles.ToDictionary(style => style.ModuleName, StringComparer.OrdinalIgnoreCase);
+
         var modules = manifest.Modules
             .OrderBy(m => m.Name, StringComparer.OrdinalIgnoreCase)
             .Select(m =>
             {
+                var style = styleLookup.TryGetValue(m.Name, out var resolvedStyle)
+                    ? resolvedStyle
+                    : KoanAdminModuleStyleResolver.Resolve(m);
+
                 var settings = m.Settings
                     .Select(s => new KoanAdminModuleSurfaceSetting(s.Key, s.Secret ? SecretMask : s.Value, s.Secret))
                     .ToList();
                 var notes = m.Notes.ToList();
-                return new KoanAdminModuleSurface(m.Name, m.Version, settings, notes);
+                return new KoanAdminModuleSurface(
+                    m.Name,
+                    m.Version,
+                    settings,
+                    notes,
+                    style.Pillar,
+                    style.PillarClass,
+                    style.ModuleClass,
+                    style.Icon,
+                    style.ColorHex,
+                    style.ColorRgb);
             })
             .ToList();
 
@@ -58,7 +75,9 @@ public sealed class KoanAdminStatusController : ControllerBase
             .SelectMany(m => m.Notes.Select(note => new KoanAdminStartupNote(m.Name, note)))
             .ToList();
 
-        var response = new KoanAdminStatusResponse(Koan.Core.KoanEnv.CurrentSnapshot, snapshot, summary, health, modules, startupNotes);
+        var configuration = BuildConfigurationSummaries(modules);
+
+        var response = new KoanAdminStatusResponse(Koan.Core.KoanEnv.CurrentSnapshot, snapshot, summary, health, modules, configuration, startupNotes);
         return Ok(response);
     }
 
@@ -91,5 +110,30 @@ public sealed class KoanAdminStatusController : ControllerBase
 
         var health = await _manifest.GetHealthAsync(cancellationToken).ConfigureAwait(false);
         return Ok(health);
+    }
+
+    private static KoanAdminConfigurationSummary BuildConfigurationSummaries(IReadOnlyList<KoanAdminModuleSurface> modules)
+    {
+        if (modules.Count == 0)
+        {
+            return KoanAdminConfigurationSummary.Empty;
+        }
+
+        var summaries = modules
+            .GroupBy(module => (module.Pillar, module.PillarClass, module.Icon, module.ColorHex, module.ColorRgb))
+            .Select(group => new KoanAdminPillarSummary(
+                group.Key.Pillar,
+                group.Key.PillarClass,
+                group.Key.Icon,
+                group.Key.ColorHex,
+                group.Key.ColorRgb,
+                group.Count(),
+                group.Sum(m => m.Settings.Count),
+                group.Sum(m => m.Notes.Count)))
+            .OrderByDescending(summary => summary.ModuleCount)
+            .ThenBy(summary => summary.Pillar, StringComparer.Ordinal)
+            .ToList();
+
+        return new KoanAdminConfigurationSummary(summaries);
     }
 }

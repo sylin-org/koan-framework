@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Koan.Core;
 using Koan.Core.Extensions;
+using Koan.Data.Core.Pillars;
 
 namespace Koan.Data.Core.Initialization;
 
@@ -13,6 +14,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 
     public void Initialize(IServiceCollection services)
     {
+        DataPillarManifest.EnsureRegistered();
         // Registration handled by KoanDataCoreInitializer; explicit AddKoanDataCore() keeps compatibility for manual layering.
     }
 

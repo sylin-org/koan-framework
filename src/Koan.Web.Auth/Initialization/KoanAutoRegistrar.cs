@@ -5,6 +5,7 @@ using Microsoft.Extensions.Hosting;
 using Koan.Core;
 using Koan.Web.Auth.Extensions;
 using Koan.Web.Extensions;
+using Koan.Web.Auth.Pillars;
 
 namespace Koan.Web.Auth.Initialization;
 
@@ -15,6 +16,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 
     public void Initialize(IServiceCollection services)
     {
+        SecurityPillarManifest.EnsureRegistered();
         // Ensure auth services are registered once
         services.AddKoanWebAuth();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<Microsoft.AspNetCore.Hosting.IStartupFilter, Hosting.KoanWebAuthStartupFilter>());

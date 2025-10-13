@@ -35,6 +35,7 @@ async function safeReadText(response) {
   }
 }
 
+
 function renderEnvironment(environment) {
   const processStartRaw = environment?.processStart ?? environment?.ProcessStart;
   const processStart = processStartRaw ? new Date(processStartRaw) : new Date();
@@ -107,59 +108,202 @@ function renderCapabilities(features) {
   }
 }
 
-function renderModules(modules, manifestSummary) {
-  modulesContainer.innerHTML = '';
-  const source = Array.isArray(modules) && modules.length ? modules : manifestSummary?.modules;
+function buildPillarGroups(modules, configurationSummary) {
+  const modulesByPillar = new Map();
 
-  if (!source || !source.length) {
+  modules.forEach(module => {
+    const key = module.pillar ?? 'General';
+    if (!modulesByPillar.has(key)) {
+      modulesByPillar.set(key, []);
+    }
+    modulesByPillar.get(key).push(module);
+  });
+
+  const groups = [];
+  const summaryList = Array.isArray(configurationSummary?.pillars)
+    ? configurationSummary.pillars.slice()
+    : [];
+
+  const normalizeSort = (a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+
+  summaryList.forEach(summary => {
+    const pillarKey = summary.pillar ?? 'General';
+    const moduleList = modulesByPillar.get(pillarKey) ?? [];
+    moduleList.sort(normalizeSort);
+
+    const moduleClassFallback = moduleList[0]?.moduleClass ?? 'module-general';
+
+    groups.push({
+      pillar: pillarKey,
+      pillarClass: summary.pillarClass ?? moduleList[0]?.pillarClass ?? 'pillar-general',
+      moduleClass: moduleClassFallback,
+      icon: summary.icon ?? moduleList[0]?.icon ?? '🧩',
+      colorHex: summary.colorHex ?? moduleList[0]?.colorHex ?? '#38bdf8',
+      colorRgb: summary.colorRgb ?? moduleList[0]?.colorRgb ?? '56, 189, 248',
+      modules: moduleList,
+  moduleCount: moduleList.length || (summary.moduleCount ?? 0),
+      settingCount: moduleList.length
+        ? moduleList.reduce((total, item) => total + (item.settings?.length ?? 0), 0)
+        : summary.settingCount ?? 0,
+      noteCount: moduleList.length
+        ? moduleList.reduce((total, item) => total + (item.notes?.length ?? 0), 0)
+        : summary.noteCount ?? 0
+    });
+
+    modulesByPillar.delete(pillarKey);
+  });
+
+  modulesByPillar.forEach((moduleList, pillarKey) => {
+    moduleList.sort(normalizeSort);
+    groups.push({
+      pillar: pillarKey,
+      pillarClass: moduleList[0]?.pillarClass ?? 'pillar-general',
+      moduleClass: moduleList[0]?.moduleClass ?? 'module-general',
+      icon: moduleList[0]?.icon ?? '🧩',
+      colorHex: moduleList[0]?.colorHex ?? '#38bdf8',
+      colorRgb: moduleList[0]?.colorRgb ?? '56, 189, 248',
+      modules: moduleList,
+      moduleCount: moduleList.length,
+      settingCount: moduleList.reduce((total, item) => total + (item.settings?.length ?? 0), 0),
+      noteCount: moduleList.reduce((total, item) => total + (item.notes?.length ?? 0), 0)
+    });
+  });
+
+  groups.sort((left, right) => {
+    if (right.moduleCount !== left.moduleCount) {
+      return right.moduleCount - left.moduleCount;
+    }
+    return left.pillar.localeCompare(right.pillar, undefined, { sensitivity: 'base' });
+  });
+
+  return groups;
+}
+
+function createModuleDetails(module, fallbackModuleClass) {
+  const details = document.createElement('details');
+  details.className = 'module-item';
+
+  const moduleClass = module.moduleClass ?? fallbackModuleClass ?? 'module-general';
+  if (!details.classList.contains(moduleClass)) {
+    details.classList.add(moduleClass);
+  }
+
+  if (module.colorHex) {
+    details.style.setProperty('--module-color-hex', module.colorHex);
+  }
+  if (module.colorRgb) {
+    details.style.setProperty('--module-color-rgb', module.colorRgb);
+  }
+
+  const icon = module.icon ?? '🧩';
+  const summary = document.createElement('summary');
+  const version = module.version ? `v${module.version}` : 'unversioned';
+  const noteCount = Array.isArray(module.notes) ? module.notes.length : module.noteCount ?? 0;
+  const settingCount = Array.isArray(module.settings) ? module.settings.length : module.settingCount ?? 0;
+
+  const nameSpan = document.createElement('span');
+  nameSpan.className = 'module-name';
+  nameSpan.innerHTML = `<span class="module-icon">${icon}</span>${module.name ?? 'Unnamed module'}`;
+
+  const metaSpan = document.createElement('span');
+  metaSpan.className = 'module-meta';
+  metaSpan.textContent = `${version} · ${settingCount} settings · ${noteCount} notes`;
+
+  summary.appendChild(nameSpan);
+  summary.appendChild(metaSpan);
+  details.appendChild(summary);
+
+  const inner = document.createElement('div');
+  inner.className = 'module-body';
+
+  const settingsList = Array.isArray(module.settings) && module.settings.length
+    ? module.settings.map(setting => `
+        <div class="module-setting">
+          <span class="key">${setting.key}</span>
+          <span class="value ${setting.secret ? 'secret' : ''}">${setting.value ?? ''}</span>
+          ${setting.secret ? '<span class="tag">secret</span>' : ''}
+        </div>
+      `).join('')
+    : '<p class="muted">No settings captured.</p>';
+
+  const notesList = Array.isArray(module.notes) && module.notes.length
+    ? `<ul class="module-notes">${module.notes.map(note => `<li>${note}</li>`).join('')}</ul>`
+    : '<p class="muted">No notes recorded.</p>';
+
+  inner.innerHTML = `
+    <div class="module-section">
+      <h3>Settings</h3>
+      ${settingsList}
+    </div>
+    <div class="module-section">
+      <h3>Notes</h3>
+      ${notesList}
+    </div>
+  `;
+
+  details.appendChild(inner);
+  return details;
+}
+
+function renderModules(modules, configurationSummary) {
+  modulesContainer.innerHTML = '';
+
+  if (!Array.isArray(modules) || !modules.length) {
     modulesContainer.innerHTML = '<p class="loading">No modules reported yet.</p>';
     return;
   }
 
-  source.forEach(module => {
-    const details = document.createElement('details');
-    details.className = 'module-item';
+  const groups = buildPillarGroups(modules, configurationSummary);
+
+  groups.forEach((group, index) => {
+    const wrapper = document.createElement('details');
+    wrapper.className = 'pillar-group';
+    if (group.pillarClass) {
+      wrapper.classList.add(group.pillarClass);
+    }
+    if (group.colorHex) {
+      wrapper.style.setProperty('--pillar-color-hex', group.colorHex);
+    }
+    if (group.colorRgb) {
+      wrapper.style.setProperty('--pillar-color-rgb', group.colorRgb);
+    }
+    if (index === 0) {
+      wrapper.open = true;
+    }
 
     const summary = document.createElement('summary');
-    const version = module.version ? `v${module.version}` : 'unversioned';
-    const noteCount = Array.isArray(module.notes) ? module.notes.length : module.noteCount ?? 0;
-    const settingCount = Array.isArray(module.settings) ? module.settings.length : module.settingCount ?? 0;
-    summary.innerHTML = `
-      <span class="module-name">${module.name}</span>
-      <span class="module-meta">${version} · ${settingCount} settings · ${noteCount} notes</span>
-    `;
-    details.appendChild(summary);
 
-    const inner = document.createElement('div');
-    inner.className = 'module-body';
+    const name = document.createElement('span');
+    name.className = 'pillar-name';
+    name.innerHTML = `<span class="module-icon">${group.icon ?? '🧩'}</span>${group.pillar}`;
 
-    const settingsList = Array.isArray(module.settings) && module.settings.length
-      ? module.settings.map(setting => `
-          <div class="module-setting">
-            <span class="key">${setting.key}</span>
-            <span class="value ${setting.secret ? 'secret' : ''}">${setting.value ?? ''}</span>
-            ${setting.secret ? '<span class="tag">secret</span>' : ''}
-          </div>
-        `).join('')
-      : '<p class="muted">No settings captured.</p>';
+    const counts = document.createElement('span');
+    counts.className = 'pillar-counts';
+    counts.textContent = `${group.moduleCount} modules · ${group.settingCount} settings${group.noteCount ? ` · ${group.noteCount} notes` : ''}`;
 
-    const notesList = Array.isArray(module.notes) && module.notes.length
-      ? `<ul class="module-notes">${module.notes.map(note => `<li>${note}</li>`).join('')}</ul>`
-      : '<p class="muted">No notes recorded.</p>';
+    summary.appendChild(name);
+    summary.appendChild(counts);
+    wrapper.appendChild(summary);
 
-    inner.innerHTML = `
-      <div class="module-section">
-        <h3>Settings</h3>
-        ${settingsList}
-      </div>
-      <div class="module-section">
-        <h3>Notes</h3>
-        ${notesList}
-      </div>
-    `;
+    const body = document.createElement('div');
+    body.className = 'pillar-body';
 
-    details.appendChild(inner);
-    modulesContainer.appendChild(details);
+    if (!group.modules.length) {
+      const empty = document.createElement('p');
+      empty.className = 'pillar-empty';
+      empty.textContent = 'No modules reported for this pillar yet.';
+      body.appendChild(empty);
+    } else {
+      const moduleList = document.createElement('div');
+      moduleList.className = 'pillar-modules';
+      group.modules.forEach(module => {
+        moduleList.appendChild(createModuleDetails(module, group.moduleClass));
+      });
+      body.appendChild(moduleList);
+    }
+
+    wrapper.appendChild(body);
+    modulesContainer.appendChild(wrapper);
   });
 }
 
@@ -473,7 +617,7 @@ async function refreshStatus(manual = false) {
     const status = await fetchJson(STATUS_ENDPOINT);
     renderEnvironment(status.environment);
     renderCapabilities(status.features);
-    renderModules(status.modules, status.manifest);
+    renderModules(status.modules, status.configuration);
     renderHealth(status.health);
     renderNotes(status.startupNotes, status.modules);
     renderGeneratedAt(status.manifest);

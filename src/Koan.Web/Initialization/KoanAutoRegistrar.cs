@@ -5,6 +5,7 @@ using Microsoft.Extensions.Hosting;
 using Koan.Core;
 using Koan.Core.Extensions;
 using Koan.Web.Extensions;
+using Koan.Web.Pillars;
 
 namespace Koan.Web.Initialization;
 
@@ -15,6 +16,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 
     public void Initialize(IServiceCollection services)
     {
+        WebPillarManifest.EnsureRegistered();
         services.AddKoanWeb();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<Microsoft.AspNetCore.Hosting.IStartupFilter, Hosting.KoanWebStartupFilter>());
 

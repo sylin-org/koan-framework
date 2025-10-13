@@ -194,6 +194,8 @@
       href: WEB-0060-flow-messaging-refactor.md
     - name: WEB-0061 Koan Admin surface refresh
       href: WEB-0061-koan-admin-surface-refresh.md
+    - name: WEB-0062 Koan Admin pillar visualization
+      href: WEB-0062-koan-admin-pillar-visualization.md
 - name: Flow (FLOW)
   items:
     - name: FLOW-0070 Flow commands bus

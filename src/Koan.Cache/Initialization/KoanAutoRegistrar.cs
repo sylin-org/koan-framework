@@ -4,6 +4,7 @@ using Koan.Cache.Extensions;
 using Koan.Cache.Options;
 using Koan.Core;
 using Koan.Core.Modules;
+using Koan.Cache.Pillars;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -18,6 +19,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 
     public void Initialize(IServiceCollection services)
     {
+        CachingPillarManifest.EnsureRegistered();
         services.AddKoanCache();
     }
 

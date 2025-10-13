@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Koan Admin Dashboard</title>
   <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="api/status/styles/module-visuals.css" />
 </head>
 <body>
   <header>
@@ -23,17 +24,17 @@
     </div>
   </header>
   <main>
-    <section id="environment" class="card">
+    <section id="environment" class="card full-width">
       <h2>Environment</h2>
       <div class="content environment-content"></div>
+    </section>
+    <section id="modules" class="card full-width">
+      <h2>Modules</h2>
+      <div class="content modules-content"></div>
     </section>
     <section id="capabilities" class="card">
       <h2>Capabilities</h2>
       <div class="content capabilities-content"></div>
-    </section>
-    <section id="modules" class="card">
-      <h2>Modules</h2>
-      <div class="content modules-content"></div>
     </section>
     <section id="health" class="card">
       <h2>Health</h2>

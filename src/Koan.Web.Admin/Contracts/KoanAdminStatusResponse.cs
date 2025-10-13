@@ -12,6 +12,7 @@ public sealed record KoanAdminStatusResponse(
     KoanAdminManifestSummary Manifest,
     KoanAdminHealthDocument Health,
     IReadOnlyList<KoanAdminModuleSurface> Modules,
+    KoanAdminConfigurationSummary Configuration,
     IReadOnlyList<KoanAdminStartupNote> StartupNotes
 )
 {
@@ -22,5 +23,6 @@ public sealed record KoanAdminStatusResponse(
             new KoanAdminManifestSummary(DateTimeOffset.UtcNow, Array.Empty<KoanAdminModuleSummary>(), HealthStatus.Unknown, 0),
             KoanAdminHealthDocument.Empty,
             Array.Empty<KoanAdminModuleSurface>(),
+            KoanAdminConfigurationSummary.Empty,
             Array.Empty<KoanAdminStartupNote>());
 }

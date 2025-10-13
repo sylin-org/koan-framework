@@ -2,6 +2,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Koan.Core;
+using Koan.Messaging.Core.Pillars;
 
 namespace Koan.Messaging.Core.Initialization;
 
@@ -15,6 +16,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 
     public void Initialize(IServiceCollection services)
     {
+        MessagingPillarManifest.EnsureRegistered();
         // Register core messaging services
         services.AddKoanMessaging();
     }

@@ -2,6 +2,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Koan.Core;
+using Koan.AI.Pillars;
 
 namespace Koan.AI.Initialization;
 
@@ -12,6 +13,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 
     public void Initialize(IServiceCollection services)
     {
+        AiPillarManifest.EnsureRegistered();
         // Bind options if IConfiguration is present later; AddAi also binds when config is provided.
         services.AddAi();
     }

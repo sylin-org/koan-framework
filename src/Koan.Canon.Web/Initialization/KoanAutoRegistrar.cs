@@ -8,6 +8,7 @@ using Koan.Canon.Web.Catalog;
 using Koan.Canon.Web.Controllers;
 using Koan.Canon.Web.Infrastructure;
 using Koan.Core;
+using Koan.Canon.Domain.Pillars;
 using Koan.Web.Extensions;
 using Koan.Web.Controllers;
 using Koan.Web.Extensions.GenericControllers;
@@ -27,6 +28,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 
     public void Initialize(IServiceCollection services)
     {
+        FlowPillarManifest.EnsureRegistered();
         services.AddKoanControllersFrom<KoanAutoRegistrar>();
         services.AddCanonRuntime();
 

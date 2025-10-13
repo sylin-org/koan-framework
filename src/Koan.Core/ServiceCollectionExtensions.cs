@@ -8,6 +8,7 @@ using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Logging;
 using Koan.Core.Modules;
 using Koan.Core.Observability.Health;
+using Koan.Core.Modules.Pillars;
 
 namespace Koan.Core;
 
@@ -25,6 +26,8 @@ public static class ServiceCollectionExtensions
 
     public static IServiceCollection AddKoanCore(this IServiceCollection services)
     {
+        CorePillarManifest.EnsureRegistered();
+
         // Default logging: simple console with concise output and sane category levels.
         services.AddLogging(logging =>
         {
