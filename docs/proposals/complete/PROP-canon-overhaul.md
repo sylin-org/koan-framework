@@ -1,10 +1,17 @@
 # PROP: Koan.Canon Complete Overhaul - Local-First, Message-Optional Architecture
 
-**Status**: Proposal
+**Status**: Delivered (2025-10)
 **Priority**: High
 **Impact**: Breaking Change (Major Version Bump)
 **Author**: Enterprise Architecture Analysis
 **Date**: 2025-10-05
+
+> **Implementation verification (2025-10):**
+> - `CanonEntity<T>.Canonize(...)` ships in [`src/Koan.Canon.Domain/Model/CanonEntity.cs`](../../../../src/Koan.Canon.Domain/Model/CanonEntity.cs) providing the local-first API proposed here.
+> - The transport-optional runtime and pipeline live in [`src/Koan.Canon.Domain/Runtime`](../../../../src/Koan.Canon.Domain/Runtime), delivering the decoupled architecture that removes messaging coupling.
+> - Simplified storage models (`CanonIndex`, `CanonStage`) replace the legacy sprawl under [`src/Koan.Canon.Domain/Model`](../../../../src/Koan.Canon.Domain/Model).
+
+> The remainder of this document captures the original problem analysis and rationale that preceded the shipped implementation.
 
 ---
 

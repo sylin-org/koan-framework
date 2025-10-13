@@ -3,6 +3,8 @@
 **Date**: 2025-10-05
 **Purpose**: Compare two architectural proposals for Koan.Canon redesign and identify complementary insights
 
+> **Status (2025-10):** Implemented via the shipping canon runtime under [`src/Koan.Canon.Domain`](../../../../src/Koan.Canon.Domain). The combined design landed as documented in [SPEC-canon-runtime.md](../specifications/SPEC-canon-runtime.md), delivering the local-first runtime (`CanonEntity<T>.Canonize(...)`) and transport-agnostic pipeline contracts (`ICanonRuntime`, `ICanonPipelineContributor`, etc.).
+
 ---
 
 ## Proposal Comparison Matrix

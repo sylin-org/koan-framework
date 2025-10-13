@@ -1,9 +1,11 @@
 # Proposal: Fluent Guard Pattern for Parameter Validation
 
-**Status**: Accepted
+**Status**: Delivered (2025-09)
 **Date**: 2025-10-12
 **Author**: Enterprise Architect
 **Related**: Koan.Core utilities, Entity<T> constructor patterns
+
+> **Implementation verification:** The fluent guard carriers are implemented in [`src/Koan.Core/Utilities/Guard`](../../../../src/Koan.Core/Utilities/Guard) with the `Must()` extension method and `Be`/`NotBe` facets. Usage patterns appear throughout guard documentation and samples, for example [`MustExtensions.cs`](../../../../src/Koan.Core/Utilities/Guard/MustExtensions.cs) and [`README.md`](../../../../src/Koan.Core/Utilities/Guard/README.md).
 
 ---
 
@@ -12,7 +14,7 @@
 Koan Framework lacks a consistent, ergonomic pattern for parameter validation (guard clauses). Developers currently use verbose .NET guard methods that require `nameof()` and reduce code readability. This proposal introduces a **fluent guard pattern** using modern C# `CallerArgumentExpression` to provide natural language validation with zero runtime overhead.
 
 **Key Benefits**:
-- **Natural language**: `title.Must.NotBe.Blank()` reads as English
+- **Natural language**: `title.Must().NotBe.Blank()` reads as English
 - **Zero ceremony**: No `nameof()` required
 - **Type-safe**: IntelliSense guides to appropriate validations
 - **Zero overhead**: `ref struct` design prevents allocations
@@ -73,7 +75,7 @@ public Todo(string title, string assignee, int priority)
 ```csharp
 /// <summary>
 /// Fluent guard extensions for parameter validation.
-/// Provides natural language validation: value.Must.NotBe.Null()
+/// Provides natural language validation: value.Must().NotBe.Null()
 /// Always throws immediately on failure - use InputValidator for batch validation.
 /// </summary>
 public static class MustExtensions
@@ -103,20 +105,20 @@ public class Todo : Entity<Todo>
     public Todo(string title, string assignee, int priority)
     {
         // Clear validation section
-        _title = title.Must.NotBe.Blank();
-        _assignee = assignee.Must.NotBe.Null();
-        _priority = priority.Must.Be.Positive();
+        _title = title.Must().NotBe.Blank();
+        _assignee = assignee.Must().NotBe.Null();
+        _priority = priority.Must().Be.Positive();
     }
 }
 
 // Chainable with business logic
-_title = title.Must.NotBe.Blank().Trim().Truncate(200);
+_title = title.Must().NotBe.Blank().Trim().Truncate(200);
 //              ^^^^^^^^^^^^^^^^^^^ validation
 //                                  ^^^^^^^^^^^^^^^^^^^^ transformation
 
 // Type-safe guards
-var id = entityId.Must.NotBe.Empty();  // Only available for Guid
-var age = userAge.Must.Be.InRange(1, 120);  // Only available for int
+var id = entityId.Must().NotBe.Empty();  // Only available for Guid
+var age = userAge.Must().Be.InRange(1, 120);  // Only available for int
 ```
 
 ---
@@ -129,10 +131,10 @@ var age = userAge.Must.Be.InRange(1, 120);  // Only available for int
 
 ```csharp
 // Reads: "title must not be blank"
-title.Must.NotBe.Blank()
+title.Must().NotBe.Blank()
 
 // Reads: "priority must be positive"
-priority.Must.Be.Positive()
+priority.Must().Be.Positive()
 ```
 
 ### 2. Zero Runtime Overhead
@@ -181,7 +183,7 @@ public static int Positive(this Be<int> be)
 
 ```csharp
 // ALWAYS throws ArgumentException if blank
-var title = input.Must.NotBe.Blank();
+var title = input.Must().NotBe.Blank();
 
 // Safe to use - guaranteed non-blank after guard
 var length = title.Length;
@@ -228,7 +230,7 @@ public static Guid IsGuidV7(this Be<Guid> be)
 }
 
 // Usage
-var id = entityId.Must.Be.IsGuidV7();
+var id = entityId.Must().Be.IsGuidV7();
 ```
 
 ---
@@ -294,9 +296,9 @@ public class User : Entity<User>
 
     public User(string email, string name, int age)
     {
-        _email = email.Must.NotBe.Blank();
-        _name = name.Must.NotBe.Blank();
-        _age = age.Must.Be.InRange(13, 150);
+        _email = email.Must().NotBe.Blank();
+        _name = name.Must().NotBe.Blank();
+        _age = age.Must().Be.InRange(13, 150);
     }
 }
 ```
@@ -306,8 +308,8 @@ public class User : Entity<User>
 ```csharp
 public async Task<Todo> AssignTodo(Guid todoId, string assignee)
 {
-    var id = todoId.Must.NotBe.Empty();
-    var user = assignee.Must.NotBe.Blank();
+    var id = todoId.Must().NotBe.Empty();
+    var user = assignee.Must().NotBe.Blank();
 
     var todo = await Todo.Get(id);
     todo.Assignee = user;
@@ -327,7 +329,7 @@ public class Todo : Entity<Todo>
     public int Priority
     {
         get => _priority;
-        set => _priority = value.Must.Be.InRange(1, 5);
+        set => _priority = value.Must().Be.InRange(1, 5);
     }
 }
 ```
@@ -344,8 +346,8 @@ public class Todo : Entity<Todo>
 [HttpPost]
 public IActionResult CreateTodo([FromBody] CreateTodoRequest request)
 {
-    request.Title.Must.NotBe.Blank();  // ❌ Throws on first error
-    request.Email.Must.NotBe.Blank();  // Never reached if title fails
+    request.Title.Must().NotBe.Blank();  // ❌ Throws on first error
+    request.Email.Must().NotBe.Blank();  // Never reached if title fails
     // ...
 }
 ```
@@ -360,7 +362,7 @@ public IActionResult CreateTodo([FromBody] CreateTodoRequest request)
         return BadRequest(ModelState);  // Returns all validation errors
 
     // Guards only for defensive programming
-    var todo = new Todo(request.Title.Must.NotBe.Blank());
+    var todo = new Todo(request.Title.Must().NotBe.Blank());
     return Ok(todo);
 }
 ```
@@ -371,7 +373,7 @@ public IActionResult CreateTodo([FromBody] CreateTodoRequest request)
 
 ```csharp
 // Wrong: Business rule in guard
-var amount = transfer.Amount.Must.Be.Where(
+var amount = transfer.Amount.Must().Be.Where(
     a => a <= account.Balance,
     "Insufficient funds");  // ❌ Domain logic in guard
 
@@ -395,7 +397,7 @@ if (transfer.Amount > account.Balance)
 ArgumentNullException.ThrowIfNull(value, nameof(value));
 
 // New style (recommended for new code)
-value.Must.NotBe.Null();
+value.Must().NotBe.Null();
 ```
 
 ### Framework Guidance
@@ -416,7 +418,7 @@ value.Must.NotBe.Null();
 
 ```csharp
 // No allocations - stack-only intermediates
-var title = input.Must.NotBe.Blank();
+var title = input.Must().NotBe.Blank();
 
 // IL equivalent to:
 ArgumentException.ThrowIfNullOrWhiteSpace(input, "input");
@@ -463,8 +465,8 @@ public static class KoanGuardExtensions
 }
 
 // Usage
-var id = entityId.Must.Be.IsGuidV7();
-var email = userEmail.Must.Be.IsValidEmail();
+var id = entityId.Must().Be.IsGuidV7();
+var email = userEmail.Must().Be.IsValidEmail();
 ```
 
 ### Domain-Specific Guards
@@ -482,7 +484,7 @@ public static decimal Positive(this Be<decimal> be)
 }
 
 // Usage
-var amount = transaction.Amount.Must.Be.Positive();
+var amount = transaction.Amount.Must().Be.Positive();
 ```
 
 ---
@@ -558,10 +560,10 @@ var amount = transaction.Amount.Must.Be.Positive();
 - Capture return value, not intermediate struct:
   ```csharp
   // Wrong (won't compile)
-  await Task.Run(() => value.Must.NotBe.Null());
+  await Task.Run(() => value.Must().NotBe.Null());
 
   // Right
-  var validated = value.Must.NotBe.Null();
+  var validated = value.Must().NotBe.Null();
   await Task.Run(() => ProcessAsync(validated));
   ```
 
