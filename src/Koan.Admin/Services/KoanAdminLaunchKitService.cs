@@ -122,7 +122,7 @@ internal sealed class KoanAdminLaunchKitService : IKoanAdminLaunchKitService
         foreach (var client in openApiClients)
         {
             var content = BuildOpenApiInstructions(client, profile, routes);
-            files.Add(new FileBuffer($"openapi/{client.ToLowerInvariant()}/README.md", "text/markdown", Encoding.UTF8.GetBytes(content)));
+            files.Add(new FileBuffer($"openapi/{client}/README.md", "text/markdown", Encoding.UTF8.GetBytes(content)));
         }
 
         var bundle = CreateBundle(profile, generatedAt, files);
@@ -207,7 +207,46 @@ internal sealed class KoanAdminLaunchKitService : IKoanAdminLaunchKitService
     }
 
     private static string NormalizeClient(string value)
-        => value.Trim();
+    {
+        var trimmed = value.Trim();
+        if (trimmed.Length == 0)
+        {
+            return "client";
+        }
+
+        var builder = new StringBuilder(trimmed.Length);
+        var previousHyphen = false;
+
+        foreach (var ch in trimmed)
+        {
+            if (char.IsLetterOrDigit(ch))
+            {
+                builder.Append(char.ToLowerInvariant(ch));
+                previousHyphen = false;
+            }
+            else if (ch is '-' or '_')
+            {
+                builder.Append(ch);
+                previousHyphen = false;
+            }
+            else if (char.IsWhiteSpace(ch) || ch == '.')
+            {
+                if (!previousHyphen)
+                {
+                    builder.Append('-');
+                    previousHyphen = true;
+                }
+            }
+        }
+
+        var normalized = builder.ToString().Trim('-');
+        if (string.IsNullOrEmpty(normalized) || normalized is "." or "..")
+        {
+            return "client";
+        }
+
+        return normalized;
+    }
 
     private byte[] BuildAppSettings(KoanAdminManifest manifest, string profile, DateTimeOffset generatedAt)
     {
@@ -381,12 +420,12 @@ internal sealed class KoanAdminLaunchKitService : IKoanAdminLaunchKitService
             builder.AppendLine("npx @openapitools/openapi-generator-cli generate \\");
             builder.AppendLine("  -i <base-address>/swagger/v1/swagger.json \\");
             builder.AppendLine($"  -g typescript-axios \\");
-            builder.AppendLine($"  -o ./openapi/{client.ToLowerInvariant()}/dist");
+            builder.AppendLine($"  -o ./openapi/{client}/dist");
         }
         else
         {
             builder.AppendLine($"# Install your preferred OpenAPI generator for '{client}'.");
-            builder.AppendLine($"openapi-generator generate -i <base-address>/swagger/v1/swagger.json -g {client} -o ./openapi/{client.ToLowerInvariant()}/dist");
+            builder.AppendLine($"openapi-generator generate -i <base-address>/swagger/v1/swagger.json -g {client} -o ./openapi/{client}/dist");
         }
         builder.AppendLine("```");
         builder.AppendLine();
