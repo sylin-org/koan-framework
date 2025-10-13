@@ -1,4 +1,5 @@
 using Koan.Admin.Contracts;
+using Koan.Core;
 using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Observability.Health;
 using Microsoft.Extensions.Configuration;

@@ -16,7 +16,7 @@ internal sealed class KoanAdminOptionsValidator : IValidateOptions<KoanAdminOpti
         }
 
         var normalized = KoanAdminPathUtility.NormalizePrefix(options.PathPrefix);
-        if (normalized.StartsWith('.', StringComparison.Ordinal) &&
+        if (normalized.StartsWith(".", StringComparison.Ordinal) &&
             (Koan.Core.KoanEnv.IsProduction || Koan.Core.KoanEnv.IsStaging) &&
             !options.AllowDotPrefixInProduction)
         {

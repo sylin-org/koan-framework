@@ -39,7 +39,7 @@ internal static class KoanAdminPathUtility
                 var (pref, suf) = state;
                 pref.AsSpan().CopyTo(span);
                 span[pref.Length] = '/';
-                suf.AsSpan().CopyTo(span[pref.Length + 1..]);
+                suf.AsSpan().CopyTo(span[(pref.Length + 1)..]);
             });
     }
 }

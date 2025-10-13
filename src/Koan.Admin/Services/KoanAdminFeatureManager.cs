@@ -30,7 +30,7 @@ internal sealed class KoanAdminFeatureManager : IKoanAdminFeatureManager, IDispo
         var destructive = enabled && options.DestructiveOps;
         var allowLog = enabled && options.Logging.AllowTranscriptDownload;
 
-        var dotPrefixAllowed = !routes.Prefix.StartsWith('.', StringComparison.Ordinal)
+        var dotPrefixAllowed = !routes.Prefix.StartsWith(".", StringComparison.Ordinal)
             || Koan.Core.KoanEnv.IsDevelopment
             || options.AllowDotPrefixInProduction;
 

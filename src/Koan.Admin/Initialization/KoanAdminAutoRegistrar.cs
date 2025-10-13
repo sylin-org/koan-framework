@@ -38,7 +38,7 @@ public sealed class KoanAdminAutoRegistrar : IKoanAutoRegistrar
         report.AddSetting("route.root", routes.RootPath);
         report.AddSetting("route.api", routes.ApiPath);
 
-        if (!KoanEnv.IsDevelopment && normalized.StartsWith('.', StringComparison.Ordinal) && !dotAllowed)
+        if (!KoanEnv.IsDevelopment && normalized.StartsWith(".", StringComparison.Ordinal) && !dotAllowed)
         {
             report.AddNote("Dot-prefixed admin routes are disabled outside Development unless AllowDotPrefixInProduction=true.");
         }
