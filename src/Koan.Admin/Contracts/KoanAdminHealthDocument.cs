@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using Koan.Core.Observability.Health;
 
 namespace Koan.Admin.Contracts;

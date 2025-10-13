@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Koan Admin Dashboard</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <h1>Koan Admin Dashboard</h1>
+    <p class="subtitle">Runtime diagnostics &amp; LaunchKit exports</p>
+  </header>
+  <main>
+    <section id="environment" class="card">
+      <h2>Environment</h2>
+      <div class="content environment-content"></div>
+    </section>
+    <section id="modules" class="card">
+      <h2>Modules</h2>
+      <div class="content modules-content"></div>
+    </section>
+    <section id="health" class="card">
+      <h2>Health</h2>
+      <div class="content health-content"></div>
+    </section>
+    <section id="launchkit" class="card">
+      <h2>LaunchKit Bundles</h2>
+      <div class="content launchkit-content">
+        <p class="loading">Loading LaunchKit metadata…</p>
+      </div>
+    </section>
+  </main>
+  <footer>
+    <span>Koan Admin</span>
+    <span class="divider">•</span>
+    <span class="timestamp" id="generated-at"></span>
+  </footer>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

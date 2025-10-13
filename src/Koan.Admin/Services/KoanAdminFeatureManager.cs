@@ -1,3 +1,4 @@
+using System;
 using Koan.Admin.Contracts;
 using Koan.Admin.Options;
 using Microsoft.Extensions.Options;
@@ -29,6 +30,7 @@ internal sealed class KoanAdminFeatureManager : IKoanAdminFeatureManager, IDispo
         var manifestExposed = enabled && options.ExposeManifest;
         var destructive = enabled && options.DestructiveOps;
         var allowLog = enabled && options.Logging.AllowTranscriptDownload;
+        var launchKitEnabled = webEnabled && options.EnableLaunchKit;
 
         var dotPrefixAllowed = !routes.Prefix.StartsWith(".", StringComparison.Ordinal)
             || Koan.Core.KoanEnv.IsDevelopment
@@ -41,6 +43,7 @@ internal sealed class KoanAdminFeatureManager : IKoanAdminFeatureManager, IDispo
             manifestExposed,
             destructive,
             allowLog,
+            launchKitEnabled,
             routes,
             routes.Prefix,
             dotPrefixAllowed

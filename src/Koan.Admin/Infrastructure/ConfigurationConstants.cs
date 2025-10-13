@@ -11,11 +11,13 @@ public static class ConfigurationConstants
             public const string Enabled = nameof(Enabled);
             public const string EnableConsoleUi = nameof(EnableConsoleUi);
             public const string EnableWeb = nameof(EnableWeb);
+            public const string EnableLaunchKit = nameof(EnableLaunchKit);
             public const string AllowInProduction = nameof(AllowInProduction);
             public const string AllowDotPrefixInProduction = nameof(AllowDotPrefixInProduction);
             public const string PathPrefix = nameof(PathPrefix);
             public const string ExposeManifest = nameof(ExposeManifest);
             public const string DestructiveOps = nameof(DestructiveOps);
+            public const string Generate = nameof(Generate);
         }
     }
 }
