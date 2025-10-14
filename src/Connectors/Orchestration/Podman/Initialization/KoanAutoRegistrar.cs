@@ -28,21 +28,18 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         var availability = GetAvailability(provider);
 
         var selected = availability.Ok ? "podman" : "unavailable";
-        report.AddProviderElection(
-            "HostingEngine",
-            selected,
-            new[] { "podman", "docker", "unavailable" },
-            availability.Ok ? "Podman CLI reachable" : availability.Reason ?? "No CLI detected");
+        var candidates = string.Join(", ", new[] { "podman", "docker", "unavailable" });
+        report.AddSetting("Engine.Selection", selected);
+        report.AddSetting("Engine.Candidates", candidates);
+        report.AddSetting("Engine.SelectionReason", availability.Ok ? "Podman CLI reachable" : availability.Reason ?? "No CLI detected");
 
         report.AddSetting("Engine", engine.Name);
         report.AddSetting("EngineVersion", string.IsNullOrWhiteSpace(engine.Version) ? "unknown" : engine.Version);
         report.AddSetting("Endpoint", string.IsNullOrWhiteSpace(engine.Endpoint) ? "default" : engine.Endpoint);
 
-        report.AddConnectionAttempt(
-            "HostingEngine.Podman",
-            "podman version",
-            availability.Ok,
-            availability.Reason);
+        var status = availability.Ok ? "reachable" : "unreachable";
+        var detail = availability.Reason ?? "no CLI detected";
+        report.AddNote($"Podman CLI {status}: {detail}");
     }
 
     private static (bool Ok, string? Reason) GetAvailability(PodmanProvider provider)

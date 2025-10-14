@@ -140,18 +140,16 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             OrchestrationMode.Standalone => "external",
             _ => "unknown"
         };
-        report.AddProviderElection("DependencyNetworking", provider,
-            new[] { "localhost", "service-names", "k8s-dns", "aspire-managed", "external" },
-            $"orchestration mode: {mode}");
+        var candidates = string.Join(", ", new[] { "localhost", "service-names", "k8s-dns", "aspire-managed", "external" });
+        report.AddSetting("DependencyNetworking.Provider", provider);
+        report.AddSetting("DependencyNetworking.Candidates", candidates);
+        report.AddSetting("DependencyNetworking.Reason", $"orchestration mode: {mode}");
 
         // Network validation attempt (if enabled and not Aspire/Standalone)
         if (validationEnabled && mode != OrchestrationMode.AspireAppHost && mode != OrchestrationMode.Standalone)
         {
             // Network validation is simplified since KoanEnv handles mode detection
-            report.AddConnectionAttempt("DependencyNetworking",
-                $"{mode} networking",
-                true,
-                "Mode detected by KoanEnv - networking strategy selected");
+            report.AddNote($"Dependency networking validated for {mode}: Mode detected by KoanEnv - networking strategy selected");
         }
     }
 

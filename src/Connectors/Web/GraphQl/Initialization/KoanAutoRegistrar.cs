@@ -26,11 +26,9 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         cfg.GetSection(Infrastructure.Constants.Configuration.Section).Bind(options);
 
         var enabled = options.Enabled ?? true;
-        report.AddProviderElection(
-            "Web.GraphQl",
-            enabled ? "enabled" : "disabled",
-            new[] { "enabled", "disabled" },
-            "Reference = GraphQL endpoint");
+        report.AddSetting("GraphQl.State", enabled ? "enabled" : "disabled");
+        report.AddSetting("GraphQl.Candidates", "enabled, disabled");
+        report.AddSetting("GraphQl.Rationale", "Reference = GraphQL endpoint");
 
         report.AddSetting("Path", options.Path);
         report.AddSetting("Debug", options.Debug.ToString());

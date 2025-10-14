@@ -72,11 +72,9 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         report.AddSetting("KeyPrefix", options.KeyPrefix);
         report.AddSetting("ProcessingTtlSeconds", options.ProcessingTtl.TotalSeconds.ToString("n0"));
 
-        report.AddProviderElection(
-            "Messaging.Inbox",
-            "redis",
-            new[] { "redis" },
-            "Redis inbox module referenced");
+        report.AddSetting("Messaging.Inbox.Selected", "redis");
+        report.AddSetting("Messaging.Inbox.Candidates", "redis");
+        report.AddSetting("Messaging.Inbox.Rationale", "Redis inbox module referenced");
     }
 
     private static IConnectionMultiplexer CreateConnectionMultiplexer(IServiceProvider sp)

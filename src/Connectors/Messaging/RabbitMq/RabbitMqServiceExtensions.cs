@@ -56,18 +56,28 @@ public class KoanAutoRegistrar : IKoanAutoRegistrar
             var discoveryTask = serviceDiscovery.DiscoverServiceAsync("rabbitmq", discoveryOptions);
             var result = discoveryTask.GetAwaiter().GetResult();
 
-            report.AddDiscovery($"orchestration-{result.DiscoveryMethod}", result.ServiceUrl);
-            report.AddConnectionAttempt("Messaging.RabbitMq", result.ServiceUrl, result.IsHealthy);
+            var method = $"orchestration-{result.DiscoveryMethod}";
+            var endpoint = Koan.Core.Redaction.DeIdentify(result.ServiceUrl ?? string.Empty);
+            report.AddSetting("Discovery.Method", method);
+            report.AddSetting("Discovery.Endpoint", endpoint);
+            report.AddSetting("Discovery.Healthy", result.IsHealthy.ToString());
+
+            var status = result.IsHealthy ? "reachable" : "unreachable";
+            report.AddNote($"RabbitMQ endpoint {status}: {endpoint}");
 
             // Log provider election decision
             var availableProviders = DiscoverAvailableMessagingProviders();
-            report.AddProviderElection("Messaging", "RabbitMQ", availableProviders,
-                "highest priority provider with orchestration-aware discovery");
+            report.AddSetting("Provider.Selected", "RabbitMQ");
+            report.AddSetting("Provider.Candidates", string.Join(", ", availableProviders));
+            report.AddSetting("Provider.Rationale", "highest priority provider with orchestration-aware discovery");
         }
         catch (Exception ex)
         {
-            report.AddDiscovery("orchestration-fallback", "amqp://guest:guest@localhost:5672");
-            report.AddConnectionAttempt("Messaging.RabbitMq", "amqp://guest:guest@localhost:5672", false);
+            var fallbackEndpoint = Koan.Core.Redaction.DeIdentify("amqp://guest:guest@localhost:5672");
+            report.AddSetting("Discovery.Method", "orchestration-fallback");
+            report.AddSetting("Discovery.Endpoint", fallbackEndpoint);
+            report.AddSetting("Discovery.Healthy", bool.FalseString);
+            report.AddNote($"RabbitMQ endpoint unreachable: {fallbackEndpoint}");
             report.AddSetting("Discovery.Error", ex.Message);
         }
 

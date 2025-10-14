@@ -24,7 +24,9 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         var capacity = Configuration.Read(cfg, CacheConstants.Configuration.Memory.TagIndexCapacity, 2048);
         var stale = Configuration.Read(cfg, CacheConstants.Configuration.Memory.EnableStaleWhileRevalidate, true);
 
-        report.AddProviderElection("CacheStore", "memory", new[] { "memory", "redis", "custom" }, "Reference = memory adapter package");
+    report.AddSetting("CacheStore.Selected", "memory");
+    report.AddSetting("CacheStore.Candidates", "memory, redis, custom");
+    report.AddSetting("CacheStore.Rationale", "Reference = memory adapter package");
         report.AddSetting("TagIndexCapacity", capacity.ToString());
         report.AddSetting("EnableStaleWhileRevalidate", stale.ToString());
     }

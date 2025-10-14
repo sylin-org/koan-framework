@@ -46,13 +46,13 @@ internal sealed class AppRuntime : IAppRuntime
             var snapshot = KoanEnv.CurrentSnapshot;
             var runtimeVersion = ResolveRuntimeVersion(modulePairs);
 
+            var hostDescription = DescribeHost();
+            var headerBlock = KoanConsoleBlocks.BuildBootstrapHeaderBlock(snapshot, hostDescription, modulePairs, runtimeVersion);
+            var inventoryBlock = KoanConsoleBlocks.BuildInventoryBlock(snapshot, modulePairs);
+
             if (_logger is not null)
             {
-                var hostDescription = DescribeHost();
-                var headerBlock = KoanConsoleBlocks.BuildBootstrapHeaderBlock(snapshot, hostDescription, modulePairs, runtimeVersion);
                 _logger.LogInformation("{Block}", headerBlock);
-
-                var inventoryBlock = KoanConsoleBlocks.BuildInventoryBlock(snapshot, modulePairs);
                 _logger.LogInformation("{Block}", inventoryBlock);
             }
 
@@ -63,10 +63,17 @@ internal sealed class AppRuntime : IAppRuntime
             if (!show)
                 show = obs?.Value?.Enabled == true && obs.Value?.Traces?.Enabled == true;
 
-            if (show && cfg != null && _logger is null)
+            if (show && _logger is null)
             {
-                var options = GetBootReportOptions(cfg);
-                try { Console.Write(report.ToString(options)); } catch { }
+                try
+                {
+                    Console.Write(headerBlock);
+                    Console.Write(inventoryBlock);
+                }
+                catch
+                {
+                    // best-effort only
+                }
             }
         }
         catch { /* best-effort */ }
@@ -126,18 +133,6 @@ internal sealed class AppRuntime : IAppRuntime
         }
 
         return $"Generic Host ({applicationName})";
-    }
-
-    private static BootReportOptions GetBootReportOptions(IConfiguration cfg)
-    {
-        var section = cfg.GetSection("Koan:Bootstrap");
-        return new BootReportOptions
-        {
-            ShowDecisions = section.GetValue("ShowDecisions", !KoanEnv.IsProduction),
-            ShowConnectionAttempts = section.GetValue("ShowConnectionAttempts", !KoanEnv.IsProduction),
-            ShowDiscovery = section.GetValue("ShowDiscovery", !KoanEnv.IsProduction),
-            CompactMode = section.GetValue("CompactMode", KoanEnv.IsProduction)
-        };
     }
 
     public void Start()

@@ -108,13 +108,23 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
                 var discoveryTask = serviceDiscovery.DiscoverServiceAsync("vault", discoveryOptions);
                 var result = discoveryTask.GetAwaiter().GetResult();
 
-                report.AddDiscovery($"orchestration-{result.DiscoveryMethod}", result.ServiceUrl);
-                report.AddConnectionAttempt("Secrets.Vault", result.ServiceUrl, result.IsHealthy);
+                var method = $"orchestration-{result.DiscoveryMethod}";
+                var endpoint = Koan.Core.Redaction.DeIdentify(result.ServiceUrl ?? string.Empty);
+
+                report.AddSetting("Discovery.Method", method);
+                report.AddSetting("Discovery.Endpoint", endpoint);
+                report.AddSetting("Discovery.Healthy", result.IsHealthy.ToString());
+
+                var status = result.IsHealthy ? "accessible" : "unreachable";
+                report.AddNote($"Vault endpoint {status}: {endpoint}");
             }
             catch (Exception ex)
             {
-                report.AddDiscovery("orchestration-fallback", "http://localhost:8200");
-                report.AddConnectionAttempt("Secrets.Vault", "http://localhost:8200", false);
+                var fallbackEndpoint = Koan.Core.Redaction.DeIdentify("http://localhost:8200");
+                report.AddSetting("Discovery.Method", "orchestration-fallback");
+                report.AddSetting("Discovery.Endpoint", fallbackEndpoint);
+                report.AddSetting("Discovery.Healthy", bool.FalseString);
+                report.AddNote($"Vault endpoint unreachable: {fallbackEndpoint}");
                 report.AddSetting("Discovery.Error", ex.Message);
             }
         }

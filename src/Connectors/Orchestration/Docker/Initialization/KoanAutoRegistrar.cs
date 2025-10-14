@@ -29,21 +29,18 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         var availability = GetAvailability(provider);
 
         var selected = availability.Ok ? "docker" : "unavailable";
-        report.AddProviderElection(
-            "HostingEngine",
-            selected,
-            new[] { "docker", "podman", "unavailable" },
-            availability.Ok ? "Docker CLI reachable" : availability.Reason ?? "No CLI detected");
+        var candidates = string.Join(", ", new[] { "docker", "podman", "unavailable" });
+        report.AddSetting("Engine.Selection", selected);
+        report.AddSetting("Engine.Candidates", candidates);
+        report.AddSetting("Engine.SelectionReason", availability.Ok ? "Docker CLI reachable" : availability.Reason ?? "No CLI detected");
 
         report.AddSetting("Engine", engine.Name);
         report.AddSetting("EngineVersion", string.IsNullOrWhiteSpace(engine.Version) ? "unknown" : engine.Version);
         report.AddSetting("Context", string.IsNullOrWhiteSpace(engine.Endpoint) ? "default" : engine.Endpoint);
 
-        report.AddConnectionAttempt(
-            "HostingEngine.Docker",
-            "docker version",
-            availability.Ok,
-            availability.Reason);
+        var status = availability.Ok ? "reachable" : "unreachable";
+        var detail = availability.Reason ?? "no CLI detected";
+        report.AddNote($"Docker CLI {status}: {detail}");
     }
 
     private static (bool Ok, string? Reason) GetAvailability(DockerProvider provider)

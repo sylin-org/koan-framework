@@ -40,7 +40,9 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         var channel = Configuration.Read(cfg, CacheConstants.Configuration.Redis.ChannelName, "koan-cache");
         var prefix = Configuration.Read(cfg, CacheConstants.Configuration.Redis.KeyPrefix, "cache:");
 
-        report.AddProviderElection("CacheStore", "redis", new[] { "memory", "redis", "custom" }, "Reference = redis adapter package");
+    report.AddSetting("CacheStore.Selected", "redis");
+    report.AddSetting("CacheStore.Candidates", "memory, redis, custom");
+    report.AddSetting("CacheStore.Rationale", "Reference = redis adapter package");
         report.AddSetting("RedisConfiguration", configuration ?? "auto");
         report.AddSetting("ChannelName", channel ?? "koan-cache");
         report.AddSetting("KeyPrefix", prefix ?? "cache:");

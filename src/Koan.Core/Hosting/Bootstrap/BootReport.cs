@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using Koan.Core.Modules.Pillars;
 using Koan.Core.Provenance;
 
@@ -11,7 +10,6 @@ namespace Koan.Core.Hosting.Bootstrap;
 public sealed class BootReport
 {
     private readonly List<BootModuleBuilder> _modules = new();
-    private readonly List<DecisionLogEntry> _decisions = new();
     private readonly IProvenanceRegistry _registry;
     private readonly List<ProvenanceModuleWriter?> _writers = new();
     private ProvenanceModuleWriter? _currentWriter;
@@ -35,17 +33,6 @@ public sealed class BootReport
         var builder = new BootModuleBuilder(name, version) { Description = description };
         _modules.Add(builder);
         _writers.Add(_currentWriter);
-    }
-
-    public int ModuleCount => _modules.Count;
-
-    public void SetModuleDescription(int index, string? description)
-    {
-        if (index < 0 || index >= _modules.Count) return;
-        _modules[index].Description = description;
-
-        var writer = _writers[index];
-        writer?.Describe(description: description);
     }
 
     public void AddSetting(
@@ -134,137 +121,6 @@ public sealed class BootReport
                 m.Tools.Select(t => new BootModuleTool(t.Name, t.Route, t.Description, t.Capability)).ToList()))
             .ToList();
 
-    // NEW: Decision logging methods
-    public void AddDecision(string category, string decision, string reason, string[]? alternatives = null)
-    {
-        _decisions.Add(new DecisionLogEntry
-        {
-            Type = DecisionType.Decision,
-            Category = category,
-            Decision = decision,
-            Reason = reason,
-            Alternatives = alternatives ?? Array.Empty<string>()
-        });
-    }
-
-    public void AddConnectionAttempt(string provider, string connectionString, bool success, string? error = null)
-    {
-        _decisions.Add(new DecisionLogEntry
-        {
-            Type = DecisionType.ConnectionAttempt,
-            Category = provider,
-            Decision = success ? "success" : "failed",
-            Reason = error ?? (success ? "connection successful" : "connection failed"),
-            ConnectionString = connectionString
-        });
-    }
-
-    public void AddProviderElection(string category, string selected, string[] available, string reason)
-    {
-        _decisions.Add(new DecisionLogEntry
-        {
-            Type = DecisionType.ProviderElection,
-            Category = category,
-            Decision = selected,
-            Reason = reason,
-            Alternatives = available
-        });
-    }
-
-    public void AddDiscovery(string source, string value, bool success = true)
-    {
-        _decisions.Add(new DecisionLogEntry
-        {
-            Type = DecisionType.Discovery,
-            Category = source,
-            Decision = value,
-            Reason = success ? "discovered" : "not found"
-        });
-    }
-
-    public override string ToString()
-    {
-        return ToString(new BootReportOptions());
-    }
-
-    public string ToString(BootReportOptions options)
-    {
-        return FormatWithKoanStyle(options);
-    }
-
-    private string FormatWithKoanStyle(BootReportOptions options)
-    {
-        var sb = new StringBuilder();
-        var timestamp = DateTime.Now.ToString("HH:mm:ss");
-
-        // Framework header with version info
-    var coreModule = _modules.FirstOrDefault(m => m.Name.Contains("Core", StringComparison.OrdinalIgnoreCase));
-    var frameworkVersion = coreModule is not null ? (coreModule.Version ?? "unknown") : "unknown";
-
-        var headerText = $"Koan FRAMEWORK v{frameworkVersion}";
-        var lineLength = 80;
-        var padding = new string('─', Math.Max(0, lineLength - headerText.Length - 4));
-        sb.AppendLine($"┌─ {headerText} {padding}");
-        sb.AppendLine($"│ Core: {frameworkVersion}");
-
-        // Module hierarchy
-        foreach (var module in _modules.Where(m => !m.Name.Contains("Core", StringComparison.OrdinalIgnoreCase)).OrderBy(m => m.Name, StringComparer.OrdinalIgnoreCase))
-        {
-            sb.AppendLine($"│   ├─ {module.Name}: {module.Version ?? "unknown"}");
-        }
-
-        if (_modules.Any(m => !m.Name.Contains("Core", StringComparison.OrdinalIgnoreCase)))
-        {
-            var lastModule = _modules.Where(m => !m.Name.Contains("Core", StringComparison.OrdinalIgnoreCase)).OrderBy(m => m.Name, StringComparer.OrdinalIgnoreCase).LastOrDefault();
-            if (lastModule != default)
-            {
-                sb.AppendLine($"│   └─ {lastModule.Name}: {lastModule.Version ?? "unknown"}");
-            }
-        }
-
-        // Startup phase
-        if (options.ShowDecisions && _decisions.Any())
-        {
-            var startupText = "STARTUP";
-            var startupPadding = new string('─', Math.Max(0, lineLength - startupText.Length - 4));
-            sb.AppendLine($"├─ {startupText} {startupPadding}");
-
-            foreach (var decision in _decisions)
-            {
-                FormatDecisionKoanStyle(sb, decision, timestamp, options);
-            }
-        }
-
-        return sb.ToString();
-    }
-
-    private static void FormatDecisionKoanStyle(StringBuilder sb, DecisionLogEntry decision, string timestamp, BootReportOptions options)
-    {
-        switch (decision.Type)
-        {
-            case DecisionType.ConnectionAttempt:
-                if (!options.ShowConnectionAttempts) return;
-                var status = decision.Decision == "success" ? "OK" : "FAIL";
-                FormatLogLine(sb, "I", timestamp, "Koan:discover", $"{decision.Category}: {Koan.Core.Redaction.DeIdentify(decision.ConnectionString ?? "")} {status}");
-                break;
-
-            case DecisionType.ProviderElection:
-                FormatLogLine(sb, "I", timestamp, "Koan:modules", $"{decision.Category.ToLower()}→{decision.Decision}");
-                break;
-
-            case DecisionType.Discovery:
-                if (!options.ShowDiscovery) return;
-                FormatLogLine(sb, "I", timestamp, "Koan:discover", $"{decision.Category}: {decision.Decision}");
-                break;
-        }
-    }
-
-    private static void FormatLogLine(StringBuilder sb, string level, string timestamp, string context, string message)
-    {
-        var paddedContext = context.PadRight(15); // Consistent column width handled here
-        sb.AppendLine($"│ {level} {timestamp} {paddedContext} {message}");
-    }
-
     private static string ResolvePillarForModule(string moduleName)
     {
         if (KoanPillarCatalog.TryMatchByModuleName(moduleName, out var descriptor))
@@ -286,25 +142,6 @@ public sealed class BootReport
             _ => ProvenanceSettingSource.Unknown
         };
 
-}
-
-// Supporting types for decision logging
-public enum DecisionType
-{
-    Decision,
-    ConnectionAttempt,
-    ProviderElection,
-    Discovery
-}
-
-public class DecisionLogEntry
-{
-    public DecisionType Type { get; set; }
-    public string Category { get; set; } = string.Empty;
-    public string Decision { get; set; } = string.Empty;
-    public string Reason { get; set; } = string.Empty;
-    public string[] Alternatives { get; set; } = Array.Empty<string>();
-    public string? ConnectionString { get; set; }
 }
 
 public enum BootSettingSource
@@ -339,14 +176,6 @@ public sealed record BootModuleTool(
     string Route,
     string? Description,
     string? Capability);
-
-public class BootReportOptions
-{
-    public bool ShowDecisions { get; set; } = true;
-    public bool ShowConnectionAttempts { get; set; } = true;
-    public bool ShowDiscovery { get; set; } = true;
-    public bool CompactMode { get; set; } = false;
-}
 
 internal sealed class BootModuleBuilder
 {
