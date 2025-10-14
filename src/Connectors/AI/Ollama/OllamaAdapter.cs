@@ -29,6 +29,7 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
     IAsyncAdapterInitializer
 {
     private readonly HttpClient _http;
+    private readonly OllamaOptions _options;
     private readonly string _defaultModel;
     private readonly AdapterReadinessConfiguration _readiness;
     private readonly AdaptersReadinessOptions _readinessDefaults;
@@ -58,34 +59,37 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
         HttpClient http,
         ILogger<OllamaAdapter> logger,
         IConfiguration configuration,
-        AdaptersReadinessOptions? readinessDefaults = null)
+        AdaptersReadinessOptions? readinessDefaults = null,
+        OllamaOptions? resolvedOptions = null)
         : base(logger, configuration)
     {
         _http = http;
         _readinessDefaults = readinessDefaults ?? new AdaptersReadinessOptions();
+        _options = resolvedOptions ?? GetOptions<OllamaOptions>();
 
         Logger.LogDebug("Ollama adapter: Constructor called - HttpClient.BaseAddress={BaseAddress}",
             http.BaseAddress?.ToString() ?? "(null)");
 
-        var options = GetOptions<OllamaOptions>();
+        ApplyConfiguredBaseAddress();
+
         var serviceDefault = GetServiceDefaultModel();
-        _readiness = (AdapterReadinessConfiguration)(options.Readiness ?? new AdapterReadinessConfiguration());
+        _readiness = (AdapterReadinessConfiguration)(_options.Readiness ?? new AdapterReadinessConfiguration());
         if (_readiness.Timeout <= TimeSpan.Zero)
         {
             _readiness.Timeout = _readinessDefaults.DefaultTimeout;
         }
 
-        _defaultModel = options.DefaultModel ?? serviceDefault ?? "all-minilm";
+        _defaultModel = _options.DefaultModel ?? serviceDefault ?? "all-minilm";
         _modelManager = new OllamaModelManager(_http, Logger, AdapterId, Type);
 
         Logger.LogDebug("Ollama adapter: Configuration - BaseUrl={BaseUrl} DefaultModel={DefaultModel}",
-            options.BaseUrl ?? "(null)",
+            _options.BaseUrl ?? "(null)",
             _defaultModel);
 
         Logger.LogInformation(
             "Ollama adapter '{AdapterId}' model resolution: options.DefaultModel='{OptionsDefault}', serviceDefault='{ServiceDefault}', final='{Final}'",
             Id,
-            options.DefaultModel,
+            _options.DefaultModel,
             serviceDefault,
             _defaultModel);
 
@@ -371,25 +375,9 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
         Logger.LogDebug("[{AdapterId}] InitializeAdapter: Start - CurrentBaseAddress={CurrentBaseAddress}",
             AdapterId, _http.BaseAddress?.ToString() ?? "(null)");
 
-        var baseUrl = GetConnectionString();
-        Logger.LogDebug("[{AdapterId}] InitializeAdapter: GetConnectionString returned {ConnectionString}",
-            AdapterId, baseUrl ?? "(null)");
-
-        if (!string.IsNullOrEmpty(baseUrl) && _http.BaseAddress == null)
-        {
-            _http.BaseAddress = new Uri(baseUrl);
-            Logger.LogInformation("[{AdapterId}] InitializeAdapter: Set BaseAddress to {BaseUrl}", AdapterId, baseUrl);
-        }
-        else if (!string.IsNullOrEmpty(baseUrl))
-        {
-            Logger.LogDebug("[{AdapterId}] InitializeAdapter: BaseAddress already set to {Existing}, ignoring GetConnectionString result {New}",
-                AdapterId, _http.BaseAddress, baseUrl);
-        }
-        else
-        {
-            Logger.LogDebug("[{AdapterId}] InitializeAdapter: No connection string found, using existing BaseAddress {BaseAddress}",
-                AdapterId, _http.BaseAddress?.ToString() ?? "(null)");
-        }
+        ApplyConfiguredBaseAddress();
+        Logger.LogDebug("[{AdapterId}] InitializeAdapter: Effective BaseAddress={BaseAddress}",
+            AdapterId, _http.BaseAddress?.ToString() ?? "(null)");
 
         _ = EnsureInitializationStarted();
 
@@ -412,11 +400,7 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
         _orchestrationContext = orchestrationContext;
         Logger.LogInformation("[{AdapterId}] Initializing with orchestration context: {ServiceKind}", AdapterId, orchestrationContext.ServiceKind);
 
-        var baseUrl = GetConnectionString();
-        if (!string.IsNullOrEmpty(baseUrl))
-        {
-            _http.BaseAddress = new Uri(baseUrl);
-        }
+        ApplyConfiguredBaseAddress();
 
         if (orchestrationContext.HasCapability("container_managed"))
         {
@@ -538,6 +522,8 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
 
     private async Task InitializeReadinessAsync()
     {
+        ApplyConfiguredBaseAddress();
+
         Logger.LogDebug("[{AdapterId}] InitializeReadiness: Starting - BaseUrl={BaseUrl} Timeout={Timeout}",
             AdapterId, _http.BaseAddress?.ToString() ?? "(null)", ReadinessTimeout);
 
@@ -875,6 +861,55 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
     {
         public string? name { get; set; }
         public string? model { get; set; }
+    }
+
+    private void ApplyConfiguredBaseAddress()
+    {
+        var configured = ResolveConfiguredBaseUrl();
+        if (string.IsNullOrWhiteSpace(configured))
+        {
+            return;
+        }
+
+        if (!Uri.TryCreate(configured, UriKind.Absolute, out var resolved))
+        {
+            Logger.LogWarning("Ollama adapter: Ignoring invalid base URL '{BaseUrl}'", configured);
+            return;
+        }
+
+        var previous = _http.BaseAddress;
+        if (previous is null || !previous.Equals(resolved))
+        {
+            Logger.LogInformation(
+                "Ollama adapter: Applying resolved base URL {NewBase} (was {OldBase})",
+                resolved,
+                previous?.ToString() ?? "(null)");
+            _http.BaseAddress = resolved;
+        }
+    }
+
+    private string? ResolveConfiguredBaseUrl()
+    {
+        if (!string.IsNullOrWhiteSpace(_options.ConnectionString) &&
+            !string.Equals(_options.ConnectionString, "auto", StringComparison.OrdinalIgnoreCase))
+        {
+            return _options.ConnectionString;
+        }
+
+        if (!string.IsNullOrWhiteSpace(_options.BaseUrl) &&
+            !string.Equals(_options.BaseUrl, "auto", StringComparison.OrdinalIgnoreCase))
+        {
+            return _options.BaseUrl;
+        }
+
+        var legacy = GetConnectionString();
+        if (!string.IsNullOrWhiteSpace(legacy) &&
+            !string.Equals(legacy, "auto", StringComparison.OrdinalIgnoreCase))
+        {
+            return legacy;
+        }
+
+        return null;
     }
 }
 
