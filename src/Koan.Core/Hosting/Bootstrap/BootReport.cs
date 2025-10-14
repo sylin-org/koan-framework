@@ -11,8 +11,16 @@ public sealed class BootReport
     private readonly List<BootModuleBuilder> _modules = new();
     private readonly List<DecisionLogEntry> _decisions = new();
 
-    public void AddModule(string name, string? version = null)
-        => _modules.Add(new BootModuleBuilder(name, version));
+    public void AddModule(string name, string? version = null, string? description = null)
+        => _modules.Add(new BootModuleBuilder(name, version) { Description = description });
+
+    public int ModuleCount => _modules.Count;
+
+    public void SetModuleDescription(int index, string? description)
+    {
+        if (index < 0 || index >= _modules.Count) return;
+        _modules[index].Description = description;
+    }
 
     public void AddSetting(
         string key,
@@ -57,6 +65,8 @@ public sealed class BootReport
             .Select(m => new BootModule(
                 m.Name,
                 m.Version,
+                m.Description,
+                m.Settings.Count == 0 && m.Notes.Count == 0 && m.Tools.Count == 0,
                 m.Settings.Select(s => new BootModuleSetting(s.Key, s.Value, s.Secret, s.Source, s.SourceKey, s.Consumers)).ToList(),
                 m.Notes.AsReadOnly(),
                 m.Tools.Select(t => new BootModuleTool(t.Name, t.Route, t.Description, t.Capability)).ToList()))
@@ -227,6 +237,8 @@ public enum BootSettingSource
 public sealed record BootModule(
     string Name,
     string? Version,
+    string? Description,
+    bool IsStub,
     IReadOnlyList<BootModuleSetting> Settings,
     IReadOnlyList<string> Notes,
     IReadOnlyList<BootModuleTool> Tools);
@@ -263,6 +275,7 @@ internal sealed class BootModuleBuilder
 
     public string Name { get; }
     public string? Version { get; }
+    public string? Description { get; set; }
     public List<BootModuleSettingEntry> Settings { get; } = new();
     public List<string> Notes { get; } = new();
     public List<BootModuleToolEntry> Tools { get; } = new();

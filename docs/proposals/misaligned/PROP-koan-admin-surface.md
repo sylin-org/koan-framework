@@ -1,8 +1,8 @@
 ﻿# Proposal: Koan Admin Surfaces & LaunchKit Function
 
-**Status**: Misaligned
-**Reality Check**: No `Koan.Console.Admin` or `Koan.Web.Admin` projects exist in `src/`, and no runtime surfaces implement these behaviors yet.
-**Date**: 2025-10-11  
+**Status**: Active Implementation
+**Reality Check**: `Koan.Admin` core services and `Koan.Web.Admin` now ship in `src/`; LaunchKit, manifest, and provenance dashboards are live in g1c1 and other samples. Console takeover remains future work.
+**Date**: 2025-10-13  
 **Authors**: Framework Architecture Working Group  
 **Related**: ARCH-0043 (Lightweight Parity Roadmap), DATA-0061 (Pagination & Streaming), WEB-0035 (EntityController Transformers)
 
@@ -27,14 +27,14 @@
 
 ## Executive Summary
 
-Koan developers still lack a cohesive way to inspect runtime capabilities or produce LaunchKit bundles without stitching together logs, diagnostics, and scripts. The Koan repository does not yet contain any `Koan.Console.Admin` or `Koan.Web.Admin` implementation, and no sample wires an admin module. This proposal captures the **target design** so engineering can prioritize the missing work.
+Koan developers now have a first-party admin experience: `Koan.Admin` aggregates capability diagnostics and LaunchKit exports, while `Koan.Web.Admin` serves the dashboard and APIs under the configurable prefix (`Koan:Admin:PathPrefix`, default `.`). Samples such as `g1c1.GardenCoop` wire the modules today, delivering runtime manifests, provenance-rich settings, and bundle downloads.
 
-We intend to ship two surfaces:
+Two workstreams remain:
 
-- **Koan.Console.Admin** — a console takeover module that renders an interactive admin UI for capability inspection, adapter validation, and LaunchKit bundle preparation.
-- **Koan.Web.Admin** — a controller-first dashboard that visualizes capabilities, runs diagnostics, and provides bundle downloads under a configurable namespace (`/.koan/admin` by default).
+- **Koan.Console.Admin** — still unimplemented; this proposal keeps the console takeover design on the roadmap.
+- **Surface polish & guardrails** — we continue to refine provenance reporting, LaunchKit outputs, and operational affordances (policy gating, destructive action guards).
 
-Activation remains development-first, with explicit gating for staging and production. Until the modules land, the admin experience remains unavailable; this proposal tracks the deliverables required to move it forward.
+Activation stays development-first with explicit staging/production opt-in. This document now tracks shipped behaviors, gaps, and the decisions governing provenance, prefix routing, and future console parity.
 
 ---
 
@@ -71,14 +71,14 @@ Activation remains development-first, with explicit gating for staging and produ
 
 ## Proposed Architecture
 
-### Current State Audit
+### Current State Audit (2025-10-13)
 
-- No `Koan.Web.Admin` project exists under `src/` or `samples/`.
-- No console takeover package or registrar implements the behaviors described here.
-- Configuration sections such as `Koan:Admin` are not read by any shipping host.
-- Samples like `S7.ContentPlatform` or `S13.DocMind` do not reference admin modules.
+- `Koan.Admin`, `Koan.Web.Admin`, and LaunchKit services ship in `src/` and are wired into g1c1 and other greenfield samples.
+- BootReport provenance is emitted for every Koan.Admin setting; derivatives (routes, manifest endpoints) are produced from the normalized prefix.
+- `Koan.Console.Admin` remains unimplemented; console takeover and CLI integration are still roadmap items.
+- Generated LaunchKit bundles include AppSettings, Compose, Aspire, manifest, and OpenAPI guidance based on live configuration.
 
-The remainder of this section outlines the modules we still need to implement.
+The rest of this section documents shipped architecture and the remaining console deliverable.
 
 ### Module Composition (Target)
 
@@ -139,6 +139,13 @@ If the prefix is changed, the manifest and both admin UIs reflect the new paths 
 
 - Roughly equivalent information can be published at `/.well-known/koan`, pointing back to the manifest.
 - Sensitive details (connection strings, provider hostnames, set names) never appear in the manifest.
+
+### Boot Report & Provenance Decision (2025-10-13)
+
+- `Koan.Admin` is the single reader of `Koan:Admin:PathPrefix`; the normalized value is emitted once in **BootReport Settings** as `prefix` with provenance metadata.
+- Derived routes (`route.root`, `route.api`, `route.launchkit`, `route.manifest`, `route.health`, `route.logs`) are **not** separate configuration reads. They now surface under **BootReport Tools** so operators see navigable URLs without mistaking them for independent settings.
+- Koan.Web.Admin augments the BootReport by adding tool entries that reference the computed paths (mirroring the `/auth/...` tool exposure in Koan.Web.Auth).
+- Provenance tags remain for all Koan.Admin feature toggles (LaunchKit, logging, destructive ops), ensuring downstream modules can attribute configuration sources while maintaining separation of concerns between core options and UI presentation.
 
 ---
 
@@ -282,13 +289,14 @@ Module registrars will own onboarding logic once the packages ship. Until then, 
 
 ## Implementation Plan
 
-1. **Options & Routing** — Introduce `KoanAdminOptions` with validation, register prefix-aware route constants, extend module `IKoanAutoRegistrar` implementations, and add startup warnings for unsafe configurations.
-2. **Shared Services** — Build capability surveyor, LaunchKit generator, schema verifier, manifest publisher, and authorization helpers in a shared assembly.
-3. **Console Module** — Create the takeover UI atop shared services, including ANSI layout, log streaming, parity panels, and automation hooks.
-4. **Web Module** — Ship controller area and bundled client, reusing shared services for data retrieval; add prefix-aware routing tests and policy enforcement checks.
-5. **Documentation & ADR** — Publish reference docs, security checklist, and ADR `WEB-Admin-0001` once the initial implementation lands.
-6. **Samples** — Update at least one sample (e.g., `samples/S7.ContentPlatform`) to include admin modules in Development mode, showcasing LaunchKit bundle preparation.
-7. **Testing** — Add integration tests covering prefix overrides, discovery manifest content, adapter validation flows, and destructive-operation gating.
+1. **Options & Routing** — ✅ Landed. `KoanAdminOptions`, prefix normalization, and registrar warnings ship in `Koan.Admin` v0.2.
+2. **Shared Services** — ✅ Landed. LaunchKit, manifest, feature manager, and route provider implementations back both surfaces.
+3. **Console Module** — ⏳ Pending. Console takeover, CLI integration, and ANSI UI composition remain open.
+4. **Web Module** — ✅ Landed. Controller area, SPA assets, LaunchKit downloads, and policy enforcement are available in `Koan.Web.Admin`.
+5. **Boot Report & Provenance** — ✅ Landed. Settings emit canonical configuration sources; derived routes are exposed as Tool entries per the 2025-10-13 decision.
+6. **Documentation & ADR** — 🔄 Ongoing. Update WEB-0061 and supporting guides as features stabilize; add console-specific ADR once work commences.
+7. **Samples** — 🔄 Ongoing. g1c1 consumes Koan.Admin today; extend coverage across other samples as feature gaps close.
+8. **Testing** — 🔄 Ongoing. Maintain integration coverage for prefix overrides, policy gating, and LaunchKit bundle generation; add console parity tests when it ships.
 
 ---
 
@@ -306,11 +314,11 @@ Module registrars will own onboarding logic once the packages ship. Until then, 
 
 ## Next Steps
 
-1. Approve prefix policy and guardrails in ADR `WEB-Admin-0001`.
-2. Implement `KoanAdminOptions` with prefix validation and environment gating.
-3. Ship v0 of Koan.Console.Admin with status/check/generate panels and manifest publisher.
-4. Ship web dashboard MVP with overview, provider health, and LaunchKit downloads.
-5. Iterate on advanced features (fixtures, AI sandbox, job management) behind feature flags.
+1. Finalize ADR updates (WEB-0061 refresh, console-specific ADR) to codify prefix policy, provenance tooling, and surface responsibilities.
+2. Staff `Koan.Console.Admin` delivery: CLI opt-in, ANSI UI, parity dashboards, and LaunchKit integration.
+3. Continue LaunchKit hardening (manifest schema docs, bundle validation) and expand provenance coverage to other modules that feed Koan.Admin manifests.
+4. Extend samples and integration suites to cover staging/production opt-in scenarios, policy enforcement, and destructive-operation gating.
+5. Iterate on advanced tooling (fixtures, AI sandbox, job management) behind guarded feature flags once console parity lands.
 
 ---
 

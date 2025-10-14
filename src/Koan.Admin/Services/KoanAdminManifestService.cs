@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using Koan.Admin.Contracts;
 using Koan.Core;
 using Koan.Core.Hosting.Bootstrap;
@@ -55,6 +56,8 @@ internal sealed class KoanAdminManifestService : IKoanAdminManifestService
             .Select(m => new KoanAdminModuleManifest(
                 m.Name,
                 m.Version,
+                m.Description,
+                m.IsStub,
                 m.Settings
                     .Select(s => new KoanAdminModuleSetting(
                         s.Key,
@@ -125,7 +128,17 @@ internal sealed class KoanAdminManifestService : IKoanAdminManifestService
             {
                 if (Activator.CreateInstance(type) is IKoanAutoRegistrar registrar)
                 {
+                    var before = report.ModuleCount;
                     registrar.Describe(report, configuration, environment);
+                    var after = report.ModuleCount;
+                    if (after > before)
+                    {
+                        var description = ReadAssemblyDescription(type.Assembly);
+                        for (var i = before; i < after; i++)
+                        {
+                            report.SetModuleDescription(i, description);
+                        }
+                    }
                 }
             }
             catch (Exception ex)
@@ -162,6 +175,19 @@ internal sealed class KoanAdminManifestService : IKoanAdminManifestService
         }
 
         return registrars.ToArray();
+    }
+
+    private static string? ReadAssemblyDescription(Assembly assembly)
+    {
+        if (assembly is null) return null;
+        try
+        {
+            return assembly.GetCustomAttribute<AssemblyDescriptionAttribute>()?.Description;
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     private bool TryGetCached(out KoanAdminManifest manifest)

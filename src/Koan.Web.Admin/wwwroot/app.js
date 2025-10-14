@@ -62,6 +62,76 @@ function pluralize(label, count) {
   return `${count} ${label}s`;
 }
 
+function formatModuleMeta(version, settingCount, noteCount, toolCount) {
+  const parts = [];
+  parts.push(version ? `v${version}` : 'unversioned');
+  parts.push(pluralize('setting', settingCount));
+  parts.push(pluralize('note', noteCount));
+  if (toolCount) {
+    parts.push(pluralize('tool', toolCount));
+  }
+  return parts.join(' · ');
+}
+
+function applyModuleStyling(element, module, fallbackModuleClass) {
+  const moduleClass = module.moduleClass ?? fallbackModuleClass ?? 'module-general';
+  if (!element.classList.contains(moduleClass)) {
+    element.classList.add(moduleClass);
+  }
+  if (module.colorHex) {
+    element.style.setProperty('--module-color-hex', module.colorHex);
+  }
+  if (module.colorRgb) {
+    element.style.setProperty('--module-color-rgb', module.colorRgb);
+  }
+}
+
+function createModuleStatic(module, fallbackModuleClass) {
+  const container = document.createElement('div');
+  container.className = 'module-item module-static';
+  applyModuleStyling(container, module, fallbackModuleClass);
+
+  const header = document.createElement('div');
+  header.className = 'module-static-header';
+
+  const nameSpan = document.createElement('span');
+  nameSpan.className = 'module-name';
+  nameSpan.innerHTML = `<span class="module-icon">${module.icon ?? '🧩'}</span>${module.name ?? 'Unnamed module'}`;
+
+  const badge = document.createElement('span');
+  badge.className = 'module-badge';
+  badge.textContent = 'Stub module';
+
+  const settingCount = Array.isArray(module.settings) ? module.settings.length : module.settingCount ?? 0;
+  const noteCount = Array.isArray(module.notes) ? module.notes.length : module.noteCount ?? 0;
+  const toolCount = Array.isArray(module.tools) ? module.tools.length : module.toolCount ?? 0;
+  const metaSpan = document.createElement('span');
+  metaSpan.className = 'module-meta';
+  metaSpan.textContent = formatModuleMeta(module.version, settingCount, noteCount, toolCount);
+
+  header.appendChild(nameSpan);
+  header.appendChild(badge);
+  header.appendChild(metaSpan);
+  container.appendChild(header);
+
+  if (module.description) {
+    const desc = document.createElement('p');
+    desc.className = 'module-description';
+    desc.textContent = module.description;
+    container.appendChild(desc);
+  }
+
+  const empty = document.createElement('div');
+  empty.className = 'module-static-empty';
+  empty.innerHTML = `
+    <p class="muted">No settings, notes, or tools reported.</p>
+    <p class="muted secondary">Feature surface is available for future expansion.</p>
+  `;
+  container.appendChild(empty);
+
+  return container;
+}
+
 
 function renderEnvironment(environment) {
   const processStartRaw = environment?.processStart ?? environment?.ProcessStart;
@@ -211,27 +281,19 @@ function buildPillarGroups(modules, configurationSummary) {
 }
 
 function createModuleDetails(module, fallbackModuleClass) {
+  if (module.isStub) {
+    return createModuleStatic(module, fallbackModuleClass);
+  }
+
   const details = document.createElement('details');
   details.className = 'module-item';
-
-  const moduleClass = module.moduleClass ?? fallbackModuleClass ?? 'module-general';
-  if (!details.classList.contains(moduleClass)) {
-    details.classList.add(moduleClass);
-  }
-
-  if (module.colorHex) {
-    details.style.setProperty('--module-color-hex', module.colorHex);
-  }
-  if (module.colorRgb) {
-    details.style.setProperty('--module-color-rgb', module.colorRgb);
-  }
+  applyModuleStyling(details, module, fallbackModuleClass);
 
   const icon = module.icon ?? '🧩';
   const summary = document.createElement('summary');
-  const version = module.version ? `v${module.version}` : 'unversioned';
-  const noteCount = Array.isArray(module.notes) ? module.notes.length : module.noteCount ?? 0;
   const settingCount = Array.isArray(module.settings) ? module.settings.length : module.settingCount ?? 0;
-  const toolCount = Array.isArray(module.tools) ? module.tools.length : 0;
+  const noteCount = Array.isArray(module.notes) ? module.notes.length : module.noteCount ?? 0;
+  const toolCount = Array.isArray(module.tools) ? module.tools.length : module.toolCount ?? 0;
 
   const nameSpan = document.createElement('span');
   nameSpan.className = 'module-name';
@@ -239,11 +301,7 @@ function createModuleDetails(module, fallbackModuleClass) {
 
   const metaSpan = document.createElement('span');
   metaSpan.className = 'module-meta';
-  const metaParts = [version, pluralize('setting', settingCount), pluralize('note', noteCount)];
-  if (toolCount) {
-    metaParts.push(pluralize('tool', toolCount));
-  }
-  metaSpan.textContent = metaParts.join(' · ');
+  metaSpan.textContent = formatModuleMeta(module.version, settingCount, noteCount, toolCount);
 
   summary.appendChild(nameSpan);
   summary.appendChild(metaSpan);
@@ -328,6 +386,13 @@ function createModuleDetails(module, fallbackModuleClass) {
       ${toolsList}
     </div>
   `;
+
+  if (module.description) {
+    const descriptionNode = document.createElement('p');
+    descriptionNode.className = 'module-description';
+    descriptionNode.textContent = module.description;
+    inner.prepend(descriptionNode);
+  }
 
   details.appendChild(inner);
   return details;

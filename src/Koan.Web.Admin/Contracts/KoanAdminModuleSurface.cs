@@ -6,6 +6,8 @@ namespace Koan.Web.Admin.Contracts;
 public sealed record KoanAdminModuleSurface(
     string Name,
     string? Version,
+    string? Description,
+    bool IsStub,
     IReadOnlyList<KoanAdminModuleSurfaceSetting> Settings,
     IReadOnlyList<string> Notes,
     string Pillar,

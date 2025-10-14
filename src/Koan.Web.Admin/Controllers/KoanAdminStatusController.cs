@@ -69,6 +69,8 @@ public sealed class KoanAdminStatusController : ControllerBase
                 return new KoanAdminModuleSurface(
                     m.Name,
                     m.Version,
+                    m.Description,
+                    m.IsStub,
                     settings,
                     notes,
                     style.Pillar,

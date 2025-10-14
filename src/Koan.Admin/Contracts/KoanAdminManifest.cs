@@ -15,7 +15,7 @@ public sealed record KoanAdminManifest(
     public KoanAdminManifestSummary ToSummary()
     {
         var summaries = Modules
-            .Select(m => new KoanAdminModuleSummary(m.Name, m.Version, m.Settings.Count, m.Notes.Count))
+            .Select(m => new KoanAdminModuleSummary(m.Name, m.Version, m.Description, m.IsStub, m.Settings.Count, m.Notes.Count))
             .ToList();
         return new KoanAdminManifestSummary(GeneratedAtUtc, summaries, Health.Overall, Modules.Count);
     }
@@ -24,6 +24,8 @@ public sealed record KoanAdminManifest(
 public sealed record KoanAdminModuleManifest(
     string Name,
     string? Version,
+    string? Description,
+    bool IsStub,
     IReadOnlyList<KoanAdminModuleSetting> Settings,
     IReadOnlyList<string> Notes,
     IReadOnlyList<KoanAdminModuleTool> Tools
@@ -47,6 +49,8 @@ public sealed record KoanAdminManifestSummary(
 public sealed record KoanAdminModuleSummary(
     string Name,
     string? Version,
+    string? Description,
+    bool IsStub,
     int SettingCount,
     int NoteCount
 );

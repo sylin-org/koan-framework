@@ -126,47 +126,41 @@ public sealed class KoanAdminAutoRegistrar : IKoanAutoRegistrar
             consumers: new[] { "Koan.Admin.RouteProvider", "Koan.Web.Admin" },
             sourceKey: prefixOption.ResolvedKey);
 
-        report.AddSetting(
-            "route.root",
+        report.AddTool(
+            "Admin UI",
             routes.RootPath,
-            source: prefixOption.Source,
-            consumers: new[] { "Koan.Admin.RouteProvider", "Koan.Web.Admin" },
-            sourceKey: prefixOption.ResolvedKey);
+            "Koan admin dashboard entry point",
+            capability: "admin.web.ui");
 
-        report.AddSetting(
-            "route.api",
+        report.AddTool(
+            "Admin API",
             routes.ApiPath,
-            source: prefixOption.Source,
-            consumers: new[] { "Koan.Admin.RouteProvider", "Koan.Web.Admin" },
-            sourceKey: prefixOption.ResolvedKey);
+            "Koan admin API root",
+            capability: "admin.web.api");
 
-        report.AddSetting(
-            "route.launchkit",
+        report.AddTool(
+            "LaunchKit Export",
             routes.LaunchKitPath,
-            source: prefixOption.Source,
-            consumers: new[] { "Koan.Admin.LaunchKitService" },
-            sourceKey: prefixOption.ResolvedKey);
+            "Download LaunchKit bundles",
+            capability: "admin.launchkit");
 
-        report.AddSetting(
-            "route.manifest",
+        report.AddTool(
+            "Manifest",
             routes.ManifestPath,
-            source: prefixOption.Source,
-            consumers: new[] { "Koan.Admin.ManifestService" },
-            sourceKey: prefixOption.ResolvedKey);
+            "Koan admin manifest endpoint",
+            capability: "admin.manifest");
 
-        report.AddSetting(
-            "route.health",
+        report.AddTool(
+            "Admin Health",
             routes.HealthPath,
-            source: prefixOption.Source,
-            consumers: new[] { "Koan.Web.Admin" },
-            sourceKey: prefixOption.ResolvedKey);
+            "Admin health probe",
+            capability: "admin.health");
 
-        report.AddSetting(
-            "route.logs",
+        report.AddTool(
+            "Log Stream",
             routes.LogStreamPath,
-            source: prefixOption.Source,
-            consumers: new[] { "Koan.Admin.Logging" },
-            sourceKey: prefixOption.ResolvedKey);
+            "Admin log streaming endpoint",
+            capability: "admin.logs");
 
         report.AddSetting(
             "authorization.policy",
