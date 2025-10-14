@@ -130,6 +130,8 @@
        href: proposals/PROP-canon-overhaul-2.md
      - name: Canon Aggregation Contract & Policies
        href: proposals/PROP-canon-aggregation-contract.md
+     - name: Koan Admin Dashboard Refresh
+       href: proposals/PROP-koan-admin-dashboard.md
 - name: Templates
   href: templates/document-template.md
 - name: Archive

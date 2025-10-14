@@ -196,6 +196,8 @@
       href: WEB-0061-koan-admin-surface-refresh.md
     - name: WEB-0062 Koan Admin pillar visualization
       href: WEB-0062-koan-admin-pillar-visualization.md
+    - name: WEB-0063 Koan Admin Dashboard roadmap
+      href: WEB-0063-admin-dashboard-roadmap.md
 - name: Flow (FLOW)
   items:
     - name: FLOW-0070 Flow commands bus
