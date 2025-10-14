@@ -1,10 +1,10 @@
 ﻿# WEB-0061 Koan Admin surface refresh
 
-**Status**: Accepted 2025-10-13  \
-**Drivers**: Koan Admin UX, LaunchKit DX, manifest visibility  \
-**Deciders**: Koan Framework maintainers  \
-**Inputs**: Koan Admin status payloads, KoanAdminManifestService, LaunchKit metadata  \
-**Outputs**: Updated admin SPA, enriched status API, documentation  \
+**Status**: Accepted 2025-10-13 \
+**Drivers**: Koan Admin UX, LaunchKit DX, manifest visibility \
+**Deciders**: Koan Framework maintainers \
+**Inputs**: Koan Admin status payloads, KoanAdminManifestService, LaunchKit metadata \
+**Outputs**: Updated admin SPA, enriched status API, documentation \
 **Related**: WEB-0044, WEB-0051
 
 ## Context

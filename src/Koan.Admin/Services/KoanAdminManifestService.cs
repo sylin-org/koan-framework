@@ -1,14 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
 using Koan.Admin.Contracts;
 using Koan.Core;
-using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Observability.Health;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.FileProviders;
-using Microsoft.Extensions.Hosting;
+using Koan.Core.Provenance;
 using Microsoft.Extensions.Logging;
 
 namespace Koan.Admin.Services;
@@ -42,35 +38,11 @@ internal sealed class KoanAdminManifestService : IKoanAdminManifestService
             return Task.FromResult(cached);
         }
 
-        var configuration = _services.GetService(typeof(IConfiguration)) as IConfiguration;
-        var environment = _services.GetService(typeof(IHostEnvironment)) as IHostEnvironment
-            ?? new DefaultHostEnvironment();
+        var snapshot = KoanEnv.Provenance ?? ProvenanceRegistry.Instance.CurrentSnapshot;
 
-        var report = new BootReport();
-        if (configuration is not null)
-        {
-            Collect(report, configuration, environment, _logger);
-        }
-
-        var modules = report.GetModules()
-            .Select(m => new KoanAdminModuleManifest(
-                m.Name,
-                m.Version,
-                m.Description,
-                m.IsStub,
-                m.Settings
-                    .Select(s => new KoanAdminModuleSetting(
-                        s.Key,
-                        s.Value,
-                        s.Secret,
-                        ConvertSource(s.Source),
-                        s.SourceKey,
-                        s.Consumers.Count == 0 ? Array.Empty<string>() : s.Consumers.ToArray()))
-                    .ToList(),
-                m.Notes.ToList(),
-                m.Tools
-                    .Select(t => new KoanAdminModuleTool(t.Name, t.Route, t.Description, t.Capability))
-                    .ToList()))
+        var modules = snapshot.Pillars
+            .SelectMany(pillar => pillar.Modules.Select(module => MapModule(pillar.Label, module)))
+            .OrderBy(m => m.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
         var health = BuildHealth();
@@ -114,82 +86,6 @@ internal sealed class KoanAdminManifestService : IKoanAdminManifestService
         return new KoanAdminHealthDocument(snapshot.Overall, components, snapshot.ComputedAtUtc);
     }
 
-    private static readonly Lazy<Type[]> RegistrarTypes = new(DiscoverRegistrars);
-
-    private static void Collect(
-        BootReport report,
-        IConfiguration configuration,
-        IHostEnvironment environment,
-        ILogger logger)
-    {
-        foreach (var type in RegistrarTypes.Value)
-        {
-            try
-            {
-                if (Activator.CreateInstance(type) is IKoanAutoRegistrar registrar)
-                {
-                    var before = report.ModuleCount;
-                    registrar.Describe(report, configuration, environment);
-                    var after = report.ModuleCount;
-                    if (after > before)
-                    {
-                        var description = ReadAssemblyDescription(type.Assembly);
-                        for (var i = before; i < after; i++)
-                        {
-                            report.SetModuleDescription(i, description);
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                logger.LogWarning(ex, "Failed to collect manifest details from registrar {Registrar}", type.FullName);
-            }
-        }
-    }
-
-    private static Type[] DiscoverRegistrars()
-    {
-        var registrars = new List<Type>();
-        foreach (var asm in AssemblyCache.Instance.GetAllAssemblies())
-        {
-            Type[] types;
-            try
-            {
-                types = asm.GetTypes();
-            }
-            catch (Exception ex)
-            {
-                // Assembly load failures shouldn't break manifest generation
-                System.Diagnostics.Debug.WriteLine($"KoanAdminManifestService: failed to enumerate types for {asm.FullName}: {ex.Message}");
-                continue;
-            }
-
-            foreach (var type in types)
-            {
-                if (!type.IsAbstract && typeof(IKoanAutoRegistrar).IsAssignableFrom(type))
-                {
-                    registrars.Add(type);
-                }
-            }
-        }
-
-        return registrars.ToArray();
-    }
-
-    private static string? ReadAssemblyDescription(Assembly assembly)
-    {
-        if (assembly is null) return null;
-        try
-        {
-            return assembly.GetCustomAttribute<AssemblyDescriptionAttribute>()?.Description;
-        }
-        catch
-        {
-            return null;
-        }
-    }
-
     private bool TryGetCached(out KoanAdminManifest manifest)
     {
         lock (_cacheLock)
@@ -214,22 +110,58 @@ internal sealed class KoanAdminManifestService : IKoanAdminManifestService
         }
     }
 
-    private static KoanAdminSettingSource ConvertSource(BootSettingSource source)
+    private static KoanAdminModuleManifest MapModule(string pillarLabel, ProvenanceModule module)
+    {
+        var settings = module.Settings
+            .Select(setting => new KoanAdminModuleSetting(
+                setting.Key,
+                setting.Value ?? string.Empty,
+                setting.IsSecret,
+                ConvertSource(setting.Source),
+                setting.SourceKey ?? string.Empty,
+                setting.Consumers.Count == 0 ? Array.Empty<string>() : setting.Consumers.ToArray()))
+            .ToList();
+
+        var notes = module.Notes
+            .Select(n => n.Message)
+            .ToList();
+
+        if (!string.IsNullOrWhiteSpace(module.Status))
+        {
+            var statusLine = string.IsNullOrWhiteSpace(module.StatusDetail)
+                ? module.Status
+                : $"{module.Status}: {module.StatusDetail}";
+            notes.Insert(0, statusLine!);
+        }
+
+        var tools = module.Tools
+            .Select(t => new KoanAdminModuleTool(t.Name, t.Route, t.Description, t.Capability))
+            .ToList();
+
+        var description = string.IsNullOrWhiteSpace(module.Description)
+            ? pillarLabel
+            : module.Description;
+
+        var isStub = settings.Count == 0 && notes.Count == 0 && tools.Count == 0;
+
+        return new KoanAdminModuleManifest(
+            module.Name,
+            module.Version,
+            description,
+            isStub,
+            settings,
+            notes,
+            tools);
+    }
+
+    private static KoanAdminSettingSource ConvertSource(ProvenanceSettingSource source)
         => source switch
         {
-            BootSettingSource.Auto => KoanAdminSettingSource.Auto,
-            BootSettingSource.AppSettings => KoanAdminSettingSource.AppSettings,
-            BootSettingSource.Environment => KoanAdminSettingSource.Environment,
-            BootSettingSource.LaunchKit => KoanAdminSettingSource.LaunchKit,
-            BootSettingSource.Custom => KoanAdminSettingSource.Custom,
+            ProvenanceSettingSource.Auto => KoanAdminSettingSource.Auto,
+            ProvenanceSettingSource.AppSettings => KoanAdminSettingSource.AppSettings,
+            ProvenanceSettingSource.Environment => KoanAdminSettingSource.Environment,
+            ProvenanceSettingSource.LaunchKit => KoanAdminSettingSource.LaunchKit,
+            ProvenanceSettingSource.Custom => KoanAdminSettingSource.Custom,
             _ => KoanAdminSettingSource.Unknown
         };
-
-    private sealed class DefaultHostEnvironment : IHostEnvironment
-    {
-        public string ApplicationName { get; set; } = "KoanApp";
-        public IFileProvider ContentRootFileProvider { get; set; } = new Microsoft.Extensions.FileProviders.NullFileProvider();
-        public string ContentRootPath { get; set; } = AppContext.BaseDirectory;
-        public string EnvironmentName { get; set; } = Environments.Production;
-    }
 }

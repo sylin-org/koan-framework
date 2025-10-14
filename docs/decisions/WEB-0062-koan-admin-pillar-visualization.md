@@ -1,10 +1,10 @@
 ﻿# WEB-0062 Koan Admin pillar visualization
 
-**Status**: Accepted 2025-10-13  \
-**Drivers**: Configuration visibility, Koan Admin UX, Pillar diagnostics  \
-**Deciders**: Koan Framework maintainers  \
-**Inputs**: BootReport module data, Koan Admin UX proposal  \
-**Outputs**: Pillar catalog, enhanced status payload, configuration matrix card  \
+**Status**: Accepted 2025-10-13 \
+**Drivers**: Configuration visibility, Koan Admin UX, Pillar diagnostics \
+**Deciders**: Koan Framework maintainers \
+**Inputs**: BootReport module data, Koan Admin UX proposal \
+**Outputs**: Pillar catalog, enhanced status payload, configuration matrix card \
 **Related**: WEB-0061, ARCH-0044, DX-0038
 
 ## Context

@@ -7,6 +7,7 @@ sponsor: Web Pillar Core
 ---
 
 **Contract**
+
 - Inputs: ADMIN enterprise mock (template-2-enterprise-v2.html), manifest metadata (modules, pillars, settings, features), Koan Admin REST endpoints.
 - Outputs: Phase 1 dashboard implementation brief, configuration view concept, roadmap alignment with WEB-0062 and WEB-0063.
 - Error Modes: Missing provenance metadata, inconsistent pillar registration, legacy modules without tooling descriptors.
@@ -59,15 +60,18 @@ Koan Admin is evolving from a utilitarian diagnostic surface into a cohesive ope
 ### Backend Extensions
 
 1. **Setting Provenance**
+
    - Extend `KoanAdminModuleSetting` with `Source` (`Auto`, `AppSettings`, `Environment`, `LaunchKit`, `Custom`) and optional `Providers` (modules relying on the value).
    - Update module manifest builders to capture provenance from discovery services, configuration binders, and LaunchKit processors.
    - Propagate through `KoanAdminModuleSurfaceSetting` so the SPA can render source tags.
 
 2. **Module Tool Descriptors**
+
    - Allow modules to register optional tool metadata (display name, description, route, capability flag) during manifest generation.
    - Surface descriptors in the status payload for dashboard actions and in LaunchKit metadata for deep links.
 
 3. **Pillar Registry Hygiene**
+
    - Enforce namespace association within pillar manifests to ensure new modules inherit icon/color defaults, avoiding fallback collisions highlighted in WEB-0062.
 
 4. **Configuration Summary Enhancements**
@@ -76,14 +80,17 @@ Koan Admin is evolving from a utilitarian diagnostic surface into a cohesive ope
 ### Front-End Implementation
 
 1. **Routing Scaffold**
+
    - Introduce lightweight hash routing (`#dashboard`, `#configurations`, future `#monitor`) to map top tabs to views without a full SPA framework.
    - Lazy-load future Monitor scripts to keep Phase 1 payload minimal.
 
 2. **Design Tokens & Theme**
+
    - Extract CSS variables for colors, typography, spacing from the mock; co-locate in `styles.css` with fallbacks for module color injection.
    - Update `module-visuals.css` to consume the new token set while retaining pillar-specific overrides.
 
 3. **Dashboard Components**
+
    - Refactor `app.js` into modular renderers (`renderStatsBar`, `renderPillarAccordion`, `renderModuleRow`) matching the mock’s DOM structure.
    - Implement setting source chips with consistent iconography and tooltips explaining provenance.
    - Wire tool descriptors to contextual action buttons (e.g., “Open Backup UI”).
@@ -107,13 +114,13 @@ Koan Admin is evolving from a utilitarian diagnostic surface into a cohesive ope
 
 ## Phase Milestones
 
-| Milestone | Scope | Owner | Timeline |
-| --- | --- | --- | --- |
-| M1 – Contracted API | Setting provenance, tool descriptors, summary enhancements | Web Admin services | Week 1-2 |
-| M2 – Dashboard UX | Stats bar, pillar accordion, left nav, tabs (Dashboard + Config stub) | Web Admin SPA | Week 3-4 |
-| M3 – Configurations View | Provenance filters, LaunchKit consolidation, JSON visualization | Web Admin SPA | Week 5-6 |
-| M4 – Validation | Accessibility audit, docs update (WEB-0063 alignment), pilot in GardenCoop sample | Web Admin QA | Week 7 |
-| Phase 2 Prep | Monitor design spike, plug-in contract refinement | Web Admin working group | Week 8 |
+| Milestone                | Scope                                                                             | Owner                   | Timeline |
+| ------------------------ | --------------------------------------------------------------------------------- | ----------------------- | -------- |
+| M1 – Contracted API      | Setting provenance, tool descriptors, summary enhancements                        | Web Admin services      | Week 1-2 |
+| M2 – Dashboard UX        | Stats bar, pillar accordion, left nav, tabs (Dashboard + Config stub)             | Web Admin SPA           | Week 3-4 |
+| M3 – Configurations View | Provenance filters, LaunchKit consolidation, JSON visualization                   | Web Admin SPA           | Week 5-6 |
+| M4 – Validation          | Accessibility audit, docs update (WEB-0063 alignment), pilot in GardenCoop sample | Web Admin QA            | Week 7   |
+| Phase 2 Prep             | Monitor design spike, plug-in contract refinement                                 | Web Admin working group | Week 8   |
 
 ## Dependencies
 

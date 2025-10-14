@@ -7,9 +7,9 @@ status: current
 last_updated: 2025-10-14
 framework_version: v0.6.3
 validation:
-    date_last_tested: 2025-10-14
-    status: drafted
-    scope: docs/reference/data/adapter-diagnostics.md
+  date_last_tested: 2025-10-14
+  status: drafted
+  scope: docs/reference/data/adapter-diagnostics.md
 links:
   adr:
     - decisions/DATA-0061-data-access-pagination-and-streaming

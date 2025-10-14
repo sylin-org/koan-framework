@@ -51,11 +51,13 @@ Data adapters already self-register, advertise capabilities, and are elected usi
 ## Consequences
 
 Positive:
+
 - Consistent “drop-in adapter” experience across Data and Web pillars.
 - Samples and greenfield apps no longer need to hand-author `Koan__Web__Auth__TestProvider__*` env vars for Development.
 - Diagnostics improve: admin surfaces and logs explicitly state which provider was elected and why.
 
 Trade-offs / Risks:
+
 - Existing apps that relied on manual redirects should validate the new cookie event behavior.
 - Providers without interactive flows (SAML) remain unsupported for challenge redirects until downstream work implements their UI flow.
 
