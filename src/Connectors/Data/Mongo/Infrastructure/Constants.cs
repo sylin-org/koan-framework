@@ -28,6 +28,8 @@ public static class Constants
             public const string MaxPageSize = Section + ":MaxPageSize";
             public const string AltDefaultPageSize = AltSection + ":DefaultPageSize";
             public const string AltMaxPageSize = AltSection + ":MaxPageSize";
+
+            public const string EnsureCreatedSupported = Section + ":EnsureCreatedSupported";
         }
     }
 

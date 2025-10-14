@@ -4,6 +4,8 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Koan.Core;
+using Koan.Core.Adapters.Reporting;
+using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Logging;
 using Koan.Core.Modules;
 using Koan.Core.Orchestration.Abstractions;
@@ -51,19 +53,106 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         // Boot report shows discovery results from SqliteDiscoveryAdapter
         report.AddNote("SQLite discovery handled by autonomous SqliteDiscoveryAdapter");
 
-        // Configure default options for reporting
+        // Configure default options for reporting with provenance metadata
         var defaultOptions = new SqliteOptions();
-        var defaultPageSize = Koan.Core.Configuration.Read(cfg,
-            Infrastructure.Constants.Configuration.Keys.DefaultPageSize, defaultOptions.DefaultPageSize);
-        var maxPageSize = Koan.Core.Configuration.Read(cfg,
-            Infrastructure.Constants.Configuration.Keys.MaxPageSize, defaultOptions.MaxPageSize);
 
-        report.AddSetting("ConnectionString", "auto (resolved by discovery)", isSecret: false);
-        report.AddSetting("NamingStyle", defaultOptions.NamingStyle.ToString());
-        report.AddSetting("Separator", defaultOptions.Separator);
-        report.AddSetting(Infrastructure.Constants.Bootstrap.EnsureCreatedSupported, true.ToString());
-        report.AddSetting(Infrastructure.Constants.Bootstrap.DefaultPageSize, defaultPageSize.ToString());
-        report.AddSetting(Infrastructure.Constants.Bootstrap.MaxPageSize, maxPageSize.ToString());
+        var connection = Koan.Core.Configuration.ReadFirstWithSource(
+            cfg,
+            defaultOptions.ConnectionString,
+            Infrastructure.Constants.Configuration.Keys.ConnectionString,
+            Infrastructure.Constants.Configuration.Keys.AltConnectionString,
+            Infrastructure.Constants.Configuration.Keys.ConnectionStringsSqlite,
+            Infrastructure.Constants.Configuration.Keys.ConnectionStringsDefault);
+
+        var defaultPageSize = Koan.Core.Configuration.ReadFirstWithSource(
+            cfg,
+            defaultOptions.DefaultPageSize,
+            Infrastructure.Constants.Configuration.Keys.DefaultPageSize,
+            Infrastructure.Constants.Configuration.Keys.AltDefaultPageSize);
+
+        var maxPageSize = Koan.Core.Configuration.ReadFirstWithSource(
+            cfg,
+            defaultOptions.MaxPageSize,
+            Infrastructure.Constants.Configuration.Keys.MaxPageSize,
+            Infrastructure.Constants.Configuration.Keys.AltMaxPageSize);
+
+        var connectionValue = string.IsNullOrWhiteSpace(connection.Value)
+            ? "auto"
+            : connection.Value;
+        var connectionIsAuto = string.Equals(connectionValue, "auto", StringComparison.OrdinalIgnoreCase);
+
+        var bootOptions = AdapterBootReporting.ConfigureForBootReportWithConfigurator<SqliteOptions, SqliteOptionsConfigurator>(
+            cfg,
+            (configuration, readiness) => new SqliteOptionsConfigurator(configuration),
+            static () => new SqliteOptions());
+
+        var resolvedConnectionString = connectionIsAuto ? bootOptions.ConnectionString : connectionValue;
+        if (string.IsNullOrWhiteSpace(resolvedConnectionString))
+        {
+            resolvedConnectionString = connectionValue;
+        }
+
+        report.AddSetting(
+            "ConnectionString",
+            resolvedConnectionString ?? "auto",
+            isSecret: true,
+            source: connection.Source,
+            consumers: new[]
+            {
+                "Koan.Data.Connector.Sqlite.SqliteOptionsConfigurator",
+                "Koan.Data.Connector.Sqlite.SqliteAdapterFactory"
+            },
+            sourceKey: connection.ResolvedKey);
+
+        report.AddSetting(
+            "NamingStyle",
+            defaultOptions.NamingStyle.ToString(),
+            source: BootSettingSource.Auto,
+            consumers: new[]
+            {
+                "Koan.Data.Connector.Sqlite.SqliteAdapterFactory"
+            },
+            sourceKey: Infrastructure.Constants.Configuration.Keys.NamingStyle);
+
+        report.AddSetting(
+            "Separator",
+            defaultOptions.Separator,
+            source: BootSettingSource.Auto,
+            consumers: new[]
+            {
+                "Koan.Data.Connector.Sqlite.SqliteAdapterFactory"
+            },
+            sourceKey: Infrastructure.Constants.Configuration.Keys.Separator);
+
+        report.AddSetting(
+            Infrastructure.Constants.Bootstrap.EnsureCreatedSupported,
+            true.ToString(),
+            source: BootSettingSource.Auto,
+            consumers: new[]
+            {
+                "Koan.Data.Connector.Sqlite.SqliteAdapterFactory"
+            },
+            sourceKey: Infrastructure.Constants.Configuration.Keys.EnsureCreatedSupported);
+
+        report.AddSetting(
+            Infrastructure.Constants.Bootstrap.DefaultPageSize,
+            defaultPageSize.Value.ToString(),
+            source: defaultPageSize.Source,
+            consumers: new[]
+            {
+                "Koan.Data.Connector.Sqlite.SqliteAdapterFactory"
+            },
+            sourceKey: defaultPageSize.ResolvedKey);
+
+        report.AddSetting(
+            Infrastructure.Constants.Bootstrap.MaxPageSize,
+            maxPageSize.Value.ToString(),
+            source: maxPageSize.Source,
+            consumers: new[]
+            {
+                "Koan.Data.Connector.Sqlite.SqliteAdapterFactory"
+            },
+            sourceKey: maxPageSize.ResolvedKey);
     }
 
     private static class LogActions

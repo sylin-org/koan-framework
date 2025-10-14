@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Koan.Core;
+using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Modules;
 using Koan.Core.Orchestration.Abstractions;
 using Koan.Data.Abstractions;
@@ -40,21 +41,94 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         // Boot report shows discovery results from SqlServerDiscoveryAdapter
         report.AddNote("SQL Server discovery handled by autonomous SqlServerDiscoveryAdapter");
 
-        // Configure default options for reporting
+        // Configure default options for reporting with provenance metadata
         var defaultOptions = new SqlServerOptions();
 
-        report.AddSetting("ConnectionString", "auto (resolved by discovery)", isSecret: false);
-        report.AddSetting("NamingStyle", defaultOptions.NamingStyle.ToString());
-        report.AddSetting("Separator", defaultOptions.Separator);
-        report.AddSetting("EnsureCreatedSupported", true.ToString());
+        var connection = Configuration.ReadFirstWithSource(
+            cfg,
+            defaultOptions.ConnectionString,
+            Infrastructure.Constants.Configuration.Keys.ConnectionString,
+            Infrastructure.Constants.Configuration.Keys.AltConnectionString,
+            Infrastructure.Constants.Configuration.Keys.ConnectionStringsSqlServer,
+            Infrastructure.Constants.Configuration.Keys.ConnectionStringsDefault);
 
-        var defSize = Configuration.ReadFirst(cfg, defaultOptions.DefaultPageSize,
+        var defaultPageSize = Configuration.ReadFirstWithSource(
+            cfg,
+            defaultOptions.DefaultPageSize,
             Infrastructure.Constants.Configuration.Keys.DefaultPageSize,
             Infrastructure.Constants.Configuration.Keys.AltDefaultPageSize);
-        var maxSize = Configuration.ReadFirst(cfg, defaultOptions.MaxPageSize,
+
+        var maxPageSize = Configuration.ReadFirstWithSource(
+            cfg,
+            defaultOptions.MaxPageSize,
             Infrastructure.Constants.Configuration.Keys.MaxPageSize,
             Infrastructure.Constants.Configuration.Keys.AltMaxPageSize);
-        report.AddSetting("DefaultPageSize", defSize.ToString());
-        report.AddSetting("MaxPageSize", maxSize.ToString());
+
+        var connectionValue = string.IsNullOrWhiteSpace(connection.Value)
+            ? "auto"
+            : connection.Value;
+        var connectionIsAuto = string.Equals(connectionValue, "auto", StringComparison.OrdinalIgnoreCase);
+
+        report.AddSetting(
+            "ConnectionString",
+            connectionIsAuto ? "auto (resolved by discovery)" : connectionValue,
+            isSecret: !connectionIsAuto,
+            source: connection.Source,
+            consumers: new[]
+            {
+                "Koan.Data.Connector.SqlServer.SqlServerOptionsConfigurator",
+                "Koan.Data.Connector.SqlServer.SqlServerAdapterFactory"
+            },
+            sourceKey: connection.ResolvedKey);
+
+        report.AddSetting(
+            "NamingStyle",
+            defaultOptions.NamingStyle.ToString(),
+            source: BootSettingSource.Auto,
+            consumers: new[]
+            {
+                "Koan.Data.Connector.SqlServer.SqlServerAdapterFactory"
+            },
+            sourceKey: Infrastructure.Constants.Configuration.Keys.NamingStyle);
+
+        report.AddSetting(
+            "Separator",
+            defaultOptions.Separator,
+            source: BootSettingSource.Auto,
+            consumers: new[]
+            {
+                "Koan.Data.Connector.SqlServer.SqlServerAdapterFactory"
+            },
+            sourceKey: Infrastructure.Constants.Configuration.Keys.Separator);
+
+        report.AddSetting(
+            "EnsureCreatedSupported",
+            true.ToString(),
+            source: BootSettingSource.Auto,
+            consumers: new[]
+            {
+                "Koan.Data.Connector.SqlServer.SqlServerAdapterFactory"
+            },
+            sourceKey: Infrastructure.Constants.Configuration.Keys.EnsureCreatedSupported);
+
+        report.AddSetting(
+            "DefaultPageSize",
+            defaultPageSize.Value.ToString(),
+            source: defaultPageSize.Source,
+            consumers: new[]
+            {
+                "Koan.Data.Connector.SqlServer.SqlServerAdapterFactory"
+            },
+            sourceKey: defaultPageSize.ResolvedKey);
+
+        report.AddSetting(
+            "MaxPageSize",
+            maxPageSize.Value.ToString(),
+            source: maxPageSize.Source,
+            consumers: new[]
+            {
+                "Koan.Data.Connector.SqlServer.SqlServerAdapterFactory"
+            },
+            sourceKey: maxPageSize.ResolvedKey);
     }
 }

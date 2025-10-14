@@ -35,6 +35,33 @@ async function safeReadText(response) {
   }
 }
 
+function formatSettingSource(source) {
+  if (!source) {
+    return '';
+  }
+  const value = source.toString();
+  return value.replace(/([a-z])([A-Z])/g, '$1 $2');
+}
+
+function renderSettingConsumers(consumers) {
+  if (!Array.isArray(consumers) || consumers.length === 0) {
+    return '';
+  }
+
+  const chips = consumers
+    .map(consumer => `<span class="consumer-chip">${consumer}</span>`)
+    .join('');
+
+  return `<div class="setting-consumers">${chips}</div>`;
+}
+
+function pluralize(label, count) {
+  if (count === 1) {
+    return `${count} ${label}`;
+  }
+  return `${count} ${label}s`;
+}
+
 
 function renderEnvironment(environment) {
   const processStartRaw = environment?.processStart ?? environment?.ProcessStart;
@@ -132,6 +159,7 @@ function buildPillarGroups(modules, configurationSummary) {
     moduleList.sort(normalizeSort);
 
     const moduleClassFallback = moduleList[0]?.moduleClass ?? 'module-general';
+    const moduleToolCount = moduleList.reduce((total, item) => total + (Array.isArray(item.tools) ? item.tools.length : 0), 0);
 
     groups.push({
       pillar: pillarKey,
@@ -141,13 +169,14 @@ function buildPillarGroups(modules, configurationSummary) {
       colorHex: summary.colorHex ?? moduleList[0]?.colorHex ?? '#38bdf8',
       colorRgb: summary.colorRgb ?? moduleList[0]?.colorRgb ?? '56, 189, 248',
       modules: moduleList,
-  moduleCount: moduleList.length || (summary.moduleCount ?? 0),
+      moduleCount: moduleList.length || (summary.moduleCount ?? 0),
       settingCount: moduleList.length
         ? moduleList.reduce((total, item) => total + (item.settings?.length ?? 0), 0)
         : summary.settingCount ?? 0,
       noteCount: moduleList.length
         ? moduleList.reduce((total, item) => total + (item.notes?.length ?? 0), 0)
-        : summary.noteCount ?? 0
+        : summary.noteCount ?? 0,
+      toolCount: moduleList.length ? moduleToolCount : 0
     });
 
     modulesByPillar.delete(pillarKey);
@@ -155,6 +184,7 @@ function buildPillarGroups(modules, configurationSummary) {
 
   modulesByPillar.forEach((moduleList, pillarKey) => {
     moduleList.sort(normalizeSort);
+    const moduleToolCount = moduleList.reduce((total, item) => total + (Array.isArray(item.tools) ? item.tools.length : 0), 0);
     groups.push({
       pillar: pillarKey,
       pillarClass: moduleList[0]?.pillarClass ?? 'pillar-general',
@@ -165,7 +195,8 @@ function buildPillarGroups(modules, configurationSummary) {
       modules: moduleList,
       moduleCount: moduleList.length,
       settingCount: moduleList.reduce((total, item) => total + (item.settings?.length ?? 0), 0),
-      noteCount: moduleList.reduce((total, item) => total + (item.notes?.length ?? 0), 0)
+      noteCount: moduleList.reduce((total, item) => total + (item.notes?.length ?? 0), 0),
+      toolCount: moduleToolCount
     });
   });
 
@@ -200,6 +231,7 @@ function createModuleDetails(module, fallbackModuleClass) {
   const version = module.version ? `v${module.version}` : 'unversioned';
   const noteCount = Array.isArray(module.notes) ? module.notes.length : module.noteCount ?? 0;
   const settingCount = Array.isArray(module.settings) ? module.settings.length : module.settingCount ?? 0;
+  const toolCount = Array.isArray(module.tools) ? module.tools.length : 0;
 
   const nameSpan = document.createElement('span');
   nameSpan.className = 'module-name';
@@ -207,7 +239,11 @@ function createModuleDetails(module, fallbackModuleClass) {
 
   const metaSpan = document.createElement('span');
   metaSpan.className = 'module-meta';
-  metaSpan.textContent = `${version} · ${settingCount} settings · ${noteCount} notes`;
+  const metaParts = [version, pluralize('setting', settingCount), pluralize('note', noteCount)];
+  if (toolCount) {
+    metaParts.push(pluralize('tool', toolCount));
+  }
+  metaSpan.textContent = metaParts.join(' · ');
 
   summary.appendChild(nameSpan);
   summary.appendChild(metaSpan);
@@ -217,18 +253,66 @@ function createModuleDetails(module, fallbackModuleClass) {
   inner.className = 'module-body';
 
   const settingsList = Array.isArray(module.settings) && module.settings.length
-    ? module.settings.map(setting => `
+    ? module.settings.map(setting => {
+        const sourceValue = formatSettingSource(setting.source);
+        const sourceLabel = sourceValue && sourceValue.toLowerCase() !== 'unknown' ? sourceValue : '';
+        const sourceKey = typeof setting.sourceKey === 'string' ? setting.sourceKey : '';
+        const tags = [];
+        if (sourceLabel) {
+          tags.push(`<span class="tag tag-source">${sourceLabel}</span>`);
+        }
+        if (setting.secret) {
+          tags.push('<span class="tag tag-secret">secret</span>');
+        }
+        const sourceKeyMarkup = sourceKey ? `<code class="setting-source-key">${sourceKey}</code>` : '';
+        const consumers = renderSettingConsumers(setting.consumers);
+        const hasMeta = sourceKeyMarkup || tags.length || consumers;
+        const meta = hasMeta
+          ? `<div class="setting-meta">${sourceKeyMarkup}${tags.join('')}${consumers}</div>`
+          : '';
+
+        return `
         <div class="module-setting">
-          <span class="key">${setting.key}</span>
-          <span class="value ${setting.secret ? 'secret' : ''}">${setting.value ?? ''}</span>
-          ${setting.secret ? '<span class="tag">secret</span>' : ''}
+          <div class="setting-header">
+            <span class="key">${setting.key}</span>
+            <span class="value ${setting.secret ? 'secret' : ''}">${setting.value ?? ''}</span>
+          </div>
+          ${meta}
         </div>
-      `).join('')
+        `;
+      }).join('')
     : '<p class="muted">No settings captured.</p>';
 
   const notesList = Array.isArray(module.notes) && module.notes.length
     ? `<ul class="module-notes">${module.notes.map(note => `<li>${note}</li>`).join('')}</ul>`
     : '<p class="muted">No notes recorded.</p>';
+
+  const tools = Array.isArray(module.tools) ? module.tools : [];
+  const toolsList = tools.length
+    ? `<ul class="module-tools">${tools.map(tool => {
+        const capabilityTag = tool.capability ? `<span class="tag tag-capability">${tool.capability}</span>` : '';
+        const headerTags = capabilityTag ? `<span class="tool-tags">${capabilityTag}</span>` : '';
+        const normalizedRoute = typeof tool.route === 'string' && tool.route.length
+          ? (tool.route.startsWith('/') || /^https?:/i.test(tool.route) ? tool.route : `/${tool.route}`)
+          : '';
+        const routeMarkup = normalizedRoute
+          ? `<a class="tool-route" href="${normalizedRoute}" target="_blank" rel="noopener noreferrer">${normalizedRoute}</a>`
+          : '<span class="tool-route muted">Route unavailable</span>';
+        const descriptionMarkup = tool.description
+          ? `<p class="tool-description">${tool.description}</p>`
+          : '';
+        return `
+          <li class="module-tool">
+            <div class="module-tool-header">
+              <span class="tool-name">${tool.name ?? 'Unnamed tool'}</span>
+              ${headerTags}
+            </div>
+            <div class="module-tool-route">${routeMarkup}</div>
+            ${descriptionMarkup}
+          </li>
+        `;
+      }).join('')}</ul>`
+    : '<p class="muted">No admin tools registered.</p>';
 
   inner.innerHTML = `
     <div class="module-section">
@@ -238,6 +322,10 @@ function createModuleDetails(module, fallbackModuleClass) {
     <div class="module-section">
       <h3>Notes</h3>
       ${notesList}
+    </div>
+    <div class="module-section">
+      <h3>Tools</h3>
+      ${toolsList}
     </div>
   `;
 
@@ -279,7 +367,17 @@ function renderModules(modules, configurationSummary) {
 
     const counts = document.createElement('span');
     counts.className = 'pillar-counts';
-    counts.textContent = `${group.moduleCount} modules · ${group.settingCount} settings${group.noteCount ? ` · ${group.noteCount} notes` : ''}`;
+    const countParts = [
+      pluralize('module', group.moduleCount),
+      pluralize('setting', group.settingCount)
+    ];
+    if (group.toolCount) {
+      countParts.push(pluralize('tool', group.toolCount));
+    }
+    if (group.noteCount) {
+      countParts.push(pluralize('note', group.noteCount));
+    }
+    counts.textContent = countParts.join(' · ');
 
     summary.appendChild(name);
     summary.appendChild(counts);

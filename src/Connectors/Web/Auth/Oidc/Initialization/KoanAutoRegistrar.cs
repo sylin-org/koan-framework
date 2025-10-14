@@ -2,6 +2,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Koan.Core;
+using Koan.Core.Hosting.Bootstrap;
 
 namespace Koan.Web.Auth.Connector.Oidc.Initialization;
 
@@ -12,13 +13,22 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 
     public void Initialize(IServiceCollection services)
     {
-        // No defaults contributed; this module exists to keep handler logic separate when implemented later.
+        // Intentionally empty: OIDC defaults are declared by provider contributors in consuming packages.
     }
 
     public void Describe(Koan.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)
     {
         report.AddModule(ModuleName, ModuleVersion);
-        report.AddSetting("Provides", "Generic OIDC handler (no defaults)");
+        report.AddSetting(
+            "ProviderContribution",
+            "generic OIDC",
+            source: BootSettingSource.Auto,
+            consumers: new[] { "Koan.Web.Auth.ProviderRegistry" });
+        report.AddSetting(
+            "Defaults.Enabled",
+            "false (requires explicit provider entry)",
+            source: BootSettingSource.Auto,
+            consumers: new[] { "Koan.Web.Auth.ProviderRegistry" });
     }
 }
 

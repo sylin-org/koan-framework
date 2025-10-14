@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Koan.Core;
+using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Modules;
 using Koan.Data.Abstractions;
 using Koan.Data.Connector.Json.Infrastructure;
@@ -26,13 +27,57 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
     public void Describe(Koan.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)
     {
         report.AddModule(ModuleName, ModuleVersion);
-        // ADR-0040: use helper to read DirectoryPath from either primary or default source sections
-        var dir = Configuration.ReadFirst(cfg, new[]
-        {
+
+        var defaultOptions = new JsonDataOptions();
+
+        var directory = Configuration.ReadFirstWithSource(
+            cfg,
+            defaultOptions.DirectoryPath,
             $"{Constants.Configuration.Section_Data}:{Constants.Configuration.Keys.DirectoryPath}",
-            $"{Constants.Configuration.Section_Sources_Default}:{Constants.Configuration.Keys.DirectoryPath}"
-        });
-        report.AddSetting(Constants.Bootstrap.DirectoryPath, dir ?? string.Empty);
+            $"{Constants.Configuration.Section_Sources_Default}:{Constants.Configuration.Keys.DirectoryPath}");
+
+        var defaultPageSize = Configuration.ReadFirstWithSource(
+            cfg,
+            defaultOptions.DefaultPageSize,
+            $"{Constants.Configuration.Section_Data}:{Constants.Configuration.Keys.DefaultPageSize}",
+            $"{Constants.Configuration.Section_Sources_Default}:{Constants.Configuration.Keys.DefaultPageSize}");
+
+        var maxPageSize = Configuration.ReadFirstWithSource(
+            cfg,
+            defaultOptions.MaxPageSize,
+            $"{Constants.Configuration.Section_Data}:{Constants.Configuration.Keys.MaxPageSize}",
+            $"{Constants.Configuration.Section_Sources_Default}:{Constants.Configuration.Keys.MaxPageSize}");
+
+        report.AddSetting(
+            Constants.Bootstrap.DirectoryPath,
+            directory.Value,
+            source: directory.Source,
+            consumers: new[]
+            {
+                "Koan.Data.Connector.Json.JsonDataOptionsConfigurator",
+                "Koan.Data.Connector.Json.JsonAdapterFactory"
+            },
+            sourceKey: directory.ResolvedKey);
+
+        report.AddSetting(
+            Constants.Bootstrap.DefaultPageSize,
+            defaultPageSize.Value.ToString(),
+            source: defaultPageSize.Source,
+            consumers: new[]
+            {
+                "Koan.Data.Connector.Json.JsonAdapterFactory"
+            },
+            sourceKey: defaultPageSize.ResolvedKey);
+
+        report.AddSetting(
+            Constants.Bootstrap.MaxPageSize,
+            maxPageSize.Value.ToString(),
+            source: maxPageSize.Source,
+            consumers: new[]
+            {
+                "Koan.Data.Connector.Json.JsonAdapterFactory"
+            },
+            sourceKey: maxPageSize.ResolvedKey);
     }
 }
 

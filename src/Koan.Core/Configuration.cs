@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Configuration;
 using System.Globalization;
+using Koan.Core.Hosting.Bootstrap;
 
 namespace Koan.Core;
 
@@ -68,8 +69,64 @@ public static class Configuration
 
     // Read with explicit default
     public static T Read<T>(IConfiguration? cfg, string key, T defaultValue)
+        => ReadWithSource(cfg, key, defaultValue).Value;
+
+    public static ConfigurationValue<T> ReadFirstWithSource<T>(IConfiguration? cfg, T defaultValue, params string[] keys)
     {
-        // If cfg not provided, try ambient provider
+        if (keys is null || keys.Length == 0)
+        {
+            return new ConfigurationValue<T>(defaultValue, BootSettingSource.Auto, string.Empty, true);
+        }
+
+        var (_, normalizedFirstKey) = Normalize(cfg, keys[0]);
+        var fallback = new ConfigurationValue<T>(defaultValue, BootSettingSource.Auto, normalizedFirstKey, true);
+
+        foreach (var key in keys)
+        {
+            var current = ReadWithSource(cfg, key, defaultValue);
+            if (!current.UsedDefault)
+            {
+                return current;
+            }
+        }
+
+        return fallback;
+    }
+
+    public static ConfigurationValue<T> ReadWithSource<T>(IConfiguration? cfg, string key, T defaultValue)
+    {
+        var (configuration, normalizedKey) = Normalize(cfg, key);
+
+        foreach (var envKey in EnumerateEnvKeys(normalizedKey))
+        {
+            var envVal = Environment.GetEnvironmentVariable(envKey);
+            if (envVal is null) continue;
+
+            if (TryConvert(envVal, out T parsed))
+            {
+                return new ConfigurationValue<T>(parsed, BootSettingSource.Environment, envKey, false);
+            }
+        }
+
+        if (configuration is not null)
+        {
+            foreach (var cfgKey in EnumerateConfigKeys(normalizedKey))
+            {
+                var str = configuration[cfgKey];
+                if (str is null) continue;
+
+                if (TryConvert(str, out T parsed))
+                {
+                    return new ConfigurationValue<T>(parsed, BootSettingSource.AppSettings, cfgKey, false);
+                }
+            }
+        }
+
+        return new ConfigurationValue<T>(defaultValue, BootSettingSource.Auto, normalizedKey, true);
+    }
+
+    private static (IConfiguration? Configuration, string NormalizedKey) Normalize(IConfiguration? cfg, string key)
+    {
         if (cfg is null && Koan.Core.Hosting.App.AppHost.Current is not null)
         {
             try
@@ -77,41 +134,21 @@ public static class Configuration
                 var sp = Koan.Core.Hosting.App.AppHost.Current;
                 if (sp is not null)
                 {
-                    cfg = sp?.GetService(typeof(IConfiguration)) as IConfiguration;
+                    cfg = sp.GetService(typeof(IConfiguration)) as IConfiguration;
                 }
             }
-            catch { /* ignore */ }
+            catch
+            {
+                // swallow: ambient resolution best-effort only
+            }
         }
-        // Canonicalize key: if caller used single underscores, normalize to ':'
+
         if (key.IndexOf(':') < 0 && key.IndexOf('_') >= 0)
         {
             key = key.Replace('_', ':');
         }
-        // 1) Environment variables (probe multiple shapes for resilience)
-        foreach (var envKey in EnumerateEnvKeys(key))
-        {
-            var envVal = Environment.GetEnvironmentVariable(envKey);
-            if (!string.IsNullOrWhiteSpace(envVal) && TryConvert(envVal!, out T parsed))
-                return parsed;
-        }
 
-        // 2) IConfiguration (probe canonical and underscore shapes)
-        if (cfg is not null)
-        {
-            // IConfiguration can bind directly when T is simple; prefer strong GetValue
-            var val = cfg.GetValue<T?>(key);
-            if (val is not null) return val;
-
-            foreach (var cfgKey in EnumerateConfigKeys(key))
-            {
-                var str = cfg[cfgKey];
-                if (!string.IsNullOrWhiteSpace(str) && TryConvert(str!, out T parsed))
-                    return parsed;
-            }
-        }
-
-        // 3) default
-        return defaultValue;
+        return (cfg, key);
     }
 
     private static IEnumerable<string> EnumerateEnvKeys(string key)
@@ -203,3 +240,5 @@ public static class Configuration
         }
     }
 }
+
+public readonly record struct ConfigurationValue<T>(T Value, BootSettingSource Source, string ResolvedKey, bool UsedDefault);

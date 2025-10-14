@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json.Serialization;
 using Koan.Core.Observability.Health;
 
 namespace Koan.Admin.Contracts;
@@ -24,10 +25,17 @@ public sealed record KoanAdminModuleManifest(
     string Name,
     string? Version,
     IReadOnlyList<KoanAdminModuleSetting> Settings,
-    IReadOnlyList<string> Notes
+    IReadOnlyList<string> Notes,
+    IReadOnlyList<KoanAdminModuleTool> Tools
 );
 
-public sealed record KoanAdminModuleSetting(string Key, string Value, bool Secret);
+public sealed record KoanAdminModuleSetting(
+    string Key,
+    string Value,
+    bool Secret,
+    KoanAdminSettingSource Source,
+    string SourceKey,
+    IReadOnlyList<string> Consumers);
 
 public sealed record KoanAdminManifestSummary(
     DateTimeOffset GeneratedAtUtc,
@@ -42,3 +50,20 @@ public sealed record KoanAdminModuleSummary(
     int SettingCount,
     int NoteCount
 );
+
+[JsonConverter(typeof(JsonStringEnumConverter))]
+public enum KoanAdminSettingSource
+{
+    Unknown,
+    Auto,
+    AppSettings,
+    Environment,
+    LaunchKit,
+    Custom
+}
+
+public sealed record KoanAdminModuleTool(
+    string Name,
+    string Route,
+    string? Description,
+    string? Capability);

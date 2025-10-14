@@ -27,15 +27,34 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
     {
         report.AddModule(ModuleName, ModuleVersion);
 
-        var provider = Configuration.Read(cfg, CacheConstants.Configuration.ProviderKey, "memory");
-        var diagnosticsEnabled = Configuration.Read(cfg, "Cache:EnableDiagnosticsEndpoint", true);
-        var defaultRegion = Configuration.Read(cfg, "Cache:DefaultRegion", CacheConstants.Configuration.DefaultRegion);
-        var singleflightTimeout = Configuration.Read(cfg, "Cache:DefaultSingleflightTimeout", TimeSpan.FromSeconds(5));
+        var provider = Koan.Core.Configuration.ReadWithSource(cfg, CacheConstants.Configuration.ProviderKey, "memory");
+        var diagnosticsEnabled = Koan.Core.Configuration.ReadWithSource(cfg, "Cache:EnableDiagnosticsEndpoint", true);
+        var defaultRegion = Koan.Core.Configuration.ReadWithSource(cfg, "Cache:DefaultRegion", CacheConstants.Configuration.DefaultRegion);
+        var singleflightTimeout = Koan.Core.Configuration.ReadWithSource(cfg, "Cache:DefaultSingleflightTimeout", TimeSpan.FromSeconds(5));
 
-        report.AddSetting("Provider", provider);
-        report.AddSetting("DefaultRegion", defaultRegion);
-        report.AddSetting("DiagnosticsEnabled", diagnosticsEnabled.ToString());
-        report.AddSetting("DefaultSingleflightTimeout", singleflightTimeout.ToString());
+        report.AddSetting(
+            "Provider",
+            provider.Value ?? "memory",
+            source: provider.Source,
+            consumers: new[] { "Koan.Cache.ProviderSelector" });
+
+        report.AddSetting(
+            "DefaultRegion",
+            defaultRegion.Value ?? CacheConstants.Configuration.DefaultRegion,
+            source: defaultRegion.Source,
+            consumers: new[] { "Koan.Cache.RegionResolver" });
+
+        report.AddSetting(
+            "DiagnosticsEnabled",
+            diagnosticsEnabled.Value.ToString(),
+            source: diagnosticsEnabled.Source,
+            consumers: new[] { "Koan.Cache.DiagnosticsEndpoint" });
+
+        report.AddSetting(
+            "DefaultSingleflightTimeout",
+            singleflightTimeout.Value.ToString(),
+            source: singleflightTimeout.Source,
+            consumers: new[] { "Koan.Cache.Singleflight" });
 
         TryDescribePolicies(report);
     }
@@ -56,10 +75,19 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
                 return;
             }
 
-            report.AddSetting("PolicyAssemblies", value.PolicyAssemblies.Count == 0
-                ? "none"
-                : string.Join(",", value.PolicyAssemblies));
-            report.AddSetting("PublishInvalidationByDefault", value.PublishInvalidationByDefault.ToString());
+            report.AddSetting(
+                "PolicyAssemblies",
+                value.PolicyAssemblies.Count == 0
+                    ? "none"
+                    : string.Join(",", value.PolicyAssemblies),
+                source: Koan.Core.Hosting.Bootstrap.BootSettingSource.Custom,
+                consumers: new[] { "Koan.Cache.PolicyRegistry" });
+
+            report.AddSetting(
+                "PublishInvalidationByDefault",
+                value.PublishInvalidationByDefault.ToString(),
+                source: Koan.Core.Hosting.Bootstrap.BootSettingSource.Custom,
+                consumers: new[] { "Koan.Cache.Invalidations" });
         }
         catch
         {

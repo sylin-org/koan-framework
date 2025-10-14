@@ -21,7 +21,8 @@ public class ModuleStyleResolverSpec
             "Koan.Diagnostics.Telemetry",
             "1.0.0",
             Array.Empty<KoanAdminModuleSetting>(),
-            Array.Empty<string>());
+            Array.Empty<string>(),
+            Array.Empty<KoanAdminModuleTool>());
 
         var style = KoanAdminModuleStyleResolver.Resolve(module);
 
@@ -46,7 +47,8 @@ public class ModuleStyleResolverSpec
             "Koan.Overrides.Plugin",
             "1.0.0",
             Array.Empty<KoanAdminModuleSetting>(),
-            notes);
+            notes,
+            Array.Empty<KoanAdminModuleTool>());
 
         var style = KoanAdminModuleStyleResolver.Resolve(module);
 

@@ -118,27 +118,95 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         report.AddNote($"Available providers: {string.Join(", ", availableProviders)}");
         report.AddNote("MongoDB discovery handled by autonomous MongoDiscoveryAdapter");
 
-        // Configure default options for reporting
+        // Configure default options for reporting with provenance metadata
         var defaultOptions = new MongoOptions();
-        var databaseName = Configuration.ReadFirst(cfg, defaultOptions.Database,
+
+        var connection = Configuration.ReadFirstWithSource(
+            cfg,
+            defaultOptions.ConnectionString,
+            Infrastructure.Constants.Configuration.Keys.ConnectionString,
+            Infrastructure.Constants.Configuration.Keys.AltConnectionString,
+            Infrastructure.Constants.Configuration.Keys.ConnectionStringsMongo,
+            Infrastructure.Constants.Configuration.Keys.ConnectionStringsDefault);
+
+        var database = Configuration.ReadFirstWithSource(
+            cfg,
+            defaultOptions.Database,
             Infrastructure.Constants.Configuration.Keys.Database,
             Infrastructure.Constants.Configuration.Keys.AltDatabase);
 
-        report.AddSetting("Database", databaseName);
-        report.AddSetting("ConnectionString", "auto (resolved by discovery)", isSecret: false);
-
-        // Announce schema capability per acceptance criteria
-        report.AddSetting(Infrastructure.Constants.Bootstrap.EnsureCreatedSupported, true.ToString());
-
-        // Announce paging guardrails (decision 0044)
-        var defSize = Configuration.ReadFirst(cfg, defaultOptions.DefaultPageSize,
+        var defaultPageSize = Configuration.ReadFirstWithSource(
+            cfg,
+            defaultOptions.DefaultPageSize,
             Infrastructure.Constants.Configuration.Keys.DefaultPageSize,
             Infrastructure.Constants.Configuration.Keys.AltDefaultPageSize);
-        var maxSize = Configuration.ReadFirst(cfg, defaultOptions.MaxPageSize,
+
+        var maxPageSize = Configuration.ReadFirstWithSource(
+            cfg,
+            defaultOptions.MaxPageSize,
             Infrastructure.Constants.Configuration.Keys.MaxPageSize,
             Infrastructure.Constants.Configuration.Keys.AltMaxPageSize);
-        report.AddSetting(Infrastructure.Constants.Bootstrap.DefaultPageSize, defSize.ToString());
-        report.AddSetting(Infrastructure.Constants.Bootstrap.MaxPageSize, maxSize.ToString());
+
+        var connectionValue = string.IsNullOrWhiteSpace(connection.Value)
+            ? "auto"
+            : connection.Value;
+        var connectionIsAuto = string.Equals(connectionValue, "auto", StringComparison.OrdinalIgnoreCase);
+
+        report.AddSetting(
+            "ConnectionString",
+            connectionIsAuto ? "auto (resolved by discovery)" : connectionValue,
+            isSecret: !connectionIsAuto,
+            source: connection.Source,
+            consumers: new[]
+            {
+                "Koan.Data.Connector.Mongo.MongoOptionsConfigurator",
+                "Koan.Data.Connector.Mongo.MongoClientProvider",
+                "Koan.Data.Connector.Mongo.MongoAdapterFactory"
+            },
+            sourceKey: connection.ResolvedKey);
+
+        report.AddSetting(
+            "Database",
+            database.Value ?? defaultOptions.Database,
+            source: database.Source,
+            consumers: new[]
+            {
+                "Koan.Data.Connector.Mongo.MongoOptionsConfigurator",
+                "Koan.Data.Connector.Mongo.MongoClientProvider"
+            },
+            sourceKey: database.ResolvedKey);
+
+        // Announce schema capability per acceptance criteria
+        report.AddSetting(
+            Infrastructure.Constants.Bootstrap.EnsureCreatedSupported,
+            true.ToString(),
+            source: BootSettingSource.Auto,
+            consumers: new[]
+            {
+                "Koan.Data.Connector.Mongo.MongoAdapterFactory"
+            },
+            sourceKey: Infrastructure.Constants.Configuration.Keys.EnsureCreatedSupported);
+
+        // Announce paging guardrails (decision 0044)
+        report.AddSetting(
+            Infrastructure.Constants.Bootstrap.DefaultPageSize,
+            defaultPageSize.Value.ToString(),
+            source: defaultPageSize.Source,
+            consumers: new[]
+            {
+                "Koan.Data.Connector.Mongo.MongoAdapterFactory"
+            },
+            sourceKey: defaultPageSize.ResolvedKey);
+
+        report.AddSetting(
+            Infrastructure.Constants.Bootstrap.MaxPageSize,
+            maxPageSize.Value.ToString(),
+            source: maxPageSize.Source,
+            consumers: new[]
+            {
+                "Koan.Data.Connector.Mongo.MongoAdapterFactory"
+            },
+            sourceKey: maxPageSize.ResolvedKey);
     }
 
     private static string[] DiscoverAvailableDataProviders()

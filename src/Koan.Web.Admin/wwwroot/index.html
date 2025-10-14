@@ -32,6 +32,34 @@
       <h2>Modules</h2>
       <div class="content modules-content"></div>
     </section>
+    <section id="provenance" class="card">
+      <h2>Setting Provenance</h2>
+      <div class="content legend-content">
+        <p class="muted">Badges describe where values originate and which components consume them.</p>
+        <div class="legend-grid">
+          <div class="legend-item">
+            <span class="tag tag-source">App Settings</span>
+            <span>Value supplied via configuration files or structured providers.</span>
+          </div>
+          <div class="legend-item">
+            <span class="tag tag-source">Environment</span>
+            <span>Value sourced from environment variables or host process state.</span>
+          </div>
+          <div class="legend-item">
+            <span class="tag tag-source">Auto</span>
+            <span>Framework default applied when no explicit override was detected.</span>
+          </div>
+          <div class="legend-item">
+            <span class="consumer-chip">Koan.Web.Auth.ProviderRegistry</span>
+            <span>Consumer chips list downstream subsystems that rely on the setting.</span>
+          </div>
+          <div class="legend-item">
+            <span class="tag tag-capability">auth.discovery</span>
+            <span>Tool capability tags describe the permission required to invoke the surface.</span>
+          </div>
+        </div>
+      </div>
+    </section>
     <section id="capabilities" class="card">
       <h2>Capabilities</h2>
       <div class="content capabilities-content"></div>

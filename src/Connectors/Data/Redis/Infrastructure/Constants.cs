@@ -12,6 +12,7 @@ public static class Constants
             public const string Database = nameof(Database);
             public const string DefaultPageSize = nameof(DefaultPageSize);
             public const string MaxPageSize = nameof(MaxPageSize);
+            public const string EnsureCreatedSupported = nameof(EnsureCreatedSupported);
         }
     }
 

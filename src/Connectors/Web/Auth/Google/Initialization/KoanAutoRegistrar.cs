@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Koan.Core;
+using Koan.Core.Hosting.Bootstrap;
 using Koan.Web.Auth.Connector.Google.Providers;
 using Koan.Web.Auth.Providers;
 
@@ -21,7 +22,16 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
     public void Describe(Koan.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)
     {
         report.AddModule(ModuleName, ModuleVersion);
-        report.AddSetting("Provides", "google (OIDC)");
+        report.AddSetting(
+            "Provider",
+            "google (OIDC)",
+            source: BootSettingSource.Auto,
+            consumers: new[] { "Koan.Web.Auth.ProviderRegistry" });
+        report.AddSetting(
+            "Defaults.Enabled",
+            "true",
+            source: BootSettingSource.Auto,
+            consumers: new[] { "Koan.Web.Auth.ProviderRegistry" });
     }
 }
 

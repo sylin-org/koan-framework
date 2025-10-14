@@ -155,22 +155,51 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
     {
         report.AddModule(ModuleName, ModuleVersion);
 
-        var options = new ServiceAuthOptions();
-        cfg.GetSection(ServiceAuthOptions.SectionPath).Bind(options);
+        var modeValue = env.IsDevelopment() ? "Development" : "Production";
+        report.AddSetting(
+            "Mode",
+            modeValue,
+            source: Koan.Core.Hosting.Bootstrap.BootSettingSource.Environment,
+            consumers: new[] { "Koan.Web.Auth.Services.Hosting" });
 
-        report.AddSetting("Mode", env.IsDevelopment() ? "Development" : "Production");
-        report.AddSetting("Auto Discovery", options.EnableAutoDiscovery.ToString());
-        report.AddSetting("Token Caching", options.EnableTokenCaching.ToString());
+        var autoDiscovery = Koan.Core.Configuration.ReadWithSource(
+            cfg,
+            $"{ServiceAuthOptions.SectionPath}:{nameof(ServiceAuthOptions.EnableAutoDiscovery)}",
+            true);
+        var tokenCaching = Koan.Core.Configuration.ReadWithSource(
+            cfg,
+            $"{ServiceAuthOptions.SectionPath}:{nameof(ServiceAuthOptions.EnableTokenCaching)}",
+            true);
+
+        report.AddSetting(
+            "Auto Discovery",
+            autoDiscovery.Value.ToString(),
+            source: autoDiscovery.Source,
+            consumers: new[] { "Koan.Web.Auth.Services.Discovery" },
+            sourceKey: autoDiscovery.ResolvedKey);
+
+        report.AddSetting(
+            "Token Caching",
+            tokenCaching.Value.ToString(),
+            source: tokenCaching.Source,
+            consumers: new[] { "Koan.Web.Auth.Services.TokenCache" },
+            sourceKey: tokenCaching.ResolvedKey);
 
         var discoveredServices = DiscoverServices();
         if (discoveredServices.Length > 0)
         {
-            report.AddSetting("Services Discovered", discoveredServices.Length.ToString());
+            report.AddSetting(
+                "Services Discovered",
+                discoveredServices.Length.ToString(),
+                source: Koan.Core.Hosting.Bootstrap.BootSettingSource.Auto,
+                consumers: new[] { "Koan.Web.Auth.Services.Directory" });
             foreach (var service in discoveredServices)
             {
-                report.AddSetting($"  └─ {service.ServiceId}",
-                    $"Scopes: {string.Join(", ", service.ProvidedScopes)} | " +
-                    $"Dependencies: {service.Dependencies.Length}");
+                report.AddSetting(
+                    $"  └─ {service.ServiceId}",
+                    $"Scopes: {string.Join(", ", service.ProvidedScopes)} | Dependencies: {service.Dependencies.Length}",
+                    source: Koan.Core.Hosting.Bootstrap.BootSettingSource.Auto,
+                    consumers: new[] { $"Koan.Web.Auth.Services.{service.ServiceId}" });
             }
         }
     }

@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Koan.Core;
+using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Modules;
 using Koan.Core.Orchestration;
 using Koan.Core.Orchestration.Abstractions;
@@ -48,16 +49,116 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         // Boot report shows discovery results from WeaviateDiscoveryAdapter
         report.AddNote("Weaviate discovery handled by autonomous WeaviateDiscoveryAdapter");
 
-        // Configure default options for reporting
+        // Configure default options for reporting with provenance metadata
         var defaultOptions = new WeaviateOptions();
 
-        report.AddSetting("ConnectionString", "auto (resolved by discovery)", isSecret: false);
-        report.AddSetting("Endpoint", "auto (resolved by discovery)", isSecret: false);
-        report.AddSetting("DefaultTopK", defaultOptions.DefaultTopK.ToString());
-        report.AddSetting("MaxTopK", defaultOptions.MaxTopK.ToString());
-        report.AddSetting("Dimension", defaultOptions.Dimension.ToString());
-        report.AddSetting("Metric", defaultOptions.Metric);
-        report.AddSetting("TimeoutSeconds", defaultOptions.DefaultTimeoutSeconds.ToString());
+        var connection = Configuration.ReadFirstWithSource(
+            cfg,
+            defaultOptions.ConnectionString,
+            Infrastructure.Constants.Configuration.Keys.ConnectionString,
+            Infrastructure.Constants.Configuration.Keys.AltConnectionString,
+            "ConnectionStrings:Weaviate");
+
+        var endpoint = Configuration.ReadWithSource(
+            cfg,
+            Infrastructure.Constants.Configuration.Keys.Endpoint,
+            defaultOptions.Endpoint);
+
+        var defaultTopK = Configuration.ReadWithSource(
+            cfg,
+            Infrastructure.Constants.Configuration.Keys.DefaultTopK,
+            defaultOptions.DefaultTopK);
+
+        var maxTopK = Configuration.ReadWithSource(
+            cfg,
+            Infrastructure.Constants.Configuration.Keys.MaxTopK,
+            defaultOptions.MaxTopK);
+
+        var dimension = Configuration.ReadWithSource(
+            cfg,
+            Infrastructure.Constants.Configuration.Keys.Dimension,
+            defaultOptions.Dimension);
+
+        var metric = Configuration.ReadWithSource(
+            cfg,
+            Infrastructure.Constants.Configuration.Keys.Metric,
+            defaultOptions.Metric);
+
+        var timeoutSeconds = Configuration.ReadWithSource(
+            cfg,
+            Infrastructure.Constants.Configuration.Keys.TimeoutSeconds,
+            defaultOptions.DefaultTimeoutSeconds);
+
+        var connectionValue = string.IsNullOrWhiteSpace(connection.Value)
+            ? "auto"
+            : connection.Value;
+        var connectionIsAuto = string.Equals(connectionValue, "auto", StringComparison.OrdinalIgnoreCase);
+
+        report.AddSetting(
+            "ConnectionString",
+            connectionIsAuto ? "auto (resolved by discovery)" : connectionValue,
+            isSecret: !connectionIsAuto,
+            source: connection.Source,
+            consumers: new[]
+            {
+                "Koan.Data.Vector.Connector.Weaviate.WeaviateOptionsConfigurator",
+                "Koan.Data.Vector.Connector.Weaviate.WeaviateVectorAdapterFactory"
+            });
+
+        report.AddSetting(
+            "Endpoint",
+            endpoint.Value,
+            source: endpoint.Source,
+            consumers: new[]
+            {
+                "Koan.Data.Vector.Connector.Weaviate.WeaviateOptionsConfigurator",
+                "Koan.Data.Vector.Connector.Weaviate.WeaviateVectorAdapterFactory"
+            });
+
+        report.AddSetting(
+            "DefaultTopK",
+            defaultTopK.Value.ToString(),
+            source: defaultTopK.Source,
+            consumers: new[]
+            {
+                "Koan.Data.Vector.Connector.Weaviate.WeaviateVectorAdapterFactory"
+            });
+
+        report.AddSetting(
+            "MaxTopK",
+            maxTopK.Value.ToString(),
+            source: maxTopK.Source,
+            consumers: new[]
+            {
+                "Koan.Data.Vector.Connector.Weaviate.WeaviateVectorAdapterFactory"
+            });
+
+        report.AddSetting(
+            "Dimension",
+            dimension.Value.ToString(),
+            source: dimension.Source,
+            consumers: new[]
+            {
+                "Koan.Data.Vector.Connector.Weaviate.WeaviateVectorAdapterFactory"
+            });
+
+        report.AddSetting(
+            "Metric",
+            metric.Value,
+            source: metric.Source,
+            consumers: new[]
+            {
+                "Koan.Data.Vector.Connector.Weaviate.WeaviateVectorAdapterFactory"
+            });
+
+        report.AddSetting(
+            "TimeoutSeconds",
+            timeoutSeconds.Value.ToString(),
+            source: timeoutSeconds.Source,
+            consumers: new[]
+            {
+                "Koan.Data.Vector.Connector.Weaviate.WeaviateVectorAdapterFactory"
+            });
     }
 
 }

@@ -27,13 +27,58 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
     public void Describe(Koan.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)
     {
         report.AddModule(ModuleName, ModuleVersion);
-        var secure = cfg.Read($"{Infrastructure.ConfigurationConstants.Web.Section}:{Infrastructure.ConfigurationConstants.Web.Keys.EnableSecureHeaders}", true);
-        var proxied = cfg.Read($"{Infrastructure.ConfigurationConstants.Web.Section}:{Infrastructure.ConfigurationConstants.Web.Keys.IsProxiedApi}", false);
-        var csp = cfg.Read<string?>($"{Infrastructure.ConfigurationConstants.Web.Section}:{Infrastructure.ConfigurationConstants.Web.Keys.ContentSecurityPolicy}");
-        var autoMap = cfg.Read($"{Infrastructure.ConfigurationConstants.Web.Section}:{Infrastructure.ConfigurationConstants.Web.Keys.AutoMapControllers}", true);
-        report.AddSetting("EnableSecureHeaders", secure.ToString());
-        report.AddSetting("IsProxiedApi", proxied.ToString());
-        report.AddSetting("AutoMapControllers", autoMap.ToString());
-        if (!string.IsNullOrWhiteSpace(csp)) report.AddSetting("ContentSecurityPolicy", $"len={csp.Length}");
+        var secure = Koan.Core.Configuration.ReadWithSource(
+            cfg,
+            $"{Infrastructure.ConfigurationConstants.Web.Section}:{Infrastructure.ConfigurationConstants.Web.Keys.EnableSecureHeaders}",
+            true);
+        var proxied = Koan.Core.Configuration.ReadWithSource(
+            cfg,
+            $"{Infrastructure.ConfigurationConstants.Web.Section}:{Infrastructure.ConfigurationConstants.Web.Keys.IsProxiedApi}",
+            false);
+        var csp = Koan.Core.Configuration.ReadWithSource(
+            cfg,
+            $"{Infrastructure.ConfigurationConstants.Web.Section}:{Infrastructure.ConfigurationConstants.Web.Keys.ContentSecurityPolicy}",
+            default(string?));
+        var autoMap = Koan.Core.Configuration.ReadWithSource(
+            cfg,
+            $"{Infrastructure.ConfigurationConstants.Web.Section}:{Infrastructure.ConfigurationConstants.Web.Keys.AutoMapControllers}",
+            true);
+
+        report.AddSetting(
+            "EnableSecureHeaders",
+            secure.Value.ToString(),
+            source: secure.Source,
+            consumers: new[] { "Koan.Web.SecurityHeaders" },
+            sourceKey: secure.ResolvedKey);
+
+        report.AddSetting(
+            "IsProxiedApi",
+            proxied.Value.ToString(),
+            source: proxied.Source,
+            consumers: new[] { "Koan.Web.HttpPipeline" },
+            sourceKey: proxied.ResolvedKey);
+
+        report.AddSetting(
+            "AutoMapControllers",
+            autoMap.Value.ToString(),
+            source: autoMap.Source,
+            consumers: new[] { "Koan.Web.ControllerDiscovery" },
+            sourceKey: autoMap.ResolvedKey);
+
+        if (!string.IsNullOrWhiteSpace(csp.Value))
+        {
+            report.AddSetting(
+                "ContentSecurityPolicy",
+                $"len={csp.Value!.Length}",
+                source: csp.Source,
+                consumers: new[] { "Koan.Web.SecurityHeaders" },
+                sourceKey: csp.ResolvedKey);
+        }
+
+        report.AddTool(
+            "Health Probes",
+            $"/{Infrastructure.KoanWebConstants.Routes.HealthBase}",
+            "Readiness and liveness endpoints exposed by Koan.Web",
+            capability: "observability.health");
     }
 }

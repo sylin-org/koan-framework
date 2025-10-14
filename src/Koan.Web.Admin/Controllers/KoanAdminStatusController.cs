@@ -54,9 +54,18 @@ public sealed class KoanAdminStatusController : ControllerBase
                     : KoanAdminModuleStyleResolver.Resolve(m);
 
                 var settings = m.Settings
-                    .Select(s => new KoanAdminModuleSurfaceSetting(s.Key, s.Secret ? SecretMask : s.Value, s.Secret))
+                    .Select(s => new KoanAdminModuleSurfaceSetting(
+                        s.Key,
+                        s.Secret ? SecretMask : s.Value,
+                        s.Secret,
+                        s.Source,
+                        s.SourceKey,
+                        s.Consumers.Count == 0 ? Array.Empty<string>() : s.Consumers.ToArray()))
                     .ToList();
                 var notes = m.Notes.ToList();
+                var tools = m.Tools
+                    .Select(t => new KoanAdminModuleSurfaceTool(t.Name, t.Route, t.Description, t.Capability))
+                    .ToList();
                 return new KoanAdminModuleSurface(
                     m.Name,
                     m.Version,
@@ -67,7 +76,8 @@ public sealed class KoanAdminStatusController : ControllerBase
                     style.ModuleClass,
                     style.Icon,
                     style.ColorHex,
-                    style.ColorRgb);
+                    style.ColorRgb,
+                    tools);
             })
             .ToList();
 

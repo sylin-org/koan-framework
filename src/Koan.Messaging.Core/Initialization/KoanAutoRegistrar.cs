@@ -24,7 +24,15 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
     public void Describe(Koan.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)
     {
         report.AddModule(ModuleName, ModuleVersion);
-        report.AddSetting("MessagingCore.Enabled", "true");
-        report.AddSetting("InMemoryProvider.Available", "true");
+        report.AddSetting(
+            "MessagingCore.Enabled",
+            "true",
+            source: Koan.Core.Hosting.Bootstrap.BootSettingSource.Auto,
+            consumers: new[] { "Koan.Messaging.Core.Runtime" });
+        report.AddSetting(
+            "InMemoryProvider.Available",
+            "true",
+            source: Koan.Core.Hosting.Bootstrap.BootSettingSource.Auto,
+            consumers: new[] { "Koan.Messaging.Core.InMemory" });
     }
 }

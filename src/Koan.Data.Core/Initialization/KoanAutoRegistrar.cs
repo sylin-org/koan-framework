@@ -21,7 +21,16 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
     public void Describe(Koan.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)
     {
         report.AddModule(ModuleName, ModuleVersion);
-        var ensure = cfg.Read(Infrastructure.Constants.Configuration.Runtime.EnsureSchemaOnStart, true);
-        report.AddSetting("EnsureSchemaOnStart", ensure.ToString());
+        var ensureSetting = Koan.Core.Configuration.ReadWithSource(
+            cfg,
+            Infrastructure.Constants.Configuration.Runtime.EnsureSchemaOnStart,
+            true);
+
+        report.AddSetting(
+            "EnsureSchemaOnStart",
+            ensureSetting.Value.ToString(),
+            source: ensureSetting.Source,
+            consumers: new[] { "Koan.Data.Core.SchemaLifecycle" },
+            sourceKey: ensureSetting.ResolvedKey);
     }
 }

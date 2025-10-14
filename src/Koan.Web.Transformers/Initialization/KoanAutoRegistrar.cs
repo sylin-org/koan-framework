@@ -20,7 +20,14 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
     public void Describe(Koan.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)
     {
         report.AddModule(ModuleName, ModuleVersion);
-        var enabled = cfg.Read(Infrastructure.Constants.Configuration.Transformers.AutoDiscover, true);
-        report.AddSetting("AutoDiscover", enabled.ToString());
+        var enabled = Koan.Core.Configuration.ReadWithSource(
+            cfg,
+            Infrastructure.Constants.Configuration.Transformers.AutoDiscover,
+            true);
+        report.AddSetting(
+            "AutoDiscover",
+            enabled.Value.ToString(),
+            source: enabled.Source,
+            consumers: new[] { "Koan.Web.Transformers.Registry" });
     }
 }

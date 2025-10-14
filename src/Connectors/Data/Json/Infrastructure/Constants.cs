@@ -21,6 +21,8 @@ public static class Constants
     public static class Bootstrap
     {
         public const string DirectoryPath = "data.json.directory";
+        public const string DefaultPageSize = "data.json.defaultPageSize";
+        public const string MaxPageSize = "data.json.maxPageSize";
     }
 }
 

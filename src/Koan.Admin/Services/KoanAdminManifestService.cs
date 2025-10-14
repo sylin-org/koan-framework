@@ -55,8 +55,19 @@ internal sealed class KoanAdminManifestService : IKoanAdminManifestService
             .Select(m => new KoanAdminModuleManifest(
                 m.Name,
                 m.Version,
-                m.Settings.Select(s => new KoanAdminModuleSetting(s.Key, s.Value, s.Secret)).ToList(),
-                m.Notes.ToList()))
+                m.Settings
+                    .Select(s => new KoanAdminModuleSetting(
+                        s.Key,
+                        s.Value,
+                        s.Secret,
+                        ConvertSource(s.Source),
+                        s.SourceKey,
+                        s.Consumers.Count == 0 ? Array.Empty<string>() : s.Consumers.ToArray()))
+                    .ToList(),
+                m.Notes.ToList(),
+                m.Tools
+                    .Select(t => new KoanAdminModuleTool(t.Name, t.Route, t.Description, t.Capability))
+                    .ToList()))
             .ToList();
 
         var health = BuildHealth();
@@ -176,6 +187,17 @@ internal sealed class KoanAdminManifestService : IKoanAdminManifestService
             _manifestCacheExpires = DateTimeOffset.UtcNow.Add(CacheDuration);
         }
     }
+
+    private static KoanAdminSettingSource ConvertSource(BootSettingSource source)
+        => source switch
+        {
+            BootSettingSource.Auto => KoanAdminSettingSource.Auto,
+            BootSettingSource.AppSettings => KoanAdminSettingSource.AppSettings,
+            BootSettingSource.Environment => KoanAdminSettingSource.Environment,
+            BootSettingSource.LaunchKit => KoanAdminSettingSource.LaunchKit,
+            BootSettingSource.Custom => KoanAdminSettingSource.Custom,
+            _ => KoanAdminSettingSource.Unknown
+        };
 
     private sealed class DefaultHostEnvironment : IHostEnvironment
     {

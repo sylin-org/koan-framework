@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Koan.Core;
+using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Modules;
 using Koan.Core.Orchestration.Abstractions;
 using Koan.Data.Abstractions;
@@ -44,18 +45,144 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         // Boot report shows discovery results from MilvusDiscoveryAdapter
         report.AddNote("Milvus discovery handled by autonomous MilvusDiscoveryAdapter");
 
-        // Configure default options for reporting
+        // Configure default options for reporting with provenance metadata
         var defaultOptions = new MilvusOptions();
 
-        report.AddSetting("ConnectionString", "auto (resolved by discovery)", isSecret: false);
-        report.AddSetting("Endpoint", "auto (resolved by discovery)", isSecret: false);
-        report.AddSetting("DatabaseName", defaultOptions.DatabaseName);
-        report.AddSetting("VectorFieldName", defaultOptions.VectorFieldName);
-        report.AddSetting("MetadataFieldName", defaultOptions.MetadataFieldName);
-        report.AddSetting("Metric", defaultOptions.Metric);
-        report.AddSetting("ConsistencyLevel", defaultOptions.ConsistencyLevel);
-        report.AddSetting("TimeoutSeconds", defaultOptions.DefaultTimeoutSeconds.ToString());
-        report.AddSetting("AutoCreateCollection", defaultOptions.AutoCreateCollection.ToString());
+        var connection = Configuration.ReadFirstWithSource(
+            cfg,
+            defaultOptions.ConnectionString,
+            Infrastructure.Constants.Configuration.Keys.ConnectionString,
+            Infrastructure.Constants.Configuration.Keys.AltConnectionString,
+            "ConnectionStrings:Milvus");
+
+        var endpoint = Configuration.ReadWithSource(
+            cfg,
+            Infrastructure.Constants.Configuration.Keys.Endpoint,
+            defaultOptions.Endpoint);
+
+        var databaseName = Configuration.ReadWithSource(
+            cfg,
+            Infrastructure.Constants.Configuration.Keys.DatabaseName,
+            defaultOptions.DatabaseName);
+
+        var vectorField = Configuration.ReadWithSource(
+            cfg,
+            Infrastructure.Constants.Configuration.Keys.VectorFieldName,
+            defaultOptions.VectorFieldName);
+
+        var metadataField = Configuration.ReadWithSource(
+            cfg,
+            Infrastructure.Constants.Configuration.Keys.MetadataFieldName,
+            defaultOptions.MetadataFieldName);
+
+        var metric = Configuration.ReadWithSource(
+            cfg,
+            Infrastructure.Constants.Configuration.Keys.Metric,
+            defaultOptions.Metric);
+
+        var consistencyLevel = Configuration.ReadWithSource(
+            cfg,
+            Infrastructure.Constants.Configuration.Keys.ConsistencyLevel,
+            defaultOptions.ConsistencyLevel);
+
+        var timeoutSeconds = Configuration.ReadWithSource(
+            cfg,
+            Infrastructure.Constants.Configuration.Keys.TimeoutSeconds,
+            defaultOptions.DefaultTimeoutSeconds);
+
+        var autoCreate = Configuration.ReadWithSource(
+            cfg,
+            Infrastructure.Constants.Configuration.Keys.AutoCreateCollection,
+            defaultOptions.AutoCreateCollection);
+
+        var connectionValue = string.IsNullOrWhiteSpace(connection.Value)
+            ? "auto"
+            : connection.Value;
+        var connectionIsAuto = string.Equals(connectionValue, "auto", StringComparison.OrdinalIgnoreCase);
+
+        report.AddSetting(
+            "ConnectionString",
+            connectionIsAuto ? "auto (resolved by discovery)" : connectionValue,
+            isSecret: !connectionIsAuto,
+            source: connection.Source,
+            consumers: new[]
+            {
+                "Koan.Data.Vector.Connector.Milvus.MilvusOptionsConfigurator",
+                "Koan.Data.Vector.Connector.Milvus.MilvusVectorAdapterFactory"
+            });
+
+        report.AddSetting(
+            "Endpoint",
+            endpoint.Value,
+            source: endpoint.Source,
+            consumers: new[]
+            {
+                "Koan.Data.Vector.Connector.Milvus.MilvusOptionsConfigurator",
+                "Koan.Data.Vector.Connector.Milvus.MilvusVectorAdapterFactory"
+            });
+
+        report.AddSetting(
+            "DatabaseName",
+            databaseName.Value,
+            source: databaseName.Source,
+            consumers: new[]
+            {
+                "Koan.Data.Vector.Connector.Milvus.MilvusVectorAdapterFactory"
+            });
+
+        report.AddSetting(
+            "VectorFieldName",
+            vectorField.Value,
+            source: vectorField.Source,
+            consumers: new[]
+            {
+                "Koan.Data.Vector.Connector.Milvus.MilvusVectorAdapterFactory"
+            });
+
+        report.AddSetting(
+            "MetadataFieldName",
+            metadataField.Value,
+            source: metadataField.Source,
+            consumers: new[]
+            {
+                "Koan.Data.Vector.Connector.Milvus.MilvusVectorAdapterFactory"
+            });
+
+        report.AddSetting(
+            "Metric",
+            metric.Value,
+            source: metric.Source,
+            consumers: new[]
+            {
+                "Koan.Data.Vector.Connector.Milvus.MilvusVectorAdapterFactory"
+            });
+
+        report.AddSetting(
+            "ConsistencyLevel",
+            consistencyLevel.Value,
+            source: consistencyLevel.Source,
+            consumers: new[]
+            {
+                "Koan.Data.Vector.Connector.Milvus.MilvusVectorAdapterFactory"
+            });
+
+        report.AddSetting(
+            "TimeoutSeconds",
+            timeoutSeconds.Value.ToString(),
+            source: timeoutSeconds.Source,
+            consumers: new[]
+            {
+                "Koan.Data.Vector.Connector.Milvus.MilvusVectorAdapterFactory"
+            });
+
+        report.AddSetting(
+            "AutoCreateCollection",
+            autoCreate.Value ? "true" : "false",
+            source: autoCreate.Source,
+            consumers: new[]
+            {
+                "Koan.Data.Vector.Connector.Milvus.MilvusVectorAdapterFactory"
+            });
     }
 }
 

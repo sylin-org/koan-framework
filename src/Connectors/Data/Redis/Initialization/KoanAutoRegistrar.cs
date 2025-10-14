@@ -5,6 +5,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Koan.Core;
+using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Modules;
 using Koan.Core.Orchestration;
 using Koan.Core.Orchestration.Abstractions;
@@ -76,15 +77,93 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar, IKoanAspireRegistrar
         // Boot report shows discovery results from RedisDiscoveryAdapter
         report.AddNote("Redis discovery handled by autonomous RedisDiscoveryAdapter");
 
-        // Configure default options for reporting
+        // Configure default options for reporting (with provenance)
         var defaultOptions = new RedisOptions();
-        var database = Koan.Core.Configuration.Read(cfg, "Koan:Data:Redis:Database", defaultOptions.Database);
 
-        report.AddSetting("ConnectionString", "auto (resolved by discovery)", isSecret: false);
-        report.AddSetting("Database", database.ToString());
-        report.AddSetting(Infrastructure.Constants.Bootstrap.EnsureCreatedSupported, true.ToString());
-        report.AddSetting(Infrastructure.Constants.Bootstrap.DefaultPageSize, defaultOptions.DefaultPageSize.ToString());
-        report.AddSetting(Infrastructure.Constants.Bootstrap.MaxPageSize, defaultOptions.MaxPageSize.ToString());
+        var connection = Configuration.ReadFirstWithSource(
+            cfg,
+            defaultOptions.ConnectionString,
+            $"{Infrastructure.Constants.Configuration.Section_Data}:{Infrastructure.Constants.Configuration.Keys.ConnectionString}",
+            $"{Infrastructure.Constants.Configuration.Section_Sources_Default}:{Infrastructure.Constants.Configuration.Keys.ConnectionString}",
+            "ConnectionStrings:Redis",
+            "ConnectionStrings:Default");
+
+        var database = Configuration.ReadFirstWithSource(
+            cfg,
+            defaultOptions.Database,
+            $"{Infrastructure.Constants.Configuration.Section_Data}:{Infrastructure.Constants.Configuration.Keys.Database}",
+            $"{Infrastructure.Constants.Configuration.Section_Sources_Default}:{Infrastructure.Constants.Configuration.Keys.Database}");
+
+        var defaultPageSize = Configuration.ReadFirstWithSource(
+            cfg,
+            defaultOptions.DefaultPageSize,
+            $"{Infrastructure.Constants.Configuration.Section_Data}:{Infrastructure.Constants.Configuration.Keys.DefaultPageSize}",
+            $"{Infrastructure.Constants.Configuration.Section_Sources_Default}:{Infrastructure.Constants.Configuration.Keys.DefaultPageSize}");
+
+        var maxPageSize = Configuration.ReadFirstWithSource(
+            cfg,
+            defaultOptions.MaxPageSize,
+            $"{Infrastructure.Constants.Configuration.Section_Data}:{Infrastructure.Constants.Configuration.Keys.MaxPageSize}",
+            $"{Infrastructure.Constants.Configuration.Section_Sources_Default}:{Infrastructure.Constants.Configuration.Keys.MaxPageSize}");
+
+        var connectionValue = string.IsNullOrWhiteSpace(connection.Value)
+            ? "auto"
+            : connection.Value;
+        var connectionIsAuto = string.Equals(connectionValue, "auto", StringComparison.OrdinalIgnoreCase);
+
+        report.AddSetting(
+            "ConnectionString",
+            connectionIsAuto ? "auto (resolved by discovery)" : connectionValue,
+            isSecret: !connectionIsAuto,
+            source: connection.Source,
+            consumers: new[]
+            {
+                "Koan.Data.Connector.Redis.RedisOptionsConfigurator",
+                "Koan.Data.Connector.Redis.RedisAdapterFactory",
+                "Koan.Data.Connector.Redis.Initialization.KoanAutoRegistrar"
+            },
+            sourceKey: connection.ResolvedKey);
+
+        report.AddSetting(
+            "Database",
+            database.Value.ToString(),
+            source: database.Source,
+            consumers: new[]
+            {
+                "Koan.Data.Connector.Redis.RedisOptionsConfigurator",
+                "StackExchange.Redis.ConnectionMultiplexer"
+            },
+            sourceKey: database.ResolvedKey);
+
+        report.AddSetting(
+            Infrastructure.Constants.Bootstrap.EnsureCreatedSupported,
+            true.ToString(),
+            source: BootSettingSource.Auto,
+            consumers: new[]
+            {
+                "Koan.Data.Connector.Redis.RedisAdapterFactory"
+            },
+            sourceKey: $"{Infrastructure.Constants.Configuration.Section_Data}:{Infrastructure.Constants.Configuration.Keys.EnsureCreatedSupported}");
+
+        report.AddSetting(
+            Infrastructure.Constants.Bootstrap.DefaultPageSize,
+            defaultPageSize.Value.ToString(),
+            source: defaultPageSize.Source,
+            consumers: new[]
+            {
+                "Koan.Data.Connector.Redis.RedisAdapterFactory"
+            },
+            sourceKey: defaultPageSize.ResolvedKey);
+
+        report.AddSetting(
+            Infrastructure.Constants.Bootstrap.MaxPageSize,
+            maxPageSize.Value.ToString(),
+            source: maxPageSize.Source,
+            consumers: new[]
+            {
+                "Koan.Data.Connector.Redis.RedisAdapterFactory"
+            },
+            sourceKey: maxPageSize.ResolvedKey);
     }
 
     // IKoanAspireRegistrar implementation

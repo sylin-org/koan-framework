@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Koan.Core;
+using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Modules;
 using Koan.Core.Orchestration.Abstractions;
 using Koan.Data.Abstractions;
@@ -44,16 +45,125 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         // Boot report shows discovery results from ElasticSearchDiscoveryAdapter
         report.AddNote("ElasticSearch discovery handled by autonomous ElasticSearchDiscoveryAdapter");
 
-        // Configure default options for reporting
+        // Configure default options for reporting with provenance metadata
         var defaultOptions = new ElasticSearchOptions();
 
-        report.AddSetting("ConnectionString", "auto (resolved by discovery)", isSecret: false);
-        report.AddSetting("Endpoint", "auto (resolved by discovery)", isSecret: false);
-        report.AddSetting("IndexPrefix", defaultOptions.IndexPrefix ?? "koan");
-        report.AddSetting("VectorField", defaultOptions.VectorField);
-        report.AddSetting("MetadataField", defaultOptions.MetadataField);
-        report.AddSetting("SimilarityMetric", defaultOptions.SimilarityMetric);
-        report.AddSetting("TimeoutSeconds", defaultOptions.DefaultTimeoutSeconds.ToString());
+        var connection = Configuration.ReadFirstWithSource(
+            cfg,
+            defaultOptions.ConnectionString,
+            Infrastructure.Constants.Configuration.Keys.ConnectionString,
+            Infrastructure.Constants.Configuration.Keys.AltConnectionString,
+            "ConnectionStrings:ElasticSearch",
+            "ConnectionStrings:Elasticsearch");
+
+        var endpoint = Configuration.ReadFirstWithSource(
+            cfg,
+            defaultOptions.Endpoint,
+            Infrastructure.Constants.Configuration.Keys.Endpoint,
+            Infrastructure.Constants.Configuration.Keys.BaseUrl);
+
+        var indexPrefix = Configuration.ReadWithSource(
+            cfg,
+            Infrastructure.Constants.Configuration.Keys.IndexPrefix,
+            defaultOptions.IndexPrefix ?? "koan");
+
+        var vectorField = Configuration.ReadWithSource(
+            cfg,
+            Infrastructure.Constants.Configuration.Keys.VectorField,
+            defaultOptions.VectorField);
+
+        var metadataField = Configuration.ReadWithSource(
+            cfg,
+            Infrastructure.Constants.Configuration.Keys.MetadataField,
+            defaultOptions.MetadataField);
+
+        var similarityMetric = Configuration.ReadWithSource(
+            cfg,
+            Infrastructure.Constants.Configuration.Keys.SimilarityMetric,
+            defaultOptions.SimilarityMetric);
+
+        var timeoutSeconds = Configuration.ReadWithSource(
+            cfg,
+            Infrastructure.Constants.Configuration.Keys.TimeoutSeconds,
+            defaultOptions.DefaultTimeoutSeconds);
+
+        var connectionValue = string.IsNullOrWhiteSpace(connection.Value)
+            ? "auto"
+            : connection.Value;
+        var connectionIsAuto = string.Equals(connectionValue, "auto", StringComparison.OrdinalIgnoreCase);
+
+        report.AddSetting(
+            "ConnectionString",
+            connectionIsAuto ? "auto (resolved by discovery)" : connectionValue,
+            isSecret: !connectionIsAuto,
+            source: connection.Source,
+            consumers: new[]
+            {
+                "Koan.Data.Connector.ElasticSearch.ElasticSearchOptionsConfigurator",
+                "Koan.Data.Connector.ElasticSearch.ElasticSearchVectorAdapterFactory"
+            },
+            sourceKey: connection.ResolvedKey);
+
+        report.AddSetting(
+            "Endpoint",
+            endpoint.Value,
+            source: endpoint.Source,
+            consumers: new[]
+            {
+                "Koan.Data.Connector.ElasticSearch.ElasticSearchOptionsConfigurator",
+                "Koan.Data.Connector.ElasticSearch.ElasticSearchVectorAdapterFactory"
+            },
+            sourceKey: endpoint.ResolvedKey);
+
+        report.AddSetting(
+            "IndexPrefix",
+            indexPrefix.Value ?? (defaultOptions.IndexPrefix ?? "koan"),
+            source: indexPrefix.Source,
+            consumers: new[]
+            {
+                "Koan.Data.Connector.ElasticSearch.ElasticSearchVectorAdapterFactory"
+            },
+            sourceKey: indexPrefix.ResolvedKey);
+
+        report.AddSetting(
+            "VectorField",
+            vectorField.Value,
+            source: vectorField.Source,
+            consumers: new[]
+            {
+                "Koan.Data.Connector.ElasticSearch.ElasticSearchVectorAdapterFactory"
+            },
+            sourceKey: vectorField.ResolvedKey);
+
+        report.AddSetting(
+            "MetadataField",
+            metadataField.Value,
+            source: metadataField.Source,
+            consumers: new[]
+            {
+                "Koan.Data.Connector.ElasticSearch.ElasticSearchVectorAdapterFactory"
+            },
+            sourceKey: metadataField.ResolvedKey);
+
+        report.AddSetting(
+            "SimilarityMetric",
+            similarityMetric.Value,
+            source: similarityMetric.Source,
+            consumers: new[]
+            {
+                "Koan.Data.Connector.ElasticSearch.ElasticSearchVectorAdapterFactory"
+            },
+            sourceKey: similarityMetric.ResolvedKey);
+
+        report.AddSetting(
+            "TimeoutSeconds",
+            timeoutSeconds.Value.ToString(),
+            source: timeoutSeconds.Source,
+            consumers: new[]
+            {
+                "Koan.Data.Connector.ElasticSearch.ElasticSearchVectorAdapterFactory"
+            },
+            sourceKey: timeoutSeconds.ResolvedKey);
     }
 }
 

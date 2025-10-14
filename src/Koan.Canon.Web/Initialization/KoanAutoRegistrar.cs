@@ -49,10 +49,32 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
     public void Describe(Koan.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)
     {
         report.AddModule(ModuleName, ModuleVersion);
-        report.AddSetting("routes.models", WebConstants.Routes.Models);
-        report.AddSetting("routes.admin", WebConstants.Routes.Admin);
-        report.AddSetting("routes.canon", WebConstants.Routes.CanonPrefix + "/{model}");
-        report.AddSetting("routes.valueObjects", WebConstants.Routes.ValueObjectPrefix + "/{type}");
+        report.AddSetting(
+            "routes.models",
+            WebConstants.Routes.Models,
+            source: Koan.Core.Hosting.Bootstrap.BootSettingSource.Custom,
+            consumers: new[] { "Koan.Canon.Web.Catalog" });
+        report.AddSetting(
+            "routes.admin",
+            WebConstants.Routes.Admin,
+            source: Koan.Core.Hosting.Bootstrap.BootSettingSource.Custom,
+            consumers: new[] { "Koan.Canon.Web.AdminSurface" });
+        report.AddSetting(
+            "routes.canon",
+            WebConstants.Routes.CanonPrefix + "/{model}",
+            source: Koan.Core.Hosting.Bootstrap.BootSettingSource.Custom,
+            consumers: new[] { "Koan.Canon.Web.EntitiesController" });
+        report.AddSetting(
+            "routes.valueObjects",
+            WebConstants.Routes.ValueObjectPrefix + "/{type}",
+            source: Koan.Core.Hosting.Bootstrap.BootSettingSource.Custom,
+            consumers: new[] { "Koan.Canon.Web.ValueObjectController" });
+
+        report.AddTool(
+            "Canon Admin",
+            WebConstants.Routes.Admin,
+            "Auto-generated admin surface for Canon models",
+            capability: "canon.admin");
     }
 
     private static void RegisterGenericController(IServiceCollection services, Type modelType, Type controllerDefinition, string route)
