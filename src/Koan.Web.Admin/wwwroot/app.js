@@ -1,1169 +1,1352 @@
-const STATUS_ENDPOINT = 'api/status';
-const HEALTH_ENDPOINT = 'api/health';
-const LAUNCHKIT_METADATA_ENDPOINT = 'api/launchkit/metadata';
-const LAUNCHKIT_BUNDLE_ENDPOINT = 'api/launchkit/bundle';
-const REFRESH_INTERVAL_MS = 30000;
+// ========================================
+// Koan Admin - Framework Inspector
+// Main Application Logic
+// ========================================
 
-const environmentContainer = document.querySelector('.environment-content');
-const runtimeContainer = document.querySelector('.runtime-content');
-const capabilitiesContainer = document.querySelector('.capabilities-content');
-const modulesContainer = document.querySelector('.modules-content');
-const healthContainer = document.querySelector('.health-content');
-const notesContainer = document.querySelector('.notes-content');
-const launchKitContainer = document.querySelector('.launchkit-content');
-const generatedAtElement = document.getElementById('generated-at');
-const refreshButton = document.getElementById('refresh-btn');
-const autoRefreshToggle = document.getElementById('auto-refresh');
-const runtimeSanitizedToggle = document.getElementById('runtime-sanitized');
-const runtimeLockReason = document.querySelector('.runtime-lock-reason');
+// Global State
+const AppState = {
+  currentView: 'dashboard',
+  configViewMode: 'canonical', // 'canonical' | 'appsettings' | 'env'
+  selectedPillar: null,
+  selectedModule: null,
+  expandedPillars: [],
+  apiData: null,
+  refreshInterval: 30000,
+  autoRefresh: true,
+  lastUpdate: null,
+  configSearchTerm: ''
+};
 
-let refreshTimer;
-let runtimeState = { sanitized: false, locked: false };
+// Constants
+const PILLAR_ICONS = {
+  'data': '🗄️',
+  'web': '🌐',
+  'ai': '🧠',
+  'security': '🔐',
+  'core': '⚙️',
+  'admin': '🧩',
+  'scheduling': '⏰',
+  'messaging': '📨',
+  'storage': '💾'
+};
 
-async function fetchJson(url) {
-  const response = await fetch(url, {
-    headers: { 'Accept': 'application/json' }
-  });
-  if (!response.ok) {
-    const detail = await safeReadText(response);
-    throw new Error(`Request to ${url} failed: ${response.status} ${response.statusText}${detail ? ` - ${detail}` : ''}`);
-  }
-  return response.json();
-}
+const PILLAR_COLORS = {
+  'data': '6, 182, 212',
+  'web': '139, 92, 246',
+  'ai': '236, 72, 153',
+  'security': '250, 204, 21',
+  'core': '100, 116, 139',
+  'admin': '6, 182, 212',
+  'scheduling': '56, 189, 248',
+  'messaging': '139, 92, 246',
+  'storage': '100, 116, 139'
+};
 
-async function safeReadText(response) {
-  try {
-    return await response.text();
-  } catch {
-    return '';
-  }
-}
+// ========================================
+// State Management
+// ========================================
 
-function formatSettingSource(source) {
-  if (!source) {
-    return '';
-  }
-  const value = source.toString();
-  return value.replace(/([a-z])([A-Z])/g, '$1 $2');
-}
-
-function renderSettingConsumers(consumers) {
-  if (!Array.isArray(consumers) || consumers.length === 0) {
-    return '';
-  }
-
-  const chips = consumers
-    .map(consumer => `<span class="consumer-chip">${consumer}</span>`)
-    .join('');
-
-  return `<div class="setting-consumers">${chips}</div>`;
-}
-
-function pluralize(label, count) {
-  if (count === 1) {
-    return `${count} ${label}`;
-  }
-  return `${count} ${label}s`;
-}
-
-function formatNumber(value, fractionDigits = 0) {
-  if (typeof value !== 'number' || !Number.isFinite(value)) {
-    return null;
-  }
-  return value.toLocaleString(undefined, {
-    minimumFractionDigits: fractionDigits,
-    maximumFractionDigits: fractionDigits
-  });
-}
-
-function formatBytes(value) {
-  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
-    return null;
-  }
-
-  const units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
-  let size = value;
-  let unitIndex = 0;
-
-  while (size >= 1024 && unitIndex < units.length - 1) {
-    size /= 1024;
-    unitIndex += 1;
-  }
-
-  const digits = size >= 10 || unitIndex === 0 ? 0 : 1;
-  return `${size.toFixed(digits)} ${units[unitIndex]}`;
-}
-
-function formatPercent(value) {
-  if (typeof value !== 'number' || !Number.isFinite(value)) {
-    return null;
-  }
-  const digits = value >= 10 ? 1 : 2;
-  return `${value.toFixed(digits)}%`;
-}
-
-function formatSeconds(value) {
-  if (typeof value !== 'number' || !Number.isFinite(value)) {
-    return null;
-  }
-  if (value >= 10) {
-    return `${Math.round(value)}s`;
-  }
-  return `${value.toFixed(2)}s`;
-}
-
-function formatDateTime(value) {
-  if (!value) {
-    return null;
-  }
-  const date = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return null;
-  }
-  return date.toLocaleString();
-}
-
-function formatBoolean(value) {
-  if (typeof value !== 'boolean') {
-    return null;
-  }
-  return value ? 'Yes' : 'No';
-}
-
-function formatModuleMeta(version, settingCount, noteCount, toolCount) {
-  const parts = [];
-  parts.push(version ? `v${version}` : 'unversioned');
-  parts.push(pluralize('setting', settingCount));
-  parts.push(pluralize('note', noteCount));
-  if (toolCount) {
-    parts.push(pluralize('tool', toolCount));
-  }
-  return parts.join(' · ');
-}
-
-function applyModuleStyling(element, module, fallbackModuleClass) {
-  const moduleClass = module.moduleClass ?? fallbackModuleClass ?? 'module-general';
-  if (!element.classList.contains(moduleClass)) {
-    element.classList.add(moduleClass);
-  }
-  if (module.colorHex) {
-    element.style.setProperty('--module-color-hex', module.colorHex);
-  }
-  if (module.colorRgb) {
-    element.style.setProperty('--module-color-rgb', module.colorRgb);
-  }
-}
-
-function createModuleStatic(module, fallbackModuleClass) {
-  const container = document.createElement('div');
-  container.className = 'module-item module-static';
-  applyModuleStyling(container, module, fallbackModuleClass);
-
-  const header = document.createElement('div');
-  header.className = 'module-static-header';
-
-  const nameSpan = document.createElement('span');
-  nameSpan.className = 'module-name';
-  nameSpan.innerHTML = `<span class="module-icon">${module.icon ?? '🧩'}</span>${module.name ?? 'Unnamed module'}`;
-
-  const badge = document.createElement('span');
-  badge.className = 'module-badge';
-  badge.textContent = 'Stub module';
-
-  const settingCount = Array.isArray(module.settings) ? module.settings.length : module.settingCount ?? 0;
-  const noteCount = Array.isArray(module.notes) ? module.notes.length : module.noteCount ?? 0;
-  const toolCount = Array.isArray(module.tools) ? module.tools.length : module.toolCount ?? 0;
-  const metaSpan = document.createElement('span');
-  metaSpan.className = 'module-meta';
-  metaSpan.textContent = formatModuleMeta(module.version, settingCount, noteCount, toolCount);
-
-  header.appendChild(nameSpan);
-  header.appendChild(badge);
-  header.appendChild(metaSpan);
-  container.appendChild(header);
-
-  if (module.description) {
-    const desc = document.createElement('p');
-    desc.className = 'module-description';
-    desc.textContent = module.description;
-    container.appendChild(desc);
-  }
-
-  const empty = document.createElement('div');
-  empty.className = 'module-static-empty';
-  empty.innerHTML = `
-    <p class="muted">No settings, notes, or tools reported.</p>
-    <p class="muted secondary">Feature surface is available for future expansion.</p>
-  `;
-  container.appendChild(empty);
-
-  return container;
-}
-
-
-function renderEnvironment(environment) {
-  const processStartRaw = environment?.processStart ?? environment?.ProcessStart;
-  const processStart = processStartRaw ? new Date(processStartRaw) : new Date();
-  const uptimeMs = Date.now() - processStart.getTime();
-
-  environmentContainer.innerHTML = '';
-
-  const primary = document.createElement('div');
-  primary.className = 'chip-row';
-  primary.innerHTML = `
-    <span class="chip">${environment?.environmentName ?? 'Unknown environment'}</span>
-    <span class="chip">Uptime: ${formatUptime(Math.max(0, uptimeMs))}</span>
-  `;
-  environmentContainer.appendChild(primary);
-
-  const meta = document.createElement('div');
-  meta.className = 'chip-row';
-  meta.innerHTML = `
-    <span class="chip">Dev: ${environment?.isDevelopment ? 'Yes' : 'No'}</span>
-    <span class="chip">Prod: ${environment?.isProduction ? 'Yes' : 'No'}</span>
-    <span class="chip">Staging: ${environment?.isStaging ? 'Yes' : 'No'}</span>
-    <span class="chip">CI: ${environment?.isCi ? 'Yes' : 'No'}</span>
-    <span class="chip">Container: ${environment?.inContainer ? 'Yes' : 'No'}</span>
-  `;
-  environmentContainer.appendChild(meta);
-}
-
-function renderRuntime(runtime) {
-  if (!runtimeContainer) {
-    return;
-  }
-
-  runtimeContainer.innerHTML = '';
-
-  if (!runtime) {
-    runtimeContainer.innerHTML = '<p class="loading">Runtime snapshot unavailable.</p>';
-    return;
-  }
-
-  const sanitizedFields = Array.isArray(runtime.sanitizedFields) ? runtime.sanitizedFields : [];
-
-  const meta = document.createElement('div');
-  meta.className = 'runtime-meta';
-  const capturedDisplay = formatDateTime(runtime.capturedAtUtc) ?? 'Unknown capture time';
-  const viewLabel = runtime.sanitized ? 'Sanitized view' : 'Raw view';
-  const threadCount = runtime.threadPool ? formatNumber(runtime.threadPool.threadCount) ?? 'N/A' : 'N/A';
-  const gcInfo = runtime.garbageCollector;
-  const gcModeLabel = gcInfo
-    ? `${gcInfo.isServerGc ? 'Server GC' : 'Workstation GC'}${gcInfo.latencyMode ? ` · ${gcInfo.latencyMode}` : ''}`
-    : 'GC mode unknown';
-  meta.innerHTML = `
-    <span class="chip">Captured ${capturedDisplay}</span>
-    <span class="chip">${viewLabel}</span>
-    <span class="chip">Threads ${threadCount}</span>
-    <span class="chip">${gcModeLabel}</span>
-  `;
-  runtimeContainer.appendChild(meta);
-
-  if (sanitizedFields.length) {
-    const sanitizedBlock = document.createElement('div');
-    sanitizedBlock.className = 'sanitized-fields';
-    const label = document.createElement('span');
-    label.className = 'muted';
-    label.textContent = 'Hidden fields:';
-    sanitizedBlock.appendChild(label);
-    sanitizedFields.forEach(field => {
-      const badge = document.createElement('span');
-      badge.className = 'chip chip-compact';
-      badge.textContent = field;
-      sanitizedBlock.appendChild(badge);
-    });
-    runtimeContainer.appendChild(sanitizedBlock);
-  }
-
-  const grid = document.createElement('div');
-  grid.className = 'runtime-grid';
-
-  const process = runtime.process ?? {};
-  grid.appendChild(buildRuntimeCard('Process', [
-    { label: 'Process ID', value: process.processId },
-    { label: 'Name', value: process.name, raw: true },
-    { label: 'User', value: process.userName, sanitized: sanitizedFields.includes('Process.UserName') },
-    { label: 'Command line', value: process.commandLine, sanitized: sanitizedFields.includes('Process.CommandLine') },
-    { label: 'Executable', value: process.executablePath, sanitized: sanitizedFields.includes('Process.ExecutablePath') },
-    { label: 'Working directory', value: process.workingDirectory, sanitized: sanitizedFields.includes('Process.WorkingDirectory') },
-    { label: 'Start (UTC)', value: formatDateTime(process.startTimeUtc), raw: true },
-    { label: 'Uptime', value: typeof process.uptimeSeconds === 'number' ? formatUptime(process.uptimeSeconds * 1000) : null, raw: true },
-    { label: 'CPU time', value: formatSeconds(process.totalProcessorTimeSeconds), raw: true },
-    { label: 'CPU usage', value: process.cpuUtilizationPercent, formatter: formatPercent },
-    { label: 'Threads', value: process.threadCount },
-    { label: 'Handles', value: process.handleCount }
-  ]));
-
-  const memory = runtime.memory ?? {};
-  grid.appendChild(buildRuntimeCard('Memory', [
-    { label: 'Working set', value: memory.workingSetBytes, formatter: formatBytes },
-    { label: 'Peak working set', value: memory.peakWorkingSetBytes, formatter: formatBytes },
-    { label: 'Private bytes', value: memory.privateBytes, formatter: formatBytes },
-    { label: 'Virtual bytes', value: memory.virtualBytes, formatter: formatBytes },
-    { label: 'Paged bytes', value: memory.pagedBytes, formatter: formatBytes },
-    { label: 'Paged system', value: memory.pagedSystemBytes, formatter: formatBytes },
-    { label: 'Non-paged system', value: memory.nonPagedSystemBytes, formatter: formatBytes },
-    { label: 'GC heap', value: memory.gcHeapSizeBytes, formatter: formatBytes },
-    { label: 'GC fragmented', value: memory.gcFragmentedBytes, formatter: formatBytes },
-    { label: 'GC committed', value: memory.gcTotalCommittedBytes, formatter: formatBytes },
-    { label: 'Managed heap', value: memory.managedHeapBytes, formatter: formatBytes },
-    { label: 'Managed allocated', value: memory.managedAllocatedBytes, formatter: formatBytes }
-  ]));
-
-  const gc = runtime.garbageCollector ?? {};
-  grid.appendChild(buildRuntimeCard('Garbage Collector', [
-    { label: 'Max generation', value: gc.maxGeneration },
-    { label: 'Server GC', value: gc.isServerGc, formatter: formatBoolean },
-    { label: 'Latency mode', value: gc.latencyMode, raw: true },
-    { label: 'Collections (per gen)', value: Array.isArray(gc.collectionCounts) ? gc.collectionCounts.join(' · ') : null, raw: true },
-    { label: 'High memory threshold', value: gc.highMemoryLoadThresholdBytes, formatter: formatBytes },
-    { label: 'Memory load', value: gc.memoryLoadBytes, formatter: formatBytes },
-    { label: 'Memory load %', value: gc.memoryLoadPercent, formatter: formatPercent }
-  ]));
-
-  const threadPool = runtime.threadPool ?? {};
-  grid.appendChild(buildRuntimeCard('Thread Pool', [
-    { label: 'Threads', value: threadPool.threadCount },
-    { label: 'Workers available', value: threadPool.availableWorkerThreads },
-    { label: 'Workers min', value: threadPool.minWorkerThreads },
-    { label: 'Workers max', value: threadPool.maxWorkerThreads },
-    { label: 'IO available', value: threadPool.availableCompletionPortThreads },
-    { label: 'IO min', value: threadPool.minCompletionPortThreads },
-    { label: 'IO max', value: threadPool.maxCompletionPortThreads },
-    { label: 'Completed work items', value: threadPool.completedWorkItemCount },
-    { label: 'Pending work items', value: threadPool.pendingWorkItemCount }
-  ]));
-
-  const machine = runtime.machine ?? {};
-  grid.appendChild(buildRuntimeCard('Host', [
-    { label: 'Machine', value: machine.machineName, sanitized: sanitizedFields.includes('Machine.MachineName') },
-    { label: 'Domain', value: machine.domainName, sanitized: sanitizedFields.includes('Machine.DomainName') },
-    { label: 'Framework', value: machine.frameworkDescription, raw: true },
-    { label: 'OS', value: machine.osDescription, raw: true },
-    { label: 'Process arch', value: machine.processArchitecture, raw: true },
-    { label: 'OS arch', value: machine.osArchitecture, raw: true },
-    { label: 'Processors', value: machine.processorCount },
-    { label: '64-bit process', value: machine.is64BitProcess, formatter: formatBoolean },
-    { label: '64-bit OS', value: machine.is64BitOperatingSystem, formatter: formatBoolean }
-  ]));
-
-  runtimeContainer.appendChild(grid);
-}
-
-function buildRuntimeCard(title, rows) {
-  const card = document.createElement('div');
-  card.className = 'runtime-card';
-
-  const heading = document.createElement('h3');
-  heading.textContent = title;
-  card.appendChild(heading);
-
-  const list = document.createElement('dl');
-
-  rows.forEach(row => {
-    const term = document.createElement('dt');
-    term.textContent = row.label;
-    const detail = document.createElement('dd');
-    detail.innerHTML = renderRuntimeValue(row.value, row);
-    list.appendChild(term);
-    list.appendChild(detail);
-  });
-
-  card.appendChild(list);
-  return card;
-}
-
-function renderRuntimeValue(value, options = {}) {
-  if (options && typeof options.formatter === 'function' && value !== null && value !== undefined) {
-    const formatted = options.formatter(value, options);
-    if (formatted !== null && formatted !== undefined) {
-      return formatted;
+function loadState() {
+  const saved = localStorage.getItem('koan-admin-state');
+  if (saved) {
+    try {
+      const parsed = JSON.parse(saved);
+      AppState.expandedPillars = parsed.expandedPillars || [];
+      AppState.autoRefresh = parsed.autoRefresh !== undefined ? parsed.autoRefresh : true;
+      AppState.configViewMode = parsed.configViewMode || 'canonical';
+    } catch (e) {
+      console.error('Failed to load state:', e);
     }
   }
-
-  if ((value === null || value === undefined || value === '') && options.sanitized) {
-    return '<span class="muted">Sanitized</span>';
-  }
-
-  if (value === null || value === undefined || value === '') {
-  return '<span class="muted">N/A</span>';
-  }
-
-  if (options.raw === true) {
-    return value;
-  }
-
-  if (typeof value === 'number') {
-    const digits = typeof options.fractionDigits === 'number' ? options.fractionDigits : 0;
-  const formattedNumber = formatNumber(value, digits);
-  return formattedNumber ?? '<span class="muted">N/A</span>';
-  }
-
-  return value;
 }
 
-function renderCapabilities(features) {
-  capabilitiesContainer.innerHTML = '';
-  if (!features) {
-    capabilitiesContainer.innerHTML = '<p class="loading">Feature snapshot unavailable.</p>';
-    return;
+function saveState() {
+  localStorage.setItem('koan-admin-state', JSON.stringify({
+    expandedPillars: AppState.expandedPillars,
+    autoRefresh: AppState.autoRefresh,
+    configViewMode: AppState.configViewMode
+  }));
+}
+
+// ========================================
+// API Fetching
+// ========================================
+
+async function fetchAPIData() {
+  try {
+    const response = await fetch('api/status');
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+    const data = await response.json();
+    AppState.apiData = data;
+    AppState.lastUpdate = new Date();
+
+    updateStatusIndicator('healthy', 'Healthy');
+    return data;
+  } catch (error) {
+    console.error('Failed to fetch API data:', error);
+    updateStatusIndicator('error', 'Error');
+    return null;
+  }
+}
+
+function updateStatusIndicator(status, label) {
+  const indicator = document.getElementById('status-indicator');
+  if (!indicator) return;
+
+  const dot = indicator.querySelector('.status-dot');
+  const text = indicator.querySelector('.status-label');
+
+  if (dot) {
+    dot.className = `status-dot status-${status}`;
+  }
+  if (text) {
+    text.textContent = label;
+  }
+}
+
+// ========================================
+// Hash Routing
+// ========================================
+
+function navigate(hash) {
+  window.location.hash = hash;
+}
+
+function parseHash() {
+  const hash = window.location.hash.slice(1); // Remove #
+  const parts = hash.split('/').filter(Boolean);
+
+  if (parts.length === 0) {
+    return { view: 'dashboard', params: {} };
   }
 
-  const flagGrid = document.createElement('div');
-  flagGrid.className = 'capability-grid';
+  const [view, ...rest] = parts;
 
-  const flags = [
-    { label: 'Web UI', value: features.webEnabled },
-    { label: 'Console', value: features.consoleEnabled },
-    { label: 'Manifest API', value: features.manifestExposed },
-    { label: 'Destructive operations', value: features.allowDestructiveOperations },
-    { label: 'Log transcript download', value: features.allowLogTranscriptDownload },
-    { label: 'LaunchKit', value: features.launchKitEnabled },
-    { label: 'Dot prefix allowed', value: features.dotPrefixAllowedInCurrentEnvironment }
-  ];
+  switch (view) {
+    case 'ops':
+      return { view: 'ops', params: {} };
+    case 'framework':
+      return { view: 'framework', params: {} };
+    case 'configuration':
+      return { view: 'configuration', params: {} };
+    case 'pillar':
+      return { view: 'pillar', params: { pillar: rest[0] } };
+    case 'module':
+      return { view: 'module', params: { module: decodeURIComponent(rest[0]) } };
+    default:
+      return { view: 'dashboard', params: {} };
+  }
+}
 
-  flags.forEach(flag => {
-    const item = document.createElement('div');
-    item.className = 'capability-item';
-    item.innerHTML = `
-      <span>${flag.label}</span>
-      <span class="badge ${flag.value ? 'on' : 'off'}">${flag.value ? 'Enabled' : 'Disabled'}</span>
-    `;
-    flagGrid.appendChild(item);
+function handleRouteChange() {
+  const route = parseHash();
+  switchView(route.view, route.params);
+  updateNavHighlight(route.view);
+}
+
+function updateNavHighlight(view) {
+  // Map view to nav item
+  const navMapping = {
+    'dashboard': 'dashboard',
+    'ops': 'ops',
+    'framework': 'framework',
+    'configuration': 'configuration',
+    'pillar': 'dashboard',  // Pillar views don't highlight nav
+    'module': 'dashboard'   // Module views don't highlight nav
+  };
+
+  const navItem = navMapping[view] || 'dashboard';
+
+  document.querySelectorAll('.nav-item').forEach(item => {
+    item.classList.toggle('active', item.dataset.nav === navItem);
   });
+}
 
-  capabilitiesContainer.appendChild(flagGrid);
+function switchView(view, params = {}) {
+  AppState.currentView = view;
 
-  if (features.routes) {
-    const routes = document.createElement('div');
-    routes.className = 'routes';
-    routes.innerHTML = `
-      <div><strong>UI root</strong><span>${features.routes.rootPath ?? '/'}</span></div>
-      <div><strong>API root</strong><span>${features.routes.apiPath ?? '/api'}</span></div>
-      <div><strong>LaunchKit</strong><span>${features.routes.launchKitPath ?? '/api/launchkit'}</span></div>
-      <div><strong>Health</strong><span>${features.routes.healthPath ?? '/api/health'}</span></div>
-    `;
-    capabilitiesContainer.appendChild(routes);
+  // Hide all views
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+
+  // Show active view
+  const activeView = document.getElementById(`${view}-view`);
+  if (activeView) {
+    activeView.classList.add('active');
+  }
+
+  // Handle view-specific logic
+  switch (view) {
+    case 'ops':
+      renderOpsMode();
+      break;
+    case 'framework':
+      renderFrameworkMode();
+      break;
+    case 'configuration':
+      renderConfigurationView();
+      break;
+    case 'pillar':
+      if (params.pillar) {
+        renderPillarView(params.pillar);
+      }
+      break;
+    case 'module':
+      if (params.module) {
+        renderModuleView(params.module);
+      }
+      break;
   }
 }
 
-function buildPillarGroups(modules, configurationSummary) {
-  const modulesByPillar = new Map();
+// ========================================
+// Framework Pulse (Hero Metrics)
+// ========================================
+
+function renderFrameworkPulse() {
+  const data = AppState.apiData;
+  if (!data) return;
+
+  const modulesCount = data.modules?.length || 0;
+  const providersCount = countProviders(data);
+  const healthyCount = data.health?.components?.filter(h => h.status === 'Healthy').length || 0;
+  const totalHealth = data.health?.components?.length || 0;
+  const settingsCount = data.modules?.reduce((sum, m) => sum + (m.settings?.length || 0), 0) || 0;
+
+  const pulseModules = document.getElementById('pulse-modules');
+  const pulseProviders = document.getElementById('pulse-providers');
+  const pulseHealth = document.getElementById('pulse-health');
+  const pulseSettings = document.getElementById('pulse-settings');
+
+  if (pulseModules) pulseModules.textContent = modulesCount;
+  if (pulseProviders) pulseProviders.textContent = providersCount;
+  if (pulseHealth) pulseHealth.textContent = `${healthyCount}/${totalHealth}`;
+  if (pulseSettings) pulseSettings.textContent = settingsCount;
+}
+
+function countProviders(data) {
+  const providers = new Set();
+  data.modules?.forEach(module => {
+    if (module.name?.toLowerCase().includes('connector')) {
+      const parts = module.name.split('.');
+      const providerName = parts[parts.length - 1];
+      providers.add(providerName);
+    }
+  });
+  return providers.size;
+}
+
+// ========================================
+// Pillar Accordion Rendering
+// ========================================
+
+function renderPillars() {
+  const data = AppState.apiData;
+  if (!data || !data.modules) return;
+
+  const pillars = groupByPillar(data.modules);
+  const container = document.getElementById('pillars-container');
+  if (!container) return;
+
+  container.innerHTML = '';
+
+  Object.entries(pillars).forEach(([pillarName, modules]) => {
+    const pillarEl = createPillarElement(pillarName, modules);
+    container.appendChild(pillarEl);
+  });
+}
+
+function groupByPillar(modules) {
+  const pillars = {};
 
   modules.forEach(module => {
-    const key = module.pillar ?? 'General';
-    if (!modulesByPillar.has(key)) {
-      modulesByPillar.set(key, []);
+    const pillarName = extractPillarName(module.name || module.pillar);
+    if (!pillars[pillarName]) {
+      pillars[pillarName] = [];
     }
-    modulesByPillar.get(key).push(module);
+    pillars[pillarName].push(module);
   });
 
-  const groups = [];
-  const summaryList = Array.isArray(configurationSummary?.pillars)
-    ? configurationSummary.pillars.slice()
-    : [];
-
-  const normalizeSort = (a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
-
-  summaryList.forEach(summary => {
-    const pillarKey = summary.pillar ?? 'General';
-    const moduleList = modulesByPillar.get(pillarKey) ?? [];
-    moduleList.sort(normalizeSort);
-
-    const moduleClassFallback = moduleList[0]?.moduleClass ?? 'module-general';
-    const moduleToolCount = moduleList.reduce((total, item) => total + (Array.isArray(item.tools) ? item.tools.length : 0), 0);
-
-    groups.push({
-      pillar: pillarKey,
-      pillarClass: summary.pillarClass ?? moduleList[0]?.pillarClass ?? 'pillar-general',
-      moduleClass: moduleClassFallback,
-      icon: summary.icon ?? moduleList[0]?.icon ?? '🧩',
-      colorHex: summary.colorHex ?? moduleList[0]?.colorHex ?? '#38bdf8',
-      colorRgb: summary.colorRgb ?? moduleList[0]?.colorRgb ?? '56, 189, 248',
-      modules: moduleList,
-      moduleCount: moduleList.length || (summary.moduleCount ?? 0),
-      settingCount: moduleList.length
-        ? moduleList.reduce((total, item) => total + (item.settings?.length ?? 0), 0)
-        : summary.settingCount ?? 0,
-      noteCount: moduleList.length
-        ? moduleList.reduce((total, item) => total + (item.notes?.length ?? 0), 0)
-        : summary.noteCount ?? 0,
-      toolCount: moduleList.length ? moduleToolCount : 0
-    });
-
-    modulesByPillar.delete(pillarKey);
-  });
-
-  modulesByPillar.forEach((moduleList, pillarKey) => {
-    moduleList.sort(normalizeSort);
-    const moduleToolCount = moduleList.reduce((total, item) => total + (Array.isArray(item.tools) ? item.tools.length : 0), 0);
-    groups.push({
-      pillar: pillarKey,
-      pillarClass: moduleList[0]?.pillarClass ?? 'pillar-general',
-      moduleClass: moduleList[0]?.moduleClass ?? 'module-general',
-      icon: moduleList[0]?.icon ?? '🧩',
-      colorHex: moduleList[0]?.colorHex ?? '#38bdf8',
-      colorRgb: moduleList[0]?.colorRgb ?? '56, 189, 248',
-      modules: moduleList,
-      moduleCount: moduleList.length,
-      settingCount: moduleList.reduce((total, item) => total + (item.settings?.length ?? 0), 0),
-      noteCount: moduleList.reduce((total, item) => total + (item.notes?.length ?? 0), 0),
-      toolCount: moduleToolCount
-    });
-  });
-
-  groups.sort((left, right) => {
-    if (right.moduleCount !== left.moduleCount) {
-      return right.moduleCount - left.moduleCount;
-    }
-    return left.pillar.localeCompare(right.pillar, undefined, { sensitivity: 'base' });
-  });
-
-  return groups;
+  return pillars;
 }
 
-function createModuleDetails(module, fallbackModuleClass) {
-  if (module.isStub) {
-    return createModuleStatic(module, fallbackModuleClass);
+function extractPillarName(moduleName) {
+  const parts = moduleName.split('.');
+  if (parts.length < 2) return 'core';
+
+  const pillar = parts[1].toLowerCase();
+
+  // Map to known pillars
+  if (pillar === 'data' || pillar === 'web' || pillar === 'ai' ||
+      pillar === 'security' || pillar === 'core' || pillar === 'admin' ||
+      pillar === 'scheduling' || pillar === 'messaging' || pillar === 'storage') {
+    return pillar;
   }
 
+  return 'core';
+}
+
+function createPillarElement(pillarName, modules) {
   const details = document.createElement('details');
-  details.className = 'module-item';
-  applyModuleStyling(details, module, fallbackModuleClass);
+  details.className = 'pillar';
+  details.dataset.pillar = pillarName;
 
-  const icon = module.icon ?? '🧩';
+  const colorRGB = PILLAR_COLORS[pillarName] || '100, 116, 139';
+  details.style.setProperty('--pillar-color-rgb', colorRGB);
+
+  // Check if this pillar should be open
+  if (AppState.expandedPillars.includes(pillarName)) {
+    details.open = true;
+  }
+
+  details.addEventListener('toggle', () => {
+    if (details.open) {
+      if (!AppState.expandedPillars.includes(pillarName)) {
+        AppState.expandedPillars.push(pillarName);
+      }
+    } else {
+      AppState.expandedPillars = AppState.expandedPillars.filter(p => p !== pillarName);
+    }
+    saveState();
+  });
+
   const summary = document.createElement('summary');
-  const settingCount = Array.isArray(module.settings) ? module.settings.length : module.settingCount ?? 0;
-  const noteCount = Array.isArray(module.notes) ? module.notes.length : module.noteCount ?? 0;
-  const toolCount = Array.isArray(module.tools) ? module.tools.length : module.toolCount ?? 0;
-
-  const nameSpan = document.createElement('span');
-  nameSpan.className = 'module-name';
-  nameSpan.innerHTML = `<span class="module-icon">${icon}</span>${module.name ?? 'Unnamed module'}`;
-
-  const metaSpan = document.createElement('span');
-  metaSpan.className = 'module-meta';
-  metaSpan.textContent = formatModuleMeta(module.version, settingCount, noteCount, toolCount);
-
-  summary.appendChild(nameSpan);
-  summary.appendChild(metaSpan);
-  details.appendChild(summary);
-
-  const inner = document.createElement('div');
-  inner.className = 'module-body';
-
-  const settingsList = Array.isArray(module.settings) && module.settings.length
-    ? module.settings.map(setting => {
-        const label = typeof setting.label === 'string' && setting.label.trim().length
-          ? setting.label.trim()
-          : setting.key;
-        const description = typeof setting.description === 'string' ? setting.description.trim() : '';
-        const sourceValue = formatSettingSource(setting.source);
-        const sourceLabel = sourceValue && sourceValue.toLowerCase() !== 'unknown' ? sourceValue : '';
-        const sourceKey = typeof setting.sourceKey === 'string' ? setting.sourceKey : '';
-        const tags = [];
-        if (sourceLabel) {
-          tags.push(`<span class="tag tag-source">${sourceLabel}</span>`);
-        }
-        if (setting.secret) {
-          tags.push('<span class="tag tag-secret">secret</span>');
-        }
-        const keyBadge = `<code class="setting-key">${setting.key}</code>`;
-        const sourceKeyMarkup = sourceKey ? `<code class="setting-source-key">${sourceKey}</code>` : '';
-        const consumers = renderSettingConsumers(setting.consumers);
-        const metaParts = [keyBadge];
-        if (sourceKeyMarkup) {
-          metaParts.push(sourceKeyMarkup);
-        }
-        if (tags.length) {
-          metaParts.push(...tags);
-        }
-        if (consumers) {
-          metaParts.push(consumers);
-        }
-        const hasMeta = metaParts.some(part => part && part.length);
-        const descriptionTitle = description.replace(/"/g, '&quot;');
-        const descriptionMarkup = description
-          ? `<span class="setting-description" title="${descriptionTitle}">${description}</span>`
-          : '';
-        const meta = hasMeta
-          ? `<div class="setting-meta">${metaParts.join('')}</div>`
-          : '';
-
-        return `
-        <div class="module-setting">
-          <div class="setting-header">
-            <div class="setting-text">
-              <span class="setting-label">${label}</span>
-              ${descriptionMarkup}
-            </div>
-            <span class="value ${setting.secret ? 'secret' : ''}">${setting.value ?? ''}</span>
-          </div>
-          ${meta}
-        </div>
-        `;
-      }).join('')
-    : '<p class="muted">No settings captured.</p>';
-
-  const notesList = Array.isArray(module.notes) && module.notes.length
-    ? `<ul class="module-notes">${module.notes.map(note => `<li>${note}</li>`).join('')}</ul>`
-    : '<p class="muted">No notes recorded.</p>';
-
-  const tools = Array.isArray(module.tools) ? module.tools : [];
-  const toolsList = tools.length
-    ? `<ul class="module-tools">${tools.map(tool => {
-        const capabilityTag = tool.capability ? `<span class="tag tag-capability">${tool.capability}</span>` : '';
-        const headerTags = capabilityTag ? `<span class="tool-tags">${capabilityTag}</span>` : '';
-        const normalizedRoute = typeof tool.route === 'string' && tool.route.length
-          ? (tool.route.startsWith('/') || /^https?:/i.test(tool.route) ? tool.route : `/${tool.route}`)
-          : '';
-        const routeMarkup = normalizedRoute
-          ? `<a class="tool-route" href="${normalizedRoute}" target="_blank" rel="noopener noreferrer">${normalizedRoute}</a>`
-          : '<span class="tool-route muted">Route unavailable</span>';
-        const descriptionMarkup = tool.description
-          ? `<p class="tool-description">${tool.description}</p>`
-          : '';
-        return `
-          <li class="module-tool">
-            <div class="module-tool-header">
-              <span class="tool-name">${tool.name ?? 'Unnamed tool'}</span>
-              ${headerTags}
-            </div>
-            <div class="module-tool-route">${routeMarkup}</div>
-            ${descriptionMarkup}
-          </li>
-        `;
-      }).join('')}</ul>`
-    : '<p class="muted">No admin tools registered.</p>';
-
-  inner.innerHTML = `
-    <div class="module-section">
-      <h3>Settings</h3>
-      ${settingsList}
+  summary.innerHTML = `
+    <div class="pillar-summary-left">
+      <span class="pillar-icon">${PILLAR_ICONS[pillarName] || '📦'}</span>
+      <span class="pillar-name">${pillarName.toUpperCase()}</span>
+      <span class="pillar-count">(${modules.length})</span>
     </div>
-    <div class="module-section">
-      <h3>Notes</h3>
-      ${notesList}
-    </div>
-    <div class="module-section">
-      <h3>Tools</h3>
-      ${toolsList}
-    </div>
+    <span class="pillar-health"></span>
   `;
 
-  if (module.description) {
-    const descriptionNode = document.createElement('p');
-    descriptionNode.className = 'module-description';
-    descriptionNode.textContent = module.description;
-    inner.prepend(descriptionNode);
-  }
+  const modulesContainer = document.createElement('div');
+  modulesContainer.className = 'pillar-modules';
 
-  details.appendChild(inner);
+  modules.forEach(module => {
+    const moduleItem = createModuleItem(module);
+    modulesContainer.appendChild(moduleItem);
+  });
+
+  details.appendChild(summary);
+  details.appendChild(modulesContainer);
+
   return details;
 }
 
-function renderModules(modules, configurationSummary) {
-  modulesContainer.innerHTML = '';
+function createModuleItem(module) {
+  const div = document.createElement('div');
+  div.className = 'module-item';
+  div.dataset.module = module.name;
 
-  if (!Array.isArray(modules) || !modules.length) {
-    modulesContainer.innerHTML = '<p class="loading">No modules reported yet.</p>';
-    return;
-  }
+  const shortName = extractModuleShortName(module.name);
+  const settingsCount = module.settings?.length || 0;
+  const notesCount = module.notes?.length || 0;
 
-  const groups = buildPillarGroups(modules, configurationSummary);
-
-  groups.forEach((group, index) => {
-    const wrapper = document.createElement('details');
-    wrapper.className = 'pillar-group';
-    if (group.pillarClass) {
-      wrapper.classList.add(group.pillarClass);
-    }
-    if (group.colorHex) {
-      wrapper.style.setProperty('--pillar-color-hex', group.colorHex);
-    }
-    if (group.colorRgb) {
-      wrapper.style.setProperty('--pillar-color-rgb', group.colorRgb);
-    }
-    if (index === 0) {
-      wrapper.open = true;
-    }
-
-    const summary = document.createElement('summary');
-
-    const name = document.createElement('span');
-    name.className = 'pillar-name';
-    name.innerHTML = `<span class="module-icon">${group.icon ?? '🧩'}</span>${group.pillar}`;
-
-    const counts = document.createElement('span');
-    counts.className = 'pillar-counts';
-    const countParts = [
-      pluralize('module', group.moduleCount),
-      pluralize('setting', group.settingCount)
-    ];
-    if (group.toolCount) {
-      countParts.push(pluralize('tool', group.toolCount));
-    }
-    if (group.noteCount) {
-      countParts.push(pluralize('note', group.noteCount));
-    }
-    counts.textContent = countParts.join(' · ');
-
-    summary.appendChild(name);
-    summary.appendChild(counts);
-    wrapper.appendChild(summary);
-
-    const body = document.createElement('div');
-    body.className = 'pillar-body';
-
-    if (!group.modules.length) {
-      const empty = document.createElement('p');
-      empty.className = 'pillar-empty';
-      empty.textContent = 'No modules reported for this pillar yet.';
-      body.appendChild(empty);
-    } else {
-      const moduleList = document.createElement('div');
-      moduleList.className = 'pillar-modules';
-      group.modules.forEach(module => {
-        moduleList.appendChild(createModuleDetails(module, group.moduleClass));
-      });
-      body.appendChild(moduleList);
-    }
-
-    wrapper.appendChild(body);
-    modulesContainer.appendChild(wrapper);
-  });
-}
-
-function renderHealth(health) {
-  healthContainer.innerHTML = '';
-  if (!health) {
-    healthContainer.innerHTML = '<p class="loading">Health snapshot unavailable.</p>';
-    return;
-  }
-
-  const overall = document.createElement('div');
-  overall.className = `overall ${statusClass((health.overall ?? '').toString())}`;
-  const computed = health.computedAtUtc ? new Date(health.computedAtUtc) : null;
-  overall.innerHTML = `
-    <span class="badge ${statusClass((health.overall ?? '').toString())}">${health.overall ?? 'Unknown'}</span>
-    <span>${computed ? `Computed ${computed.toLocaleString()}` : 'No timestamp available'}</span>
+  div.innerHTML = `
+    <span class="module-name">${shortName}</span>
+    <span class="module-indicators">
+      ${settingsCount > 0 ? `<span class="has-settings" title="${settingsCount} settings">⚙</span>` : ''}
+      ${notesCount > 0 ? `<span class="has-notes" title="${notesCount} notes">📝</span>` : ''}
+    </span>
   `;
-  healthContainer.appendChild(overall);
 
-  if (!Array.isArray(health.components) || !health.components.length) {
-    const empty = document.createElement('p');
-    empty.className = 'loading';
-    empty.textContent = 'No health components registered.';
-    healthContainer.appendChild(empty);
+  div.addEventListener('click', (e) => {
+    e.stopPropagation();
+    selectModule(module);
+  });
+
+  return div;
+}
+
+function extractModuleShortName(fullName) {
+  const parts = fullName.split('.');
+  return parts.slice(2).join('.') || parts[parts.length - 1];
+}
+
+function selectModule(module) {
+  AppState.selectedModule = module;
+
+  // Update selection in pillar sidebar
+  document.querySelectorAll('.module-item').forEach(item => {
+    item.classList.toggle('selected', item.dataset.module === module.name);
+  });
+
+  // Navigate to module view
+  navigate(`#/module/${encodeURIComponent(module.name)}`);
+}
+
+// ========================================
+// Ops Mode Content
+// ========================================
+
+function renderOpsMode() {
+  const data = AppState.apiData;
+  if (!data) return;
+
+  renderTelemetry(data.runtime);
+  renderCriticalHealth(data.health?.components);
+  renderEnvironment(data.environment);
+  renderStartupNotes(data.modules);
+}
+
+function renderTelemetry(runtime) {
+  const grid = document.getElementById('telemetry-grid');
+  if (!grid || !runtime) return;
+
+  const process = runtime.process || {};
+  const memory = runtime.memory || {};
+  const gc = runtime.garbageCollector || {};
+  const threadPool = runtime.threadPool || {};
+
+  grid.innerHTML = `
+    <div class="telemetry-card">
+      <div class="telemetry-label">CPU Usage</div>
+      <div class="telemetry-value">${formatPercent(process.cpuUtilizationPercent) || '—'}</div>
+      <div class="telemetry-detail">Current</div>
+    </div>
+    <div class="telemetry-card">
+      <div class="telemetry-label">Memory</div>
+      <div class="telemetry-value">${formatBytes(memory.workingSetBytes) || '—'}</div>
+      <div class="telemetry-detail">Working set</div>
+    </div>
+    <div class="telemetry-card">
+      <div class="telemetry-label">Threads</div>
+      <div class="telemetry-value">${threadPool.threadCount || '—'}</div>
+      <div class="telemetry-detail">Thread pool</div>
+    </div>
+    <div class="telemetry-card">
+      <div class="telemetry-label">GC Collections</div>
+      <div class="telemetry-value">${formatGCCounts(gc.collectionCounts)}</div>
+      <div class="telemetry-detail">Gen0/Gen1/Gen2</div>
+    </div>
+    <div class="telemetry-card">
+      <div class="telemetry-label">Handles</div>
+      <div class="telemetry-value">${process.handleCount || '—'}</div>
+      <div class="telemetry-detail">System handles</div>
+    </div>
+    <div class="telemetry-card">
+      <div class="telemetry-label">Work Items</div>
+      <div class="telemetry-value">${formatNumber(threadPool.pendingWorkItemCount) || '—'}</div>
+      <div class="telemetry-detail">ThreadPool queue</div>
+    </div>
+  `;
+}
+
+function renderCriticalHealth(components) {
+  const body = document.getElementById('critical-health-body');
+  if (!body || !components) return;
+
+  const criticalHealth = components.filter(h => h.facts?.critical === 'true');
+
+  if (criticalHealth.length === 0) {
+    body.innerHTML = '<p class="text-secondary">No critical health checks configured</p>';
     return;
   }
 
-  health.components.forEach(component => {
-    const detail = document.createElement('details');
-    detail.className = 'health-item';
-    detail.open = component.status?.toString().toLowerCase().includes('unhealthy');
+  const list = document.createElement('div');
+  list.className = 'health-list';
 
-    const summary = document.createElement('summary');
-    const status = (component.status ?? '').toString();
-    summary.innerHTML = `
-      <span class="health-name">${component.component}</span>
-      <span class="badge ${statusClass(status.toLowerCase())}">${status}</span>
+  criticalHealth.forEach(item => {
+    const div = document.createElement('div');
+    div.className = 'health-item';
+
+    const statusClass = item.status?.toLowerCase() || 'unknown';
+
+    div.innerHTML = `
+      <span class="health-component">${item.component || 'Unknown'}</span>
+      <span class="health-status ${statusClass}">
+        ${statusClass === 'healthy' ? '●' : statusClass === 'degraded' ? '⚠' : statusClass === 'error' ? '✕' : '○'}
+        ${item.status || 'Unknown'}
+      </span>
     `;
-    detail.appendChild(summary);
 
-    const body = document.createElement('div');
-    body.className = 'health-body';
-
-    if (component.message) {
-      const message = document.createElement('p');
-      message.className = 'health-message';
-      message.textContent = component.message;
-      body.appendChild(message);
-    }
-
-    const timestamp = component.timestampUtc ? new Date(component.timestampUtc) : null;
-    const stamp = document.createElement('p');
-    stamp.className = 'muted';
-    stamp.textContent = timestamp ? `Observed ${timestamp.toLocaleString()}` : 'Timestamp unavailable';
-    body.appendChild(stamp);
-
-    const facts = component.facts && Object.keys(component.facts).length
-      ? Object.entries(component.facts).map(([key, value]) => `<div><span class="fact-key">${key}</span><span>${value}</span></div>`).join('')
-      : '<p class="muted">No diagnostic facts supplied.</p>';
-
-    const factBlock = document.createElement('div');
-    factBlock.className = 'health-facts';
-    factBlock.innerHTML = facts;
-    body.appendChild(factBlock);
-
-    detail.appendChild(body);
-    healthContainer.appendChild(detail);
+    list.appendChild(div);
   });
+
+  body.innerHTML = '';
+  body.appendChild(list);
 }
 
-function renderNotes(notes, modules) {
-  notesContainer.innerHTML = '';
-  const entries = Array.isArray(notes) && notes.length
-    ? notes
-    : (Array.isArray(modules) ? modules.flatMap(module => (module.notes ?? []).map(note => ({ module: module.name, note }))) : []);
+function renderEnvironment(environment) {
+  const body = document.getElementById('environment-body');
+  if (!body || !environment) return;
 
-  if (!entries.length) {
-    notesContainer.innerHTML = '<p class="loading">No startup notes recorded.</p>';
+  const list = document.createElement('div');
+  list.className = 'env-list';
+
+  Object.entries(environment).forEach(([key, value]) => {
+    const div = document.createElement('div');
+    div.className = 'env-item';
+    div.innerHTML = `
+      <span class="env-label">${formatEnvKey(key)}</span>
+      <span class="env-value">${escapeHtml(String(value))}</span>
+    `;
+    list.appendChild(div);
+  });
+
+  body.innerHTML = '';
+  body.appendChild(list);
+}
+
+function renderStartupNotes(modules) {
+  const body = document.getElementById('startup-notes-body');
+  if (!body || !modules) return;
+
+  const notes = [];
+  modules.forEach(module => {
+    if (module.notes && module.notes.length > 0) {
+      module.notes.forEach(note => {
+        notes.push({ module: module.name, note });
+      });
+    }
+  });
+
+  if (notes.length === 0) {
+    body.innerHTML = '<p class="text-secondary">No startup notes</p>';
     return;
   }
 
   const list = document.createElement('ul');
   list.className = 'notes-list';
-  entries.forEach(entry => {
-    const item = document.createElement('li');
-    item.innerHTML = `<strong>${entry.module}</strong><span>${entry.note}</span>`;
-    list.appendChild(item);
+
+  notes.slice(0, 10).forEach(item => {
+    const li = document.createElement('li');
+    li.className = 'note-item';
+    li.innerHTML = `
+      <span class="note-module">${extractModuleShortName(item.module)}</span>
+      <span class="note-text">${escapeHtml(item.note)}</span>
+    `;
+    list.appendChild(li);
   });
-  notesContainer.appendChild(list);
+
+  body.innerHTML = '';
+  body.appendChild(list);
 }
 
-async function renderLaunchKit(status) {
-  launchKitContainer.innerHTML = '';
+// ========================================
+// Framework Mode Content
+// ========================================
 
-  if (!status?.features?.launchKitEnabled) {
-    launchKitContainer.innerHTML = '<p class="launchkit-disabled">LaunchKit is disabled for this host. Set Koan:Admin:EnableLaunchKit=true to enable bundle generation.</p>';
+function renderFrameworkMode() {
+  const data = AppState.apiData;
+  if (!data) return;
+
+  renderAutoRegistrationReport(data.modules);
+  renderProviderElection(data.modules);
+  renderCapabilityMatrix(data.modules);
+  renderProvenanceAnalysis(data.modules);
+}
+
+function renderAutoRegistrationReport(modules) {
+  const summary = document.getElementById('registration-summary');
+  const tableBody = document.querySelector('#registration-table tbody');
+
+  if (!summary || !tableBody || !modules) return;
+
+  summary.textContent = `✓ Scan completed • ${modules.length} modules registered via IKoanAutoRegistrar`;
+
+  const pillars = groupByPillar(modules);
+  tableBody.innerHTML = '';
+
+  Object.entries(pillars).forEach(([pillarName, pillarModules]) => {
+    const settingsCount = pillarModules.reduce((sum, m) => sum + (m.settings?.length || 0), 0);
+    const notesCount = pillarModules.reduce((sum, m) => sum + (m.notes?.length || 0), 0);
+
+    const row = document.createElement('tr');
+    row.innerHTML = `
+      <td><strong>${pillarName.toUpperCase()}</strong></td>
+      <td>${pillarModules.length}</td>
+      <td>${settingsCount}</td>
+      <td>${notesCount}</td>
+      <td><span class="text-success">✓ OK</span></td>
+    `;
+    tableBody.appendChild(row);
+  });
+}
+
+function renderProviderElection(modules) {
+  const body = document.getElementById('provider-election-body');
+  if (!body || !modules) return;
+
+  const providers = modules.filter(m => m.name.toLowerCase().includes('connector'));
+
+  if (providers.length === 0) {
+    body.innerHTML = '<p class="text-secondary">No providers detected</p>';
     return;
   }
 
-  try {
-    const metadata = await fetchJson(LAUNCHKIT_METADATA_ENDPOINT);
-    launchKitContainer.appendChild(buildLaunchKitForm(metadata));
-  } catch (err) {
-    console.error(err);
-    launchKitContainer.innerHTML = `<p class="error">Unable to load LaunchKit metadata. ${err.message}</p>`;
-  }
-}
+  body.innerHTML = '';
 
-function buildLaunchKitForm(metadata) {
-  const form = document.createElement('form');
-  form.className = 'launchkit-form';
+  providers.forEach(provider => {
+    const card = document.createElement('div');
+    card.className = 'provider-election-card';
 
-  const profileField = document.createElement('label');
-  profileField.className = 'field';
-  profileField.innerHTML = '<span>Profile</span>';
-  const profileSelect = document.createElement('select');
-  const profiles = metadata.availableProfiles && metadata.availableProfiles.length
-    ? metadata.availableProfiles
-    : [metadata.defaultProfile ?? 'Default'];
-  profiles.forEach(profile => {
-    const option = document.createElement('option');
-    option.value = profile;
-    option.textContent = profile;
-    if (profile === metadata.defaultProfile) {
-      option.selected = true;
-    }
-    profileSelect.appendChild(option);
-  });
-  profileField.appendChild(profileSelect);
-  form.appendChild(profileField);
+    const providerType = extractProviderType(provider.name);
+    const connectionString = findConnectionString(provider.settings);
 
-  const toggles = [
-    { id: 'include-appsettings', prop: 'includeAppSettings', label: 'Appsettings bundle', description: 'Exports environment scoped configuration files.', supported: metadata.supportsAppSettings },
-    { id: 'include-compose', prop: 'includeCompose', label: 'Docker Compose bundle', description: 'Generates docker-compose assets for local orchestration.', supported: metadata.supportsCompose },
-    { id: 'include-aspire', prop: 'includeAspire', label: 'Aspire manifest', description: 'Adds Aspire manifest files for AppHost projects.', supported: metadata.supportsAspire },
-    { id: 'include-manifest', prop: 'includeManifest', label: 'Diagnostic manifest', description: 'Includes the sanitized Koan Admin manifest summary.', supported: metadata.supportsManifest },
-    { id: 'include-readme', prop: 'includeReadme', label: 'README guidance', description: 'Adds walkthrough README tailored to the selected profile.', supported: metadata.supportsReadme }
-  ];
-
-  const toggleGroup = document.createElement('div');
-  toggleGroup.className = 'toggle-group';
-  toggles.forEach(toggle => {
-    const wrapper = document.createElement('label');
-    wrapper.className = toggle.supported ? 'toggle-option' : 'toggle-option disabled';
-    wrapper.innerHTML = `
-      <input type="checkbox" id="${toggle.id}" ${toggle.supported ? 'checked' : 'disabled'} />
-      <div>
-        <span>${toggle.label}</span>
-        <small>${toggle.description}</small>
+    card.innerHTML = `
+      <div class="provider-election-header">
+        <span class="provider-name">${providerType}</span>
+      </div>
+      <div class="provider-details">
+        <div class="provider-detail-row">
+          <span class="provider-detail-label">Module</span>
+          <span class="provider-detail-value">${provider.name}</span>
+        </div>
+        ${connectionString ? `
+          <div class="provider-detail-row">
+            <span class="provider-detail-label">Connection</span>
+            <span class="provider-detail-value">${escapeHtml(truncate(connectionString, 80))}</span>
+          </div>
+        ` : ''}
+        <div class="provider-detail-row">
+          <span class="provider-detail-label">Settings</span>
+          <span class="provider-detail-value">${provider.settings?.length || 0} configured</span>
+        </div>
+        <div class="provider-detail-row">
+          <span class="provider-detail-label">Reason</span>
+          <span class="provider-detail-value">Auto-discovered via ${providerType}DiscoveryAdapter</span>
+        </div>
       </div>
     `;
-    toggleGroup.appendChild(wrapper);
+
+    body.appendChild(card);
   });
-  form.appendChild(toggleGroup);
+}
 
-  const openApiSection = document.createElement('div');
-  openApiSection.className = 'openapi';
-  if (metadata.openApiClientTemplates?.length) {
-    openApiSection.innerHTML = '<p class="section-title">OpenAPI clients</p>';
-    metadata.openApiClientTemplates.forEach(client => {
-      const wrapper = document.createElement('label');
-      wrapper.className = 'toggle-option';
-      wrapper.innerHTML = `<input type="checkbox" value="${client}" checked /><div><span>${client}</span></div>`;
-      openApiSection.appendChild(wrapper);
-    });
-  } else {
-    openApiSection.innerHTML = '<p class="muted">No OpenAPI client templates configured.</p>';
+function renderCapabilityMatrix(modules) {
+  const matrix = document.getElementById('capability-matrix');
+  if (!matrix || !modules) return;
+
+  const providers = modules.filter(m => m.name.toLowerCase().includes('connector'));
+
+  if (providers.length === 0) {
+    matrix.innerHTML = '<p class="text-secondary">No providers to analyze</p>';
+    return;
   }
-  form.appendChild(openApiSection);
 
-  const submit = document.createElement('button');
-  submit.type = 'submit';
-  submit.textContent = 'Download bundle';
-  form.appendChild(submit);
+  const table = document.createElement('table');
+  table.className = 'capability-table';
+  table.innerHTML = `
+    <thead>
+      <tr>
+        <th>Provider</th>
+        <th>Module</th>
+        <th>Settings</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  `;
 
-  const message = document.createElement('p');
-  message.className = 'launchkit-message';
-  form.appendChild(message);
+  const tbody = table.querySelector('tbody');
 
-  form.addEventListener('submit', async event => {
-    event.preventDefault();
-    try {
-      message.className = 'launchkit-message loading';
-      message.textContent = 'Preparing bundle…';
+  providers.forEach(provider => {
+    const row = document.createElement('tr');
+    const providerType = extractProviderType(provider.name);
+    const settingsCount = provider.settings?.length || 0;
 
-      const payload = buildPayload(profileSelect, toggles, openApiSection);
-      const response = await fetch(LAUNCHKIT_BUNDLE_ENDPOINT, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+    row.innerHTML = `
+      <td><strong>${providerType}</strong></td>
+      <td>${provider.name}</td>
+      <td>${settingsCount}</td>
+      <td><span class="capability-indicator supported">✓ Active</span></td>
+    `;
+    tbody.appendChild(row);
+  });
+
+  matrix.innerHTML = '';
+  matrix.appendChild(table);
+}
+
+function renderProvenanceAnalysis(modules) {
+  const summary = document.getElementById('provenance-summary');
+  const details = document.getElementById('provenance-details');
+
+  if (!summary || !details || !modules) return;
+
+  let autoCount = 0;
+  let appSettingsCount = 0;
+  let environmentCount = 0;
+
+  modules.forEach(module => {
+    if (module.settings) {
+      module.settings.forEach(setting => {
+        const source = setting.source || 'Auto';
+        if (source.toLowerCase().includes('auto')) autoCount++;
+        else if (source.toLowerCase().includes('appsettings')) appSettingsCount++;
+        else if (source.toLowerCase().includes('environment')) environmentCount++;
       });
-
-      if (!response.ok) {
-        const detail = await safeReadText(response);
-        throw new Error(`Bundle generation failed: ${response.status} ${response.statusText}${detail ? ` - ${detail}` : ''}`);
-      }
-
-      const blob = await response.blob();
-      const filename = extractFileName(response.headers.get('Content-Disposition')) || `koan-launchkit-${payload.profile}.zip`;
-      downloadBlob(blob, filename);
-
-      message.className = 'launchkit-message';
-      message.textContent = `Bundle ready: ${filename}`;
-    } catch (err) {
-      console.error(err);
-      message.className = 'launchkit-message error';
-      message.textContent = err.message;
     }
   });
 
-  return form;
+  summary.innerHTML = `
+    <div class="provenance-stat">
+      <div class="provenance-stat-label">Auto Defaults</div>
+      <div class="provenance-stat-value">${autoCount}</div>
+    </div>
+    <div class="provenance-stat">
+      <div class="provenance-stat-label">AppSettings</div>
+      <div class="provenance-stat-value">${appSettingsCount}</div>
+    </div>
+    <div class="provenance-stat">
+      <div class="provenance-stat-label">Environment</div>
+      <div class="provenance-stat-value">${environmentCount}</div>
+    </div>
+    <div class="provenance-stat">
+      <div class="provenance-stat-label">Total Settings</div>
+      <div class="provenance-stat-value">${autoCount + appSettingsCount + environmentCount}</div>
+    </div>
+  `;
+
+  details.innerHTML = '<p class="text-secondary">Navigate to Configuration view for detailed setting provenance</p>';
 }
 
-function buildPayload(profileSelect, toggles, openApiSection) {
-  const payload = {
-    profile: profileSelect.value,
-    openApiClients: []
+// ========================================
+// Configuration View
+// ========================================
+
+function renderConfigurationView() {
+  const data = AppState.apiData;
+  if (!data || !data.modules) return;
+
+  // Collect all settings
+  const allSettings = [];
+  data.modules.forEach(module => {
+    if (module.settings) {
+      module.settings.forEach(setting => {
+        allSettings.push({
+          ...setting,
+          module: module.name,
+          canonicalKey: buildCanonicalKey(module.name, setting.key)
+        });
+      });
+    }
+  });
+
+  // Render based on current mode
+  switch (AppState.configViewMode) {
+    case 'canonical':
+      renderCanonicalView(allSettings);
+      break;
+    case 'appsettings':
+      renderAppSettingsView(allSettings);
+      break;
+    case 'env':
+      renderEnvView(allSettings);
+      break;
+  }
+}
+
+function buildCanonicalKey(moduleName, settingKey) {
+  // The setting key is already the full canonical path
+  return settingKey;
+}
+
+function renderCanonicalView(allSettings) {
+  const list = document.getElementById('config-list');
+  if (!list) return;
+
+  // Filter by search term
+  const filteredSettings = allSettings.filter(setting => {
+    if (!AppState.configSearchTerm) return true;
+    const searchLower = AppState.configSearchTerm.toLowerCase();
+    return setting.canonicalKey.toLowerCase().includes(searchLower) ||
+           setting.value.toLowerCase().includes(searchLower) ||
+           (setting.source || '').toLowerCase().includes(searchLower);
+  });
+
+  if (filteredSettings.length === 0) {
+    list.innerHTML = '<p class="text-secondary">No settings found</p>';
+    return;
+  }
+
+  list.innerHTML = '';
+
+  filteredSettings.forEach(setting => {
+    const item = document.createElement('div');
+    item.className = 'config-item';
+
+    const source = (setting.source || 'Auto').toLowerCase().replace(/\s/g, '');
+
+    item.innerHTML = `
+      <div class="config-key">${setting.canonicalKey}</div>
+      <div>
+        <span class="config-source-badge ${source}">${setting.source || 'Auto'}</span>
+      </div>
+      <div class="config-value">${escapeHtml(truncate(setting.value, 80))}</div>
+    `;
+
+    list.appendChild(item);
+  });
+}
+
+function renderAppSettingsView(allSettings) {
+  const output = document.getElementById('config-json-output');
+  if (!output) return;
+
+  // Build nested JSON structure
+  const json = {};
+
+  allSettings.forEach(setting => {
+    const parts = setting.canonicalKey.split(':');
+    let current = json;
+    let isValid = true;
+
+    parts.forEach((part, index) => {
+      if (!isValid) return; // Skip if we've hit an invalid path
+
+      if (index === parts.length - 1) {
+        // Last part - set the value (but only if current is an object)
+        if (typeof current === 'object' && current !== null) {
+          current[part] = setting.value;
+        }
+      } else {
+        // Intermediate part - create object if doesn't exist
+        if (!current[part]) {
+          current[part] = {};
+        } else if (typeof current[part] !== 'object' || current[part] === null) {
+          // If current[part] is already a primitive value, we can't traverse deeper
+          // This happens when settings have conflicting paths
+          isValid = false;
+          return;
+        }
+        current = current[part];
+      }
+    });
+  });
+
+  output.textContent = JSON.stringify(json, null, 2);
+}
+
+function renderEnvView(allSettings) {
+  const output = document.getElementById('config-env-output');
+  if (!output) return;
+
+  // Convert to environment variable format (Koan:Pillar:Module → KOAN__PILLAR__MODULE)
+  const lines = [];
+
+  // Group by source
+  const bySource = {
+    auto: [],
+    appsettings: [],
+    environment: []
   };
 
-  toggles.forEach(toggle => {
-    const input = document.getElementById(toggle.id);
-    if (input && !input.disabled) {
-      payload[toggle.prop] = input.checked;
+  allSettings.forEach(setting => {
+    const source = (setting.source || 'Auto').toLowerCase();
+    const envKey = setting.canonicalKey.replace(/:/g, '__').toUpperCase();
+    const envLine = `${envKey}=${setting.value}`;
+
+    if (source.includes('auto')) {
+      bySource.auto.push(envLine);
+    } else if (source.includes('appsettings')) {
+      bySource.appsettings.push(envLine);
+    } else if (source.includes('environment')) {
+      bySource.environment.push(envLine);
     }
   });
 
-  const clientInputs = openApiSection.querySelectorAll('input[type="checkbox"]');
-  clientInputs.forEach(input => {
-    if (input.checked) {
-      payload.openApiClients.push(input.value);
-    }
-  });
-
-  if (!payload.openApiClients.length) {
-    delete payload.openApiClients;
+  // Build output with sections
+  if (bySource.environment.length > 0) {
+    lines.push('# Environment-sourced settings');
+    lines.push(...bySource.environment);
+    lines.push('');
   }
 
-  return payload;
+  if (bySource.appsettings.length > 0) {
+    lines.push('# AppSettings-sourced settings');
+    lines.push(...bySource.appsettings);
+    lines.push('');
+  }
+
+  if (bySource.auto.length > 0) {
+    lines.push('# Auto-discovered settings (shown for reference)');
+    bySource.auto.forEach(line => {
+      lines.push(`# ${line}`);
+    });
+  }
+
+  output.textContent = lines.join('\n');
 }
 
-function downloadBlob(blob, fileName) {
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = fileName;
-  document.body.appendChild(anchor);
-  anchor.click();
-  setTimeout(() => {
-    URL.revokeObjectURL(url);
-    anchor.remove();
-  }, 0);
+// ========================================
+// Pillar View Rendering
+// ========================================
+
+function renderPillarView(pillarName) {
+  const data = AppState.apiData;
+  if (!data) return;
+
+  const pillars = groupByPillar(data.modules);
+  const modules = pillars[pillarName] || [];
+
+  const titleEl = document.getElementById('pillar-view-title');
+  const subtitleEl = document.getElementById('pillar-view-subtitle');
+
+  if (titleEl) titleEl.textContent = `${pillarName.toUpperCase()} Pillar`;
+  if (subtitleEl) subtitleEl.textContent = `${modules.length} modules`;
+
+  const grid = document.getElementById('pillar-modules-grid');
+  if (!grid) return;
+
+  grid.innerHTML = '';
+
+  modules.forEach(module => {
+    const card = createModuleCard(module, pillarName);
+    grid.appendChild(card);
+  });
+
+  // Setup back button
+  const backBtn = document.getElementById('back-to-dashboard');
+  if (backBtn) {
+    backBtn.onclick = () => navigate('#/');
+  }
 }
 
-function extractFileName(contentDisposition) {
-  if (!contentDisposition) return null;
-  const match = /filename="?([^";]+)"?/i.exec(contentDisposition);
-  return match ? match[1] : null;
+function createModuleCard(module, pillarName) {
+  const card = document.createElement('div');
+  card.className = 'module-card';
+
+  const colorRGB = PILLAR_COLORS[pillarName] || '100, 116, 139';
+  card.style.borderLeftColor = `rgb(${colorRGB})`;
+
+  const version = module.version || 'N/A';
+  const settingsCount = module.settings?.length || 0;
+  const notesCount = module.notes?.length || 0;
+
+  card.innerHTML = `
+    <div class="module-card-header">
+      <div>
+        <div class="module-card-title">${module.name}</div>
+        <div class="module-card-version">v${version}</div>
+      </div>
+    </div>
+    <div class="module-card-meta">
+      <span>⚙ ${settingsCount} settings</span>
+      <span>📝 ${notesCount} notes</span>
+    </div>
+  `;
+
+  card.addEventListener('click', () => {
+    navigate(`#/module/${encodeURIComponent(module.name)}`);
+  });
+
+  return card;
+}
+
+// ========================================
+// Module View Rendering
+// ========================================
+
+function renderModuleView(moduleName) {
+  const data = AppState.apiData;
+  if (!data) return;
+
+  const module = data.modules?.find(m => m.name === moduleName);
+  if (!module) {
+    const titleEl = document.getElementById('module-view-title');
+    const subtitleEl = document.getElementById('module-view-subtitle');
+    const contentEl = document.getElementById('module-detail-content');
+
+    if (titleEl) titleEl.textContent = 'Module Not Found';
+    if (subtitleEl) subtitleEl.textContent = '';
+    if (contentEl) contentEl.innerHTML = '<p class="text-secondary">Module not found</p>';
+    return;
+  }
+
+  const titleEl = document.getElementById('module-view-title');
+  const subtitleEl = document.getElementById('module-view-subtitle');
+
+  if (titleEl) titleEl.textContent = module.name;
+  if (subtitleEl) subtitleEl.textContent = `v${module.version || 'N/A'}`;
+
+  const content = document.getElementById('module-detail-content');
+  if (!content) return;
+
+  content.innerHTML = `
+    <div class="panel">
+      <div class="panel-header">
+        <div>
+          <h3>Settings</h3>
+          <p class="panel-subtitle">${module.settings?.length || 0} configuration values</p>
+        </div>
+      </div>
+      <div class="panel-body">
+        ${renderAllSettings(module.settings)}
+      </div>
+    </div>
+
+    ${module.notes && module.notes.length > 0 ? `
+      <div class="panel">
+        <div class="panel-header">
+          <div>
+            <h3>Notes</h3>
+            <p class="panel-subtitle">${module.notes.length} startup notes</p>
+          </div>
+        </div>
+        <div class="panel-body">
+          <ul class="notes-list">
+            ${module.notes.map(note => `
+              <li class="note-item">
+                <span class="note-text">${escapeHtml(note)}</span>
+              </li>
+            `).join('')}
+          </ul>
+        </div>
+      </div>
+    ` : ''}
+
+    ${module.tools && module.tools.length > 0 ? `
+      <div class="panel">
+        <div class="panel-header">
+          <div>
+            <h3>Tools</h3>
+            <p class="panel-subtitle">${module.tools.length} exposed routes</p>
+          </div>
+        </div>
+        <div class="panel-body">
+          ${module.tools.map(tool => `
+            <div class="setting-compact">
+              <div class="setting-key">${tool.name || 'Tool'}</div>
+              <div class="setting-value">${escapeHtml(tool.route || 'N/A')}</div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    ` : ''}
+  `;
+
+  // Setup back button
+  const backBtn = document.getElementById('back-to-pillar');
+  if (backBtn) {
+    const pillarName = extractPillarName(module.name);
+    backBtn.onclick = () => navigate(`#/pillar/${pillarName}`);
+  }
+}
+
+function renderAllSettings(settings) {
+  if (!settings || settings.length === 0) {
+    return '<p class="text-secondary">No settings configured</p>';
+  }
+
+  return settings.map(setting => {
+    const source = setting.source || 'Auto';
+    const sourceClass = source.toLowerCase().replace(/\s/g, '');
+    const consumers = setting.consumers || [];
+
+    return `
+      <div class="setting-compact">
+        <div class="setting-key">${setting.key}</div>
+        <div class="setting-value">${escapeHtml(setting.value)}</div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.5rem;">
+          <span class="setting-source ${sourceClass}">${source}</span>
+          ${consumers.length > 0 ? `
+            <div class="consumer-chips">
+              ${consumers.slice(0, 3).map(c => `<span class="consumer-chip">${c}</span>`).join('')}
+              ${consumers.length > 3 ? `<span class="consumer-chip">+${consumers.length - 3}</span>` : ''}
+            </div>
+          ` : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+// ========================================
+// Utility Functions
+// ========================================
+
+function formatBytes(bytes) {
+  if (bytes === undefined || bytes === null) return null;
+  if (bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
+}
+
+function formatNumber(num) {
+  if (num === undefined || num === null) return null;
+  return num.toLocaleString();
+}
+
+function formatPercent(value) {
+  if (value === undefined || value === null) return null;
+  return `${value.toFixed(1)}%`;
+}
+
+function formatGCCounts(gcCounts) {
+  if (!gcCounts || gcCounts.length !== 3) return '—/—/—';
+  return gcCounts.join('/');
+}
+
+function formatEnvKey(key) {
+  return key.replace(/([A-Z])/g, ' $1').trim();
+}
+
+function truncate(str, maxLen) {
+  if (!str) return '';
+  if (str.length <= maxLen) return str;
+  return str.substring(0, maxLen) + '...';
+}
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+function extractProviderType(moduleName) {
+  const parts = moduleName.split('.');
+  return parts[parts.length - 1];
+}
+
+function findConnectionString(settings) {
+  if (!settings) return null;
+  const connSetting = settings.find(s =>
+    s.key.toLowerCase().includes('connection') ||
+    s.key.toLowerCase().includes('endpoint') ||
+    s.key.toLowerCase().includes('url')
+  );
+  return connSetting?.value || null;
+}
+
+// ========================================
+// Context Bar Updates
+// ========================================
+
+function updateContextMeta() {
+  const data = AppState.apiData;
+  if (!data || !data.environment) return;
+
+  const envBadge = document.getElementById('env-badge');
+  const sessionId = document.getElementById('session-id');
+  const uptime = document.getElementById('uptime');
+
+  if (envBadge && data.environment.environmentName) {
+    envBadge.textContent = data.environment.environmentName;
+  }
+
+  if (sessionId && data.environment.sessionId) {
+    sessionId.textContent = `Session: ${data.environment.sessionId}`;
+  }
+
+  if (uptime && data.runtime?.process?.uptimeSeconds) {
+    const uptimeMs = data.runtime.process.uptimeSeconds * 1000;
+    uptime.textContent = `Uptime: ${formatUptime(uptimeMs)}`;
+  }
+}
+
+function updateGeneratedAt() {
+  const timestamp = document.getElementById('generated-at');
+  if (timestamp && AppState.lastUpdate) {
+    timestamp.textContent = `Updated ${formatRelativeTime(AppState.lastUpdate)}`;
+  }
 }
 
 function formatUptime(milliseconds) {
   const totalSeconds = Math.floor(milliseconds / 1000);
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
-  if (hours > 0) {
-    return `${hours}h ${minutes}m`;
-  }
-  if (minutes > 0) {
-    return `${minutes}m ${seconds}s`;
-  }
-  return `${seconds}s`;
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  if (minutes > 0) return `${minutes}m`;
+  return `${totalSeconds}s`;
 }
 
-function renderGeneratedAt(manifestSummary) {
-  if (!manifestSummary) {
-    generatedAtElement.textContent = '';
-    return;
-  }
-  const generatedAt = manifestSummary.generatedAtUtc ?? manifestSummary.GeneratedAtUtc;
-  const timestamp = generatedAt ? new Date(generatedAt) : new Date();
-  generatedAtElement.textContent = `Summary generated ${timestamp.toLocaleString()}`;
+function formatRelativeTime(date) {
+  const seconds = Math.floor((new Date() - date) / 1000);
+  if (seconds < 60) return `${seconds}s ago`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  return `${hours}h ago`;
 }
 
-function statusClass(status) {
-  const normalized = status.toLowerCase();
-  if (normalized.includes('fail') || normalized.includes('down') || normalized.includes('unhealthy')) {
-    return 'error';
-  }
-  if (normalized.includes('healthy') || normalized.includes('up')) {
-    return 'success';
-  }
-  if (normalized.includes('degraded') || normalized.includes('warn')) {
-    return 'warn';
-  }
-  return 'warn';
+// ========================================
+// Main Render Function
+// ========================================
+
+function renderContent() {
+  if (!AppState.apiData) return;
+
+  renderFrameworkPulse();
+  renderPillars();
+  updateContextMeta();
+  updateGeneratedAt();
 }
 
-function clearRefreshTimer() {
+// ========================================
+// Event Handlers
+// ========================================
+
+function setupEventHandlers() {
+  // Refresh button
+  const refreshBtn = document.getElementById('refresh-btn');
+  if (refreshBtn) {
+    refreshBtn.addEventListener('click', async () => {
+      refreshBtn.disabled = true;
+      await fetchAPIData();
+      renderContent();
+      // Re-render current view
+      handleRouteChange();
+      setTimeout(() => {
+        refreshBtn.disabled = false;
+      }, 1000);
+    });
+  }
+
+  // Auto-refresh toggle
+  const autoRefreshCheckbox = document.getElementById('auto-refresh');
+  if (autoRefreshCheckbox) {
+    autoRefreshCheckbox.checked = AppState.autoRefresh;
+    autoRefreshCheckbox.addEventListener('change', (e) => {
+      AppState.autoRefresh = e.target.checked;
+      saveState();
+      if (AppState.autoRefresh) {
+        startAutoRefresh();
+      } else {
+        stopAutoRefresh();
+      }
+    });
+  }
+
+  // Collapse all button
+  const collapseAllBtn = document.getElementById('collapse-all-btn');
+  if (collapseAllBtn) {
+    collapseAllBtn.addEventListener('click', () => {
+      document.querySelectorAll('.pillar[open]').forEach(pillar => {
+        pillar.open = false;
+      });
+      AppState.expandedPillars = [];
+      saveState();
+    });
+  }
+
+  // Show all health button
+  const showAllHealthBtn = document.getElementById('show-all-health-btn');
+  if (showAllHealthBtn) {
+    showAllHealthBtn.addEventListener('click', () => {
+      // TODO: Implement modal or expanded view for all health checks
+      alert('Show all health checks - coming soon!');
+    });
+  }
+
+  // Configuration view mode switcher
+  const configModeButtons = document.querySelectorAll('#config-view-mode .view-mode-btn');
+  configModeButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const mode = btn.dataset.mode;
+      AppState.configViewMode = mode;
+      saveState();
+
+      // Update button states
+      configModeButtons.forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+
+      // Update content visibility
+      document.querySelectorAll('.config-mode-content').forEach(content => {
+        const contentMode = content.id.replace('config-', '');
+        content.classList.toggle('active', contentMode === mode);
+      });
+
+      // Re-render configuration view
+      renderConfigurationView();
+    });
+  });
+
+  // Configuration search
+  const searchInput = document.getElementById('config-search-input');
+  if (searchInput) {
+    searchInput.addEventListener('input', (e) => {
+      AppState.configSearchTerm = e.target.value;
+      renderCanonicalView(collectAllSettings());
+    });
+  }
+
+  // Hash change
+  window.addEventListener('hashchange', handleRouteChange);
+}
+
+function collectAllSettings() {
+  const data = AppState.apiData;
+  if (!data || !data.modules) return [];
+
+  const allSettings = [];
+  data.modules.forEach(module => {
+    if (module.settings) {
+      module.settings.forEach(setting => {
+        allSettings.push({
+          ...setting,
+          module: module.name,
+          canonicalKey: buildCanonicalKey(module.name, setting.key)
+        });
+      });
+    }
+  });
+
+  return allSettings;
+}
+
+// ========================================
+// Auto-refresh
+// ========================================
+
+let refreshTimer = null;
+
+function startAutoRefresh() {
+  stopAutoRefresh();
+  if (AppState.autoRefresh) {
+    refreshTimer = setInterval(async () => {
+      await fetchAPIData();
+      renderContent();
+      // Re-render current view
+      handleRouteChange();
+      updateGeneratedAt();
+    }, AppState.refreshInterval);
+  }
+}
+
+function stopAutoRefresh() {
   if (refreshTimer) {
     clearInterval(refreshTimer);
-    refreshTimer = undefined;
+    refreshTimer = null;
   }
 }
 
-function buildStatusUrl(sanitized) {
-  if (sanitized) {
-    return `${STATUS_ENDPOINT}?sanitized=true`;
-  }
-  return STATUS_ENDPOINT;
-}
+// ========================================
+// Initialization
+// ========================================
 
-async function refreshStatus(manual = false) {
-  try {
-    if (manual && refreshButton) {
-      refreshButton.disabled = true;
-    }
+async function initialize() {
+  console.log('Koan Admin initializing...');
 
-    const statusUrl = buildStatusUrl(runtimeState.sanitized);
-    const status = await fetchJson(statusUrl);
-    renderEnvironment(status.environment);
-    renderCapabilities(status.features);
-    renderModules(status.modules, status.configuration);
-    renderHealth(status.health);
-    renderNotes(status.startupNotes, status.modules);
-    renderGeneratedAt(status.manifest);
-    await renderLaunchKit(status);
+  loadState();
+  setupEventHandlers();
 
-    if (status?.runtime) {
-      runtimeState = {
-        sanitized: Boolean(status.runtime.sanitized),
-        locked: Boolean(status.runtime.locked)
-      };
+  // Initial data fetch
+  await fetchAPIData();
 
-      if (runtimeSanitizedToggle) {
-        runtimeSanitizedToggle.checked = runtimeState.sanitized;
-        runtimeSanitizedToggle.disabled = runtimeState.locked;
-        if (runtimeState.locked && status.runtime.lockReason) {
-          runtimeSanitizedToggle.title = status.runtime.lockReason;
-        } else {
-          runtimeSanitizedToggle.removeAttribute('title');
-        }
-      }
+  // Handle initial route
+  handleRouteChange();
 
-      if (runtimeLockReason) {
-        const lockMessage = runtimeState.locked && status.runtime.lockReason
-          ? status.runtime.lockReason
-          : '';
-        runtimeLockReason.textContent = lockMessage;
-        runtimeLockReason.hidden = lockMessage.length === 0;
-      }
-    } else {
-      runtimeState = { sanitized: false, locked: false };
-      if (runtimeSanitizedToggle) {
-        runtimeSanitizedToggle.checked = false;
-        runtimeSanitizedToggle.disabled = false;
-        runtimeSanitizedToggle.removeAttribute('title');
-      }
-      if (runtimeLockReason) {
-        runtimeLockReason.textContent = '';
-        runtimeLockReason.hidden = true;
-      }
-    }
+  // Render content
+  renderContent();
 
-    renderRuntime(status.runtime);
-  } catch (err) {
-    console.error(err);
-    const message = `<p class="error">Unable to load admin status. ${err.message}</p>`;
-    environmentContainer.innerHTML = message;
-    if (runtimeContainer) {
-      runtimeContainer.innerHTML = '<p class="error">Unable to load runtime snapshot.</p>';
-    }
-    if (runtimeSanitizedToggle) {
-      runtimeSanitizedToggle.disabled = true;
-    }
-    if (runtimeLockReason) {
-      runtimeLockReason.textContent = '';
-      runtimeLockReason.hidden = true;
-    }
-    capabilitiesContainer.innerHTML = '';
-    modulesContainer.innerHTML = '';
-    healthContainer.innerHTML = '';
-    notesContainer.innerHTML = '';
-    launchKitContainer.innerHTML = '';
-  } finally {
-    if (manual && refreshButton) {
-      refreshButton.disabled = false;
-    }
-  }
-}
-
-async function refreshHealthOnly() {
-  try {
-    const health = await fetchJson(HEALTH_ENDPOINT);
-    renderHealth(health);
-  } catch (err) {
-    console.error(err);
-  }
-}
-
-function enableAutoRefresh(enabled) {
-  clearRefreshTimer();
-  if (!enabled) {
-    return;
+  // Start auto-refresh if enabled
+  if (AppState.autoRefresh) {
+    startAutoRefresh();
   }
 
-  refreshTimer = setInterval(() => {
-    refreshStatus(false);
-    refreshHealthOnly();
-  }, REFRESH_INTERVAL_MS);
+  // Update timestamps periodically
+  setInterval(updateGeneratedAt, 5000);
+
+  console.log('Koan Admin initialized');
 }
 
-if (refreshButton) {
-  refreshButton.addEventListener('click', () => refreshStatus(true));
+// Start the app when DOM is ready
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initialize);
+} else {
+  initialize();
 }
-
-if (autoRefreshToggle) {
-  autoRefreshToggle.addEventListener('change', event => {
-    enableAutoRefresh(event.target.checked);
-    if (event.target.checked) {
-      refreshStatus(false);
-    }
-  });
-}
-
-if (runtimeSanitizedToggle) {
-  runtimeSanitizedToggle.addEventListener('change', event => {
-    if (runtimeState.locked) {
-      event.target.checked = true;
-      return;
-    }
-    runtimeState.sanitized = event.target.checked;
-    refreshStatus(true);
-  });
-}
-
-refreshStatus(false);
