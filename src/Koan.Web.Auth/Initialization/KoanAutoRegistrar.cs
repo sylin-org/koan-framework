@@ -8,9 +8,12 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Koan.Core;
 using Koan.Web.Auth.Extensions;
+using Koan.Web.Auth.Infrastructure;
 using Koan.Web.Extensions;
 using Koan.Web.Auth.Pillars;
 using Koan.Core.Hosting.Bootstrap;
+using ProvenanceModes = Koan.Core.Hosting.Bootstrap.ProvenancePublicationModeExtensions;
+using BootSettingSource = Koan.Core.Hosting.Bootstrap.BootSettingSource;
 
 namespace Koan.Web.Auth.Initialization;
 
@@ -53,19 +56,23 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
                 ? Koan.Core.Hosting.Bootstrap.BootSettingSource.Auto
                 : Koan.Core.Hosting.Bootstrap.BootSettingSource.Auto;
 
-        module.AddSetting(
-            "Providers",
-            effective.Count.ToString(),
-            source: providerSource,
-            consumers: new[] { "Koan.Web.Auth.ProviderRegistry" },
-            sourceKey: providerSectionKey);
+        var providerMode = ProvenanceModes.FromBootSource(providerSource, configured.Count == 0);
+        var providerSourceKey = configured.Count > 0 ? providerSectionKey : null;
+        var providerUsedDefault = configured.Count == 0;
 
         module.AddSetting(
-            "DetectedProviders",
+            WebAuthProvenanceItems.ProviderRegistryCount,
+            providerMode,
+            effective.Count,
+            sourceKey: providerSourceKey,
+            usedDefault: providerUsedDefault);
+
+        module.AddSetting(
+            WebAuthProvenanceItems.ProviderRegistryDetails,
+            providerMode,
             detected.Count == 0 ? "(none)" : string.Join(", ", detected),
-            source: providerSource,
-            consumers: new[] { "Koan.Web.Auth.ProviderRegistry" },
-            sourceKey: providerSectionKey);
+            sourceKey: providerSourceKey,
+            usedDefault: providerUsedDefault);
 
         // Production gating for dynamic providers (adapter/contributor defaults without explicit config)
         var allowDynamicOption = Koan.Core.Configuration.ReadWithSource(
@@ -81,37 +88,29 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
                            || Koan.Core.KoanEnv.AllowMagicInProduction
                            || allowMagicOption.Value;
 
-        var dynamicSource = allowDynamicOption.Value
-            ? allowDynamicOption.Source
-            : allowMagicOption.Value
-                ? allowMagicOption.Source
+        var dynamicMode = !allowDynamicOption.UsedDefault
+            ? ProvenanceModes.FromConfigurationValue(allowDynamicOption)
+            : !allowMagicOption.UsedDefault
+                ? ProvenanceModes.FromConfigurationValue(allowMagicOption)
                 : Koan.Core.KoanEnv.AllowMagicInProduction
-                    ? Koan.Core.Hosting.Bootstrap.BootSettingSource.Environment
-                    : allowDynamicOption.Source;
+                    ? ProvenanceModes.FromBootSource(BootSettingSource.Environment)
+                    : ProvenancePublicationMode.Auto;
         var dynamicSourceKey = !allowDynamicOption.UsedDefault
             ? allowDynamicOption.ResolvedKey
             : !allowMagicOption.UsedDefault
                 ? allowMagicOption.ResolvedKey
                 : Koan.Core.Infrastructure.Constants.Configuration.Koan.AllowMagicInProduction;
+        var dynamicUsedDefault = allowDynamicOption.UsedDefault && allowMagicOption.UsedDefault && !Koan.Core.KoanEnv.AllowMagicInProduction;
+        var dynamicValue = Koan.Core.KoanEnv.IsProduction && !allowDynamic
+            ? "disabled (set Koan:Web:Auth:AllowDynamicProvidersInProduction=true or Koan:AllowMagicInProduction=true)"
+            : "enabled";
 
-        if (Koan.Core.KoanEnv.IsProduction && !allowDynamic)
-        {
-            module.AddSetting(
-                "DynamicProvidersInProduction",
-                "disabled (set Koan:Web:Auth:AllowDynamicProvidersInProduction=true or Koan:AllowMagicInProduction=true)",
-                source: dynamicSource,
-                consumers: new[] { "Koan.Web.Auth.ProviderRegistry" },
-                sourceKey: dynamicSourceKey);
-        }
-        else
-        {
-            module.AddSetting(
-                "DynamicProvidersInProduction",
-                "enabled",
-                source: dynamicSource,
-                consumers: new[] { "Koan.Web.Auth.ProviderRegistry" },
-                sourceKey: dynamicSourceKey);
-        }
+        module.AddSetting(
+            WebAuthProvenanceItems.DynamicProvidersInProduction,
+            dynamicMode,
+            dynamicValue,
+            sourceKey: dynamicSourceKey,
+            usedDefault: dynamicUsedDefault);
 
         module.AddTool(
             "Auth Provider Discovery",

@@ -12,6 +12,9 @@ using Koan.Web.Auth.Services.Discovery;
 using Koan.Web.Auth.Services.Http;
 using Koan.Web.Auth.Services.Options;
 using Koan.Web.Auth.Connector.Test.Options;
+using Koan.Web.Auth.Services.Infrastructure;
+using ProvenanceModes = Koan.Core.Hosting.Bootstrap.ProvenancePublicationModeExtensions;
+using BootSettingSource = Koan.Core.Hosting.Bootstrap.BootSettingSource;
 
 namespace Koan.Web.Auth.Services.Initialization;
 
@@ -154,12 +157,13 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
     public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
         module.Describe(ModuleVersion);
+
         var modeValue = env.IsDevelopment() ? "Development" : "Production";
         module.AddSetting(
-            "Mode",
+            WebAuthServicesProvenanceItems.Mode,
+            ProvenanceModes.FromBootSource(BootSettingSource.Environment, usedDefault: false),
             modeValue,
-            source: Koan.Core.Hosting.Bootstrap.BootSettingSource.Environment,
-            consumers: new[] { "Koan.Web.Auth.Services.Hosting" });
+            usedDefault: false);
 
         var autoDiscovery = Koan.Core.Configuration.ReadWithSource(
             cfg,
@@ -171,35 +175,44 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             true);
 
         module.AddSetting(
-            "Auto Discovery",
-            autoDiscovery.Value.ToString(),
-            source: autoDiscovery.Source,
-            consumers: new[] { "Koan.Web.Auth.Services.Discovery" },
-            sourceKey: autoDiscovery.ResolvedKey);
+            WebAuthServicesProvenanceItems.AutoDiscovery,
+            ProvenanceModes.FromConfigurationValue(autoDiscovery),
+            autoDiscovery.Value,
+            sourceKey: autoDiscovery.ResolvedKey,
+            usedDefault: autoDiscovery.UsedDefault);
 
         module.AddSetting(
-            "Token Caching",
-            tokenCaching.Value.ToString(),
-            source: tokenCaching.Source,
-            consumers: new[] { "Koan.Web.Auth.Services.TokenCache" },
-            sourceKey: tokenCaching.ResolvedKey);
+            WebAuthServicesProvenanceItems.TokenCaching,
+            ProvenanceModes.FromConfigurationValue(tokenCaching),
+            tokenCaching.Value,
+            sourceKey: tokenCaching.ResolvedKey,
+            usedDefault: tokenCaching.UsedDefault);
 
         var discoveredServices = DiscoverServices();
         if (discoveredServices.Length > 0)
         {
             module.AddSetting(
-                "Services Discovered",
-                discoveredServices.Length.ToString(),
-                source: Koan.Core.Hosting.Bootstrap.BootSettingSource.Auto,
-                consumers: new[] { "Koan.Web.Auth.Services.Directory" });
+                WebAuthServicesProvenanceItems.ServicesDiscovered,
+                ProvenancePublicationMode.Discovery,
+                discoveredServices.Length,
+                usedDefault: true);
+
             foreach (var service in discoveredServices)
             {
                 module.AddSetting(
-                    $"  └─ {service.ServiceId}",
+                    WebAuthServicesProvenanceItems.ServiceDetail(service.ServiceId),
+                    ProvenancePublicationMode.Discovery,
                     $"Scopes: {string.Join(", ", service.ProvidedScopes)} | Dependencies: {service.Dependencies.Length}",
-                    source: Koan.Core.Hosting.Bootstrap.BootSettingSource.Auto,
-                    consumers: new[] { $"Koan.Web.Auth.Services.{service.ServiceId}" });
+                    usedDefault: true);
             }
+        }
+        else
+        {
+            module.AddSetting(
+                WebAuthServicesProvenanceItems.ServicesDiscovered,
+                ProvenancePublicationMode.Discovery,
+                0,
+                usedDefault: true);
         }
     }
 }

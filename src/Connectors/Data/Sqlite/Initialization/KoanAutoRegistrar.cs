@@ -12,6 +12,9 @@ using Koan.Core.Orchestration.Abstractions;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Naming;
 using Koan.Data.Relational.Orchestration;
+using Koan.Core.Provenance;
+using SqliteItems = Koan.Data.Connector.Sqlite.Infrastructure.SqliteProvenanceItems;
+using ProvenanceModes = Koan.Core.Hosting.Bootstrap.ProvenancePublicationModeExtensions;
 
 namespace Koan.Data.Connector.Sqlite.Initialization;
 
@@ -75,6 +78,23 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             Infrastructure.Constants.Configuration.Keys.MaxPageSize,
             Infrastructure.Constants.Configuration.Keys.AltMaxPageSize);
 
+        var namingStyle = Koan.Core.Configuration.ReadFirstWithSource(
+            cfg,
+            defaultOptions.NamingStyle,
+            Infrastructure.Constants.Configuration.Keys.NamingStyle,
+            Infrastructure.Constants.Configuration.Keys.AltNamingStyle);
+
+        var separator = Koan.Core.Configuration.ReadFirstWithSource(
+            cfg,
+            defaultOptions.Separator,
+            Infrastructure.Constants.Configuration.Keys.Separator,
+            Infrastructure.Constants.Configuration.Keys.AltSeparator);
+
+        var ensureCreated = Koan.Core.Configuration.ReadWithSource(
+            cfg,
+            Infrastructure.Constants.Configuration.Keys.EnsureCreatedSupported,
+            true);
+
         var connectionValue = string.IsNullOrWhiteSpace(connection.Value)
             ? "auto"
             : connection.Value;
@@ -93,69 +113,38 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 
         var displayConnection = connectionIsAuto || string.IsNullOrWhiteSpace(resolvedConnectionString)
             ? "auto"
-            : Koan.Core.Redaction.DeIdentify(resolvedConnectionString);
+            : resolvedConnectionString;
 
-        module.AddSetting(
-            "ConnectionString",
-            displayConnection,
-            isSecret: false,
-            source: connection.Source,
-            consumers: new[]
-            {
-                "Koan.Data.Connector.Sqlite.SqliteOptionsConfigurator",
-                "Koan.Data.Connector.Sqlite.SqliteAdapterFactory"
-            },
-            sourceKey: connection.ResolvedKey);
+        var connectionMode = connectionIsAuto
+            ? ProvenanceModes.FromBootSource(BootSettingSource.Auto, usedDefault: true)
+            : ProvenanceModes.FromConfigurationValue(connection);
 
-        module.AddSetting(
-            "NamingStyle",
-            defaultOptions.NamingStyle.ToString(),
-            source: BootSettingSource.Auto,
-            consumers: new[]
-            {
-                "Koan.Data.Connector.Sqlite.SqliteAdapterFactory"
-            },
-            sourceKey: Infrastructure.Constants.Configuration.Keys.NamingStyle);
+        Publish(
+            module,
+            SqliteItems.ConnectionString,
+            connection,
+            displayOverride: displayConnection,
+            modeOverride: connectionMode,
+            usedDefaultOverride: connectionIsAuto ? true : connection.UsedDefault,
+            sourceKeyOverride: connection.ResolvedKey ?? Infrastructure.Constants.Configuration.Keys.ConnectionString,
+            sanitizeOverride: connectionIsAuto ? false : null);
 
-        module.AddSetting(
-            "Separator",
-            defaultOptions.Separator,
-            source: BootSettingSource.Auto,
-            consumers: new[]
-            {
-                "Koan.Data.Connector.Sqlite.SqliteAdapterFactory"
-            },
-            sourceKey: Infrastructure.Constants.Configuration.Keys.Separator);
+        Publish(module, SqliteItems.NamingStyle, namingStyle);
+        Publish(module, SqliteItems.Separator, separator);
+        Publish(module, SqliteItems.EnsureCreatedSupported, ensureCreated);
+        Publish(module, SqliteItems.DefaultPageSize, defaultPageSize);
+        Publish(module, SqliteItems.MaxPageSize, maxPageSize);
+    }
 
+    private static void Publish<T>(ProvenanceModuleWriter module, ProvenanceItem item, Koan.Core.ConfigurationValue<T> value, object? displayOverride = null, ProvenancePublicationMode? modeOverride = null, bool? usedDefaultOverride = null, string? sourceKeyOverride = null, bool? sanitizeOverride = null)
+    {
         module.AddSetting(
-            Infrastructure.Constants.Bootstrap.EnsureCreatedSupported,
-            true.ToString(),
-            source: BootSettingSource.Auto,
-            consumers: new[]
-            {
-                "Koan.Data.Connector.Sqlite.SqliteAdapterFactory"
-            },
-            sourceKey: Infrastructure.Constants.Configuration.Keys.EnsureCreatedSupported);
-
-        module.AddSetting(
-            Infrastructure.Constants.Bootstrap.DefaultPageSize,
-            defaultPageSize.Value.ToString(),
-            source: defaultPageSize.Source,
-            consumers: new[]
-            {
-                "Koan.Data.Connector.Sqlite.SqliteAdapterFactory"
-            },
-            sourceKey: defaultPageSize.ResolvedKey);
-
-        module.AddSetting(
-            Infrastructure.Constants.Bootstrap.MaxPageSize,
-            maxPageSize.Value.ToString(),
-            source: maxPageSize.Source,
-            consumers: new[]
-            {
-                "Koan.Data.Connector.Sqlite.SqliteAdapterFactory"
-            },
-            sourceKey: maxPageSize.ResolvedKey);
+            item,
+            modeOverride ?? ProvenanceModes.FromConfigurationValue(value),
+            displayOverride ?? value.Value,
+            sourceKey: sourceKeyOverride ?? value.ResolvedKey,
+            usedDefault: usedDefaultOverride ?? value.UsedDefault,
+            sanitizeOverride: sanitizeOverride);
     }
 
     private static class LogActions

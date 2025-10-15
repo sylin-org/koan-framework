@@ -171,19 +171,16 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             ? ProvenanceModes.FromBootSource(BootSettingSource.Auto, usedDefault: true)
             : ProvenanceModes.FromConfigurationValue(connection);
 
-        module.AddSetting(
+        Publish(
+            module,
             MongoItems.ConnectionString,
-            connectionMode,
-            effectiveConnectionString,
-            sourceKey: connectionSourceKey,
-            usedDefault: connectionIsAuto ? true : connection.UsedDefault);
+            connection,
+            displayOverride: effectiveConnectionString,
+            modeOverride: connectionMode,
+            usedDefaultOverride: connectionIsAuto ? true : connection.UsedDefault,
+            sourceKeyOverride: connectionSourceKey);
 
-        module.AddSetting(
-            MongoItems.Database,
-            ProvenanceModes.FromConfigurationValue(database),
-            database.Value ?? defaultOptions.Database,
-            sourceKey: database.ResolvedKey,
-            usedDefault: database.UsedDefault);
+        Publish(module, MongoItems.Database, database, database.Value ?? defaultOptions.Database);
 
         module.AddSetting(
             MongoItems.EnsureCreatedSupported,
@@ -192,19 +189,20 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             usedDefault: true,
             sanitizeOverride: false);
 
-        module.AddSetting(
-            MongoItems.DefaultPageSize,
-            ProvenanceModes.FromConfigurationValue(defaultPageSize),
-            defaultPageSize.Value,
-            sourceKey: defaultPageSize.ResolvedKey,
-            usedDefault: defaultPageSize.UsedDefault);
+        Publish(module, MongoItems.DefaultPageSize, defaultPageSize);
 
+        Publish(module, MongoItems.MaxPageSize, maxPageSize);
+    }
+
+    private static void Publish<T>(Koan.Core.Provenance.ProvenanceModuleWriter module, ProvenanceItem item, Koan.Core.ConfigurationValue<T> value, object? displayOverride = null, ProvenancePublicationMode? modeOverride = null, bool? usedDefaultOverride = null, string? sourceKeyOverride = null, bool? sanitizeOverride = null)
+    {
         module.AddSetting(
-            MongoItems.MaxPageSize,
-            ProvenanceModes.FromConfigurationValue(maxPageSize),
-            maxPageSize.Value,
-            sourceKey: maxPageSize.ResolvedKey,
-            usedDefault: maxPageSize.UsedDefault);
+            item,
+            modeOverride ?? ProvenanceModes.FromConfigurationValue(value),
+            displayOverride ?? value.Value,
+            sourceKey: sourceKeyOverride ?? value.ResolvedKey,
+            usedDefault: usedDefaultOverride ?? value.UsedDefault,
+            sanitizeOverride: sanitizeOverride);
     }
 
     private static string ResolveConnectionStringForReporting(

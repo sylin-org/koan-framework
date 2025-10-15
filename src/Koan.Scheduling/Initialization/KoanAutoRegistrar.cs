@@ -5,6 +5,8 @@ using Microsoft.Extensions.Options;
 using Koan.Core;
 using Koan.Core.Modules;
 using Koan.Core.Hosting.Bootstrap;
+using Koan.Scheduling.Infrastructure;
+using static Koan.Core.Hosting.Bootstrap.ProvenancePublicationModeExtensions;
 
 namespace Koan.Scheduling.Initialization;
 
@@ -40,9 +42,30 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
     public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
         module.Describe(ModuleVersion);
-        var enabled = cfg["Koan:Scheduling:Enabled"]; // may be null
-        module.AddSetting("enabled", enabled ?? (env.IsDevelopment() ? "(default true)" : "(default false)"));
-        module.AddSetting("readinessGate", cfg["Koan:Scheduling:ReadinessGate"] ?? "true");
+        var enabledOption = Configuration.ReadWithSource<bool?>(cfg, "Koan:Scheduling:Enabled", null);
+        var schedulingSectionExists = cfg.GetSection("Koan:Scheduling").Exists();
+        var effectiveEnabled = enabledOption.UsedDefault
+            ? (env.IsDevelopment() || schedulingSectionExists)
+            : enabledOption.Value ?? true;
+
+        var enabledMode = enabledOption.UsedDefault
+            ? ProvenancePublicationMode.Auto
+            : FromConfigurationValue(enabledOption);
+
+        module.AddSetting(
+            SchedulingProvenanceItems.Enabled,
+            enabledMode,
+            effectiveEnabled,
+            sourceKey: enabledOption.ResolvedKey,
+            usedDefault: enabledOption.UsedDefault);
+
+        var readinessOption = Configuration.ReadWithSource(cfg, "Koan:Scheduling:ReadinessGate", true);
+        module.AddSetting(
+            SchedulingProvenanceItems.ReadinessGate,
+            FromConfigurationValue(readinessOption),
+            readinessOption.Value,
+            sourceKey: readinessOption.ResolvedKey,
+            usedDefault: readinessOption.UsedDefault);
         // Discovery count omitted; tasks self-register using Koan.Core initialization.
     }
 }

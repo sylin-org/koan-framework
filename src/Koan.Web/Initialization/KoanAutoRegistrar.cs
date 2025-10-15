@@ -5,6 +5,7 @@ using Microsoft.Extensions.Hosting;
 using Koan.Core;
 using Koan.Core.Extensions;
 using Koan.Web.Extensions;
+using Koan.Web.Infrastructure;
 using Koan.Web.Pillars;
 using Koan.Core.Hosting.Bootstrap;
 
@@ -25,55 +26,55 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         services.AddKoanControllersFrom<Controllers.HealthController>();
     }
 
-    public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
+    public void Describe(global::Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
         module.Describe(ModuleVersion);
         var secure = Koan.Core.Configuration.ReadWithSource(
             cfg,
-            $"{Infrastructure.ConfigurationConstants.Web.Section}:{Infrastructure.ConfigurationConstants.Web.Keys.EnableSecureHeaders}",
+            $"{ConfigurationConstants.Web.Section}:{ConfigurationConstants.Web.Keys.EnableSecureHeaders}",
             true);
         var proxied = Koan.Core.Configuration.ReadWithSource(
             cfg,
-            $"{Infrastructure.ConfigurationConstants.Web.Section}:{Infrastructure.ConfigurationConstants.Web.Keys.IsProxiedApi}",
+            $"{ConfigurationConstants.Web.Section}:{ConfigurationConstants.Web.Keys.IsProxiedApi}",
             false);
         var csp = Koan.Core.Configuration.ReadWithSource(
             cfg,
-            $"{Infrastructure.ConfigurationConstants.Web.Section}:{Infrastructure.ConfigurationConstants.Web.Keys.ContentSecurityPolicy}",
-            default(string?));
+            $"{ConfigurationConstants.Web.Section}:{ConfigurationConstants.Web.Keys.ContentSecurityPolicy}",
+            string.Empty);
         var autoMap = Koan.Core.Configuration.ReadWithSource(
             cfg,
-            $"{Infrastructure.ConfigurationConstants.Web.Section}:{Infrastructure.ConfigurationConstants.Web.Keys.AutoMapControllers}",
+            $"{ConfigurationConstants.Web.Section}:{ConfigurationConstants.Web.Keys.AutoMapControllers}",
             true);
 
         module.AddSetting(
-            "EnableSecureHeaders",
-            secure.Value.ToString(),
-            source: secure.Source,
-            consumers: new[] { "Koan.Web.SecurityHeaders" },
-            sourceKey: secure.ResolvedKey);
+            WebProvenanceItems.SecureHeadersEnabled,
+            global::Koan.Core.Hosting.Bootstrap.ProvenancePublicationModeExtensions.FromConfigurationValue(secure),
+            secure.Value,
+            sourceKey: secure.ResolvedKey,
+            usedDefault: secure.UsedDefault);
 
         module.AddSetting(
-            "IsProxiedApi",
-            proxied.Value.ToString(),
-            source: proxied.Source,
-            consumers: new[] { "Koan.Web.HttpPipeline" },
-            sourceKey: proxied.ResolvedKey);
+            WebProvenanceItems.ProxiedApi,
+            global::Koan.Core.Hosting.Bootstrap.ProvenancePublicationModeExtensions.FromConfigurationValue(proxied),
+            proxied.Value,
+            sourceKey: proxied.ResolvedKey,
+            usedDefault: proxied.UsedDefault);
 
         module.AddSetting(
-            "AutoMapControllers",
-            autoMap.Value.ToString(),
-            source: autoMap.Source,
-            consumers: new[] { "Koan.Web.ControllerDiscovery" },
-            sourceKey: autoMap.ResolvedKey);
+            WebProvenanceItems.AutoMapControllers,
+            global::Koan.Core.Hosting.Bootstrap.ProvenancePublicationModeExtensions.FromConfigurationValue(autoMap),
+            autoMap.Value,
+            sourceKey: autoMap.ResolvedKey,
+            usedDefault: autoMap.UsedDefault);
 
         if (!string.IsNullOrWhiteSpace(csp.Value))
         {
             module.AddSetting(
-                "ContentSecurityPolicy",
-                $"len={csp.Value!.Length}",
-                source: csp.Source,
-                consumers: new[] { "Koan.Web.SecurityHeaders" },
-                sourceKey: csp.ResolvedKey);
+                WebProvenanceItems.ContentSecurityPolicy,
+                global::Koan.Core.Hosting.Bootstrap.ProvenancePublicationModeExtensions.FromConfigurationValue(csp),
+                csp.Value,
+                sourceKey: csp.ResolvedKey,
+                usedDefault: csp.UsedDefault);
         }
 
         module.AddTool(

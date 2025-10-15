@@ -7,11 +7,14 @@ using Microsoft.AspNetCore.Hosting;
 using Koan.Core;
 using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Modules;
+using Koan.Core.Provenance;
 using Koan.Web.Auth.Providers;
 using Koan.Web.Auth.Connector.Test.Infrastructure;
 using Koan.Web.Auth.Connector.Test.Options;
 using Koan.Web.Auth.Connector.Test.Controllers;
 using Koan.Web.Extensions;
+using TestProviderItems = Koan.Web.Auth.Connector.Test.Infrastructure.TestProviderProvenanceItems;
+using ProvenanceModes = Koan.Core.Hosting.Bootstrap.ProvenancePublicationModeExtensions;
 
 namespace Koan.Web.Auth.Connector.Test.Initialization;
 
@@ -41,18 +44,18 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             $"{TestProviderOptions.SectionPath}:{nameof(TestProviderOptions.Enabled)}",
             false);
         var enabled = env.IsDevelopment() || enabledOption.Value;
-        var enabledSource = enabledOption.Value
-            ? enabledOption.Source
-            : env.IsDevelopment()
-                ? BootSettingSource.Environment
-                : BootSettingSource.Auto;
+        var enabledMode = env.IsDevelopment() && !enabledOption.Value
+            ? ProvenanceModes.FromBootSource(BootSettingSource.Environment, usedDefault: false)
+            : ProvenanceModes.FromConfigurationValue(enabledOption);
 
-        module.AddSetting(
-            "Enabled",
-            enabled ? "true" : "false",
-            source: enabledSource,
-            consumers: new[] { "Koan.Web.Auth.Connector.Test.Hosting.KoanTestProviderStartupFilter" },
-            sourceKey: enabledOption.ResolvedKey);
+        Publish(
+            module,
+            TestProviderItems.Enabled,
+            enabledOption,
+            displayOverride: enabled ? "true" : "false",
+            modeOverride: enabledMode,
+            usedDefaultOverride: env.IsDevelopment() && !enabledOption.Value ? false : null,
+            sourceKeyOverride: enabledOption.ResolvedKey);
 
         var routeBaseOption = Koan.Core.Configuration.ReadWithSource(
             cfg,
@@ -77,12 +80,12 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             false);
         var tokenFormat = useJwtTokensOption.Value ? "JWT" : "Hash";
 
-        module.AddSetting(
-            "TokenFormat",
-            tokenFormat,
-            source: useJwtTokensOption.Source,
-            consumers: new[] { "Koan.Web.Auth.Connector.Test.Infrastructure.JwtTokenService" },
-            sourceKey: useJwtTokensOption.ResolvedKey);
+        Publish(
+            module,
+            TestProviderItems.TokenFormat,
+            useJwtTokensOption,
+            displayOverride: tokenFormat,
+            sourceKeyOverride: useJwtTokensOption.ResolvedKey);
 
         if (useJwtTokensOption.Value)
         {
@@ -99,24 +102,9 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
                 $"{TestProviderOptions.SectionPath}:{nameof(TestProviderOptions.JwtExpirationMinutes)}",
                 60);
 
-            module.AddSetting(
-                "JWT.Issuer",
-                issuerOption.Value,
-                source: issuerOption.Source,
-                consumers: new[] { "Koan.Web.Auth.Connector.Test.Infrastructure.JwtTokenService" },
-                sourceKey: issuerOption.ResolvedKey);
-            module.AddSetting(
-                "JWT.Audience",
-                audienceOption.Value,
-                source: audienceOption.Source,
-                consumers: new[] { "Koan.Web.Auth.Connector.Test.Infrastructure.JwtTokenService" },
-                sourceKey: audienceOption.ResolvedKey);
-            module.AddSetting(
-                "JWT.Expiration",
-                $"{expirationOption.Value}min",
-                source: expirationOption.Source,
-                consumers: new[] { "Koan.Web.Auth.Connector.Test.Infrastructure.JwtTokenService" },
-                sourceKey: expirationOption.ResolvedKey);
+            Publish(module, TestProviderItems.JwtIssuer, issuerOption);
+            Publish(module, TestProviderItems.JwtAudience, audienceOption);
+            Publish(module, TestProviderItems.JwtExpirationMinutes, expirationOption, displayOverride: $"{expirationOption.Value}min");
         }
 
         var clientCredentialsOption = Koan.Core.Configuration.ReadWithSource(
@@ -124,24 +112,27 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             $"{TestProviderOptions.SectionPath}:{nameof(TestProviderOptions.EnableClientCredentials)}",
             false);
 
-        module.AddSetting(
-            "ClientCredentials",
-            clientCredentialsOption.Value ? "Enabled" : "Disabled",
-            source: clientCredentialsOption.Source,
-            consumers: new[] { "Koan.Web.Auth.Connector.Test.Controllers.TokenController" },
-            sourceKey: clientCredentialsOption.ResolvedKey);
+        Publish(
+            module,
+            TestProviderItems.ClientCredentials,
+            clientCredentialsOption,
+            displayOverride: clientCredentialsOption.Value ? "Enabled" : "Disabled",
+            sourceKeyOverride: clientCredentialsOption.ResolvedKey);
 
         var clientsSection = cfg.GetSection(TestProviderOptions.SectionPath)
             .GetSection(nameof(TestProviderOptions.RegisteredClients));
         var clientCount = clientsSection.GetChildren().Count();
-        var clientsSource = clientCount > 0 ? BootSettingSource.AppSettings : BootSettingSource.Auto;
+        var registeredClientsValue = new ConfigurationValue<int>(
+            clientCount,
+            clientCount > 0 ? BootSettingSource.AppSettings : BootSettingSource.Auto,
+            $"{TestProviderOptions.SectionPath}:{nameof(TestProviderOptions.RegisteredClients)}",
+            clientCount == 0);
 
-        module.AddSetting(
-            "RegisteredClients",
-            clientCount.ToString(),
-            source: clientsSource,
-            consumers: new[] { "Koan.Web.Auth.Connector.Test.Controllers.TokenController" },
-            sourceKey: $"{TestProviderOptions.SectionPath}:{nameof(TestProviderOptions.RegisteredClients)}");
+        Publish(
+            module,
+            TestProviderItems.RegisteredClients,
+            registeredClientsValue,
+            displayOverride: clientCount.ToString());
 
         if (!env.IsDevelopment() && enabled)
         {
@@ -153,6 +144,25 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             $"{routeBase}/login.html",
             "Simulated OAuth login surface",
             capability: "auth.providers.test");
+    }
+
+    private static void Publish<T>(
+        ProvenanceModuleWriter module,
+        ProvenanceItem item,
+        ConfigurationValue<T> value,
+        object? displayOverride = null,
+        ProvenancePublicationMode? modeOverride = null,
+        bool? usedDefaultOverride = null,
+        string? sourceKeyOverride = null,
+        bool? sanitizeOverride = null)
+    {
+        module.AddSetting(
+            item,
+            modeOverride ?? ProvenanceModes.FromConfigurationValue(value),
+            displayOverride ?? value.Value,
+            sourceKey: sourceKeyOverride ?? value.ResolvedKey,
+            usedDefault: usedDefaultOverride ?? value.UsedDefault,
+            sanitizeOverride: sanitizeOverride);
     }
 }
 

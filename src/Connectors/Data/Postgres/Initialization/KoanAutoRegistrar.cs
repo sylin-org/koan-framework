@@ -19,6 +19,8 @@ using Koan.Data.Connector.Postgres.Orchestration;
 using Koan.Data.Relational.Orchestration;
 using Koan.Orchestration.Aspire;
 using Aspire.Hosting;
+using PostgresItems = Koan.Data.Connector.Postgres.Infrastructure.PostgresProvenanceItems;
+using ProvenanceModes = Koan.Core.Hosting.Bootstrap.ProvenancePublicationModeExtensions;
 
 namespace Koan.Data.Connector.Postgres.Initialization;
 
@@ -81,8 +83,24 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar, IKoanAspireRegistrar
             Infrastructure.Constants.Configuration.Keys.MaxPageSize,
             Infrastructure.Constants.Configuration.Keys.AltMaxPageSize);
 
+        var namingStyle = Configuration.ReadFirstWithSource(
+            cfg,
+            defaultOptions.NamingStyle,
+            Infrastructure.Constants.Configuration.Keys.NamingStyle,
+            Infrastructure.Constants.Configuration.Keys.AltNamingStyle);
+
+        var separator = Configuration.ReadFirstWithSource(
+            cfg,
+            defaultOptions.Separator,
+            Infrastructure.Constants.Configuration.Keys.Separator,
+            Infrastructure.Constants.Configuration.Keys.AltSeparator);
+
+        var ensureCreated = Configuration.ReadWithSource(
+            cfg,
+            Infrastructure.Constants.Configuration.Keys.EnsureCreatedSupported,
+            true);
+
         var connectionIsAuto = string.IsNullOrWhiteSpace(connection.Value) || string.Equals(connection.Value, "auto", StringComparison.OrdinalIgnoreCase);
-        var connectionSource = connectionIsAuto ? BootSettingSource.Auto : connection.Source;
         var connectionSourceKey = connection.ResolvedKey ?? Infrastructure.Constants.Configuration.Keys.ConnectionString;
         var effectiveConnectionString = connection.Value ?? defaultOptions.ConnectionString;
 
@@ -96,80 +114,41 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar, IKoanAspireRegistrar
                 () => BuildPostgresFallback(defaultOptions));
         }
 
-        var sanitizedConnection = Redaction.DeIdentify(effectiveConnectionString);
+        var connectionMode = connectionIsAuto
+            ? ProvenanceModes.FromBootSource(BootSettingSource.Auto, usedDefault: true)
+            : ProvenanceModes.FromConfigurationValue(connection);
 
-        module.AddSetting(
-            "ConnectionString",
-            sanitizedConnection,
-            source: connectionSource,
-            consumers: new[]
-            {
-                "Koan.Data.Connector.Postgres.PostgresOptionsConfigurator",
-                "Koan.Data.Connector.Postgres.PostgresAdapterFactory",
-                "Koan.Data.Connector.Postgres.Initialization.KoanAutoRegistrar"
-            },
-            sourceKey: connectionSourceKey);
+        Publish(
+            module,
+            PostgresItems.ConnectionString,
+            connection,
+            displayOverride: effectiveConnectionString,
+            modeOverride: connectionMode,
+            usedDefaultOverride: connectionIsAuto ? true : connection.UsedDefault,
+            sourceKeyOverride: connectionSourceKey);
 
-        module.AddSetting(
-            "NamingStyle",
-            defaultOptions.NamingStyle.ToString(),
-            source: BootSettingSource.Auto,
-            consumers: new[]
-            {
-                "Koan.Data.Connector.Postgres.PostgresAdapterFactory"
-            },
-            sourceKey: Infrastructure.Constants.Configuration.Keys.NamingStyle);
+        Publish(
+            module,
+            PostgresItems.SearchPath,
+            searchPath,
+            displayOverride: searchPath.Value ?? defaultOptions.SearchPath ?? "public");
 
-        module.AddSetting(
-            "Separator",
-            defaultOptions.Separator,
-            source: BootSettingSource.Auto,
-            consumers: new[]
-            {
-                "Koan.Data.Connector.Postgres.PostgresAdapterFactory"
-            },
-            sourceKey: Infrastructure.Constants.Configuration.Keys.Separator);
+        Publish(module, PostgresItems.NamingStyle, namingStyle);
+        Publish(module, PostgresItems.Separator, separator);
+        Publish(module, PostgresItems.EnsureCreatedSupported, ensureCreated);
+        Publish(module, PostgresItems.DefaultPageSize, defaultPageSize);
+        Publish(module, PostgresItems.MaxPageSize, maxPageSize);
+    }
 
+    private static void Publish<T>(ProvenanceModuleWriter module, ProvenanceItem item, ConfigurationValue<T> value, object? displayOverride = null, ProvenancePublicationMode? modeOverride = null, bool? usedDefaultOverride = null, string? sourceKeyOverride = null, bool? sanitizeOverride = null)
+    {
         module.AddSetting(
-            "SearchPath",
-            (searchPath.Value ?? "public").ToString(),
-            source: searchPath.Source,
-            consumers: new[]
-            {
-                "Koan.Data.Connector.Postgres.PostgresOptionsConfigurator",
-                "Koan.Data.Connector.Postgres.PostgresAdapterFactory"
-            },
-            sourceKey: searchPath.ResolvedKey);
-
-        module.AddSetting(
-            "EnsureCreatedSupported",
-            true.ToString(),
-            source: BootSettingSource.Auto,
-            consumers: new[]
-            {
-                "Koan.Data.Connector.Postgres.PostgresAdapterFactory"
-            },
-            sourceKey: Infrastructure.Constants.Configuration.Keys.EnsureCreatedSupported);
-
-        module.AddSetting(
-            "DefaultPageSize",
-            defaultPageSize.Value.ToString(),
-            source: defaultPageSize.Source,
-            consumers: new[]
-            {
-                "Koan.Data.Connector.Postgres.PostgresAdapterFactory"
-            },
-            sourceKey: defaultPageSize.ResolvedKey);
-
-        module.AddSetting(
-            "MaxPageSize",
-            maxPageSize.Value.ToString(),
-            source: maxPageSize.Source,
-            consumers: new[]
-            {
-                "Koan.Data.Connector.Postgres.PostgresAdapterFactory"
-            },
-            sourceKey: maxPageSize.ResolvedKey);
+            item,
+            modeOverride ?? ProvenanceModes.FromConfigurationValue(value),
+            displayOverride ?? value.Value,
+            sourceKey: sourceKeyOverride ?? value.ResolvedKey,
+            usedDefault: usedDefaultOverride ?? value.UsedDefault,
+            sanitizeOverride: sanitizeOverride);
     }
 
     private static string BuildPostgresFallback(PostgresOptions defaults)

@@ -1,10 +1,14 @@
 ﻿using System.Collections.Generic;
+using System.Globalization;
 using Koan.Core.Hosting.Bootstrap;
+using Koan.Data.Connector.Mongo;
 
 namespace Koan.Data.Connector.Mongo.Infrastructure;
 
 internal static class MongoProvenanceItems
 {
+    private static readonly MongoOptions Defaults = new();
+
     internal static readonly string[] ConnectionStringKeys =
     {
         "Koan:Data:Mongo:ConnectionString",
@@ -55,29 +59,36 @@ internal static class MongoProvenanceItems
         "MongoDB connection string resolved from configuration, discovery, or defaults.",
         IsSecret: false,
         MustSanitize: true,
+        DefaultValue: Defaults.ConnectionString,
         DefaultConsumers: ConnectionConsumers);
 
     internal static readonly ProvenanceItem Database = new(
         DatabaseKeys[0],
         "Mongo Database",
         "Default MongoDB database used for Koan data operations.",
+        DefaultValue: Defaults.Database,
         DefaultConsumers: DatabaseConsumers);
 
     internal static readonly ProvenanceItem EnsureCreatedSupported = new(
         "Mongo.EnsureCreatedSupported",
         "Ensure Created Supported",
         "Indicates whether the Mongo adapter can create missing schema artifacts automatically.",
+        DefaultValue: BoolString(true),
         DefaultConsumers: PagingConsumers);
 
     internal static readonly ProvenanceItem DefaultPageSize = new(
         DefaultPageSizeKeys[0],
         "Default Page Size",
         "Default batch size used when paging Mongo queries.",
+        DefaultValue: Defaults.DefaultPageSize.ToString(CultureInfo.InvariantCulture),
         DefaultConsumers: PagingConsumers);
 
     internal static readonly ProvenanceItem MaxPageSize = new(
         MaxPageSizeKeys[0],
         "Max Page Size",
         "Maximum server-allowed page size for Mongo query batching.",
+        DefaultValue: Defaults.MaxPageSize.ToString(CultureInfo.InvariantCulture),
         DefaultConsumers: PagingConsumers);
+
+    private static string BoolString(bool value) => value ? "true" : "false";
 }

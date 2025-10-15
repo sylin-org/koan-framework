@@ -75,11 +75,11 @@ public static class Configuration
     {
         if (keys is null || keys.Length == 0)
         {
-            return new ConfigurationValue<T>(defaultValue, BootSettingSource.Auto, string.Empty, true);
+            return new ConfigurationValue<T>(defaultValue, BootSettingSource.Auto, null, true);
         }
 
         var (_, normalizedFirstKey) = Normalize(cfg, keys[0]);
-        var fallback = new ConfigurationValue<T>(defaultValue, BootSettingSource.Auto, normalizedFirstKey, true);
+        var fallback = new ConfigurationValue<T>(defaultValue, BootSettingSource.Auto, null, true);
 
         foreach (var key in keys)
         {
@@ -117,12 +117,12 @@ public static class Configuration
 
                 if (TryConvert(str, out T parsed))
                 {
-                    return new ConfigurationValue<T>(parsed, BootSettingSource.AppSettings, cfgKey, false);
+                    return new ConfigurationValue<T>(parsed, BootSettingSource.AppSettings, ToDottedPath(normalizedKey), false);
                 }
             }
         }
 
-        return new ConfigurationValue<T>(defaultValue, BootSettingSource.Auto, normalizedKey, true);
+        return new ConfigurationValue<T>(defaultValue, BootSettingSource.Auto, null, true);
     }
 
     private static (IConfiguration? Configuration, string NormalizedKey) Normalize(IConfiguration? cfg, string key)
@@ -170,6 +170,9 @@ public static class Configuration
         // Also try single underscore form for providers that expose them as flat keys
         yield return key.Replace(":", "_");
     }
+
+    private static string ToDottedPath(string key)
+        => key.Replace(':', '.');
 
     private static bool TryConvert<T>(string value, out T result)
     {
@@ -241,4 +244,4 @@ public static class Configuration
     }
 }
 
-public readonly record struct ConfigurationValue<T>(T Value, BootSettingSource Source, string ResolvedKey, bool UsedDefault);
+public readonly record struct ConfigurationValue<T>(T Value, BootSettingSource Source, string? ResolvedKey, bool UsedDefault);

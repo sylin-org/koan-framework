@@ -10,6 +10,7 @@ using Koan.Core.Hosting.Bootstrap;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using static Koan.Core.Hosting.Bootstrap.ProvenancePublicationModeExtensions;
 
 namespace Koan.Admin.Initialization;
 
@@ -63,67 +64,67 @@ public sealed class KoanAdminAutoRegistrar : IKoanAutoRegistrar
         var composeBasePortOption = Configuration.ReadWithSource(configuration, $"{ConfigurationConstants.Admin.Generate.Section}:{ConfigurationConstants.Admin.Generate.Keys.ComposeBasePort}", generateDefaults.ComposeBasePort);
 
         module.AddSetting(
-            "enabled",
-            BoolString(enabledOption.Value),
-            source: enabledOption.Source,
-            consumers: new[] { "Koan.Admin.FeatureManager" },
-            sourceKey: enabledOption.ResolvedKey);
+            AdminProvenanceItems.Enabled,
+            FromConfigurationValue(enabledOption),
+            enabledOption.Value,
+            sourceKey: enabledOption.ResolvedKey,
+            usedDefault: enabledOption.UsedDefault);
 
         module.AddSetting(
-            "allow.production",
-            BoolString(allowProdOption.Value),
-            source: allowProdOption.Source,
-            consumers: new[] { "Koan.Admin.FeatureManager" },
-            sourceKey: allowProdOption.ResolvedKey);
+            AdminProvenanceItems.AllowInProduction,
+            FromConfigurationValue(allowProdOption),
+            allowProdOption.Value,
+            sourceKey: allowProdOption.ResolvedKey,
+            usedDefault: allowProdOption.UsedDefault);
 
         module.AddSetting(
-            "allow.dotPrefix.production",
-            BoolString(allowDotOption.Value),
-            source: allowDotOption.Source,
-            consumers: new[] { "Koan.Admin.RouteProvider" },
-            sourceKey: allowDotOption.ResolvedKey);
+            AdminProvenanceItems.AllowDotPrefixInProduction,
+            FromConfigurationValue(allowDotOption),
+            allowDotOption.Value,
+            sourceKey: allowDotOption.ResolvedKey,
+            usedDefault: allowDotOption.UsedDefault);
 
         module.AddSetting(
-            "web.enabled",
-            BoolString(webOption.Value),
-            source: webOption.Source,
-            consumers: new[] { "Koan.Admin.FeatureManager", "Koan.Web.Admin" },
-            sourceKey: webOption.ResolvedKey);
+            AdminProvenanceItems.WebEnabled,
+            FromConfigurationValue(webOption),
+            webOption.Value,
+            sourceKey: webOption.ResolvedKey,
+            usedDefault: webOption.UsedDefault);
 
         module.AddSetting(
-            "console.enabled",
-            BoolString(consoleOption.Value),
-            source: consoleOption.Source,
-            consumers: new[] { "Koan.Admin.FeatureManager" },
-            sourceKey: consoleOption.ResolvedKey);
+            AdminProvenanceItems.ConsoleEnabled,
+            FromConfigurationValue(consoleOption),
+            consoleOption.Value,
+            sourceKey: consoleOption.ResolvedKey,
+            usedDefault: consoleOption.UsedDefault);
 
         module.AddSetting(
-            "launchkit.enabled",
-            BoolString(launchKitOption.Value),
-            source: launchKitOption.Source,
-            consumers: new[] { "Koan.Admin.LaunchKitService" },
-            sourceKey: launchKitOption.ResolvedKey);
+            AdminProvenanceItems.LaunchKitEnabled,
+            FromConfigurationValue(launchKitOption),
+            launchKitOption.Value,
+            sourceKey: launchKitOption.ResolvedKey,
+            usedDefault: launchKitOption.UsedDefault);
 
         module.AddSetting(
-            "manifest.expose",
-            BoolString(manifestOption.Value),
-            source: manifestOption.Source,
-            consumers: new[] { "Koan.Admin.ManifestService" },
-            sourceKey: manifestOption.ResolvedKey);
+            AdminProvenanceItems.ManifestExposure,
+            FromConfigurationValue(manifestOption),
+            manifestOption.Value,
+            sourceKey: manifestOption.ResolvedKey,
+            usedDefault: manifestOption.UsedDefault);
 
         module.AddSetting(
-            "destructive.ops",
-            BoolString(destructiveOption.Value),
-            source: destructiveOption.Source,
-            consumers: new[] { "Koan.Admin.FeatureManager" },
-            sourceKey: destructiveOption.ResolvedKey);
+            AdminProvenanceItems.DestructiveOperations,
+            FromConfigurationValue(destructiveOption),
+            destructiveOption.Value,
+            sourceKey: destructiveOption.ResolvedKey,
+            usedDefault: destructiveOption.UsedDefault);
 
         module.AddSetting(
-            "prefix",
+            AdminProvenanceItems.PathPrefix,
+            FromConfigurationValue(prefixOption),
             normalizedPrefix,
-            source: prefixOption.Source,
-            consumers: new[] { "Koan.Admin.RouteProvider", "Koan.Web.Admin" },
-            sourceKey: prefixOption.ResolvedKey);
+            sourceKey: prefixOption.ResolvedKey,
+            usedDefault: prefixOption.UsedDefault);
 
         module.AddTool(
             "Admin UI",
@@ -162,104 +163,104 @@ public sealed class KoanAdminAutoRegistrar : IKoanAutoRegistrar
             capability: "admin.logs");
 
         module.AddSetting(
-            "authorization.policy",
-            authorizationPolicyOption.Value ?? string.Empty,
-            source: authorizationPolicyOption.Source,
-            consumers: new[] { "Koan.Web.Admin.Authorization" },
-            sourceKey: authorizationPolicyOption.ResolvedKey);
+            AdminProvenanceItems.AuthorizationPolicy,
+            FromConfigurationValue(authorizationPolicyOption),
+            authorizationPolicyOption.Value,
+            sourceKey: authorizationPolicyOption.ResolvedKey,
+            usedDefault: authorizationPolicyOption.UsedDefault);
 
         module.AddSetting(
-            "authorization.autoCreateDevelopmentPolicy",
-            BoolString(authorizationAutoCreateOption.Value),
-            source: authorizationAutoCreateOption.Source,
-            consumers: new[] { "Koan.Web.Admin.Authorization" },
-            sourceKey: authorizationAutoCreateOption.ResolvedKey);
+            AdminProvenanceItems.AuthorizationAutoCreatePolicy,
+            FromConfigurationValue(authorizationAutoCreateOption),
+            authorizationAutoCreateOption.Value,
+            sourceKey: authorizationAutoCreateOption.ResolvedKey,
+            usedDefault: authorizationAutoCreateOption.UsedDefault);
 
         module.AddSetting(
-            "authorization.allowedNetworks",
+            AdminProvenanceItems.AuthorizationAllowedNetworks,
+            FromBootSource(allowedNetworks.Source, allowedNetworks.UsedDefault),
             allowedNetworks.Display,
-            source: allowedNetworks.Source,
-            consumers: new[] { "Koan.Web.Admin.Authorization" },
-            sourceKey: allowedNetworks.SourceKey);
+            sourceKey: allowedNetworks.SourceKey,
+            usedDefault: allowedNetworks.UsedDefault);
 
         module.AddSetting(
-            "logging.enableLogStream",
-            BoolString(enableLogStreamOption.Value),
-            source: enableLogStreamOption.Source,
-            consumers: new[] { "Koan.Admin.Logging" },
-            sourceKey: enableLogStreamOption.ResolvedKey);
+            AdminProvenanceItems.LoggingEnableStream,
+            FromConfigurationValue(enableLogStreamOption),
+            enableLogStreamOption.Value,
+            sourceKey: enableLogStreamOption.ResolvedKey,
+            usedDefault: enableLogStreamOption.UsedDefault);
 
         module.AddSetting(
-            "logging.allowTranscriptDownload",
-            BoolString(allowTranscriptOption.Value),
-            source: allowTranscriptOption.Source,
-            consumers: new[] { "Koan.Admin.Logging" },
-            sourceKey: allowTranscriptOption.ResolvedKey);
+            AdminProvenanceItems.LoggingAllowTranscriptDownload,
+            FromConfigurationValue(allowTranscriptOption),
+            allowTranscriptOption.Value,
+            sourceKey: allowTranscriptOption.ResolvedKey,
+            usedDefault: allowTranscriptOption.UsedDefault);
 
         module.AddSetting(
-            "logging.allowedCategories",
+            AdminProvenanceItems.LoggingAllowedCategories,
+            FromBootSource(allowedCategories.Source, allowedCategories.UsedDefault),
             allowedCategories.Display,
-            source: allowedCategories.Source,
-            consumers: new[] { "Koan.Admin.Logging" },
-            sourceKey: allowedCategories.SourceKey);
+            sourceKey: allowedCategories.SourceKey,
+            usedDefault: allowedCategories.UsedDefault);
 
         module.AddSetting(
-            "generate.composeProfiles",
+            AdminProvenanceItems.GenerateComposeProfiles,
+            FromBootSource(composeProfiles.Source, composeProfiles.UsedDefault),
             composeProfiles.Display,
-            source: composeProfiles.Source,
-            consumers: new[] { "Koan.Admin.LaunchKitService" },
-            sourceKey: composeProfiles.SourceKey);
+            sourceKey: composeProfiles.SourceKey,
+            usedDefault: composeProfiles.UsedDefault);
 
         module.AddSetting(
-            "generate.openApiClients",
+            AdminProvenanceItems.GenerateOpenApiClients,
+            FromBootSource(openApiClients.Source, openApiClients.UsedDefault),
             openApiClients.Display,
-            source: openApiClients.Source,
-            consumers: new[] { "Koan.Admin.LaunchKitService" },
-            sourceKey: openApiClients.SourceKey);
+            sourceKey: openApiClients.SourceKey,
+            usedDefault: openApiClients.UsedDefault);
 
         module.AddSetting(
-            "generate.includeAppSettings",
-            BoolString(includeAppSettingsOption.Value),
-            source: includeAppSettingsOption.Source,
-            consumers: new[] { "Koan.Admin.LaunchKitService" },
-            sourceKey: includeAppSettingsOption.ResolvedKey);
+            AdminProvenanceItems.GenerateIncludeAppSettings,
+            FromConfigurationValue(includeAppSettingsOption),
+            includeAppSettingsOption.Value,
+            sourceKey: includeAppSettingsOption.ResolvedKey,
+            usedDefault: includeAppSettingsOption.UsedDefault);
 
         module.AddSetting(
-            "generate.includeCompose",
-            BoolString(includeComposeOption.Value),
-            source: includeComposeOption.Source,
-            consumers: new[] { "Koan.Admin.LaunchKitService" },
-            sourceKey: includeComposeOption.ResolvedKey);
+            AdminProvenanceItems.GenerateIncludeCompose,
+            FromConfigurationValue(includeComposeOption),
+            includeComposeOption.Value,
+            sourceKey: includeComposeOption.ResolvedKey,
+            usedDefault: includeComposeOption.UsedDefault);
 
         module.AddSetting(
-            "generate.includeAspire",
-            BoolString(includeAspireOption.Value),
-            source: includeAspireOption.Source,
-            consumers: new[] { "Koan.Admin.LaunchKitService" },
-            sourceKey: includeAspireOption.ResolvedKey);
+            AdminProvenanceItems.GenerateIncludeAspire,
+            FromConfigurationValue(includeAspireOption),
+            includeAspireOption.Value,
+            sourceKey: includeAspireOption.ResolvedKey,
+            usedDefault: includeAspireOption.UsedDefault);
 
         module.AddSetting(
-            "generate.includeManifest",
-            BoolString(includeManifestOption.Value),
-            source: includeManifestOption.Source,
-            consumers: new[] { "Koan.Admin.LaunchKitService" },
-            sourceKey: includeManifestOption.ResolvedKey);
+            AdminProvenanceItems.GenerateIncludeManifest,
+            FromConfigurationValue(includeManifestOption),
+            includeManifestOption.Value,
+            sourceKey: includeManifestOption.ResolvedKey,
+            usedDefault: includeManifestOption.UsedDefault);
 
         module.AddSetting(
-            "generate.includeReadme",
-            BoolString(includeReadmeOption.Value),
-            source: includeReadmeOption.Source,
-            consumers: new[] { "Koan.Admin.LaunchKitService" },
-            sourceKey: includeReadmeOption.ResolvedKey);
+            AdminProvenanceItems.GenerateIncludeReadme,
+            FromConfigurationValue(includeReadmeOption),
+            includeReadmeOption.Value,
+            sourceKey: includeReadmeOption.ResolvedKey,
+            usedDefault: includeReadmeOption.UsedDefault);
 
         module.AddSetting(
-            "generate.composeBasePort",
-            composeBasePortOption.Value.ToString(),
-            source: composeBasePortOption.Source,
-            consumers: new[] { "Koan.Admin.LaunchKitService" },
-            sourceKey: composeBasePortOption.ResolvedKey);
+            AdminProvenanceItems.GenerateComposeBasePort,
+            FromConfigurationValue(composeBasePortOption),
+            composeBasePortOption.Value,
+            sourceKey: composeBasePortOption.ResolvedKey,
+            usedDefault: composeBasePortOption.UsedDefault);
 
-    if (!KoanEnv.IsDevelopment && normalizedPrefix.StartsWith(".", StringComparison.Ordinal) && !allowDotOption.Value)
+        if (!KoanEnv.IsDevelopment && normalizedPrefix.StartsWith(".", StringComparison.Ordinal) && !allowDotOption.Value)
         {
             module.AddNote("Dot-prefixed admin routes are disabled outside Development unless AllowDotPrefixInProduction=true.");
         }
@@ -274,7 +275,7 @@ public sealed class KoanAdminAutoRegistrar : IKoanAutoRegistrar
     {
         if (cfg is null)
         {
-            return new ConfigurationArrayValue(FormatList(defaults), BootSettingSource.Auto, baseKey, true);
+            return new ConfigurationArrayValue(FormatList(defaults), BootSettingSource.Auto, null, true);
         }
 
         var section = cfg.GetSection(baseKey);
@@ -282,7 +283,7 @@ public sealed class KoanAdminAutoRegistrar : IKoanAutoRegistrar
 
         if (children.Count == 0)
         {
-            return new ConfigurationArrayValue(FormatList(defaults), BootSettingSource.Auto, baseKey, true);
+            return new ConfigurationArrayValue(FormatList(defaults), BootSettingSource.Auto, null, true);
         }
 
         var resolved = new List<ConfigurationValue<string?>>();
@@ -298,7 +299,7 @@ public sealed class KoanAdminAutoRegistrar : IKoanAutoRegistrar
 
         if (resolved.Count == 0)
         {
-            return new ConfigurationArrayValue(FormatList(defaults), BootSettingSource.Auto, baseKey, true);
+            return new ConfigurationArrayValue(FormatList(defaults), BootSettingSource.Auto, null, true);
         }
 
         var displayValues = resolved
@@ -310,12 +311,10 @@ public sealed class KoanAdminAutoRegistrar : IKoanAutoRegistrar
         var source = resolved.Any(v => v.Source == BootSettingSource.Environment)
             ? BootSettingSource.Environment
             : resolved[0].Source;
-        var sourceKey = resolved.First(v => v.Source == source).ResolvedKey;
+        var sourceKey = resolved.FirstOrDefault(v => v.Source == source).ResolvedKey;
 
         return new ConfigurationArrayValue(display, source, sourceKey, false);
     }
-
-    private static string BoolString(bool value) => value ? "true" : "false";
 
     private static string FormatList(IReadOnlyCollection<string> items)
     {
@@ -324,6 +323,6 @@ public sealed class KoanAdminAutoRegistrar : IKoanAutoRegistrar
         return trimmed.Length == 0 ? "(none)" : string.Join(", ", trimmed);
     }
 
-    private readonly record struct ConfigurationArrayValue(string Display, BootSettingSource Source, string SourceKey, bool UsedDefault);
+    private readonly record struct ConfigurationArrayValue(string Display, BootSettingSource Source, string? SourceKey, bool UsedDefault);
 }
 

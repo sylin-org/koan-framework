@@ -19,6 +19,9 @@ using Koan.Orchestration.Aspire;
 using Aspire.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
 using Koan.Data.Connector.Redis.Discovery;
+using Koan.Core.Provenance;
+using RedisItems = Koan.Data.Connector.Redis.Infrastructure.RedisProvenanceItems;
+using ProvenanceModes = Koan.Core.Hosting.Bootstrap.ProvenancePublicationModeExtensions;
 
 namespace Koan.Data.Connector.Redis.Initialization;
 
@@ -109,8 +112,13 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar, IKoanAspireRegistrar
             $"{Infrastructure.Constants.Configuration.Section_Data}:{Infrastructure.Constants.Configuration.Keys.MaxPageSize}",
             $"{Infrastructure.Constants.Configuration.Section_Sources_Default}:{Infrastructure.Constants.Configuration.Keys.MaxPageSize}");
 
+        var ensureCreated = Configuration.ReadFirstWithSource(
+            cfg,
+            true,
+            $"{Infrastructure.Constants.Configuration.Section_Data}:{Infrastructure.Constants.Configuration.Keys.EnsureCreatedSupported}",
+            $"{Infrastructure.Constants.Configuration.Section_Sources_Default}:{Infrastructure.Constants.Configuration.Keys.EnsureCreatedSupported}");
+
         var connectionIsAuto = string.IsNullOrWhiteSpace(connection.Value) || string.Equals(connection.Value, "auto", StringComparison.OrdinalIgnoreCase);
-        var connectionSource = connectionIsAuto ? BootSettingSource.Auto : connection.Source;
         var connectionSourceKey = connection.ResolvedKey ??
             $"{Infrastructure.Constants.Configuration.Section_Data}:{Infrastructure.Constants.Configuration.Keys.ConnectionString}";
 
@@ -125,60 +133,34 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar, IKoanAspireRegistrar
                 () => BuildRedisFallback(defaultOptions));
         }
 
-        var sanitizedConnection = Redaction.DeIdentify(effectiveConnectionString);
+        var connectionMode = connectionIsAuto
+            ? ProvenanceModes.FromBootSource(BootSettingSource.Auto, usedDefault: true)
+            : ProvenanceModes.FromConfigurationValue(connection);
 
-        module.AddSetting(
-            "ConnectionString",
-            sanitizedConnection,
-            source: connectionSource,
-            consumers: new[]
-            {
-                "Koan.Data.Connector.Redis.RedisOptionsConfigurator",
-                "Koan.Data.Connector.Redis.RedisAdapterFactory",
-                "Koan.Data.Connector.Redis.Initialization.KoanAutoRegistrar"
-            },
-            sourceKey: connectionSourceKey);
+        Publish(
+            module,
+            RedisItems.ConnectionString,
+            connection,
+            displayOverride: effectiveConnectionString,
+            modeOverride: connectionMode,
+            usedDefaultOverride: connectionIsAuto ? true : connection.UsedDefault,
+            sourceKeyOverride: connectionSourceKey);
 
-        module.AddSetting(
-            "Database",
-            database.Value.ToString(),
-            source: database.Source,
-            consumers: new[]
-            {
-                "Koan.Data.Connector.Redis.RedisOptionsConfigurator",
-                "StackExchange.Redis.ConnectionMultiplexer"
-            },
-            sourceKey: database.ResolvedKey);
+        Publish(module, RedisItems.Database, database);
+        Publish(module, RedisItems.EnsureCreatedSupported, ensureCreated);
+        Publish(module, RedisItems.DefaultPageSize, defaultPageSize);
+        Publish(module, RedisItems.MaxPageSize, maxPageSize);
+    }
 
+    private static void Publish<T>(ProvenanceModuleWriter module, ProvenanceItem item, ConfigurationValue<T> value, object? displayOverride = null, ProvenancePublicationMode? modeOverride = null, bool? usedDefaultOverride = null, string? sourceKeyOverride = null, bool? sanitizeOverride = null)
+    {
         module.AddSetting(
-            Infrastructure.Constants.Bootstrap.EnsureCreatedSupported,
-            true.ToString(),
-            source: BootSettingSource.Auto,
-            consumers: new[]
-            {
-                "Koan.Data.Connector.Redis.RedisAdapterFactory"
-            },
-            sourceKey: $"{Infrastructure.Constants.Configuration.Section_Data}:{Infrastructure.Constants.Configuration.Keys.EnsureCreatedSupported}");
-
-        module.AddSetting(
-            Infrastructure.Constants.Bootstrap.DefaultPageSize,
-            defaultPageSize.Value.ToString(),
-            source: defaultPageSize.Source,
-            consumers: new[]
-            {
-                "Koan.Data.Connector.Redis.RedisAdapterFactory"
-            },
-            sourceKey: defaultPageSize.ResolvedKey);
-
-        module.AddSetting(
-            Infrastructure.Constants.Bootstrap.MaxPageSize,
-            maxPageSize.Value.ToString(),
-            source: maxPageSize.Source,
-            consumers: new[]
-            {
-                "Koan.Data.Connector.Redis.RedisAdapterFactory"
-            },
-            sourceKey: maxPageSize.ResolvedKey);
+            item,
+            modeOverride ?? ProvenanceModes.FromConfigurationValue(value),
+            displayOverride ?? value.Value,
+            sourceKey: sourceKeyOverride ?? value.ResolvedKey,
+            usedDefault: usedDefaultOverride ?? value.UsedDefault,
+            sanitizeOverride: sanitizeOverride);
     }
 
     private static string BuildRedisFallback(RedisOptions defaults)

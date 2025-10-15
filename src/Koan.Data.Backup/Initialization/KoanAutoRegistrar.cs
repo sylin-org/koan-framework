@@ -107,97 +107,19 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             BackupItems.ExcludeFromCleanup.Key,
             retentionDefaults.ExcludeFromCleanup);
 
-        module.AddSetting(
-            BackupItems.DefaultStorageProfile,
-            ProvenanceModes.FromConfigurationValue(defaultStorageProfile),
-            string.IsNullOrWhiteSpace(defaultStorageProfile.Value) ? "(auto)" : defaultStorageProfile.Value,
-            sourceKey: defaultStorageProfile.ResolvedKey,
-            usedDefault: defaultStorageProfile.UsedDefault);
-
-        module.AddSetting(
-            BackupItems.DefaultBatchSize,
-            ProvenanceModes.FromConfigurationValue(defaultBatchSize),
-            defaultBatchSize.Value,
-            sourceKey: defaultBatchSize.ResolvedKey,
-            usedDefault: defaultBatchSize.UsedDefault);
-
-        module.AddSetting(
-            BackupItems.WarmupEntitiesOnStartup,
-            ProvenanceModes.FromConfigurationValue(warmupOnStartup),
-            warmupOnStartup.Value,
-            sourceKey: warmupOnStartup.ResolvedKey,
-            usedDefault: warmupOnStartup.UsedDefault);
-
-        module.AddSetting(
-            BackupItems.EnableBackgroundMaintenance,
-            ProvenanceModes.FromConfigurationValue(enableMaintenance),
-            enableMaintenance.Value,
-            sourceKey: enableMaintenance.ResolvedKey,
-            usedDefault: enableMaintenance.UsedDefault);
-
-        module.AddSetting(
-            BackupItems.MaintenanceInterval,
-            ProvenanceModes.FromConfigurationValue(maintenanceInterval),
-            maintenanceInterval.Value,
-            sourceKey: maintenanceInterval.ResolvedKey,
-            usedDefault: maintenanceInterval.UsedDefault);
-
-        module.AddSetting(
-            BackupItems.MaxConcurrency,
-            ProvenanceModes.FromConfigurationValue(maxConcurrency),
-            maxConcurrency.Value,
-            sourceKey: maxConcurrency.ResolvedKey,
-            usedDefault: maxConcurrency.UsedDefault);
-
-        module.AddSetting(
-            BackupItems.AutoValidateBackups,
-            ProvenanceModes.FromConfigurationValue(autoValidateBackups),
-            autoValidateBackups.Value,
-            sourceKey: autoValidateBackups.ResolvedKey,
-            usedDefault: autoValidateBackups.UsedDefault);
-
-        module.AddSetting(
-            BackupItems.CompressionLevel,
-            ProvenanceModes.FromConfigurationValue(compressionLevel),
-            compressionLevel.Value,
-            sourceKey: compressionLevel.ResolvedKey,
-            usedDefault: compressionLevel.UsedDefault);
-
-        module.AddSetting(
-            BackupItems.KeepDaily,
-            ProvenanceModes.FromConfigurationValue(keepDaily),
-            keepDaily.Value,
-            sourceKey: keepDaily.ResolvedKey,
-            usedDefault: keepDaily.UsedDefault);
-
-        module.AddSetting(
-            BackupItems.KeepWeekly,
-            ProvenanceModes.FromConfigurationValue(keepWeekly),
-            keepWeekly.Value,
-            sourceKey: keepWeekly.ResolvedKey,
-            usedDefault: keepWeekly.UsedDefault);
-
-        module.AddSetting(
-            BackupItems.KeepMonthly,
-            ProvenanceModes.FromConfigurationValue(keepMonthly),
-            keepMonthly.Value,
-            sourceKey: keepMonthly.ResolvedKey,
-            usedDefault: keepMonthly.UsedDefault);
-
-        module.AddSetting(
-            BackupItems.KeepYearly,
-            ProvenanceModes.FromConfigurationValue(keepYearly),
-            keepYearly.Value,
-            sourceKey: keepYearly.ResolvedKey,
-            usedDefault: keepYearly.UsedDefault);
-
-        module.AddSetting(
-            BackupItems.ExcludeFromCleanup,
-            ProvenanceModes.FromBootSource(excludeFromCleanup.Source, excludeFromCleanup.UsedDefault),
-            excludeFromCleanup.Display,
-            sourceKey: excludeFromCleanup.SourceKey,
-            usedDefault: excludeFromCleanup.UsedDefault,
-            sanitizeOverride: false);
+        Publish(module, BackupItems.DefaultStorageProfile, defaultStorageProfile, ResolveDefaultProfileDisplay(defaultStorageProfile.Value));
+        Publish(module, BackupItems.DefaultBatchSize, defaultBatchSize);
+        Publish(module, BackupItems.WarmupEntitiesOnStartup, warmupOnStartup);
+        Publish(module, BackupItems.EnableBackgroundMaintenance, enableMaintenance);
+        Publish(module, BackupItems.MaintenanceInterval, maintenanceInterval);
+        Publish(module, BackupItems.MaxConcurrency, maxConcurrency);
+        Publish(module, BackupItems.AutoValidateBackups, autoValidateBackups);
+        Publish(module, BackupItems.CompressionLevel, compressionLevel);
+        Publish(module, BackupItems.KeepDaily, keepDaily);
+        Publish(module, BackupItems.KeepWeekly, keepWeekly);
+        Publish(module, BackupItems.KeepMonthly, keepMonthly);
+        Publish(module, BackupItems.KeepYearly, keepYearly);
+        Publish(module, BackupItems.ExcludeFromCleanup, excludeFromCleanup);
 
         // Backup capabilities
         module.AddNote("Capabilities: auto entity discovery, streaming backup, multi-provider support, zip compression, JSON lines format, integrity validation, schema snapshots, backup discovery, progress tracking, attribute-based opt-in, policy management.");
@@ -296,11 +218,30 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         public const string Inventory = "backup.inventory";
     }
 
-    private static string BoolString(bool value) => value ? "true" : "false";
+    private static void Publish<T>(Koan.Core.Provenance.ProvenanceModuleWriter module, ProvenanceItem item, Koan.Core.ConfigurationValue<T> value, object? displayOverride = null, bool? sanitizeOverride = null)
+    {
+        module.AddSetting(
+            item,
+            ProvenanceModes.FromConfigurationValue(value),
+            displayOverride ?? value.Value,
+            sourceKey: value.ResolvedKey,
+            usedDefault: value.UsedDefault,
+            sanitizeOverride: sanitizeOverride);
+    }
 
-    private static IReadOnlyCollection<string> BackupOptionConsumers() => BackupConsumersCache.OptionConsumers;
+    private static void Publish(Koan.Core.Provenance.ProvenanceModuleWriter module, ProvenanceItem item, StringArrayValue value)
+    {
+        module.AddSetting(
+            item,
+            ProvenanceModes.FromBootSource(value.Source, value.UsedDefault),
+            value.Display,
+            sourceKey: value.SourceKey,
+            usedDefault: value.UsedDefault,
+            sanitizeOverride: false);
+    }
 
-    private static IReadOnlyCollection<string> BackupMaintenanceConsumers() => BackupConsumersCache.MaintenanceConsumers;
+    private static string ResolveDefaultProfileDisplay(string? value)
+        => string.IsNullOrWhiteSpace(value) ? "(auto)" : value;
 
     private static StringArrayValue ReadStringArray(IConfiguration? cfg, string baseKey, IReadOnlyList<string> defaults)
     {

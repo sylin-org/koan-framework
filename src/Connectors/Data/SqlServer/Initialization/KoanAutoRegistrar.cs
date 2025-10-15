@@ -9,10 +9,13 @@ using Koan.Core.Adapters.Reporting;
 using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Modules;
 using Koan.Core.Orchestration.Abstractions;
+using Koan.Core.Provenance;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Naming;
 using Koan.Data.Connector.SqlServer.Discovery;
 using Microsoft.Extensions.Logging.Abstractions;
+using SqlServerItems = Koan.Data.Connector.SqlServer.Infrastructure.SqlServerProvenanceItems;
+using ProvenanceModes = Koan.Core.Hosting.Bootstrap.ProvenancePublicationModeExtensions;
 
 namespace Koan.Data.Connector.SqlServer.Initialization;
 
@@ -66,8 +69,24 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             Infrastructure.Constants.Configuration.Keys.MaxPageSize,
             Infrastructure.Constants.Configuration.Keys.AltMaxPageSize);
 
-        var connectionIsAuto = string.IsNullOrWhiteSpace(connection.Value) || string.Equals(connection.Value, "auto", StringComparison.OrdinalIgnoreCase);
-        var connectionSource = connectionIsAuto ? BootSettingSource.Auto : connection.Source;
+        var namingStyle = Configuration.ReadFirstWithSource(
+            cfg,
+            defaultOptions.NamingStyle,
+            Infrastructure.Constants.Configuration.Keys.NamingStyle,
+            Infrastructure.Constants.Configuration.Keys.AltNamingStyle);
+
+        var separator = Configuration.ReadFirstWithSource(
+            cfg,
+            defaultOptions.Separator,
+            Infrastructure.Constants.Configuration.Keys.Separator,
+            Infrastructure.Constants.Configuration.Keys.AltSeparator);
+
+        var ensureCreated = Configuration.ReadWithSource(
+            cfg,
+            Infrastructure.Constants.Configuration.Keys.EnsureCreatedSupported,
+            true);
+
+    var connectionIsAuto = string.IsNullOrWhiteSpace(connection.Value) || string.Equals(connection.Value, "auto", StringComparison.OrdinalIgnoreCase);
         var connectionSourceKey = connection.ResolvedKey ?? Infrastructure.Constants.Configuration.Keys.ConnectionString;
 
         var effectiveConnectionString = connection.Value ?? defaultOptions.ConnectionString;
@@ -81,68 +100,35 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
                 () => BuildSqlServerFallback());
         }
 
-        var sanitizedConnection = Redaction.DeIdentify(effectiveConnectionString);
+        var connectionMode = connectionIsAuto
+            ? ProvenanceModes.FromBootSource(BootSettingSource.Auto, usedDefault: true)
+            : ProvenanceModes.FromConfigurationValue(connection);
 
-        module.AddSetting(
-            "ConnectionString",
-            sanitizedConnection,
-            source: connectionSource,
-            consumers: new[]
-            {
-                "Koan.Data.Connector.SqlServer.SqlServerOptionsConfigurator",
-                "Koan.Data.Connector.SqlServer.SqlServerAdapterFactory"
-            },
-            sourceKey: connectionSourceKey);
+        Publish(
+            module,
+            SqlServerItems.ConnectionString,
+            connection,
+            displayOverride: effectiveConnectionString,
+            modeOverride: connectionMode,
+            usedDefaultOverride: connectionIsAuto ? true : connection.UsedDefault,
+            sourceKeyOverride: connectionSourceKey);
 
-        module.AddSetting(
-            "NamingStyle",
-            defaultOptions.NamingStyle.ToString(),
-            source: BootSettingSource.Auto,
-            consumers: new[]
-            {
-                "Koan.Data.Connector.SqlServer.SqlServerAdapterFactory"
-            },
-            sourceKey: Infrastructure.Constants.Configuration.Keys.NamingStyle);
+        Publish(module, SqlServerItems.NamingStyle, namingStyle);
+        Publish(module, SqlServerItems.Separator, separator);
+        Publish(module, SqlServerItems.EnsureCreatedSupported, ensureCreated);
+        Publish(module, SqlServerItems.DefaultPageSize, defaultPageSize);
+        Publish(module, SqlServerItems.MaxPageSize, maxPageSize);
+    }
 
+    private static void Publish<T>(ProvenanceModuleWriter module, ProvenanceItem item, ConfigurationValue<T> value, object? displayOverride = null, ProvenancePublicationMode? modeOverride = null, bool? usedDefaultOverride = null, string? sourceKeyOverride = null, bool? sanitizeOverride = null)
+    {
         module.AddSetting(
-            "Separator",
-            defaultOptions.Separator,
-            source: BootSettingSource.Auto,
-            consumers: new[]
-            {
-                "Koan.Data.Connector.SqlServer.SqlServerAdapterFactory"
-            },
-            sourceKey: Infrastructure.Constants.Configuration.Keys.Separator);
-
-        module.AddSetting(
-            "EnsureCreatedSupported",
-            true.ToString(),
-            source: BootSettingSource.Auto,
-            consumers: new[]
-            {
-                "Koan.Data.Connector.SqlServer.SqlServerAdapterFactory"
-            },
-            sourceKey: Infrastructure.Constants.Configuration.Keys.EnsureCreatedSupported);
-
-        module.AddSetting(
-            "DefaultPageSize",
-            defaultPageSize.Value.ToString(),
-            source: defaultPageSize.Source,
-            consumers: new[]
-            {
-                "Koan.Data.Connector.SqlServer.SqlServerAdapterFactory"
-            },
-            sourceKey: defaultPageSize.ResolvedKey);
-
-        module.AddSetting(
-            "MaxPageSize",
-            maxPageSize.Value.ToString(),
-            source: maxPageSize.Source,
-            consumers: new[]
-            {
-                "Koan.Data.Connector.SqlServer.SqlServerAdapterFactory"
-            },
-            sourceKey: maxPageSize.ResolvedKey);
+            item,
+            modeOverride ?? ProvenanceModes.FromConfigurationValue(value),
+            displayOverride ?? value.Value,
+            sourceKey: sourceKeyOverride ?? value.ResolvedKey,
+            usedDefault: usedDefaultOverride ?? value.UsedDefault,
+            sanitizeOverride: sanitizeOverride);
     }
 
     private static string BuildSqlServerFallback()
