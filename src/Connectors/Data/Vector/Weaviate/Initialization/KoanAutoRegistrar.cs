@@ -1,9 +1,13 @@
+using System;
+using System.Globalization;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Koan.Core;
+using Koan.Core.Adapters.Reporting;
 using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Modules;
 using Koan.Core.Orchestration;
@@ -41,12 +45,10 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         services.AddHttpClient("weaviate");
     }
 
-    public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
+    public void Describe(global::Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
-        module.Describe(ModuleVersion);
-        // Autonomous discovery adapter handles all connection string resolution
-        // Boot report shows discovery results from WeaviateDiscoveryAdapter
-        module.AddNote("Weaviate discovery handled by autonomous WeaviateDiscoveryAdapter");
+    module.Describe(ModuleVersion);
+    module.AddNote("Weaviate discovery handled by autonomous WeaviateDiscoveryAdapter");
 
         // Configure default options for reporting with provenance metadata
         var defaultOptions = new WeaviateOptions();
@@ -88,21 +90,35 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             Infrastructure.Constants.Configuration.Keys.TimeoutSeconds,
             defaultOptions.DefaultTimeoutSeconds);
 
-        var connectionValue = string.IsNullOrWhiteSpace(connection.Value)
-            ? "auto"
-            : connection.Value;
-        var connectionIsAuto = string.Equals(connectionValue, "auto", StringComparison.OrdinalIgnoreCase);
+        var connectionIsAuto = string.IsNullOrWhiteSpace(connection.Value) || string.Equals(connection.Value, "auto", StringComparison.OrdinalIgnoreCase);
+        var connectionSource = connectionIsAuto ? BootSettingSource.Auto : connection.Source;
+        var connectionSourceKey = connectionIsAuto
+            ? Infrastructure.Constants.Configuration.Keys.ConnectionString
+            : connection.ResolvedKey;
+
+        var effectiveConnectionString = connection.Value ?? defaultOptions.ConnectionString;
+        if (connectionIsAuto)
+        {
+            var adapter = new WeaviateDiscoveryAdapter(cfg, NullLogger<WeaviateDiscoveryAdapter>.Instance);
+            effectiveConnectionString = AdapterBootReporting.ResolveConnectionString(
+                cfg,
+                adapter,
+                null,
+                () => BuildWeaviateFallback(defaultOptions, endpoint.Value));
+        }
+
+        var sanitizedConnection = Redaction.DeIdentify(effectiveConnectionString);
 
         module.AddSetting(
             "ConnectionString",
-            connectionIsAuto ? "auto (resolved by discovery)" : connectionValue,
-            isSecret: !connectionIsAuto,
-            source: connection.Source,
+            sanitizedConnection,
+            source: connectionSource,
             consumers: new[]
             {
                 "Koan.Data.Vector.Connector.Weaviate.WeaviateOptionsConfigurator",
                 "Koan.Data.Vector.Connector.Weaviate.WeaviateVectorAdapterFactory"
-            });
+            },
+            sourceKey: connectionSourceKey);
 
         module.AddSetting(
             "Endpoint",
@@ -112,34 +128,38 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             {
                 "Koan.Data.Vector.Connector.Weaviate.WeaviateOptionsConfigurator",
                 "Koan.Data.Vector.Connector.Weaviate.WeaviateVectorAdapterFactory"
-            });
+            },
+            sourceKey: endpoint.ResolvedKey);
 
         module.AddSetting(
             "DefaultTopK",
-            defaultTopK.Value.ToString(),
+            defaultTopK.Value.ToString(CultureInfo.InvariantCulture),
             source: defaultTopK.Source,
             consumers: new[]
             {
                 "Koan.Data.Vector.Connector.Weaviate.WeaviateVectorAdapterFactory"
-            });
+            },
+            sourceKey: defaultTopK.ResolvedKey);
 
         module.AddSetting(
             "MaxTopK",
-            maxTopK.Value.ToString(),
+            maxTopK.Value.ToString(CultureInfo.InvariantCulture),
             source: maxTopK.Source,
             consumers: new[]
             {
                 "Koan.Data.Vector.Connector.Weaviate.WeaviateVectorAdapterFactory"
-            });
+            },
+            sourceKey: maxTopK.ResolvedKey);
 
         module.AddSetting(
             "Dimension",
-            dimension.Value.ToString(),
+            dimension.Value.ToString(CultureInfo.InvariantCulture),
             source: dimension.Source,
             consumers: new[]
             {
                 "Koan.Data.Vector.Connector.Weaviate.WeaviateVectorAdapterFactory"
-            });
+            },
+            sourceKey: dimension.ResolvedKey);
 
         module.AddSetting(
             "Metric",
@@ -148,18 +168,44 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             consumers: new[]
             {
                 "Koan.Data.Vector.Connector.Weaviate.WeaviateVectorAdapterFactory"
-            });
+            },
+            sourceKey: metric.ResolvedKey);
 
         module.AddSetting(
             "TimeoutSeconds",
-            timeoutSeconds.Value.ToString(),
+            timeoutSeconds.Value.ToString(CultureInfo.InvariantCulture),
             source: timeoutSeconds.Source,
             consumers: new[]
             {
                 "Koan.Data.Vector.Connector.Weaviate.WeaviateVectorAdapterFactory"
-            });
+            },
+            sourceKey: timeoutSeconds.ResolvedKey);
+    }
+    private static string BuildWeaviateFallback(WeaviateOptions defaults, string? configuredEndpoint)
+    {
+        var endpoint = !string.IsNullOrWhiteSpace(configuredEndpoint)
+            ? configuredEndpoint
+            : defaults.Endpoint;
+
+        return NormalizeWeaviateEndpoint(endpoint);
     }
 
+    private static string NormalizeWeaviateEndpoint(string endpoint)
+    {
+        if (string.IsNullOrWhiteSpace(endpoint))
+        {
+            return "http://localhost:8085";
+        }
+
+        if (Uri.TryCreate(endpoint, UriKind.Absolute, out var uri))
+        {
+            var scheme = string.IsNullOrWhiteSpace(uri.Scheme) ? "http" : uri.Scheme;
+            var portSegment = uri.IsDefaultPort ? string.Empty : $":{uri.Port}";
+            return $"{scheme}://{uri.Host}{portSegment}";
+        }
+
+        return endpoint;
+    }
 }
 
 

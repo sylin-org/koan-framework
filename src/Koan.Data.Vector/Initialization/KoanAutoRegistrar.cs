@@ -4,6 +4,7 @@ using Microsoft.Extensions.Hosting;
 using Koan.Core;
 using Koan.Core.Logging;
 using Koan.Core.Hosting.Bootstrap;
+using Koan.Data.Vector.Infrastructure;
 
 namespace Koan.Data.Vector.Initialization;
 
@@ -22,12 +23,31 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         Log.BootDebug(LogActions.Init, "services-registered", ("module", ModuleName));
     }
 
-    public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
+    public void Describe(global::Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
         module.Describe(ModuleVersion);
-        var def = Configuration.Read(cfg, "Koan:Data:VectorDefaults:DefaultProvider", null);
-        module.AddSetting("VectorDefaults:DefaultProvider", def, isSecret: false);
+        var defaultOptions = new VectorDefaultsOptions();
+        var defaultProvider = Configuration.ReadWithSource<string?>(
+            cfg,
+            Constants.Configuration.Keys.DefaultProvider,
+            defaultOptions.DefaultProvider);
+
+        var display = string.IsNullOrWhiteSpace(defaultProvider.Value)
+            ? "(auto)"
+            : defaultProvider.Value;
+
+        module.AddSetting(
+            "VectorDefaults:DefaultProvider",
+            display,
+            source: defaultProvider.Source,
+            sourceKey: defaultProvider.ResolvedKey,
+            consumers: DefaultProviderConsumers);
     }
+
+    private static readonly string[] DefaultProviderConsumers =
+    {
+        "Koan.Data.Vector.VectorService"
+    };
 
     private static class LogActions
     {
