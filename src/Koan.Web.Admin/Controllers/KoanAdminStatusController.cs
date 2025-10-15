@@ -1,10 +1,10 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Koan.Admin.Contracts;
 using Koan.Admin.Services;
+using Koan.Core;
 using Koan.Web.Admin.Contracts;
 using Koan.Web.Admin.Infrastructure;
 using Microsoft.AspNetCore.Authorization;
@@ -30,13 +30,20 @@ public sealed class KoanAdminStatusController : ControllerBase
     }
 
     [HttpGet("status")]
-    public async Task<ActionResult<KoanAdminStatusResponse>> GetStatus(CancellationToken cancellationToken)
+    public async Task<ActionResult<KoanAdminStatusResponse>> GetStatus([FromQuery] bool? sanitized, CancellationToken cancellationToken)
     {
         var snapshot = _features.Current;
         if (!snapshot.Enabled || !snapshot.WebEnabled)
         {
             return NotFound();
         }
+
+        var sanitizedRequested = sanitized ?? false;
+        var runtimeLocked = KoanEnv.IsProduction && !KoanEnv.AllowMagicInProduction;
+        var effectiveSanitized = runtimeLocked || sanitizedRequested;
+        var runtimeLockReason = runtimeLocked
+            ? "Production hosts require sanitized runtime details. Set Koan:AllowMagicInProduction=true to view raw diagnostics."
+            : null;
 
         var manifest = await _manifest.BuildAsync(cancellationToken).ConfigureAwait(false);
         var summary = manifest.ToSummary();
@@ -90,8 +97,9 @@ public sealed class KoanAdminStatusController : ControllerBase
             .ToList();
 
         var configuration = BuildConfigurationSummaries(modules);
+        var runtime = KoanAdminRuntimeSurfaceFactory.Capture(effectiveSanitized, runtimeLocked, runtimeLockReason);
 
-        var response = new KoanAdminStatusResponse(Koan.Core.KoanEnv.CurrentSnapshot, snapshot, summary, health, modules, configuration, startupNotes);
+        var response = new KoanAdminStatusResponse(KoanEnv.CurrentSnapshot, snapshot, runtime, summary, health, modules, configuration, startupNotes);
         return Ok(response);
     }
 

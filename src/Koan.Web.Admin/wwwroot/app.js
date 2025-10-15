@@ -5,6 +5,7 @@ const LAUNCHKIT_BUNDLE_ENDPOINT = 'api/launchkit/bundle';
 const REFRESH_INTERVAL_MS = 30000;
 
 const environmentContainer = document.querySelector('.environment-content');
+const runtimeContainer = document.querySelector('.runtime-content');
 const capabilitiesContainer = document.querySelector('.capabilities-content');
 const modulesContainer = document.querySelector('.modules-content');
 const healthContainer = document.querySelector('.health-content');
@@ -13,8 +14,11 @@ const launchKitContainer = document.querySelector('.launchkit-content');
 const generatedAtElement = document.getElementById('generated-at');
 const refreshButton = document.getElementById('refresh-btn');
 const autoRefreshToggle = document.getElementById('auto-refresh');
+const runtimeSanitizedToggle = document.getElementById('runtime-sanitized');
+const runtimeLockReason = document.querySelector('.runtime-lock-reason');
 
 let refreshTimer;
+let runtimeState = { sanitized: false, locked: false };
 
 async function fetchJson(url) {
   const response = await fetch(url, {
@@ -60,6 +64,70 @@ function pluralize(label, count) {
     return `${count} ${label}`;
   }
   return `${count} ${label}s`;
+}
+
+function formatNumber(value, fractionDigits = 0) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return null;
+  }
+  return value.toLocaleString(undefined, {
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits
+  });
+}
+
+function formatBytes(value) {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
+    return null;
+  }
+
+  const units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
+  let size = value;
+  let unitIndex = 0;
+
+  while (size >= 1024 && unitIndex < units.length - 1) {
+    size /= 1024;
+    unitIndex += 1;
+  }
+
+  const digits = size >= 10 || unitIndex === 0 ? 0 : 1;
+  return `${size.toFixed(digits)} ${units[unitIndex]}`;
+}
+
+function formatPercent(value) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return null;
+  }
+  const digits = value >= 10 ? 1 : 2;
+  return `${value.toFixed(digits)}%`;
+}
+
+function formatSeconds(value) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return null;
+  }
+  if (value >= 10) {
+    return `${Math.round(value)}s`;
+  }
+  return `${value.toFixed(2)}s`;
+}
+
+function formatDateTime(value) {
+  if (!value) {
+    return null;
+  }
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+  return date.toLocaleString();
+}
+
+function formatBoolean(value) {
+  if (typeof value !== 'boolean') {
+    return null;
+  }
+  return value ? 'Yes' : 'No';
 }
 
 function formatModuleMeta(version, settingCount, noteCount, toolCount) {
@@ -158,6 +226,180 @@ function renderEnvironment(environment) {
     <span class="chip">Container: ${environment?.inContainer ? 'Yes' : 'No'}</span>
   `;
   environmentContainer.appendChild(meta);
+}
+
+function renderRuntime(runtime) {
+  if (!runtimeContainer) {
+    return;
+  }
+
+  runtimeContainer.innerHTML = '';
+
+  if (!runtime) {
+    runtimeContainer.innerHTML = '<p class="loading">Runtime snapshot unavailable.</p>';
+    return;
+  }
+
+  const sanitizedFields = Array.isArray(runtime.sanitizedFields) ? runtime.sanitizedFields : [];
+
+  const meta = document.createElement('div');
+  meta.className = 'runtime-meta';
+  const capturedDisplay = formatDateTime(runtime.capturedAtUtc) ?? 'Unknown capture time';
+  const viewLabel = runtime.sanitized ? 'Sanitized view' : 'Raw view';
+  const threadCount = runtime.threadPool ? formatNumber(runtime.threadPool.threadCount) ?? 'N/A' : 'N/A';
+  const gcInfo = runtime.garbageCollector;
+  const gcModeLabel = gcInfo
+    ? `${gcInfo.isServerGc ? 'Server GC' : 'Workstation GC'}${gcInfo.latencyMode ? ` · ${gcInfo.latencyMode}` : ''}`
+    : 'GC mode unknown';
+  meta.innerHTML = `
+    <span class="chip">Captured ${capturedDisplay}</span>
+    <span class="chip">${viewLabel}</span>
+    <span class="chip">Threads ${threadCount}</span>
+    <span class="chip">${gcModeLabel}</span>
+  `;
+  runtimeContainer.appendChild(meta);
+
+  if (sanitizedFields.length) {
+    const sanitizedBlock = document.createElement('div');
+    sanitizedBlock.className = 'sanitized-fields';
+    const label = document.createElement('span');
+    label.className = 'muted';
+    label.textContent = 'Hidden fields:';
+    sanitizedBlock.appendChild(label);
+    sanitizedFields.forEach(field => {
+      const badge = document.createElement('span');
+      badge.className = 'chip chip-compact';
+      badge.textContent = field;
+      sanitizedBlock.appendChild(badge);
+    });
+    runtimeContainer.appendChild(sanitizedBlock);
+  }
+
+  const grid = document.createElement('div');
+  grid.className = 'runtime-grid';
+
+  const process = runtime.process ?? {};
+  grid.appendChild(buildRuntimeCard('Process', [
+    { label: 'Process ID', value: process.processId },
+    { label: 'Name', value: process.name, raw: true },
+    { label: 'User', value: process.userName, sanitized: sanitizedFields.includes('Process.UserName') },
+    { label: 'Command line', value: process.commandLine, sanitized: sanitizedFields.includes('Process.CommandLine') },
+    { label: 'Executable', value: process.executablePath, sanitized: sanitizedFields.includes('Process.ExecutablePath') },
+    { label: 'Working directory', value: process.workingDirectory, sanitized: sanitizedFields.includes('Process.WorkingDirectory') },
+    { label: 'Start (UTC)', value: formatDateTime(process.startTimeUtc), raw: true },
+    { label: 'Uptime', value: typeof process.uptimeSeconds === 'number' ? formatUptime(process.uptimeSeconds * 1000) : null, raw: true },
+    { label: 'CPU time', value: formatSeconds(process.totalProcessorTimeSeconds), raw: true },
+    { label: 'CPU usage', value: process.cpuUtilizationPercent, formatter: formatPercent },
+    { label: 'Threads', value: process.threadCount },
+    { label: 'Handles', value: process.handleCount }
+  ]));
+
+  const memory = runtime.memory ?? {};
+  grid.appendChild(buildRuntimeCard('Memory', [
+    { label: 'Working set', value: memory.workingSetBytes, formatter: formatBytes },
+    { label: 'Peak working set', value: memory.peakWorkingSetBytes, formatter: formatBytes },
+    { label: 'Private bytes', value: memory.privateBytes, formatter: formatBytes },
+    { label: 'Virtual bytes', value: memory.virtualBytes, formatter: formatBytes },
+    { label: 'Paged bytes', value: memory.pagedBytes, formatter: formatBytes },
+    { label: 'Paged system', value: memory.pagedSystemBytes, formatter: formatBytes },
+    { label: 'Non-paged system', value: memory.nonPagedSystemBytes, formatter: formatBytes },
+    { label: 'GC heap', value: memory.gcHeapSizeBytes, formatter: formatBytes },
+    { label: 'GC fragmented', value: memory.gcFragmentedBytes, formatter: formatBytes },
+    { label: 'GC committed', value: memory.gcTotalCommittedBytes, formatter: formatBytes },
+    { label: 'Managed heap', value: memory.managedHeapBytes, formatter: formatBytes },
+    { label: 'Managed allocated', value: memory.managedAllocatedBytes, formatter: formatBytes }
+  ]));
+
+  const gc = runtime.garbageCollector ?? {};
+  grid.appendChild(buildRuntimeCard('Garbage Collector', [
+    { label: 'Max generation', value: gc.maxGeneration },
+    { label: 'Server GC', value: gc.isServerGc, formatter: formatBoolean },
+    { label: 'Latency mode', value: gc.latencyMode, raw: true },
+    { label: 'Collections (per gen)', value: Array.isArray(gc.collectionCounts) ? gc.collectionCounts.join(' · ') : null, raw: true },
+    { label: 'High memory threshold', value: gc.highMemoryLoadThresholdBytes, formatter: formatBytes },
+    { label: 'Memory load', value: gc.memoryLoadBytes, formatter: formatBytes },
+    { label: 'Memory load %', value: gc.memoryLoadPercent, formatter: formatPercent }
+  ]));
+
+  const threadPool = runtime.threadPool ?? {};
+  grid.appendChild(buildRuntimeCard('Thread Pool', [
+    { label: 'Threads', value: threadPool.threadCount },
+    { label: 'Workers available', value: threadPool.availableWorkerThreads },
+    { label: 'Workers min', value: threadPool.minWorkerThreads },
+    { label: 'Workers max', value: threadPool.maxWorkerThreads },
+    { label: 'IO available', value: threadPool.availableCompletionPortThreads },
+    { label: 'IO min', value: threadPool.minCompletionPortThreads },
+    { label: 'IO max', value: threadPool.maxCompletionPortThreads },
+    { label: 'Completed work items', value: threadPool.completedWorkItemCount },
+    { label: 'Pending work items', value: threadPool.pendingWorkItemCount }
+  ]));
+
+  const machine = runtime.machine ?? {};
+  grid.appendChild(buildRuntimeCard('Host', [
+    { label: 'Machine', value: machine.machineName, sanitized: sanitizedFields.includes('Machine.MachineName') },
+    { label: 'Domain', value: machine.domainName, sanitized: sanitizedFields.includes('Machine.DomainName') },
+    { label: 'Framework', value: machine.frameworkDescription, raw: true },
+    { label: 'OS', value: machine.osDescription, raw: true },
+    { label: 'Process arch', value: machine.processArchitecture, raw: true },
+    { label: 'OS arch', value: machine.osArchitecture, raw: true },
+    { label: 'Processors', value: machine.processorCount },
+    { label: '64-bit process', value: machine.is64BitProcess, formatter: formatBoolean },
+    { label: '64-bit OS', value: machine.is64BitOperatingSystem, formatter: formatBoolean }
+  ]));
+
+  runtimeContainer.appendChild(grid);
+}
+
+function buildRuntimeCard(title, rows) {
+  const card = document.createElement('div');
+  card.className = 'runtime-card';
+
+  const heading = document.createElement('h3');
+  heading.textContent = title;
+  card.appendChild(heading);
+
+  const list = document.createElement('dl');
+
+  rows.forEach(row => {
+    const term = document.createElement('dt');
+    term.textContent = row.label;
+    const detail = document.createElement('dd');
+    detail.innerHTML = renderRuntimeValue(row.value, row);
+    list.appendChild(term);
+    list.appendChild(detail);
+  });
+
+  card.appendChild(list);
+  return card;
+}
+
+function renderRuntimeValue(value, options = {}) {
+  if (options && typeof options.formatter === 'function' && value !== null && value !== undefined) {
+    const formatted = options.formatter(value, options);
+    if (formatted !== null && formatted !== undefined) {
+      return formatted;
+    }
+  }
+
+  if ((value === null || value === undefined || value === '') && options.sanitized) {
+    return '<span class="muted">Sanitized</span>';
+  }
+
+  if (value === null || value === undefined || value === '') {
+  return '<span class="muted">N/A</span>';
+  }
+
+  if (options.raw === true) {
+    return value;
+  }
+
+  if (typeof value === 'number') {
+    const digits = typeof options.fractionDigits === 'number' ? options.fractionDigits : 0;
+  const formattedNumber = formatNumber(value, digits);
+  return formattedNumber ?? '<span class="muted">N/A</span>';
+  }
+
+  return value;
 }
 
 function renderCapabilities(features) {
@@ -793,13 +1035,21 @@ function clearRefreshTimer() {
   }
 }
 
+function buildStatusUrl(sanitized) {
+  if (sanitized) {
+    return `${STATUS_ENDPOINT}?sanitized=true`;
+  }
+  return STATUS_ENDPOINT;
+}
+
 async function refreshStatus(manual = false) {
   try {
     if (manual && refreshButton) {
       refreshButton.disabled = true;
     }
 
-    const status = await fetchJson(STATUS_ENDPOINT);
+    const statusUrl = buildStatusUrl(runtimeState.sanitized);
+    const status = await fetchJson(statusUrl);
     renderEnvironment(status.environment);
     renderCapabilities(status.features);
     renderModules(status.modules, status.configuration);
@@ -807,10 +1057,58 @@ async function refreshStatus(manual = false) {
     renderNotes(status.startupNotes, status.modules);
     renderGeneratedAt(status.manifest);
     await renderLaunchKit(status);
+
+    if (status?.runtime) {
+      runtimeState = {
+        sanitized: Boolean(status.runtime.sanitized),
+        locked: Boolean(status.runtime.locked)
+      };
+
+      if (runtimeSanitizedToggle) {
+        runtimeSanitizedToggle.checked = runtimeState.sanitized;
+        runtimeSanitizedToggle.disabled = runtimeState.locked;
+        if (runtimeState.locked && status.runtime.lockReason) {
+          runtimeSanitizedToggle.title = status.runtime.lockReason;
+        } else {
+          runtimeSanitizedToggle.removeAttribute('title');
+        }
+      }
+
+      if (runtimeLockReason) {
+        const lockMessage = runtimeState.locked && status.runtime.lockReason
+          ? status.runtime.lockReason
+          : '';
+        runtimeLockReason.textContent = lockMessage;
+        runtimeLockReason.hidden = lockMessage.length === 0;
+      }
+    } else {
+      runtimeState = { sanitized: false, locked: false };
+      if (runtimeSanitizedToggle) {
+        runtimeSanitizedToggle.checked = false;
+        runtimeSanitizedToggle.disabled = false;
+        runtimeSanitizedToggle.removeAttribute('title');
+      }
+      if (runtimeLockReason) {
+        runtimeLockReason.textContent = '';
+        runtimeLockReason.hidden = true;
+      }
+    }
+
+    renderRuntime(status.runtime);
   } catch (err) {
     console.error(err);
     const message = `<p class="error">Unable to load admin status. ${err.message}</p>`;
     environmentContainer.innerHTML = message;
+    if (runtimeContainer) {
+      runtimeContainer.innerHTML = '<p class="error">Unable to load runtime snapshot.</p>';
+    }
+    if (runtimeSanitizedToggle) {
+      runtimeSanitizedToggle.disabled = true;
+    }
+    if (runtimeLockReason) {
+      runtimeLockReason.textContent = '';
+      runtimeLockReason.hidden = true;
+    }
     capabilitiesContainer.innerHTML = '';
     modulesContainer.innerHTML = '';
     healthContainer.innerHTML = '';
@@ -854,6 +1152,17 @@ if (autoRefreshToggle) {
     if (event.target.checked) {
       refreshStatus(false);
     }
+  });
+}
+
+if (runtimeSanitizedToggle) {
+  runtimeSanitizedToggle.addEventListener('change', event => {
+    if (runtimeState.locked) {
+      event.target.checked = true;
+      return;
+    }
+    runtimeState.sanitized = event.target.checked;
+    refreshStatus(true);
   });
 }
 
