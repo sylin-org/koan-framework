@@ -9,6 +9,7 @@ using Koan.Core.Adapters.Configuration;
 using Koan.Core.Logging;
 using Koan.Core.Orchestration;
 using Koan.Core.Orchestration.Abstractions;
+using MongoItems = Koan.Data.Connector.Mongo.Infrastructure.MongoProvenanceItems;
 
 namespace Koan.Data.Connector.Mongo;
 
@@ -56,11 +57,9 @@ internal sealed class MongoOptionsConfigurator : AdapterOptionsConfigurator<Mong
             "Koan:Data:Mongo:Password",
             "Koan:Data:Password");
 
-        var explicitConnectionString = ReadProviderConfiguration("",
-            Infrastructure.Constants.Configuration.Keys.ConnectionString,
-            Infrastructure.Constants.Configuration.Keys.AltConnectionString,
-            Infrastructure.Constants.Configuration.Keys.ConnectionStringsMongo,
-            Infrastructure.Constants.Configuration.Keys.ConnectionStringsDefault);
+        var explicitConnectionString = ReadProviderConfiguration(
+            string.Empty,
+            MongoItems.ConnectionStringKeys);
 
         if (!string.IsNullOrWhiteSpace(explicitConnectionString))
         {
@@ -80,8 +79,7 @@ internal sealed class MongoOptionsConfigurator : AdapterOptionsConfigurator<Mong
         }
 
         options.Database = ReadProviderConfiguration(options.Database,
-            Infrastructure.Constants.Configuration.Keys.Database,
-            Infrastructure.Constants.Configuration.Keys.AltDatabase)
+            MongoItems.DatabaseKeys)
             ?? options.Database
             ?? string.Empty;
 

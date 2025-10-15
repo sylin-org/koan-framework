@@ -1,5 +1,4 @@
 using System;
-using System.Globalization;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -12,11 +11,14 @@ using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Modules;
 using Koan.Core.Orchestration;
 using Koan.Core.Orchestration.Abstractions;
+using Koan.Core.Provenance;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Naming;
 using Koan.Data.Vector.Abstractions;
 using Koan.Data.Vector.Connector.Weaviate.Discovery;
 using Koan.Data.Vector.Connector.Weaviate.Orchestration;
+using WeaviateItems = Koan.Data.Vector.Connector.Weaviate.Infrastructure.WeaviateProvenanceItems;
+using ProvenanceModes = Koan.Core.Hosting.Bootstrap.ProvenancePublicationModeExtensions;
 
 namespace Koan.Data.Vector.Connector.Weaviate.Initialization;
 
@@ -45,10 +47,10 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         services.AddHttpClient("weaviate");
     }
 
-    public void Describe(global::Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
+    public void Describe(ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
-    module.Describe(ModuleVersion);
-    module.AddNote("Weaviate discovery handled by autonomous WeaviateDiscoveryAdapter");
+        module.Describe(ModuleVersion);
+        module.AddNote("Weaviate discovery handled by autonomous WeaviateDiscoveryAdapter");
 
         // Configure default options for reporting with provenance metadata
         var defaultOptions = new WeaviateOptions();
@@ -56,45 +58,43 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         var connection = Configuration.ReadFirstWithSource(
             cfg,
             defaultOptions.ConnectionString,
-            Infrastructure.Constants.Configuration.Keys.ConnectionString,
-            Infrastructure.Constants.Configuration.Keys.AltConnectionString,
-            "ConnectionStrings:Weaviate");
+            WeaviateItems.ConnectionStringKeys);
 
-        var endpoint = Configuration.ReadWithSource(
+        var endpoint = Configuration.ReadFirstWithSource(
             cfg,
-            Infrastructure.Constants.Configuration.Keys.Endpoint,
-            defaultOptions.Endpoint);
+            defaultOptions.Endpoint,
+            WeaviateItems.EndpointKeys);
 
         var defaultTopK = Configuration.ReadWithSource(
             cfg,
-            Infrastructure.Constants.Configuration.Keys.DefaultTopK,
+            WeaviateItems.DefaultTopK.Key,
             defaultOptions.DefaultTopK);
 
         var maxTopK = Configuration.ReadWithSource(
             cfg,
-            Infrastructure.Constants.Configuration.Keys.MaxTopK,
+            WeaviateItems.MaxTopK.Key,
             defaultOptions.MaxTopK);
 
         var dimension = Configuration.ReadWithSource(
             cfg,
-            Infrastructure.Constants.Configuration.Keys.Dimension,
+            WeaviateItems.Dimension.Key,
             defaultOptions.Dimension);
 
         var metric = Configuration.ReadWithSource(
             cfg,
-            Infrastructure.Constants.Configuration.Keys.Metric,
+            WeaviateItems.Metric.Key,
             defaultOptions.Metric);
 
         var timeoutSeconds = Configuration.ReadWithSource(
             cfg,
-            Infrastructure.Constants.Configuration.Keys.TimeoutSeconds,
+            WeaviateItems.TimeoutSeconds.Key,
             defaultOptions.DefaultTimeoutSeconds);
 
         var connectionIsAuto = string.IsNullOrWhiteSpace(connection.Value) || string.Equals(connection.Value, "auto", StringComparison.OrdinalIgnoreCase);
-        var connectionSource = connectionIsAuto ? BootSettingSource.Auto : connection.Source;
-        var connectionSourceKey = connectionIsAuto
-            ? Infrastructure.Constants.Configuration.Keys.ConnectionString
-            : connection.ResolvedKey;
+        var connectionMode = connectionIsAuto
+            ? ProvenanceModes.FromBootSource(BootSettingSource.Auto, usedDefault: true)
+            : ProvenanceModes.FromConfigurationValue(connection);
+        var connectionSourceKey = connection.ResolvedKey ?? WeaviateItems.ConnectionString.Key;
 
         var effectiveConnectionString = connection.Value ?? defaultOptions.ConnectionString;
         if (connectionIsAuto)
@@ -107,79 +107,54 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
                 () => BuildWeaviateFallback(defaultOptions, endpoint.Value));
         }
 
-        var sanitizedConnection = Redaction.DeIdentify(effectiveConnectionString);
+        module.AddSetting(
+            WeaviateItems.ConnectionString,
+            connectionMode,
+            effectiveConnectionString,
+            sourceKey: connectionSourceKey,
+            usedDefault: connectionIsAuto ? true : connection.UsedDefault);
 
         module.AddSetting(
-            "ConnectionString",
-            sanitizedConnection,
-            source: connectionSource,
-            consumers: new[]
-            {
-                "Koan.Data.Vector.Connector.Weaviate.WeaviateOptionsConfigurator",
-                "Koan.Data.Vector.Connector.Weaviate.WeaviateVectorAdapterFactory"
-            },
-            sourceKey: connectionSourceKey);
-
-        module.AddSetting(
-            "Endpoint",
+            WeaviateItems.Endpoint,
+            ProvenanceModes.FromConfigurationValue(endpoint),
             endpoint.Value,
-            source: endpoint.Source,
-            consumers: new[]
-            {
-                "Koan.Data.Vector.Connector.Weaviate.WeaviateOptionsConfigurator",
-                "Koan.Data.Vector.Connector.Weaviate.WeaviateVectorAdapterFactory"
-            },
-            sourceKey: endpoint.ResolvedKey);
+            sourceKey: endpoint.ResolvedKey,
+            usedDefault: endpoint.UsedDefault);
 
         module.AddSetting(
-            "DefaultTopK",
-            defaultTopK.Value.ToString(CultureInfo.InvariantCulture),
-            source: defaultTopK.Source,
-            consumers: new[]
-            {
-                "Koan.Data.Vector.Connector.Weaviate.WeaviateVectorAdapterFactory"
-            },
-            sourceKey: defaultTopK.ResolvedKey);
+            WeaviateItems.DefaultTopK,
+            ProvenanceModes.FromConfigurationValue(defaultTopK),
+            defaultTopK.Value,
+            sourceKey: defaultTopK.ResolvedKey,
+            usedDefault: defaultTopK.UsedDefault);
 
         module.AddSetting(
-            "MaxTopK",
-            maxTopK.Value.ToString(CultureInfo.InvariantCulture),
-            source: maxTopK.Source,
-            consumers: new[]
-            {
-                "Koan.Data.Vector.Connector.Weaviate.WeaviateVectorAdapterFactory"
-            },
-            sourceKey: maxTopK.ResolvedKey);
+            WeaviateItems.MaxTopK,
+            ProvenanceModes.FromConfigurationValue(maxTopK),
+            maxTopK.Value,
+            sourceKey: maxTopK.ResolvedKey,
+            usedDefault: maxTopK.UsedDefault);
 
         module.AddSetting(
-            "Dimension",
-            dimension.Value.ToString(CultureInfo.InvariantCulture),
-            source: dimension.Source,
-            consumers: new[]
-            {
-                "Koan.Data.Vector.Connector.Weaviate.WeaviateVectorAdapterFactory"
-            },
-            sourceKey: dimension.ResolvedKey);
+            WeaviateItems.Dimension,
+            ProvenanceModes.FromConfigurationValue(dimension),
+            dimension.Value,
+            sourceKey: dimension.ResolvedKey,
+            usedDefault: dimension.UsedDefault);
 
         module.AddSetting(
-            "Metric",
+            WeaviateItems.Metric,
+            ProvenanceModes.FromConfigurationValue(metric),
             metric.Value,
-            source: metric.Source,
-            consumers: new[]
-            {
-                "Koan.Data.Vector.Connector.Weaviate.WeaviateVectorAdapterFactory"
-            },
-            sourceKey: metric.ResolvedKey);
+            sourceKey: metric.ResolvedKey,
+            usedDefault: metric.UsedDefault);
 
         module.AddSetting(
-            "TimeoutSeconds",
-            timeoutSeconds.Value.ToString(CultureInfo.InvariantCulture),
-            source: timeoutSeconds.Source,
-            consumers: new[]
-            {
-                "Koan.Data.Vector.Connector.Weaviate.WeaviateVectorAdapterFactory"
-            },
-            sourceKey: timeoutSeconds.ResolvedKey);
+            WeaviateItems.TimeoutSeconds,
+            ProvenanceModes.FromConfigurationValue(timeoutSeconds),
+            timeoutSeconds.Value,
+            sourceKey: timeoutSeconds.ResolvedKey,
+            usedDefault: timeoutSeconds.UsedDefault);
     }
     private static string BuildWeaviateFallback(WeaviateOptions defaults, string? configuredEndpoint)
     {

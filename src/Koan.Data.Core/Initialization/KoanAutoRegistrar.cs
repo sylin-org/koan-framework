@@ -5,6 +5,8 @@ using Koan.Core;
 using Koan.Core.Extensions;
 using Koan.Data.Core.Pillars;
 using Koan.Core.Hosting.Bootstrap;
+using DataCoreItems = Koan.Data.Core.Infrastructure.DataCoreProvenanceItems;
+using ProvenanceModes = Koan.Core.Hosting.Bootstrap.ProvenancePublicationModeExtensions;
 
 namespace Koan.Data.Core.Initialization;
 
@@ -24,15 +26,15 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         module.Describe(ModuleVersion);
         var ensureSetting = Koan.Core.Configuration.ReadWithSource(
             cfg,
-            Infrastructure.Constants.Configuration.Runtime.EnsureSchemaOnStart,
+            DataCoreItems.EnsureSchemaOnStart.Key,
             true);
 
         module.AddSetting(
-            "EnsureSchemaOnStart",
-            ensureSetting.Value.ToString(),
-            source: ensureSetting.Source,
-            consumers: new[] { "Koan.Data.Core.SchemaLifecycle" },
-            sourceKey: ensureSetting.ResolvedKey);
+            DataCoreItems.EnsureSchemaOnStart,
+            ProvenanceModes.FromConfigurationValue(ensureSetting),
+            ensureSetting.Value,
+            sourceKey: ensureSetting.ResolvedKey,
+            usedDefault: ensureSetting.UsedDefault);
     }
 }
 

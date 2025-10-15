@@ -1,13 +1,17 @@
+using System;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Logging.Abstractions;
 using Koan.Core;
+using Koan.Core.Adapters.Reporting;
 using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Modules;
 using Koan.Core.Orchestration;
 using Koan.Core.Orchestration.Abstractions;
+using Koan.Core.Provenance;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Naming;
 using Koan.Data.Connector.Postgres.Discovery;
@@ -77,23 +81,34 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar, IKoanAspireRegistrar
             Infrastructure.Constants.Configuration.Keys.MaxPageSize,
             Infrastructure.Constants.Configuration.Keys.AltMaxPageSize);
 
-        var connectionValue = string.IsNullOrWhiteSpace(connection.Value)
-            ? "auto"
-            : connection.Value;
-        var connectionIsAuto = string.Equals(connectionValue, "auto", StringComparison.OrdinalIgnoreCase);
+        var connectionIsAuto = string.IsNullOrWhiteSpace(connection.Value) || string.Equals(connection.Value, "auto", StringComparison.OrdinalIgnoreCase);
+        var connectionSource = connectionIsAuto ? BootSettingSource.Auto : connection.Source;
+        var connectionSourceKey = connection.ResolvedKey ?? Infrastructure.Constants.Configuration.Keys.ConnectionString;
+        var effectiveConnectionString = connection.Value ?? defaultOptions.ConnectionString;
+
+        if (connectionIsAuto)
+        {
+            var adapter = new PostgresDiscoveryAdapter(cfg, NullLogger<PostgresDiscoveryAdapter>.Instance);
+            effectiveConnectionString = AdapterBootReporting.ResolveConnectionString(
+                cfg,
+                adapter,
+                null,
+                () => BuildPostgresFallback(defaultOptions));
+        }
+
+        var sanitizedConnection = Redaction.DeIdentify(effectiveConnectionString);
 
         module.AddSetting(
             "ConnectionString",
-            connectionIsAuto ? "auto (resolved by discovery)" : connectionValue,
-            isSecret: !connectionIsAuto,
-            source: connection.Source,
+            sanitizedConnection,
+            source: connectionSource,
             consumers: new[]
             {
                 "Koan.Data.Connector.Postgres.PostgresOptionsConfigurator",
                 "Koan.Data.Connector.Postgres.PostgresAdapterFactory",
                 "Koan.Data.Connector.Postgres.Initialization.KoanAutoRegistrar"
             },
-            sourceKey: connection.ResolvedKey);
+            sourceKey: connectionSourceKey);
 
         module.AddSetting(
             "NamingStyle",
@@ -155,6 +170,12 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar, IKoanAspireRegistrar
                 "Koan.Data.Connector.Postgres.PostgresAdapterFactory"
             },
             sourceKey: maxPageSize.ResolvedKey);
+    }
+
+    private static string BuildPostgresFallback(PostgresOptions defaults)
+    {
+        var database = defaults.SearchPath ?? "Koan";
+        return $"Host=localhost;Port=5432;Database={database};Username=postgres;Password=postgres";
     }
 
     // IKoanAspireRegistrar implementation

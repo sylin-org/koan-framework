@@ -1,3 +1,4 @@
+using System;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -5,6 +6,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Koan.Core;
+using Koan.Core.Adapters.Reporting;
 using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Modules;
 using Koan.Core.Orchestration;
@@ -15,6 +17,8 @@ using Koan.Data.Connector.Redis.Orchestration;
 using StackExchange.Redis;
 using Koan.Orchestration.Aspire;
 using Aspire.Hosting;
+using Microsoft.Extensions.Logging.Abstractions;
+using Koan.Data.Connector.Redis.Discovery;
 
 namespace Koan.Data.Connector.Redis.Initialization;
 
@@ -105,23 +109,35 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar, IKoanAspireRegistrar
             $"{Infrastructure.Constants.Configuration.Section_Data}:{Infrastructure.Constants.Configuration.Keys.MaxPageSize}",
             $"{Infrastructure.Constants.Configuration.Section_Sources_Default}:{Infrastructure.Constants.Configuration.Keys.MaxPageSize}");
 
-        var connectionValue = string.IsNullOrWhiteSpace(connection.Value)
-            ? "auto"
-            : connection.Value;
-        var connectionIsAuto = string.Equals(connectionValue, "auto", StringComparison.OrdinalIgnoreCase);
+        var connectionIsAuto = string.IsNullOrWhiteSpace(connection.Value) || string.Equals(connection.Value, "auto", StringComparison.OrdinalIgnoreCase);
+        var connectionSource = connectionIsAuto ? BootSettingSource.Auto : connection.Source;
+        var connectionSourceKey = connection.ResolvedKey ??
+            $"{Infrastructure.Constants.Configuration.Section_Data}:{Infrastructure.Constants.Configuration.Keys.ConnectionString}";
+
+        var effectiveConnectionString = connection.Value ?? defaultOptions.ConnectionString;
+        if (connectionIsAuto)
+        {
+            var adapter = new RedisDiscoveryAdapter(cfg, NullLogger<RedisDiscoveryAdapter>.Instance);
+            effectiveConnectionString = AdapterBootReporting.ResolveConnectionString(
+                cfg,
+                adapter,
+                null,
+                () => BuildRedisFallback(defaultOptions));
+        }
+
+        var sanitizedConnection = Redaction.DeIdentify(effectiveConnectionString);
 
         module.AddSetting(
             "ConnectionString",
-            connectionIsAuto ? "auto (resolved by discovery)" : connectionValue,
-            isSecret: !connectionIsAuto,
-            source: connection.Source,
+            sanitizedConnection,
+            source: connectionSource,
             consumers: new[]
             {
                 "Koan.Data.Connector.Redis.RedisOptionsConfigurator",
                 "Koan.Data.Connector.Redis.RedisAdapterFactory",
                 "Koan.Data.Connector.Redis.Initialization.KoanAutoRegistrar"
             },
-            sourceKey: connection.ResolvedKey);
+            sourceKey: connectionSourceKey);
 
         module.AddSetting(
             "Database",
@@ -163,6 +179,19 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar, IKoanAspireRegistrar
                 "Koan.Data.Connector.Redis.RedisAdapterFactory"
             },
             sourceKey: maxPageSize.ResolvedKey);
+    }
+
+    private static string BuildRedisFallback(RedisOptions defaults)
+    {
+        if (!string.IsNullOrWhiteSpace(defaults.ConnectionString) &&
+            !string.Equals(defaults.ConnectionString, "auto", StringComparison.OrdinalIgnoreCase))
+        {
+            return defaults.ConnectionString;
+        }
+
+        return KoanEnv.InContainer
+            ? Infrastructure.Constants.Discovery.DefaultCompose
+            : Infrastructure.Constants.Discovery.DefaultLocal;
     }
 
     // IKoanAspireRegistrar implementation

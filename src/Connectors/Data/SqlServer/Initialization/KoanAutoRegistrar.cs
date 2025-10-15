@@ -1,15 +1,18 @@
+using System;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Koan.Core;
+using Koan.Core.Adapters.Reporting;
 using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Modules;
 using Koan.Core.Orchestration.Abstractions;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Naming;
 using Koan.Data.Connector.SqlServer.Discovery;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Koan.Data.Connector.SqlServer.Initialization;
 
@@ -63,22 +66,33 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             Infrastructure.Constants.Configuration.Keys.MaxPageSize,
             Infrastructure.Constants.Configuration.Keys.AltMaxPageSize);
 
-        var connectionValue = string.IsNullOrWhiteSpace(connection.Value)
-            ? "auto"
-            : connection.Value;
-        var connectionIsAuto = string.Equals(connectionValue, "auto", StringComparison.OrdinalIgnoreCase);
+        var connectionIsAuto = string.IsNullOrWhiteSpace(connection.Value) || string.Equals(connection.Value, "auto", StringComparison.OrdinalIgnoreCase);
+        var connectionSource = connectionIsAuto ? BootSettingSource.Auto : connection.Source;
+        var connectionSourceKey = connection.ResolvedKey ?? Infrastructure.Constants.Configuration.Keys.ConnectionString;
+
+        var effectiveConnectionString = connection.Value ?? defaultOptions.ConnectionString;
+        if (connectionIsAuto)
+        {
+            var adapter = new SqlServerDiscoveryAdapter(cfg, NullLogger<SqlServerDiscoveryAdapter>.Instance);
+            effectiveConnectionString = AdapterBootReporting.ResolveConnectionString(
+                cfg,
+                adapter,
+                null,
+                () => BuildSqlServerFallback());
+        }
+
+        var sanitizedConnection = Redaction.DeIdentify(effectiveConnectionString);
 
         module.AddSetting(
             "ConnectionString",
-            connectionIsAuto ? "auto (resolved by discovery)" : connectionValue,
-            isSecret: !connectionIsAuto,
-            source: connection.Source,
+            sanitizedConnection,
+            source: connectionSource,
             consumers: new[]
             {
                 "Koan.Data.Connector.SqlServer.SqlServerOptionsConfigurator",
                 "Koan.Data.Connector.SqlServer.SqlServerAdapterFactory"
             },
-            sourceKey: connection.ResolvedKey);
+            sourceKey: connectionSourceKey);
 
         module.AddSetting(
             "NamingStyle",
@@ -130,5 +144,8 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             },
             sourceKey: maxPageSize.ResolvedKey);
     }
+
+    private static string BuildSqlServerFallback()
+        => "Server=localhost;Database=Koan;Trusted_Connection=True;Encrypt=False";
 }
 

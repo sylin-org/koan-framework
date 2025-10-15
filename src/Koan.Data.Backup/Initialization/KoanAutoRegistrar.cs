@@ -12,6 +12,8 @@ using Koan.Data.Backup.Extensions;
 using Koan.Data.Backup.Infrastructure;
 using Koan.Data.Backup.Models;
 using Koan.Core.Hosting.Bootstrap;
+using BackupItems = Koan.Data.Backup.Infrastructure.BackupProvenanceItems;
+using ProvenanceModes = Koan.Core.Hosting.Bootstrap.ProvenancePublicationModeExtensions;
 
 namespace Koan.Data.Backup.Initialization;
 
@@ -42,162 +44,163 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 
         var defaultStorageProfile = Configuration.ReadWithSource(
             cfg,
-            Constants.Configuration.Keys.DefaultStorageProfile,
+            BackupItems.DefaultStorageProfile.Key,
             defaults.DefaultStorageProfile ?? string.Empty);
 
         var defaultBatchSize = Configuration.ReadWithSource(
             cfg,
-            Constants.Configuration.Keys.DefaultBatchSize,
+            BackupItems.DefaultBatchSize.Key,
             defaults.DefaultBatchSize);
 
         var warmupOnStartup = Configuration.ReadWithSource(
             cfg,
-            Constants.Configuration.Keys.WarmupEntitiesOnStartup,
+            BackupItems.WarmupEntitiesOnStartup.Key,
             defaults.WarmupEntitiesOnStartup);
 
         var enableMaintenance = Configuration.ReadWithSource(
             cfg,
-            Constants.Configuration.Keys.EnableBackgroundMaintenance,
+            BackupItems.EnableBackgroundMaintenance.Key,
             defaults.EnableBackgroundMaintenance);
 
         var maintenanceInterval = Configuration.ReadWithSource(
             cfg,
-            Constants.Configuration.Keys.MaintenanceInterval,
+            BackupItems.MaintenanceInterval.Key,
             defaults.MaintenanceInterval);
 
         var maxConcurrency = Configuration.ReadWithSource(
             cfg,
-            Constants.Configuration.Keys.MaxConcurrency,
+            BackupItems.MaxConcurrency.Key,
             defaults.MaxConcurrency);
 
         var autoValidateBackups = Configuration.ReadWithSource(
             cfg,
-            Constants.Configuration.Keys.AutoValidateBackups,
+            BackupItems.AutoValidateBackups.Key,
             defaults.AutoValidateBackups);
 
         var compressionLevel = Configuration.ReadWithSource(
             cfg,
-            Constants.Configuration.Keys.CompressionLevel,
+            BackupItems.CompressionLevel.Key,
             defaults.CompressionLevel);
 
         var keepDaily = Configuration.ReadWithSource(
             cfg,
-            Constants.Configuration.Retention.KeepDaily,
+            BackupItems.KeepDaily.Key,
             retentionDefaults.KeepDaily);
 
         var keepWeekly = Configuration.ReadWithSource(
             cfg,
-            Constants.Configuration.Retention.KeepWeekly,
+            BackupItems.KeepWeekly.Key,
             retentionDefaults.KeepWeekly);
 
         var keepMonthly = Configuration.ReadWithSource(
             cfg,
-            Constants.Configuration.Retention.KeepMonthly,
+            BackupItems.KeepMonthly.Key,
             retentionDefaults.KeepMonthly);
 
         var keepYearly = Configuration.ReadWithSource(
             cfg,
-            Constants.Configuration.Retention.KeepYearly,
+            BackupItems.KeepYearly.Key,
             retentionDefaults.KeepYearly);
 
         var excludeFromCleanup = ReadStringArray(
             cfg,
-            Constants.Configuration.Retention.ExcludeFromCleanup,
+            BackupItems.ExcludeFromCleanup.Key,
             retentionDefaults.ExcludeFromCleanup);
 
         module.AddSetting(
-            "DefaultStorageProfile",
-            string.IsNullOrWhiteSpace(defaultStorageProfile.Value) ? "(default)" : defaultStorageProfile.Value,
-            source: defaultStorageProfile.Source,
+            BackupItems.DefaultStorageProfile,
+            ProvenanceModes.FromConfigurationValue(defaultStorageProfile),
+            string.IsNullOrWhiteSpace(defaultStorageProfile.Value) ? "(auto)" : defaultStorageProfile.Value,
             sourceKey: defaultStorageProfile.ResolvedKey,
-            consumers: BackupOptionConsumers());
+            usedDefault: defaultStorageProfile.UsedDefault);
 
         module.AddSetting(
-            "DefaultBatchSize",
-            defaultBatchSize.Value.ToString(),
-            source: defaultBatchSize.Source,
+            BackupItems.DefaultBatchSize,
+            ProvenanceModes.FromConfigurationValue(defaultBatchSize),
+            defaultBatchSize.Value,
             sourceKey: defaultBatchSize.ResolvedKey,
-            consumers: BackupOptionConsumers());
+            usedDefault: defaultBatchSize.UsedDefault);
 
         module.AddSetting(
-            "WarmupEntitiesOnStartup",
-            BoolString(warmupOnStartup.Value),
-            source: warmupOnStartup.Source,
+            BackupItems.WarmupEntitiesOnStartup,
+            ProvenanceModes.FromConfigurationValue(warmupOnStartup),
+            warmupOnStartup.Value,
             sourceKey: warmupOnStartup.ResolvedKey,
-            consumers: BackupMaintenanceConsumers());
+            usedDefault: warmupOnStartup.UsedDefault);
 
         module.AddSetting(
-            "EnableBackgroundMaintenance",
-            BoolString(enableMaintenance.Value),
-            source: enableMaintenance.Source,
+            BackupItems.EnableBackgroundMaintenance,
+            ProvenanceModes.FromConfigurationValue(enableMaintenance),
+            enableMaintenance.Value,
             sourceKey: enableMaintenance.ResolvedKey,
-            consumers: BackupMaintenanceConsumers());
+            usedDefault: enableMaintenance.UsedDefault);
 
         module.AddSetting(
-            "MaintenanceInterval",
-            maintenanceInterval.Value.ToString(),
-            source: maintenanceInterval.Source,
+            BackupItems.MaintenanceInterval,
+            ProvenanceModes.FromConfigurationValue(maintenanceInterval),
+            maintenanceInterval.Value,
             sourceKey: maintenanceInterval.ResolvedKey,
-            consumers: BackupMaintenanceConsumers());
+            usedDefault: maintenanceInterval.UsedDefault);
 
         module.AddSetting(
-            "MaxConcurrency",
-            maxConcurrency.Value.ToString(),
-            source: maxConcurrency.Source,
+            BackupItems.MaxConcurrency,
+            ProvenanceModes.FromConfigurationValue(maxConcurrency),
+            maxConcurrency.Value,
             sourceKey: maxConcurrency.ResolvedKey,
-            consumers: BackupOptionConsumers());
+            usedDefault: maxConcurrency.UsedDefault);
 
         module.AddSetting(
-            "AutoValidateBackups",
-            BoolString(autoValidateBackups.Value),
-            source: autoValidateBackups.Source,
+            BackupItems.AutoValidateBackups,
+            ProvenanceModes.FromConfigurationValue(autoValidateBackups),
+            autoValidateBackups.Value,
             sourceKey: autoValidateBackups.ResolvedKey,
-            consumers: BackupMaintenanceConsumers());
+            usedDefault: autoValidateBackups.UsedDefault);
 
         module.AddSetting(
-            "CompressionLevel",
-            compressionLevel.Value.ToString(),
-            source: compressionLevel.Source,
+            BackupItems.CompressionLevel,
+            ProvenanceModes.FromConfigurationValue(compressionLevel),
+            compressionLevel.Value,
             sourceKey: compressionLevel.ResolvedKey,
-            consumers: BackupOptionConsumers());
+            usedDefault: compressionLevel.UsedDefault);
 
         module.AddSetting(
-            "RetentionPolicy.KeepDaily",
-            keepDaily.Value.ToString(),
-            source: keepDaily.Source,
+            BackupItems.KeepDaily,
+            ProvenanceModes.FromConfigurationValue(keepDaily),
+            keepDaily.Value,
             sourceKey: keepDaily.ResolvedKey,
-            consumers: BackupMaintenanceConsumers());
+            usedDefault: keepDaily.UsedDefault);
 
         module.AddSetting(
-            "RetentionPolicy.KeepWeekly",
-            keepWeekly.Value.ToString(),
-            source: keepWeekly.Source,
+            BackupItems.KeepWeekly,
+            ProvenanceModes.FromConfigurationValue(keepWeekly),
+            keepWeekly.Value,
             sourceKey: keepWeekly.ResolvedKey,
-            consumers: BackupMaintenanceConsumers());
+            usedDefault: keepWeekly.UsedDefault);
 
         module.AddSetting(
-            "RetentionPolicy.KeepMonthly",
-            keepMonthly.Value.ToString(),
-            source: keepMonthly.Source,
+            BackupItems.KeepMonthly,
+            ProvenanceModes.FromConfigurationValue(keepMonthly),
+            keepMonthly.Value,
             sourceKey: keepMonthly.ResolvedKey,
-            consumers: BackupMaintenanceConsumers());
+            usedDefault: keepMonthly.UsedDefault);
 
         module.AddSetting(
-            "RetentionPolicy.KeepYearly",
-            keepYearly.Value.ToString(),
-            source: keepYearly.Source,
+            BackupItems.KeepYearly,
+            ProvenanceModes.FromConfigurationValue(keepYearly),
+            keepYearly.Value,
             sourceKey: keepYearly.ResolvedKey,
-            consumers: BackupMaintenanceConsumers());
+            usedDefault: keepYearly.UsedDefault);
 
         module.AddSetting(
-            "RetentionPolicy.ExcludeFromCleanup",
+            BackupItems.ExcludeFromCleanup,
+            ProvenanceModes.FromBootSource(excludeFromCleanup.Source, excludeFromCleanup.UsedDefault),
             excludeFromCleanup.Display,
-            source: excludeFromCleanup.Source,
             sourceKey: excludeFromCleanup.SourceKey,
-            consumers: BackupMaintenanceConsumers());
+            usedDefault: excludeFromCleanup.UsedDefault,
+            sanitizeOverride: false);
 
         // Backup capabilities
-    module.AddNote("Capabilities: auto entity discovery, streaming backup, multi-provider support, zip compression, JSON lines format, integrity validation, schema snapshots, backup discovery, progress tracking, attribute-based opt-in, policy management.");
+        module.AddNote("Capabilities: auto entity discovery, streaming backup, multi-provider support, zip compression, JSON lines format, integrity validation, schema snapshots, backup discovery, progress tracking, attribute-based opt-in, policy management.");
     }
 
     /// <summary>

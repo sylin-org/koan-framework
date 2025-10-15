@@ -1,8 +1,10 @@
+using System.Linq;
+using System.Net.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
-using System.Net.Http;
 using Koan.Core;
 using Koan.Core.Orchestration;
+using WeaviateItems = Koan.Data.Vector.Connector.Weaviate.Infrastructure.WeaviateProvenanceItems;
 
 namespace Koan.Data.Vector.Connector.Weaviate.Orchestration;
 
@@ -33,10 +35,17 @@ public class WeaviateOrchestrationEvaluator : BaseOrchestrationEvaluator
     protected override bool HasExplicitConfiguration(IConfiguration configuration)
     {
         // Check for explicit Weaviate endpoint configuration
-        return !string.IsNullOrEmpty(configuration["Koan:Data:Weaviate:Endpoint"]) ||
-               !string.IsNullOrEmpty(configuration["Weaviate:Endpoint"]) ||
-               !string.IsNullOrEmpty(configuration["ConnectionStrings:Weaviate"]) ||
-               !string.IsNullOrEmpty(configuration["ConnectionStrings:weaviate"]);
+        if (WeaviateItems.EndpointKeys.Any(key => !string.IsNullOrEmpty(configuration[key])))
+        {
+            return true;
+        }
+
+        if (WeaviateItems.ConnectionStringKeys.Any(key => !string.IsNullOrEmpty(configuration[key])))
+        {
+            return true;
+        }
+
+        return false;
     }
 
     protected override int GetDefaultPort()

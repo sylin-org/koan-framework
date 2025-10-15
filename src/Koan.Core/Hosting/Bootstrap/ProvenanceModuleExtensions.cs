@@ -17,14 +17,15 @@ public static class ProvenanceModuleExtensions
         bool isSecret = false,
         BootSettingSource source = BootSettingSource.Unknown,
         IReadOnlyCollection<string>? consumers = null,
-        string? sourceKey = null)
+        string? sourceKey = null,
+        ProvenanceSettingState state = ProvenanceSettingState.Configured)
     {
         ArgumentNullException.ThrowIfNull(module);
 
         module.SetSetting(key, builder =>
         {
             builder.Value(value)
-                .State(ProvenanceSettingState.Configured)
+                .State(state)
                 .Source(MapSource(source), sourceKey);
 
             if (consumers is not null && consumers.Count > 0)
@@ -37,6 +38,37 @@ public static class ProvenanceModuleExtensions
                 builder.Secret(input => Koan.Core.Redaction.DeIdentify(input ?? string.Empty));
             }
         });
+    }
+
+    public static void AddSetting(
+        this ProvenanceModuleWriter module,
+        ProvenanceItem item,
+        ProvenancePublicationMode mode,
+        object? value,
+        IReadOnlyCollection<string>? consumers = null,
+        string? sourceKey = null,
+        bool usedDefault = false,
+        bool? isSecretOverride = null,
+        bool? sanitizeOverride = null,
+        ProvenanceSettingState? stateOverride = null)
+    {
+        ArgumentNullException.ThrowIfNull(module);
+        ArgumentNullException.ThrowIfNull(item);
+
+        var formatted = item.FormatValue(value);
+        var sanitize = sanitizeOverride ?? item.MustSanitize;
+        var isSecret = isSecretOverride ?? item.IsSecret;
+
+        if (sanitize && formatted is not null)
+        {
+            formatted = Koan.Core.Redaction.DeIdentify(formatted);
+        }
+
+        var resolvedConsumers = consumers ?? item.DefaultConsumers;
+        var source = MapSource(mode);
+        var state = stateOverride ?? MapState(mode, usedDefault);
+
+        module.AddSetting(item.Key, formatted, isSecret, source, resolvedConsumers, sourceKey, state);
     }
 
     public static void AddNote(this ProvenanceModuleWriter module, string message)
@@ -71,6 +103,27 @@ public static class ProvenanceModuleExtensions
             BootSettingSource.LaunchKit => ProvenanceSettingSource.LaunchKit,
             BootSettingSource.Custom => ProvenanceSettingSource.Custom,
             _ => ProvenanceSettingSource.Unknown
+        };
+
+    private static BootSettingSource MapSource(ProvenancePublicationMode mode)
+        => mode switch
+        {
+            ProvenancePublicationMode.Auto => BootSettingSource.Auto,
+            ProvenancePublicationMode.Settings => BootSettingSource.AppSettings,
+            ProvenancePublicationMode.Environment => BootSettingSource.Environment,
+            ProvenancePublicationMode.LaunchKit => BootSettingSource.LaunchKit,
+            ProvenancePublicationMode.Discovery => BootSettingSource.Custom,
+            ProvenancePublicationMode.Custom => BootSettingSource.Custom,
+            _ => BootSettingSource.Unknown
+        };
+
+    private static ProvenanceSettingState MapState(ProvenancePublicationMode mode, bool usedDefault)
+        => mode switch
+        {
+            ProvenancePublicationMode.Discovery => ProvenanceSettingState.Discovered,
+            ProvenancePublicationMode.Auto => usedDefault ? ProvenanceSettingState.Default : ProvenanceSettingState.Configured,
+            ProvenancePublicationMode.Settings => usedDefault ? ProvenanceSettingState.Default : ProvenanceSettingState.Configured,
+            _ => usedDefault ? ProvenanceSettingState.Default : ProvenanceSettingState.Configured
         };
 }
 

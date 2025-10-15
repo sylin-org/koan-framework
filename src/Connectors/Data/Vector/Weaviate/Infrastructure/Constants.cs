@@ -6,16 +6,9 @@ public static class Constants
     {
         public const string Section = "Koan:Data:Weaviate";
 
-        public static class Keys
+        public static class Flags
         {
-            public const string ConnectionString = "Koan:Data:Weaviate:ConnectionString";
-            public const string AltConnectionString = "Koan:Data:ConnectionString";
-            public const string Endpoint = "Koan:Data:Weaviate:Endpoint";
-            public const string DefaultTopK = "Koan:Data:Weaviate:DefaultTopK";
-            public const string MaxTopK = "Koan:Data:Weaviate:MaxTopK";
-            public const string Dimension = "Koan:Data:Weaviate:Dimension";
-            public const string Metric = "Koan:Data:Weaviate:Metric";
-            public const string TimeoutSeconds = "Koan:Data:Weaviate:TimeoutSeconds";
+            public const string DisableAutoDetection = "Koan:Data:Weaviate:DisableAutoDetection";
         }
     }
 

@@ -1,9 +1,12 @@
+using System;
+using System.Collections.Generic;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Logging.Abstractions;
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization;
 using MongoDB.Bson.Serialization.Conventions;
@@ -17,6 +20,8 @@ using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Naming;
 using Koan.Data.Connector.Mongo.Discovery;
 using Koan.Data.Connector.Mongo.Orchestration;
+using MongoItems = Koan.Data.Connector.Mongo.Infrastructure.MongoProvenanceItems;
+using ProvenanceModes = Koan.Core.Hosting.Bootstrap.ProvenancePublicationModeExtensions;
 
 namespace Koan.Data.Connector.Mongo.Initialization;
 
@@ -123,89 +128,166 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         var connection = Configuration.ReadFirstWithSource(
             cfg,
             defaultOptions.ConnectionString,
-            Infrastructure.Constants.Configuration.Keys.ConnectionString,
-            Infrastructure.Constants.Configuration.Keys.AltConnectionString,
-            Infrastructure.Constants.Configuration.Keys.ConnectionStringsMongo,
-            Infrastructure.Constants.Configuration.Keys.ConnectionStringsDefault);
+            MongoItems.ConnectionStringKeys);
 
         var database = Configuration.ReadFirstWithSource(
             cfg,
             defaultOptions.Database,
-            Infrastructure.Constants.Configuration.Keys.Database,
-            Infrastructure.Constants.Configuration.Keys.AltDatabase);
+            MongoItems.DatabaseKeys);
 
         var defaultPageSize = Configuration.ReadFirstWithSource(
             cfg,
             defaultOptions.DefaultPageSize,
-            Infrastructure.Constants.Configuration.Keys.DefaultPageSize,
-            Infrastructure.Constants.Configuration.Keys.AltDefaultPageSize);
+            MongoItems.DefaultPageSizeKeys);
 
         var maxPageSize = Configuration.ReadFirstWithSource(
             cfg,
             defaultOptions.MaxPageSize,
-            Infrastructure.Constants.Configuration.Keys.MaxPageSize,
-            Infrastructure.Constants.Configuration.Keys.AltMaxPageSize);
+            MongoItems.MaxPageSizeKeys);
 
-        var connectionValue = string.IsNullOrWhiteSpace(connection.Value)
-            ? "auto"
-            : connection.Value;
-        var connectionIsAuto = string.Equals(connectionValue, "auto", StringComparison.OrdinalIgnoreCase);
+        var username = Configuration.ReadFirstWithSource(
+            cfg,
+            string.Empty,
+            "Koan:Data:Mongo:Username",
+            "Koan:Data:Username");
 
-        module.AddSetting(
-            "ConnectionString",
-            connectionIsAuto ? "auto (resolved by discovery)" : connectionValue,
-            isSecret: !connectionIsAuto,
-            source: connection.Source,
-            consumers: new[]
-            {
-                "Koan.Data.Connector.Mongo.MongoOptionsConfigurator",
-                "Koan.Data.Connector.Mongo.MongoClientProvider",
-                "Koan.Data.Connector.Mongo.MongoAdapterFactory"
-            },
-            sourceKey: connection.ResolvedKey);
+        var password = Configuration.ReadFirstWithSource(
+            cfg,
+            string.Empty,
+            "Koan:Data:Mongo:Password",
+            "Koan:Data:Password");
 
-        module.AddSetting(
-            "Database",
+        var effectiveConnectionString = ResolveConnectionStringForReporting(
+            cfg,
+            defaultOptions,
+            connection,
             database.Value ?? defaultOptions.Database,
-            source: database.Source,
-            consumers: new[]
-            {
-                "Koan.Data.Connector.Mongo.MongoOptionsConfigurator",
-                "Koan.Data.Connector.Mongo.MongoClientProvider"
-            },
-            sourceKey: database.ResolvedKey);
+            username.Value,
+            password.Value);
 
-        // Announce schema capability per acceptance criteria
-        module.AddSetting(
-            Infrastructure.Constants.Bootstrap.EnsureCreatedSupported,
-            true.ToString(),
-            source: BootSettingSource.Auto,
-            consumers: new[]
-            {
-                "Koan.Data.Connector.Mongo.MongoAdapterFactory"
-            },
-            sourceKey: Infrastructure.Constants.Configuration.Keys.EnsureCreatedSupported);
-
-        // Announce paging guardrails (decision 0044)
-        module.AddSetting(
-            Infrastructure.Constants.Bootstrap.DefaultPageSize,
-            defaultPageSize.Value.ToString(),
-            source: defaultPageSize.Source,
-            consumers: new[]
-            {
-                "Koan.Data.Connector.Mongo.MongoAdapterFactory"
-            },
-            sourceKey: defaultPageSize.ResolvedKey);
+        var connectionIsAuto = string.IsNullOrWhiteSpace(connection.Value) || string.Equals(connection.Value, "auto", StringComparison.OrdinalIgnoreCase);
+        var connectionSourceKey = connection.ResolvedKey ?? MongoItems.ConnectionString.Key;
+        var connectionMode = connectionIsAuto
+            ? ProvenanceModes.FromBootSource(BootSettingSource.Auto, usedDefault: true)
+            : ProvenanceModes.FromConfigurationValue(connection);
 
         module.AddSetting(
-            Infrastructure.Constants.Bootstrap.MaxPageSize,
-            maxPageSize.Value.ToString(),
-            source: maxPageSize.Source,
-            consumers: new[]
+            MongoItems.ConnectionString,
+            connectionMode,
+            effectiveConnectionString,
+            sourceKey: connectionSourceKey,
+            usedDefault: connectionIsAuto ? true : connection.UsedDefault);
+
+        module.AddSetting(
+            MongoItems.Database,
+            ProvenanceModes.FromConfigurationValue(database),
+            database.Value ?? defaultOptions.Database,
+            sourceKey: database.ResolvedKey,
+            usedDefault: database.UsedDefault);
+
+        module.AddSetting(
+            MongoItems.EnsureCreatedSupported,
+            ProvenanceModes.FromBootSource(BootSettingSource.Auto, usedDefault: true),
+            true,
+            usedDefault: true,
+            sanitizeOverride: false);
+
+        module.AddSetting(
+            MongoItems.DefaultPageSize,
+            ProvenanceModes.FromConfigurationValue(defaultPageSize),
+            defaultPageSize.Value,
+            sourceKey: defaultPageSize.ResolvedKey,
+            usedDefault: defaultPageSize.UsedDefault);
+
+        module.AddSetting(
+            MongoItems.MaxPageSize,
+            ProvenanceModes.FromConfigurationValue(maxPageSize),
+            maxPageSize.Value,
+            sourceKey: maxPageSize.ResolvedKey,
+            usedDefault: maxPageSize.UsedDefault);
+    }
+
+    private static string ResolveConnectionStringForReporting(
+        IConfiguration? configuration,
+        MongoOptions defaults,
+    Koan.Core.ConfigurationValue<string> configuredConnection,
+        string? database,
+        string? username,
+        string? password)
+    {
+        if (!string.IsNullOrWhiteSpace(configuredConnection.Value) &&
+            !string.Equals(configuredConnection.Value, "auto", StringComparison.OrdinalIgnoreCase))
+        {
+            return configuredConnection.Value!;
+        }
+
+        var resolvedDatabase = string.IsNullOrWhiteSpace(database) ? defaults.Database : database!;
+        var safeConfiguration = configuration ?? new ConfigurationBuilder().AddInMemoryCollection().Build();
+
+        try
+        {
+            var adapter = new MongoDiscoveryAdapter(safeConfiguration, NullLogger<MongoDiscoveryAdapter>.Instance);
+
+            var parameters = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+            if (!string.IsNullOrWhiteSpace(resolvedDatabase))
             {
-                "Koan.Data.Connector.Mongo.MongoAdapterFactory"
-            },
-            sourceKey: maxPageSize.ResolvedKey);
+                parameters["database"] = resolvedDatabase;
+            }
+
+            if (!string.IsNullOrWhiteSpace(username))
+            {
+                parameters["username"] = username!;
+            }
+
+            if (!string.IsNullOrWhiteSpace(password))
+            {
+                parameters["password"] = password!;
+            }
+
+            var context = new DiscoveryContext
+            {
+                OrchestrationMode = KoanEnv.OrchestrationMode,
+                Configuration = safeConfiguration,
+                HealthCheckTimeout = TimeSpan.FromMilliseconds(500),
+                Parameters = parameters.Count > 0 ? parameters : null
+            };
+
+            var result = adapter.DiscoverAsync(context).GetAwaiter().GetResult();
+            if (result.IsSuccessful && !string.IsNullOrWhiteSpace(result.ServiceUrl))
+            {
+                return result.ServiceUrl!;
+            }
+        }
+        catch
+        {
+            // Discovery failures fall back to defaults below.
+        }
+
+        return BuildFallbackConnectionString(defaults, resolvedDatabase, username, password);
+    }
+
+    private static string BuildFallbackConnectionString(
+        MongoOptions defaults,
+        string? database,
+        string? username,
+        string? password)
+    {
+        var fallback = defaults.ConnectionString;
+        if (!string.IsNullOrWhiteSpace(fallback) &&
+            !string.Equals(fallback, "auto", StringComparison.OrdinalIgnoreCase))
+        {
+            return fallback;
+        }
+
+        var auth = string.IsNullOrWhiteSpace(username)
+            ? string.Empty
+            : $"{username}:{password ?? string.Empty}@";
+
+        var databaseSegment = string.IsNullOrWhiteSpace(database)
+            ? defaults.Database
+            : database!;
+
+        return $"mongodb://{auth}localhost:27017/{databaseSegment}";
     }
 
     private static string[] DiscoverAvailableDataProviders()

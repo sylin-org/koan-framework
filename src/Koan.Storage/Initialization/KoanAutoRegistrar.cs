@@ -1,3 +1,4 @@
+using System.Linq;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -8,6 +9,9 @@ using Koan.Storage.Abstractions;
 using Koan.Storage.Infrastructure;
 using Koan.Storage.Options;
 using Koan.Core.Hosting.Bootstrap;
+using Koan.Core.Provenance;
+using StorageItems = Koan.Storage.Infrastructure.StorageProvenanceItems;
+using ProvenanceModes = Koan.Core.Hosting.Bootstrap.ProvenancePublicationModeExtensions;
 
 namespace Koan.Storage.Initialization;
 
@@ -27,19 +31,60 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         }
     }
 
-    public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
+    public void Describe(ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
         module.Describe(ModuleVersion);
-        var defaultProfile = Core.Configuration.Read(cfg, StorageConstants.Constants.Configuration.Keys.DefaultProfile, string.Empty) ?? string.Empty;
-        var fallback = Core.Configuration.Read(cfg, StorageConstants.Constants.Configuration.Keys.FallbackMode, nameof(StorageFallbackMode.SingleProfileOnly));
-        var validate = Core.Configuration.Read(cfg, StorageConstants.Constants.Configuration.Keys.ValidateOnStart, true);
-        // Profiles are a complex object; report count when available
-        var profilesSection = cfg.GetSection($"{StorageConstants.Constants.Configuration.Section}:{StorageConstants.Constants.Configuration.Keys.Profiles}");
-        var profilesCount = profilesSection.Exists() ? profilesSection.GetChildren().Count() : 0;
-        module.AddSetting("Profiles", profilesCount.ToString());
-        if (!string.IsNullOrWhiteSpace(defaultProfile)) module.AddSetting("DefaultProfile", defaultProfile);
-        module.AddSetting("FallbackMode", fallback);
-        module.AddSetting("ValidateOnStart", validate.ToString());
+
+        var profilesPath = $"{StorageConstants.Constants.Configuration.Section}:{StorageConstants.Constants.Configuration.Keys.Profiles}";
+        var profilesSection = cfg.GetSection(profilesPath);
+        var profilesExists = profilesSection.Exists();
+        var profilesCount = profilesExists ? profilesSection.GetChildren().Count() : 0;
+        var profilesMode = ProvenanceModes.FromBootSource(
+            profilesExists ? BootSettingSource.AppSettings : BootSettingSource.Auto,
+            usedDefault: !profilesExists);
+
+        module.AddSetting(
+            StorageItems.Profiles,
+            profilesMode,
+            profilesCount,
+            sourceKey: profilesPath,
+            usedDefault: !profilesExists);
+
+        var defaultProfile = Core.Configuration.ReadWithSource(
+            cfg,
+            $"{StorageConstants.Constants.Configuration.Section}:{StorageConstants.Constants.Configuration.Keys.DefaultProfile}",
+            string.Empty);
+
+        module.AddSetting(
+            StorageItems.DefaultProfile,
+            ProvenanceModes.FromConfigurationValue(defaultProfile),
+            string.IsNullOrWhiteSpace(defaultProfile.Value) ? null : defaultProfile.Value,
+            sourceKey: defaultProfile.ResolvedKey,
+            usedDefault: defaultProfile.UsedDefault);
+
+        var fallback = Core.Configuration.ReadWithSource(
+            cfg,
+            $"{StorageConstants.Constants.Configuration.Section}:{StorageConstants.Constants.Configuration.Keys.FallbackMode}",
+            StorageFallbackMode.SingleProfileOnly);
+
+        module.AddSetting(
+            StorageItems.FallbackMode,
+            ProvenanceModes.FromConfigurationValue(fallback),
+            fallback.Value,
+            sourceKey: fallback.ResolvedKey,
+            usedDefault: fallback.UsedDefault);
+
+        var validate = Core.Configuration.ReadWithSource(
+            cfg,
+            $"{StorageConstants.Constants.Configuration.Section}:{StorageConstants.Constants.Configuration.Keys.ValidateOnStart}",
+            true);
+
+        module.AddSetting(
+            StorageItems.ValidateOnStart,
+            ProvenanceModes.FromConfigurationValue(validate),
+            validate.Value,
+            sourceKey: validate.ResolvedKey,
+            usedDefault: validate.UsedDefault);
     }
 }
 

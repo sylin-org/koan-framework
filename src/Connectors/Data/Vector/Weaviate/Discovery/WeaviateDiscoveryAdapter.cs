@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Koan.Core;
 using Koan.Core.Orchestration;
 using Koan.Core.Orchestration.Abstractions;
+using WeaviateItems = Koan.Data.Vector.Connector.Weaviate.Infrastructure.WeaviateProvenanceItems;
 
 namespace Koan.Data.Vector.Connector.Weaviate.Discovery;
 
@@ -69,10 +70,25 @@ internal sealed class WeaviateDiscoveryAdapter : ServiceDiscoveryAdapterBase
     protected override string? ReadExplicitConfiguration()
     {
         // Check Weaviate-specific configuration paths
-        return _configuration.GetConnectionString("Weaviate") ??
-               _configuration["Koan:Data:Weaviate:ConnectionString"] ??
-               _configuration["Koan:Data:Weaviate:Endpoint"] ??
-               _configuration["Koan:Data:ConnectionString"];
+        foreach (var key in WeaviateItems.ConnectionStringKeys)
+        {
+            var value = _configuration[key];
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                return value;
+            }
+        }
+
+        foreach (var key in WeaviateItems.EndpointKeys)
+        {
+            var value = _configuration[key];
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                return value;
+            }
+        }
+
+        return null;
     }
 
     /// <summary>Weaviate-specific discovery candidates with proper container-first priority</summary>

@@ -63,11 +63,11 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         cfg.GetSection(Infrastructure.Constants.Configuration.Section).Bind(options);
 
         var connectionHint = options.ConnectionString ?? "auto";
-        var sanitized = string.Equals(connectionHint, "auto", StringComparison.OrdinalIgnoreCase)
+        var displayConnection = string.Equals(connectionHint, "auto", StringComparison.OrdinalIgnoreCase)
             ? "auto"
-            : connectionHint;
+            : Koan.Core.Redaction.DeIdentify(connectionHint);
 
-        module.AddSetting("ConnectionString", sanitized, isSecret: true);
+        module.AddSetting("ConnectionString", displayConnection, isSecret: false);
         module.AddSetting("KeyPrefix", options.KeyPrefix);
         module.AddSetting("ProcessingTtlSeconds", options.ProcessingTtl.TotalSeconds.ToString("n0"));
 

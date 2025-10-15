@@ -91,10 +91,14 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             resolvedConnectionString = connectionValue;
         }
 
+        var displayConnection = connectionIsAuto || string.IsNullOrWhiteSpace(resolvedConnectionString)
+            ? "auto"
+            : Koan.Core.Redaction.DeIdentify(resolvedConnectionString);
+
         module.AddSetting(
             "ConnectionString",
-            resolvedConnectionString ?? "auto",
-            isSecret: true,
+            displayConnection,
+            isSecret: false,
             source: connection.Source,
             consumers: new[]
             {

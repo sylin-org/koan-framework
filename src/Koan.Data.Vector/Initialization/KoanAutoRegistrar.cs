@@ -5,6 +5,8 @@ using Koan.Core;
 using Koan.Core.Logging;
 using Koan.Core.Hosting.Bootstrap;
 using Koan.Data.Vector.Infrastructure;
+using VectorItems = Koan.Data.Vector.Infrastructure.VectorProvenanceItems;
+using ProvenanceModes = Koan.Core.Hosting.Bootstrap.ProvenancePublicationModeExtensions;
 
 namespace Koan.Data.Vector.Initialization;
 
@@ -29,7 +31,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         var defaultOptions = new VectorDefaultsOptions();
         var defaultProvider = Configuration.ReadWithSource<string?>(
             cfg,
-            Constants.Configuration.Keys.DefaultProvider,
+            VectorItems.DefaultProvider.Key,
             defaultOptions.DefaultProvider);
 
         var display = string.IsNullOrWhiteSpace(defaultProvider.Value)
@@ -37,17 +39,12 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             : defaultProvider.Value;
 
         module.AddSetting(
-            "VectorDefaults:DefaultProvider",
+            VectorItems.DefaultProvider,
+            ProvenanceModes.FromConfigurationValue(defaultProvider),
             display,
-            source: defaultProvider.Source,
             sourceKey: defaultProvider.ResolvedKey,
-            consumers: DefaultProviderConsumers);
+            usedDefault: defaultProvider.UsedDefault);
     }
-
-    private static readonly string[] DefaultProviderConsumers =
-    {
-        "Koan.Data.Vector.VectorService"
-    };
 
     private static class LogActions
     {
