@@ -33,6 +33,8 @@ public sealed record KoanAdminModuleManifest(
 
 public sealed record KoanAdminModuleSetting(
     string Key,
+    string Label,
+    string Description,
     string Value,
     bool Secret,
     KoanAdminSettingSource Source,

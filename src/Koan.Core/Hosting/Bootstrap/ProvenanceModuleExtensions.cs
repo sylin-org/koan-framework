@@ -24,7 +24,10 @@ public static class ProvenanceModuleExtensions
 
         module.SetSetting(key, builder =>
         {
-            builder.Value(value)
+            builder
+                .Label(key)
+                .Description(string.Empty)
+                .Value(value)
                 .State(state)
                 .Source(MapSource(source), sourceKey);
 
@@ -65,10 +68,27 @@ public static class ProvenanceModuleExtensions
         }
 
         var resolvedConsumers = consumers ?? item.DefaultConsumers;
-        var source = MapSource(mode);
+    var source = MapSource(mode);
         var state = stateOverride ?? MapState(mode, usedDefault);
+        module.SetSetting(item.Key, builder =>
+        {
+            builder
+                .Label(item.Label)
+                .Description(item.Description)
+                .Value(formatted)
+                .State(state)
+                .Source(source, sourceKey);
 
-        module.AddSetting(item.Key, formatted, isSecret, source, resolvedConsumers, sourceKey, state);
+            if (resolvedConsumers is not null && resolvedConsumers.Count > 0)
+            {
+                builder.Consumers(resolvedConsumers.ToArray());
+            }
+
+            if (isSecret)
+            {
+                builder.Secret(input => Koan.Core.Redaction.DeIdentify(input ?? string.Empty));
+            }
+        });
     }
 
     public static void AddNote(this ProvenanceModuleWriter module, string message)
@@ -105,16 +125,16 @@ public static class ProvenanceModuleExtensions
             _ => ProvenanceSettingSource.Unknown
         };
 
-    private static BootSettingSource MapSource(ProvenancePublicationMode mode)
+    private static ProvenanceSettingSource MapSource(ProvenancePublicationMode mode)
         => mode switch
         {
-            ProvenancePublicationMode.Auto => BootSettingSource.Auto,
-            ProvenancePublicationMode.Settings => BootSettingSource.AppSettings,
-            ProvenancePublicationMode.Environment => BootSettingSource.Environment,
-            ProvenancePublicationMode.LaunchKit => BootSettingSource.LaunchKit,
-            ProvenancePublicationMode.Discovery => BootSettingSource.Custom,
-            ProvenancePublicationMode.Custom => BootSettingSource.Custom,
-            _ => BootSettingSource.Unknown
+            ProvenancePublicationMode.Auto => ProvenanceSettingSource.Auto,
+            ProvenancePublicationMode.Settings => ProvenanceSettingSource.AppSettings,
+            ProvenancePublicationMode.Environment => ProvenanceSettingSource.Environment,
+            ProvenancePublicationMode.LaunchKit => ProvenanceSettingSource.LaunchKit,
+            ProvenancePublicationMode.Discovery => ProvenanceSettingSource.Custom,
+            ProvenancePublicationMode.Custom => ProvenanceSettingSource.Custom,
+            _ => ProvenanceSettingSource.Unknown
         };
 
     private static ProvenanceSettingState MapState(ProvenancePublicationMode mode, bool usedDefault)

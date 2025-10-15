@@ -56,6 +56,8 @@ public sealed class KoanAdminStatusController : ControllerBase
                 var settings = m.Settings
                     .Select(s => new KoanAdminModuleSurfaceSetting(
                         s.Key,
+                        string.IsNullOrWhiteSpace(s.Label) ? s.Key : s.Label,
+                        s.Description ?? string.Empty,
                         s.Secret ? SecretMask : s.Value,
                         s.Secret,
                         s.Source,

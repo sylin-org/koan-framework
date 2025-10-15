@@ -7,6 +7,10 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Koan.Web.Extensions;
 using Koan.Core.Hosting.Bootstrap;
+using Koan.Core.Provenance;
+using WebBackupItems = Koan.Web.Backup.Infrastructure.WebBackupProvenanceItems;
+using PublicationMode = Koan.Core.Hosting.Bootstrap.ProvenancePublicationMode;
+using ProvenanceWriter = Koan.Core.Provenance.ProvenanceModuleWriter;
 
 namespace Koan.Web.Backup.Initialization;
 
@@ -36,77 +40,77 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         Log.BootDebug(LogActions.Init, "services-registered", ("module", ModuleName));
     }
 
-    public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
+    public void Describe(ProvenanceWriter module, IConfiguration cfg, IHostEnvironment env)
     {
         module.Describe(ModuleVersion);
         // Add web backup capabilities
         module.AddSetting(
-            "Capability:BackupWebAPI",
-            "true",
-            source: Koan.Core.Hosting.Bootstrap.BootSettingSource.Auto,
-            consumers: new[] { "Koan.Web.Backup.BackupController" });
+            WebBackupItems.BackupWebApi,
+            PublicationMode.Auto,
+            true,
+            usedDefault: true);
         module.AddSetting(
-            "Capability:RestoreWebAPI",
-            "true",
-            source: Koan.Core.Hosting.Bootstrap.BootSettingSource.Auto,
-            consumers: new[] { "Koan.Web.Backup.RestoreController" });
+            WebBackupItems.RestoreWebApi,
+            PublicationMode.Auto,
+            true,
+            usedDefault: true);
         module.AddSetting(
-            "Capability:PollingProgressTracking",
-            "true",
-            source: Koan.Core.Hosting.Bootstrap.BootSettingSource.Auto,
-            consumers: new[] { "Koan.Web.Backup.Operations" });
+            WebBackupItems.PollingProgressTracking,
+            PublicationMode.Auto,
+            true,
+            usedDefault: true);
         module.AddSetting(
-            "Capability:OperationManagement",
-            "true",
-            source: Koan.Core.Hosting.Bootstrap.BootSettingSource.Auto,
-            consumers: new[] { "Koan.Web.Backup.Operations" });
+            WebBackupItems.OperationManagement,
+            PublicationMode.Auto,
+            true,
+            usedDefault: true);
         module.AddSetting(
-            "Capability:BackupCatalogAPI",
-            "true",
-            source: Koan.Core.Hosting.Bootstrap.BootSettingSource.Auto,
-            consumers: new[] { "Koan.Web.Backup.Catalog" });
+            WebBackupItems.BackupCatalogApi,
+            PublicationMode.Auto,
+            true,
+            usedDefault: true);
         module.AddSetting(
-            "Capability:BackupVerificationAPI",
-            "true",
-            source: Koan.Core.Hosting.Bootstrap.BootSettingSource.Auto,
-            consumers: new[] { "Koan.Web.Backup.Verification" });
+            WebBackupItems.BackupVerificationApi,
+            PublicationMode.Auto,
+            true,
+            usedDefault: true);
         module.AddSetting(
-            "Capability:SystemStatusAPI",
-            "true",
-            source: Koan.Core.Hosting.Bootstrap.BootSettingSource.Auto,
-            consumers: new[] { "Koan.Web.Backup.Status" });
+            WebBackupItems.SystemStatusApi,
+            PublicationMode.Auto,
+            true,
+            usedDefault: true);
         module.AddSetting(
-            "Capability:CORSSupport",
-            "true",
-            source: Koan.Core.Hosting.Bootstrap.BootSettingSource.Auto,
-            consumers: new[] { "Koan.Web.Backup.Middleware" });
+            WebBackupItems.CorsSupport,
+            PublicationMode.Auto,
+            true,
+            usedDefault: true);
         module.AddSetting(
-            "Capability:APIVersioning",
-            "true",
-            source: Koan.Core.Hosting.Bootstrap.BootSettingSource.Auto,
-            consumers: new[] { "Koan.Web.Backup.ApiSurface" });
+            WebBackupItems.ApiVersioning,
+            PublicationMode.Auto,
+            true,
+            usedDefault: true);
         module.AddSetting(
-            "Capability:BackgroundCleanup",
-            "true",
-            source: Koan.Core.Hosting.Bootstrap.BootSettingSource.Auto,
-            consumers: new[] { "Koan.Web.Backup.BackgroundServices" });
+            WebBackupItems.BackgroundCleanup,
+            PublicationMode.Auto,
+            true,
+            usedDefault: true);
 
         // Add architecture info
         module.AddSetting(
-            "ProgressTracking",
+            WebBackupItems.ProgressTracking,
+            PublicationMode.Auto,
             "Polling-based (REST endpoints)",
-            source: Koan.Core.Hosting.Bootstrap.BootSettingSource.Auto,
-            consumers: new[] { "Koan.Web.Backup.Progress" });
+            usedDefault: true);
         module.AddSetting(
-            "SignalRSupport",
-            "false",
-            source: Koan.Core.Hosting.Bootstrap.BootSettingSource.Auto,
-            consumers: new[] { "Koan.Web.Backup.Progress" });
+            WebBackupItems.SignalRSupport,
+            PublicationMode.Auto,
+            false,
+            usedDefault: true);
         module.AddSetting(
-            "PollingInterval",
+            WebBackupItems.PollingInterval,
+            PublicationMode.Auto,
             "Client-controlled",
-            source: Koan.Core.Hosting.Bootstrap.BootSettingSource.Auto,
-            consumers: new[] { "Koan.Web.Backup.Progress" });
+            usedDefault: true);
 
         module.AddTool(
             "Backup Operations API",

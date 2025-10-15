@@ -21,6 +21,8 @@ public sealed record KoanAdminModuleSurface(
 
 public sealed record KoanAdminModuleSurfaceSetting(
     string Key,
+    string Label,
+    string Description,
     string Value,
     bool Secret,
     KoanAdminSettingSource Source,

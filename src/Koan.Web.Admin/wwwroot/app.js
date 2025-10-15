@@ -312,6 +312,10 @@ function createModuleDetails(module, fallbackModuleClass) {
 
   const settingsList = Array.isArray(module.settings) && module.settings.length
     ? module.settings.map(setting => {
+        const label = typeof setting.label === 'string' && setting.label.trim().length
+          ? setting.label.trim()
+          : setting.key;
+        const description = typeof setting.description === 'string' ? setting.description.trim() : '';
         const sourceValue = formatSettingSource(setting.source);
         const sourceLabel = sourceValue && sourceValue.toLowerCase() !== 'unknown' ? sourceValue : '';
         const sourceKey = typeof setting.sourceKey === 'string' ? setting.sourceKey : '';
@@ -322,17 +326,35 @@ function createModuleDetails(module, fallbackModuleClass) {
         if (setting.secret) {
           tags.push('<span class="tag tag-secret">secret</span>');
         }
+        const keyBadge = `<code class="setting-key">${setting.key}</code>`;
         const sourceKeyMarkup = sourceKey ? `<code class="setting-source-key">${sourceKey}</code>` : '';
         const consumers = renderSettingConsumers(setting.consumers);
-        const hasMeta = sourceKeyMarkup || tags.length || consumers;
+        const metaParts = [keyBadge];
+        if (sourceKeyMarkup) {
+          metaParts.push(sourceKeyMarkup);
+        }
+        if (tags.length) {
+          metaParts.push(...tags);
+        }
+        if (consumers) {
+          metaParts.push(consumers);
+        }
+        const hasMeta = metaParts.some(part => part && part.length);
+        const descriptionTitle = description.replace(/"/g, '&quot;');
+        const descriptionMarkup = description
+          ? `<span class="setting-description" title="${descriptionTitle}">${description}</span>`
+          : '';
         const meta = hasMeta
-          ? `<div class="setting-meta">${sourceKeyMarkup}${tags.join('')}${consumers}</div>`
+          ? `<div class="setting-meta">${metaParts.join('')}</div>`
           : '';
 
         return `
         <div class="module-setting">
           <div class="setting-header">
-            <span class="key">${setting.key}</span>
+            <div class="setting-text">
+              <span class="setting-label">${label}</span>
+              ${descriptionMarkup}
+            </div>
             <span class="value ${setting.secret ? 'secret' : ''}">${setting.value ?? ''}</span>
           </div>
           ${meta}

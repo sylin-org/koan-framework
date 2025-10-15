@@ -384,9 +384,28 @@ main {
   gap: 0.75rem;
 }
 
-.setting-header .key {
-  font-weight: 600;
+.setting-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
   flex: 1 1 auto;
+  min-width: 0;
+}
+
+.setting-label {
+  font-weight: 600;
+  color: #ffffff;
+  font-size: 0.95rem;
+  line-height: 1.2;
+}
+
+.setting-description {
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.15;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .setting-header .value {
@@ -408,6 +427,16 @@ main {
   gap: 0.35rem;
   font-size: 0.75rem;
   color: var(--muted);
+}
+
+.setting-meta .setting-key {
+  font-family: "Cascadia Code", "Consolas", monospace;
+  background: rgba(148, 163, 184, 0.12);
+  border-radius: 6px;
+  padding: 0.15rem 0.35rem;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  color: rgba(226, 232, 240, 0.95);
+  font-size: 0.72rem;
 }
 
 .setting-meta .tag {

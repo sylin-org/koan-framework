@@ -303,6 +303,8 @@ namespace Koan.Core.Provenance
 
     internal sealed record SettingState(
         string Key,
+        string Label,
+        string Description,
         string? Value,
         bool IsSecret,
         ProvenanceSettingSource Source,
@@ -312,7 +314,7 @@ namespace Koan.Core.Provenance
         DateTimeOffset UpdatedUtc)
     {
         public ProvenanceSetting ToSnapshot()
-            => new(Key, Value, IsSecret, Source, SourceKey, Consumers, State, UpdatedUtc);
+            => new(Key, Label, Description, Value, IsSecret, Source, SourceKey, Consumers, State, UpdatedUtc);
     }
 
     internal sealed record ToolState(

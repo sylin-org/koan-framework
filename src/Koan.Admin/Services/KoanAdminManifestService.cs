@@ -115,6 +115,8 @@ internal sealed class KoanAdminManifestService : IKoanAdminManifestService
         var settings = module.Settings
             .Select(setting => new KoanAdminModuleSetting(
                 setting.Key,
+                string.IsNullOrWhiteSpace(setting.Label) ? setting.Key : setting.Label,
+                setting.Description ?? string.Empty,
                 setting.Value ?? string.Empty,
                 setting.IsSecret,
                 ConvertSource(setting.Source),

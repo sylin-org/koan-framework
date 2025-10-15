@@ -110,15 +110,30 @@ namespace Koan.Core.Provenance
         private string? _sourceKey;
         private readonly HashSet<string> _consumers = new(StringComparer.OrdinalIgnoreCase);
         private ProvenanceSettingState _state = ProvenanceSettingState.Unknown;
+        private string _label;
+        private string _description = string.Empty;
 
         internal ProvenanceSettingBuilder(string key)
         {
             _key = key;
+            _label = key;
         }
 
         public ProvenanceSettingBuilder Value(string? value)
         {
             _value = value;
+            return this;
+        }
+
+        public ProvenanceSettingBuilder Label(string label)
+        {
+            _label = string.IsNullOrWhiteSpace(label) ? _key : label;
+            return this;
+        }
+
+        public ProvenanceSettingBuilder Description(string? description)
+        {
+            _description = description ?? string.Empty;
             return this;
         }
 
@@ -172,6 +187,8 @@ namespace Koan.Core.Provenance
 
             return new ProvenanceRegistry.SettingState(
                 _key,
+                _label,
+                _description,
                 displayValue,
                 _isSecret,
                 _source,

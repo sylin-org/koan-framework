@@ -31,6 +31,8 @@ namespace Koan.Core.Provenance
 
     public sealed record ProvenanceSetting(
         string Key,
+        string Label,
+        string Description,
         string? Value,
         bool IsSecret,
         ProvenanceSettingSource Source,
