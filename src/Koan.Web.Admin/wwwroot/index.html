@@ -86,26 +86,26 @@
         <section class="framework-pulse" id="framework-pulse">
           <h2 class="pulse-title">Framework Pulse</h2>
           <div class="pulse-grid" id="pulse-grid">
-            <div class="pulse-card">
+            <a href="#/framework" class="pulse-card">
               <div class="pulse-label">Modules Registered</div>
               <div class="pulse-value" id="pulse-modules">—</div>
               <div class="pulse-detail">Auto-registration complete</div>
-            </div>
-            <div class="pulse-card">
+            </a>
+            <a href="#/framework" class="pulse-card">
               <div class="pulse-label">Providers Elected</div>
               <div class="pulse-value" id="pulse-providers">—</div>
               <div class="pulse-detail">Multi-provider routing</div>
-            </div>
-            <div class="pulse-card">
+            </a>
+            <a href="#/ops" class="pulse-card">
               <div class="pulse-label">Health Status</div>
               <div class="pulse-value" id="pulse-health">—</div>
               <div class="pulse-detail">Critical components</div>
-            </div>
-            <div class="pulse-card">
+            </a>
+            <a href="#/configuration" class="pulse-card">
               <div class="pulse-label">Settings</div>
               <div class="pulse-value" id="pulse-settings">—</div>
               <div class="pulse-detail">Configuration values</div>
-            </div>
+            </a>
           </div>
         </section>
 
@@ -169,14 +169,11 @@
               <section class="panel health-panel">
                 <header class="panel-header">
                   <div>
-                    <h3>Critical Health</h3>
-                    <p class="panel-subtitle">Components marked critical=true</p>
+                    <h3>Health Status</h3>
+                    <p class="panel-subtitle">All components sorted by criticality</p>
                   </div>
-                  <button class="panel-action-btn" id="show-all-health-btn">
-                    Show All
-                  </button>
                 </header>
-                <div class="panel-body" id="critical-health-body">
+                <div class="panel-body" id="health-body">
                   <!-- Dynamically populated -->
                 </div>
               </section>
@@ -310,8 +307,27 @@
             <div class="config-mode-content active" id="config-canonical">
               <section class="panel">
                 <div class="panel-body">
-                  <div class="config-search">
-                    <input type="text" id="config-search-input" placeholder="🔍 Search settings..." class="config-search-input" />
+                  <div class="config-controls">
+                    <div class="config-search">
+                      <input type="text" id="config-search-input" placeholder="🔍 Search settings..." class="config-search-input" />
+                    </div>
+                    <div class="config-controls-right">
+                      <div class="config-display">
+                        <label class="config-display-label">Display:</label>
+                        <div class="config-display-buttons" id="config-display-buttons">
+                          <button class="config-display-btn" data-display="label">Label</button>
+                          <button class="config-display-btn active" data-display="canonical">Canonical</button>
+                        </div>
+                      </div>
+                      <div class="config-sort">
+                        <label class="config-sort-label">Sort by:</label>
+                        <div class="config-sort-buttons" id="config-sort-buttons">
+                          <button class="config-sort-btn active" data-sort="key">Key</button>
+                          <button class="config-sort-btn" data-sort="source">Source</button>
+                          <button class="config-sort-btn" data-sort="value">Value</button>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                   <div class="config-list" id="config-list">
                     <!-- Dynamically populated -->

@@ -14,7 +14,10 @@ const AppState = {
   refreshInterval: 30000,
   autoRefresh: true,
   lastUpdate: null,
-  configSearchTerm: ''
+  configSearchTerm: '',
+  configSortBy: 'key', // 'key' | 'source' | 'value'
+  expandedConfigItems: [], // Array of expanded canonical keys
+  configDisplayMode: 'canonical' // 'label' | 'canonical'
 };
 
 // Constants
@@ -54,6 +57,9 @@ function loadState() {
       AppState.expandedPillars = parsed.expandedPillars || [];
       AppState.autoRefresh = parsed.autoRefresh !== undefined ? parsed.autoRefresh : true;
       AppState.configViewMode = parsed.configViewMode || 'canonical';
+      AppState.configSortBy = parsed.configSortBy || 'key';
+      AppState.expandedConfigItems = parsed.expandedConfigItems || [];
+      AppState.configDisplayMode = parsed.configDisplayMode || 'canonical';
     } catch (e) {
       console.error('Failed to load state:', e);
     }
@@ -64,7 +70,10 @@ function saveState() {
   localStorage.setItem('koan-admin-state', JSON.stringify({
     expandedPillars: AppState.expandedPillars,
     autoRefresh: AppState.autoRefresh,
-    configViewMode: AppState.configViewMode
+    configViewMode: AppState.configViewMode,
+    configSortBy: AppState.configSortBy,
+    expandedConfigItems: AppState.expandedConfigItems,
+    configDisplayMode: AppState.configDisplayMode
   }));
 }
 
@@ -385,7 +394,7 @@ function renderOpsMode() {
   if (!data) return;
 
   renderTelemetry(data.runtime);
-  renderCriticalHealth(data.health?.components);
+  renderHealth(data.health?.components);
   renderEnvironment(data.environment);
   renderStartupNotes(data.modules);
 }
@@ -433,28 +442,54 @@ function renderTelemetry(runtime) {
   `;
 }
 
-function renderCriticalHealth(components) {
-  const body = document.getElementById('critical-health-body');
+function renderHealth(components) {
+  const body = document.getElementById('health-body');
   if (!body || !components) return;
 
-  const criticalHealth = components.filter(h => h.facts?.critical === 'true');
-
-  if (criticalHealth.length === 0) {
-    body.innerHTML = '<p class="text-secondary">No critical health checks configured</p>';
+  if (components.length === 0) {
+    body.innerHTML = '<p class="text-secondary">No health checks configured</p>';
     return;
   }
+
+  // Sort by criticality (critical=true first), then by status, then by component name
+  const sortedComponents = [...components].sort((a, b) => {
+    const aCritical = a.facts?.critical === 'true';
+    const bCritical = b.facts?.critical === 'true';
+
+    if (aCritical !== bCritical) {
+      return bCritical ? 1 : -1; // Critical items first
+    }
+
+    // Then by status (error, degraded, healthy, unknown)
+    const statusOrder = { 'error': 0, 'degraded': 1, 'unknown': 2, 'healthy': 3 };
+    const aStatus = (a.status?.toLowerCase() || 'unknown');
+    const bStatus = (b.status?.toLowerCase() || 'unknown');
+    const aOrder = statusOrder[aStatus] ?? 4;
+    const bOrder = statusOrder[bStatus] ?? 4;
+
+    if (aOrder !== bOrder) {
+      return aOrder - bOrder;
+    }
+
+    // Finally by component name
+    return (a.component || '').localeCompare(b.component || '');
+  });
 
   const list = document.createElement('div');
   list.className = 'health-list';
 
-  criticalHealth.forEach(item => {
+  sortedComponents.forEach(item => {
     const div = document.createElement('div');
-    div.className = 'health-item';
+    const isCritical = item.facts?.critical === 'true';
+    div.className = isCritical ? 'health-item critical' : 'health-item';
 
     const statusClass = item.status?.toLowerCase() || 'unknown';
 
     div.innerHTML = `
-      <span class="health-component">${item.component || 'Unknown'}</span>
+      <span class="health-component">
+        ${isCritical ? '<span class="critical-badge">CRITICAL</span>' : ''}
+        ${item.component || 'Unknown'}
+      </span>
       <span class="health-status ${statusClass}">
         ${statusClass === 'healthy' ? '●' : statusClass === 'degraded' ? '⚠' : statusClass === 'error' ? '✕' : '○'}
         ${item.status || 'Unknown'}
@@ -725,6 +760,18 @@ function renderConfigurationView() {
     }
   });
 
+  // Update display button states
+  const displayButtons = document.querySelectorAll('.config-display-btn');
+  displayButtons.forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.display === AppState.configDisplayMode);
+  });
+
+  // Update sort button states
+  const sortButtons = document.querySelectorAll('.config-sort-btn');
+  sortButtons.forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.sort === AppState.configSortBy);
+  });
+
   // Render based on current mode
   switch (AppState.configViewMode) {
     case 'canonical':
@@ -762,24 +809,119 @@ function renderCanonicalView(allSettings) {
     return;
   }
 
+  // Sort settings based on AppState.configSortBy
+  const sortedSettings = [...filteredSettings].sort((a, b) => {
+    switch (AppState.configSortBy) {
+      case 'key':
+        return a.canonicalKey.localeCompare(b.canonicalKey);
+      case 'source':
+        const sourceA = (a.source || 'Auto').toLowerCase();
+        const sourceB = (b.source || 'Auto').toLowerCase();
+        return sourceA.localeCompare(sourceB);
+      case 'value':
+        return a.value.localeCompare(b.value);
+      default:
+        return 0;
+    }
+  });
+
   list.innerHTML = '';
 
-  filteredSettings.forEach(setting => {
+  sortedSettings.forEach(setting => {
     const item = document.createElement('div');
     item.className = 'config-item';
+    item.dataset.canonicalKey = setting.canonicalKey;
+
+    // Check if this item is expanded
+    const isExpanded = AppState.expandedConfigItems.includes(setting.canonicalKey);
+    if (isExpanded) {
+      item.classList.add('expanded');
+    }
 
     const source = (setting.source || 'Auto').toLowerCase().replace(/\s/g, '');
+    const sourceLabel = setting.source || 'Auto';
+    const consumers = setting.consumers || [];
+
+    // Determine display text based on display mode
+    const displayText = AppState.configDisplayMode === 'label'
+      ? (setting.label || setting.canonicalKey)
+      : setting.canonicalKey;
+
+    // Get source key for non-Auto sources
+    const sourceKey = setting.sourceKey && setting.sourceKey.trim() !== '' ? setting.sourceKey : null;
 
     item.innerHTML = `
-      <div class="config-key">${setting.canonicalKey}</div>
-      <div>
-        <span class="config-source-badge ${source}">${setting.source || 'Auto'}</span>
+      <div class="config-item-row">
+        <div class="config-key">
+          <span class="config-expand-icon">${isExpanded ? '▼' : '▶'}</span>
+          ${displayText}
+        </div>
+        <span class="config-source-badge ${source}">${sourceLabel}</span>
+        <div class="config-value">${escapeHtml(truncate(setting.value, 80))}</div>
       </div>
-      <div class="config-value">${escapeHtml(truncate(setting.value, 80))}</div>
+      <div class="config-item-details">
+        <div class="config-detail-row">
+          <span class="config-detail-label">Label</span>
+          <span class="config-detail-value">${setting.label || setting.canonicalKey}</span>
+        </div>
+        <div class="config-detail-row">
+          <span class="config-detail-label">Canonical Key</span>
+          <span class="config-detail-value">${setting.canonicalKey}</span>
+        </div>
+        <div class="config-detail-row">
+          <span class="config-detail-label">Value</span>
+          <span class="config-detail-value">${escapeHtml(setting.value)}</span>
+        </div>
+        ${sourceKey ? `
+          <div class="config-detail-row">
+            <span class="config-detail-label">Source Key</span>
+            <span class="config-detail-value">
+              <span class="config-source-key ${source}">${sourceKey}</span>
+            </span>
+          </div>
+        ` : ''}
+        ${setting.description ? `
+          <div class="config-detail-row">
+            <span class="config-detail-label">Description</span>
+            <span class="config-detail-value">${escapeHtml(setting.description)}</span>
+          </div>
+        ` : ''}
+        ${consumers.length > 0 ? `
+          <div class="config-detail-row">
+            <span class="config-detail-label">Consumers</span>
+            <div class="config-consumers">
+              ${consumers.map(c => `<span class="config-consumer-chip">${c}</span>`).join('')}
+            </div>
+          </div>
+        ` : ''}
+      </div>
     `;
+
+    // Add click handler to header row only to toggle expanded state
+    const headerRow = item.querySelector('.config-item-row');
+    headerRow.addEventListener('click', (e) => {
+      toggleConfigItem(setting.canonicalKey);
+    });
 
     list.appendChild(item);
   });
+}
+
+function toggleConfigItem(canonicalKey) {
+  const index = AppState.expandedConfigItems.indexOf(canonicalKey);
+
+  if (index > -1) {
+    // Item is expanded, collapse it
+    AppState.expandedConfigItems.splice(index, 1);
+  } else {
+    // Item is collapsed, expand it
+    AppState.expandedConfigItems.push(canonicalKey);
+  }
+
+  saveState();
+
+  // Re-render to update UI
+  renderCanonicalView(collectAllSettings());
 }
 
 function renderAppSettingsView(allSettings) {
@@ -1224,15 +1366,6 @@ function setupEventHandlers() {
     });
   }
 
-  // Show all health button
-  const showAllHealthBtn = document.getElementById('show-all-health-btn');
-  if (showAllHealthBtn) {
-    showAllHealthBtn.addEventListener('click', () => {
-      // TODO: Implement modal or expanded view for all health checks
-      alert('Show all health checks - coming soon!');
-    });
-  }
-
   // Configuration view mode switcher
   const configModeButtons = document.querySelectorAll('#config-view-mode .view-mode-btn');
   configModeButtons.forEach(btn => {
@@ -1263,6 +1396,36 @@ function setupEventHandlers() {
       renderCanonicalView(collectAllSettings());
     });
   }
+
+  // Configuration display mode buttons
+  const displayButtons = document.querySelectorAll('.config-display-btn');
+  displayButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      AppState.configDisplayMode = btn.dataset.display;
+      saveState();
+
+      // Update button states
+      displayButtons.forEach(b => b.classList.toggle('active', b.dataset.display === AppState.configDisplayMode));
+
+      // Re-render configuration view
+      renderCanonicalView(collectAllSettings());
+    });
+  });
+
+  // Configuration sort buttons
+  const sortButtons = document.querySelectorAll('.config-sort-btn');
+  sortButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      AppState.configSortBy = btn.dataset.sort;
+      saveState();
+
+      // Update button states
+      sortButtons.forEach(b => b.classList.toggle('active', b.dataset.sort === AppState.configSortBy));
+
+      // Re-render configuration view
+      renderCanonicalView(collectAllSettings());
+    });
+  });
 
   // Hash change
   window.addEventListener('hashchange', handleRouteChange);
