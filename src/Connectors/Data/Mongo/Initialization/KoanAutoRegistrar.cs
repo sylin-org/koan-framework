@@ -107,16 +107,15 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         optimizer.Initialize(null!); // Optimizer doesn't use services parameter
     }
 
-    public void Describe(Koan.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)
+    public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
-        report.AddModule(ModuleName, ModuleVersion);
-
+        module.Describe(ModuleVersion);
         // Autonomous discovery adapter handles all connection string resolution
         // Boot report shows discovery results from MongoDiscoveryAdapter
 
         var availableProviders = DiscoverAvailableDataProviders();
-        report.AddNote($"Available providers: {string.Join(", ", availableProviders)}");
-        report.AddNote("MongoDB discovery handled by autonomous MongoDiscoveryAdapter");
+        module.AddNote($"Available providers: {string.Join(", ", availableProviders)}");
+        module.AddNote("MongoDB discovery handled by autonomous MongoDiscoveryAdapter");
 
         // Configure default options for reporting with provenance metadata
         var defaultOptions = new MongoOptions();
@@ -152,7 +151,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             : connection.Value;
         var connectionIsAuto = string.Equals(connectionValue, "auto", StringComparison.OrdinalIgnoreCase);
 
-        report.AddSetting(
+        module.AddSetting(
             "ConnectionString",
             connectionIsAuto ? "auto (resolved by discovery)" : connectionValue,
             isSecret: !connectionIsAuto,
@@ -165,7 +164,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             },
             sourceKey: connection.ResolvedKey);
 
-        report.AddSetting(
+        module.AddSetting(
             "Database",
             database.Value ?? defaultOptions.Database,
             source: database.Source,
@@ -177,7 +176,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             sourceKey: database.ResolvedKey);
 
         // Announce schema capability per acceptance criteria
-        report.AddSetting(
+        module.AddSetting(
             Infrastructure.Constants.Bootstrap.EnsureCreatedSupported,
             true.ToString(),
             source: BootSettingSource.Auto,
@@ -188,7 +187,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             sourceKey: Infrastructure.Constants.Configuration.Keys.EnsureCreatedSupported);
 
         // Announce paging guardrails (decision 0044)
-        report.AddSetting(
+        module.AddSetting(
             Infrastructure.Constants.Bootstrap.DefaultPageSize,
             defaultPageSize.Value.ToString(),
             source: defaultPageSize.Source,
@@ -198,7 +197,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             },
             sourceKey: defaultPageSize.ResolvedKey);
 
-        report.AddSetting(
+        module.AddSetting(
             Infrastructure.Constants.Bootstrap.MaxPageSize,
             maxPageSize.Value.ToString(),
             source: maxPageSize.Source,
@@ -255,6 +254,7 @@ public class NullBsonValueConvention : IMemberMapConvention
         }
     }
 }
+
 
 
 

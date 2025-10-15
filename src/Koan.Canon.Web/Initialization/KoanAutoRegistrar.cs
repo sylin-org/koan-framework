@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -15,6 +15,7 @@ using Koan.Web.Extensions.GenericControllers;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Koan.Core.Hosting.Bootstrap;
 
 namespace Koan.Canon.Web.Initialization;
 
@@ -46,31 +47,31 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         }
     }
 
-    public void Describe(Koan.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)
+    public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
-        report.AddModule(ModuleName, ModuleVersion);
-        report.AddSetting(
+        module.Describe(ModuleVersion);
+        module.AddSetting(
             "routes.models",
             WebConstants.Routes.Models,
             source: Koan.Core.Hosting.Bootstrap.BootSettingSource.Custom,
             consumers: new[] { "Koan.Canon.Web.Catalog" });
-        report.AddSetting(
+        module.AddSetting(
             "routes.admin",
             WebConstants.Routes.Admin,
             source: Koan.Core.Hosting.Bootstrap.BootSettingSource.Custom,
             consumers: new[] { "Koan.Canon.Web.AdminSurface" });
-        report.AddSetting(
+        module.AddSetting(
             "routes.canon",
             WebConstants.Routes.CanonPrefix + "/{model}",
             source: Koan.Core.Hosting.Bootstrap.BootSettingSource.Custom,
             consumers: new[] { "Koan.Canon.Web.EntitiesController" });
-        report.AddSetting(
+        module.AddSetting(
             "routes.valueObjects",
             WebConstants.Routes.ValueObjectPrefix + "/{type}",
             source: Koan.Core.Hosting.Bootstrap.BootSettingSource.Custom,
             consumers: new[] { "Koan.Canon.Web.ValueObjectController" });
 
-        report.AddTool(
+        module.AddTool(
             "Canon Admin",
             WebConstants.Routes.Admin,
             "Auto-generated admin surface for Canon models",
@@ -188,3 +189,4 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         return new string(buffer[..bufferIndex]);
     }
 }
+

@@ -6,6 +6,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
+using Koan.Core.Hosting.Bootstrap;
 
 namespace Koan.Orchestration.Aspire.Initialization;
 
@@ -87,35 +88,34 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         return KoanEnv.OrchestrationMode == OrchestrationMode.AspireAppHost;
     }
 
-    public void Describe(Koan.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)
+    public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
-        report.AddModule(ModuleName, ModuleVersion);
-
+        module.Describe(ModuleVersion);
         var mode = KoanEnv.OrchestrationMode;
 
         // Core orchestration information
-        report.AddSetting("Orchestration:Mode", mode.ToString());
-        report.AddSetting("Orchestration:SessionId", KoanEnv.SessionId);
+        module.AddSetting("Orchestration:Mode", mode.ToString());
+        module.AddSetting("Orchestration:SessionId", KoanEnv.SessionId);
 
         // Context detection details (from KoanEnv)
-        report.AddSetting("Orchestration:AspireDetected", (mode == OrchestrationMode.AspireAppHost).ToString());
-        report.AddSetting("Orchestration:KubernetesDetected", (mode == OrchestrationMode.Kubernetes).ToString());
-        report.AddSetting("Orchestration:DockerComposeDetected", (mode == OrchestrationMode.DockerCompose).ToString());
-        report.AddSetting("Orchestration:SelfOrchestrationEnabled", (mode == OrchestrationMode.SelfOrchestrating).ToString());
+        module.AddSetting("Orchestration:AspireDetected", (mode == OrchestrationMode.AspireAppHost).ToString());
+        module.AddSetting("Orchestration:KubernetesDetected", (mode == OrchestrationMode.Kubernetes).ToString());
+        module.AddSetting("Orchestration:DockerComposeDetected", (mode == OrchestrationMode.DockerCompose).ToString());
+        module.AddSetting("Orchestration:SelfOrchestrationEnabled", (mode == OrchestrationMode.SelfOrchestrating).ToString());
 
         // Environment context
-        report.AddSetting("Orchestration:InContainer", KoanEnv.InContainer.ToString());
-        report.AddSetting("Orchestration:IsDevelopment", KoanEnv.IsDevelopment.ToString());
+        module.AddSetting("Orchestration:InContainer", KoanEnv.InContainer.ToString());
+        module.AddSetting("Orchestration:IsDevelopment", KoanEnv.IsDevelopment.ToString());
 
         // Configuration overrides
         var forcedMode = Configuration.Read<string?>(cfg, Koan.Core.Infrastructure.Constants.Configuration.Orchestration.ForceOrchestrationMode, null);
         if (!string.IsNullOrEmpty(forcedMode))
         {
-            report.AddSetting("Orchestration:ForcedMode", forcedMode);
+            module.AddSetting("Orchestration:ForcedMode", forcedMode);
         }
 
         var validationEnabled = Configuration.Read(cfg, Koan.Core.Infrastructure.Constants.Configuration.Orchestration.ValidateNetworking, true);
-        report.AddSetting("Orchestration:NetworkValidationEnabled", validationEnabled.ToString());
+        module.AddSetting("Orchestration:NetworkValidationEnabled", validationEnabled.ToString());
 
         // Docker availability (for self-orchestration)
         try
@@ -123,11 +123,11 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             var dockerAvailable = new DockerContainerManager(
                 new Microsoft.Extensions.Logging.Abstractions.NullLogger<DockerContainerManager>())
                 .IsDockerAvailableAsync().Result;
-            report.AddSetting("Orchestration:DockerAvailable", dockerAvailable.ToString());
+            module.AddSetting("Orchestration:DockerAvailable", dockerAvailable.ToString());
         }
         catch
         {
-            report.AddSetting("Orchestration:DockerAvailable", "unknown");
+            module.AddSetting("Orchestration:DockerAvailable", "unknown");
         }
 
         // Provider election for dependency services
@@ -141,15 +141,15 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             _ => "unknown"
         };
         var candidates = string.Join(", ", new[] { "localhost", "service-names", "k8s-dns", "aspire-managed", "external" });
-        report.AddSetting("DependencyNetworking.Provider", provider);
-        report.AddSetting("DependencyNetworking.Candidates", candidates);
-        report.AddSetting("DependencyNetworking.Reason", $"orchestration mode: {mode}");
+        module.AddSetting("DependencyNetworking.Provider", provider);
+        module.AddSetting("DependencyNetworking.Candidates", candidates);
+        module.AddSetting("DependencyNetworking.Reason", $"orchestration mode: {mode}");
 
         // Network validation attempt (if enabled and not Aspire/Standalone)
         if (validationEnabled && mode != OrchestrationMode.AspireAppHost && mode != OrchestrationMode.Standalone)
         {
             // Network validation is simplified since KoanEnv handles mode detection
-            report.AddNote($"Dependency networking validated for {mode}: Mode detected by KoanEnv - networking strategy selected");
+            module.AddNote($"Dependency networking validated for {mode}: Mode detected by KoanEnv - networking strategy selected");
         }
     }
 

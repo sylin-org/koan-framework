@@ -18,13 +18,14 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         services.AddKoanJobs();
     }
 
-    public void Describe(BootReport report, IConfiguration cfg, IHostEnvironment env)
+    public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
         var options = cfg.GetSection("Koan:Jobs").Get<JobsOptions>();
-        report.AddModule(ModuleName, ModuleVersion);
+        module.Describe(ModuleVersion);
         if (options is not null)
         {
-            report.AddNote($"Jobs default store: {options.DefaultStore}");
+            module.AddNote($"Jobs default store: {options.DefaultStore}");
         }
     }
 }
+

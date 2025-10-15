@@ -19,19 +19,20 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IAuthProviderContributor, GoogleProviderContributor>());
     }
 
-    public void Describe(Koan.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)
+    public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
-        report.AddModule(ModuleName, ModuleVersion);
-        report.AddSetting(
+        module.Describe(ModuleVersion);
+        module.AddSetting(
             "Provider",
             "google (OIDC)",
             source: BootSettingSource.Auto,
             consumers: new[] { "Koan.Web.Auth.ProviderRegistry" });
-        report.AddSetting(
+        module.AddSetting(
             "Defaults.Enabled",
             "true",
             source: BootSettingSource.Auto,
             consumers: new[] { "Koan.Web.Auth.ProviderRegistry" });
     }
 }
+
 

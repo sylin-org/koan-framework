@@ -1,4 +1,4 @@
-﻿using Koan.Core;
+using Koan.Core;
 using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Modules;
 using Microsoft.Extensions.Configuration;
@@ -18,19 +18,18 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         services.AddKoanGraphQl();
     }
 
-    public void Describe(BootReport report, IConfiguration cfg, IHostEnvironment env)
+    public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
-        report.AddModule(ModuleName, ModuleVersion);
-
+        module.Describe(ModuleVersion);
         var options = new GraphQlOptions();
         cfg.GetSection(Infrastructure.Constants.Configuration.Section).Bind(options);
 
         var enabled = options.Enabled ?? true;
-        report.AddSetting("GraphQl.State", enabled ? "enabled" : "disabled");
-        report.AddSetting("GraphQl.Candidates", "enabled, disabled");
-        report.AddSetting("GraphQl.Rationale", "Reference = GraphQL endpoint");
+        module.AddSetting("GraphQl.State", enabled ? "enabled" : "disabled");
+        module.AddSetting("GraphQl.Candidates", "enabled, disabled");
+        module.AddSetting("GraphQl.Rationale", "Reference = GraphQL endpoint");
 
-        report.AddSetting("Path", options.Path);
-        report.AddSetting("Debug", options.Debug.ToString());
+        module.AddSetting("Path", options.Path);
+        module.AddSetting("Debug", options.Debug.ToString());
     }
 }

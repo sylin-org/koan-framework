@@ -151,12 +151,11 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             .AddHttpMessageHandler<ServiceAuthenticationHandler>();
     }
 
-    public void Describe(BootReport report, IConfiguration cfg, IHostEnvironment env)
+    public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
-        report.AddModule(ModuleName, ModuleVersion);
-
+        module.Describe(ModuleVersion);
         var modeValue = env.IsDevelopment() ? "Development" : "Production";
-        report.AddSetting(
+        module.AddSetting(
             "Mode",
             modeValue,
             source: Koan.Core.Hosting.Bootstrap.BootSettingSource.Environment,
@@ -171,14 +170,14 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             $"{ServiceAuthOptions.SectionPath}:{nameof(ServiceAuthOptions.EnableTokenCaching)}",
             true);
 
-        report.AddSetting(
+        module.AddSetting(
             "Auto Discovery",
             autoDiscovery.Value.ToString(),
             source: autoDiscovery.Source,
             consumers: new[] { "Koan.Web.Auth.Services.Discovery" },
             sourceKey: autoDiscovery.ResolvedKey);
 
-        report.AddSetting(
+        module.AddSetting(
             "Token Caching",
             tokenCaching.Value.ToString(),
             source: tokenCaching.Source,
@@ -188,14 +187,14 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         var discoveredServices = DiscoverServices();
         if (discoveredServices.Length > 0)
         {
-            report.AddSetting(
+            module.AddSetting(
                 "Services Discovered",
                 discoveredServices.Length.ToString(),
                 source: Koan.Core.Hosting.Bootstrap.BootSettingSource.Auto,
                 consumers: new[] { "Koan.Web.Auth.Services.Directory" });
             foreach (var service in discoveredServices)
             {
-                report.AddSetting(
+                module.AddSetting(
                     $"  └─ {service.ServiceId}",
                     $"Scopes: {string.Join(", ", service.ProvidedScopes)} | Dependencies: {service.Dependencies.Length}",
                     source: Koan.Core.Hosting.Bootstrap.BootSettingSource.Auto,
@@ -204,3 +203,4 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         }
     }
 }
+

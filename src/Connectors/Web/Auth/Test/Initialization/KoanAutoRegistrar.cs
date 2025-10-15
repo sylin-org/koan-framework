@@ -33,10 +33,9 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IStartupFilter, Hosting.KoanTestProviderStartupFilter>());
     }
 
-    public void Describe(Koan.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)
+    public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
-        report.AddModule(ModuleName, ModuleVersion);
-
+        module.Describe(ModuleVersion);
         var enabledOption = Koan.Core.Configuration.ReadWithSource(
             cfg,
             $"{TestProviderOptions.SectionPath}:{nameof(TestProviderOptions.Enabled)}",
@@ -48,7 +47,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
                 ? BootSettingSource.Environment
                 : BootSettingSource.Auto;
 
-        report.AddSetting(
+        module.AddSetting(
             "Enabled",
             enabled ? "true" : "false",
             source: enabledSource,
@@ -78,7 +77,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             false);
         var tokenFormat = useJwtTokensOption.Value ? "JWT" : "Hash";
 
-        report.AddSetting(
+        module.AddSetting(
             "TokenFormat",
             tokenFormat,
             source: useJwtTokensOption.Source,
@@ -100,19 +99,19 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
                 $"{TestProviderOptions.SectionPath}:{nameof(TestProviderOptions.JwtExpirationMinutes)}",
                 60);
 
-            report.AddSetting(
+            module.AddSetting(
                 "JWT.Issuer",
                 issuerOption.Value,
                 source: issuerOption.Source,
                 consumers: new[] { "Koan.Web.Auth.Connector.Test.Infrastructure.JwtTokenService" },
                 sourceKey: issuerOption.ResolvedKey);
-            report.AddSetting(
+            module.AddSetting(
                 "JWT.Audience",
                 audienceOption.Value,
                 source: audienceOption.Source,
                 consumers: new[] { "Koan.Web.Auth.Connector.Test.Infrastructure.JwtTokenService" },
                 sourceKey: audienceOption.ResolvedKey);
-            report.AddSetting(
+            module.AddSetting(
                 "JWT.Expiration",
                 $"{expirationOption.Value}min",
                 source: expirationOption.Source,
@@ -125,7 +124,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             $"{TestProviderOptions.SectionPath}:{nameof(TestProviderOptions.EnableClientCredentials)}",
             false);
 
-        report.AddSetting(
+        module.AddSetting(
             "ClientCredentials",
             clientCredentialsOption.Value ? "Enabled" : "Disabled",
             source: clientCredentialsOption.Source,
@@ -137,7 +136,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         var clientCount = clientsSection.GetChildren().Count();
         var clientsSource = clientCount > 0 ? BootSettingSource.AppSettings : BootSettingSource.Auto;
 
-        report.AddSetting(
+        module.AddSetting(
             "RegisteredClients",
             clientCount.ToString(),
             source: clientsSource,
@@ -146,13 +145,14 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 
         if (!env.IsDevelopment() && enabled)
         {
-            report.AddNote("WARNING: TestProvider is enabled outside Development. Do not use in Production.");
+            module.AddNote("WARNING: TestProvider is enabled outside Development. Do not use in Production.");
         }
 
-        report.AddTool(
+        module.AddTool(
             "Test Provider Login",
             $"{routeBase}/login.html",
             "Simulated OAuth login surface",
             capability: "auth.providers.test");
     }
 }
+

@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Koan.Core;
 using Koan.Core.Logging;
+using Koan.Core.Hosting.Bootstrap;
 
 namespace Koan.Data.Vector.Initialization;
 
@@ -21,11 +22,11 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         Log.BootDebug(LogActions.Init, "services-registered", ("module", ModuleName));
     }
 
-    public void Describe(Koan.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)
+    public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
-        report.AddModule(ModuleName, ModuleVersion);
+        module.Describe(ModuleVersion);
         var def = Configuration.Read(cfg, "Koan:Data:VectorDefaults:DefaultProvider", null);
-        report.AddSetting("VectorDefaults:DefaultProvider", def, isSecret: false);
+        module.AddSetting("VectorDefaults:DefaultProvider", def, isSecret: false);
     }
 
     private static class LogActions
@@ -33,3 +34,4 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         public const string Init = "registrar.init";
     }
 }
+

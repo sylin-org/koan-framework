@@ -26,10 +26,11 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         services.AddSingleton<IDataAdapterFactory, InMemoryAdapterFactory>();
     }
 
-    public void Describe(BootReport report, IConfiguration cfg, IHostEnvironment env)
+    public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
-        report.AddModule(ModuleName, ModuleVersion);
-        report.AddSetting("Storage", "InMemory (ephemeral)");
-        report.AddSetting("Priority", "-100 (fallback)");
+        module.Describe(ModuleVersion);
+        module.AddSetting("Storage", "InMemory (ephemeral)");
+        module.AddSetting("Priority", "-100 (fallback)");
     }
 }
+

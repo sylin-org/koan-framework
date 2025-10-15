@@ -11,6 +11,7 @@ using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Logging;
 using Koan.Core.Observability;
 using Koan.Core;
+using Koan.Core.Provenance;
 
 namespace Koan.Core.Hosting.Runtime;
 
@@ -32,15 +33,18 @@ internal sealed class AppRuntime : IAppRuntime
         KoanStartupTimeline.Mark(KoanStartupStage.BootstrapStart);
         try
         {
-            var report = new BootReport();
+            IProvenanceRegistry registry = ProvenanceRegistry.Instance;
             var cfg = _sp.GetService<IConfiguration>();
 
             // Collect module information from all KoanAutoRegistrars
-            CollectBootReport(report, cfg);
+            CollectProvenance(registry, cfg);
 
-            var modules = report.GetModules();
-            var modulePairs = modules
-                .Select(m => (m.Name, m.Version ?? "unknown"))
+            var provenance = registry.CurrentSnapshot;
+            var modulePairs = provenance.Pillars
+                .SelectMany(p => p.Modules)
+                .GroupBy(m => m.Name, StringComparer.OrdinalIgnoreCase)
+                .Select(g => (g.Key, string.IsNullOrWhiteSpace(g.First().Version) ? "unknown" : g.First().Version!))
+                .OrderBy(pair => pair.Key, StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
             var snapshot = KoanEnv.CurrentSnapshot;
@@ -79,7 +83,7 @@ internal sealed class AppRuntime : IAppRuntime
         catch { /* best-effort */ }
     }
 
-    private void CollectBootReport(BootReport report, IConfiguration? cfg)
+    private void CollectProvenance(IProvenanceRegistry registry, IConfiguration? cfg)
     {
         if (cfg == null) return;
 
@@ -102,7 +106,9 @@ internal sealed class AppRuntime : IAppRuntime
                     if (Activator.CreateInstance(t) is IKoanAutoRegistrar registrar)
                     {
                         var hostEnv = env ?? new DefaultHostEnvironment();
-                        registrar.Describe(report, cfg, hostEnv);
+                        var module = registry.GetOrCreateModule(string.Empty, registrar.ModuleName);
+                        module.Describe(registrar.ModuleVersion);
+                        registrar.Describe(module, cfg, hostEnv);
                     }
                 }
                 catch { /* best-effort */ }

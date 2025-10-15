@@ -1,4 +1,4 @@
-﻿using Koan.Core;
+using Koan.Core;
 using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Modules;
 using Koan.Core.Orchestration;
@@ -56,10 +56,9 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         }
     }
 
-    public void Describe(BootReport report, IConfiguration cfg, IHostEnvironment env)
+    public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
-        report.AddModule(ModuleName, ModuleVersion);
-
+        module.Describe(ModuleVersion);
         var options = new RedisInboxOptions();
         cfg.GetSection(Infrastructure.Constants.Configuration.Section).Bind(options);
 
@@ -68,13 +67,13 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             ? "auto"
             : connectionHint;
 
-        report.AddSetting("ConnectionString", sanitized, isSecret: true);
-        report.AddSetting("KeyPrefix", options.KeyPrefix);
-        report.AddSetting("ProcessingTtlSeconds", options.ProcessingTtl.TotalSeconds.ToString("n0"));
+        module.AddSetting("ConnectionString", sanitized, isSecret: true);
+        module.AddSetting("KeyPrefix", options.KeyPrefix);
+        module.AddSetting("ProcessingTtlSeconds", options.ProcessingTtl.TotalSeconds.ToString("n0"));
 
-        report.AddSetting("Messaging.Inbox.Selected", "redis");
-        report.AddSetting("Messaging.Inbox.Candidates", "redis");
-        report.AddSetting("Messaging.Inbox.Rationale", "Redis inbox module referenced");
+        module.AddSetting("Messaging.Inbox.Selected", "redis");
+        module.AddSetting("Messaging.Inbox.Candidates", "redis");
+        module.AddSetting("Messaging.Inbox.Rationale", "Redis inbox module referenced");
     }
 
     private static IConnectionMultiplexer CreateConnectionMultiplexer(IServiceProvider sp)

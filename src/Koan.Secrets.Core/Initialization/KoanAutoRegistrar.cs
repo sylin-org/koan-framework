@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Koan.Core;
 using Koan.Secrets.Core.DI;
+using Koan.Core.Hosting.Bootstrap;
 
 namespace Koan.Secrets.Core.Initialization;
 
@@ -18,10 +19,11 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         services.AddKoanSecrets();
     }
 
-    public void Describe(Koan.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)
+    public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
-        report.AddModule(ModuleName, ModuleVersion);
+        module.Describe(ModuleVersion);
         // Minimal, implementation-neutral description: chain starts with env + config; adapters may extend.
-        report.AddSetting("Resolver", "env → config → adapters");
+        module.AddSetting("Resolver", "env → config → adapters");
     }
 }
+

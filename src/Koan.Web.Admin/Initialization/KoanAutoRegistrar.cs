@@ -18,8 +18,9 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         services.AddKoanWebAdmin();
     }
 
-    public void Describe(BootReport report, IConfiguration cfg, IHostEnvironment env)
+    public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
-        report.AddModule(ModuleName, ModuleVersion);
+        module.Describe(ModuleVersion);
     }
 }
+

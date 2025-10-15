@@ -6,6 +6,7 @@ using Koan.Core;
 using Koan.Core.Extensions;
 using Koan.Web.Connector.Swagger.Infrastructure;
 using Swashbuckle.AspNetCore.Swagger;
+using Koan.Core.Hosting.Bootstrap;
 
 namespace Koan.Web.Connector.Swagger.Initialization;
 
@@ -24,9 +25,9 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         services.TryAddEnumerable(ServiceDescriptor.Singleton<Microsoft.AspNetCore.Hosting.IStartupFilter, Hosting.KoanSwaggerStartupFilter>());
     }
 
-    public void Describe(Koan.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)
+    public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
-        report.AddModule(ModuleName, ModuleVersion);
+        module.Describe(ModuleVersion);
         // ADR-0040: read settings via helper and constants
         var enabled = cfg.Read(Constants.Configuration.Enabled, KoanEnv.IsProduction ? false : true);
         var routePrefix = cfg.Read($"{Constants.Configuration.Section}:{Constants.Configuration.Keys.RoutePrefix}", "swagger");
@@ -35,10 +36,11 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         // Magic flag can force-enable in production
         var magic = cfg.Read(Core.Infrastructure.Constants.Configuration.Koan.AllowMagicInProduction, false);
         if (magic) enabled = true;
-        report.AddSetting("Enabled", enabled.ToString());
-        report.AddSetting("RoutePrefix", routePrefix);
-        report.AddSetting("RequireAuthOutsideDevelopment", requireAuth.ToString());
-        report.AddSetting("IncludeXmlComments", xml.ToString());
+        module.AddSetting("Enabled", enabled.ToString());
+        module.AddSetting("RoutePrefix", routePrefix);
+        module.AddSetting("RequireAuthOutsideDevelopment", requireAuth.ToString());
+        module.AddSetting("IncludeXmlComments", xml.ToString());
     }
 }
+
 

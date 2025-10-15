@@ -42,13 +42,12 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar, IKoanAspireRegistrar
         services.AddSingleton<IDataAdapterFactory, PostgresAdapterFactory>();
     }
 
-    public void Describe(Koan.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)
+    public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
-        report.AddModule(ModuleName, ModuleVersion);
-
+        module.Describe(ModuleVersion);
         // Autonomous discovery adapter handles all connection string resolution
         // Boot report shows discovery results from PostgresDiscoveryAdapter
-        report.AddNote("PostgreSQL discovery handled by autonomous PostgresDiscoveryAdapter");
+        module.AddNote("PostgreSQL discovery handled by autonomous PostgresDiscoveryAdapter");
 
         // Configure default options for reporting (with provenance)
         var defaultOptions = new PostgresOptions();
@@ -83,7 +82,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar, IKoanAspireRegistrar
             : connection.Value;
         var connectionIsAuto = string.Equals(connectionValue, "auto", StringComparison.OrdinalIgnoreCase);
 
-        report.AddSetting(
+        module.AddSetting(
             "ConnectionString",
             connectionIsAuto ? "auto (resolved by discovery)" : connectionValue,
             isSecret: !connectionIsAuto,
@@ -96,7 +95,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar, IKoanAspireRegistrar
             },
             sourceKey: connection.ResolvedKey);
 
-        report.AddSetting(
+        module.AddSetting(
             "NamingStyle",
             defaultOptions.NamingStyle.ToString(),
             source: BootSettingSource.Auto,
@@ -106,7 +105,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar, IKoanAspireRegistrar
             },
             sourceKey: Infrastructure.Constants.Configuration.Keys.NamingStyle);
 
-        report.AddSetting(
+        module.AddSetting(
             "Separator",
             defaultOptions.Separator,
             source: BootSettingSource.Auto,
@@ -116,7 +115,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar, IKoanAspireRegistrar
             },
             sourceKey: Infrastructure.Constants.Configuration.Keys.Separator);
 
-        report.AddSetting(
+        module.AddSetting(
             "SearchPath",
             (searchPath.Value ?? "public").ToString(),
             source: searchPath.Source,
@@ -127,7 +126,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar, IKoanAspireRegistrar
             },
             sourceKey: searchPath.ResolvedKey);
 
-        report.AddSetting(
+        module.AddSetting(
             "EnsureCreatedSupported",
             true.ToString(),
             source: BootSettingSource.Auto,
@@ -137,7 +136,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar, IKoanAspireRegistrar
             },
             sourceKey: Infrastructure.Constants.Configuration.Keys.EnsureCreatedSupported);
 
-        report.AddSetting(
+        module.AddSetting(
             "DefaultPageSize",
             defaultPageSize.Value.ToString(),
             source: defaultPageSize.Source,
@@ -147,7 +146,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar, IKoanAspireRegistrar
             },
             sourceKey: defaultPageSize.ResolvedKey);
 
-        report.AddSetting(
+        module.AddSetting(
             "MaxPageSize",
             maxPageSize.Value.ToString(),
             source: maxPageSize.Source,
@@ -243,4 +242,5 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar, IKoanAspireRegistrar
         return (database, username, password, port);
     }
 }
+
 

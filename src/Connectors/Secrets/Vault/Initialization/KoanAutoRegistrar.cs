@@ -11,6 +11,7 @@ using Koan.Secrets.Connector.Vault.Internal;
 using Koan.Secrets.Connector.Vault;
 using Koan.Secrets.Connector.Vault.Health;
 using Koan.Secrets.Connector.Vault.Orchestration;
+using Koan.Core.Hosting.Bootstrap;
 
 namespace Koan.Secrets.Connector.Vault.Initialization;
 
@@ -71,17 +72,17 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         services.AddHealthChecks().AddTypeActivatedCheck<VaultHealthCheck>("vault", HealthStatus.Unhealthy);
     }
 
-    public void Describe(Koan.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)
+    public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
         var section = cfg.GetSection(VaultConstants.ConfigPath);
         var enabled = section.GetValue<bool>(nameof(VaultOptions.Enabled));
 
-        report.AddModule(ModuleName, ModuleVersion);
-        report.AddSetting("Enabled", enabled.ToString());
-        report.AddSetting("Mount", section.GetValue<string?>(nameof(VaultOptions.Mount)) ?? "secret");
-        report.AddSetting("KvV2", section.GetValue<bool?>(nameof(VaultOptions.UseKvV2))?.ToString() ?? "true");
-        report.AddSetting("OrchestrationMode", KoanEnv.OrchestrationMode.ToString());
-        report.AddSetting("Configuration", "Orchestration-aware service discovery enabled");
+        module.Describe(ModuleVersion);
+        module.AddSetting("Enabled", enabled.ToString());
+        module.AddSetting("Mount", section.GetValue<string?>(nameof(VaultOptions.Mount)) ?? "secret");
+        module.AddSetting("KvV2", section.GetValue<bool?>(nameof(VaultOptions.UseKvV2))?.ToString() ?? "true");
+        module.AddSetting("OrchestrationMode", KoanEnv.OrchestrationMode.ToString());
+        module.AddSetting("Configuration", "Orchestration-aware service discovery enabled");
 
         // Only perform discovery reporting if Vault is enabled
         if (enabled)
@@ -111,21 +112,21 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
                 var method = $"orchestration-{result.DiscoveryMethod}";
                 var endpoint = Koan.Core.Redaction.DeIdentify(result.ServiceUrl ?? string.Empty);
 
-                report.AddSetting("Discovery.Method", method);
-                report.AddSetting("Discovery.Endpoint", endpoint);
-                report.AddSetting("Discovery.Healthy", result.IsHealthy.ToString());
+                module.AddSetting("Discovery.Method", method);
+                module.AddSetting("Discovery.Endpoint", endpoint);
+                module.AddSetting("Discovery.Healthy", result.IsHealthy.ToString());
 
                 var status = result.IsHealthy ? "accessible" : "unreachable";
-                report.AddNote($"Vault endpoint {status}: {endpoint}");
+                module.AddNote($"Vault endpoint {status}: {endpoint}");
             }
             catch (Exception ex)
             {
                 var fallbackEndpoint = Koan.Core.Redaction.DeIdentify("http://localhost:8200");
-                report.AddSetting("Discovery.Method", "orchestration-fallback");
-                report.AddSetting("Discovery.Endpoint", fallbackEndpoint);
-                report.AddSetting("Discovery.Healthy", bool.FalseString);
-                report.AddNote($"Vault endpoint unreachable: {fallbackEndpoint}");
-                report.AddSetting("Discovery.Error", ex.Message);
+                module.AddSetting("Discovery.Method", "orchestration-fallback");
+                module.AddSetting("Discovery.Endpoint", fallbackEndpoint);
+                module.AddSetting("Discovery.Healthy", bool.FalseString);
+                module.AddNote($"Vault endpoint unreachable: {fallbackEndpoint}");
+                module.AddSetting("Discovery.Error", ex.Message);
             }
         }
     }
@@ -150,4 +151,5 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         return candidates.ToArray();
     }
 }
+
 

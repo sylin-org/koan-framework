@@ -10,6 +10,7 @@ using Koan.Core;
 using Koan.Web.Auth.Extensions;
 using Koan.Web.Extensions;
 using Koan.Web.Auth.Pillars;
+using Koan.Core.Hosting.Bootstrap;
 
 namespace Koan.Web.Auth.Initialization;
 
@@ -29,10 +30,9 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         services.AddKoanControllersFrom<Controllers.DiscoveryController>();
     }
 
-    public void Describe(Koan.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)
+    public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
-        report.AddModule(ModuleName, ModuleVersion);
-
+        module.Describe(ModuleVersion);
         cfg ??= new ConfigurationBuilder().Build();
 
         // Best-effort discovery summary without binding or DI: list provider display names and protocol
@@ -53,14 +53,14 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
                 ? Koan.Core.Hosting.Bootstrap.BootSettingSource.Auto
                 : Koan.Core.Hosting.Bootstrap.BootSettingSource.Auto;
 
-        report.AddSetting(
+        module.AddSetting(
             "Providers",
             effective.Count.ToString(),
             source: providerSource,
             consumers: new[] { "Koan.Web.Auth.ProviderRegistry" },
             sourceKey: providerSectionKey);
 
-        report.AddSetting(
+        module.AddSetting(
             "DetectedProviders",
             detected.Count == 0 ? "(none)" : string.Join(", ", detected),
             source: providerSource,
@@ -96,7 +96,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 
         if (Koan.Core.KoanEnv.IsProduction && !allowDynamic)
         {
-            report.AddSetting(
+            module.AddSetting(
                 "DynamicProvidersInProduction",
                 "disabled (set Koan:Web:Auth:AllowDynamicProvidersInProduction=true or Koan:AllowMagicInProduction=true)",
                 source: dynamicSource,
@@ -105,7 +105,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         }
         else
         {
-            report.AddSetting(
+            module.AddSetting(
                 "DynamicProvidersInProduction",
                 "enabled",
                 source: dynamicSource,
@@ -113,7 +113,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
                 sourceKey: dynamicSourceKey);
         }
 
-        report.AddTool(
+        module.AddTool(
             "Auth Provider Discovery",
             Infrastructure.AuthConstants.Routes.Discovery,
             "Lists configured authentication providers",
@@ -300,3 +300,4 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         return string.Join(' ', parts);
     }
 }
+

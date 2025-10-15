@@ -1,4 +1,4 @@
-﻿using Koan.Cache.Abstractions;
+using Koan.Cache.Abstractions;
 using Koan.Cache.Extensions;
 using Koan.Core;
 using Koan.Core.Modules;
@@ -9,6 +9,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
+using Koan.Core.Hosting.Bootstrap;
 
 namespace Koan.Cache.Adapter.Redis.Initialization;
 
@@ -32,19 +33,19 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         });
     }
 
-    public void Describe(Koan.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)
+    public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
-        report.AddModule(ModuleName, ModuleVersion);
-
+        module.Describe(ModuleVersion);
         var configuration = Configuration.Read(cfg, CacheConstants.Configuration.Redis.Configuration, "auto");
         var channel = Configuration.Read(cfg, CacheConstants.Configuration.Redis.ChannelName, "koan-cache");
         var prefix = Configuration.Read(cfg, CacheConstants.Configuration.Redis.KeyPrefix, "cache:");
 
-    report.AddSetting("CacheStore.Selected", "redis");
-    report.AddSetting("CacheStore.Candidates", "memory, redis, custom");
-    report.AddSetting("CacheStore.Rationale", "Reference = redis adapter package");
-        report.AddSetting("RedisConfiguration", configuration ?? "auto");
-        report.AddSetting("ChannelName", channel ?? "koan-cache");
-        report.AddSetting("KeyPrefix", prefix ?? "cache:");
+    module.AddSetting("CacheStore.Selected", "redis");
+    module.AddSetting("CacheStore.Candidates", "memory, redis, custom");
+    module.AddSetting("CacheStore.Rationale", "Reference = redis adapter package");
+        module.AddSetting("RedisConfiguration", configuration ?? "auto");
+        module.AddSetting("ChannelName", channel ?? "koan-cache");
+        module.AddSetting("KeyPrefix", prefix ?? "cache:");
     }
 }
+

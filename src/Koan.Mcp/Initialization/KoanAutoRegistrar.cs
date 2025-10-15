@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Koan.Core.Hosting.Bootstrap;
 using Koan.Core;
 using Koan.Mcp.CodeMode.Execution;
@@ -25,10 +25,11 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         // We could force eager generation of TypeScript SDK by resolving provider in a hosted service if desired.
     }
 
-    public void Describe(BootReport report, IConfiguration cfg, IHostEnvironment env)
+    public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
-        report.AddModule(ModuleName, ModuleVersion);
+        module.Describe(ModuleVersion);
         // We cannot reliably resolve scoped services here without a provided IServiceProvider. Keep note minimal.
-        report.AddNote("CodeMode: diagnostics_unavailable reason=NoServiceProvider");
+        module.AddNote("CodeMode: diagnostics_unavailable reason=NoServiceProvider");
     }
 }
+

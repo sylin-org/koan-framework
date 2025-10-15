@@ -6,6 +6,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Koan.Web.Extensions;
+using Koan.Core.Hosting.Bootstrap;
 
 namespace Koan.Web.Backup.Initialization;
 
@@ -35,80 +36,79 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         Log.BootDebug(LogActions.Init, "services-registered", ("module", ModuleName));
     }
 
-    public void Describe(Koan.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)
+    public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
-        report.AddModule(ModuleName, ModuleVersion);
-
+        module.Describe(ModuleVersion);
         // Add web backup capabilities
-        report.AddSetting(
+        module.AddSetting(
             "Capability:BackupWebAPI",
             "true",
             source: Koan.Core.Hosting.Bootstrap.BootSettingSource.Auto,
             consumers: new[] { "Koan.Web.Backup.BackupController" });
-        report.AddSetting(
+        module.AddSetting(
             "Capability:RestoreWebAPI",
             "true",
             source: Koan.Core.Hosting.Bootstrap.BootSettingSource.Auto,
             consumers: new[] { "Koan.Web.Backup.RestoreController" });
-        report.AddSetting(
+        module.AddSetting(
             "Capability:PollingProgressTracking",
             "true",
             source: Koan.Core.Hosting.Bootstrap.BootSettingSource.Auto,
             consumers: new[] { "Koan.Web.Backup.Operations" });
-        report.AddSetting(
+        module.AddSetting(
             "Capability:OperationManagement",
             "true",
             source: Koan.Core.Hosting.Bootstrap.BootSettingSource.Auto,
             consumers: new[] { "Koan.Web.Backup.Operations" });
-        report.AddSetting(
+        module.AddSetting(
             "Capability:BackupCatalogAPI",
             "true",
             source: Koan.Core.Hosting.Bootstrap.BootSettingSource.Auto,
             consumers: new[] { "Koan.Web.Backup.Catalog" });
-        report.AddSetting(
+        module.AddSetting(
             "Capability:BackupVerificationAPI",
             "true",
             source: Koan.Core.Hosting.Bootstrap.BootSettingSource.Auto,
             consumers: new[] { "Koan.Web.Backup.Verification" });
-        report.AddSetting(
+        module.AddSetting(
             "Capability:SystemStatusAPI",
             "true",
             source: Koan.Core.Hosting.Bootstrap.BootSettingSource.Auto,
             consumers: new[] { "Koan.Web.Backup.Status" });
-        report.AddSetting(
+        module.AddSetting(
             "Capability:CORSSupport",
             "true",
             source: Koan.Core.Hosting.Bootstrap.BootSettingSource.Auto,
             consumers: new[] { "Koan.Web.Backup.Middleware" });
-        report.AddSetting(
+        module.AddSetting(
             "Capability:APIVersioning",
             "true",
             source: Koan.Core.Hosting.Bootstrap.BootSettingSource.Auto,
             consumers: new[] { "Koan.Web.Backup.ApiSurface" });
-        report.AddSetting(
+        module.AddSetting(
             "Capability:BackgroundCleanup",
             "true",
             source: Koan.Core.Hosting.Bootstrap.BootSettingSource.Auto,
             consumers: new[] { "Koan.Web.Backup.BackgroundServices" });
 
         // Add architecture info
-        report.AddSetting(
+        module.AddSetting(
             "ProgressTracking",
             "Polling-based (REST endpoints)",
             source: Koan.Core.Hosting.Bootstrap.BootSettingSource.Auto,
             consumers: new[] { "Koan.Web.Backup.Progress" });
-        report.AddSetting(
+        module.AddSetting(
             "SignalRSupport",
             "false",
             source: Koan.Core.Hosting.Bootstrap.BootSettingSource.Auto,
             consumers: new[] { "Koan.Web.Backup.Progress" });
-        report.AddSetting(
+        module.AddSetting(
             "PollingInterval",
             "Client-controlled",
             source: Koan.Core.Hosting.Bootstrap.BootSettingSource.Auto,
             consumers: new[] { "Koan.Web.Backup.Progress" });
 
-        report.AddTool(
+        module.AddTool(
             "Backup Operations API",
             "/api/backup",
             "Manage backup and restore operations",

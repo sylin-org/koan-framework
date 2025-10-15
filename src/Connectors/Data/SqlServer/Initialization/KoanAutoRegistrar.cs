@@ -33,13 +33,12 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         services.AddSingleton<IDataAdapterFactory, SqlServerAdapterFactory>();
     }
 
-    public void Describe(Koan.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)
+    public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
-        report.AddModule(ModuleName, ModuleVersion);
-
+        module.Describe(ModuleVersion);
         // Autonomous discovery adapter handles all connection string resolution
         // Boot report shows discovery results from SqlServerDiscoveryAdapter
-        report.AddNote("SQL Server discovery handled by autonomous SqlServerDiscoveryAdapter");
+        module.AddNote("SQL Server discovery handled by autonomous SqlServerDiscoveryAdapter");
 
         // Configure default options for reporting with provenance metadata
         var defaultOptions = new SqlServerOptions();
@@ -69,7 +68,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             : connection.Value;
         var connectionIsAuto = string.Equals(connectionValue, "auto", StringComparison.OrdinalIgnoreCase);
 
-        report.AddSetting(
+        module.AddSetting(
             "ConnectionString",
             connectionIsAuto ? "auto (resolved by discovery)" : connectionValue,
             isSecret: !connectionIsAuto,
@@ -81,7 +80,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             },
             sourceKey: connection.ResolvedKey);
 
-        report.AddSetting(
+        module.AddSetting(
             "NamingStyle",
             defaultOptions.NamingStyle.ToString(),
             source: BootSettingSource.Auto,
@@ -91,7 +90,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             },
             sourceKey: Infrastructure.Constants.Configuration.Keys.NamingStyle);
 
-        report.AddSetting(
+        module.AddSetting(
             "Separator",
             defaultOptions.Separator,
             source: BootSettingSource.Auto,
@@ -101,7 +100,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             },
             sourceKey: Infrastructure.Constants.Configuration.Keys.Separator);
 
-        report.AddSetting(
+        module.AddSetting(
             "EnsureCreatedSupported",
             true.ToString(),
             source: BootSettingSource.Auto,
@@ -111,7 +110,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             },
             sourceKey: Infrastructure.Constants.Configuration.Keys.EnsureCreatedSupported);
 
-        report.AddSetting(
+        module.AddSetting(
             "DefaultPageSize",
             defaultPageSize.Value.ToString(),
             source: defaultPageSize.Source,
@@ -121,7 +120,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             },
             sourceKey: defaultPageSize.ResolvedKey);
 
-        report.AddSetting(
+        module.AddSetting(
             "MaxPageSize",
             maxPageSize.Value.ToString(),
             source: maxPageSize.Source,
@@ -132,3 +131,4 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             sourceKey: maxPageSize.ResolvedKey);
     }
 }
+

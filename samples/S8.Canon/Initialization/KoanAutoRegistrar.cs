@@ -1,6 +1,7 @@
 using Koan.Canon.Domain.Runtime;
 using Koan.Core;
 using Koan.Core.Hosting.Bootstrap;
+using Koan.Core.Provenance;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -25,10 +26,10 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         services.TryAddEnumerable(ServiceDescriptor.Singleton<ICanonRuntimeConfigurator, CustomerPipelineRegistrar>());
     }
 
-    public void Describe(BootReport report, IConfiguration cfg, IHostEnvironment env)
+    public void Describe(ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
-        report.AddModule(ModuleName, ModuleVersion);
-        report.AddSetting("pipeline", "Customer (Validation → Enrichment)");
-        report.AddSetting("entity", "Customer (CanonEntity)");
+        module.Describe(ModuleVersion, "Customer pipeline sample");
+        module.AddSetting("pipeline", "Customer (Validation → Enrichment)");
+        module.AddSetting("entity", "Customer (CanonEntity)");
     }
 }

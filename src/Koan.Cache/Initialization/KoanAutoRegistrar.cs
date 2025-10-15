@@ -1,8 +1,9 @@
-﻿using System;
+using System;
 using Koan.Cache.Abstractions;
 using Koan.Cache.Extensions;
 using Koan.Cache.Options;
 using Koan.Core;
+using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Modules;
 using Koan.Cache.Pillars;
 using Microsoft.Extensions.Configuration;
@@ -23,43 +24,42 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         services.AddKoanCache();
     }
 
-    public void Describe(Koan.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)
+    public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
-        report.AddModule(ModuleName, ModuleVersion);
-
+        module.Describe(ModuleVersion);
         var provider = Koan.Core.Configuration.ReadWithSource(cfg, CacheConstants.Configuration.ProviderKey, "memory");
         var diagnosticsEnabled = Koan.Core.Configuration.ReadWithSource(cfg, "Cache:EnableDiagnosticsEndpoint", true);
         var defaultRegion = Koan.Core.Configuration.ReadWithSource(cfg, "Cache:DefaultRegion", CacheConstants.Configuration.DefaultRegion);
         var singleflightTimeout = Koan.Core.Configuration.ReadWithSource(cfg, "Cache:DefaultSingleflightTimeout", TimeSpan.FromSeconds(5));
 
-        report.AddSetting(
+        module.AddSetting(
             "Provider",
             provider.Value ?? "memory",
             source: provider.Source,
             consumers: new[] { "Koan.Cache.ProviderSelector" });
 
-        report.AddSetting(
+        module.AddSetting(
             "DefaultRegion",
             defaultRegion.Value ?? CacheConstants.Configuration.DefaultRegion,
             source: defaultRegion.Source,
             consumers: new[] { "Koan.Cache.RegionResolver" });
 
-        report.AddSetting(
+        module.AddSetting(
             "DiagnosticsEnabled",
             diagnosticsEnabled.Value.ToString(),
             source: diagnosticsEnabled.Source,
             consumers: new[] { "Koan.Cache.DiagnosticsEndpoint" });
 
-        report.AddSetting(
+        module.AddSetting(
             "DefaultSingleflightTimeout",
             singleflightTimeout.Value.ToString(),
             source: singleflightTimeout.Source,
             consumers: new[] { "Koan.Cache.Singleflight" });
 
-        TryDescribePolicies(report);
+        TryDescribePolicies(module);
     }
 
-    private static void TryDescribePolicies(Koan.Core.Hosting.Bootstrap.BootReport report)
+    private static void TryDescribePolicies(Koan.Core.Provenance.ProvenanceModuleWriter module)
     {
         try
         {
@@ -75,7 +75,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
                 return;
             }
 
-            report.AddSetting(
+            module.AddSetting(
                 "PolicyAssemblies",
                 value.PolicyAssemblies.Count == 0
                     ? "none"
@@ -83,7 +83,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
                 source: Koan.Core.Hosting.Bootstrap.BootSettingSource.Custom,
                 consumers: new[] { "Koan.Cache.PolicyRegistry" });
 
-            report.AddSetting(
+            module.AddSetting(
                 "PublishInvalidationByDefault",
                 value.PublishInvalidationByDefault.ToString(),
                 source: Koan.Core.Hosting.Bootstrap.BootSettingSource.Custom,
@@ -95,3 +95,4 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         }
     }
 }
+

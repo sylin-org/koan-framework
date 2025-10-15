@@ -7,6 +7,7 @@ using Koan.Core.Logging;
 using Koan.Data.Backup.Abstractions;
 using Koan.Data.Backup.Extensions;
 using Koan.Data.Backup.Models;
+using Koan.Core.Hosting.Bootstrap;
 
 namespace Koan.Data.Backup.Initialization;
 
@@ -28,36 +29,35 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         Log.BootDebug(LogActions.Init, "services-registered", ("module", ModuleName));
     }
 
-    public void Describe(Koan.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)
+    public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
-        report.AddModule(ModuleName, ModuleVersion);
-
+        module.Describe(ModuleVersion);
         // Add backup-specific configuration information
         var options = new BackupRestoreOptions();
         cfg.GetSection("Koan:Backup").Bind(options);
 
-        report.AddSetting("DefaultStorageProfile", options.DefaultStorageProfile ?? "(default)");
-        report.AddSetting("DefaultBatchSize", options.DefaultBatchSize.ToString());
-        report.AddSetting("WarmupEntitiesOnStartup", options.WarmupEntitiesOnStartup.ToString());
-        report.AddSetting("EnableBackgroundMaintenance", options.EnableBackgroundMaintenance.ToString());
+        module.AddSetting("DefaultStorageProfile", options.DefaultStorageProfile ?? "(default)");
+        module.AddSetting("DefaultBatchSize", options.DefaultBatchSize.ToString());
+        module.AddSetting("WarmupEntitiesOnStartup", options.WarmupEntitiesOnStartup.ToString());
+        module.AddSetting("EnableBackgroundMaintenance", options.EnableBackgroundMaintenance.ToString());
 
         if (options.EnableBackgroundMaintenance)
         {
-            report.AddSetting("MaintenanceInterval", options.MaintenanceInterval.ToString());
+            module.AddSetting("MaintenanceInterval", options.MaintenanceInterval.ToString());
         }
 
         // Backup capabilities
-        report.AddSetting("Capability:AutoEntityDiscovery", "true");
-        report.AddSetting("Capability:MultiProviderSupport", "true");
-        report.AddSetting("Capability:StreamingBackup", "true");
-        report.AddSetting("Capability:ZipCompression", "true");
-        report.AddSetting("Capability:JsonLinesFormat", "true");
-        report.AddSetting("Capability:IntegrityValidation", "true");
-        report.AddSetting("Capability:SchemaSnapshots", "true");
-        report.AddSetting("Capability:BackupDiscovery", "true");
-        report.AddSetting("Capability:ProgressTracking", "true");
-        report.AddSetting("Capability:AttributeBasedOptIn", "true");
-        report.AddSetting("Capability:PolicyManagement", "true");
+        module.AddSetting("Capability:AutoEntityDiscovery", "true");
+        module.AddSetting("Capability:MultiProviderSupport", "true");
+        module.AddSetting("Capability:StreamingBackup", "true");
+        module.AddSetting("Capability:ZipCompression", "true");
+        module.AddSetting("Capability:JsonLinesFormat", "true");
+        module.AddSetting("Capability:IntegrityValidation", "true");
+        module.AddSetting("Capability:SchemaSnapshots", "true");
+        module.AddSetting("Capability:BackupDiscovery", "true");
+        module.AddSetting("Capability:ProgressTracking", "true");
+        module.AddSetting("Capability:AttributeBasedOptIn", "true");
+        module.AddSetting("Capability:PolicyManagement", "true");
     }
 
     /// <summary>

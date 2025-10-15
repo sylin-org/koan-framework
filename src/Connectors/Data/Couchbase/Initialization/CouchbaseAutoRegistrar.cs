@@ -38,13 +38,12 @@ public sealed class CouchbaseAutoRegistrar : IKoanAutoRegistrar
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IServiceDiscoveryAdapter, CouchbaseDiscoveryAdapter>());
     }
 
-    public void Describe(BootReport report, IConfiguration cfg, IHostEnvironment env)
+    public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
-        report.AddModule(ModuleName, ModuleVersion);
-
+        module.Describe(ModuleVersion);
         // Autonomous discovery adapter handles all connection string resolution
         // Boot report shows discovery results from CouchbaseDiscoveryAdapter
-        report.AddNote("Couchbase discovery handled by autonomous CouchbaseDiscoveryAdapter");
+        module.AddNote("Couchbase discovery handled by autonomous CouchbaseDiscoveryAdapter");
 
         // Use centralized boot reporting with adapter-specific callback
         var options = AdapterBootReporting.ConfigureForBootReportWithConfigurator<CouchbaseOptions, CouchbaseOptionsConfigurator>(
@@ -52,14 +51,15 @@ public sealed class CouchbaseAutoRegistrar : IKoanAutoRegistrar
             (config, readiness) => new CouchbaseOptionsConfigurator(config),
             () => new CouchbaseOptions());
 
-        report.ReportAdapterConfiguration(ModuleName, ModuleVersion, options,
-            (r, o) => {
+        module.ReportAdapterConfiguration(ModuleName, ModuleVersion, options,
+            (m, o) => {
                 // Couchbase-specific settings
-                r.ReportConnectionString(ModuleName, "auto (resolved by discovery)");
-                r.ReportStorageTargets(ModuleName, o.Bucket, o.Collection, o.Scope);
-                r.ReportPerformanceSettings(ModuleName, queryTimeout: o.QueryTimeout);
-                r.AddSetting($"{ModuleName}:DurabilityLevel", o.DurabilityLevel ?? "<default>");
-                r.AddSetting(Constants.Bootstrap.EnsureCreatedSupported, true.ToString());
+                m.ReportConnectionString(ModuleName, "auto (resolved by discovery)");
+                m.ReportStorageTargets(ModuleName, o.Bucket, o.Collection, o.Scope);
+                m.ReportPerformanceSettings(ModuleName, queryTimeout: o.QueryTimeout);
+                m.AddSetting($"{ModuleName}:DurabilityLevel", o.DurabilityLevel ?? "<default>");
+                m.AddSetting(Constants.Bootstrap.EnsureCreatedSupported, true.ToString());
             });
     }
 }
+

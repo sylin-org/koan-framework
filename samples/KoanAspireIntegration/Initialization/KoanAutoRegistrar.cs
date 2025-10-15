@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Koan.Core;
 using Koan.Core.Hosting.Bootstrap;
+using Koan.Core.Provenance;
 using Koan.Orchestration.Aspire;
 using Aspire.Hosting;
 
@@ -27,18 +28,18 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar, IKoanAspireRegistrar
     }
 
     /// <summary>
-    /// Describe the application module in boot reports
+    /// Describe the application module in provenance
     /// </summary>
-    public void Describe(BootReport report, IConfiguration cfg, IHostEnvironment env)
+    public void Describe(ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
-        report.AddModule(ModuleName, ModuleVersion);
-        report.AddSetting("ApplicationName", "Koan-Aspire Integration Sample");
-        report.AddSetting("Environment", env.EnvironmentName);
-        report.AddSetting("AspireIntegrationEnabled", "true");
+        module.Describe(ModuleVersion, "Koan-Aspire Integration Sample");
+        module.AddSetting("ApplicationName", "Koan-Aspire Integration Sample");
+        module.AddSetting("Environment", env.EnvironmentName);
+        module.AddSetting("AspireIntegrationEnabled", "true");
 
         // Report on referenced infrastructure modules
-        report.AddNote("This sample application demonstrates Koan-Aspire integration");
-        report.AddNote("Dependencies: Postgres (data), Redis (cache), Koan.Web (framework)");
+        module.AddNote("This sample application demonstrates Koan-Aspire integration");
+        module.AddNote("Dependencies: Postgres (data), Redis (cache), Koan.Web (framework)");
     }
 
     /// <summary>

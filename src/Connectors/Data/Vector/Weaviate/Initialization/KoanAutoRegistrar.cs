@@ -41,13 +41,12 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         services.AddHttpClient("weaviate");
     }
 
-    public void Describe(Koan.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)
+    public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
-        report.AddModule(ModuleName, ModuleVersion);
-
+        module.Describe(ModuleVersion);
         // Autonomous discovery adapter handles all connection string resolution
         // Boot report shows discovery results from WeaviateDiscoveryAdapter
-        report.AddNote("Weaviate discovery handled by autonomous WeaviateDiscoveryAdapter");
+        module.AddNote("Weaviate discovery handled by autonomous WeaviateDiscoveryAdapter");
 
         // Configure default options for reporting with provenance metadata
         var defaultOptions = new WeaviateOptions();
@@ -94,7 +93,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             : connection.Value;
         var connectionIsAuto = string.Equals(connectionValue, "auto", StringComparison.OrdinalIgnoreCase);
 
-        report.AddSetting(
+        module.AddSetting(
             "ConnectionString",
             connectionIsAuto ? "auto (resolved by discovery)" : connectionValue,
             isSecret: !connectionIsAuto,
@@ -105,7 +104,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
                 "Koan.Data.Vector.Connector.Weaviate.WeaviateVectorAdapterFactory"
             });
 
-        report.AddSetting(
+        module.AddSetting(
             "Endpoint",
             endpoint.Value,
             source: endpoint.Source,
@@ -115,7 +114,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
                 "Koan.Data.Vector.Connector.Weaviate.WeaviateVectorAdapterFactory"
             });
 
-        report.AddSetting(
+        module.AddSetting(
             "DefaultTopK",
             defaultTopK.Value.ToString(),
             source: defaultTopK.Source,
@@ -124,7 +123,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
                 "Koan.Data.Vector.Connector.Weaviate.WeaviateVectorAdapterFactory"
             });
 
-        report.AddSetting(
+        module.AddSetting(
             "MaxTopK",
             maxTopK.Value.ToString(),
             source: maxTopK.Source,
@@ -133,7 +132,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
                 "Koan.Data.Vector.Connector.Weaviate.WeaviateVectorAdapterFactory"
             });
 
-        report.AddSetting(
+        module.AddSetting(
             "Dimension",
             dimension.Value.ToString(),
             source: dimension.Source,
@@ -142,7 +141,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
                 "Koan.Data.Vector.Connector.Weaviate.WeaviateVectorAdapterFactory"
             });
 
-        report.AddSetting(
+        module.AddSetting(
             "Metric",
             metric.Value,
             source: metric.Source,
@@ -151,7 +150,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
                 "Koan.Data.Vector.Connector.Weaviate.WeaviateVectorAdapterFactory"
             });
 
-        report.AddSetting(
+        module.AddSetting(
             "TimeoutSeconds",
             timeoutSeconds.Value.ToString(),
             source: timeoutSeconds.Source,
@@ -162,4 +161,5 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
     }
 
 }
+
 

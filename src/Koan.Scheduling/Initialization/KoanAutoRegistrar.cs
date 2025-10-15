@@ -4,6 +4,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Koan.Core;
 using Koan.Core.Modules;
+using Koan.Core.Hosting.Bootstrap;
 
 namespace Koan.Scheduling.Initialization;
 
@@ -36,12 +37,13 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         services.AddHostedService<SchedulingOrchestrator>();
     }
 
-    public void Describe(Koan.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)
+    public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
-        report.AddModule(ModuleName, ModuleVersion);
+        module.Describe(ModuleVersion);
         var enabled = cfg["Koan:Scheduling:Enabled"]; // may be null
-        report.AddSetting("enabled", enabled ?? (env.IsDevelopment() ? "(default true)" : "(default false)"));
-        report.AddSetting("readinessGate", cfg["Koan:Scheduling:ReadinessGate"] ?? "true");
+        module.AddSetting("enabled", enabled ?? (env.IsDevelopment() ? "(default true)" : "(default false)"));
+        module.AddSetting("readinessGate", cfg["Koan:Scheduling:ReadinessGate"] ?? "true");
         // Discovery count omitted; tasks self-register using Koan.Core initialization.
     }
 }
+

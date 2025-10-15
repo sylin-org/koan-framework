@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Koan.Core;
 using Koan.Messaging.Core.Pillars;
+using Koan.Core.Hosting.Bootstrap;
 
 namespace Koan.Messaging.Core.Initialization;
 
@@ -21,15 +22,15 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         services.AddKoanMessaging();
     }
 
-    public void Describe(Koan.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)
+    public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
-        report.AddModule(ModuleName, ModuleVersion);
-        report.AddSetting(
+        module.Describe(ModuleVersion);
+        module.AddSetting(
             "MessagingCore.Enabled",
             "true",
             source: Koan.Core.Hosting.Bootstrap.BootSettingSource.Auto,
             consumers: new[] { "Koan.Messaging.Core.Runtime" });
-        report.AddSetting(
+        module.AddSetting(
             "InMemoryProvider.Available",
             "true",
             source: Koan.Core.Hosting.Bootstrap.BootSettingSource.Auto,

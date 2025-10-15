@@ -1,10 +1,11 @@
-﻿using Koan.Cache.Abstractions;
+using Koan.Cache.Abstractions;
 using Koan.Cache.Extensions;
 using Koan.Core;
 using Koan.Core.Modules;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Koan.Core.Hosting.Bootstrap;
 
 namespace Koan.Cache.Adapter.Memory.Initialization;
 
@@ -18,16 +19,17 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         services.AddKoanCacheAdapter("memory");
     }
 
-    public void Describe(Koan.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)
+    public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
-        report.AddModule(ModuleName, ModuleVersion);
+        module.Describe(ModuleVersion);
         var capacity = Configuration.Read(cfg, CacheConstants.Configuration.Memory.TagIndexCapacity, 2048);
         var stale = Configuration.Read(cfg, CacheConstants.Configuration.Memory.EnableStaleWhileRevalidate, true);
 
-    report.AddSetting("CacheStore.Selected", "memory");
-    report.AddSetting("CacheStore.Candidates", "memory, redis, custom");
-    report.AddSetting("CacheStore.Rationale", "Reference = memory adapter package");
-        report.AddSetting("TagIndexCapacity", capacity.ToString());
-        report.AddSetting("EnableStaleWhileRevalidate", stale.ToString());
+    module.AddSetting("CacheStore.Selected", "memory");
+    module.AddSetting("CacheStore.Candidates", "memory, redis, custom");
+    module.AddSetting("CacheStore.Rationale", "Reference = memory adapter package");
+        module.AddSetting("TagIndexCapacity", capacity.ToString());
+        module.AddSetting("EnableStaleWhileRevalidate", stale.ToString());
     }
 }
+

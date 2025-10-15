@@ -1,3 +1,4 @@
+using Koan.Core.Provenance;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 
@@ -7,5 +8,5 @@ public interface IKoanAutoRegistrar : IKoanInitializer
 {
     string ModuleName { get; }
     string? ModuleVersion { get; }
-    void Describe(Koan.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env);
+    void Describe(ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env);
 }

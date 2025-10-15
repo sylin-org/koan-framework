@@ -4,6 +4,7 @@ using Microsoft.Extensions.Hosting;
 using Koan.Core;
 using Koan.Core.Extensions;
 using Koan.Data.Core.Pillars;
+using Koan.Core.Hosting.Bootstrap;
 
 namespace Koan.Data.Core.Initialization;
 
@@ -18,15 +19,15 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         // Registration handled by KoanDataCoreInitializer; explicit AddKoanDataCore() keeps compatibility for manual layering.
     }
 
-    public void Describe(Koan.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)
+    public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
-        report.AddModule(ModuleName, ModuleVersion);
+        module.Describe(ModuleVersion);
         var ensureSetting = Koan.Core.Configuration.ReadWithSource(
             cfg,
             Infrastructure.Constants.Configuration.Runtime.EnsureSchemaOnStart,
             true);
 
-        report.AddSetting(
+        module.AddSetting(
             "EnsureSchemaOnStart",
             ensureSetting.Value.ToString(),
             source: ensureSetting.Source,
@@ -34,3 +35,4 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             sourceKey: ensureSetting.ResolvedKey);
     }
 }
+

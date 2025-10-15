@@ -23,10 +23,9 @@ public sealed class KoanAdminAutoRegistrar : IKoanAutoRegistrar
         services.AddKoanAdminCore();
     }
 
-    public void Describe(BootReport report, IConfiguration cfg, IHostEnvironment env)
+    public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
-        report.AddModule(ModuleName, ModuleVersion);
-
+        module.Describe(ModuleVersion);
         var configuration = cfg ?? new ConfigurationBuilder().Build();
         var defaults = new KoanAdminOptions();
         var authorizationDefaults = defaults.Authorization;
@@ -63,197 +62,197 @@ public sealed class KoanAdminAutoRegistrar : IKoanAutoRegistrar
         var includeReadmeOption = Configuration.ReadWithSource(configuration, $"{ConfigurationConstants.Admin.Generate.Section}:{ConfigurationConstants.Admin.Generate.Keys.IncludeReadme}", generateDefaults.IncludeReadme);
         var composeBasePortOption = Configuration.ReadWithSource(configuration, $"{ConfigurationConstants.Admin.Generate.Section}:{ConfigurationConstants.Admin.Generate.Keys.ComposeBasePort}", generateDefaults.ComposeBasePort);
 
-        report.AddSetting(
+        module.AddSetting(
             "enabled",
             BoolString(enabledOption.Value),
             source: enabledOption.Source,
             consumers: new[] { "Koan.Admin.FeatureManager" },
             sourceKey: enabledOption.ResolvedKey);
 
-        report.AddSetting(
+        module.AddSetting(
             "allow.production",
             BoolString(allowProdOption.Value),
             source: allowProdOption.Source,
             consumers: new[] { "Koan.Admin.FeatureManager" },
             sourceKey: allowProdOption.ResolvedKey);
 
-        report.AddSetting(
+        module.AddSetting(
             "allow.dotPrefix.production",
             BoolString(allowDotOption.Value),
             source: allowDotOption.Source,
             consumers: new[] { "Koan.Admin.RouteProvider" },
             sourceKey: allowDotOption.ResolvedKey);
 
-        report.AddSetting(
+        module.AddSetting(
             "web.enabled",
             BoolString(webOption.Value),
             source: webOption.Source,
             consumers: new[] { "Koan.Admin.FeatureManager", "Koan.Web.Admin" },
             sourceKey: webOption.ResolvedKey);
 
-        report.AddSetting(
+        module.AddSetting(
             "console.enabled",
             BoolString(consoleOption.Value),
             source: consoleOption.Source,
             consumers: new[] { "Koan.Admin.FeatureManager" },
             sourceKey: consoleOption.ResolvedKey);
 
-        report.AddSetting(
+        module.AddSetting(
             "launchkit.enabled",
             BoolString(launchKitOption.Value),
             source: launchKitOption.Source,
             consumers: new[] { "Koan.Admin.LaunchKitService" },
             sourceKey: launchKitOption.ResolvedKey);
 
-        report.AddSetting(
+        module.AddSetting(
             "manifest.expose",
             BoolString(manifestOption.Value),
             source: manifestOption.Source,
             consumers: new[] { "Koan.Admin.ManifestService" },
             sourceKey: manifestOption.ResolvedKey);
 
-        report.AddSetting(
+        module.AddSetting(
             "destructive.ops",
             BoolString(destructiveOption.Value),
             source: destructiveOption.Source,
             consumers: new[] { "Koan.Admin.FeatureManager" },
             sourceKey: destructiveOption.ResolvedKey);
 
-        report.AddSetting(
+        module.AddSetting(
             "prefix",
             normalizedPrefix,
             source: prefixOption.Source,
             consumers: new[] { "Koan.Admin.RouteProvider", "Koan.Web.Admin" },
             sourceKey: prefixOption.ResolvedKey);
 
-        report.AddTool(
+        module.AddTool(
             "Admin UI",
             routes.RootPath,
             "Koan admin dashboard entry point",
             capability: "admin.web.ui");
 
-        report.AddTool(
+        module.AddTool(
             "Admin API",
             routes.ApiPath,
             "Koan admin API root",
             capability: "admin.web.api");
 
-        report.AddTool(
+        module.AddTool(
             "LaunchKit Export",
             routes.LaunchKitPath,
             "Download LaunchKit bundles",
             capability: "admin.launchkit");
 
-        report.AddTool(
+        module.AddTool(
             "Manifest",
             routes.ManifestPath,
             "Koan admin manifest endpoint",
             capability: "admin.manifest");
 
-        report.AddTool(
+        module.AddTool(
             "Admin Health",
             routes.HealthPath,
             "Admin health probe",
             capability: "admin.health");
 
-        report.AddTool(
+        module.AddTool(
             "Log Stream",
             routes.LogStreamPath,
             "Admin log streaming endpoint",
             capability: "admin.logs");
 
-        report.AddSetting(
+        module.AddSetting(
             "authorization.policy",
             authorizationPolicyOption.Value ?? string.Empty,
             source: authorizationPolicyOption.Source,
             consumers: new[] { "Koan.Web.Admin.Authorization" },
             sourceKey: authorizationPolicyOption.ResolvedKey);
 
-        report.AddSetting(
+        module.AddSetting(
             "authorization.autoCreateDevelopmentPolicy",
             BoolString(authorizationAutoCreateOption.Value),
             source: authorizationAutoCreateOption.Source,
             consumers: new[] { "Koan.Web.Admin.Authorization" },
             sourceKey: authorizationAutoCreateOption.ResolvedKey);
 
-        report.AddSetting(
+        module.AddSetting(
             "authorization.allowedNetworks",
             allowedNetworks.Display,
             source: allowedNetworks.Source,
             consumers: new[] { "Koan.Web.Admin.Authorization" },
             sourceKey: allowedNetworks.SourceKey);
 
-        report.AddSetting(
+        module.AddSetting(
             "logging.enableLogStream",
             BoolString(enableLogStreamOption.Value),
             source: enableLogStreamOption.Source,
             consumers: new[] { "Koan.Admin.Logging" },
             sourceKey: enableLogStreamOption.ResolvedKey);
 
-        report.AddSetting(
+        module.AddSetting(
             "logging.allowTranscriptDownload",
             BoolString(allowTranscriptOption.Value),
             source: allowTranscriptOption.Source,
             consumers: new[] { "Koan.Admin.Logging" },
             sourceKey: allowTranscriptOption.ResolvedKey);
 
-        report.AddSetting(
+        module.AddSetting(
             "logging.allowedCategories",
             allowedCategories.Display,
             source: allowedCategories.Source,
             consumers: new[] { "Koan.Admin.Logging" },
             sourceKey: allowedCategories.SourceKey);
 
-        report.AddSetting(
+        module.AddSetting(
             "generate.composeProfiles",
             composeProfiles.Display,
             source: composeProfiles.Source,
             consumers: new[] { "Koan.Admin.LaunchKitService" },
             sourceKey: composeProfiles.SourceKey);
 
-        report.AddSetting(
+        module.AddSetting(
             "generate.openApiClients",
             openApiClients.Display,
             source: openApiClients.Source,
             consumers: new[] { "Koan.Admin.LaunchKitService" },
             sourceKey: openApiClients.SourceKey);
 
-        report.AddSetting(
+        module.AddSetting(
             "generate.includeAppSettings",
             BoolString(includeAppSettingsOption.Value),
             source: includeAppSettingsOption.Source,
             consumers: new[] { "Koan.Admin.LaunchKitService" },
             sourceKey: includeAppSettingsOption.ResolvedKey);
 
-        report.AddSetting(
+        module.AddSetting(
             "generate.includeCompose",
             BoolString(includeComposeOption.Value),
             source: includeComposeOption.Source,
             consumers: new[] { "Koan.Admin.LaunchKitService" },
             sourceKey: includeComposeOption.ResolvedKey);
 
-        report.AddSetting(
+        module.AddSetting(
             "generate.includeAspire",
             BoolString(includeAspireOption.Value),
             source: includeAspireOption.Source,
             consumers: new[] { "Koan.Admin.LaunchKitService" },
             sourceKey: includeAspireOption.ResolvedKey);
 
-        report.AddSetting(
+        module.AddSetting(
             "generate.includeManifest",
             BoolString(includeManifestOption.Value),
             source: includeManifestOption.Source,
             consumers: new[] { "Koan.Admin.LaunchKitService" },
             sourceKey: includeManifestOption.ResolvedKey);
 
-        report.AddSetting(
+        module.AddSetting(
             "generate.includeReadme",
             BoolString(includeReadmeOption.Value),
             source: includeReadmeOption.Source,
             consumers: new[] { "Koan.Admin.LaunchKitService" },
             sourceKey: includeReadmeOption.ResolvedKey);
 
-        report.AddSetting(
+        module.AddSetting(
             "generate.composeBasePort",
             composeBasePortOption.Value.ToString(),
             source: composeBasePortOption.Source,
@@ -262,12 +261,12 @@ public sealed class KoanAdminAutoRegistrar : IKoanAutoRegistrar
 
     if (!KoanEnv.IsDevelopment && normalizedPrefix.StartsWith(".", StringComparison.Ordinal) && !allowDotOption.Value)
         {
-            report.AddNote("Dot-prefixed admin routes are disabled outside Development unless AllowDotPrefixInProduction=true.");
+            module.AddNote("Dot-prefixed admin routes are disabled outside Development unless AllowDotPrefixInProduction=true.");
         }
 
         if ((env.IsProduction() || env.IsStaging()) && enabledOption.Value && !allowProdOption.Value)
         {
-            report.AddNote("Koan Admin requested but AllowInProduction=false; surfaces will remain inactive.");
+            module.AddNote("Koan Admin requested but AllowInProduction=false; surfaces will remain inactive.");
         }
     }
 
@@ -327,3 +326,4 @@ public sealed class KoanAdminAutoRegistrar : IKoanAutoRegistrar
 
     private readonly record struct ConfigurationArrayValue(string Display, BootSettingSource Source, string SourceKey, bool UsedDefault);
 }
+

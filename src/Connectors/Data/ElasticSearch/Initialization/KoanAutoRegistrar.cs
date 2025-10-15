@@ -37,13 +37,12 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         services.AddHttpClient(Infrastructure.Constants.HttpClientName);
     }
 
-    public void Describe(Koan.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)
+    public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
-        report.AddModule(ModuleName, ModuleVersion);
-
+        module.Describe(ModuleVersion);
         // Autonomous discovery adapter handles all connection string resolution
         // Boot report shows discovery results from ElasticSearchDiscoveryAdapter
-        report.AddNote("ElasticSearch discovery handled by autonomous ElasticSearchDiscoveryAdapter");
+        module.AddNote("ElasticSearch discovery handled by autonomous ElasticSearchDiscoveryAdapter");
 
         // Configure default options for reporting with provenance metadata
         var defaultOptions = new ElasticSearchOptions();
@@ -92,7 +91,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             : connection.Value;
         var connectionIsAuto = string.Equals(connectionValue, "auto", StringComparison.OrdinalIgnoreCase);
 
-        report.AddSetting(
+        module.AddSetting(
             "ConnectionString",
             connectionIsAuto ? "auto (resolved by discovery)" : connectionValue,
             isSecret: !connectionIsAuto,
@@ -104,7 +103,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             },
             sourceKey: connection.ResolvedKey);
 
-        report.AddSetting(
+        module.AddSetting(
             "Endpoint",
             endpoint.Value,
             source: endpoint.Source,
@@ -115,7 +114,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             },
             sourceKey: endpoint.ResolvedKey);
 
-        report.AddSetting(
+        module.AddSetting(
             "IndexPrefix",
             indexPrefix.Value ?? (defaultOptions.IndexPrefix ?? "koan"),
             source: indexPrefix.Source,
@@ -125,7 +124,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             },
             sourceKey: indexPrefix.ResolvedKey);
 
-        report.AddSetting(
+        module.AddSetting(
             "VectorField",
             vectorField.Value,
             source: vectorField.Source,
@@ -135,7 +134,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             },
             sourceKey: vectorField.ResolvedKey);
 
-        report.AddSetting(
+        module.AddSetting(
             "MetadataField",
             metadataField.Value,
             source: metadataField.Source,
@@ -145,7 +144,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             },
             sourceKey: metadataField.ResolvedKey);
 
-        report.AddSetting(
+        module.AddSetting(
             "SimilarityMetric",
             similarityMetric.Value,
             source: similarityMetric.Source,
@@ -155,7 +154,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             },
             sourceKey: similarityMetric.ResolvedKey);
 
-        report.AddSetting(
+        module.AddSetting(
             "TimeoutSeconds",
             timeoutSeconds.Value.ToString(),
             source: timeoutSeconds.Source,
@@ -166,4 +165,5 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             sourceKey: timeoutSeconds.ResolvedKey);
     }
 }
+
 

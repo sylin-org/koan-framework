@@ -24,10 +24,9 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, JsonHealthContributor>());
     }
 
-    public void Describe(Koan.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)
+    public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
-        report.AddModule(ModuleName, ModuleVersion);
-
+        module.Describe(ModuleVersion);
         var defaultOptions = new JsonDataOptions();
 
         var directory = Configuration.ReadFirstWithSource(
@@ -48,7 +47,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             $"{Constants.Configuration.Section_Data}:{Constants.Configuration.Keys.MaxPageSize}",
             $"{Constants.Configuration.Section_Sources_Default}:{Constants.Configuration.Keys.MaxPageSize}");
 
-        report.AddSetting(
+        module.AddSetting(
             Constants.Bootstrap.DirectoryPath,
             directory.Value,
             source: directory.Source,
@@ -59,7 +58,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             },
             sourceKey: directory.ResolvedKey);
 
-        report.AddSetting(
+        module.AddSetting(
             Constants.Bootstrap.DefaultPageSize,
             defaultPageSize.Value.ToString(),
             source: defaultPageSize.Source,
@@ -69,7 +68,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             },
             sourceKey: defaultPageSize.ResolvedKey);
 
-        report.AddSetting(
+        module.AddSetting(
             Constants.Bootstrap.MaxPageSize,
             maxPageSize.Value.ToString(),
             source: maxPageSize.Source,
@@ -80,4 +79,5 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             sourceKey: maxPageSize.ResolvedKey);
     }
 }
+
 

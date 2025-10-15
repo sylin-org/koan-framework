@@ -37,13 +37,12 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         services.AddHttpClient(Infrastructure.Constants.HttpClientName);
     }
 
-    public void Describe(Koan.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)
+    public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
-        report.AddModule(ModuleName, ModuleVersion);
-
+        module.Describe(ModuleVersion);
         // Autonomous discovery adapter handles all connection string resolution
         // Boot report shows discovery results from MilvusDiscoveryAdapter
-        report.AddNote("Milvus discovery handled by autonomous MilvusDiscoveryAdapter");
+        module.AddNote("Milvus discovery handled by autonomous MilvusDiscoveryAdapter");
 
         // Configure default options for reporting with provenance metadata
         var defaultOptions = new MilvusOptions();
@@ -100,7 +99,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             : connection.Value;
         var connectionIsAuto = string.Equals(connectionValue, "auto", StringComparison.OrdinalIgnoreCase);
 
-        report.AddSetting(
+        module.AddSetting(
             "ConnectionString",
             connectionIsAuto ? "auto (resolved by discovery)" : connectionValue,
             isSecret: !connectionIsAuto,
@@ -111,7 +110,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
                 "Koan.Data.Vector.Connector.Milvus.MilvusVectorAdapterFactory"
             });
 
-        report.AddSetting(
+        module.AddSetting(
             "Endpoint",
             endpoint.Value,
             source: endpoint.Source,
@@ -121,7 +120,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
                 "Koan.Data.Vector.Connector.Milvus.MilvusVectorAdapterFactory"
             });
 
-        report.AddSetting(
+        module.AddSetting(
             "DatabaseName",
             databaseName.Value,
             source: databaseName.Source,
@@ -130,7 +129,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
                 "Koan.Data.Vector.Connector.Milvus.MilvusVectorAdapterFactory"
             });
 
-        report.AddSetting(
+        module.AddSetting(
             "VectorFieldName",
             vectorField.Value,
             source: vectorField.Source,
@@ -139,7 +138,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
                 "Koan.Data.Vector.Connector.Milvus.MilvusVectorAdapterFactory"
             });
 
-        report.AddSetting(
+        module.AddSetting(
             "MetadataFieldName",
             metadataField.Value,
             source: metadataField.Source,
@@ -148,7 +147,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
                 "Koan.Data.Vector.Connector.Milvus.MilvusVectorAdapterFactory"
             });
 
-        report.AddSetting(
+        module.AddSetting(
             "Metric",
             metric.Value,
             source: metric.Source,
@@ -157,7 +156,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
                 "Koan.Data.Vector.Connector.Milvus.MilvusVectorAdapterFactory"
             });
 
-        report.AddSetting(
+        module.AddSetting(
             "ConsistencyLevel",
             consistencyLevel.Value,
             source: consistencyLevel.Source,
@@ -166,7 +165,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
                 "Koan.Data.Vector.Connector.Milvus.MilvusVectorAdapterFactory"
             });
 
-        report.AddSetting(
+        module.AddSetting(
             "TimeoutSeconds",
             timeoutSeconds.Value.ToString(),
             source: timeoutSeconds.Source,
@@ -175,7 +174,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
                 "Koan.Data.Vector.Connector.Milvus.MilvusVectorAdapterFactory"
             });
 
-        report.AddSetting(
+        module.AddSetting(
             "AutoCreateCollection",
             autoCreate.Value ? "true" : "false",
             source: autoCreate.Source,
@@ -185,4 +184,5 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             });
     }
 }
+
 

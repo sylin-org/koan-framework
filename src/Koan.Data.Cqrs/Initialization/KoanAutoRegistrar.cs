@@ -5,6 +5,7 @@ using Microsoft.Extensions.Hosting;
 using Koan.Core;
 using Koan.Core.Modules;
 using Koan.Data.Abstractions;
+using Koan.Core.Hosting.Bootstrap;
 
 namespace Koan.Data.Cqrs.Initialization;
 
@@ -25,12 +26,13 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         services.AddHostedService<OutboxProcessor>();
     }
 
-    public void Describe(Koan.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)
+    public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
-        report.AddModule(ModuleName, ModuleVersion);
+        module.Describe(ModuleVersion);
         var defaultProfile = Configuration.Read<string?>(cfg, Infrastructure.Constants.Configuration.Keys.DefaultProfile, null);
-        report.AddSetting("DefaultProfile", defaultProfile);
+        module.AddSetting("DefaultProfile", defaultProfile);
         var profiles = cfg.GetSection(Infrastructure.Constants.Configuration.Profiles.Section).GetChildren().Select(c => c.Key).ToArray();
-        report.AddSetting("Profiles", string.Join(",", profiles));
+        module.AddSetting("Profiles", string.Join(",", profiles));
     }
 }
+

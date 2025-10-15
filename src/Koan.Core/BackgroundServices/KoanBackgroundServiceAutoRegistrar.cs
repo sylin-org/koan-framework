@@ -50,14 +50,14 @@ public class KoanBackgroundServiceAutoRegistrar : IKoanAutoRegistrar
             provider => (IHealthContributor)provider.GetRequiredService<KoanBackgroundServiceOrchestrator>());
     }
 
-    public void Describe(BootReport report, IConfiguration cfg, IHostEnvironment env)
+    public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
         var discoveredServices = DiscoverBackgroundServices();
         var enabledCount = discoveredServices.Count(s => ShouldRegisterService(s));
         var totalCount = discoveredServices.Count();
 
-        report.AddModule(ModuleName, ModuleVersion);
-        report.AddNote($"TotalServices: {totalCount}, EnabledServices: {enabledCount}");
+        module.Describe(ModuleVersion);
+        module.AddNote($"TotalServices: {totalCount}, EnabledServices: {enabledCount}");
         var serviceTypes = discoveredServices.GroupBy(s => s.ServiceType switch
         {
             var t when typeof(IKoanStartupService).IsAssignableFrom(t) => "Startup",
@@ -66,7 +66,7 @@ public class KoanBackgroundServiceAutoRegistrar : IKoanAutoRegistrar
             _ => "Standard"
         }).ToDictionary(g => g.Key, g => g.Count());
         foreach (var kvp in serviceTypes)
-            report.AddNote($"{kvp.Key}: {kvp.Value}");
+            module.AddNote($"{kvp.Key}: {kvp.Value}");
     }
 
     private IEnumerable<BackgroundServiceInfo> DiscoverBackgroundServices()

@@ -6,6 +6,7 @@ using Koan.Core;
 using Koan.Web.Auth.Roles.Extensions;
 using Koan.Web.Auth.Roles.Options;
 using Koan.Web.Extensions;
+using Koan.Core.Hosting.Bootstrap;
 
 namespace Koan.Web.Auth.Roles.Initialization;
 
@@ -22,24 +23,25 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         services.AddKoanControllersFrom<Controllers.RolesAdminController>();
     }
 
-    public void Describe(Koan.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)
+    public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
-        report.AddModule(ModuleName, ModuleVersion);
+        module.Describe(ModuleVersion);
         var emitPermissionClaims = Koan.Core.Configuration.ReadWithSource(
             cfg,
             $"{RoleAttributionOptions.SectionPath}:EmitPermissionClaims",
             true);
 
-        report.AddSetting(
+        module.AddSetting(
             "Auth:Roles:EmitPermissionClaims",
             emitPermissionClaims.Value.ToString(),
             source: emitPermissionClaims.Source,
             consumers: new[] { "Koan.Web.Auth.Roles.PermissionEmitter" });
 
-        report.AddTool(
+        module.AddTool(
             "Role Administration",
             $"/{Koan.Web.Auth.Roles.Infrastructure.AuthRoutes.Base}",
             "Manage role, alias, and policy bindings",
             capability: "auth.roles.admin");
     }
 }
+

@@ -29,14 +29,14 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         Log.BootDebug(LogActions.Init, "services-registered", ("module", ModuleName));
     }
 
-    public void Describe(BootReport report, IConfiguration cfg, IHostEnvironment env)
+    public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
-        report.AddModule(ModuleName, ModuleVersion);
+        module.Describe(ModuleVersion);
         var section = cfg.GetSection(AdaptersReadinessOptions.SectionPath);
-        report.AddSetting("Adapters.Readiness:DefaultPolicy", section["DefaultPolicy"] ?? ReadinessPolicy.Hold.ToString());
-        report.AddSetting("Adapters.Readiness:DefaultTimeout", section["DefaultTimeout"] ?? TimeSpan.FromSeconds(30).ToString());
-        report.AddSetting("Adapters.Readiness:InitializationTimeout", section["InitializationTimeout"] ?? TimeSpan.FromMinutes(5).ToString());
-        report.AddSetting("Adapters.Readiness:Monitoring", section["EnableMonitoring"] ?? bool.TrueString);
+        module.AddSetting("Adapters.Readiness:DefaultPolicy", section["DefaultPolicy"] ?? ReadinessPolicy.Hold.ToString());
+        module.AddSetting("Adapters.Readiness:DefaultTimeout", section["DefaultTimeout"] ?? TimeSpan.FromSeconds(30).ToString());
+        module.AddSetting("Adapters.Readiness:InitializationTimeout", section["InitializationTimeout"] ?? TimeSpan.FromMinutes(5).ToString());
+        module.AddSetting("Adapters.Readiness:Monitoring", section["EnableMonitoring"] ?? bool.TrueString);
     }
 
     private static class LogActions
@@ -44,3 +44,4 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         public const string Init = "registrar.init";
     }
 }
+

@@ -1,4 +1,4 @@
-﻿using Koan.Core;
+using Koan.Core;
 using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Modules;
 using Koan.Orchestration.Abstractions;
@@ -19,14 +19,13 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IArtifactExporter, ComposeExporter>());
     }
 
-    public void Describe(BootReport report, IConfiguration cfg, IHostEnvironment env)
+    public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
-        report.AddModule(ModuleName, ModuleVersion);
-
+        module.Describe(ModuleVersion);
         var exporter = new ComposeExporter();
-        report.AddSetting("ExporterId", exporter.Id);
-        report.AddSetting("SecretsRefOnly", exporter.Capabilities.SecretsRefOnly.ToString());
-        report.AddSetting("ReadinessProbes", exporter.Capabilities.ReadinessProbes.ToString());
-        report.AddSetting("TlsHints", exporter.Capabilities.TlsHints.ToString());
+        module.AddSetting("ExporterId", exporter.Id);
+        module.AddSetting("SecretsRefOnly", exporter.Capabilities.SecretsRefOnly.ToString());
+        module.AddSetting("ReadinessProbes", exporter.Capabilities.ReadinessProbes.ToString());
+        module.AddSetting("TlsHints", exporter.Capabilities.TlsHints.ToString());
     }
 }
