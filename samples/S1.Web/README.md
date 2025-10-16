@@ -66,28 +66,37 @@ GET /api/todo/streaming-demo
 
 ## Run locally
 
-Windows (PowerShell or cmd):
+Launch the sample without Docker using the console bootstrap (mirrors `g1c1`):
 
-- Open a terminal in this folder and run the helper script:
+- **Windows (cmd or PowerShell)**
 
-```powershell
-# default: http://localhost:5044
-./start.bat
+    ```powershell
+    # defaults to http://localhost:4998
+    ./start.bat
 
-# custom URL
-./start.bat "http://localhost:5044"
-```
+    # pass additional app arguments (e.g., custom URLs)
+    ./start.bat --urls "http://localhost:5055"
+    ```
 
-This script kills previous instances, frees the port, waits for /api/health, and opens the browser.
+- **PowerShell helper with optional first-argument URL**
 
-Alternatively:
+    ```powershell
+    ./start.ps1                 # http://localhost:4998
+    ./start.ps1 "http://localhost:5055"
+    ./start.ps1 -AppArgs @('--urls','http://localhost:5055')
+    ```
+
+Both scripts set Development environments, spawn `dotnet run --project S1.Web.csproj --no-launch-profile`, and rely on the app lifecycle to open the browser once the server is listening while keeping the app on HTTP by default.
+
+Manual alternative:
 
 ```powershell
 # From repo root
-dotnet run --project "Koan/samples/S1.Web/S1.Web.csproj" --urls "http://localhost:5044"
+$env:ASPNETCORE_URLS = "http://localhost:4998"
+dotnet run --project "Koan/samples/S1.Web/S1.Web.csproj" --no-launch-profile
 ```
 
-Then browse to the root (index.html is served via static files). The UI supports CRUD, seeding, and server-side pagination with navigation buttons.
+> If you skip `--no-launch-profile`, the default Visual Studio launch profile will re-enable HTTPS and prompt for the ASP.NET Core developer certificate.
 
 ## Quick API tests
 
@@ -95,46 +104,17 @@ Use the included requests.http file (VS Code "REST Client" extension) or copy cu
 
 ## Container (optional)
 
-Windows helper scripts (from this folder):
+Existing Docker helpers remain available when you need containers:
 
-```powershell
-./start-docker.bat           # Docker (single container); defaults to http://localhost:5044
-./start-docker.bat 5090      # Use a different host port
+- `./start-docker.bat [hostPort]`
+- `./start-compose.bat`
+- `./stop-docker.bat`
 
-./start-compose.bat          # Docker Compose; reads HOST_PORT from .env (defaults to 5044)
-```
-
-Stop and maintenance:
-
-```powershell
-./stop-docker.bat            # Stop single-container run
-./clean-data.bat             # Remove persisted data folder (danger)
-```
-
-Manual Docker:
-
-```powershell
-# From repo root
-# Use Koan folder as build context so .dockerignore applies
-docker build -f Koan/samples/S1.Web/Dockerfile -t Koan-s1:latest Koan
-
-docker run --rm -p 5044:5044 -v ${PWD}/Koan/samples/S1.Web/data:/app/data Koan-s1:latest
-```
-
-Manual Compose:
-
-```powershell
-# From S1.Web folder
-# Edit .env to change HOST_PORT
-HOST_PORT=5081 docker compose up -d --build
-```
-
-- App listens on port 5044 inside the container; mapped to your chosen host port.
-- Data is persisted to Koan/samples/S1.Web/data/ via a bind mount.
+They still build the Dockerfile in this folder and mount `.Koan/Data` for persistence, but the primary path for day-to-day development is now the console bootstrap above.
 
 ## Notes
 
-- Program.cs is intentionally minimal; Koan.Web self-wires controllers, static files, secure headers, and /api/health via a startup filter. Adjust via `KoanWebOptions`.
+- Program.cs now mirrors the g1c1 console bootstrap: simple logging, lifecycle hooks, and browser launch once the app is ready.
 - Application policy (ProblemDetails, Rate Limiting) is configured in the app (see `Program.cs`).
 - JSON adapter persists under ./data by default; safe for dev.
 - For demo pagination, the controller emits headers and Link relations; the UI reads them to enable navigation.

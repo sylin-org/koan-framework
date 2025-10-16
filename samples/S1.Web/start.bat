@@ -1,31 +1,21 @@
 @echo off
-setlocal enableextensions
+setlocal
 
-set "ROOT=%~dp0"
-pushd "%ROOT%" >nul
+set "SCRIPT_DIR=%~dp0"
+pushd "%SCRIPT_DIR%" >nul
 
-set "PROJECT_NAME=koan-s1-web"
-set "COMPOSE_FILE=docker\compose.yml"
-set "OPEN_URL=http://localhost:5044"
+set "DOTNET_ENVIRONMENT=Development"
+set "ASPNETCORE_ENVIRONMENT=Development"
+if not defined ASPNETCORE_URLS set "ASPNETCORE_URLS=http://localhost:4998"
 
-where docker >nul 2>nul || (
-	echo Docker is required but not found in PATH.
-	popd & exit /b 1
+set "DOTNET_CMD=dotnet run --project ""S1.Web.csproj"" --no-launch-profile"
+
+if not "%~1"=="" (
+    set "DOTNET_CMD=%DOTNET_CMD% -- %*"
 )
 
-for /f "tokens=*" %%i in ('docker compose version 2^>nul') do set HAS_DOCKER_COMPOSE=1
-if defined HAS_DOCKER_COMPOSE (
-	docker compose -p %PROJECT_NAME% -f "%COMPOSE_FILE%" build || (popd & exit /b 1)
-	docker compose -p %PROJECT_NAME% -f "%COMPOSE_FILE%" up -d || (popd & exit /b 1)
-) else (
-	where docker-compose >nul 2>nul || (
-		echo docker-compose is not available. Please update Docker Desktop or install docker-compose.
-		popd & exit /b 1
-	)
-	docker-compose -p %PROJECT_NAME% -f "%COMPOSE_FILE%" build || (popd & exit /b 1)
-	docker-compose -p %PROJECT_NAME% -f "%COMPOSE_FILE%" up -d || (popd & exit /b 1)
-)
+start "" cmd /c "%DOTNET_CMD%"
 
-start "" "%OPEN_URL%" >nul 2>&1
 popd
+endlocal
 exit /b 0
