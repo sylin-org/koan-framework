@@ -40,6 +40,21 @@ const Progress = {
     },
 
     updateUI(progress) {
+        // Update circular progress
+        const percent = progress.progressPercentage;
+        const circumference = 502.4;
+        const offset = circumference - (percent / 100) * circumference;
+        document.getElementById('circularProgressBar').style.strokeDashoffset = offset;
+        document.getElementById('circularProgressPercent').textContent = `${percent}%`;
+
+        // Update live stats
+        document.getElementById('liveCurrentTest').textContent = progress.currentTest || 'Initializing...';
+        document.getElementById('liveCurrentProvider').textContent = progress.currentProvider?.toUpperCase() || '-';
+        document.getElementById('liveSpeed').textContent = Math.round(progress.currentOperationsPerSecond).toLocaleString();
+        document.getElementById('liveCurrentOps').textContent = progress.currentOperationCount.toLocaleString();
+        document.getElementById('liveTotalOps').textContent = progress.totalOperations.toLocaleString();
+
+        // Update legacy elements (for compatibility)
         document.getElementById('currentProvider').textContent = progress.currentProvider;
         document.getElementById('currentTest').textContent = progress.currentTest;
         document.getElementById('progressPercent').textContent = progress.progressPercentage;
@@ -47,9 +62,11 @@ const Progress = {
         document.getElementById('totalOps').textContent = progress.totalOperations.toLocaleString();
         document.getElementById('currentSpeed').textContent = Math.round(progress.currentOperationsPerSecond).toLocaleString();
 
-        // Update progress bar
+        // Update linear progress bar (if it exists)
         const progressBar = document.getElementById('progressBar');
-        progressBar.style.width = `${progress.progressPercentage}%`;
+        if (progressBar) {
+            progressBar.style.width = `${progress.progressPercentage}%`;
+        }
 
         // Update per-provider progress (if available)
         if (progress.providerProgress && Object.keys(progress.providerProgress).length > 0) {
@@ -60,7 +77,8 @@ const Progress = {
         const log = document.getElementById('testLog');
         const logEntry = document.createElement('div');
         logEntry.className = 'log-entry';
-        logEntry.textContent = `[${progress.currentProvider}] ${progress.currentTest} - ${Math.round(progress.currentOperationsPerSecond)} ops/sec`;
+        const timestamp = new Date().toLocaleTimeString();
+        logEntry.innerHTML = `<strong>[${timestamp}]</strong> ${progress.currentProvider?.toUpperCase()} → ${progress.currentTest} <span style="color: var(--color-success);">${Math.round(progress.currentOperationsPerSecond).toLocaleString()} ops/sec</span>`;
         log.appendChild(logEntry);
 
         // Auto-scroll log
