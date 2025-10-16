@@ -36,47 +36,6 @@
       </div>
     </header>
 
-    <!-- Hero Section: Framework Pulse -->
-    <section class="framework-pulse">
-      <h2 class="pulse-title">Framework Pulse</h2>
-      <div class="pulse-grid">
-
-        <div class="pulse-card" ng-click="vm.showTab('code-patterns')">
-          <div class="pulse-label">Entities Registered</div>
-          <div class="pulse-value">4</div>
-          <div class="pulse-detail">Todo • User • Category • TodoItem</div>
-          <div class="pulse-insight">✨ Auto-discovered via Entity&lt;T&gt;</div>
-        </div>
-
-        <div class="pulse-card">
-          <div class="pulse-label">Active Provider</div>
-          <div class="pulse-value">SQLite</div>
-          <div class="pulse-detail">[DataAdapter("sqlite")]</div>
-          <div class="pulse-insight">🔄 Provider transparency in action</div>
-        </div>
-
-        <div class="pulse-card">
-          <div class="pulse-label">Auto ID Generation</div>
-          <div class="pulse-value">GUID v7</div>
-          <div class="pulse-detail">Time-sortable • No conflicts</div>
-          <div class="pulse-insight">🎲 No manual key management needed</div>
-        </div>
-
-        <div class="pulse-card">
-          <div class="pulse-label">API Requests</div>
-          <div class="pulse-value">{{vm.requests.length}}</div>
-          <div class="pulse-detail" ng-if="vm.requests.length > 0">
-            Avg: {{vm.getAvgResponseTime()}}ms
-          </div>
-          <div class="pulse-detail" ng-if="vm.requests.length === 0">
-            No requests yet
-          </div>
-          <div class="pulse-insight">📊 EntityController auto-routing</div>
-        </div>
-
-      </div>
-    </section>
-
     <!-- Main Layout -->
     <div class="main-layout">
 
@@ -684,24 +643,48 @@ public class TodoController
         <div class="sidebar-panel">
           <h3 class="sidebar-title">🔍 Framework Insights</h3>
 
+          <!-- Compact Framework Overview -->
+          <div class="insight-section">
+            <h4 class="insight-section-title">Overview</h4>
+            <div class="framework-metrics">
+              <div class="metric-row">
+                <span class="metric-label">Entities:</span>
+                <span class="metric-value">4 registered</span>
+              </div>
+              <div class="metric-row">
+                <span class="metric-label">Provider:</span>
+                <span class="metric-value">SQLite</span>
+              </div>
+              <div class="metric-row">
+                <span class="metric-label">ID Strategy:</span>
+                <span class="metric-value">GUID v7</span>
+              </div>
+              <div class="metric-row">
+                <span class="metric-label">API Requests:</span>
+                <span class="metric-value">{{vm.requests.length}}</span>
+                <span class="metric-detail" ng-if="vm.requests.length > 0">(avg {{vm.getAvgResponseTime()}}ms)</span>
+              </div>
+            </div>
+          </div>
+
           <div class="insight-section">
             <h4 class="insight-section-title">Auto-Registration</h4>
             <div class="insight-list">
               <div class="insight-item insight-success">
                 <span class="insight-icon">✓</span>
-                <span class="insight-text">Todo registered</span>
+                <span class="insight-text">Todo</span>
               </div>
               <div class="insight-item insight-success">
                 <span class="insight-icon">✓</span>
-                <span class="insight-text">User registered</span>
+                <span class="insight-text">User</span>
               </div>
               <div class="insight-item insight-success">
                 <span class="insight-icon">✓</span>
-                <span class="insight-text">Category registered</span>
+                <span class="insight-text">Category</span>
               </div>
               <div class="insight-item insight-success">
                 <span class="insight-icon">✓</span>
-                <span class="insight-text">TodoItem registered</span>
+                <span class="insight-text">TodoItem</span>
               </div>
             </div>
             <p class="insight-footer">via IKoanAutoRegistrar</p>
@@ -726,50 +709,6 @@ public class TodoController
               </div>
             </div>
             <button class="btn-text" ng-click="vm.clearRequests()" ng-if="vm.requests.length > 0">Clear log</button>
-          </div>
-
-          <div class="insight-section">
-            <h4 class="insight-section-title">Provider Capabilities</h4>
-            <div class="capability-list">
-              <div class="capability-item">
-                <strong>SQLite</strong>
-                <span class="capability-badge capability-active">Active</span>
-              </div>
-              <div class="capability-detail">
-                <span class="capability-yes">✓</span> CRUD operations
-              </div>
-              <div class="capability-detail">
-                <span class="capability-yes">✓</span> Pagination
-              </div>
-              <div class="capability-detail">
-                <span class="capability-yes">✓</span> Transactions
-              </div>
-              <div class="capability-detail">
-                <span class="capability-yes">✓</span> Relationships
-              </div>
-              <div class="capability-detail">
-                <span class="capability-no">✗</span> Full-text search
-              </div>
-            </div>
-            <div class="code-insight" style="margin-top: 0.75rem; font-size: 0.75rem;">
-              💡 Switch to PostgreSQL or MongoDB for advanced query features
-            </div>
-          </div>
-
-          <div class="insight-section">
-            <h4 class="insight-section-title">System Health</h4>
-            <div class="health-status">
-              <div class="health-indicator" ng-class="{'health-healthy': vm.health, 'health-unknown': !vm.health}">
-                <span class="health-dot"></span>
-                <span class="health-label">{{vm.health ? 'Healthy' : 'Unknown'}}</span>
-              </div>
-              <div class="health-details" ng-if="vm.health">
-                <div class="health-detail">
-                  <span class="health-detail-label">Status:</span>
-                  <span class="health-detail-value">{{vm.health.status}}</span>
-                </div>
-              </div>
-            </div>
           </div>
 
         </div>
