@@ -102,8 +102,16 @@ public class BenchmarkController : ControllerBase
     {
         var progress = new Progress<BenchmarkProgress>(async p =>
         {
+            // Send overall progress
             await _hubContext.Clients.Group("BenchmarkProgress")
                 .SendAsync("ProgressUpdate", p, cancellationToken);
+
+            // Send detailed provider progress for parallel mode visualization
+            if (p.ProviderProgress != null && p.ProviderProgress.Count > 0)
+            {
+                await _hubContext.Clients.Group("BenchmarkProgress")
+                    .SendAsync("ProviderProgressUpdate", p, cancellationToken);
+            }
         });
 
         var result = await _benchmarkService.RunBenchmarkAsync(request, progress, cancellationToken);

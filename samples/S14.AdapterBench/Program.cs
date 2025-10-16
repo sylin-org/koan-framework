@@ -17,8 +17,9 @@ builder.Services.AddKoan();
 // SignalR for real-time benchmark progress
 builder.Services.AddSignalR();
 
-// Benchmark service
-builder.Services.AddSingleton<IBenchmarkService, BenchmarkService>();
+// Benchmark service (transient - no state, creates fresh instance per request)
+builder.Services.AddTransient<IBenchmarkService, BenchmarkService>();
+builder.Services.AddTransient<BenchmarkService>();
 
 var app = builder.Build();
 

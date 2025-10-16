@@ -244,6 +244,110 @@ header h1 {
     font-size: 0.875rem;
 }
 
+/* Provider Progress Container */
+.provider-progress-container {
+    background: #0f172a;
+    border-radius: 0.5rem;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+}
+
+.provider-progress-container h3 {
+    margin-bottom: 1rem;
+    color: #cbd5e1;
+    font-size: 1.1rem;
+}
+
+.provider-progress-item {
+    background: #1e293b;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.provider-progress-item:last-child {
+    margin-bottom: 0;
+}
+
+.provider-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.provider-name {
+    font-weight: 700;
+    font-size: 1rem;
+    color: #e2e8f0;
+}
+
+.provider-status {
+    padding: 0.25rem 0.75rem;
+    border-radius: 0.25rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.provider-status.pending {
+    background: #475569;
+    color: #cbd5e1;
+}
+
+.provider-status.running {
+    background: #2196f3;
+    color: white;
+    animation: pulse 2s infinite;
+}
+
+.provider-status.completed {
+    background: #4caf50;
+    color: white;
+}
+
+.provider-status.failed {
+    background: #f44336;
+    color: white;
+}
+
+.provider-percentage {
+    font-weight: 700;
+    color: #60a5fa;
+    font-size: 1rem;
+}
+
+.provider-progress-bar-container {
+    height: 1.5rem;
+    background: #0f172a;
+    border-radius: 0.75rem;
+    overflow: hidden;
+    margin-bottom: 0.5rem;
+}
+
+.provider-progress-bar {
+    height: 100%;
+    background: #2196f3;
+    transition: width 0.3s ease, background-color 0.3s ease;
+    border-radius: 0.75rem;
+}
+
+.provider-current-test {
+    font-size: 0.875rem;
+    color: #94a3b8;
+    font-style: italic;
+    min-height: 1.2rem;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.7;
+    }
+}
+
 /* Results Panel */
 .results-panel {
     background: #1e293b;

@@ -147,6 +147,7 @@ const App = {
         document.getElementById('testLog').innerHTML = '';
         document.getElementById('progressBar').style.width = '0%';
         document.getElementById('currentMode').textContent = this.currentMode;
+        Progress.clearProviderProgress();
 
         // Build request
         const request = {
@@ -157,13 +158,26 @@ const App = {
         };
 
         try {
-            // Submit the job
-            const jobResponse = await API.runBenchmark(request);
-            this.currentJobId = jobResponse.jobId;
+            // Run benchmark synchronously with real-time SignalR progress
+            const result = await API.runBenchmark(request);
 
-            // Start polling for status
-            await this.pollJobStatus();
+            // Display results immediately
+            if (result) {
+                // Convert TimeSpan strings to nanoseconds for display
+                result.providerResults.forEach(p => {
+                    p.totalDuration = this.parseTimeSpan(p.totalDuration);
+                    p.tests.forEach(t => {
+                        t.duration = this.parseTimeSpan(t.duration);
+                    });
+                });
 
+                result.startedAt = new Date(result.startedAt);
+                result.completedAt = new Date(result.completedAt);
+
+                Results.display(result);
+            }
+
+            this.resetUI();
         } catch (error) {
             console.error('Benchmark failed:', error);
             alert(`Benchmark failed: ${error.message}`);
@@ -263,6 +277,7 @@ const App = {
         document.getElementById('progressPanel').style.display = 'none';
         document.getElementById('runBenchmarkBtn').style.display = 'inline-block';
         document.getElementById('stopBenchmarkBtn').style.display = 'none';
+        Progress.clearProviderProgress();
         this.currentJobId = null;
     },
 

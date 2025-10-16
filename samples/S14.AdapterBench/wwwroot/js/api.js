@@ -13,7 +13,8 @@ const API = {
     },
 
     async runBenchmark(config) {
-        const response = await fetch(`${this.baseUrl}/api/benchmark/run`, {
+        // Use synchronous endpoint that supports real-time SignalR progress
+        const response = await fetch(`${this.baseUrl}/api/benchmark/run-sync`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
