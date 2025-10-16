@@ -16,6 +16,12 @@ const Results = {
         Charts.createPerformanceChart('singleWriteChart', results, 'Single Writes');
         Charts.createPerformanceChart('batchWriteChart', results, 'Batch Writes');
         Charts.createPerformanceChart('readByIdChart', results, 'Read By ID');
+        Charts.createPerformanceChart('updateChart', results, 'Update Operations');
+        Charts.createPerformanceChart('querySimpleChart', results, 'Query (Simple Filter)');
+        Charts.createPerformanceChart('queryRangeChart', results, 'Query (Range Filter)');
+        Charts.createPerformanceChart('queryComplexChart', results, 'Query (Complex Filter)');
+        Charts.createPerformanceChart('paginationChart', results, 'Pagination');
+        Charts.createMigrationChart(results);
 
         // Generate recommendations
         this.generateRecommendations(results);

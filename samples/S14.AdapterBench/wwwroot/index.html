@@ -100,9 +100,11 @@
 
             <div class="tabs">
                 <button class="tab-btn active" data-tab="overview">Overview</button>
-                <button class="tab-btn" data-tab="writes">Write Performance</button>
-                <button class="tab-btn" data-tab="reads">Read Performance</button>
-                <button class="tab-btn" data-tab="details">Detailed Results</button>
+                <button class="tab-btn" data-tab="writes">Writes</button>
+                <button class="tab-btn" data-tab="reads">Reads</button>
+                <button class="tab-btn" data-tab="queries">Queries</button>
+                <button class="tab-btn" data-tab="migration">Migration</button>
+                <button class="tab-btn" data-tab="details">Details</button>
             </div>
 
             <div class="tab-content">
@@ -152,6 +154,37 @@
                     <div class="chart-container">
                         <h3>Read By ID Performance</h3>
                         <canvas id="readByIdChart"></canvas>
+                    </div>
+                    <div class="chart-container">
+                        <h3>Update Operations Performance</h3>
+                        <canvas id="updateChart"></canvas>
+                    </div>
+                    <div class="chart-container">
+                        <h3>Pagination Performance</h3>
+                        <canvas id="paginationChart"></canvas>
+                    </div>
+                </div>
+
+                <div id="queriesTab" class="tab-pane">
+                    <div class="chart-container">
+                        <h3>Simple Filter Query Performance</h3>
+                        <canvas id="querySimpleChart"></canvas>
+                    </div>
+                    <div class="chart-container">
+                        <h3>Range Filter Query Performance</h3>
+                        <canvas id="queryRangeChart"></canvas>
+                    </div>
+                    <div class="chart-container">
+                        <h3>Complex Filter Query Performance</h3>
+                        <canvas id="queryComplexChart"></canvas>
+                    </div>
+                </div>
+
+                <div id="migrationTab" class="tab-pane">
+                    <div class="chart-container">
+                        <h3>Cross-Provider Migration Performance</h3>
+                        <p>Shows the performance of migrating data from one provider to another.</p>
+                        <canvas id="migrationChart"></canvas>
                     </div>
                 </div>
 

@@ -82,7 +82,11 @@ public class BenchmarkService : IBenchmarkService
         IProgress<BenchmarkProgress>? progress,
         CancellationToken cancellationToken)
     {
-        var totalTests = providers.Count * entityTiers.Count * 6; // 6 test types per tier
+        // 11 test types per provider per tier + cross-provider migrations
+        var testsPerProviderPerTier = 11;
+        var regularTests = providers.Count * entityTiers.Count * testsPerProviderPerTier;
+        var migrationTests = providers.Count * (providers.Count - 1) * entityTiers.Count; // N*(N-1) provider pairs
+        var totalTests = regularTests + migrationTests;
         var completedTests = 0;
 
         foreach (var provider in providers)
@@ -116,6 +120,31 @@ public class BenchmarkService : IBenchmarkService
                     provider, tier, result.EntityCount, progress, completedTests++, totalTests, cancellationToken);
                 providerResult.Tests.Add(readByIdResult);
 
+                // Update Operations Test
+                var updateResult = await RunUpdateTestAsync(
+                    provider, tier, result.EntityCount, progress, completedTests++, totalTests, cancellationToken);
+                providerResult.Tests.Add(updateResult);
+
+                // Query Simple Filter Test
+                var querySimpleResult = await RunQueryTestAsync(
+                    provider, tier, "Simple Filter", progress, completedTests++, totalTests, cancellationToken);
+                providerResult.Tests.Add(querySimpleResult);
+
+                // Query Range Filter Test
+                var queryRangeResult = await RunQueryTestAsync(
+                    provider, tier, "Range Filter", progress, completedTests++, totalTests, cancellationToken);
+                providerResult.Tests.Add(queryRangeResult);
+
+                // Query Complex Filter Test
+                var queryComplexResult = await RunQueryTestAsync(
+                    provider, tier, "Complex Filter", progress, completedTests++, totalTests, cancellationToken);
+                providerResult.Tests.Add(queryComplexResult);
+
+                // Pagination Test
+                var paginationResult = await RunPaginationTestAsync(
+                    provider, tier, result.EntityCount, progress, completedTests++, totalTests, cancellationToken);
+                providerResult.Tests.Add(paginationResult);
+
                 // RemoveAll Safe Test
                 var removeAllSafeResult = await RunRemoveAllTestAsync(
                     provider, tier, result.EntityCount, "Safe", RemoveStrategy.Safe, progress, completedTests++, totalTests, cancellationToken);
@@ -140,6 +169,27 @@ public class BenchmarkService : IBenchmarkService
                 provider,
                 providerStopwatch.Elapsed.TotalSeconds);
         }
+
+        // Cross-Provider Migration Tests
+        _logger.LogInformation("Starting cross-provider migration tests between {Count} providers", providers.Count);
+        foreach (var sourceProvider in providers)
+        {
+            foreach (var destProvider in providers)
+            {
+                if (sourceProvider == destProvider) continue; // Skip same-provider migration
+
+                foreach (var tier in entityTiers)
+                {
+                    var migrationResult = await RunCrossProviderMigrationTestAsync(
+                        sourceProvider, destProvider, tier, result.EntityCount,
+                        progress, completedTests++, totalTests, cancellationToken);
+
+                    // Add to both source and dest provider results for visibility
+                    var sourceResult = result.ProviderResults.FirstOrDefault(p => p.ProviderName == sourceProvider);
+                    sourceResult?.Tests.Add(migrationResult);
+                }
+            }
+        }
     }
 
     private async Task RunParallelBenchmarkAsync(
@@ -149,8 +199,12 @@ public class BenchmarkService : IBenchmarkService
         IProgress<BenchmarkProgress>? progress,
         CancellationToken cancellationToken)
     {
-        var totalTests = providers.Count * entityTiers.Count * 6; // 6 test types per tier and provider
-        var testsPerProvider = entityTiers.Count * 6;
+        // 11 test types per provider per tier + cross-provider migrations
+        var testsPerProviderPerTier = 11;
+        var regularTests = providers.Count * entityTiers.Count * testsPerProviderPerTier;
+        var migrationTests = providers.Count * (providers.Count - 1) * entityTiers.Count;
+        var totalTests = regularTests + migrationTests;
+        var testsPerProvider = entityTiers.Count * testsPerProviderPerTier;
         var completedTests = 0;
 
         var providerResults = providers.Select(p => new ProviderResult
@@ -235,6 +289,66 @@ public class BenchmarkService : IBenchmarkService
                     Interlocked.Increment(ref completedTests);
                     UpdateProviderProgress(provider, tier, "Read By ID", ++providerTestsCompleted);
 
+                    var update = await RunUpdateTestAsync(
+                        provider,
+                        tier,
+                        result.EntityCount,
+                        null,
+                        Volatile.Read(ref completedTests),
+                        totalTests,
+                        cancellationToken);
+                    providerResult.Tests.Add(update);
+                    Interlocked.Increment(ref completedTests);
+                    UpdateProviderProgress(provider, tier, "Update Operations", ++providerTestsCompleted);
+
+                    var querySimple = await RunQueryTestAsync(
+                        provider,
+                        tier,
+                        "Simple Filter",
+                        null,
+                        Volatile.Read(ref completedTests),
+                        totalTests,
+                        cancellationToken);
+                    providerResult.Tests.Add(querySimple);
+                    Interlocked.Increment(ref completedTests);
+                    UpdateProviderProgress(provider, tier, "Query (Simple)", ++providerTestsCompleted);
+
+                    var queryRange = await RunQueryTestAsync(
+                        provider,
+                        tier,
+                        "Range Filter",
+                        null,
+                        Volatile.Read(ref completedTests),
+                        totalTests,
+                        cancellationToken);
+                    providerResult.Tests.Add(queryRange);
+                    Interlocked.Increment(ref completedTests);
+                    UpdateProviderProgress(provider, tier, "Query (Range)", ++providerTestsCompleted);
+
+                    var queryComplex = await RunQueryTestAsync(
+                        provider,
+                        tier,
+                        "Complex Filter",
+                        null,
+                        Volatile.Read(ref completedTests),
+                        totalTests,
+                        cancellationToken);
+                    providerResult.Tests.Add(queryComplex);
+                    Interlocked.Increment(ref completedTests);
+                    UpdateProviderProgress(provider, tier, "Query (Complex)", ++providerTestsCompleted);
+
+                    var pagination = await RunPaginationTestAsync(
+                        provider,
+                        tier,
+                        result.EntityCount,
+                        null,
+                        Volatile.Read(ref completedTests),
+                        totalTests,
+                        cancellationToken);
+                    providerResult.Tests.Add(pagination);
+                    Interlocked.Increment(ref completedTests);
+                    UpdateProviderProgress(provider, tier, "Pagination", ++providerTestsCompleted);
+
                     var removeSafe = await RunRemoveAllTestAsync(
                         provider,
                         tier,
@@ -292,10 +406,31 @@ public class BenchmarkService : IBenchmarkService
 
         await Task.WhenAll(providerTasks);
 
-        overallStopwatch.Stop();
-
         // Add all provider results (keep their actual durations, don't override)
         result.ProviderResults.AddRange(providerResults);
+
+        // Cross-Provider Migration Tests (run sequentially after parallel provider tests)
+        _logger.LogInformation("Starting cross-provider migration tests between {Count} providers", providers.Count);
+        foreach (var sourceProvider in providers)
+        {
+            foreach (var destProvider in providers)
+            {
+                if (sourceProvider == destProvider) continue; // Skip same-provider migration
+
+                foreach (var tier in entityTiers)
+                {
+                    var migrationResult = await RunCrossProviderMigrationTestAsync(
+                        sourceProvider, destProvider, tier, result.EntityCount,
+                        progress, completedTests++, totalTests, cancellationToken);
+
+                    // Add to source provider results for visibility
+                    var sourceResult = result.ProviderResults.FirstOrDefault(p => p.ProviderName == sourceProvider);
+                    sourceResult?.Tests.Add(migrationResult);
+                }
+            }
+        }
+
+        overallStopwatch.Stop();
 
         var maxDuration = providerResults.Max(pr => pr.TotalDuration);
         _logger.LogInformation("Parallel benchmark finished. Total wall-clock time: {WallClockTime:F2}s, slowest provider: {MaxDuration:F2}s",
@@ -781,6 +916,337 @@ public class BenchmarkService : IBenchmarkService
             "Complex" => await BenchmarkComplex.Get(id),
             _ => null
         };
+    }
+
+    private async Task<TestResult> RunUpdateTestAsync(
+        string provider,
+        string tier,
+        int count,
+        IProgress<BenchmarkProgress>? progress,
+        int completedTests,
+        int totalTests,
+        CancellationToken cancellationToken)
+    {
+        var testResult = new TestResult
+        {
+            TestName = "Update Operations",
+            EntityTier = tier,
+            OperationCount = count,
+            UsedNativeExecution = true
+        };
+
+        try
+        {
+            _logger.LogInformation("Provider {Provider} starting {Tier} - {Test} ({Count} updates)",
+                provider, tier, testResult.TestName, count);
+
+            List<string> ids;
+            using (EntityContext.Adapter(provider))
+            {
+                ids = await GetEntityIdsAsync(tier, count);
+            }
+
+            if (ids.Count == 0)
+            {
+                testResult.Error = "No entities found to update";
+                return testResult;
+            }
+
+            var stopwatch = Stopwatch.StartNew();
+            using (EntityContext.Adapter(provider))
+            {
+                for (int i = 0; i < Math.Min(count, ids.Count); i++)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    // Load entity
+                    var entity = await GetEntityByIdAsync(tier, ids[i]);
+                    if (entity == null) continue;
+
+                    // Modify entity based on tier
+                    switch (tier)
+                    {
+                        case "Indexed":
+                            var indexed = (BenchmarkIndexed)entity;
+                            indexed.Amount += 10;
+                            indexed.Title = $"Updated {i}";
+                            await indexed.Save();
+                            break;
+                        case "Complex":
+                            var complex = (BenchmarkComplex)entity;
+                            complex.UpdatedAt = DateTime.UtcNow;
+                            complex.FirstName = $"Updated{i}";
+                            await complex.Save();
+                            break;
+                        case "Minimal":
+                            var minimal = (BenchmarkMinimal)entity;
+                            minimal.CreatedAt = DateTime.UtcNow;
+                            await minimal.Save();
+                            break;
+                    }
+
+                    if (i % 100 == 0 && i > 0)
+                    {
+                        progress?.Report(new BenchmarkProgress
+                        {
+                            CurrentProvider = provider,
+                            CurrentTest = $"{tier} - Update Operations",
+                            TotalTests = totalTests,
+                            CompletedTests = completedTests,
+                            CurrentOperationCount = i,
+                            TotalOperations = count,
+                            CurrentOperationsPerSecond = i / (stopwatch.Elapsed.TotalSeconds + 0.001)
+                        });
+                    }
+                }
+            }
+
+            stopwatch.Stop();
+            testResult.Duration = stopwatch.Elapsed;
+            testResult.OperationsPerSecond = Math.Min(count, ids.Count) / stopwatch.Elapsed.TotalSeconds;
+            _logger.LogInformation("Provider {Provider} finished {Tier} - {Test} in {Duration:F2}s ({OpsPerSecond:F0} ops/sec)",
+                provider, tier, testResult.TestName, stopwatch.Elapsed.TotalSeconds, testResult.OperationsPerSecond);
+        }
+        catch (Exception ex)
+        {
+            testResult.Error = ex.Message;
+            _logger.LogError(ex, "Provider {Provider} failed {Tier} - {Test}", provider, tier, testResult.TestName);
+        }
+
+        return testResult;
+    }
+
+    private async Task<TestResult> RunQueryTestAsync(
+        string provider,
+        string tier,
+        string filterType,
+        IProgress<BenchmarkProgress>? progress,
+        int completedTests,
+        int totalTests,
+        CancellationToken cancellationToken)
+    {
+        var testResult = new TestResult
+        {
+            TestName = $"Query ({filterType})",
+            EntityTier = tier,
+            OperationCount = 1, // Single query operation
+            UsedNativeExecution = true
+        };
+
+        try
+        {
+            _logger.LogInformation("Provider {Provider} starting {Tier} - {Test}",
+                provider, tier, testResult.TestName);
+
+            var stopwatch = Stopwatch.StartNew();
+            int resultCount = 0;
+
+            using (EntityContext.Adapter(provider))
+            {
+                switch (tier)
+                {
+                    case "Indexed":
+                        resultCount = filterType switch
+                        {
+                            "Simple Filter" => (await BenchmarkIndexed.Query(e => e.UserId == "user_50")).Count,
+                            "Range Filter" => (await BenchmarkIndexed.Query(e => e.Amount > 100 && e.Amount < 500)).Count,
+                            "Complex Filter" => (await BenchmarkIndexed.Query(e =>
+                                e.Category == "category_5" &&
+                                e.Amount > 200 &&
+                                e.CreatedAt > DateTime.UtcNow.AddDays(-7))).Count,
+                            _ => 0
+                        };
+                        break;
+                    case "Complex":
+                        resultCount = filterType switch
+                        {
+                            "Simple Filter" => (await BenchmarkComplex.Query(e => e.UserId == "user_50")).Count,
+                            "Range Filter" => (await BenchmarkComplex.Query(e => e.Email.Contains("50"))).Count,
+                            "Complex Filter" => (await BenchmarkComplex.Query(e =>
+                                e.UserId == "user_50" &&
+                                e.FirstName.StartsWith("First") &&
+                                e.CreatedAt > DateTime.UtcNow.AddDays(-7))).Count,
+                            _ => 0
+                        };
+                        break;
+                    case "Minimal":
+                        resultCount = filterType switch
+                        {
+                            "Simple Filter" => (await BenchmarkMinimal.Query(e => e.CreatedAt > DateTime.UtcNow.AddDays(-1))).Count,
+                            "Range Filter" => (await BenchmarkMinimal.Query(e => e.CreatedAt > DateTime.UtcNow.AddDays(-7))).Count,
+                            "Complex Filter" => (await BenchmarkMinimal.Query(e => e.CreatedAt > DateTime.UtcNow.AddDays(-30))).Count,
+                            _ => 0
+                        };
+                        break;
+                }
+            }
+
+            stopwatch.Stop();
+            testResult.Duration = stopwatch.Elapsed;
+            testResult.OperationsPerSecond = 1 / stopwatch.Elapsed.TotalSeconds;
+            _logger.LogInformation("Provider {Provider} finished {Tier} - {Test} in {Duration:F2}s (found {Count} results)",
+                provider, tier, testResult.TestName, stopwatch.Elapsed.TotalSeconds, resultCount);
+        }
+        catch (Exception ex)
+        {
+            testResult.Error = ex.Message;
+            _logger.LogError(ex, "Provider {Provider} failed {Tier} - {Test}", provider, tier, testResult.TestName);
+        }
+
+        return testResult;
+    }
+
+    private async Task<TestResult> RunPaginationTestAsync(
+        string provider,
+        string tier,
+        int count,
+        IProgress<BenchmarkProgress>? progress,
+        int completedTests,
+        int totalTests,
+        CancellationToken cancellationToken)
+    {
+        var testResult = new TestResult
+        {
+            TestName = "Pagination",
+            EntityTier = tier,
+            OperationCount = count,
+            UsedNativeExecution = true
+        };
+
+        try
+        {
+            _logger.LogInformation("Provider {Provider} starting {Tier} - {Test} (skip {Skip}, take {Take})",
+                provider, tier, testResult.TestName, count / 2, 100);
+
+            var stopwatch = Stopwatch.StartNew();
+            int resultCount = 0;
+
+            using (EntityContext.Adapter(provider))
+            {
+                // Test pagination: skip half, take 100
+                var skip = Math.Max(0, count / 2);
+                var take = 100;
+
+                switch (tier)
+                {
+                    case "Minimal":
+                        resultCount = (await BenchmarkMinimal.All()).Skip(skip).Take(take).Count();
+                        break;
+                    case "Indexed":
+                        resultCount = (await BenchmarkIndexed.All()).Skip(skip).Take(take).Count();
+                        break;
+                    case "Complex":
+                        resultCount = (await BenchmarkComplex.All()).Skip(skip).Take(take).Count();
+                        break;
+                }
+            }
+
+            stopwatch.Stop();
+            testResult.Duration = stopwatch.Elapsed;
+            testResult.OperationsPerSecond = resultCount / stopwatch.Elapsed.TotalSeconds;
+            _logger.LogInformation("Provider {Provider} finished {Tier} - {Test} in {Duration:F2}s (retrieved {Count} entities)",
+                provider, tier, testResult.TestName, stopwatch.Elapsed.TotalSeconds, resultCount);
+        }
+        catch (Exception ex)
+        {
+            testResult.Error = ex.Message;
+            _logger.LogError(ex, "Provider {Provider} failed {Tier} - {Test}", provider, tier, testResult.TestName);
+        }
+
+        return testResult;
+    }
+
+    private async Task<TestResult> RunCrossProviderMigrationTestAsync(
+        string sourceProvider,
+        string destProvider,
+        string tier,
+        int count,
+        IProgress<BenchmarkProgress>? progress,
+        int completedTests,
+        int totalTests,
+        CancellationToken cancellationToken)
+    {
+        var testResult = new TestResult
+        {
+            TestName = $"Migration ({sourceProvider} → {destProvider})",
+            EntityTier = tier,
+            OperationCount = count,
+            UsedNativeExecution = true
+        };
+
+        try
+        {
+            _logger.LogInformation("Starting cross-provider migration: {Source} → {Dest}, tier {Tier} ({Count} entities)",
+                sourceProvider, destProvider, tier, count);
+
+            List<object> entities;
+            var readStopwatch = Stopwatch.StartNew();
+
+            // Read from source provider
+            using (EntityContext.Adapter(sourceProvider))
+            {
+                switch (tier)
+                {
+                    case "Minimal":
+                        entities = (await BenchmarkMinimal.All()).Take(count).Cast<object>().ToList();
+                        break;
+                    case "Indexed":
+                        entities = (await BenchmarkIndexed.All()).Take(count).Cast<object>().ToList();
+                        break;
+                    case "Complex":
+                        entities = (await BenchmarkComplex.All()).Take(count).Cast<object>().ToList();
+                        break;
+                    default:
+                        testResult.Error = $"Unknown tier: {tier}";
+                        return testResult;
+                }
+            }
+
+            readStopwatch.Stop();
+            var readOpsPerSec = entities.Count / readStopwatch.Elapsed.TotalSeconds;
+            _logger.LogDebug("Read {Count} entities from {Source} in {Duration:F2}s ({OpsPerSec:F0} ops/sec)",
+                entities.Count, sourceProvider, readStopwatch.Elapsed.TotalSeconds, readOpsPerSec);
+
+            if (entities.Count == 0)
+            {
+                testResult.Error = $"No entities found in {sourceProvider}";
+                return testResult;
+            }
+
+            // Write to destination provider
+            var writeStopwatch = Stopwatch.StartNew();
+            using (EntityContext.Adapter(destProvider))
+            {
+                const int batchSize = 500;
+                for (int i = 0; i < entities.Count; i += batchSize)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    var batch = entities.Skip(i).Take(batchSize).ToList();
+                    await SaveEntitiesBatchAsync(batch, tier);
+                }
+            }
+
+            writeStopwatch.Stop();
+            var writeOpsPerSec = entities.Count / writeStopwatch.Elapsed.TotalSeconds;
+            _logger.LogDebug("Wrote {Count} entities to {Dest} in {Duration:F2}s ({OpsPerSec:F0} ops/sec)",
+                entities.Count, destProvider, writeStopwatch.Elapsed.TotalSeconds, writeOpsPerSec);
+
+            // Total duration includes both read and write
+            testResult.Duration = readStopwatch.Elapsed + writeStopwatch.Elapsed;
+            testResult.OperationsPerSecond = entities.Count / testResult.Duration.TotalSeconds;
+
+            _logger.LogInformation("Completed migration {Source} → {Dest}, tier {Tier}: {Count} entities in {Duration:F2}s ({OpsPerSec:F0} ops/sec) [Read: {ReadOps:F0} ops/sec, Write: {WriteOps:F0} ops/sec]",
+                sourceProvider, destProvider, tier, entities.Count, testResult.Duration.TotalSeconds,
+                testResult.OperationsPerSecond, readOpsPerSec, writeOpsPerSec);
+        }
+        catch (Exception ex)
+        {
+            testResult.Error = ex.Message;
+            _logger.LogError(ex, "Migration failed {Source} → {Dest}, tier {Tier}", sourceProvider, destProvider, tier);
+        }
+
+        return testResult;
     }
 
     private int GetEntityCount(BenchmarkScale scale, int? customCount = null)

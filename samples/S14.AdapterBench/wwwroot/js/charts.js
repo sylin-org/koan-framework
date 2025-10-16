@@ -118,5 +118,81 @@ const Charts = {
                 }
             }
         });
+    },
+
+    createMigrationChart(results) {
+        const ctx = document.getElementById('migrationChart').getContext('2d');
+
+        // Collect all migration test results
+        const migrationData = [];
+        results.providerResults.forEach(provider => {
+            provider.tests
+                .filter(t => t.testName.startsWith('Migration ('))
+                .forEach(test => {
+                    // Extract source and dest from test name like "Migration (sqlite → postgres)"
+                    const match = test.testName.match(/Migration \((.+) → (.+)\)/);
+                    if (match) {
+                        migrationData.push({
+                            source: match[1],
+                            dest: match[2],
+                            tier: test.entityTier,
+                            opsPerSec: test.operationsPerSecond,
+                            label: `${match[1]} → ${match[2]} (${test.entityTier})`
+                        });
+                    }
+                });
+        });
+
+        if (migrationData.length === 0) {
+            // No migration data, show message
+            ctx.font = '16px Arial';
+            ctx.fillText('No migration data available', 10, 30);
+            return;
+        }
+
+        // Sort by ops/sec descending
+        migrationData.sort((a, b) => b.opsPerSec - a.opsPerSec);
+
+        const data = {
+            labels: migrationData.map(m => m.label),
+            datasets: [{
+                label: 'Migration Speed (ops/sec)',
+                data: migrationData.map(m => m.opsPerSec),
+                backgroundColor: migrationData.map(m =>
+                    this.providerColors[m.source.toLowerCase()] || '#666'),
+            }]
+        };
+
+        if (this.charts.migration) {
+            this.charts.migration.destroy();
+        }
+
+        this.charts.migration = new Chart(ctx, {
+            type: 'bar',
+            data: data,
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                indexAxis: 'y',
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    title: {
+                        display: true,
+                        text: 'Higher is better (operations per second)'
+                    }
+                },
+                scales: {
+                    x: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Operations per Second'
+                        }
+                    }
+                }
+            }
+        });
     }
 };
