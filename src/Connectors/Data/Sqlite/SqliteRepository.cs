@@ -55,6 +55,15 @@ internal sealed class SqliteRepository<TEntity, TKey> :
     private readonly RelationalMaterializationOptions _relOptions;
     private readonly StorageOptimizationInfo _optimizationInfo;
     private static readonly ConcurrentDictionary<string, bool> _healthyCache = new(StringComparer.Ordinal);
+    private static readonly ConcurrentDictionary<string, bool> _visibilityCache = new(StringComparer.Ordinal);
+
+    // Performance caches to eliminate redundant parsing/checks
+    private static readonly ConcurrentDictionary<string, (string dataSource, string? directory)> _connectionInfoCache = new(StringComparer.Ordinal);
+    private static readonly ConcurrentDictionary<string, System.Reflection.PropertyInfo?> _propertyInfoCache = new(StringComparer.Ordinal);
+
+    // Connection pooling infrastructure to eliminate connection creation overhead
+    private static readonly ConcurrentDictionary<string, ConnectionPool> _connectionPools = new(StringComparer.Ordinal);
+
     private static string BuildCacheKey(SqliteConnection conn, string table)
         => ($"{conn.DataSource}/{conn.Database}::{table}");
 
@@ -66,7 +75,12 @@ internal sealed class SqliteRepository<TEntity, TKey> :
 
     private void InvalidateHealth(SqliteConnection conn, string table)
     {
-        try { _healthyCache.TryRemove(BuildCacheKey(conn, table), out _); }
+        try
+        {
+            var key = BuildCacheKey(conn, table);
+            _healthyCache.TryRemove(key, out _);
+            _visibilityCache.TryRemove(key, out _);
+        }
         catch { }
     }
 
@@ -107,20 +121,41 @@ internal sealed class SqliteRepository<TEntity, TKey> :
     private SqliteConnection CreateConnection()
     {
         var cs = _options.ConnectionString;
-        try
+
+        // Cache connection string parsing and directory resolution
+        if (!_connectionInfoCache.TryGetValue(cs, out var info))
         {
-            // Best-effort: create directory for file-based connection strings
-            var builder = new SqliteConnectionStringBuilder(cs);
-            var dataSource = builder.DataSource;
-            if (!string.IsNullOrWhiteSpace(dataSource))
+            try
             {
-                var fullPath = dataSource;
-                try { fullPath = Path.GetFullPath(dataSource); } catch { }
-                var dir = Path.GetDirectoryName(fullPath);
-                if (!string.IsNullOrWhiteSpace(dir)) Directory.CreateDirectory(dir);
+                // Best-effort: create directory for file-based connection strings
+                var builder = new SqliteConnectionStringBuilder(cs);
+                var dataSource = builder.DataSource;
+                string? directory = null;
+
+                if (!string.IsNullOrWhiteSpace(dataSource))
+                {
+                    var fullPath = dataSource;
+                    try { fullPath = Path.GetFullPath(dataSource); } catch { }
+                    directory = Path.GetDirectoryName(fullPath);
+                }
+
+                info = (dataSource, directory);
+                _connectionInfoCache[cs] = info;
+            }
+            catch
+            {
+                // Cache empty info to avoid repeated failures
+                info = (string.Empty, null);
+                _connectionInfoCache[cs] = info;
             }
         }
-        catch { /* non-fatal */ }
+
+        // Create directory if needed (only on first access or if it doesn't exist)
+        if (!string.IsNullOrWhiteSpace(info.directory))
+        {
+            try { Directory.CreateDirectory(info.directory); } catch { /* non-fatal */ }
+        }
+
         var conn = new SqliteConnection(cs);
         conn.Open();
         return conn;
@@ -128,9 +163,58 @@ internal sealed class SqliteRepository<TEntity, TKey> :
 
     private IDbConnection Open()
     {
-        var conn = CreateConnection();
+        var cs = _options.ConnectionString;
+
+        // Ensure directory exists before renting from pool
+        if (!_connectionInfoCache.TryGetValue(cs, out var info))
+        {
+            try
+            {
+                var builder = new SqliteConnectionStringBuilder(cs);
+                var dataSource = builder.DataSource;
+                string? directory = null;
+
+                if (!string.IsNullOrWhiteSpace(dataSource))
+                {
+                    var fullPath = dataSource;
+                    try { fullPath = Path.GetFullPath(dataSource); } catch { }
+                    directory = Path.GetDirectoryName(fullPath);
+                }
+
+                info = (dataSource, directory);
+                _connectionInfoCache[cs] = info;
+            }
+            catch
+            {
+                info = (string.Empty, null);
+                _connectionInfoCache[cs] = info;
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(info.directory))
+        {
+            try { Directory.CreateDirectory(info.directory); } catch { }
+        }
+
+        // Rent connection from pool - eliminates connection creation overhead
+        var pool = _connectionPools.GetOrAdd(cs, key => new ConnectionPool(key));
+        var pooledConn = pool.Rent();
+
+        // Extract underlying SqliteConnection for EnsureOrchestrated
+        var connField = typeof(PooledConnection).GetField("_connection",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        var conn = (SqliteConnection)connField!.GetValue(pooledConn)!;
+
         EnsureOrchestrated(conn);
+
         // Extra barrier: ensure the table and projected columns are visible on this connection
+        // Use cache to avoid expensive PRAGMA queries on every connection
+        var cacheKey = BuildCacheKey(conn, TableName);
+        if (_visibilityCache.TryGetValue(cacheKey, out var visible) && visible)
+        {
+            return pooledConn; // Return wrapper, not raw connection
+        }
+
         try
         {
             var ddl = new SqliteDdlExecutor(conn, TableName);
@@ -143,7 +227,12 @@ internal sealed class SqliteRepository<TEntity, TKey> :
             {
                 try
                 {
-                    if (ddl.TableExists(string.Empty, TableName) && required.All(cn => ddl.ColumnExists(string.Empty, TableName, cn))) break;
+                    if (ddl.TableExists(string.Empty, TableName) && required.All(cn => ddl.ColumnExists(string.Empty, TableName, cn)))
+                    {
+                        // Cache successful visibility check
+                        _visibilityCache[cacheKey] = true;
+                        break;
+                    }
                 }
                 catch { }
                 Thread.Sleep(delay);
@@ -151,7 +240,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
             }
         }
         catch { }
-        return conn;
+        return pooledConn; // Return wrapper, not raw connection
     }
 
     private Task EnsureOrchestratedAsync(SqliteConnection conn, CancellationToken ct)
@@ -184,6 +273,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
             if (key.EndsWith(suffix, StringComparison.Ordinal))
             {
                 _healthyCache.TryRemove(key, out _);
+                _visibilityCache.TryRemove(key, out _);
             }
         }
     }
@@ -296,7 +386,14 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         if (!optimizationInfo.IsOptimized || typeof(TKey) != typeof(string))
             return;
 
-        var idProperty = typeof(TEntity).GetProperty(optimizationInfo.IdPropertyName);
+        // Cache PropertyInfo lookup to avoid reflection on every entity write
+        var cacheKey = $"{typeof(TEntity).FullName}:{optimizationInfo.IdPropertyName}";
+        if (!_propertyInfoCache.TryGetValue(cacheKey, out var idProperty))
+        {
+            idProperty = typeof(TEntity).GetProperty(optimizationInfo.IdPropertyName);
+            _propertyInfoCache[cacheKey] = idProperty;
+        }
+
         if (idProperty?.GetValue(entity) is not string stringId || string.IsNullOrEmpty(stringId))
             return;
 
@@ -663,14 +760,15 @@ internal sealed class SqliteRepository<TEntity, TKey> :
     public async Task<int> UpsertManyAsync(IEnumerable<TEntity> models, CancellationToken ct = default)
     {
         using var conn = Open();
-        // Best-effort ensure in case the connection factory didn’t create yet
-        if (conn is SqliteConnection sc0) { EnsureOrchestrated(sc0); }
         using var tx = conn.BeginTransaction();
+
         var count = 0;
         foreach (var e in models)
         {
             ct.ThrowIfCancellationRequested();
+
             var row = ToRow(e);
+
             try
             {
                 await conn.ExecuteAsync($"INSERT INTO [{TableName}] (Id, Json) VALUES (@Id, @Json) ON CONFLICT(Id) DO UPDATE SET Json = excluded.Json;", new { row.Id, row.Json }, tx);
@@ -688,6 +786,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
             }
             count++;
         }
+
         tx.Commit();
         return count;
     }
@@ -1205,6 +1304,123 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         public bool SupportsPersistedComputedColumns => false;
         public bool SupportsIndexesOnComputedColumns => true;
         public string ProviderName => "sqlite";
+    }
+
+    /// <summary>
+    /// Connection pool for SQLite to eliminate connection creation overhead.
+    /// Manages a pool of reusable connections per connection string.
+    /// </summary>
+    private sealed class ConnectionPool
+    {
+        private readonly string _connectionString;
+        private readonly ConcurrentBag<SqliteConnection> _availableConnections = new();
+        private readonly SemaphoreSlim _semaphore = new(20, 20); // Max 20 concurrent connections
+        private int _totalCreated;
+
+        public ConnectionPool(string connectionString)
+        {
+            _connectionString = connectionString;
+        }
+
+        public PooledConnection Rent()
+        {
+            _semaphore.Wait();
+
+            // Try to get an existing connection from the pool
+            if (_availableConnections.TryTake(out var conn))
+            {
+                try
+                {
+                    // Verify connection is still valid
+                    if (conn.State == ConnectionState.Open)
+                    {
+                        return new PooledConnection(conn, this);
+                    }
+                    // Connection was closed, reopen it
+                    conn.Open();
+                    return new PooledConnection(conn, this);
+                }
+                catch
+                {
+                    // Connection is bad, dispose and create new
+                    try { conn.Dispose(); } catch { }
+                }
+            }
+
+            // Create a new connection
+            var newConn = new SqliteConnection(_connectionString);
+            newConn.Open();
+            Interlocked.Increment(ref _totalCreated);
+            return new PooledConnection(newConn, this);
+        }
+
+        public void Return(SqliteConnection conn)
+        {
+            try
+            {
+                if (conn.State == ConnectionState.Open)
+                {
+                    // Return connection to pool for reuse
+                    _availableConnections.Add(conn);
+                }
+                else
+                {
+                    // Connection is closed, dispose it
+                    try { conn.Dispose(); } catch { }
+                }
+            }
+            finally
+            {
+                _semaphore.Release();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Wrapper around SqliteConnection that returns to pool on Dispose.
+    /// </summary>
+    private sealed class PooledConnection : IDbConnection
+    {
+        private SqliteConnection? _connection;
+        private readonly ConnectionPool _pool;
+        private bool _disposed;
+
+        public PooledConnection(SqliteConnection connection, ConnectionPool pool)
+        {
+            _connection = connection;
+            _pool = pool;
+        }
+
+        public string ConnectionString
+        {
+            get => _connection?.ConnectionString ?? string.Empty;
+            set
+            {
+                if (_connection != null) _connection.ConnectionString = value;
+            }
+        }
+
+        public int ConnectionTimeout => _connection?.ConnectionTimeout ?? 0;
+        public string Database => _connection?.Database ?? string.Empty;
+        public ConnectionState State => _connection?.State ?? ConnectionState.Closed;
+
+        public IDbTransaction BeginTransaction() => _connection!.BeginTransaction();
+        public IDbTransaction BeginTransaction(IsolationLevel il) => _connection!.BeginTransaction(il);
+        public void ChangeDatabase(string databaseName) => _connection?.ChangeDatabase(databaseName);
+        public void Close() { } // Don't actually close - return to pool on Dispose
+        public IDbCommand CreateCommand() => _connection!.CreateCommand();
+        public void Open() => _connection?.Open();
+
+        public void Dispose()
+        {
+            if (!_disposed && _connection != null)
+            {
+                _disposed = true;
+                // Return connection to pool instead of disposing it
+                _pool.Return(_connection);
+                _connection = null;
+            }
+        }
     }
 
     private (int offset, int limit) ComputeSkipTake(DataQueryOptions? options)

@@ -58,6 +58,18 @@ const Charts = {
     createPerformanceChart(canvasId, results, testName) {
         const ctx = document.getElementById(canvasId).getContext('2d');
 
+        // Collect all unique entity tiers from actual test results
+        const tierSet = new Set();
+        results.providerResults.forEach(provider => {
+            provider.tests
+                .filter(t => t.testName === testName)
+                .forEach(t => tierSet.add(t.entityTier));
+        });
+        const tierLabels = Array.from(tierSet).sort((a, b) => {
+            const order = { 'Minimal': 1, 'Indexed': 2, 'Complex': 3 };
+            return (order[a] || 99) - (order[b] || 99);
+        });
+
         const datasets = results.providerResults.map(provider => {
             const testData = provider.tests
                 .filter(t => t.testName === testName)
@@ -80,7 +92,7 @@ const Charts = {
         this.charts[canvasId] = new Chart(ctx, {
             type: 'bar',
             data: {
-                labels: ['Minimal', 'Indexed', 'Complex'],
+                labels: tierLabels,
                 datasets: datasets
             },
             options: {
