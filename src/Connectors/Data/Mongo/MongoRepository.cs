@@ -24,6 +24,7 @@ namespace Koan.Data.Connector.Mongo;
 
 internal sealed class MongoRepository<TEntity, TKey> :
     IDataRepository<TEntity, TKey>,
+    IDataRepositoryWithOptions<TEntity, TKey>,
     ILinqQueryRepository<TEntity, TKey>,
     IQueryCapabilities,
     IWriteCapabilities,

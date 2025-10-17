@@ -86,12 +86,14 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         }
 
         var list = queryResult.Items.ToList();
+
         if (context.Options.Sort.Count > 0)
         {
             list = ApplySort(list, context.Options.Sort);
         }
 
         var shouldPaginate = request.ApplyPagination;
+
         if (shouldPaginate && !queryResult.RepositoryHandledPagination)
         {
             (list, total) = ApplyPagination(list, context.Options.Page, context.Options.PageSize, total);
@@ -129,6 +131,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         }
 
         object payload = list;
+
         if (!string.IsNullOrWhiteSpace(request.With) && request.With.Contains("all", StringComparison.OrdinalIgnoreCase))
         {
             payload = await EnrichRelationshipsAsync(list, context.CancellationToken);

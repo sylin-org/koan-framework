@@ -33,6 +33,7 @@ public class PhotosController : EntityController<PhotoAsset>
         _hubContext = hubContext;
     }
 
+
     /// <summary>
     /// Upload photos to an event (or auto-create daily album if eventId not provided)
     /// Demonstrates: File upload, batch processing, background jobs, auto-organization
