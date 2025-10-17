@@ -51,7 +51,7 @@ public static class EntityLifecycleConfiguration
             }
 
             // Continue with the removal
-            return Koan.Data.Core.Events.EntityEventResult.Continue();
+            return Koan.Data.Core.Events.EntityEventResult.Proceed();
         });
     }
 }
