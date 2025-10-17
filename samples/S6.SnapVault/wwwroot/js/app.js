@@ -154,16 +154,10 @@ class SnapVaultApp {
       btn.classList.toggle('active', btn.dataset.preset === presetId);
     });
 
-    // Update grid with new preset
-    const grid = document.querySelector('.photo-grid');
-    if (grid) {
-      grid.dataset.preset = presetId;
-    }
-
     console.log(`[setViewPreset] View preset: ${VIEW_PRESETS[presetId].label}`);
 
-    // Flush data and refetch with new resolution tier
-    await this.loadPhotos();
+    // Update preset attribute only (instant, no image reload)
+    this.components.grid.updatePreset();
 
     // Delay re-enabling infinite scroll to prevent immediate trigger
     // This gives the layout time to settle and user time to scroll

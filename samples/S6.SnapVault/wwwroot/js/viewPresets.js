@@ -12,12 +12,12 @@ export const VIEW_PRESETS = {
     columns: {
       mobile: 1,
       tablet: 2,
-      desktop: 2,
-      wide: 3,
-      ultra: 3
+      desktop: 3,
+      wide: 4,
+      ultra: 4
     },
     imageTier: 'gallery', // Always use gallery tier
-    minWidth: 400, // Minimum px per tile
+    minWidth: 350, // Minimum px per tile
     order: 1
   },
 

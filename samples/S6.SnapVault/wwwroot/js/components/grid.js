@@ -81,6 +81,18 @@ export class PhotoGrid {
     });
   }
 
+  /**
+   * Update view preset without re-rendering (instant, no image reload)
+   * Only updates the CSS data-preset attribute to trigger column changes
+   */
+  updatePreset() {
+    if (!this.container) return;
+
+    const currentPreset = this.app.state.viewPreset || 'comfortable';
+    this.container.dataset.preset = currentPreset;
+    console.log(`[Grid] Updated preset to: ${currentPreset} (no re-render)`);
+  }
+
   render() {
     if (!this.container) return;
 
@@ -113,6 +125,11 @@ export class PhotoGrid {
     // Apply CSS class based on masonry support
     this.container.classList.toggle('masonry-native', this.supportsMasonry);
     this.container.classList.toggle('masonry-fallback', !this.supportsMasonry);
+
+    // Apply view preset to grid container
+    const currentPreset = this.app.state.viewPreset || 'comfortable';
+    this.container.dataset.preset = currentPreset;
+    console.log(`[Grid] Applied preset: ${currentPreset}`);
 
     // Render all photos in current state
     photos.forEach(photo => {
@@ -158,16 +175,15 @@ export class PhotoGrid {
     // Map tier to appropriate endpoint
     switch (tier) {
       case 'gallery':
-        // Gallery tier (1200px) - use gallery thumbnail if available
-        if (photo.galleryThumbnailMediaId) {
-          return `/api/media/gallery-thumbnails/${photo.galleryThumbnailMediaId}`;
+        // Gallery tier (1200px) - use photo ID (endpoint looks up gallery media)
+        if (photo.galleryMediaId) {
+          return `/api/media/photos/${photo.id}/gallery`;
         }
         // Fallback to masonry if gallery not available
         return `/api/media/masonry-thumbnails/${photo.masonryThumbnailMediaId || photo.id}`;
 
       case 'retina':
-        // Retina tier (600px) - will be implemented in Phase 3
-        // For now, fallback to masonry
+        // Retina tier (600px) - use media ID directly
         if (photo.retinaThumbnailMediaId) {
           return `/api/media/retina-thumbnails/${photo.retinaThumbnailMediaId}`;
         }
@@ -175,7 +191,7 @@ export class PhotoGrid {
 
       case 'masonry':
       default:
-        // Masonry tier (300px) - aspect-ratio preserved
+        // Masonry tier (300px) - use media ID directly
         return `/api/media/masonry-thumbnails/${photo.masonryThumbnailMediaId || photo.id}`;
     }
   }

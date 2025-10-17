@@ -634,7 +634,6 @@ body {
 .photo-grid.masonry-native {
   padding: var(--space-3);
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
   grid-template-rows: masonry;
   gap: var(--space-2);
 }
@@ -643,7 +642,99 @@ body {
 .photo-grid.masonry-fallback {
   padding: var(--space-3);
   column-gap: var(--space-2);
+}
+
+/* View Preset Column Counts - Gallery Mode (Large Tiles) */
+.photo-grid[data-preset="gallery"].masonry-native {
+  grid-template-columns: repeat(3, 1fr); /* Desktop: 3 columns */
+}
+.photo-grid[data-preset="gallery"].masonry-fallback {
+  column-count: 3;
+}
+
+/* View Preset Column Counts - Comfortable Mode (Default) */
+.photo-grid[data-preset="comfortable"].masonry-native {
+  grid-template-columns: repeat(4, 1fr); /* Desktop: 4 columns */
+}
+.photo-grid[data-preset="comfortable"].masonry-fallback {
   column-count: 4;
+}
+
+/* View Preset Column Counts - Cozy Mode (Smaller Tiles) */
+.photo-grid[data-preset="cozy"].masonry-native {
+  grid-template-columns: repeat(6, 1fr); /* Desktop: 6 columns */
+}
+.photo-grid[data-preset="cozy"].masonry-fallback {
+  column-count: 6;
+}
+
+/* View Preset Column Counts - Compact Mode (Tiny Tiles) */
+.photo-grid[data-preset="compact"].masonry-native {
+  grid-template-columns: repeat(8, 1fr); /* Desktop: 8 columns */
+}
+.photo-grid[data-preset="compact"].masonry-fallback {
+  column-count: 8;
+}
+
+/* Responsive Column Adjustments */
+@media (min-width: 3840px) {
+  /* 4K+ Ultra Wide */
+  .photo-grid[data-preset="gallery"].masonry-native { grid-template-columns: repeat(4, 1fr); }
+  .photo-grid[data-preset="gallery"].masonry-fallback { column-count: 4; }
+
+  .photo-grid[data-preset="comfortable"].masonry-native { grid-template-columns: repeat(6, 1fr); }
+  .photo-grid[data-preset="comfortable"].masonry-fallback { column-count: 6; }
+
+  .photo-grid[data-preset="cozy"].masonry-native { grid-template-columns: repeat(8, 1fr); }
+  .photo-grid[data-preset="cozy"].masonry-fallback { column-count: 8; }
+
+  .photo-grid[data-preset="compact"].masonry-native { grid-template-columns: repeat(12, 1fr); }
+  .photo-grid[data-preset="compact"].masonry-fallback { column-count: 12; }
+}
+
+@media (min-width: 2560px) and (max-width: 3839px) {
+  /* QHD/4K Wide */
+  .photo-grid[data-preset="gallery"].masonry-native { grid-template-columns: repeat(4, 1fr); }
+  .photo-grid[data-preset="gallery"].masonry-fallback { column-count: 4; }
+
+  .photo-grid[data-preset="comfortable"].masonry-native { grid-template-columns: repeat(5, 1fr); }
+  .photo-grid[data-preset="comfortable"].masonry-fallback { column-count: 5; }
+
+  .photo-grid[data-preset="cozy"].masonry-native { grid-template-columns: repeat(7, 1fr); }
+  .photo-grid[data-preset="cozy"].masonry-fallback { column-count: 7; }
+
+  .photo-grid[data-preset="compact"].masonry-native { grid-template-columns: repeat(10, 1fr); }
+  .photo-grid[data-preset="compact"].masonry-fallback { column-count: 10; }
+}
+
+@media (max-width: 1023px) {
+  /* Tablet */
+  .photo-grid[data-preset="gallery"].masonry-native { grid-template-columns: repeat(2, 1fr); }
+  .photo-grid[data-preset="gallery"].masonry-fallback { column-count: 2; }
+
+  .photo-grid[data-preset="comfortable"].masonry-native { grid-template-columns: repeat(3, 1fr); }
+  .photo-grid[data-preset="comfortable"].masonry-fallback { column-count: 3; }
+
+  .photo-grid[data-preset="cozy"].masonry-native { grid-template-columns: repeat(4, 1fr); }
+  .photo-grid[data-preset="cozy"].masonry-fallback { column-count: 4; }
+
+  .photo-grid[data-preset="compact"].masonry-native { grid-template-columns: repeat(6, 1fr); }
+  .photo-grid[data-preset="compact"].masonry-fallback { column-count: 6; }
+}
+
+@media (max-width: 767px) {
+  /* Mobile */
+  .photo-grid[data-preset="gallery"].masonry-native { grid-template-columns: repeat(1, 1fr); }
+  .photo-grid[data-preset="gallery"].masonry-fallback { column-count: 1; }
+
+  .photo-grid[data-preset="comfortable"].masonry-native { grid-template-columns: repeat(2, 1fr); }
+  .photo-grid[data-preset="comfortable"].masonry-fallback { column-count: 2; }
+
+  .photo-grid[data-preset="cozy"].masonry-native { grid-template-columns: repeat(3, 1fr); }
+  .photo-grid[data-preset="cozy"].masonry-fallback { column-count: 3; }
+
+  .photo-grid[data-preset="compact"].masonry-native { grid-template-columns: repeat(4, 1fr); }
+  .photo-grid[data-preset="compact"].masonry-fallback { column-count: 4; }
 }
 
 /* Photo Card */
