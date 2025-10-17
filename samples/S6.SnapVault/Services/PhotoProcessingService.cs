@@ -502,7 +502,7 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
             await imageStream.CopyToAsync(ms, ct);
             var imageBytes = ms.ToArray();
 
-            // Simplified JSON prompt - focused on accuracy over completeness
+            // Refined JSON prompt - captures detailed facts while maintaining accuracy
             var prompt = @"Analyze this photograph and return a JSON object. Be accurate and only describe what you clearly see.
 
 Return ONLY valid JSON in this exact format (no markdown, no code blocks, just the JSON):
@@ -511,40 +511,65 @@ Return ONLY valid JSON in this exact format (no markdown, no code blocks, just t
   ""tags"": [""tag1"", ""tag2"", ""tag3"", ""...""],
   ""summary"": ""One clear sentence describing the image"",
   ""facts"": {
-    ""Type"": ""portrait|landscape|product|food|screenshot|architecture|wildlife|other"",
+    ""Type"": ""portrait|landscape|still-life|product|food|screenshot|architecture|wildlife|other"",
+    ""Subject Count"": ""describe number and type of subjects"",
     ""Composition"": ""describe framing and arrangement"",
     ""Palette"": ""list 3-5 dominant colors"",
     ""Lighting"": ""describe light source and quality"",
-    ""[Additional Facts]"": ""include any other clearly visible details""
+    ""Setting"": ""describe location context"",
+    ""Mood"": ""describe emotional tone or atmosphere""
   }
 }
+
+IMPORTANT: Add additional fact fields for clearly visible details. Use descriptive field names.
+Example with optional fields: { ""Character"": ""female, dark hair, elf ears"", ""Atmospherics"": ""soft fog, god rays"", ""Light Sources"": ""neon signs, LED panels"" }
 
 GUIDELINES:
 - tags: 6-10 searchable keywords (lowercase, use hyphens for multi-word like ""red-hoodie"")
   Examples: character, portrait, studio, graffiti, black-hoodie, red-headphones, cool-tones, centered
 
-- summary: 20-50 words describing subject, action, setting, and visual characteristics
+- summary: 30-80 words describing subject, action, setting, and visual characteristics
   Example: ""A female character with dark brown hair and elf-like ears, wearing a black hoodie and red headphones, stands against a graffiti-style backdrop in a cool-toned, evenly lit studio.""
 
-- facts.Type: Main category of the photo (portrait, landscape, product, food, screenshot, etc.)
+- facts.Type: Main category of the photo
+  Examples: portrait, landscape, still-life, product, food, screenshot, architecture, wildlife, macro, abstract
 
-- facts.Composition: How elements are arranged (centered, rule-of-thirds, symmetrical, etc.)
+- facts.SubjectCount: Number and type of main subjects
+  Examples: ""no subjects"", ""1 person"", ""2 people"", ""3 characters"", ""single object"", ""multiple items""
 
-- facts.Palette: 3-5 dominant colors (black, red, white, gray, brown, blue, etc.)
+- facts.Composition: How elements are arranged
+  Examples: centered, rule-of-thirds, symmetrical, diagonal, leading-lines, framed, off-center
 
-- facts.Lighting: Light source and characteristics (studio, natural, golden-hour, soft, dramatic, etc.)
+- facts.Palette: 3-5 dominant colors (comma-separated)
+  Examples: ""blue, gray, brown"", ""black, red, white"", ""warm-tones, orange, yellow""
 
-- Additional facts: Include any clearly visible details like:
-  * For portraits: ""Character"" (gender, hair, expression, clothing, accessories)
-  * For landscapes: ""Atmosphere"" (weather, time of day, season)
-  * For products: ""Presentation"" (flat-lay, lifestyle, close-up)
-  * For screenshots: ""Content"" (game, UI, app)
+- facts.Lighting: Light source and characteristics
+  Examples: overcast, golden-hour, studio, natural, soft, dramatic, backlit, low-key, high-key
+
+- facts.Setting: Location or environment context
+  Examples: ""outdoor, castle"", ""indoor, studio"", ""urban, street"", ""nature, forest"", ""home, kitchen""
+
+- facts.Mood: Emotional tone or atmosphere
+  Examples: mysterious, cheerful, serene, dramatic, playful, somber, energetic, contemplative
+
+- Additional facts: Include any other clearly visible details. Only add fields you can see - never force details that aren't there.
+  * Character details: gender, hair, expression, clothing, accessories, pose
+  * Locale cues: architecture style, props, vegetation, furniture, water, terrain
+  * Topology: foreground/midground/background elements, platforms, stairs, bridges, paths
+  * Atmospherics: fog, haze, smoke, sparks, rain, snow, bloom, god-rays
+  * Color grade: warm/cool/neutral tints (teal-orange, magenta, sepia)
+  * Time/Weather: day/night/sunset/overcast (if discernible)
+  * Depth cues: bokeh, DOF blur, shallow/deep focus
+  * Motion/VFX: motion blur, particles, energy effects, magic circles
+  * Visible text: transcribe short, clearly readable text only
+  * Light sources: torches, neon, sun, LEDs, screens, practicals
 
 CRITICAL RULES:
 1. Return ONLY the JSON object - no explanatory text
 2. Only include what you can CLEARLY see - never guess or hallucinate
 3. Use simple, factual descriptions
 4. Keep all strings properly escaped for JSON
+5. If uncertain about a field, use generic but accurate descriptions
 
 Analyze the image and return the JSON now.";
 
