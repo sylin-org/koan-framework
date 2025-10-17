@@ -307,8 +307,42 @@ public class MaintenanceController : ControllerBase
         {
             await SendProgress(0, "Starting repository wipe...");
 
-            // Step 1: Delete ALL media entities (photos, thumbnails, galleries) - 60% of progress
-            await SendProgress(5, "Deleting all photos...");
+            // Step 1: Delete media derivatives FIRST (to avoid cascade delete issues) - 40% of progress
+            await SendProgress(5, "Deleting all thumbnails...");
+            var thumbnails = await PhotoThumbnail.All(ct);
+            var totalThumbs = thumbnails.Count;
+            var deletedThumbs = 0;
+            foreach (var thumb in thumbnails)
+            {
+                await thumb.Delete(ct);
+                deletedThumbs++;
+            }
+            await SendProgress(15, $"Deleted {deletedThumbs} thumbnails");
+
+            await SendProgress(15, "Deleting all masonry thumbnails...");
+            var masonryThumbs = await PhotoMasonryThumbnail.All(ct);
+            var totalMasonryThumbs = masonryThumbs.Count;
+            var deletedMasonryThumbs = 0;
+            foreach (var masonryThumb in masonryThumbs)
+            {
+                await masonryThumb.Delete(ct);
+                deletedMasonryThumbs++;
+            }
+            await SendProgress(25, $"Deleted {deletedMasonryThumbs} masonry thumbnails");
+
+            await SendProgress(25, "Deleting all gallery images...");
+            var galleries = await PhotoGallery.All(ct);
+            var totalGalleries = galleries.Count;
+            var deletedGalleries = 0;
+            foreach (var gallery in galleries)
+            {
+                await gallery.Delete(ct);
+                deletedGalleries++;
+            }
+            await SendProgress(35, $"Deleted {deletedGalleries} gallery images");
+
+            // Step 2: Delete PhotoAssets (now that derivatives are gone, cascade delete won't interfere) - 20% of progress
+            await SendProgress(35, "Deleting all photos...");
             var photos = await PhotoAsset.All(ct);
             var totalPhotos = photos.Count;
             var deletedPhotos = 0;
@@ -319,72 +353,40 @@ public class MaintenanceController : ControllerBase
                 deletedPhotos++;
                 if (deletedPhotos % 10 == 0 || deletedPhotos == totalPhotos)
                 {
-                    var progress = 5 + (int)((deletedPhotos / (double)Math.Max(totalPhotos, 1)) * 25);
+                    var progress = 35 + (int)((deletedPhotos / (double)Math.Max(totalPhotos, 1)) * 20);
                     await SendProgress(progress, $"Deleting photos... {deletedPhotos}/{totalPhotos}");
                 }
             }
+            await SendProgress(55, $"Deleted {totalPhotos} photos");
 
-            await SendProgress(30, "Deleting all thumbnails...");
-            var thumbnails = await PhotoThumbnail.All(ct);
-            var totalThumbs = thumbnails.Count;
-            var deletedThumbs = 0;
-            foreach (var thumb in thumbnails)
-            {
-                await thumb.Delete(ct);
-                deletedThumbs++;
-            }
-            await SendProgress(37, $"Deleted {deletedThumbs} thumbnails");
-
-            await SendProgress(37, "Deleting all masonry thumbnails...");
-            var masonryThumbs = await PhotoMasonryThumbnail.All(ct);
-            var totalMasonryThumbs = masonryThumbs.Count;
-            var deletedMasonryThumbs = 0;
-            foreach (var masonryThumb in masonryThumbs)
-            {
-                await masonryThumb.Delete(ct);
-                deletedMasonryThumbs++;
-            }
-            await SendProgress(45, $"Deleted {deletedMasonryThumbs} masonry thumbnails");
-
-            await SendProgress(45, "Deleting all gallery images...");
-            var galleries = await PhotoGallery.All(ct);
-            var totalGalleries = galleries.Count;
-            var deletedGalleries = 0;
-            foreach (var gallery in galleries)
-            {
-                await gallery.Delete(ct);
-                deletedGalleries++;
-            }
-            await SendProgress(60, $"Deleted {deletedGalleries} gallery images");
-
-            // Step 2: Delete all events (15% of progress)
-            await SendProgress(60, "Deleting events...");
+            // Step 3: Delete all events (15% of progress)
+            await SendProgress(55, "Deleting events...");
             var events = await Event.All(ct);
             foreach (var evt in events)
             {
                 await evt.Delete(ct);
             }
-            await SendProgress(75, $"Deleted {events.Count} events");
+            await SendProgress(70, $"Deleted {events.Count} events");
 
-            // Step 3: Delete processing jobs (10% of progress)
-            await SendProgress(75, "Deleting processing jobs...");
+            // Step 4: Delete processing jobs (10% of progress)
+            await SendProgress(70, "Deleting processing jobs...");
             var jobs = await ProcessingJob.All(ct);
             foreach (var job in jobs)
             {
                 await job.Delete(ct);
             }
-            await SendProgress(85, $"Deleted {jobs.Count} processing jobs");
+            await SendProgress(80, $"Deleted {jobs.Count} processing jobs");
 
-            // Step 4: Clear physical file storage (15% of progress)
-            await SendProgress(85, "Clearing physical storage...");
+            // Step 5: Clear physical file storage (15% of progress)
+            await SendProgress(80, "Clearing physical storage...");
             var storageRoot = Path.Combine(_env.ContentRootPath, ".Koan", "storage");
             if (Directory.Exists(storageRoot))
             {
                 Directory.Delete(storageRoot, true);
             }
 
-            // Step 5: Clear AI cache
-            await SendProgress(95, "Clearing AI cache...");
+            // Step 6: Clear AI cache
+            await SendProgress(90, "Clearing AI cache...");
             var cacheRoot = Path.Combine(_env.ContentRootPath, ".Koan", "cache");
             if (Directory.Exists(cacheRoot))
             {
