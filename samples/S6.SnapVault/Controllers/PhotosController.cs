@@ -12,6 +12,7 @@ namespace S6.SnapVault.Controllers;
 /// Photo management API - demonstrates batch operations, semantic search, and storage tiers
 /// </summary>
 [Route("api/[controller]")]
+[Pagination(Mode = PaginationMode.On, DefaultSize = 30, MaxSize = 200, DefaultSort = "-id")]
 public class PhotosController : EntityController<PhotoAsset>
 {
     private readonly ILogger<PhotosController> _logger;
@@ -29,45 +30,6 @@ public class PhotosController : EntityController<PhotoAsset>
         _processingService = processingService;
         _queue = queue;
         _hubContext = hubContext;
-    }
-
-    /// <summary>
-    /// Get all photos with pagination and sorting
-    /// Overrides EntityController base GET to add pagination support
-    /// </summary>
-    [HttpGet]
-    public async Task<ActionResult<List<PhotoAsset>>> GetPhotos(
-        [FromQuery] string? sort = null,
-        [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 30,
-        CancellationToken ct = default)
-    {
-        var allPhotos = await PhotoAsset.All(ct);
-
-        // Apply sorting (support -id for descending)
-        if (!string.IsNullOrEmpty(sort))
-        {
-            if (sort == "-id")
-            {
-                allPhotos = allPhotos.OrderByDescending(p => p.Id).ToList();
-            }
-            else if (sort == "id")
-            {
-                allPhotos = allPhotos.OrderBy(p => p.Id).ToList();
-            }
-        }
-
-        // Apply pagination
-        var paginatedPhotos = allPhotos
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .ToList();
-
-        _logger.LogInformation(
-            "GET /api/photos returned {Count} photos (page {Page}, pageSize {PageSize}, total {Total})",
-            paginatedPhotos.Count, page, pageSize, allPhotos.Count);
-
-        return Ok(paginatedPhotos);
     }
 
     /// <summary>
