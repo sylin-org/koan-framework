@@ -69,6 +69,8 @@
     padding: var(--space-4) var(--space-6);
     max-width: 1200px;
     margin: 0 auto;
+    max-height: calc(100vh - 92px);
+    overflow-y: auto;
 }
 
 .tab-panel {
