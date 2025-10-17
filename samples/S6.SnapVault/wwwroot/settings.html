@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="SnapVault Pro - Settings & Maintenance">
+    <title>Settings - SnapVault Pro</title>
+    <link rel="stylesheet" href="/css/app.css">
+    <link rel="stylesheet" href="/css/settings.css">
+</head>
+<body>
+    <!-- App Header -->
+    <header class="app-header">
+        <div class="header-left">
+            <h1 class="logo">SnapVault <span class="pro">Pro</span></h1>
+            <nav class="breadcrumb">
+                <a href="/" class="breadcrumb-link">Home</a>
+                <span class="breadcrumb-separator">›</span>
+                <span class="breadcrumb-current">Settings</span>
+            </nav>
+        </div>
+
+        <div class="header-right">
+            <button class="btn-icon" aria-label="Close settings" onclick="window.location.href='/'">
+                <svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </button>
+        </div>
+    </header>
+
+    <!-- Settings Content -->
+    <div class="settings-container">
+        <!-- Settings Tabs -->
+        <nav class="settings-tabs" role="tablist">
+            <button class="tab-btn" role="tab" aria-selected="false" data-tab="general">
+                <svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="3"></circle>
+                    <path d="M12 1v6m0 6v6m-5.2-2.2l4.2-4.2m0 0l4.2-4.2M1 12h6m6 0h6"></path>
+                </svg>
+                General
+            </button>
+            <button class="tab-btn active" role="tab" aria-selected="true" data-tab="storage">
+                <svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                    <line x1="8" y1="21" x2="16" y2="21"></line>
+                    <line x1="12" y1="17" x2="12" y2="21"></line>
+                </svg>
+                Storage & Data
+            </button>
+            <button class="tab-btn" role="tab" aria-selected="false" data-tab="appearance">
+                <svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z"></path>
+                </svg>
+                Appearance
+            </button>
+            <button class="tab-btn" role="tab" aria-selected="false" data-tab="about">
+                <svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="12" y1="16" x2="12" y2="12"></line>
+                    <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                </svg>
+                About
+            </button>
+        </nav>
+
+        <!-- Tab Panels -->
+        <div class="settings-content">
+            <!-- Storage & Data Tab -->
+            <div class="tab-panel active" id="tab-storage" role="tabpanel">
+                <h2 class="settings-title">Storage & Data Management</h2>
+
+                <!-- Storage Overview -->
+                <div class="settings-section">
+                    <h3 class="section-header">Storage Overview</h3>
+                    <div class="storage-card">
+                        <div class="storage-chart" id="storage-chart">
+                            <div class="chart-bar">
+                                <div class="chart-segment hot" style="width: 4%" data-tier="hot">
+                                    <span class="segment-label">Hot</span>
+                                </div>
+                                <div class="chart-segment warm" style="width: 15%" data-tier="warm">
+                                    <span class="segment-label">Warm</span>
+                                </div>
+                                <div class="chart-segment cold" style="width: 81%" data-tier="cold">
+                                    <span class="segment-label">Cold</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="storage-stats">
+                            <div class="stat-item">
+                                <span class="stat-icon">🔥</span>
+                                <div class="stat-info">
+                                    <span class="stat-label">Hot Tier (Thumbnails)</span>
+                                    <span class="stat-value" id="hot-size">-- GB</span>
+                                </div>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-icon">🌤️</span>
+                                <div class="stat-info">
+                                    <span class="stat-label">Warm Tier (Gallery)</span>
+                                    <span class="stat-value" id="warm-size">-- GB</span>
+                                </div>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-icon">❄️</span>
+                                <div class="stat-info">
+                                    <span class="stat-label">Cold Tier (Originals)</span>
+                                    <span class="stat-value" id="cold-size">-- GB</span>
+                                </div>
+                            </div>
+                            <div class="stat-item total">
+                                <div class="stat-info">
+                                    <span class="stat-label">Total Storage Used</span>
+                                    <span class="stat-value stat-total" id="total-size">-- GB</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Maintenance Actions -->
+                <div class="settings-section">
+                    <h3 class="section-header">Maintenance Actions</h3>
+
+                    <div class="action-card action-safe">
+                        <div class="action-icon">🔄</div>
+                        <div class="action-content">
+                            <h4 class="action-label">Rebuild Search Index</h4>
+                            <p class="action-description">Updates vector embeddings and metadata indexes for faster searches</p>
+                            <span class="action-meta" id="index-status">Checking status...</span>
+                        </div>
+                        <button class="btn btn-primary" id="rebuild-index-btn">
+                            Rebuild Now
+                        </button>
+                    </div>
+
+                    <div class="action-card action-safe">
+                        <div class="action-icon">🧹</div>
+                        <div class="action-content">
+                            <h4 class="action-label">Clear AI Embedding Cache</h4>
+                            <p class="action-description">Removes cached embeddings to free up space (will regenerate on next search)</p>
+                            <span class="action-meta" id="cache-status">Checking cache size...</span>
+                        </div>
+                        <button class="btn btn-primary" id="clear-cache-btn">
+                            Clear Cache
+                        </button>
+                    </div>
+
+                    <div class="action-card action-safe">
+                        <div class="action-icon">⚡</div>
+                        <div class="action-content">
+                            <h4 class="action-label">Optimize Database</h4>
+                            <p class="action-description">Compact database and rebuild indexes for better performance</p>
+                            <span class="action-meta">Recommended monthly</span>
+                        </div>
+                        <button class="btn btn-primary" id="optimize-db-btn">
+                            Optimize Now
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Data Export & Backup -->
+                <div class="settings-section">
+                    <h3 class="section-header">Data Export & Backup</h3>
+
+                    <div class="action-card action-caution">
+                        <div class="action-icon">📦</div>
+                        <div class="action-content">
+                            <h4 class="action-label">Export Photo Metadata</h4>
+                            <p class="action-description">Download a JSON archive containing all photo metadata, tags, and embeddings</p>
+                            <span class="action-meta" id="photo-count">-- photos</span>
+                        </div>
+                        <button class="btn btn-secondary" id="export-metadata-btn">
+                            Export Metadata
+                        </button>
+                    </div>
+
+                    <div class="action-card action-caution">
+                        <div class="action-icon">💾</div>
+                        <div class="action-content">
+                            <h4 class="action-label">Backup Configuration</h4>
+                            <p class="action-description">Export all settings and preferences for backup or migration</p>
+                            <span class="action-meta">Includes events, settings, and user data</span>
+                        </div>
+                        <button class="btn btn-secondary" id="backup-config-btn">
+                            Backup Config
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Danger Zone -->
+                <div class="settings-section">
+                    <div class="danger-zone-header">
+                        <svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                            <line x1="12" y1="9" x2="12" y2="13"></line>
+                            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                        </svg>
+                        DANGER ZONE
+                    </div>
+
+                    <div class="danger-zone" id="danger-zone">
+                        <div class="danger-card">
+                            <div class="danger-header">
+                                <div class="danger-icon">🗑️</div>
+                                <h4 class="danger-title">Wipe Entire Repository</h4>
+                            </div>
+                            <div class="danger-content collapsed" id="wipe-content">
+                                <div class="danger-warning">
+                                    <p class="warning-text">
+                                        <strong>⚠️ WARNING:</strong> This will permanently delete:
+                                    </p>
+                                    <ul class="deletion-list">
+                                        <li><input type="checkbox" checked disabled> All photos (<span id="wipe-photo-count">--</span> files, <span id="wipe-photo-size">--</span> GB)</li>
+                                        <li><input type="checkbox" checked disabled> All metadata and AI embeddings</li>
+                                        <li><input type="checkbox" checked disabled> All events and processing history</li>
+                                        <li><input type="checkbox" checked disabled> All configuration and preferences</li>
+                                    </ul>
+                                </div>
+
+                                <div class="export-nudge">
+                                    <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                        <polyline points="7 10 12 15 17 10"></polyline>
+                                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                                    </svg>
+                                    We recommend exporting your data first
+                                    <button class="btn-link" onclick="document.getElementById('export-metadata-btn').click()">
+                                        Export All Data
+                                    </button>
+                                </div>
+
+                                <div class="confirmation-section">
+                                    <label for="wipe-confirm" class="confirm-label">
+                                        To proceed, type: <code>DELETE ALL DATA</code>
+                                    </label>
+                                    <input
+                                        type="text"
+                                        id="wipe-confirm"
+                                        class="confirm-input"
+                                        placeholder="Type here to confirm..."
+                                        autocomplete="off"
+                                        spellcheck="false">
+                                </div>
+
+                                <div class="danger-actions">
+                                    <button class="btn btn-ghost" id="wipe-cancel-btn">
+                                        Cancel
+                                    </button>
+                                    <button class="btn btn-danger" id="wipe-confirm-btn" disabled>
+                                        Wipe Repository
+                                    </button>
+                                </div>
+                            </div>
+                            <button class="btn btn-danger-outline" id="show-wipe-btn">
+                                Show Wipe Options ▼
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Other tabs (placeholders) -->
+            <div class="tab-panel" id="tab-general" role="tabpanel">
+                <h2 class="settings-title">General Settings</h2>
+                <p class="placeholder-text">General settings coming soon...</p>
+            </div>
+
+            <div class="tab-panel" id="tab-appearance" role="tabpanel">
+                <h2 class="settings-title">Appearance</h2>
+                <p class="placeholder-text">Appearance settings coming soon...</p>
+            </div>
+
+            <div class="tab-panel" id="tab-about" role="tabpanel">
+                <h2 class="settings-title">About SnapVault Pro</h2>
+                <div class="about-content">
+                    <p>Version 1.0.0</p>
+                    <p>Powered by Koan Framework v0.6.3</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Wipe Confirmation Modal -->
+    <div class="modal" id="wipe-modal" role="dialog" aria-labelledby="modal-title" aria-modal="true">
+        <div class="modal-overlay" onclick="closeWipeModal()"></div>
+        <div class="modal-content modal-danger">
+            <h3 id="modal-title" class="modal-title">
+                <svg class="icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                    <line x1="12" y1="9" x2="12" y2="13"></line>
+                    <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                </svg>
+                FINAL CONFIRMATION
+            </h3>
+            <div class="modal-body">
+                <p class="modal-text">You are about to permanently delete:</p>
+                <ul class="modal-list">
+                    <li><span id="modal-photo-count">--</span> photos (<span id="modal-photo-size">--</span> GB)</li>
+                    <li>All metadata and embeddings</li>
+                    <li>All events and history</li>
+                </ul>
+                <p class="modal-warning">⚠️ This action is <strong>IRREVERSIBLE</strong></p>
+
+                <div class="modal-export">
+                    <p>Last chance to export your data:</p>
+                    <button class="btn btn-secondary btn-sm" onclick="document.getElementById('export-metadata-btn').click()">
+                        Export Now
+                    </button>
+                </div>
+
+                <p class="modal-question">Are you absolutely sure?</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-ghost" onclick="closeWipeModal()">
+                    No, Cancel
+                </button>
+                <button class="btn btn-danger" id="final-wipe-btn">
+                    Yes, Wipe Everything
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Progress Modal -->
+    <div class="modal" id="progress-modal" role="dialog" aria-labelledby="progress-title" aria-modal="true">
+        <div class="modal-content modal-progress">
+            <h3 id="progress-title" class="modal-title">
+                🗑️ Wiping Repository
+            </h3>
+            <div class="modal-body">
+                <div class="progress-bar-container">
+                    <div class="progress-bar" id="wipe-progress" style="width: 0%"></div>
+                </div>
+                <p class="progress-text" id="progress-text">Preparing...</p>
+                <p class="progress-warning">⚠️ Do not close this window</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container" role="status" aria-live="polite" aria-atomic="true"></div>
+
+    <!-- Scripts -->
+    <script src="/js/settings.js" type="module"></script>
+</body>
+</html>
