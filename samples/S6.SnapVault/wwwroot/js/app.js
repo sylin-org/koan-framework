@@ -213,14 +213,16 @@ class SnapVaultApp {
   async loadPhotos() {
     try {
       this.setLoading(true);
-      // Initial load: first page only (50 photos for fast FCP)
+      // Initial load: first page only (30 photos for fast FCP)
       // Sort by ID descending (newest first - GUID v7 embeds timestamp)
-      const response = await this.api.get('/api/photos?sort=-id&page=1&pageSize=50');
+      const response = await this.api.get('/api/photos?sort=-id&page=1&pageSize=30');
       this.state.photos = response || [];
       this.state.currentPage = 1;
       this.state.hasMorePages = true; // Assume more until proven otherwise
       this.components.grid.render();
       this.updateLibraryCounts();
+
+      console.log(`[Photos] Initial load: ${response?.length || 0} photos (page 1)`);
 
       // Enable infinite scroll after initial load
       this.components.grid.enableInfiniteScroll();
@@ -238,18 +240,24 @@ class SnapVaultApp {
     try {
       this.state.loadingMore = true;
       const nextPage = this.state.currentPage + 1;
-      const response = await this.api.get(`/api/photos?sort=-id&page=${nextPage}&pageSize=50`);
+
+      console.log(`[Infinite Scroll] Triggered - Loading page ${nextPage}...`);
+
+      const response = await this.api.get(`/api/photos?sort=-id&page=${nextPage}&pageSize=30`);
 
       if (response && response.length > 0) {
         this.state.photos.push(...response);
         this.state.currentPage = nextPage;
         this.components.grid.appendPhotos(response);
+
+        console.log(`[Infinite Scroll] Loaded ${response.length} photos (page ${nextPage}, total: ${this.state.photos.length})`);
       } else {
         // No more photos
         this.state.hasMorePages = false;
+        console.log(`[Infinite Scroll] No more pages - reached end of library`);
       }
     } catch (error) {
-      console.error('Failed to load more photos:', error);
+      console.error('[Infinite Scroll] Failed to load page:', error);
       this.components.toast.show('Failed to load more photos', { icon: '⚠️', duration: 3000 });
     } finally {
       this.state.loadingMore = false;

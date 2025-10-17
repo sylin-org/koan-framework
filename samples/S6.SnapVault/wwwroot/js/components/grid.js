@@ -383,6 +383,8 @@ export class PhotoGrid {
   appendPhotos(photos) {
     if (!photos || photos.length === 0) return;
 
+    console.log(`[Grid] Appending ${photos.length} photos to DOM...`);
+
     // Add new photo cards to DOM
     photos.forEach(photo => {
       this.addPhotoCard(photo);
@@ -391,9 +393,8 @@ export class PhotoGrid {
     // Trigger Macy to recalculate positions for new cards
     if (this.macy) {
       this.macy.recalculate(true);
+      console.log(`[Grid] Macy recalculated layout for ${photos.length} new cards`);
     }
-
-    console.log(`📸 Loaded ${photos.length} more photos (${this.app.state.photos.length} total)`);
   }
 
   /**
@@ -420,7 +421,7 @@ export class PhotoGrid {
       (entries) => {
         entries.forEach(entry => {
           if (entry.isIntersecting && this.app.state.hasMorePages && !this.app.state.loadingMore) {
-            console.log('📜 Loading more photos...');
+            console.log(`[Infinite Scroll] Sentinel visible - triggering load (400px margin)`);
             this.app.loadMorePhotos();
           }
         });
@@ -431,7 +432,7 @@ export class PhotoGrid {
     );
 
     this.infiniteScrollObserver.observe(sentinel);
-    console.log('♾️ Infinite scroll enabled');
+    console.log('[Infinite Scroll] Enabled with 400px preload margin');
   }
 
   /**
