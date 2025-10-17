@@ -38,6 +38,7 @@ public class PhotoAsset : MediaEntity<PhotoAsset>
     public List<string> DetectedObjects { get; set; } = new();
     public string MoodDescription { get; set; } = "";
     public List<string> AutoTags { get; set; } = new();
+    public string DetailedDescription { get; set; } = ""; // AI vision-generated detailed analysis
 
     // Vector for semantic search (no attribute needed - framework detects float[] automatically)
     public float[]? Embedding { get; set; }

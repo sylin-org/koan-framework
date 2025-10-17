@@ -144,7 +144,10 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
         {
             _logger.LogInformation("Generating AI metadata for photo {PhotoId}", photo.Id);
 
-            // Build embedding text from available metadata
+            // Generate detailed description using vision AI
+            await GenerateDetailedDescriptionAsync(photo, ct);
+
+            // Build embedding text from available metadata (including detailed description)
             var embeddingText = BuildEmbeddingText(photo);
 
             // Generate embedding using Koan AI (S5.Recs pattern)
@@ -315,6 +318,10 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
     {
         var parts = new List<string>();
 
+        // Detailed AI description first (most comprehensive)
+        if (!string.IsNullOrEmpty(photo.DetailedDescription))
+            parts.Add(photo.DetailedDescription);
+
         if (!string.IsNullOrEmpty(photo.OriginalFileName))
             parts.Add($"Filename: {photo.OriginalFileName}");
 
@@ -343,6 +350,94 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
         var info = await Image.IdentifyAsync(stream, ct);
         stream.Position = originalPosition;
         return (info.Width, info.Height);
+    }
+
+    /// <summary>
+    /// Generate detailed AI description for a photo using vision model
+    /// </summary>
+    private async Task GenerateDetailedDescriptionAsync(PhotoAsset photo, CancellationToken ct)
+    {
+        try
+        {
+            _logger.LogInformation("Generating detailed AI description for photo {PhotoId}", photo.Id);
+
+            // Load image bytes from storage
+            var imageStream = await photo.OpenRead(ct);
+            using var ms = new MemoryStream();
+            await imageStream.CopyToAsync(ms, ct);
+            var imageBytes = ms.ToArray();
+
+            // Detailed vision analysis prompt
+            var prompt = @"Role: You are a meticulous visual analyst. Describe what is visibly present in the image. Do not guess brand/model names, locations, or emotions beyond what is supported by the visuals.
+
+Output format: Markdown with the sections below. Keep it concise but specific. If a detail is unclear, write ""unclear"" or ""unreadable"" rather than guessing.
+
+1) Subject
+
+Who/what is the main subject? (human/character/object/animal)
+
+Visible attributes: age range, build/shape, notable features (hair, ears, markings), pose/gesture, facial expression (if readable).
+
+2) Wardrobe / Props / Key Elements
+
+Garments or objects from top → bottom (or front → back for products).
+
+For each, note: type, silhouette/cut, material/finish (matte/leather/satin/metal), color/undertone, hardware/trim (buckles, zippers, chains), patterns/graphics, wear/texture.
+
+3) Environment & Composition
+
+Setting (studio/backdrop/interior/exterior/scenic), background elements, set dressing.
+
+Framing (full body, half, close-up), angle (eye/low/high), camera distance, rule-of-thirds/centered, negative space.
+
+Depth of field (shallow/deep), bokeh or motion blur if present.
+
+4) Lighting & Color
+
+Light sources (softbox, spotlight, window, daylight), direction (front/side/back/rim), quality (soft/hard), contrast ratio if clear.
+
+Color temperature/grade (cool/warm/neutral), dominant palette, reflections/specular highlights.
+
+5) Technical/Surface Details
+
+Visible textures (gloss, grain, knit, suede, metal polish).
+
+Any legible text/symbols: transcribe exactly; if not readable, write ""unreadable"".
+
+Artifacts (film grain, compression), post effects (vignette, glow, color shift).
+
+6) Safety & Grounding
+
+Avoid private info or identity claims.
+
+No brand/location/model IDs unless explicitly visible and legible.
+
+7) One-Sentence Alt Text
+
+1–2 sentences, 140–200 characters, purely descriptive.
+
+8) Tags (8–15)
+
+Short, searchable keywords: subject, materials, colors, setting, mood, shot type (e.g., ""black leather, thigh-high boots, studio spotlight, dramatic rim light, cyberpunk, full-body portrait"").";
+
+            // Use vision model with context for qwen2.5-vl:7b
+            string description;
+            using (Koan.AI.Ai.Context(model: "qwen2.5-vl:7b"))
+            {
+                description = await Koan.AI.Ai.Understand(imageBytes, prompt, ct);
+            }
+
+            photo.DetailedDescription = description;
+            await photo.Save(ct);
+
+            _logger.LogInformation("Detailed AI description generated for photo {PhotoId} ({Length} chars)",
+                photo.Id, description.Length);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to generate detailed description for photo {PhotoId}, continuing without it", photo.Id);
+            // Non-fatal - continue processing even if vision description fails
+        }
     }
 
     /// <summary>
