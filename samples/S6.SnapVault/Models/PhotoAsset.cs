@@ -17,7 +17,8 @@ public class PhotoAsset : MediaEntity<PhotoAsset>
 
     // Derivative relationships (using framework's media graph)
     // ThumbnailMediaId already provided by MediaEntity<T> (square, for grid views)
-    public string? MasonryThumbnailMediaId { get; set; } // Aspect-ratio preserving, for masonry views
+    public string? MasonryThumbnailMediaId { get; set; } // Aspect-ratio preserving, 300px for masonry views
+    public string? RetinaThumbnailMediaId { get; set; } // Aspect-ratio preserving, 600px for retina/4K displays
     public string? GalleryMediaId { get; set; }
 
     // Original file metadata

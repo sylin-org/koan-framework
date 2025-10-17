@@ -138,6 +138,14 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
 
             photo.MasonryThumbnailMediaId = masonryEntity.Id;
 
+            // Branch 4: Retina thumbnail (600px max, preserve aspect ratio for retina/4K displays)
+            var retinaBranch = galleryResult.Branch();
+            var retinaResized = await retinaBranch.ResizeFit(600, 600, ct);
+            var retinaEntity = await PhotoRetinaThumbnail.Upload(retinaResized, $"{photo.Id}_retina.jpg", "image/jpeg", ct: ct);
+            await retinaEntity.Save(ct); // Save retina thumbnail entity to database
+
+            photo.RetinaThumbnailMediaId = retinaEntity.Id;
+
             await galleryResult.DisposeAsync();
 
             // Save photo entity (without AI metadata yet)
@@ -150,8 +158,8 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
             await UpdateEventPhotoCountAsync(photo.EventId, ct);
 
             _logger.LogInformation(
-                "Photo processed: {PhotoId} ({Width}x{Height}) -> Gallery: {GalleryId}, Thumbnail: {ThumbId}, Masonry: {MasonryId}",
-                photo.Id, photo.Width, photo.Height, photo.GalleryMediaId, photo.ThumbnailMediaId, photo.MasonryThumbnailMediaId);
+                "Photo processed: {PhotoId} ({Width}x{Height}) -> Gallery: {GalleryId}, Retina: {RetinaId}, Masonry: {MasonryId}, Thumbnail: {ThumbId}",
+                photo.Id, photo.Width, photo.Height, photo.GalleryMediaId, photo.RetinaThumbnailMediaId, photo.MasonryThumbnailMediaId, photo.ThumbnailMediaId);
 
             await EmitProgressAsync(photo.Id, "processing", "ai-description");
 

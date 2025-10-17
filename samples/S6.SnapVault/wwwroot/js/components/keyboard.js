@@ -50,17 +50,25 @@ export class KeyboardShortcuts {
       return;
     }
 
-    // Density controls
+    // View preset controls
     if (e.key === '1') {
-      this.app.setDensity(3);
+      e.preventDefault();
+      this.app.setViewPreset('gallery');
       return;
     }
     if (e.key === '2') {
-      this.app.setDensity(4);
+      e.preventDefault();
+      this.app.setViewPreset('comfortable');
       return;
     }
     if (e.key === '3') {
-      this.app.setDensity(6);
+      e.preventDefault();
+      this.app.setViewPreset('cozy');
+      return;
+    }
+    if (e.key === '4') {
+      e.preventDefault();
+      this.app.setViewPreset('compact');
       return;
     }
 
@@ -107,11 +115,12 @@ export class KeyboardShortcuts {
             </dl>
           </div>
           <div class="shortcut-group">
-            <h4>View</h4>
+            <h4>View Presets</h4>
             <dl>
-              <dt><kbd>1</kbd></dt><dd>Sparse density</dd>
-              <dt><kbd>2</kbd></dt><dd>Normal density</dd>
-              <dt><kbd>3</kbd></dt><dd>Dense density</dd>
+              <dt><kbd>1</kbd></dt><dd>Gallery view</dd>
+              <dt><kbd>2</kbd></dt><dd>Comfortable view</dd>
+              <dt><kbd>3</kbd></dt><dd>Cozy view</dd>
+              <dt><kbd>4</kbd></dt><dd>Compact view</dd>
             </dl>
           </div>
         </div>

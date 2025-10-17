@@ -3,13 +3,52 @@
  * Masonry layout with hover interactions
  */
 
+import { VIEW_PRESETS, selectOptimalImageTier, getResponsiveColumns } from '../viewPresets.js';
+
 export class PhotoGrid {
   constructor(app) {
     this.app = app;
     this.container = document.querySelector('.photo-grid');
     this.photoCards = new Map();
     this.observer = null;
+    this.viewportWidth = window.innerWidth;
+    this.devicePixelRatio = window.devicePixelRatio || 1;
     this.setupIntersectionObserver();
+    this.setupViewportDetection();
+  }
+
+  setupViewportDetection() {
+    // Update viewport dimensions on resize with debouncing
+    let resizeTimer;
+    window.addEventListener('resize', () => {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        this.viewportWidth = window.innerWidth;
+        this.devicePixelRatio = window.devicePixelRatio || 1;
+        console.log(`📐 Viewport updated: ${this.viewportWidth}px @ ${this.devicePixelRatio}x DPI`);
+
+        // Recalculate column count for current preset
+        this.updateResponsiveColumns();
+      }, 250);
+    });
+  }
+
+  /**
+   * Update grid column count based on viewport width and current preset
+   */
+  updateResponsiveColumns() {
+    const presetId = this.app.state.viewPreset || 'comfortable';
+    const preset = VIEW_PRESETS[presetId];
+
+    if (!preset || !this.container) return;
+
+    // Get responsive column count
+    const columns = getResponsiveColumns(preset, this.viewportWidth);
+
+    // Apply to grid via CSS custom property
+    this.container.style.columnCount = columns.toString();
+
+    console.log(`📊 Responsive columns: ${columns} (${presetId} @ ${this.viewportWidth}px)`);
   }
 
   setupIntersectionObserver() {
@@ -45,7 +84,13 @@ export class PhotoGrid {
       emptyState.style.display = 'none';
     }
 
-    // Clear existing photos (for re-render with different density)
+    // Reset tier logging flag for new render
+    this._tierLogged = false;
+
+    // Update responsive columns for current preset and viewport
+    this.updateResponsiveColumns();
+
+    // Clear existing photos (for re-render with different view preset)
     const existingCards = this.container.querySelectorAll('.photo-card');
     existingCards.forEach(card => card.remove());
 
@@ -59,6 +104,57 @@ export class PhotoGrid {
     const emptyState = this.container.querySelector('.empty-state-hero');
     if (emptyState) {
       emptyState.style.display = 'flex';
+    }
+  }
+
+  /**
+   * Get optimal image URL based on smart tier selection
+   * @param {Object} photo - Photo object with media IDs
+   * @returns {string} - Optimal image URL for current display
+   */
+  getOptimalImageUrl(photo) {
+    const presetId = this.app.state.viewPreset || 'comfortable';
+    const preset = VIEW_PRESETS[presetId];
+
+    if (!preset) {
+      console.warn(`Unknown preset: ${presetId}, falling back to masonry`);
+      return `/api/media/masonry-thumbnails/${photo.masonryThumbnailMediaId || photo.id}`;
+    }
+
+    // Select optimal tier based on display characteristics
+    const tier = selectOptimalImageTier(preset, this.viewportWidth, this.devicePixelRatio);
+
+    // Log tier selection (first photo only to avoid spam)
+    if (!this._tierLogged) {
+      const columns = getResponsiveColumns(preset, this.viewportWidth);
+      const tileWidth = Math.floor(this.viewportWidth / columns);
+      const effectivePixels = Math.floor(tileWidth * this.devicePixelRatio);
+      console.log(`🎯 Smart Resolution: ${tier} tier (${presetId} preset, ${columns} cols, ${tileWidth}px/tile × ${this.devicePixelRatio}x = ${effectivePixels}px effective)`);
+      this._tierLogged = true;
+    }
+
+    // Map tier to appropriate endpoint
+    switch (tier) {
+      case 'gallery':
+        // Gallery tier (1200px) - use gallery thumbnail if available
+        if (photo.galleryThumbnailMediaId) {
+          return `/api/media/gallery-thumbnails/${photo.galleryThumbnailMediaId}`;
+        }
+        // Fallback to masonry if gallery not available
+        return `/api/media/masonry-thumbnails/${photo.masonryThumbnailMediaId || photo.id}`;
+
+      case 'retina':
+        // Retina tier (600px) - will be implemented in Phase 3
+        // For now, fallback to masonry
+        if (photo.retinaThumbnailMediaId) {
+          return `/api/media/retina-thumbnails/${photo.retinaThumbnailMediaId}`;
+        }
+        return `/api/media/masonry-thumbnails/${photo.masonryThumbnailMediaId || photo.id}`;
+
+      case 'masonry':
+      default:
+        // Masonry tier (300px) - aspect-ratio preserved
+        return `/api/media/masonry-thumbnails/${photo.masonryThumbnailMediaId || photo.id}`;
     }
   }
 
@@ -80,13 +176,8 @@ export class PhotoGrid {
     article.dataset.photoId = photo.id;
     article.dataset.aspect = (photo.width / photo.height).toFixed(2);
 
-    // Use masonry thumbnails (aspect-ratio preserved) for densities 1-3
-    // Use square thumbnails for density 4 (compact grid view)
-    const density = this.app.state.density || 4;
-    const useMasonryThumbnail = density < 4;
-    const thumbnailUrl = useMasonryThumbnail
-      ? `/api/media/masonry-thumbnails/${photo.masonryThumbnailMediaId || photo.id}`
-      : `/api/media/photos/${photo.id}/thumbnail`;
+    // Smart tier selection based on view preset and display characteristics
+    const thumbnailUrl = this.getOptimalImageUrl(photo);
 
     const isFavorite = photo.isFavorite || false;
     const rating = photo.rating || 0;

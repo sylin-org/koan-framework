@@ -589,42 +589,68 @@ body {
 /* View Controls */
 .view-controls {
   display: flex;
-  gap: var(--space-1);
+  gap: var(--space-2);
+  align-items: center;
 }
 
-.density-btn {
-  padding: var(--space-1);
+.view-preset-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
   border-radius: var(--radius-md);
   color: var(--text-secondary);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
   transition: all var(--duration-fast) var(--ease-out-cubic);
+  border: 1px solid transparent;
 }
 
-.density-btn:hover {
+.view-preset-btn .label {
+  display: none;
+}
+
+.view-preset-btn:hover {
   background-color: var(--bg-surface-hover);
   color: var(--text-primary);
+  border-color: var(--border-subtle);
 }
 
-.density-btn.active {
+.view-preset-btn.active {
   background-color: var(--bg-surface-active);
   color: var(--accent-primary);
+  border-color: var(--accent-primary);
+}
+
+/* Show labels on larger screens */
+@media (min-width: 1920px) {
+  .view-preset-btn .label {
+    display: inline;
+  }
 }
 
 /* ===== Photo Grid ===== */
 .photo-grid {
   padding: var(--space-3);
   column-gap: var(--space-2);
+  transition: column-count var(--duration-normal) var(--ease-out-cubic);
 }
 
-.photo-grid[data-density="3"] {
-  column-count: 3;
+/* View Preset Column Counts */
+.photo-grid[data-preset="gallery"] {
+  column-count: 2;
 }
 
-.photo-grid[data-density="4"] {
+.photo-grid[data-preset="comfortable"] {
   column-count: 4;
 }
 
-.photo-grid[data-density="6"] {
+.photo-grid[data-preset="cozy"] {
   column-count: 6;
+}
+
+.photo-grid[data-preset="compact"] {
+  column-count: 8;
 }
 
 /* Photo Card */

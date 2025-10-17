@@ -103,35 +103,49 @@
                 <div class="content-header">
                     <h2 class="page-title">All Photos</h2>
                     <div class="view-controls">
-                        <button class="density-btn" data-density="3" aria-label="Sparse density (3 columns)" title="Sparse (1)">
+                        <button class="view-preset-btn" data-preset="gallery" aria-label="Gallery view - Large tiles (1)" title="Gallery">
                             <svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <rect x="2" y="2" width="9" height="9"></rect>
-                                <rect x="13" y="2" width="9" height="9"></rect>
-                                <rect x="2" y="13" width="9" height="9"></rect>
+                                <rect x="3" y="3" width="18" height="18" rx="2"></rect>
                             </svg>
+                            <span class="label">Gallery</span>
                         </button>
-                        <button class="density-btn active" data-density="4" aria-label="Normal density (4 columns)" title="Normal (2)">
+                        <button class="view-preset-btn active" data-preset="comfortable" aria-label="Comfortable view - Medium tiles (2)" title="Comfortable">
                             <svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <rect x="3" y="3" width="7" height="7"></rect>
                                 <rect x="14" y="3" width="7" height="7"></rect>
                                 <rect x="14" y="14" width="7" height="7"></rect>
                                 <rect x="3" y="14" width="7" height="7"></rect>
                             </svg>
+                            <span class="label">Comfortable</span>
                         </button>
-                        <button class="density-btn" data-density="6" aria-label="Dense density (6 columns)" title="Dense (3)">
+                        <button class="view-preset-btn" data-preset="cozy" aria-label="Cozy view - Smaller tiles (3)" title="Cozy">
                             <svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <rect x="2" y="2" width="6" height="6"></rect>
-                                <rect x="9" y="2" width="6" height="6"></rect>
-                                <rect x="16" y="2" width="6" height="6"></rect>
-                                <rect x="2" y="9" width="6" height="6"></rect>
-                                <rect x="9" y="9" width="6" height="6"></rect>
-                                <rect x="16" y="9" width="6" height="6"></rect>
+                                <rect x="10" y="2" width="6" height="6"></rect>
+                                <rect x="18" y="2" width="4" height="6"></rect>
+                                <rect x="2" y="10" width="6" height="6"></rect>
+                                <rect x="10" y="10" width="6" height="6"></rect>
+                                <rect x="18" y="10" width="4" height="6"></rect>
                             </svg>
+                            <span class="label">Cozy</span>
+                        </button>
+                        <button class="view-preset-btn" data-preset="compact" aria-label="Compact view - Tiny tiles (4)" title="Compact">
+                            <svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="2" y="2" width="4" height="4"></rect>
+                                <rect x="7" y="2" width="4" height="4"></rect>
+                                <rect x="12" y="2" width="4" height="4"></rect>
+                                <rect x="17" y="2" width="5" height="4"></rect>
+                                <rect x="2" y="7" width="4" height="4"></rect>
+                                <rect x="7" y="7" width="4" height="4"></rect>
+                                <rect x="12" y="7" width="4" height="4"></rect>
+                                <rect x="17" y="7" width="5" height="4"></rect>
+                            </svg>
+                            <span class="label">Compact</span>
                         </button>
                     </div>
                 </div>
 
-                <div class="photo-grid" data-density="4">
+                <div class="photo-grid" data-preset="comfortable">
                     <div class="empty-state-hero">
                         <svg class="icon-cloud" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>

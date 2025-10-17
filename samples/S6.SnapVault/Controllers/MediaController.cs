@@ -72,6 +72,30 @@ public class MediaController : ControllerBase
     }
 
     /// <summary>
+    /// Serve retina thumbnail image (600px max, aspect-ratio preserved, hot-cdn tier)
+    /// Optimized for high-DPI displays (4K monitors, retina screens)
+    /// </summary>
+    [HttpGet("retina-thumbnails/{id}")]
+    [ResponseCache(Duration = 31536000, Location = ResponseCacheLocation.Any)] // 1 year - images are immutable
+    public async Task<IActionResult> GetRetinaThumbnail(string id, CancellationToken ct = default)
+    {
+        // Get retina thumbnail entity directly
+        var retinaThumbnail = await PhotoRetinaThumbnail.Get(id, ct);
+        if (retinaThumbnail == null)
+        {
+            _logger.LogWarning("Retina thumbnail not found for id {Id}", id);
+            return NotFound();
+        }
+
+        // Add aggressive caching headers
+        Response.Headers["Cache-Control"] = "public, max-age=31536000, immutable";
+
+        // Stream directly from storage
+        var stream = await retinaThumbnail.OpenRead(ct);
+        return File(stream, retinaThumbnail.ContentType ?? "image/jpeg");
+    }
+
+    /// <summary>
     /// Serve gallery-size image (1200px max, warm tier)
     /// </summary>
     [HttpGet("photos/{id}/gallery")]

@@ -1,7 +1,7 @@
 /**
  * S6.SnapVault Professional Edition
  * Main Application Entry Point
- * Version 1.1 - Self-Hosted, Desktop-Only
+ * Version 1.2 - Professional View Presets with Smart Resolution
  */
 
 import { PhotoGrid } from './components/grid.js';
@@ -15,18 +15,40 @@ import { BulkActions } from './components/bulkActions.js';
 import { Filters } from './components/filters.js';
 import { Toast } from './components/toast.js';
 import { API } from './api.js';
+import { VIEW_PRESETS, migrateOldDensity } from './viewPresets.js';
 
 class SnapVaultApp {
   constructor() {
     this.currentWorkspace = 'gallery';
     this.components = {};
+
+    // Migrate old density preference to new view preset
+    this.migrateUserPreferences();
+
     this.state = {
       photos: [],
       events: [],
       selectedPhotos: new Set(),
       filters: {},
-      density: 4
+      viewPreset: this.loadViewPreset() // NEW: View preset instead of density
     };
+  }
+
+  migrateUserPreferences() {
+    // Check for old density setting and migrate
+    const oldDensity = localStorage.getItem('snapvault-density');
+    if (oldDensity && !localStorage.getItem('snapvault-view-preset')) {
+      const newPreset = migrateOldDensity(parseInt(oldDensity));
+      localStorage.setItem('snapvault-view-preset', newPreset);
+      localStorage.removeItem('snapvault-density');
+      console.log(`📦 Migrated density ${oldDensity} → preset "${newPreset}"`);
+    }
+  }
+
+  loadViewPreset() {
+    // Load saved preference or default to 'comfortable'
+    const saved = localStorage.getItem('snapvault-view-preset');
+    return (saved && VIEW_PRESETS[saved]) ? saved : 'comfortable';
   }
 
   // Expose photos array for components
@@ -54,7 +76,7 @@ class SnapVaultApp {
 
     // Setup event listeners
     this.setupWorkspaceNavigation();
-    this.setupDensityControls();
+    this.setupViewPresetControls(); // NEW: View preset controls
     this.setupUploadButtons();
     this.setupLibraryNavigation();
     this.setupDragAndDrop();
@@ -98,32 +120,42 @@ class SnapVaultApp {
     }
   }
 
-  setupDensityControls() {
-    const densityButtons = document.querySelectorAll('.density-btn');
-    densityButtons.forEach(btn => {
+  setupViewPresetControls() {
+    const presetButtons = document.querySelectorAll('.view-preset-btn');
+    presetButtons.forEach(btn => {
       btn.addEventListener('click', () => {
-        const density = parseInt(btn.dataset.density);
-        this.setDensity(density);
+        const preset = btn.dataset.preset;
+        this.setViewPreset(preset);
       });
     });
   }
 
-  setDensity(density) {
-    this.state.density = density;
-
-    // Update active button
-    document.querySelectorAll('.density-btn').forEach(btn => {
-      btn.classList.toggle('active', parseInt(btn.dataset.density) === density);
-    });
-
-    // Update grid
-    const grid = document.querySelector('.photo-grid');
-    if (grid) {
-      grid.dataset.density = density;
+  setViewPreset(presetId) {
+    if (!VIEW_PRESETS[presetId]) {
+      console.warn(`Unknown view preset: ${presetId}`);
+      return;
     }
 
-    // Re-render grid
+    this.state.viewPreset = presetId;
+
+    // Save preference
+    localStorage.setItem('snapvault-view-preset', presetId);
+
+    // Update active button
+    document.querySelectorAll('.view-preset-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.preset === presetId);
+    });
+
+    // Update grid with new preset
+    const grid = document.querySelector('.photo-grid');
+    if (grid) {
+      grid.dataset.preset = presetId;
+    }
+
+    // Re-render grid with new resolution tier
     this.components.grid.render();
+
+    console.log(`📐 View preset: ${VIEW_PRESETS[presetId].label}`);
   }
 
   setupUploadButtons() {
