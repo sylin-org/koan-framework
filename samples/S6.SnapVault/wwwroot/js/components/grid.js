@@ -86,6 +86,8 @@ export class PhotoGrid {
 
     const photos = this.app.state.photos;
 
+    console.log(`[Grid] render() called - ${photos.length} photos in state`);
+
     if (photos.length === 0) {
       this.renderEmpty();
       return;
@@ -102,7 +104,11 @@ export class PhotoGrid {
 
     // Clear existing photos
     const existingCards = this.container.querySelectorAll('.photo-card');
+    console.log(`[Grid] Clearing ${existingCards.length} existing cards`);
     existingCards.forEach(card => card.remove());
+
+    // Clear the photoCards map
+    this.photoCards.clear();
 
     // Apply CSS class based on masonry support
     this.container.classList.toggle('masonry-native', this.supportsMasonry);
@@ -112,6 +118,8 @@ export class PhotoGrid {
     photos.forEach(photo => {
       this.addPhotoCard(photo);
     });
+
+    console.log(`[Grid] render() complete - ${this.photoCards.size} cards in DOM`);
   }
 
   renderEmpty() {

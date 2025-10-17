@@ -41,7 +41,7 @@ class SnapVaultApp {
       const newPreset = migrateOldDensity(parseInt(oldDensity));
       localStorage.setItem('snapvault-view-preset', newPreset);
       localStorage.removeItem('snapvault-density');
-      console.log(`📦 Migrated density ${oldDensity} → preset "${newPreset}"`);
+      console.log(`[Migration] Migrated density ${oldDensity} to preset "${newPreset}"`);
     }
   }
 
@@ -57,7 +57,7 @@ class SnapVaultApp {
   }
 
   async init() {
-    console.log('🚀 Initializing SnapVault Pro...');
+    console.log('[App] Initializing SnapVault Pro...');
 
     // Initialize API client
     this.api = new API();
@@ -88,7 +88,7 @@ class SnapVaultApp {
     // Initialize filters after photos are loaded
     await this.components.filters.init();
 
-    console.log('✅ SnapVault Pro ready');
+    console.log('[App] SnapVault Pro ready');
   }
 
   setupWorkspaceNavigation() {
@@ -131,6 +131,8 @@ class SnapVaultApp {
   }
 
   async setViewPreset(presetId) {
+    console.log(`[setViewPreset] START - switching to ${presetId}`);
+
     if (!VIEW_PRESETS[presetId]) {
       console.warn(`Unknown view preset: ${presetId}`);
       return;
@@ -152,10 +154,12 @@ class SnapVaultApp {
       grid.dataset.preset = presetId;
     }
 
-    console.log(`📐 View preset: ${VIEW_PRESETS[presetId].label}`);
+    console.log(`[setViewPreset] View preset: ${VIEW_PRESETS[presetId].label}`);
 
     // Flush data and refetch with new resolution tier
     await this.loadPhotos();
+
+    console.log(`[setViewPreset] COMPLETE`);
   }
 
   setupUploadButtons() {
