@@ -446,64 +446,6 @@ class SettingsManager {
     }
 }
 
-// Add missing toast styles
-const style = document.createElement('style');
-style.textContent = `
-.toast {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 1rem 1.25rem;
-    background: var(--bg-secondary);
-    border: 1px solid var(--info-border);
-    border-radius: 8px;
-    margin-bottom: 0.75rem;
-    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
-    transform: translateX(400px);
-    opacity: 0;
-    transition: all 300ms cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.toast.show {
-    transform: translateX(0);
-    opacity: 1;
-}
-
-.toast-success {
-    border-color: var(--success-border);
-    background: var(--success-bg);
-}
-
-.toast-error {
-    border-color: var(--danger-border);
-    background: var(--danger-bg);
-}
-
-.toast-icon {
-    font-weight: 600;
-    font-size: 1.25rem;
-}
-
-.toast-success .toast-icon {
-    color: var(--success-text);
-}
-
-.toast-error .toast-icon {
-    color: var(--danger-text);
-}
-
-.toast-message {
-    color: #E2E8F0;
-    font-size: 0.9375rem;
-}
-
-.toast:hover {
-    cursor: pointer;
-    opacity: 0.9;
-}
-`;
-document.head.appendChild(style);
-
 // Initialize
 window.closeWipeModal = () => {
     document.getElementById('wipe-modal').classList.remove('active');
