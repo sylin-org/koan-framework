@@ -197,10 +197,14 @@ class SnapVaultApp {
 
       case 'favorites':
         this.setLoading(true);
-        // Load all photos sorted by ID descending, then filter favorites
-        const allPhotos = await this.api.get('/api/photos?sort=-id');
+        // TODO: Backend should support filter=isFavorite:true for server-side filtering
+        // For now, load first page and filter client-side
+        const allPhotos = await this.api.get('/api/photos?sort=-id&page=1&pageSize=200');
         this.state.photos = allPhotos.filter(p => p.isFavorite);
+        this.state.currentPage = 1;
+        this.state.hasMorePages = false; // Disable infinite scroll for filtered views
         this.components.grid.render();
+        this.components.grid.disableInfiniteScroll();
         this.setLoading(false);
         break;
     }
@@ -209,16 +213,46 @@ class SnapVaultApp {
   async loadPhotos() {
     try {
       this.setLoading(true);
+      // Initial load: first page only (50 photos for fast FCP)
       // Sort by ID descending (newest first - GUID v7 embeds timestamp)
-      const response = await this.api.get('/api/photos?sort=-id');
+      const response = await this.api.get('/api/photos?sort=-id&page=1&pageSize=50');
       this.state.photos = response || [];
+      this.state.currentPage = 1;
+      this.state.hasMorePages = true; // Assume more until proven otherwise
       this.components.grid.render();
       this.updateLibraryCounts();
+
+      // Enable infinite scroll after initial load
+      this.components.grid.enableInfiniteScroll();
     } catch (error) {
       console.error('Failed to load photos:', error);
       this.components.toast.show('Failed to load photos', { icon: '⚠️', duration: 5000 });
     } finally {
       this.setLoading(false);
+    }
+  }
+
+  async loadMorePhotos() {
+    if (!this.state.hasMorePages || this.state.loadingMore) return;
+
+    try {
+      this.state.loadingMore = true;
+      const nextPage = this.state.currentPage + 1;
+      const response = await this.api.get(`/api/photos?sort=-id&page=${nextPage}&pageSize=50`);
+
+      if (response && response.length > 0) {
+        this.state.photos.push(...response);
+        this.state.currentPage = nextPage;
+        this.components.grid.appendPhotos(response);
+      } else {
+        // No more photos
+        this.state.hasMorePages = false;
+      }
+    } catch (error) {
+      console.error('Failed to load more photos:', error);
+      this.components.toast.show('Failed to load more photos', { icon: '⚠️', duration: 3000 });
+    } finally {
+      this.state.loadingMore = false;
     }
   }
 

@@ -12,6 +12,7 @@ export class PhotoGrid {
     this.photoCards = new Map();
     this.observer = null;
     this.macy = null;
+    this.infiniteScrollObserver = null;
     this.viewportWidth = window.innerWidth;
     this.devicePixelRatio = window.devicePixelRatio || 1;
     this.setupIntersectionObserver();
@@ -373,5 +374,73 @@ export class PhotoGrid {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+  }
+
+  /**
+   * Append new photos to the grid (for pagination/infinite scroll)
+   * @param {Array} photos - Array of new photos to append
+   */
+  appendPhotos(photos) {
+    if (!photos || photos.length === 0) return;
+
+    // Add new photo cards to DOM
+    photos.forEach(photo => {
+      this.addPhotoCard(photo);
+    });
+
+    // Trigger Macy to recalculate positions for new cards
+    if (this.macy) {
+      this.macy.recalculate(true);
+    }
+
+    console.log(`📸 Loaded ${photos.length} more photos (${this.app.state.photos.length} total)`);
+  }
+
+  /**
+   * Enable infinite scroll to load more photos when near bottom
+   */
+  enableInfiniteScroll() {
+    // Disconnect existing observer if present
+    if (this.infiniteScrollObserver) {
+      this.infiniteScrollObserver.disconnect();
+    }
+
+    // Create sentinel element at the end of the grid
+    let sentinel = this.container.querySelector('.infinite-scroll-sentinel');
+    if (!sentinel) {
+      sentinel = document.createElement('div');
+      sentinel.className = 'infinite-scroll-sentinel';
+      sentinel.style.height = '1px';
+      sentinel.style.width = '100%';
+      this.container.appendChild(sentinel);
+    }
+
+    // Observe when sentinel enters viewport
+    this.infiniteScrollObserver = new IntersectionObserver(
+      (entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting && this.app.state.hasMorePages && !this.app.state.loadingMore) {
+            console.log('📜 Loading more photos...');
+            this.app.loadMorePhotos();
+          }
+        });
+      },
+      {
+        rootMargin: '400px' // Trigger 400px before sentinel visible
+      }
+    );
+
+    this.infiniteScrollObserver.observe(sentinel);
+    console.log('♾️ Infinite scroll enabled');
+  }
+
+  /**
+   * Disable infinite scroll
+   */
+  disableInfiniteScroll() {
+    if (this.infiniteScrollObserver) {
+      this.infiniteScrollObserver.disconnect();
+      this.infiniteScrollObserver = null;
+    }
   }
 }
