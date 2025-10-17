@@ -35,6 +35,11 @@ public sealed class OllamaOptions : IAdapterOptions
     public int ModelDownloadTimeoutMinutes { get; set; } = 10;
 
     /// <summary>
+    /// Timeout for AI inference requests (in seconds). Default is 180 seconds (3 minutes) to accommodate vision models.
+    /// </summary>
+    public int RequestTimeoutSeconds { get; set; } = 180;
+
+    /// <summary>
     /// Whether auto-discovery is enabled
     /// </summary>
     public bool AutoDiscoveryEnabled { get; set; } = true;

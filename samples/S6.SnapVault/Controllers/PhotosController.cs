@@ -1,8 +1,10 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 using Koan.Data.Core;
 using Koan.Web.Controllers;
 using S6.SnapVault.Models;
 using S6.SnapVault.Services;
+using S6.SnapVault.Hubs;
 
 namespace S6.SnapVault.Controllers;
 
@@ -14,13 +16,19 @@ public class PhotosController : EntityController<PhotoAsset>
 {
     private readonly ILogger<PhotosController> _logger;
     private readonly IPhotoProcessingService _processingService;
+    private readonly IPhotoProcessingQueue _queue;
+    private readonly IHubContext<PhotoProcessingHub> _hubContext;
 
     public PhotosController(
         ILogger<PhotosController> logger,
-        IPhotoProcessingService processingService)
+        IPhotoProcessingService processingService,
+        IPhotoProcessingQueue queue,
+        IHubContext<PhotoProcessingHub> hubContext)
     {
         _logger = logger;
         _processingService = processingService;
+        _queue = queue;
+        _hubContext = hubContext;
     }
 
     /// <summary>
@@ -31,7 +39,8 @@ public class PhotosController : EntityController<PhotoAsset>
     [RequestSizeLimit(104857600)] // 100MB limit
     public async Task<ActionResult<UploadResponse>> UploadPhotos(
         [FromForm] string? eventId,
-        [FromForm] List<IFormFile> files)
+        [FromForm] List<IFormFile> files,
+        CancellationToken ct = default)
     {
         if (files == null || files.Count == 0)
         {
@@ -42,7 +51,7 @@ public class PhotosController : EntityController<PhotoAsset>
         Event? evt = null;
         if (!string.IsNullOrEmpty(eventId))
         {
-            evt = await Event.Get(eventId);
+            evt = await Event.Get(eventId, ct);
             if (evt == null)
             {
                 return NotFound(new { Error = "Event not found" });
@@ -56,66 +65,75 @@ public class PhotosController : EntityController<PhotoAsset>
             return BadRequest(new { Error = "No valid image files found" });
         }
 
-        // Create processing job (eventId may be null for auto-organization)
+        // Create processing job
         var job = new ProcessingJob
         {
             EventId = eventId ?? "auto",
             TotalPhotos = validFiles.Count,
             Status = ProcessingStatus.InProgress
         };
-        await job.Save();
+        await job.Save(ct);
 
-        // Process files (auto-creates daily events if eventId is null)
-        var uploadedPhotos = new List<PhotoAsset>();
-        var affectedEventIds = new HashSet<string>();
+        _logger.LogInformation(
+            "Created upload job {JobId} with {Count} file(s) for event {EventId}",
+            job.Id, validFiles.Count, eventId ?? "auto");
 
+        // Queue files for background processing
+        var queuedCount = 0;
         foreach (var file in validFiles)
         {
             try
             {
-                var photo = await _processingService.ProcessUploadAsync(eventId, file);
-                uploadedPhotos.Add(photo);
-                affectedEventIds.Add(photo.EventId);
+                // Read file into memory for queuing
+                using var ms = new MemoryStream();
+                await file.CopyToAsync(ms, ct);
+                var fileData = ms.ToArray();
 
-                job.ProcessedPhotos++;
-                await job.Save();
+                // Queue for background processing
+                var queuedUpload = new QueuedPhotoUpload
+                {
+                    JobId = job.Id,
+                    EventId = eventId,
+                    FileName = file.FileName,
+                    ContentType = file.ContentType,
+                    FileData = fileData
+                };
+
+                _queue.Enqueue(queuedUpload);
+                queuedCount++;
+
+                // Notify clients that file is queued
+                await _hubContext.Clients.Group($"job:{job.Id}").SendAsync("PhotoQueued", new PhotoProgressEvent
+                {
+                    JobId = job.Id,
+                    PhotoId = "", // Not yet created
+                    FileName = file.FileName,
+                    Status = "queued",
+                    Stage = "queued"
+                }, ct);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to process file {FileName}", file.FileName);
+                _logger.LogError(ex, "Failed to queue file {FileName}", file.FileName);
                 job.Errors.Add($"{file.FileName}: {ex.Message}");
             }
         }
 
-        // Update job status
-        job.Status = job.Errors.Count == 0 ? ProcessingStatus.Completed : ProcessingStatus.PartialSuccess;
-        job.CompletedAt = DateTime.UtcNow;
-        await job.Save();
-
-        // Update event counts for all affected events
-        foreach (var affectedEventId in affectedEventIds)
-        {
-            var affectedEvent = await Event.Get(affectedEventId);
-            if (affectedEvent != null)
-            {
-                var eventPhotoCount = await PhotoAsset.Query(p => p.EventId == affectedEventId);
-                affectedEvent.PhotoCount = eventPhotoCount.Count;
-                affectedEvent.ProcessingStatus = ProcessingStatus.Completed;
-                await affectedEvent.Save();
-            }
-        }
+        // Update job with queue status
+        job.ProcessedPhotos = 0; // Will be updated by background worker
+        await job.Save(ct);
 
         _logger.LogInformation(
-            "Uploaded {Count} photos across {EventCount} event(s)",
-            uploadedPhotos.Count,
-            affectedEventIds.Count);
+            "Queued {QueuedCount} of {TotalCount} file(s) for background processing (Job: {JobId})",
+            queuedCount, validFiles.Count, job.Id);
 
+        // Return immediately - processing happens in background
         return Ok(new UploadResponse
         {
             JobId = job.Id,
-            TotalUploaded = uploadedPhotos.Count,
+            TotalQueued = queuedCount,
             TotalFailed = job.Errors.Count,
-            Photos = uploadedPhotos
+            Message = $"Queued {queuedCount} photo(s) for processing. Connect to SignalR hub to receive real-time updates."
         });
     }
 
@@ -214,6 +232,45 @@ public class PhotosController : EntityController<PhotoAsset>
         await photo.Save(ct);
 
         return Ok(new { Rating = photo.Rating });
+    }
+
+    /// <summary>
+    /// Regenerate AI description and embedding for a photo
+    /// </summary>
+    [HttpPost("{id}/regenerate-ai")]
+    public async Task<ActionResult> RegenerateAI(string id, CancellationToken ct = default)
+    {
+        var photo = await PhotoAsset.Get(id, ct);
+        if (photo == null)
+        {
+            return NotFound();
+        }
+
+        _logger.LogInformation("Regenerating AI metadata for photo {PhotoId}", id);
+
+        // Clear existing AI data
+        photo.DetailedDescription = "";
+        photo.Embedding = null;
+        photo.AutoTags = new List<string>();
+        photo.DetectedObjects = new List<string>();
+        photo.MoodDescription = "";
+        await photo.Save(ct);
+
+        // Regenerate AI metadata in background
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await _processingService.GenerateAIMetadataAsync(photo, CancellationToken.None);
+                _logger.LogInformation("Successfully regenerated AI metadata for photo {PhotoId}", id);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to regenerate AI metadata for photo {PhotoId}", id);
+            }
+        }, CancellationToken.None);
+
+        return Ok(new { Message = "AI regeneration started in background", PhotoId = id });
     }
 
     /// <summary>
@@ -370,9 +427,9 @@ public class PhotosController : EntityController<PhotoAsset>
 public class UploadResponse
 {
     public string JobId { get; set; } = "";
-    public int TotalUploaded { get; set; }
+    public int TotalQueued { get; set; }
     public int TotalFailed { get; set; }
-    public List<PhotoAsset> Photos { get; set; } = new();
+    public string Message { get; set; } = "";
 }
 
 public class SearchRequest

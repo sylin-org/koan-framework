@@ -154,11 +154,6 @@ export class UploadModal {
   }
 
   close() {
-    if (this.uploading) {
-      const confirmed = confirm('Upload in progress. Are you sure you want to cancel?');
-      if (!confirmed) return;
-    }
-
     this.isOpen = false;
     this.modal.classList.remove('show');
     this.reset();
@@ -287,9 +282,11 @@ export class UploadModal {
     const progressSection = this.modal.querySelector('.upload-progress');
     const progressContainer = this.modal.querySelector('.progress-container');
     const uploadBtn = this.modal.querySelector('.btn-upload');
+    const cancelBtn = this.modal.querySelector('.btn-cancel');
 
     progressSection.style.display = 'block';
     uploadBtn.disabled = true;
+    cancelBtn.textContent = 'Close';
 
     // Create FormData
     const formData = new FormData();
@@ -304,36 +301,39 @@ export class UploadModal {
     });
 
     try {
-      const response = await this.app.api.upload('/api/photos/upload', formData, (progress) => {
-        this.updateProgress(progress);
+      // Start upload - this will queue files and return immediately
+      const response = await fetch('/api/photos/upload', {
+        method: 'POST',
+        body: formData
       });
 
-      this.app.components.toast.show(`Uploaded ${response.totalUploaded} photos successfully`, {
-        icon: '✅',
-        duration: 3000
+      if (!response.ok) {
+        throw new Error(`Upload failed: ${response.statusText}`);
+      }
+
+      const uploadResponse = await response.json();
+      const jobId = uploadResponse.jobId;
+
+      this.app.components.toast.show(`Queued ${uploadResponse.totalQueued} photo(s) for processing`, {
+        icon: '📤',
+        duration: 2000
       });
 
-      // Reload photos
-      await this.app.loadPhotos();
+      // Start process monitor (floating progress card)
+      this.app.components.processMonitor.startJob(jobId, uploadResponse.totalQueued);
 
+      // Close modal immediately - processing continues in background
       this.close();
+
     } catch (error) {
       console.error('Upload failed:', error);
       this.app.components.toast.show('Upload failed', { icon: '⚠️', duration: 5000 });
       this.uploading = false;
       uploadBtn.disabled = false;
+      cancelBtn.textContent = 'Cancel';
     }
   }
 
-  updateProgress(percent) {
-    const container = this.modal.querySelector('.progress-container');
-    container.innerHTML = `
-      <div class="progress-bar">
-        <div class="progress-fill" style="width: ${percent}%"></div>
-      </div>
-      <div class="progress-text">${Math.round(percent)}%</div>
-    `;
-  }
 
   async createEvent() {
     const eventName = prompt('Enter event name:');

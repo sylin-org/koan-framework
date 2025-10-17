@@ -1,7 +1,9 @@
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Logging;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Metadata.Profiles.Exif;
 using S6.SnapVault.Models;
+using S6.SnapVault.Hubs;
 using Koan.Media.Core.Extensions;
 using Koan.AI;
 using Koan.Data.Core;
@@ -15,15 +17,19 @@ namespace S6.SnapVault.Services;
 internal sealed class PhotoProcessingService : IPhotoProcessingService
 {
     private readonly ILogger<PhotoProcessingService> _logger;
+    private readonly IHubContext<PhotoProcessingHub> _hubContext;
 
-    public PhotoProcessingService(ILogger<PhotoProcessingService> logger)
+    public PhotoProcessingService(
+        ILogger<PhotoProcessingService> logger,
+        IHubContext<PhotoProcessingHub> hubContext)
     {
         _logger = logger;
+        _hubContext = hubContext;
     }
 
-    public async Task<PhotoAsset> ProcessUploadAsync(string? eventId, IFormFile file, CancellationToken ct = default)
+    public async Task<PhotoAsset> ProcessUploadAsync(string? eventId, IFormFile file, string jobId, CancellationToken ct = default)
     {
-        _logger.LogInformation("Processing upload: {FileName} for event {EventId}", file.FileName, eventId ?? "auto");
+        _logger.LogInformation("Processing upload: {FileName} for event {EventId} (job: {JobId})", file.FileName, eventId ?? "auto", jobId);
 
         // Create PhotoAsset entity (eventId will be set after EXIF extraction if null)
         var photo = new PhotoAsset
@@ -34,8 +40,31 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
             ProcessingStatus = ProcessingStatus.InProgress
         };
 
+        // Helper method for emitting progress events
+        async Task EmitProgressAsync(string photoId, string status, string stage, string? error = null)
+        {
+            try
+            {
+                await _hubContext.Clients.Group($"job:{jobId}").SendAsync("PhotoProgress", new PhotoProgressEvent
+                {
+                    JobId = jobId,
+                    PhotoId = photoId,
+                    FileName = file.FileName,
+                    Status = status,
+                    Stage = stage,
+                    Error = error
+                }, CancellationToken.None); // Don't propagate CT to SignalR
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to emit SignalR progress event for {PhotoId}", photoId);
+            }
+        }
+
         try
         {
+            await EmitProgressAsync("", "processing", "upload");
+
             // Open source stream
             using var sourceStream = file.OpenReadStream();
 
@@ -50,6 +79,8 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
                 photo.Width = info.Width;
                 photo.Height = info.Height;
             }
+
+            await EmitProgressAsync("", "processing", "exif");
 
             // Extract EXIF metadata (including capture date)
             await ExtractExifMetadataAsync(photo, sourceStream, ct);
@@ -70,6 +101,8 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
             photo.Key = fullResEntity.Key;
             photo.ContentType = fullResEntity.ContentType;
             photo.Size = fullResEntity.Size;
+
+            await EmitProgressAsync(photo.Id, "processing", "thumbnails");
 
             // Use DX-0047 fluent API to create derivatives
             // Branch 1: Gallery view (1200px max)
@@ -108,25 +141,40 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
             // Save photo entity (without AI metadata yet)
             await photo.Save(ct);
 
+            // Update job progress
+            await UpdateJobProgressAsync(jobId, ct);
+
+            // Update event photo count
+            await UpdateEventPhotoCountAsync(photo.EventId, ct);
+
             _logger.LogInformation(
                 "Photo processed: {PhotoId} ({Width}x{Height}) -> Gallery: {GalleryId}, Thumbnail: {ThumbId}, Masonry: {MasonryId}",
                 photo.Id, photo.Width, photo.Height, photo.GalleryMediaId, photo.ThumbnailMediaId, photo.MasonryThumbnailMediaId);
 
-            // Generate AI metadata asynchronously
+            await EmitProgressAsync(photo.Id, "processing", "ai-description");
+
+            // Generate AI metadata asynchronously (with SignalR updates)
             _ = Task.Run(async () =>
             {
                 try
                 {
                     await GenerateAIMetadataAsync(photo, CancellationToken.None);
+
+                    // Emit completion event after AI processing
+                    await EmitProgressAsync(photo.Id, "completed", "completed");
                 }
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Failed to generate AI metadata for photo {PhotoId}", photo.Id);
+                    await EmitProgressAsync(photo.Id, "failed", "ai-description", ex.Message);
                 }
             }, CancellationToken.None);
 
             photo.ProcessingStatus = ProcessingStatus.Completed;
             await photo.Save(ct);
+
+            // Emit progress for basic processing complete (AI still running in background)
+            await EmitProgressAsync(photo.Id, "processing", "completed");
 
             return photo;
         }
@@ -134,6 +182,24 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
         {
             _logger.LogError(ex, "Failed to process photo {FileName}", file.FileName);
             photo.ProcessingStatus = ProcessingStatus.Failed;
+
+            await EmitProgressAsync(photo.Id ?? "", "failed", "upload", ex.Message);
+
+            // Update job with error
+            try
+            {
+                var job = await ProcessingJob.Get(jobId, CancellationToken.None);
+                if (job != null)
+                {
+                    job.Errors.Add($"{file.FileName}: {ex.Message}");
+                    await job.Save(CancellationToken.None);
+                }
+            }
+            catch (Exception jobEx)
+            {
+                _logger.LogWarning(jobEx, "Failed to update job {JobId} with error", jobId);
+            }
+
             throw;
         }
     }
@@ -361,8 +427,16 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
         {
             _logger.LogInformation("Generating detailed AI description for photo {PhotoId}", photo.Id);
 
-            // Load image bytes from storage
-            var imageStream = await photo.OpenRead(ct);
+            // Load gallery image (auto-oriented, JPEG, proper size) instead of original
+            // This ensures the AI sees the same orientation and format as the user
+            var gallery = await PhotoGallery.Get(photo.GalleryMediaId, ct);
+            if (gallery == null)
+            {
+                _logger.LogWarning("Gallery image not found for photo {PhotoId}, skipping AI description", photo.Id);
+                return;
+            }
+
+            await using var imageStream = await gallery.OpenRead(ct);
             using var ms = new MemoryStream();
             await imageStream.CopyToAsync(ms, ct);
             var imageBytes = ms.ToArray();
@@ -420,12 +494,12 @@ No brand/location/model IDs unless explicitly visible and legible.
 
 Short, searchable keywords: subject, materials, colors, setting, mood, shot type (e.g., ""black leather, thigh-high boots, studio spotlight, dramatic rim light, cyberpunk, full-body portrait"").";
 
-            // Use vision model (qwen2.5-vl:7b) with explicit options
+            // Use vision model (qwen2.5vl) with explicit options
             var visionOptions = new Koan.AI.Contracts.Options.AiVisionOptions
             {
                 ImageBytes = imageBytes,
                 Prompt = prompt,
-                Model = "qwen2.5-vl:7b",
+                Model = "qwen2.5vl",
                 Temperature = 0.7
             };
 
@@ -483,5 +557,68 @@ Short, searchable keywords: subject, materials, colors, setting, mood, shot type
         _logger.LogInformation("Created daily event: {EventName} ({EventId})", eventName, newEvent.Id);
 
         return newEvent;
+    }
+
+    /// <summary>
+    /// Update job progress by incrementing processed photo count
+    /// </summary>
+    private async Task UpdateJobProgressAsync(string jobId, CancellationToken ct)
+    {
+        try
+        {
+            var job = await ProcessingJob.Get(jobId, ct);
+            if (job != null)
+            {
+                job.ProcessedPhotos++;
+
+                // Update job status if all photos processed
+                if (job.ProcessedPhotos >= job.TotalPhotos)
+                {
+                    job.Status = job.Errors.Count == 0
+                        ? ProcessingStatus.Completed
+                        : ProcessingStatus.PartialSuccess;
+                    job.CompletedAt = DateTime.UtcNow;
+
+                    // Emit job completion event
+                    await _hubContext.Clients.Group($"job:{jobId}").SendAsync("JobCompleted", new JobCompletionEvent
+                    {
+                        JobId = jobId,
+                        Status = job.Status == ProcessingStatus.Completed ? "completed" : "partial-success",
+                        TotalPhotos = job.TotalPhotos,
+                        SuccessCount = job.ProcessedPhotos - job.Errors.Count,
+                        FailureCount = job.Errors.Count,
+                        Errors = job.Errors
+                    }, CancellationToken.None);
+                }
+
+                await job.Save(ct);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to update job progress for {JobId}", jobId);
+        }
+    }
+
+    /// <summary>
+    /// Update event photo count and status
+    /// </summary>
+    private async Task UpdateEventPhotoCountAsync(string eventId, CancellationToken ct)
+    {
+        try
+        {
+            var evt = await Event.Get(eventId, ct);
+            if (evt != null)
+            {
+                var photos = await PhotoAsset.Query(p => p.EventId == eventId, ct);
+                evt.PhotoCount = photos.Count;
+                evt.ProcessingStatus = ProcessingStatus.Completed;
+                await evt.Save(ct);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to update event photo count for {EventId}", eventId);
+        }
     }
 }

@@ -198,10 +198,13 @@ internal sealed class OllamaDiscoveryService : IHostedService
     {
         try
         {
+            var resolvedOptions = _sp.GetService<IOptionsMonitor<OllamaOptions>>()?.CurrentValue;
+            var timeoutSeconds = resolvedOptions?.RequestTimeoutSeconds ?? 180;
+
             // Create singleton adapter; router injects member-specific connection strings per request
             var http = new HttpClient
             {
-                Timeout = TimeSpan.FromSeconds(60)
+                Timeout = TimeSpan.FromSeconds(timeoutSeconds)
             };
 
             var adapterLogger = _sp.GetService<ILogger<OllamaAdapter>>()
@@ -209,14 +212,13 @@ internal sealed class OllamaDiscoveryService : IHostedService
 
             var readinessDefaults = _sp.GetService<IOptions<AdaptersReadinessOptions>>()?.Value;
 
-            var resolvedOptions = _sp.GetService<IOptionsMonitor<OllamaOptions>>()?.CurrentValue;
-
             var adapter = new OllamaAdapter(http, adapterLogger, _cfg, readinessDefaults, resolvedOptions);
             _adapterRegistry.Add(adapter);
 
             KoanLog.BootInfo(_logger, LogActions.Discovery, "adapter-registered",
                 ("adapter", "ollama"),
-                ("pattern", "singleton"));
+                ("pattern", "singleton"),
+                ("timeout", $"{timeoutSeconds}s"));
         }
         catch (Exception ex)
         {

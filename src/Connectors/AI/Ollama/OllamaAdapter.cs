@@ -120,8 +120,9 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
     {
         if (!string.IsNullOrWhiteSpace(connectionString))
         {
-            // Router specified member URL - create client for it
-            return new HttpClient { BaseAddress = new Uri(connectionString), Timeout = TimeSpan.FromSeconds(60) };
+            // Router specified member URL - create client for it with configured timeout
+            var timeoutSeconds = _options.RequestTimeoutSeconds > 0 ? _options.RequestTimeoutSeconds : 180;
+            return new HttpClient { BaseAddress = new Uri(connectionString), Timeout = TimeSpan.FromSeconds(timeoutSeconds) };
         }
 
         // Use default HttpClient from DI
@@ -138,7 +139,7 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
             throw new InvalidOperationException("Ollama adapter requires a model name.");
         }
 
-        var prompt = BuildPrompt(request);
+        var (prompt, imageBase64List) = BuildPromptWithImages(request);
         var body = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
         {
             ["model"] = model,
@@ -146,6 +147,13 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
             ["stream"] = false,
             ["options"] = MapOptions(request.Options)
         };
+
+        // Add images array for vision models (Ollama API format)
+        if (imageBase64List.Count > 0)
+        {
+            body["images"] = imageBase64List;
+            Logger.LogDebug("Ollama: Including {Count} image(s) in vision request", imageBase64List.Count);
+        }
 
         if (request.Options?.Think is bool thinkFlag)
         {
@@ -187,7 +195,7 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
             throw new InvalidOperationException("Ollama adapter requires a model name.");
         }
 
-        var prompt = BuildPrompt(request);
+        var (prompt, imageBase64List) = BuildPromptWithImages(request);
         var streamBody = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
         {
             ["model"] = model,
@@ -195,6 +203,13 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
             ["stream"] = true,
             ["options"] = MapOptions(request.Options)
         };
+
+        // Add images array for vision models (Ollama API format)
+        if (imageBase64List.Count > 0)
+        {
+            streamBody["images"] = imageBase64List;
+            Logger.LogDebug("Ollama: Including {Count} image(s) in streaming vision request", imageBase64List.Count);
+        }
 
         if (request.Options?.Think is bool thinkFlag)
         {
@@ -538,8 +553,9 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
             await TestConnectivityAsync(timeoutCts.Token).ConfigureAwait(false);
             Logger.LogDebug("[{AdapterId}] InitializeReadiness: Connectivity test passed", AdapterId);
 
-            var defaultReady = await EnsureDefaultModelAvailabilityAsync(timeoutCts.Token).ConfigureAwait(false);
-            var newState = defaultReady ? AdapterReadinessState.Ready : AdapterReadinessState.Degraded;
+            // Ensure all required models are available (not just the default)
+            var allModelsReady = await EnsureRequiredModelsAvailabilityAsync(timeoutCts.Token).ConfigureAwait(false);
+            var newState = allModelsReady ? AdapterReadinessState.Ready : AdapterReadinessState.Degraded;
             _stateManager.TransitionTo(newState);
 
             Logger.LogInformation("[{AdapterId}] InitializeReadiness: Complete - State={State} BaseUrl={BaseUrl}",
@@ -558,6 +574,86 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
             Logger.LogError(ex, "[{AdapterId}] InitializeReadiness: Failed - BaseUrl={BaseUrl}", AdapterId, _http.BaseAddress);
             throw;
         }
+    }
+
+    private async Task<bool> EnsureRequiredModelsAvailabilityAsync(CancellationToken ct)
+    {
+        // Get RequiredModels from config (Koan:Ai:Ollama:RequiredModels)
+        var requiredModels = Configuration.GetSection("Koan:Ai:Ollama:RequiredModels").Get<string[]>();
+
+        // Build complete list: RequiredModels + default model (if not already in list)
+        var modelsToEnsure = new List<string>();
+
+        if (requiredModels != null && requiredModels.Length > 0)
+        {
+            modelsToEnsure.AddRange(requiredModels);
+        }
+
+        // Add default model if not already in required list
+        if (!string.IsNullOrWhiteSpace(_defaultModel) && !modelsToEnsure.Contains(_defaultModel, StringComparer.OrdinalIgnoreCase))
+        {
+            modelsToEnsure.Add(_defaultModel);
+        }
+
+        if (modelsToEnsure.Count == 0)
+        {
+            Logger.LogDebug("[{AdapterId}] No required models configured, skipping model installation", AdapterId);
+            return true;
+        }
+
+        Logger.LogInformation("[{AdapterId}] Ensuring {Count} required model(s) are available: {Models}",
+            AdapterId, modelsToEnsure.Count, string.Join(", ", modelsToEnsure));
+
+        var allSucceeded = true;
+        var installedCount = 0;
+
+        foreach (var model in modelsToEnsure)
+        {
+            var provenance = new AiModelProvenance
+            {
+                RequestedBy = AdapterId,
+                Reason = "readiness:required-model",
+                RequestedAt = DateTimeOffset.UtcNow,
+                Metadata = new Dictionary<string, string>
+                {
+                    ["adapter_id"] = AdapterId,
+                    ["phase"] = "readiness"
+                }
+            };
+
+            var request = new AiModelOperationRequest
+            {
+                Model = model,
+                Provenance = provenance
+            };
+
+            var result = await _modelManager.EnsureInstalledAsync(request, ct).ConfigureAwait(false);
+
+            if (!result.Success)
+            {
+                Logger.LogWarning("[{AdapterId}] Failed to ensure model '{Model}' is available: {Message}",
+                    AdapterId, model, result.Message);
+                allSucceeded = false;
+            }
+            else if (result.OperationPerformed)
+            {
+                Logger.LogInformation("[{AdapterId}] Installed model '{Model}' during readiness initialization",
+                    AdapterId, model);
+                installedCount++;
+            }
+            else
+            {
+                Logger.LogDebug("[{AdapterId}] Model '{Model}' already available", AdapterId, model);
+            }
+        }
+
+        if (installedCount > 0)
+        {
+            Logger.LogInformation("[{AdapterId}] Successfully installed {InstalledCount} of {TotalCount} required models",
+                AdapterId, installedCount, modelsToEnsure.Count);
+        }
+
+        return allSucceeded;
     }
 
     private async Task<bool> EnsureDefaultModelAvailabilityAsync(CancellationToken ct)
@@ -612,60 +708,114 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
         return JsonConvert.DeserializeObject<OllamaTagsResponse>(json);
     }
 
-    private static string BuildPrompt(AiChatRequest req)
+    /// <summary>
+    /// Build prompt and extract images for Ollama vision API
+    /// </summary>
+    private static (string prompt, List<string> images) BuildPromptWithImages(AiChatRequest req)
     {
+        var images = new List<string>();
+
+        // Single message optimization
         if (req.Messages.Count == 1 && string.Equals(req.Messages[0].Role, "user", StringComparison.OrdinalIgnoreCase))
         {
-            return ResolveMessageContent(req.Messages[0]);
+            var (content, messageImages) = ResolveMessageContentWithImages(req.Messages[0]);
+            images.AddRange(messageImages);
+            return (content, images);
         }
 
+        // Multi-message conversation
         var sb = new StringBuilder();
         foreach (var m in req.Messages)
         {
+            var (content, messageImages) = ResolveMessageContentWithImages(m);
+            images.AddRange(messageImages);
+
             if (string.Equals(m.Role, "system", StringComparison.OrdinalIgnoreCase))
             {
-                sb.AppendLine($"[system]\n{ResolveMessageContent(m)}\n");
+                sb.AppendLine($"[system]\n{content}\n");
             }
             else if (string.Equals(m.Role, "user", StringComparison.OrdinalIgnoreCase))
             {
-                sb.AppendLine($"[user]\n{ResolveMessageContent(m)}\n");
+                sb.AppendLine($"[user]\n{content}\n");
             }
             else if (string.Equals(m.Role, "assistant", StringComparison.OrdinalIgnoreCase))
             {
-                sb.AppendLine($"[assistant]\n{ResolveMessageContent(m)}\n");
+                sb.AppendLine($"[assistant]\n{content}\n");
             }
         }
 
-        return sb.ToString();
+        return (sb.ToString(), images);
+    }
+
+    /// <summary>
+    /// Extract text content and image data from a message
+    /// </summary>
+    private static (string content, List<string> images) ResolveMessageContentWithImages(AiMessage message)
+    {
+        var images = new List<string>();
+
+        if (message.Parts is { Count: > 0 })
+        {
+            var textBuilder = new StringBuilder();
+            foreach (var part in message.Parts)
+            {
+                // Handle text parts
+                if (!string.IsNullOrWhiteSpace(part.Text))
+                {
+                    textBuilder.Append(part.Text);
+                    continue;
+                }
+
+                // Handle data parts (could be images)
+                if (part.Data is not null)
+                {
+                    // Check if it's byte array (image data)
+                    if (part.Data is byte[] imageBytes)
+                    {
+                        var base64 = Convert.ToBase64String(imageBytes);
+                        images.Add(base64);
+                    }
+                    // Check if it's already a base64 string
+                    else if (part.Data is string str && !string.IsNullOrWhiteSpace(str))
+                    {
+                        // Only add as image if it looks like base64 (not regular text)
+                        if (str.Length > 100 && !str.Contains(' '))
+                        {
+                            images.Add(str);
+                        }
+                        else
+                        {
+                            textBuilder.Append(str);
+                        }
+                    }
+                    else
+                    {
+                        // Unknown data type - serialize as JSON for backward compatibility
+                        textBuilder.Append(JsonConvert.SerializeObject(part.Data));
+                    }
+                }
+            }
+
+            var text = textBuilder.ToString();
+            if (!string.IsNullOrWhiteSpace(text))
+            {
+                return (text, images);
+            }
+        }
+
+        return (message.Content, images);
+    }
+
+    private static string BuildPrompt(AiChatRequest req)
+    {
+        var (prompt, _) = BuildPromptWithImages(req);
+        return prompt;
     }
 
     private static string ResolveMessageContent(AiMessage message)
     {
-        if (message.Parts is { Count: > 0 })
-        {
-            var builder = new StringBuilder();
-            foreach (var part in message.Parts)
-            {
-                if (!string.IsNullOrWhiteSpace(part.Text))
-                {
-                    builder.Append(part.Text);
-                    continue;
-                }
-
-                if (part.Data is not null)
-                {
-                    builder.Append(JsonConvert.SerializeObject(part.Data));
-                }
-            }
-
-            var text = builder.ToString();
-            if (!string.IsNullOrWhiteSpace(text))
-            {
-                return text;
-            }
-        }
-
-        return message.Content;
+        var (content, _) = ResolveMessageContentWithImages(message);
+        return content;
     }
 
     private static IDictionary<string, object?> MapOptions(AiPromptOptions? o)

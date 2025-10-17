@@ -8,6 +8,7 @@ import { PhotoGrid } from './components/grid.js';
 import { SearchBar } from './components/search.js';
 import { Lightbox } from './components/lightbox.js';
 import { UploadModal } from './components/upload.js';
+import { ProcessMonitor } from './components/processMonitor.js';
 import { Timeline } from './components/timeline.js';
 import { KeyboardShortcuts } from './components/keyboard.js';
 import { BulkActions } from './components/bulkActions.js';
@@ -45,6 +46,7 @@ class SnapVaultApp {
     this.components.search = new SearchBar(this);
     this.components.lightbox = new Lightbox(this);
     this.components.upload = new UploadModal(this);
+    this.components.processMonitor = new ProcessMonitor(this);
     this.components.timeline = new Timeline(this);
     this.components.keyboard = new KeyboardShortcuts(this);
     this.components.bulkActions = new BulkActions(this);

@@ -96,6 +96,14 @@ export class Lightbox {
               </svg>
               <span class="exif-tags-text"></span>
             </div>
+            <button class="exif-section exif-ai-toggle btn-ai-description" title="Toggle AI description (I)" aria-label="Toggle AI description">
+              <svg class="exif-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                <line x1="12" y1="17" x2="12.01" y2="17"></line>
+              </svg>
+              <span class="exif-ai-toggle-text">AI Description</span>
+            </button>
           </div>
           <div class="lightbox-rating">
             <div class="rating-stars">
@@ -108,6 +116,29 @@ export class Lightbox {
               `).join('')}
             </div>
           </div>
+        </div>
+
+        <!-- AI Description Panel -->
+        <div class="lightbox-ai-panel">
+          <div class="ai-panel-header">
+            <h3>AI-Generated Description</h3>
+            <div class="ai-panel-actions">
+              <button class="btn-icon btn-regenerate-ai" title="Regenerate description" aria-label="Regenerate AI description">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="23 4 23 10 17 10"></polyline>
+                  <polyline points="1 20 1 14 7 14"></polyline>
+                  <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                </svg>
+              </button>
+              <button class="btn-icon btn-close-ai" title="Close (I)" aria-label="Close AI description">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
+            </div>
+          </div>
+          <div class="ai-panel-content"></div>
         </div>
 
         <!-- Navigation arrows -->
@@ -168,10 +199,18 @@ export class Lightbox {
     const zoomResetBtn = this.container.querySelector('.btn-zoom-reset');
     const starBtns = this.container.querySelectorAll('.star-btn');
     const chrome = this.container.querySelector('.lightbox-chrome');
+    const aiToggleBtn = this.container.querySelector('.btn-ai-description');
+    const aiCloseBtn = this.container.querySelector('.btn-close-ai');
+    const aiRegenerateBtn = this.container.querySelector('.btn-regenerate-ai');
 
     // Close
     overlay.addEventListener('click', () => this.close());
     closeBtn.addEventListener('click', () => this.close());
+
+    // AI Description toggle
+    aiToggleBtn.addEventListener('click', () => this.toggleAIPanel());
+    aiCloseBtn.addEventListener('click', () => this.toggleAIPanel());
+    aiRegenerateBtn.addEventListener('click', () => this.regenerateAIDescription());
 
     // Navigation
     prevBtn.addEventListener('click', () => this.previous());
@@ -285,6 +324,10 @@ export class Lightbox {
         case '5':
           this.rate(parseInt(e.key));
           break;
+        case 'i':
+        case 'I':
+          this.toggleAIPanel();
+          break;
       }
     };
 
@@ -293,17 +336,20 @@ export class Lightbox {
 
   async open(photoId) {
     this.currentPhotoId = photoId;
-    this.currentPhoto = this.app.photos.find(p => p.id === photoId);
     this.currentIndex = this.app.photos.findIndex(p => p.id === photoId);
-
-    if (!this.currentPhoto) {
-      console.error('Photo not found:', photoId);
-      return;
-    }
 
     this.isOpen = true;
     this.container.classList.add('show');
     this.resetZoom();
+
+    // Fetch fresh photo data from backend (includes latest AI description)
+    await this.fetchPhotoData();
+
+    if (!this.currentPhoto) {
+      console.error('Photo not found:', photoId);
+      this.close();
+      return;
+    }
 
     // Load photo and metadata
     await this.loadPhoto();
@@ -317,6 +363,18 @@ export class Lightbox {
     this.chromeTimeout = setTimeout(() => {
       chrome.classList.remove('visible');
     }, 3000);
+  }
+
+  async fetchPhotoData() {
+    try {
+      // Fetch fresh photo data from API
+      this.currentPhoto = await this.app.api.get(`/api/photos/${this.currentPhotoId}`);
+    } catch (error) {
+      console.error('Failed to fetch photo data:', error);
+      this.app.components.toast.show('Failed to load photo details', { icon: '⚠️', duration: 3000 });
+      // Fallback to cached data
+      this.currentPhoto = this.app.photos.find(p => p.id === this.currentPhotoId);
+    }
   }
 
   close() {
@@ -385,6 +443,20 @@ export class Lightbox {
       ? tags.join(', ')
       : 'No tags';
 
+    // AI Description
+    const aiToggleBtn = this.container.querySelector('.btn-ai-description');
+    const aiPanelContent = this.container.querySelector('.ai-panel-content');
+
+    if (photo.detailedDescription && photo.detailedDescription.trim()) {
+      aiToggleBtn.style.display = 'flex';
+      // Convert markdown-like formatting to HTML
+      const formattedDescription = this.formatMarkdown(photo.detailedDescription);
+      aiPanelContent.innerHTML = formattedDescription;
+    } else {
+      aiToggleBtn.style.display = 'none';
+      aiPanelContent.innerHTML = '<p class="no-description">No AI description available yet. The description is being generated in the background.</p>';
+    }
+
     // Favorite button state
     const favoriteBtn = this.container.querySelector('.btn-favorite');
     if (photo.isFavorite) {
@@ -425,14 +497,30 @@ export class Lightbox {
   async next() {
     if (this.currentIndex < this.app.photos.length - 1) {
       const nextPhoto = this.app.photos[this.currentIndex + 1];
-      await this.open(nextPhoto.id);
+      this.currentPhotoId = nextPhoto.id;
+      this.currentIndex++;
+
+      // Fetch fresh data and update display
+      await this.fetchPhotoData();
+      await this.loadPhoto();
+      this.updateMetadata();
+      this.updateNavigation();
+      this.resetZoom();
     }
   }
 
   async previous() {
     if (this.currentIndex > 0) {
       const prevPhoto = this.app.photos[this.currentIndex - 1];
-      await this.open(prevPhoto.id);
+      this.currentPhotoId = prevPhoto.id;
+      this.currentIndex--;
+
+      // Fetch fresh data and update display
+      await this.fetchPhotoData();
+      await this.loadPhoto();
+      this.updateMetadata();
+      this.updateNavigation();
+      this.resetZoom();
     }
   }
 
@@ -527,6 +615,109 @@ export class Lightbox {
     // Open download endpoint in new window
     window.open(`/api/photos/${this.currentPhotoId}/download`, '_blank');
     this.app.components.toast.show('Download started', { icon: '⬇️', duration: 2000 });
+  }
+
+  toggleAIPanel() {
+    const aiPanel = this.container.querySelector('.lightbox-ai-panel');
+    const isVisible = aiPanel.classList.contains('visible');
+
+    if (isVisible) {
+      aiPanel.classList.remove('visible');
+    } else {
+      aiPanel.classList.add('visible');
+    }
+  }
+
+  formatMarkdown(text) {
+    // Simple markdown-to-HTML converter for the AI description
+    let html = text;
+
+    // Headers (## Header)
+    html = html.replace(/^## (.+)$/gm, '<h4>$1</h4>');
+    html = html.replace(/^# (.+)$/gm, '<h3>$1</h3>');
+
+    // Bold (**text**)
+    html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+
+    // Italic (*text*)
+    html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+
+    // Line breaks (preserve double newlines as paragraphs)
+    const paragraphs = html.split('\n\n').filter(p => p.trim());
+    html = paragraphs.map(p => {
+      // Don't wrap headers in paragraphs
+      if (p.trim().startsWith('<h')) {
+        return p;
+      }
+      // Replace single newlines within paragraphs with <br>
+      const withBreaks = p.replace(/\n/g, '<br>');
+      return `<p>${withBreaks}</p>`;
+    }).join('');
+
+    return html;
+  }
+
+  async regenerateAIDescription() {
+    if (!this.currentPhotoId) return;
+
+    const aiPanelContent = this.container.querySelector('.ai-panel-content');
+    const regenerateBtn = this.container.querySelector('.btn-regenerate-ai');
+
+    try {
+      // Disable button and show loading state
+      regenerateBtn.disabled = true;
+      regenerateBtn.style.opacity = '0.5';
+      aiPanelContent.innerHTML = '<p style="text-align: center; padding: var(--space-5); color: var(--text-secondary);">🔄 Regenerating AI description...<br><span style="font-size: var(--text-sm); color: var(--text-tertiary);">This may take 15-30 seconds</span></p>';
+
+      // Call API to regenerate AI metadata
+      await this.app.api.post(`/api/photos/${this.currentPhotoId}/regenerate-ai`);
+
+      this.app.components.toast.show('AI description regeneration started', { icon: '🔄', duration: 3000 });
+
+      // Poll for completion (AI processing happens in background)
+      let attempts = 0;
+      const maxAttempts = 60; // 60 seconds max
+      const pollInterval = setInterval(async () => {
+        attempts++;
+
+        // Fetch fresh photo data
+        const updatedPhoto = await this.app.api.get(`/api/photos/${this.currentPhotoId}`);
+
+        // Check if description has been updated (different from current or newly generated)
+        if (updatedPhoto.detailedDescription &&
+            updatedPhoto.detailedDescription !== this.currentPhoto.detailedDescription) {
+
+          clearInterval(pollInterval);
+
+          // Update current photo data
+          this.currentPhoto = updatedPhoto;
+
+          // Update UI with new description
+          const formattedDescription = this.formatMarkdown(updatedPhoto.detailedDescription);
+          aiPanelContent.innerHTML = formattedDescription;
+
+          // Re-enable button
+          regenerateBtn.disabled = false;
+          regenerateBtn.style.opacity = '1';
+
+          this.app.components.toast.show('AI description regenerated successfully', { icon: '✅', duration: 3000 });
+        } else if (attempts >= maxAttempts) {
+          // Timeout
+          clearInterval(pollInterval);
+          aiPanelContent.innerHTML = '<p class="no-description">Regeneration timed out. Please try again or check the server logs.</p>';
+          regenerateBtn.disabled = false;
+          regenerateBtn.style.opacity = '1';
+          this.app.components.toast.show('Regeneration timed out', { icon: '⚠️', duration: 5000 });
+        }
+      }, 1000); // Poll every second
+
+    } catch (error) {
+      console.error('Failed to regenerate AI description:', error);
+      aiPanelContent.innerHTML = '<p class="no-description">Failed to regenerate description. Please try again.</p>';
+      regenerateBtn.disabled = false;
+      regenerateBtn.style.opacity = '1';
+      this.app.components.toast.show('Failed to regenerate description', { icon: '⚠️', duration: 5000 });
+    }
   }
 
   destroy() {

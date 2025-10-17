@@ -3,6 +3,7 @@ using Koan.Web;
 using Koan.Web.Extensions;
 using S6.SnapVault.Configuration;
 using S6.SnapVault.Services;
+using S6.SnapVault.Hubs;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -17,10 +18,14 @@ EntityLifecycleConfiguration.Configure();
 // Register application services
 builder.Services.AddScoped<IPhotoProcessingService, PhotoProcessingService>();
 
+// Register background processing queue and worker
+builder.Services.AddSingleton<IPhotoProcessingQueue, InMemoryPhotoProcessingQueue>();
+builder.Services.AddHostedService<PhotoProcessingWorker>();
+
 // SignalR for real-time progress updates
 builder.Services.AddSignalR();
 
-// CORS for development
+// CORS for development (allow credentials for SignalR)
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
@@ -53,20 +58,6 @@ app.MapControllers();
 app.MapFallbackToFile("index.html");
 
 // Map SignalR hubs
-app.MapHub<ProcessingHub>("/hubs/processing");
+app.MapHub<PhotoProcessingHub>("/hubs/processing");
 
 app.Run();
-
-// SignalR Hub for processing progress
-public class ProcessingHub : Microsoft.AspNetCore.SignalR.Hub
-{
-    public async Task JoinEventGroup(string eventId)
-    {
-        await Groups.AddToGroupAsync(Context.ConnectionId, eventId);
-    }
-
-    public async Task LeaveEventGroup(string eventId)
-    {
-        await Groups.RemoveFromGroupAsync(Context.ConnectionId, eventId);
-    }
-}

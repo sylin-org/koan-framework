@@ -10,8 +10,9 @@ public interface IPhotoProcessingService
     /// <summary>
     /// Process a single uploaded photo: storage, derivatives, EXIF, AI analysis
     /// If eventId is null, auto-creates daily event based on EXIF capture date
+    /// Emits SignalR events to notify clients of processing progress
     /// </summary>
-    Task<PhotoAsset> ProcessUploadAsync(string? eventId, IFormFile file, CancellationToken ct = default);
+    Task<PhotoAsset> ProcessUploadAsync(string? eventId, IFormFile file, string jobId, CancellationToken ct = default);
 
     /// <summary>
     /// Generate AI metadata and vector embedding for a photo
