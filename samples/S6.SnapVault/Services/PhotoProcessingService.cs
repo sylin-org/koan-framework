@@ -420,12 +420,16 @@ No brand/location/model IDs unless explicitly visible and legible.
 
 Short, searchable keywords: subject, materials, colors, setting, mood, shot type (e.g., ""black leather, thigh-high boots, studio spotlight, dramatic rim light, cyberpunk, full-body portrait"").";
 
-            // Use vision model with context for qwen2.5-vl:7b
-            string description;
-            using (Koan.AI.Ai.Context(model: "qwen2.5-vl:7b"))
+            // Use vision model (qwen2.5-vl:7b) with explicit options
+            var visionOptions = new Koan.AI.Contracts.Options.AiVisionOptions
             {
-                description = await Koan.AI.Ai.Understand(imageBytes, prompt, ct);
-            }
+                ImageBytes = imageBytes,
+                Prompt = prompt,
+                Model = "qwen2.5-vl:7b",
+                Temperature = 0.7
+            };
+
+            var description = await Koan.AI.Ai.Understand(visionOptions, ct);
 
             photo.DetailedDescription = description;
             await photo.Save(ct);
