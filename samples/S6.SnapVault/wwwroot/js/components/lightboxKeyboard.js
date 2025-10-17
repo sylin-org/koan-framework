@@ -1,0 +1,304 @@
+/**
+ * Lightbox Keyboard Shortcuts Manager
+ * Comprehensive keyboard support for power users
+ */
+
+export class LightboxKeyboard {
+  constructor(lightbox) {
+    this.lightbox = lightbox;
+    this.enabled = false;
+    this.handlers = new Map();
+    this.helpOverlayOpen = false;
+    this.helpOverlay = null;
+    this.registerShortcuts();
+  }
+
+  registerShortcuts() {
+    // Navigation
+    this.register('Escape', () => this.handleEscape());
+    this.register('ArrowLeft', () => this.handleLeftArrow());
+    this.register('ArrowRight', () => this.handleRightArrow());
+    this.register('ArrowUp', () => this.handleUpArrow());
+    this.register('ArrowDown', () => this.handleDownArrow());
+
+    // Panel
+    this.register('i', () => this.lightbox.panel?.toggle());
+    this.register('I', () => this.lightbox.panel?.toggle());
+
+    // Zoom
+    this.register('z', () => this.lightbox.zoomSystem?.cycle());
+    this.register('Z', () => this.lightbox.zoomSystem?.cycle());
+    this.register('0', () => this.lightbox.zoomSystem?.setMode('fit'));
+    this.register('f', () => this.toggleFitFill());
+    this.register('F', () => this.toggleFitFill());
+    this.register('1', () => this.zoomToPercent(1.0));
+    this.register('2', () => this.zoomToPercent(2.0));
+    this.register('3', () => this.zoomToPercent(3.0));
+    this.register('4', () => this.zoomToPercent(4.0));
+    this.register('+', () => this.zoomIn());
+    this.register('=', () => this.zoomIn()); // + without shift
+    this.register('-', () => this.zoomOut());
+
+    // Actions
+    this.register('s', () => this.lightbox.actions?.toggleFavorite());
+    this.register('S', () => this.lightbox.actions?.toggleFavorite());
+    this.register('d', () => this.lightbox.actions?.download());
+    this.register('D', () => this.lightbox.actions?.download());
+    this.register('Delete', () => this.lightbox.actions?.deletePhoto());
+
+    // Rating (1-5 already handled in lightbox.js)
+    // Help
+    this.register('?', () => this.toggleHelpOverlay());
+  }
+
+  register(key, handler) {
+    this.handlers.set(key, handler);
+  }
+
+  enable() {
+    if (this.enabled) return;
+    this.enabled = true;
+    // Use capture phase to run before main app's keyboard handlers
+    document.addEventListener('keydown', this.handleKeyDown, { capture: true });
+  }
+
+  disable() {
+    if (!this.enabled) return;
+    this.enabled = false;
+    document.removeEventListener('keydown', this.handleKeyDown, { capture: true });
+    this.hideHelpOverlay();
+  }
+
+  handleKeyDown = (event) => {
+    if (!this.enabled) return;
+
+    // Ignore if typing in input/textarea/select
+    if (event.target.matches('input, textarea, select, [contenteditable="true"]')) {
+      return;
+    }
+
+    const handler = this.handlers.get(event.key);
+
+    if (handler) {
+      event.preventDefault();
+      event.stopPropagation(); // Prevent main app shortcuts from firing
+      handler();
+    }
+  };
+
+  handleEscape() {
+    if (this.helpOverlayOpen) {
+      // Priority 1: Close help overlay
+      this.toggleHelpOverlay();
+    } else if (this.lightbox.panel?.isOpen) {
+      // Priority 2: Close panel
+      this.lightbox.panel.close();
+    } else {
+      // Priority 3: Close lightbox
+      this.lightbox.close();
+    }
+  }
+
+  handleLeftArrow() {
+    // If zoomed, pan left
+    if (this.isZoomed()) {
+      this.pan(-50, 0);
+    } else {
+      // Navigate to previous photo
+      this.lightbox.previous();
+    }
+  }
+
+  handleRightArrow() {
+    // If zoomed, pan right
+    if (this.isZoomed()) {
+      this.pan(50, 0);
+    } else {
+      // Navigate to next photo
+      this.lightbox.next();
+    }
+  }
+
+  handleUpArrow() {
+    // Pan up when zoomed
+    if (this.isZoomed()) {
+      this.pan(0, -50);
+    }
+  }
+
+  handleDownArrow() {
+    // Pan down when zoomed
+    if (this.isZoomed()) {
+      this.pan(0, 50);
+    }
+  }
+
+  isZoomed() {
+    const zoom = this.lightbox.zoomSystem;
+    if (!zoom) return false;
+    return zoom.currentScale > (zoom.calculateFitScale() + 0.01);
+  }
+
+  toggleFitFill() {
+    const zoom = this.lightbox.zoomSystem;
+    if (!zoom) return;
+
+    if (zoom.mode === 'fit') {
+      zoom.setMode('fill');
+    } else {
+      zoom.setMode('fit');
+    }
+  }
+
+  zoomToPercent(scale) {
+    const zoom = this.lightbox.zoomSystem;
+    if (!zoom) return;
+
+    zoom.currentScale = scale;
+    zoom.mode = scale === 1.0 ? '100%' : 'custom';
+    zoom.panOffset = { x: 0, y: 0 };
+    zoom.apply();
+    zoom.updateBadge();
+  }
+
+  zoomIn() {
+    const zoom = this.lightbox.zoomSystem;
+    if (!zoom) return;
+
+    zoom.currentScale = Math.min(zoom.maxScale, zoom.currentScale + 0.1);
+    zoom.mode = 'custom';
+    zoom.apply();
+    zoom.updateBadge();
+  }
+
+  zoomOut() {
+    const zoom = this.lightbox.zoomSystem;
+    if (!zoom) return;
+
+    zoom.currentScale = Math.max(zoom.minScale, zoom.currentScale - 0.1);
+    if (zoom.currentScale <= zoom.calculateFitScale()) {
+      zoom.mode = 'fit';
+      zoom.panOffset = { x: 0, y: 0 };
+    } else {
+      zoom.mode = 'custom';
+    }
+    zoom.apply();
+    zoom.updateBadge();
+  }
+
+  pan(deltaX, deltaY) {
+    const zoom = this.lightbox.zoomSystem;
+    if (!zoom || zoom.currentScale <= 1.0) return; // Can't pan when not zoomed
+
+    zoom.panOffset.x += deltaX;
+    zoom.panOffset.y += deltaY;
+
+    // Constrain to bounds
+    const photo = this.lightbox.photoElement;
+    if (!photo) return;
+
+    const container = this.lightbox.container.querySelector('.lightbox-stage');
+    const photoWidth = photo.naturalWidth * zoom.currentScale;
+    const photoHeight = photo.naturalHeight * zoom.currentScale;
+    const containerWidth = container.clientWidth;
+    const containerHeight = container.clientHeight;
+
+    const maxX = Math.max(0, (photoWidth - containerWidth) / 2);
+    const maxY = Math.max(0, (photoHeight - containerHeight) / 2);
+
+    zoom.panOffset.x = Math.max(-maxX, Math.min(maxX, zoom.panOffset.x));
+    zoom.panOffset.y = Math.max(-maxY, Math.min(maxY, zoom.panOffset.y));
+
+    zoom.apply();
+  }
+
+  toggleHelpOverlay() {
+    this.helpOverlayOpen = !this.helpOverlayOpen;
+
+    if (this.helpOverlayOpen) {
+      this.showHelpOverlay();
+    } else {
+      this.hideHelpOverlay();
+    }
+  }
+
+  showHelpOverlay() {
+    const overlay = document.createElement('div');
+    overlay.className = 'keyboard-help-overlay';
+    overlay.innerHTML = `
+      <div class="help-card">
+        <div class="help-header">
+          <h2>Keyboard Shortcuts</h2>
+          <button class="btn-close-help" aria-label="Close help">×</button>
+        </div>
+        <div class="help-content">
+          <div class="help-section">
+            <h3>Navigation</h3>
+            <div class="help-shortcuts">
+              <div><kbd>ESC</kbd> Close lightbox</div>
+              <div><kbd>←</kbd> Previous photo</div>
+              <div><kbd>→</kbd> Next photo</div>
+              <div><kbd>I</kbd> Toggle info panel</div>
+            </div>
+          </div>
+
+          <div class="help-section">
+            <h3>Zoom</h3>
+            <div class="help-shortcuts">
+              <div><kbd>Z</kbd> Cycle zoom modes</div>
+              <div><kbd>0</kbd> Reset to Fit</div>
+              <div><kbd>F</kbd> Toggle Fit/Fill</div>
+              <div><kbd>1</kbd>-<kbd>4</kbd> Zoom 100%-400%</div>
+              <div><kbd>+</kbd> / <kbd>-</kbd> Zoom in/out 10%</div>
+            </div>
+          </div>
+
+          <div class="help-section">
+            <h3>Pan (when zoomed)</h3>
+            <div class="help-shortcuts">
+              <div><kbd>↑</kbd> <kbd>↓</kbd> <kbd>←</kbd> <kbd>→</kbd> Pan photo</div>
+              <div>or drag with mouse</div>
+            </div>
+          </div>
+
+          <div class="help-section">
+            <h3>Actions</h3>
+            <div class="help-shortcuts">
+              <div><kbd>S</kbd> Toggle favorite</div>
+              <div><kbd>D</kbd> Download photo</div>
+              <div><kbd>Delete</kbd> Delete photo</div>
+            </div>
+          </div>
+
+          <div class="help-section">
+            <h3>Help</h3>
+            <div class="help-shortcuts">
+              <div><kbd>?</kbd> Show/hide this help</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+    this.helpOverlay = overlay;
+
+    // Close button
+    const closeBtn = overlay.querySelector('.btn-close-help');
+    closeBtn.addEventListener('click', () => this.toggleHelpOverlay());
+
+    // Click outside to close
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) {
+        this.toggleHelpOverlay();
+      }
+    });
+  }
+
+  hideHelpOverlay() {
+    if (this.helpOverlay) {
+      this.helpOverlay.remove();
+      this.helpOverlay = null;
+    }
+  }
+}

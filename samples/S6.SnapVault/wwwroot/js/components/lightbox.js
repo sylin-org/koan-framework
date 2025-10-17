@@ -3,6 +3,13 @@
  * Full-screen immersive photo viewing with EXIF, zoom, navigation
  */
 
+import { LightboxPanel } from './lightboxPanel.js';
+import { LightboxZoom } from './lightboxZoom.js';
+import { LightboxActions } from './lightboxActions.js';
+import { LightboxKeyboard } from './lightboxKeyboard.js';
+import { FocusManager } from './lightboxFocus.js';
+import { AnnouncementManager } from './lightboxAnnouncer.js';
+
 export class Lightbox {
   constructor(app) {
     this.app = app;
@@ -10,27 +17,56 @@ export class Lightbox {
     this.currentPhotoId = null;
     this.currentPhoto = null;
     this.currentIndex = -1;
-    this.zoom = 1;
-    this.panX = 0;
-    this.panY = 0;
-    this.isDragging = false;
-    this.dragStartX = 0;
-    this.dragStartY = 0;
     this.showChrome = true;
     this.chromeTimeout = null;
     this.container = null;
+    this.photoElement = null;
+    this.currentLayout = null;
     this.render();
+
+    // Note: this.panel is initialized in render() method
+
+    // Initialize zoom system (Phase 3)
+    this.zoomSystem = new LightboxZoom(this);
+
+    // Initialize actions system (Phase 4)
+    this.actions = new LightboxActions(this, this.app);
+
+    // Initialize keyboard shortcuts system (Phase 5)
+    this.keyboard = new LightboxKeyboard(this);
+
+    // Initialize accessibility managers (Phase 6)
+    this.focusManager = new FocusManager(this);
+    this.announcer = new AnnouncementManager();
+
+    // Setup resize handler for responsive photo reflow
+    this.setupResizeHandler();
   }
 
   render() {
     const container = document.createElement('div');
     container.className = 'lightbox';
+
+    // ARIA: Dialog role (Phase 6)
+    container.setAttribute('role', 'dialog');
+    container.setAttribute('aria-modal', 'true');
+    container.setAttribute('aria-labelledby', 'lightbox-title');
+    container.setAttribute('aria-describedby', 'lightbox-description');
+
     container.innerHTML = `
+      <!-- Hidden title and description for screen readers -->
+      <h1 id="lightbox-title" class="sr-only">Photo Viewer</h1>
+      <p id="lightbox-description" class="sr-only">
+        Use arrow keys to navigate photos, I to toggle info panel, ESC to close.
+      </p>
+
       <div class="lightbox-overlay"></div>
 
-      <!-- Main image container -->
-      <div class="lightbox-stage">
-        <img class="lightbox-image" alt="Photo" />
+      <!-- Viewer area (shrinks when panel opens) -->
+      <div class="lightbox-viewer">
+        <!-- Main image container -->
+        <div class="lightbox-stage" role="document">
+        <img class="lightbox-image" alt="Current photo" />
       </div>
 
       <!-- Chrome (mouse-reveal UI) -->
@@ -96,7 +132,11 @@ export class Lightbox {
               </svg>
               <span class="exif-tags-text"></span>
             </div>
-            <button class="exif-section exif-ai-toggle btn-ai-description" title="Toggle AI description (I)" aria-label="Toggle AI description">
+            <button class="exif-section exif-ai-toggle btn-ai-description"
+                    title="Toggle AI description (I)"
+                    aria-label="Toggle photo information panel"
+                    aria-expanded="false"
+                    aria-controls="info-panel">
               <svg class="exif-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <circle cx="12" cy="12" r="10"></circle>
                 <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
@@ -179,10 +219,21 @@ export class Lightbox {
           </button>
         </div>
       </div>
+      </div>
     `;
 
     document.body.appendChild(container);
     this.container = container;
+
+    // Create and append unified panel
+    this.panel = new LightboxPanel(this, this.app);
+    this.container.appendChild(this.panel.getElement());
+
+    // Append zoom badge (Phase 3)
+    if (this.zoomSystem && this.zoomSystem.badge) {
+      this.container.appendChild(this.zoomSystem.badge);
+    }
+
     this.setupEventListeners();
   }
 
@@ -207,9 +258,13 @@ export class Lightbox {
     overlay.addEventListener('click', () => this.close());
     closeBtn.addEventListener('click', () => this.close());
 
-    // AI Description toggle
-    aiToggleBtn.addEventListener('click', () => this.toggleAIPanel());
-    aiCloseBtn.addEventListener('click', () => this.toggleAIPanel());
+    // AI Description toggle - now toggles unified panel
+    aiToggleBtn.addEventListener('click', () => {
+      if (this.panel) this.panel.toggle();
+    });
+    aiCloseBtn.addEventListener('click', () => {
+      if (this.panel) this.panel.toggle();
+    });
     aiRegenerateBtn.addEventListener('click', () => this.regenerateAIDescription());
 
     // Navigation
@@ -220,45 +275,38 @@ export class Lightbox {
     downloadBtn.addEventListener('click', () => this.download());
     favoriteBtn.addEventListener('click', () => this.toggleFavorite());
 
-    // Zoom
-    zoomInBtn.addEventListener('click', () => this.zoomIn());
-    zoomOutBtn.addEventListener('click', () => this.zoomOut());
-    zoomResetBtn.addEventListener('click', () => this.resetZoom());
-
-    // Mouse wheel zoom
-    image.addEventListener('wheel', (e) => {
-      e.preventDefault();
-      if (e.deltaY < 0) {
-        this.zoomIn();
-      } else {
-        this.zoomOut();
+    // Zoom (deprecated - kept for backward compatibility, redirects to new zoom system)
+    zoomInBtn.addEventListener('click', () => {
+      if (this.zoomSystem) {
+        const newScale = Math.min(this.zoomSystem.currentScale + 0.25, this.zoomSystem.maxScale);
+        this.zoomSystem.currentScale = newScale;
+        this.zoomSystem.mode = 'custom';
+        this.zoomSystem.apply();
+        this.zoomSystem.updateBadge();
       }
-    }, { passive: false });
-
-    // Pan with drag
-    image.addEventListener('mousedown', (e) => {
-      if (this.zoom > 1) {
-        this.isDragging = true;
-        this.dragStartX = e.clientX - this.panX;
-        this.dragStartY = e.clientY - this.panY;
-        image.style.cursor = 'grabbing';
+    });
+    zoomOutBtn.addEventListener('click', () => {
+      if (this.zoomSystem) {
+        const newScale = Math.max(this.zoomSystem.currentScale - 0.25, this.zoomSystem.minScale);
+        this.zoomSystem.currentScale = newScale;
+        if (newScale <= this.zoomSystem.calculateFitScale()) {
+          this.zoomSystem.mode = 'fit';
+          this.zoomSystem.panOffset = { x: 0, y: 0 };
+        } else {
+          this.zoomSystem.mode = 'custom';
+        }
+        this.zoomSystem.apply();
+        this.zoomSystem.updateBadge();
+      }
+    });
+    zoomResetBtn.addEventListener('click', () => {
+      if (this.zoomSystem) {
+        this.zoomSystem.reset();
       }
     });
 
-    document.addEventListener('mousemove', (e) => {
-      if (this.isDragging) {
-        this.panX = e.clientX - this.dragStartX;
-        this.panY = e.clientY - this.dragStartY;
-        this.updateImageTransform();
-      }
-    });
-
-    document.addEventListener('mouseup', () => {
-      if (this.isDragging) {
-        this.isDragging = false;
-        image.style.cursor = this.zoom > 1 ? 'grab' : 'default';
-      }
-    });
+    // Setup new zoom system event listeners (Phase 3)
+    this.setupZoomListeners();
 
     // Rating
     starBtns.forEach(btn => {
@@ -280,58 +328,58 @@ export class Lightbox {
       }, 2000);
     });
 
-    // Keyboard shortcuts
-    this.keyboardHandler = (e) => {
-      if (!this.isOpen) return;
+    // NOTE: Keyboard shortcuts are now handled by LightboxKeyboard (Phase 5)
+    // The old keyboard handler has been removed to prevent conflicts
+  }
 
-      switch (e.key) {
-        case 'Escape':
-          this.close();
-          break;
-        case 'ArrowLeft':
-        case 'k':
-        case 'K':
-          this.previous();
-          break;
-        case 'ArrowRight':
-        case 'j':
-        case 'J':
-          this.next();
-          break;
-        case 'd':
-        case 'D':
-          this.download();
-          break;
-        case 'f':
-        case 'F':
-          this.toggleFavorite();
-          break;
-        case '+':
-        case '=':
-          this.zoomIn();
-          break;
-        case '-':
-        case '_':
-          this.zoomOut();
-          break;
-        case '0':
-          this.resetZoom();
-          break;
-        case '1':
-        case '2':
-        case '3':
-        case '4':
-        case '5':
-          this.rate(parseInt(e.key));
-          break;
-        case 'i':
-        case 'I':
-          this.toggleAIPanel();
-          break;
+  setupZoomListeners() {
+    const image = this.container.querySelector('.lightbox-image');
+    if (!image) return;
+
+    // Click-to-cycle: Fit → Fill → 100% → Fit
+    image.addEventListener('click', (e) => {
+      // Only cycle if not panning
+      if (!this.zoomSystem.panController.isDragging) {
+        this.zoomSystem.cycle();
       }
-    };
+    });
 
-    document.addEventListener('keydown', this.keyboardHandler);
+    // Scroll-wheel zoom (desktop)
+    image.addEventListener('wheel', (e) => {
+      this.zoomSystem.handleWheelZoom(e);
+    }, { passive: false });
+
+    // Pinch zoom (mobile/touchpad)
+    image.addEventListener('touchstart', (e) => {
+      if (e.touches.length === 2) {
+        e.preventDefault();
+        this.zoomSystem.handlePinchZoom(e);
+      }
+    }, { passive: false });
+
+    image.addEventListener('touchmove', (e) => {
+      if (e.touches.length === 2) {
+        e.preventDefault();
+        this.zoomSystem.handlePinchZoom(e);
+      }
+    }, { passive: false });
+
+    image.addEventListener('touchend', () => {
+      this.zoomSystem.pinchStartDistance = null;
+    });
+
+    // Pan when zoomed (works for both mouse and touch)
+    image.addEventListener('pointerdown', (e) => {
+      this.zoomSystem.panController.handlePointerDown(e);
+    });
+
+    document.addEventListener('pointermove', (e) => {
+      this.zoomSystem.panController.handlePointerMove(e);
+    });
+
+    document.addEventListener('pointerup', () => {
+      this.zoomSystem.panController.handlePointerUp();
+    });
   }
 
   async open(photoId) {
@@ -340,7 +388,6 @@ export class Lightbox {
 
     this.isOpen = true;
     this.container.classList.add('show');
-    this.resetZoom();
 
     // Fetch fresh photo data from backend (includes latest AI description)
     await this.fetchPhotoData();
@@ -355,6 +402,43 @@ export class Lightbox {
     await this.loadPhoto();
     this.updateMetadata();
     this.updateNavigation();
+
+    // Update unified panel with photo data
+    if (this.panel && this.currentPhoto) {
+      this.panel.render(this.currentPhoto);
+    }
+
+    // Set current photo for actions system (Phase 4)
+    if (this.actions && this.currentPhoto) {
+      this.actions.setPhoto(this.currentPhoto);
+    }
+
+    // Get photo element reference and apply initial layout (panel closed)
+    this.photoElement = this.container.querySelector('.lightbox-image');
+    this.applyPhotoLayout({ open: false });
+
+    // Reset zoom to fit mode (Phase 3)
+    if (this.zoomSystem) {
+      this.zoomSystem.reset();
+    }
+
+    // Enable keyboard shortcuts (Phase 5)
+    if (this.keyboard) {
+      this.keyboard.enable();
+      this.showFirstUseHint();
+    }
+
+    // Capture focus and announce photo (Phase 6)
+    if (this.focusManager) {
+      this.focusManager.captureFocus();
+    }
+    if (this.announcer && this.currentPhoto) {
+      this.announcer.announcePhotoChange(
+        this.currentIndex,
+        this.app.photos.length,
+        this.currentPhoto.originalFileName
+      );
+    }
 
     // Show chrome initially
     const chrome = this.container.querySelector('.lightbox-chrome');
@@ -378,6 +462,21 @@ export class Lightbox {
   }
 
   close() {
+    // Close panel first if open
+    if (this.panel && this.panel.isOpen) {
+      this.panel.close();
+    }
+
+    // Disable keyboard shortcuts (Phase 5)
+    if (this.keyboard) {
+      this.keyboard.disable();
+    }
+
+    // Restore focus (Phase 6)
+    if (this.focusManager) {
+      this.focusManager.restoreFocus();
+    }
+
     this.isOpen = false;
     this.container.classList.remove('show');
     this.currentPhotoId = null;
@@ -505,7 +604,30 @@ export class Lightbox {
       await this.loadPhoto();
       this.updateMetadata();
       this.updateNavigation();
-      this.resetZoom();
+
+      // Reset zoom to fit mode (Phase 3)
+      if (this.zoomSystem) {
+        this.zoomSystem.reset();
+      }
+
+      // Update unified panel
+      if (this.panel && this.currentPhoto) {
+        this.panel.render(this.currentPhoto);
+      }
+
+      // Update actions with new photo (Phase 4)
+      if (this.actions && this.currentPhoto) {
+        this.actions.setPhoto(this.currentPhoto);
+      }
+
+      // Announce photo change (Phase 6)
+      if (this.announcer && this.currentPhoto) {
+        this.announcer.announcePhotoChange(
+          this.currentIndex,
+          this.app.photos.length,
+          this.currentPhoto.originalFileName
+        );
+      }
     }
   }
 
@@ -520,112 +642,89 @@ export class Lightbox {
       await this.loadPhoto();
       this.updateMetadata();
       this.updateNavigation();
-      this.resetZoom();
-    }
-  }
 
-  zoomIn() {
-    this.zoom = Math.min(this.zoom + 0.25, 4);
-    this.updateImageTransform();
-    this.updateZoomUI();
-  }
-
-  zoomOut() {
-    this.zoom = Math.max(this.zoom - 0.25, 1);
-    if (this.zoom === 1) {
-      this.panX = 0;
-      this.panY = 0;
-    }
-    this.updateImageTransform();
-    this.updateZoomUI();
-  }
-
-  resetZoom() {
-    this.zoom = 1;
-    this.panX = 0;
-    this.panY = 0;
-    this.updateImageTransform();
-    this.updateZoomUI();
-  }
-
-  updateImageTransform() {
-    const image = this.container.querySelector('.lightbox-image');
-    image.style.transform = `scale(${this.zoom}) translate(${this.panX / this.zoom}px, ${this.panY / this.zoom}px)`;
-    image.style.cursor = this.zoom > 1 ? 'grab' : 'default';
-  }
-
-  updateZoomUI() {
-    const zoomLevel = this.container.querySelector('.zoom-level');
-    zoomLevel.textContent = `${Math.round(this.zoom * 100)}%`;
-  }
-
-  async toggleFavorite() {
-    try {
-      const response = await this.app.api.post(`/api/photos/${this.currentPhotoId}/favorite`);
-
-      // Update local state
-      this.currentPhoto.isFavorite = response.isFavorite;
-
-      // Update photo in app.photos array
-      const photoInList = this.app.photos.find(p => p.id === this.currentPhotoId);
-      if (photoInList) {
-        photoInList.isFavorite = response.isFavorite;
+      // Reset zoom to fit mode (Phase 3)
+      if (this.zoomSystem) {
+        this.zoomSystem.reset();
       }
 
-      // Update UI
-      this.updateMetadata();
+      // Update unified panel
+      if (this.panel && this.currentPhoto) {
+        this.panel.render(this.currentPhoto);
+      }
 
-      this.app.components.toast.show(
-        response.isFavorite ? 'Added to favorites' : 'Removed from favorites',
-        { icon: response.isFavorite ? '❤️' : '🤍', duration: 1500 }
-      );
-    } catch (error) {
-      console.error('Failed to toggle favorite:', error);
-      this.app.components.toast.show('Failed to update favorite', { icon: '⚠️', duration: 2000 });
+      // Update actions with new photo (Phase 4)
+      if (this.actions && this.currentPhoto) {
+        this.actions.setPhoto(this.currentPhoto);
+      }
+
+      // Announce photo change (Phase 6)
+      if (this.announcer && this.currentPhoto) {
+        this.announcer.announcePhotoChange(
+          this.currentIndex,
+          this.app.photos.length,
+          this.currentPhoto.originalFileName
+        );
+      }
+    }
+  }
+
+  // Old zoom methods removed - replaced by LightboxZoom system (Phase 3)
+
+  // Old action methods - redirect to LightboxActions (Phase 4, backward compatibility)
+  async toggleFavorite() {
+    if (this.actions) {
+      return this.actions.toggleFavorite();
     }
   }
 
   async rate(rating) {
-    try {
-      const response = await this.app.api.post(`/api/photos/${this.currentPhotoId}/rate`, { rating });
-
-      // Update local state
-      this.currentPhoto.rating = response.rating;
-
-      // Update photo in app.photos array
-      const photoInList = this.app.photos.find(p => p.id === this.currentPhotoId);
-      if (photoInList) {
-        photoInList.rating = response.rating;
-      }
-
-      // Update UI
-      this.updateRatingStars(response.rating);
-
-      this.app.components.toast.show(
-        `Rated ${rating} star${rating !== 1 ? 's' : ''}`,
-        { icon: '⭐', duration: 1500 }
-      );
-    } catch (error) {
-      console.error('Failed to rate photo:', error);
-      this.app.components.toast.show('Failed to update rating', { icon: '⚠️', duration: 2000 });
+    if (this.actions) {
+      return this.actions.setRating(rating);
     }
   }
 
   download() {
-    // Open download endpoint in new window
-    window.open(`/api/photos/${this.currentPhotoId}/download`, '_blank');
-    this.app.components.toast.show('Download started', { icon: '⬇️', duration: 2000 });
+    if (this.actions) {
+      return this.actions.download();
+    }
   }
 
-  toggleAIPanel() {
-    const aiPanel = this.container.querySelector('.lightbox-ai-panel');
-    const isVisible = aiPanel.classList.contains('visible');
-
-    if (isVisible) {
-      aiPanel.classList.remove('visible');
-    } else {
-      aiPanel.classList.add('visible');
+  async deletePhoto() {
+    if (this.actions) {
+      return this.actions.deletePhoto();
     }
+  }
+
+  async regenerateAIDescription() {
+    if (this.actions) {
+      return this.actions.regenerateAI();
+    }
+  }
+
+  // Deprecated: kept for backward compatibility
+  toggleAIPanel() {
+    if (this.panel) {
+      this.panel.toggle();
+    }
+  }
+
+  showFirstUseHint() {
+    // Check if user has seen the hint before
+    if (localStorage.getItem('lightbox-hint-seen')) return;
+
+    const tooltip = document.createElement('div');
+    tooltip.className = 'zoom-hint-tooltip';
+    tooltip.innerHTML = '💡 Click photo to zoom • Press <kbd>?</kbd> for shortcuts';
+    document.body.appendChild(tooltip);
+
+    // Auto-dismiss after 5 seconds
+    setTimeout(() => {
+      tooltip.remove();
+    }, 5000);
+
+    // Mark hint as seen
+    localStorage.setItem('lightbox-hint-seen', 'true');
   }
 
   formatMarkdown(text) {
@@ -657,71 +756,123 @@ export class Lightbox {
     return html;
   }
 
-  async regenerateAIDescription() {
-    if (!this.currentPhotoId) return;
+  calculatePhotoLayout(photo, viewport, panelState) {
+    const aspectRatio = photo.width / photo.height;
 
-    const aiPanelContent = this.container.querySelector('.ai-panel-content');
-    const regenerateBtn = this.container.querySelector('.btn-regenerate-ai');
+    // Special case: Panorama (ultra-wide)
+    if (aspectRatio < 0.5) {
+      return {
+        mode: 'bottom-sheet',
+        reason: 'panorama',
+        scale: 1.0,
+        offsetX: 0
+      };
+    }
 
-    try {
-      // Disable button and show loading state
-      regenerateBtn.disabled = true;
-      regenerateBtn.style.opacity = '0.5';
-      aiPanelContent.innerHTML = '<p style="text-align: center; padding: var(--space-5); color: var(--text-secondary);">🔄 Regenerating AI description...<br><span style="font-size: var(--text-sm); color: var(--text-tertiary);">This may take 15-30 seconds</span></p>';
+    // Special case: Portrait (ultra-tall)
+    const isPortrait = aspectRatio > 1.5;
+    const heightScale = isPortrait ? 0.85 : 0.75;
 
-      // Call API to regenerate AI metadata
-      await this.app.api.post(`/api/photos/${this.currentPhotoId}/regenerate-ai`);
+    // Desktop: Shift + scale
+    if (viewport.width >= 1200) {
+      const panelWidth = panelState.open ? 380 : 0;
+      const availableWidth = viewport.width - panelWidth - 80; // 80px margins
+      const availableHeight = viewport.height * heightScale;
 
-      this.app.components.toast.show('AI description regeneration started', { icon: '🔄', duration: 3000 });
+      const scale = Math.min(
+        availableWidth / photo.width,
+        availableHeight / photo.height,
+        1.0 // Never scale up
+      );
 
-      // Poll for completion (AI processing happens in background)
-      let attempts = 0;
-      const maxAttempts = 60; // 60 seconds max
-      const pollInterval = setInterval(async () => {
-        attempts++;
+      return {
+        mode: 'shift-scale',
+        scale,
+        offsetX: panelState.open ? -190 : 0, // Half panel width
+        width: photo.width * scale,
+        height: photo.height * scale
+      };
+    }
 
-        // Fetch fresh photo data
-        const updatedPhoto = await this.app.api.get(`/api/photos/${this.currentPhotoId}`);
+    // Tablet: Overlay (no reflow)
+    if (viewport.width >= 768) {
+      return {
+        mode: 'overlay',
+        scale: 1.0,
+        offsetX: 0
+      };
+    }
 
-        // Check if description has been updated (different from current or newly generated)
-        if (updatedPhoto.detailedDescription &&
-            updatedPhoto.detailedDescription !== this.currentPhoto.detailedDescription) {
+    // Mobile: Bottom sheet
+    return {
+      mode: 'bottom-sheet',
+      scale: 1.0,
+      offsetX: 0
+    };
+  }
 
-          clearInterval(pollInterval);
+  applyPhotoLayout(panelState) {
+    if (!this.currentPhoto) return;
 
-          // Update current photo data
-          this.currentPhoto = updatedPhoto;
+    const viewport = {
+      width: window.innerWidth,
+      height: window.innerHeight
+    };
 
-          // Update UI with new description
-          const formattedDescription = this.formatMarkdown(updatedPhoto.detailedDescription);
-          aiPanelContent.innerHTML = formattedDescription;
+    const photo = {
+      width: this.currentPhoto.width,
+      height: this.currentPhoto.height
+    };
 
-          // Re-enable button
-          regenerateBtn.disabled = false;
-          regenerateBtn.style.opacity = '1';
+    const layout = this.calculatePhotoLayout(photo, viewport, panelState);
+    this.currentLayout = layout;
 
-          this.app.components.toast.show('AI description regenerated successfully', { icon: '✅', duration: 3000 });
-        } else if (attempts >= maxAttempts) {
-          // Timeout
-          clearInterval(pollInterval);
-          aiPanelContent.innerHTML = '<p class="no-description">Regeneration timed out. Please try again or check the server logs.</p>';
-          regenerateBtn.disabled = false;
-          regenerateBtn.style.opacity = '1';
-          this.app.components.toast.show('Regeneration timed out', { icon: '⚠️', duration: 5000 });
-        }
-      }, 1000); // Poll every second
+    const viewer = this.container.querySelector('.lightbox-viewer');
+    const overlay = this.container.querySelector('.lightbox-overlay');
 
-    } catch (error) {
-      console.error('Failed to regenerate AI description:', error);
-      aiPanelContent.innerHTML = '<p class="no-description">Failed to regenerate description. Please try again.</p>';
-      regenerateBtn.disabled = false;
-      regenerateBtn.style.opacity = '1';
-      this.app.components.toast.show('Failed to regenerate description', { icon: '⚠️', duration: 5000 });
+    if (layout.mode === 'shift-scale') {
+      // Desktop: Shrink viewer width to make room for panel
+      viewer.style.transition = 'width 300ms cubic-bezier(0.4, 0, 0.2, 1)';
+      viewer.style.width = panelState.open ? 'calc(100% - 380px)' : '100%';
+
+      // Remove panel-open class from overlay (desktop doesn't use backdrop)
+      overlay.classList.remove('panel-open');
+
+      // Recalculate zoom after viewer size changes
+      if (this.zoomSystem && this.zoomSystem.mode === 'fit') {
+        // Small delay to let the transition start, then recalculate
+        setTimeout(() => {
+          this.zoomSystem.reset();
+        }, 10);
+      }
+    } else if (layout.mode === 'overlay') {
+      // Tablet: No viewer reflow, just backdrop
+      viewer.style.width = '100%';
+      overlay.classList.toggle('panel-open', panelState.open);
+    } else if (layout.mode === 'bottom-sheet') {
+      // Mobile: No viewer changes
+      viewer.style.width = '100%';
+      overlay.classList.remove('panel-open');
     }
   }
 
+  setupResizeHandler() {
+    let resizeTimeout;
+    window.addEventListener('resize', () => {
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(() => {
+        if (this.isOpen && this.panel && this.panel.isOpen) {
+          this.applyPhotoLayout({ open: true });
+        }
+      }, 150); // Debounce
+    });
+  }
+
   destroy() {
-    document.removeEventListener('keydown', this.keyboardHandler);
+    // Cleanup
     clearTimeout(this.chromeTimeout);
+    if (this.announcer) {
+      this.announcer.destroy();
+    }
   }
 }
