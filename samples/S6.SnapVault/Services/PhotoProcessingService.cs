@@ -8,6 +8,8 @@ using Koan.Media.Core.Extensions;
 using Koan.AI;
 using Koan.Data.Core;
 using Koan.Data.Vector;
+using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace S6.SnapVault.Services;
 
@@ -384,10 +386,13 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
     {
         var parts = new List<string>();
 
-        // Detailed AI description first (most comprehensive)
-        if (!string.IsNullOrEmpty(photo.DetailedDescription))
-            parts.Add(photo.DetailedDescription);
+        // Structured AI analysis first (best semantic content)
+        if (photo.AiAnalysis != null)
+        {
+            parts.Add(photo.AiAnalysis.ToEmbeddingText());
+        }
 
+        // Fallback to legacy fields if no structured analysis
         if (!string.IsNullOrEmpty(photo.OriginalFileName))
             parts.Add($"Filename: {photo.OriginalFileName}");
 
@@ -396,9 +401,6 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
 
         if (!string.IsNullOrEmpty(photo.MoodDescription))
             parts.Add($"Mood: {photo.MoodDescription}");
-
-        if (photo.DetectedObjects.Any())
-            parts.Add($"Objects: {string.Join(", ", photo.DetectedObjects)}");
 
         if (!string.IsNullOrEmpty(photo.CameraModel))
             parts.Add($"Camera: {photo.CameraModel}");
@@ -419,20 +421,79 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
     }
 
     /// <summary>
-    /// Generate detailed AI description for a photo using vision model
+    /// Robust JSON parsing with multiple fallback strategies
+    /// </summary>
+    private AiAnalysis? ParseAiResponse(string response)
+    {
+        if (string.IsNullOrWhiteSpace(response))
+            return null;
+
+        // Strategy 1: Direct parse (model returned clean JSON)
+        try
+        {
+            return JsonSerializer.Deserialize<AiAnalysis>(response);
+        }
+        catch
+        {
+            // Continue to fallback strategies
+        }
+
+        // Strategy 2: Strip markdown code blocks
+        var cleanedResponse = Regex.Replace(
+            response,
+            @"```(?:json)?\s*|\s*```",
+            "",
+            RegexOptions.IgnoreCase | RegexOptions.Multiline
+        ).Trim();
+
+        try
+        {
+            return JsonSerializer.Deserialize<AiAnalysis>(cleanedResponse);
+        }
+        catch
+        {
+            // Continue to fallback strategies
+        }
+
+        // Strategy 3: Extract first JSON object from mixed content
+        var jsonMatch = Regex.Match(
+            cleanedResponse,
+            @"\{[\s\S]*?\}(?=\s*(?:$|[^,\}\]]))",
+            RegexOptions.Multiline
+        );
+
+        if (jsonMatch.Success)
+        {
+            try
+            {
+                return JsonSerializer.Deserialize<AiAnalysis>(jsonMatch.Value);
+            }
+            catch
+            {
+                // All strategies failed
+            }
+        }
+
+        _logger.LogWarning("All JSON parsing strategies failed. Response preview: {Preview}",
+            response.Length > 200 ? response.Substring(0, 200) + "..." : response);
+
+        return null;
+    }
+
+    /// <summary>
+    /// Generate structured AI analysis for a photo using vision model
     /// </summary>
     private async Task GenerateDetailedDescriptionAsync(PhotoAsset photo, CancellationToken ct)
     {
         try
         {
-            _logger.LogInformation("Generating detailed AI description for photo {PhotoId}", photo.Id);
+            _logger.LogInformation("Generating structured AI analysis for photo {PhotoId}", photo.Id);
 
-            // Load gallery image (auto-oriented, JPEG, proper size) instead of original
-            // This ensures the AI sees the same orientation and format as the user
+            // Load gallery image
             var gallery = await PhotoGallery.Get(photo.GalleryMediaId, ct);
             if (gallery == null)
             {
-                _logger.LogWarning("Gallery image not found for photo {PhotoId}, skipping AI description", photo.Id);
+                _logger.LogWarning("Gallery image not found for photo {PhotoId}, skipping AI analysis", photo.Id);
                 return;
             }
 
@@ -441,73 +502,53 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
             await imageStream.CopyToAsync(ms, ct);
             var imageBytes = ms.ToArray();
 
-            // Detailed vision analysis prompt - structured format for precise visual description
-            var prompt = @"**Role:** You are a precise visual describer. Only state what's visible. No brand/IP/identity guesses.
+            // Simplified JSON prompt - focused on accuracy over completeness
+            var prompt = @"Analyze this photograph and return a JSON object. Be accurate and only describe what you clearly see.
 
-**Output order (markdown).**
-Always include: **Type**, **Characters**, **Alt**, **Tags**.
-Include the others **only if you detect them**.
+Return ONLY valid JSON in this exact format (no markdown, no code blocks, just the JSON):
 
----
+{
+  ""tags"": [""tag1"", ""tag2"", ""tag3"", ""...""],
+  ""summary"": ""One clear sentence describing the image"",
+  ""facts"": {
+    ""Type"": ""portrait|landscape|product|food|screenshot|architecture|wildlife|other"",
+    ""Composition"": ""describe framing and arrangement"",
+    ""Palette"": ""list 3-5 dominant colors"",
+    ""Lighting"": ""describe light source and quality"",
+    ""[Additional Facts]"": ""include any other clearly visible details""
+  }
+}
 
-### Type
+GUIDELINES:
+- tags: 6-10 searchable keywords (lowercase, use hyphens for multi-word like ""red-hoodie"")
+  Examples: character, portrait, studio, graffiti, black-hoodie, red-headphones, cool-tones, centered
 
-*(portrait | character | action | group | architecture | landscape | graphic/symbol | product | UI)*
+- summary: 20-50 words describing subject, action, setting, and visual characteristics
+  Example: ""A female character with dark brown hair and elf-like ears, wearing a black hoodie and red headphones, stands against a graffiti-style backdrop in a cool-toned, evenly lit studio.""
 
-### Count & Layout (≤14w)
+- facts.Type: Main category of the photo (portrait, landscape, product, food, screenshot, etc.)
 
-*e.g., ""1 subject, centered, half-body"".*
+- facts.Composition: How elements are arranged (centered, rule-of-thirds, symmetrical, etc.)
 
-### Characters
+- facts.Palette: 3-5 dominant colors (black, red, white, gray, brown, blue, etc.)
 
-* **C1:** *primary/secondary; perceived gender (male/female/androgynous/ambiguous); age band (child/teen/young adult/adult/older); presentation (masc/fem/androgynous); build; skin; hair (color/length/style); distinctive face/ears/makeup; pose/gesture; visibility (full/half/close/silhouette/partial); 3 attire keys (material+color+part); notable items (weapons/jewelry/tattoos/etc.).*
-* **C2/C3:** *repeat as needed.*
+- facts.Lighting: Light source and characteristics (studio, natural, golden-hour, soft, dramatic, etc.)
 
-### Scene (Detailed)
+- Additional facts: Include any clearly visible details like:
+  * For portraits: ""Character"" (gender, hair, expression, clothing, accessories)
+  * For landscapes: ""Atmosphere"" (weather, time of day, season)
+  * For products: ""Presentation"" (flat-lay, lifestyle, close-up)
+  * For screenshots: ""Content"" (game, UI, app)
 
-Provide **concise bullets**. Use only lines that apply; skip the rest.
+CRITICAL RULES:
+1. Return ONLY the JSON object - no explanatory text
+2. Only include what you can CLEARLY see - never guess or hallucinate
+3. Use simple, factual descriptions
+4. Keep all strings properly escaped for JSON
 
-* **Setting:** *(studio/backdrop/interior/exterior/city/temple/forest/beach/etc.)*
-* **Locale cues:** *architecture style, props, vegetation, furniture, water, terrain.*
-* **Topology:** *foreground/midground/background; platforms, stairs, bridges, paths.*
-* **Atmospherics:** *fog, haze, smoke, sparks, rain, snow, bloom, god rays.*
-* **Lighting:** *key/fill/rim practicals; direction (front/side/back/top); quality (soft/hard); intensity/contrast.*
-* **Color grade:** *warm/cool/neutral; tints (teal-orange, magenta, sepia).*
-* **Time/Weather:** *day/night/sunset/overcast/indoor practicals.*
-* **Depth cues:** *bokeh, DOF blur, parallax, scale references.*
-* **Motion/VFX:** *motion blur, energy rings, particles, magic circles.*
-* **Background text/symbols:** *transcribe short, visible text; else omit.*
-* **Sound/heat/light sources (visible):** *torches, neon, sun, LEDs, screens.*
+Analyze the image and return the JSON now.";
 
-### Composition (≤12w)
-
-*framing, angle, symmetry/asymmetry, leading lines, horizon level.*
-
-### Text/Symbols (≤20 chars)
-
-*verbatim or omit.*
-
-### Palette (3–5 colors)
-
-*common names or hex.*
-
-### Alt (≤140 chars)
-
-*single sentence.*
-
-### Tags (8 single words)
-
-*materials, colors, setting, mood, shot type, etc.*
-
-**Style rules**
-
-* Use **material + color + part** (""black leather bodice"").
-* Concrete, visual facts only; no story or opinions.
-* **Silhouette present?** mark gender/age as **ambiguous**, focus on outline/costume shapes.
-* **Omit anything not clearly visible.** No ""unclear"".
-* Keep within word/character limits.";
-
-            // Use vision model (qwen2.5vl) with explicit options
+            // Use vision model
             var visionOptions = new Koan.AI.Contracts.Options.AiVisionOptions
             {
                 ImageBytes = imageBytes,
@@ -516,18 +557,29 @@ Provide **concise bullets**. Use only lines that apply; skip the rest.
                 Temperature = 0.7
             };
 
-            var description = await Koan.AI.Ai.Understand(visionOptions, ct);
+            var response = await Koan.AI.Ai.Understand(visionOptions, ct);
 
-            photo.DetailedDescription = description;
+            // Parse JSON with robust error handling
+            var analysis = ParseAiResponse(response);
+
+            if (analysis == null)
+            {
+                _logger.LogWarning("Failed to parse AI response for photo {PhotoId}, using error state", photo.Id);
+                analysis = AiAnalysis.CreateError("Failed to parse AI vision response");
+            }
+
+            // Store structured analysis
+            photo.AiAnalysis = analysis;
             await photo.Save(ct);
 
-            _logger.LogInformation("Detailed AI description generated for photo {PhotoId} ({Length} chars)",
-                photo.Id, description.Length);
+            _logger.LogInformation(
+                "Structured AI analysis generated for photo {PhotoId}: {TagCount} tags, {FactCount} facts",
+                photo.Id, analysis.Tags.Count, analysis.Facts.Count);
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to generate detailed description for photo {PhotoId}, continuing without it", photo.Id);
-            // Non-fatal - continue processing even if vision description fails
+            _logger.LogWarning(ex, "Failed to generate AI analysis for photo {PhotoId}, continuing without it", photo.Id);
+            // Non-fatal - continue processing
         }
     }
 

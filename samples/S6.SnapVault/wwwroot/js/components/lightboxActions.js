@@ -215,8 +215,8 @@ export class LightboxActions {
         const updatedPhoto = await this.app.api.get(`/api/photos/${this.currentPhoto.id}`);
 
         // Check if AI analysis is updated (new structured format or legacy format)
-        const hasNewAnalysis = updatedPhoto.aiAnalysisJson &&
-                               updatedPhoto.aiAnalysisJson !== this.currentPhoto.aiAnalysisJson;
+        const hasNewAnalysis = updatedPhoto.aiAnalysis &&
+                               JSON.stringify(updatedPhoto.aiAnalysis) !== JSON.stringify(this.currentPhoto.aiAnalysis);
         const hasUpdatedDescription = updatedPhoto.detailedDescription &&
                                       updatedPhoto.detailedDescription !== this.currentPhoto.detailedDescription;
 

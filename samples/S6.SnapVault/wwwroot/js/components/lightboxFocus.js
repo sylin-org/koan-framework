@@ -79,7 +79,7 @@ export class FocusManager {
 
   focusInfoToggle() {
     // Return focus to info toggle when panel closes
-    const infoToggle = this.lightbox.container.querySelector('.btn-ai-description');
+    const infoToggle = this.lightbox.container.querySelector('.btn-info');
     if (infoToggle) {
       infoToggle.focus();
     }

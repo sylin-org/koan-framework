@@ -78,6 +78,13 @@ export class Lightbox {
             <span class="photo-dimensions"></span>
           </div>
           <div class="lightbox-actions">
+            <button class="btn-icon btn-info" title="Photo Information (I)" aria-label="Toggle photo information panel" aria-expanded="false" aria-controls="info-panel">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="16" x2="12" y2="12"></line>
+                <line x1="12" y1="8" x2="12.01" y2="8"></line>
+              </svg>
+            </button>
             <button class="btn-icon btn-download" title="Download original (D)" aria-label="Download">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
@@ -97,88 +104,6 @@ export class Lightbox {
               </svg>
             </button>
           </div>
-        </div>
-
-        <!-- Bottom bar with EXIF and rating -->
-        <div class="lightbox-bottom-bar">
-          <div class="lightbox-exif">
-            <div class="exif-section exif-camera">
-              <svg class="exif-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
-                <circle cx="12" cy="13" r="4"></circle>
-              </svg>
-              <span class="exif-camera-text"></span>
-            </div>
-            <div class="exif-section exif-settings">
-              <svg class="exif-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="12" cy="12" r="3"></circle>
-                <path d="M12 1v6m0 6v6M1 12h6m6 0h6"></path>
-              </svg>
-              <span class="exif-settings-text"></span>
-            </div>
-            <div class="exif-section exif-date">
-              <svg class="exif-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                <line x1="16" y1="2" x2="16" y2="6"></line>
-                <line x1="8" y1="2" x2="8" y2="6"></line>
-                <line x1="3" y1="10" x2="21" y2="10"></line>
-              </svg>
-              <span class="exif-date-text"></span>
-            </div>
-            <div class="exif-section exif-tags">
-              <svg class="exif-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path>
-                <line x1="7" y1="7" x2="7.01" y2="7"></line>
-              </svg>
-              <span class="exif-tags-text"></span>
-            </div>
-            <button class="exif-section exif-ai-toggle btn-ai-description"
-                    title="Toggle AI description (I)"
-                    aria-label="Toggle photo information panel"
-                    aria-expanded="false"
-                    aria-controls="info-panel">
-              <svg class="exif-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="12" cy="12" r="10"></circle>
-                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
-                <line x1="12" y1="17" x2="12.01" y2="17"></line>
-              </svg>
-              <span class="exif-ai-toggle-text">AI Description</span>
-            </button>
-          </div>
-          <div class="lightbox-rating">
-            <div class="rating-stars">
-              ${[1, 2, 3, 4, 5].map(star => `
-                <button class="star-btn" data-rating="${star}" aria-label="Rate ${star} stars">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
-                  </svg>
-                </button>
-              `).join('')}
-            </div>
-          </div>
-        </div>
-
-        <!-- AI Description Panel -->
-        <div class="lightbox-ai-panel">
-          <div class="ai-panel-header">
-            <h3>AI-Generated Description</h3>
-            <div class="ai-panel-actions">
-              <button class="btn-icon btn-regenerate-ai" title="Regenerate description" aria-label="Regenerate AI description">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <polyline points="23 4 23 10 17 10"></polyline>
-                  <polyline points="1 20 1 14 7 14"></polyline>
-                  <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
-                </svg>
-              </button>
-              <button class="btn-icon btn-close-ai" title="Close (I)" aria-label="Close AI description">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <line x1="18" y1="6" x2="6" y2="18"></line>
-                  <line x1="6" y1="6" x2="18" y2="18"></line>
-                </svg>
-              </button>
-            </div>
-          </div>
-          <div class="ai-panel-content"></div>
         </div>
 
         <!-- Navigation arrows -->
@@ -245,27 +170,20 @@ export class Lightbox {
     const nextBtn = this.container.querySelector('.lightbox-next');
     const downloadBtn = this.container.querySelector('.btn-download');
     const favoriteBtn = this.container.querySelector('.btn-favorite');
+    const infoBtn = this.container.querySelector('.btn-info');
     const zoomInBtn = this.container.querySelector('.btn-zoom-in');
     const zoomOutBtn = this.container.querySelector('.btn-zoom-out');
     const zoomResetBtn = this.container.querySelector('.btn-zoom-reset');
-    const starBtns = this.container.querySelectorAll('.star-btn');
     const chrome = this.container.querySelector('.lightbox-chrome');
-    const aiToggleBtn = this.container.querySelector('.btn-ai-description');
-    const aiCloseBtn = this.container.querySelector('.btn-close-ai');
-    const aiRegenerateBtn = this.container.querySelector('.btn-regenerate-ai');
 
     // Close
     overlay.addEventListener('click', () => this.close());
     closeBtn.addEventListener('click', () => this.close());
 
-    // AI Description toggle - now toggles unified panel
-    aiToggleBtn.addEventListener('click', () => {
+    // Info panel toggle
+    infoBtn.addEventListener('click', () => {
       if (this.panel) this.panel.toggle();
     });
-    aiCloseBtn.addEventListener('click', () => {
-      if (this.panel) this.panel.toggle();
-    });
-    aiRegenerateBtn.addEventListener('click', () => this.regenerateAIDescription());
 
     // Navigation
     prevBtn.addEventListener('click', () => this.previous());
@@ -307,14 +225,6 @@ export class Lightbox {
 
     // Setup new zoom system event listeners (Phase 3)
     this.setupZoomListeners();
-
-    // Rating
-    starBtns.forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const rating = parseInt(btn.dataset.rating);
-        await this.rate(rating);
-      });
-    });
 
     // Mouse reveal chrome
     this.container.addEventListener('mousemove', () => {
@@ -413,9 +323,14 @@ export class Lightbox {
       this.actions.setPhoto(this.currentPhoto);
     }
 
-    // Get photo element reference and apply initial layout (panel closed)
+    // Open the panel by default
+    if (this.panel) {
+      this.panel.open();
+    }
+
+    // Get photo element reference and apply initial layout (panel open)
     this.photoElement = this.container.querySelector('.lightbox-image');
-    this.applyPhotoLayout({ open: false });
+    this.applyPhotoLayout({ open: true });
 
     // Reset zoom to fit mode (Phase 3)
     if (this.zoomSystem) {
@@ -511,51 +426,6 @@ export class Lightbox {
     this.container.querySelector('.photo-filename').textContent = photo.originalFileName;
     this.container.querySelector('.photo-dimensions').textContent = `${photo.width} × ${photo.height}`;
 
-    // Camera info
-    const cameraText = [];
-    if (photo.cameraModel) cameraText.push(photo.cameraModel);
-    if (photo.lensModel) cameraText.push(photo.lensModel);
-    this.container.querySelector('.exif-camera-text').textContent = cameraText.join(' · ') || 'No camera data';
-
-    // Settings
-    const settingsText = [];
-    if (photo.focalLength) settingsText.push(photo.focalLength);
-    if (photo.aperture) settingsText.push(photo.aperture);
-    if (photo.shutterSpeed) settingsText.push(photo.shutterSpeed);
-    if (photo.iso) settingsText.push(`ISO ${photo.iso}`);
-    this.container.querySelector('.exif-settings-text').textContent = settingsText.join(' · ') || 'No settings data';
-
-    // Date
-    const dateText = photo.capturedAt
-      ? new Date(photo.capturedAt).toLocaleString('en-US', {
-          year: 'numeric', month: 'short', day: 'numeric',
-          hour: '2-digit', minute: '2-digit'
-        })
-      : new Date(photo.uploadedAt).toLocaleString('en-US', {
-          year: 'numeric', month: 'short', day: 'numeric'
-        });
-    this.container.querySelector('.exif-date-text').textContent = dateText;
-
-    // Tags
-    const tags = [...photo.autoTags, ...photo.detectedObjects].slice(0, 5);
-    this.container.querySelector('.exif-tags-text').textContent = tags.length > 0
-      ? tags.join(', ')
-      : 'No tags';
-
-    // AI Description
-    const aiToggleBtn = this.container.querySelector('.btn-ai-description');
-    const aiPanelContent = this.container.querySelector('.ai-panel-content');
-
-    if (photo.detailedDescription && photo.detailedDescription.trim()) {
-      aiToggleBtn.style.display = 'flex';
-      // Convert markdown-like formatting to HTML
-      const formattedDescription = this.formatMarkdown(photo.detailedDescription);
-      aiPanelContent.innerHTML = formattedDescription;
-    } else {
-      aiToggleBtn.style.display = 'none';
-      aiPanelContent.innerHTML = '<p class="no-description">No AI description available yet. The description is being generated in the background.</p>';
-    }
-
     // Favorite button state
     const favoriteBtn = this.container.querySelector('.btn-favorite');
     if (photo.isFavorite) {
@@ -565,25 +435,8 @@ export class Lightbox {
       favoriteBtn.classList.remove('active');
       favoriteBtn.querySelector('svg').setAttribute('fill', 'none');
     }
-
-    // Rating stars
-    this.updateRatingStars(photo.rating);
   }
 
-  updateRatingStars(rating) {
-    const starBtns = this.container.querySelectorAll('.star-btn');
-    starBtns.forEach((btn, index) => {
-      const starRating = index + 1;
-      const svg = btn.querySelector('svg');
-      if (starRating <= rating) {
-        btn.classList.add('active');
-        svg.setAttribute('fill', 'currentColor');
-      } else {
-        btn.classList.remove('active');
-        svg.setAttribute('fill', 'none');
-      }
-    });
-  }
 
   updateNavigation() {
     const prevBtn = this.container.querySelector('.lightbox-prev');

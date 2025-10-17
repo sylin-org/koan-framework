@@ -289,15 +289,8 @@ export class LightboxPanel {
     const aiContent = this.container.querySelector('.ai-content');
     const regenerateBtn = this.container.querySelector('#btn-regenerate');
 
-    // Try to parse structured AI analysis (new format)
-    let analysis = null;
-    if (photo.aiAnalysisJson) {
-      try {
-        analysis = JSON.parse(photo.aiAnalysisJson);
-      } catch (e) {
-        console.warn('Failed to parse AI analysis JSON:', e);
-      }
-    }
+    // Use structured AI analysis if available (new format)
+    const analysis = photo.aiAnalysis;
 
     // Render structured format if available
     if (analysis && analysis.tags && analysis.summary) {
@@ -491,7 +484,7 @@ export class LightboxPanel {
     this.container.classList.add('open');
 
     // Update ARIA expanded state (Phase 6)
-    const infoToggle = document.querySelector('.btn-ai-description');
+    const infoToggle = document.querySelector('.btn-info');
     if (infoToggle) {
       infoToggle.setAttribute('aria-expanded', 'true');
     }
@@ -517,7 +510,7 @@ export class LightboxPanel {
     this.container.classList.remove('open');
 
     // Update ARIA expanded state (Phase 6)
-    const infoToggle = document.querySelector('.btn-ai-description');
+    const infoToggle = document.querySelector('.btn-info');
     if (infoToggle) {
       infoToggle.setAttribute('aria-expanded', 'false');
     }
