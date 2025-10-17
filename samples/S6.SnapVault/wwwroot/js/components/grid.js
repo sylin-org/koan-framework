@@ -107,7 +107,7 @@ export class PhotoGrid {
     });
   }
 
-  render(firstPageOnly = false) {
+  render() {
     if (!this.container) return;
 
     const photos = this.app.state.photos;
@@ -126,13 +126,12 @@ export class PhotoGrid {
     // Reset tier logging flag for new render
     this._tierLogged = false;
 
-    // Clear existing photos (for re-render with different view preset)
+    // Clear existing photos
     const existingCards = this.container.querySelectorAll('.photo-card');
     existingCards.forEach(card => card.remove());
 
-    // Render photos (first page only if switching view presets for performance)
-    const photosToRender = firstPageOnly ? photos.slice(0, 50) : photos;
-    photosToRender.forEach(photo => {
+    // Render all photos in current state
+    photos.forEach(photo => {
       this.addPhotoCard(photo);
     });
 
