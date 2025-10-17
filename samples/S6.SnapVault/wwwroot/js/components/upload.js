@@ -34,9 +34,10 @@ export class UploadModal {
         <div class="upload-modal-body">
           <!-- Event Selection -->
           <div class="upload-section">
-            <label class="upload-label">Select Event</label>
-            <select class="event-select" required>
-              <option value="">Choose an event...</option>
+            <label class="upload-label">Organization</label>
+            <select class="event-select">
+              <option value="auto">📅 Auto-organize by date</option>
+              <option value="">──────────</option>
             </select>
             <button class="btn-create-event">+ Create New Event</button>
           </div>
@@ -141,8 +142,12 @@ export class UploadModal {
   async open() {
     this.isOpen = true;
     this.selectedFiles = [];
-    this.selectedEventId = null;
+    this.selectedEventId = 'auto'; // Default to auto-organize
     this.modal.classList.add('show');
+
+    // Reset event select to auto
+    const eventSelect = this.modal.querySelector('.event-select');
+    eventSelect.value = 'auto';
 
     // Load events
     await this.loadEvents();
@@ -164,13 +169,23 @@ export class UploadModal {
       const events = await this.app.api.get('/api/events');
       const select = this.modal.querySelector('.event-select');
 
-      select.innerHTML = '<option value="">Choose an event...</option>';
-      events.forEach(event => {
+      // Reset options but keep auto and separator
+      select.innerHTML = `
+        <option value="auto">📅 Auto-organize by date</option>
+        <option value="" disabled>──────────</option>
+      `;
+
+      // Add user events (excluding auto-generated daily events)
+      const userEvents = events.filter(e => e.type !== 6); // EventType.DailyAuto = 6
+      userEvents.forEach(event => {
         const option = document.createElement('option');
         option.value = event.id;
         option.textContent = `${event.name} (${event.photoCount || 0} photos)`;
         select.appendChild(option);
       });
+
+      // Set back to auto
+      select.value = this.selectedEventId || 'auto';
     } catch (error) {
       console.error('Failed to load events:', error);
       this.app.components.toast.show('Failed to load events', { icon: '⚠️', duration: 3000 });
@@ -253,7 +268,9 @@ export class UploadModal {
     const uploadBtn = this.modal.querySelector('.btn-upload');
     const uploadCount = this.modal.querySelector('.upload-count');
 
-    const canUpload = this.selectedFiles.length > 0 && this.selectedEventId;
+    // Allow upload if files selected and either auto or a specific event is chosen
+    const canUpload = this.selectedFiles.length > 0 &&
+                      (this.selectedEventId === 'auto' || this.selectedEventId);
     uploadBtn.disabled = !canUpload;
 
     if (this.selectedFiles.length > 0) {
@@ -264,7 +281,7 @@ export class UploadModal {
   }
 
   async startUpload() {
-    if (this.selectedFiles.length === 0 || !this.selectedEventId) return;
+    if (this.selectedFiles.length === 0) return;
 
     this.uploading = true;
     const progressSection = this.modal.querySelector('.upload-progress');
@@ -276,7 +293,12 @@ export class UploadModal {
 
     // Create FormData
     const formData = new FormData();
-    formData.append('eventId', this.selectedEventId);
+
+    // Only append eventId if not auto-organize
+    if (this.selectedEventId && this.selectedEventId !== 'auto') {
+      formData.append('eventId', this.selectedEventId);
+    }
+
     this.selectedFiles.forEach(file => {
       formData.append('files', file);
     });
@@ -341,11 +363,14 @@ export class UploadModal {
 
   reset() {
     this.selectedFiles = [];
-    this.selectedEventId = null;
+    this.selectedEventId = 'auto';
     this.uploading = false;
 
     const fileInput = this.modal.querySelector('.file-input');
     fileInput.value = '';
+
+    const eventSelect = this.modal.querySelector('.event-select');
+    eventSelect.value = 'auto';
 
     this.renderFilesList();
     this.updateUploadButton();

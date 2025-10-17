@@ -24,29 +24,29 @@ public class PhotosController : EntityController<PhotoAsset>
     }
 
     /// <summary>
-    /// Upload photos to an event
-    /// Demonstrates: File upload, batch processing, background jobs
+    /// Upload photos to an event (or auto-create daily album if eventId not provided)
+    /// Demonstrates: File upload, batch processing, background jobs, auto-organization
     /// </summary>
     [HttpPost("upload")]
     [RequestSizeLimit(104857600)] // 100MB limit
     public async Task<ActionResult<UploadResponse>> UploadPhotos(
-        [FromForm] string eventId,
+        [FromForm] string? eventId,
         [FromForm] List<IFormFile> files)
     {
-        if (string.IsNullOrEmpty(eventId))
-        {
-            return BadRequest(new { Error = "EventId is required" });
-        }
-
-        var evt = await Event.Get(eventId);
-        if (evt == null)
-        {
-            return NotFound(new { Error = "Event not found" });
-        }
-
         if (files == null || files.Count == 0)
         {
             return BadRequest(new { Error = "No files provided" });
+        }
+
+        // If eventId provided, validate it exists
+        Event? evt = null;
+        if (!string.IsNullOrEmpty(eventId))
+        {
+            evt = await Event.Get(eventId);
+            if (evt == null)
+            {
+                return NotFound(new { Error = "Event not found" });
+            }
         }
 
         // Validate files
@@ -56,23 +56,26 @@ public class PhotosController : EntityController<PhotoAsset>
             return BadRequest(new { Error = "No valid image files found" });
         }
 
-        // Create processing job
+        // Create processing job (eventId may be null for auto-organization)
         var job = new ProcessingJob
         {
-            EventId = eventId,
+            EventId = eventId ?? "auto",
             TotalPhotos = validFiles.Count,
             Status = ProcessingStatus.InProgress
         };
         await job.Save();
 
-        // Process files (in background for real implementation)
+        // Process files (auto-creates daily events if eventId is null)
         var uploadedPhotos = new List<PhotoAsset>();
+        var affectedEventIds = new HashSet<string>();
+
         foreach (var file in validFiles)
         {
             try
             {
                 var photo = await _processingService.ProcessUploadAsync(eventId, file);
                 uploadedPhotos.Add(photo);
+                affectedEventIds.Add(photo.EventId);
 
                 job.ProcessedPhotos++;
                 await job.Save();
@@ -89,15 +92,23 @@ public class PhotosController : EntityController<PhotoAsset>
         job.CompletedAt = DateTime.UtcNow;
         await job.Save();
 
-        // Update event counts
-        evt.PhotoCount += uploadedPhotos.Count;
-        evt.ProcessingStatus = job.Status;
-        await evt.Save();
+        // Update event counts for all affected events
+        foreach (var affectedEventId in affectedEventIds)
+        {
+            var affectedEvent = await Event.Get(affectedEventId);
+            if (affectedEvent != null)
+            {
+                var eventPhotoCount = await PhotoAsset.Query(p => p.EventId == affectedEventId);
+                affectedEvent.PhotoCount = eventPhotoCount.Count;
+                affectedEvent.ProcessingStatus = ProcessingStatus.Completed;
+                await affectedEvent.Save();
+            }
+        }
 
         _logger.LogInformation(
-            "Uploaded {Count} photos to event {EventId}",
+            "Uploaded {Count} photos across {EventCount} event(s)",
             uploadedPhotos.Count,
-            eventId);
+            affectedEventIds.Count);
 
         return Ok(new UploadResponse
         {

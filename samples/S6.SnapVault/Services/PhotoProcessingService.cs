@@ -21,14 +21,14 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
         _logger = logger;
     }
 
-    public async Task<PhotoAsset> ProcessUploadAsync(string eventId, IFormFile file, CancellationToken ct = default)
+    public async Task<PhotoAsset> ProcessUploadAsync(string? eventId, IFormFile file, CancellationToken ct = default)
     {
-        _logger.LogInformation("Processing upload: {FileName} for event {EventId}", file.FileName, eventId);
+        _logger.LogInformation("Processing upload: {FileName} for event {EventId}", file.FileName, eventId ?? "auto");
 
-        // Create PhotoAsset entity
+        // Create PhotoAsset entity (eventId will be set after EXIF extraction if null)
         var photo = new PhotoAsset
         {
-            EventId = eventId,
+            EventId = eventId ?? "", // Temporary, will be set after determining date
             OriginalFileName = file.FileName,
             UploadedAt = DateTime.UtcNow,
             ProcessingStatus = ProcessingStatus.InProgress
@@ -51,9 +51,18 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
                 photo.Height = info.Height;
             }
 
-            // Extract EXIF metadata
+            // Extract EXIF metadata (including capture date)
             await ExtractExifMetadataAsync(photo, sourceStream, ct);
             sourceStream.Position = 0;
+
+            // If no eventId provided, auto-create or get daily event based on capture date
+            if (string.IsNullOrEmpty(eventId))
+            {
+                var eventDate = photo.CapturedAt ?? photo.UploadedAt;
+                var dailyEvent = await GetOrCreateDailyEventAsync(eventDate, ct);
+                photo.EventId = dailyEvent.Id;
+                _logger.LogInformation("Auto-assigned photo to daily event: {EventName}", dailyEvent.Name);
+            }
 
             // Upload full-resolution to cold storage using MediaEntity<T> pattern
             var fullResEntity = await PhotoAsset.Upload(sourceStream, file.FileName, file.ContentType, ct: ct);
@@ -334,5 +343,46 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
         var info = await Image.IdentifyAsync(stream, ct);
         stream.Position = originalPosition;
         return (info.Width, info.Height);
+    }
+
+    /// <summary>
+    /// Get or create a daily event for the given date
+    /// Event name format: "October 1, 2025"
+    /// </summary>
+    private async Task<Event> GetOrCreateDailyEventAsync(DateTime date, CancellationToken ct)
+    {
+        // Normalize to date only (UTC)
+        var normalizedDate = date.Date;
+
+        // Generate event name in format: "October 1, 2025"
+        var eventName = normalizedDate.ToString("MMMM d, yyyy");
+
+        // Check if event already exists for this date
+        var existingEvents = await Event.Query(e =>
+            e.Type == EventType.DailyAuto &&
+            e.EventDate.Date == normalizedDate,
+            ct);
+
+        if (existingEvents.Any())
+        {
+            return existingEvents.First();
+        }
+
+        // Create new daily event
+        var newEvent = new Event
+        {
+            Name = eventName,
+            Type = EventType.DailyAuto,
+            EventDate = normalizedDate,
+            Description = $"Auto-generated album for photos taken on {eventName}",
+            CreatedAt = DateTime.UtcNow,
+            ProcessingStatus = ProcessingStatus.InProgress
+        };
+
+        await newEvent.Save(ct);
+
+        _logger.LogInformation("Created daily event: {EventName} ({EventId})", eventName, newEvent.Id);
+
+        return newEvent;
     }
 }

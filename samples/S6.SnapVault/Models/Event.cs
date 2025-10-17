@@ -37,6 +37,7 @@ public enum EventType
     Birthday,
     Graduation,
     Anniversary,
+    DailyAuto,  // Auto-generated daily albums based on capture date
     Other
 }
 
