@@ -8,13 +8,16 @@ last_updated: 2025-10-16
 framework_version: v0.6.3
 validation:
   date_last_tested: 2025-10-16
-  status: proposed
+  status: approved
   scope: samples/S6.SnapVault
+related_adrs: [DX-0046-IMPLEMENTATION]
 ---
 
 # DX-0046: S6.SnapVault Feature Specification
 
 Status: Approved
+
+**Implementation Guide**: See [DX-0046-IMPLEMENTATION.md](./DX-0046-IMPLEMENTATION.md) for detailed framework integration patterns, architectural decisions, and implementation roadmap.
 
 ## Overview
 
@@ -25,15 +28,16 @@ Status: Approved
 **Tagline**: *"Professional event photography platform with intelligent storage management"*
 
 **Primary Framework Capabilities Demonstrated**:
-- ✅ Koan.Media.* - Image processing pipelines
-- ✅ Koan.Storage.* - Object storage with tiering profiles
-- ✅ Koan.Data.Backup - Backup and restore workflows
-- ✅ Koan.AI.Vision - Computer vision for image analysis
-- ✅ Koan.Data.Vector.* - Vector storage and semantic search
-- ✅ Entity<T> patterns - PhotoAsset, Event, ProcessingJob entities
-- ✅ Batch operations - Bulk photo processing
+- ✅ Koan.Media.* - MediaEntity<T>, MediaOperators (ResizeOperator, RotateOperator)
+- ✅ Koan.Storage.* - Multi-profile storage, tier migration via IStorageService
+- ✅ Koan.Data.Backup - IBackupService for backup and restore workflows
+- ✅ Koan.AI.Vision - IAIVisionService for computer vision
+- ✅ Koan.Data.Vector.* - [Vector] attribute and semantic search
+- ✅ Entity<T> patterns - Event, ProcessingJob (metadata entities)
+- ✅ MediaEntity<T> patterns - PhotoAsset, derivatives (storage-backed media)
+- ✅ [StorageBinding] - Entity-level storage profile configuration
 
-**Timeline**: 5.5-6.5 weeks (including AI features)
+**Timeline**: 5-6 weeks (reduced from 6.5 weeks due to framework usage)
 
 ---
 
@@ -126,23 +130,23 @@ Upload → EXIF Extract → AI Analysis → Generate Sizes → Store → Index
 5. Generate embeddings for semantic search
 6. Update event counters
 
-**Entity Model**:
+**Entity Model** (simplified for spec - see [DX-0046-IMPLEMENTATION.md](./DX-0046-IMPLEMENTATION.md) for detailed multi-entity architecture):
 ```csharp
-public class PhotoAsset : Entity<PhotoAsset>
+/// <summary>
+/// Full-resolution photo asset with AI metadata and vector embeddings
+/// Uses multi-entity pattern: PhotoAsset (full-res), PhotoGallery (1200px), PhotoThumbnail (150x150)
+/// Each derivative uses [StorageBinding] for tier-specific storage
+/// </summary>
+[StorageBinding(Profile = "cold", Container = "photos-fullres")]
+public class PhotoAsset : MediaEntity<PhotoAsset>  // MediaEntity, not Entity!
 {
-    public string EventId { get; set; }
-    public DateTime UploadedAt { get; set; }
+    public string EventId { get; set; } = "";
+    public DateTime UploadedAt { get; set; } = DateTime.UtcNow;
     public DateTime? CapturedAt { get; set; } // From EXIF
 
-    // Storage URLs (Koan.Storage profiles)
-    [StorageProfile("hot-cdn")]
-    public string ThumbnailUrl { get; set; } = "";
-
-    [StorageProfile("warm")]
-    public string GalleryUrl { get; set; } = "";
-
-    [StorageProfile("cold")]
-    public string FullResUrl { get; set; } = "";
+    // Derived media references (framework MediaEntity pattern)
+    public string? GalleryMediaId { get; set; }  // References PhotoGallery.Id
+    // ThumbnailMediaId inherited from MediaEntity<T>
 
     // EXIF metadata
     public string? CameraModel { get; set; }
@@ -163,9 +167,29 @@ public class PhotoAsset : Entity<PhotoAsset>
     public float[]? Embedding { get; set; }
 
     // Stats
-    public long FileSizeBytes { get; set; }
     public int ViewCount { get; set; }
-    public bool IsFavorite { get; set; } // Client marking
+    public bool IsFavorite { get; set; }
+    public ProcessingStatus ProcessingStatus { get; set; } = ProcessingStatus.Pending;
+}
+
+/// <summary>
+/// Gallery-size derivative (1200px) - warm tier storage
+/// </summary>
+[StorageBinding(Profile = "warm", Container = "photos-gallery")]
+public class PhotoGallery : MediaEntity<PhotoGallery>
+{
+    // SourceMediaId inherited from MediaEntity - points to PhotoAsset.Id
+    // DerivationKey inherited - set to "gallery-1200"
+}
+
+/// <summary>
+/// Thumbnail derivative (150x150) - hot tier with CDN
+/// </summary>
+[StorageBinding(Profile = "hot-cdn", Container = "photos-thumbnails")]
+public class PhotoThumbnail : MediaEntity<PhotoThumbnail>
+{
+    // SourceMediaId inherited from MediaEntity - points to PhotoAsset.Id
+    // DerivationKey inherited - set to "thumbnail-150"
 }
 
 public class ProcessingJob : Entity<ProcessingJob>
@@ -318,43 +342,30 @@ public enum ProcessingStatus
 - **Auto-tagging**: Generate searchable tags
   - Example: ["wedding", "outdoor", "romantic", "sunset", "formal"]
 
-**Implementation**:
+**Implementation** (simplified - see [DX-0046-IMPLEMENTATION.md](./DX-0046-IMPLEMENTATION.md) for complete implementation):
 ```csharp
 public class PhotoProcessingService
 {
-    private readonly IAIVisionService _visionService;
+    private readonly IPhotoVisionService _visionService;
+    private readonly ResizeOperator _resizeOperator;  // Framework MediaOperator
+    private readonly RotateOperator _rotateOperator;  // Framework MediaOperator
 
-    public async Task AnalyzePhoto(PhotoAsset photo, Stream imageStream)
+    public async Task<PhotoAsset> ProcessUploadAsync(string eventId, IFormFile file, CancellationToken ct)
     {
-        // Koan.AI.Vision - one call, provider-agnostic
-        var analysis = await AI.Vision.AnalyzeAsync(imageStream, new VisionOptions
-        {
-            DetectObjects = true,
-            GenerateDescription = true,
-            ExtractText = false
-        });
+        using var stream = file.OpenReadStream();
 
-        photo.DetectedObjects = analysis.Objects;
-        photo.MoodDescription = analysis.Description;
-        photo.AutoTags = GenerateTags(analysis);
+        // Step 1: Auto-orient using EXIF (framework operator)
+        var orientedStream = await _rotateOperator.ExecuteAsync(stream, new(), ct);
 
-        // Save with vector embedding for semantic search
-        await photo.SaveWithVector(photo.MoodDescription);
-    }
+        // Step 2: Upload full-res photo (MediaEntity upload)
+        var photo = await PhotoAsset.Upload(orientedStream, file.FileName, file.ContentType);
+        photo.EventId = eventId;
 
-    private List<string> GenerateTags(VisionAnalysis analysis)
-    {
-        // Combine objects + keywords from description
-        var tags = new HashSet<string>(analysis.Objects);
+        // Step 3: Extract EXIF, generate derivatives, run AI analysis
+        // (see DX-0046-IMPLEMENTATION.md for complete pipeline)
 
-        // Extract mood keywords
-        var moodKeywords = ExtractKeywords(analysis.Description);
-        foreach (var keyword in moodKeywords)
-        {
-            tags.Add(keyword);
-        }
-
-        return tags.Take(10).ToList();
+        await photo.Save();
+        return photo;
     }
 }
 ```
@@ -655,18 +666,8 @@ public class BackupService
     }
 }
 
-public class BackupJob : Entity<BackupJob>
-{
-    public string EventId { get; set; } = "";
-    public BackupType Type { get; set; }
-    public BackupStatus Status { get; set; }
-    public DateTime StartedAt { get; set; }
-    public DateTime? CompletedAt { get; set; }
-    public int TotalItems { get; set; }
-    public int ProcessedItems { get; set; }
-    public long BackupSizeBytes { get; set; }
-    public string? ErrorMessage { get; set; }
-}
+// BackupJob entity REMOVED - using framework IBackupService instead
+// See DX-0046-IMPLEMENTATION.md for IEventBackupService integration
 ```
 
 **Scheduled Backup**:
@@ -1013,11 +1014,12 @@ POST   /api/gallery/{eventId}/auth    Authenticate with password
 
 ## Implementation Phases
 
-### Phase 1: Core Infrastructure (Week 1-2)
-- Entity models (Event, PhotoAsset, ProcessingJob, BackupJob)
-- Upload pipeline (file validation, EXIF extraction)
-- Image processing service (resize to 3 sizes)
-- Storage profile system (hot/warm/cold)
+### Phase 1: Core Infrastructure (Week 1-1.5) ⚡ Accelerated
+- Entity models (Event, PhotoAsset, PhotoGallery, PhotoThumbnail, ProcessingJob)
+- **Framework Integration**: MediaEntity<T>, [StorageBinding], MediaOperators
+- Upload pipeline using IPhotoProcessingService
+- IPhotoStorage abstraction for multi-tier storage
+- IEventBackupService wrapping IBackupService
 - Basic API endpoints (CRUD for events/photos)
 
 ### Phase 2: Grid Gallery Mode (Week 3)
@@ -1027,11 +1029,11 @@ POST   /api/gallery/{eventId}/auth    Authenticate with password
 - Layout toggle (grid/list)
 - Favorite marking
 
-### Phase 3: AI Features (Week 4)
-- Koan.AI.Vision integration
-- Object detection + mood description
-- Vector storage ([Vector] attribute)
-- Semantic search endpoint
+### Phase 3: AI Features (Week 3.75-4.5) ⚡ Accelerated
+- **Framework Integration**: IAIVisionService, IEmbeddingService
+- IPhotoVisionService wrapping framework AI
+- [Vector] attribute for semantic search
+- PhotoAsset.SemanticSearch() endpoint
 - Search UI component
 
 ### Phase 4: Event Timeline Mode (Week 5)
@@ -1041,19 +1043,21 @@ POST   /api/gallery/{eventId}/auth    Authenticate with password
 - Storage tier visualization
 - Manual archive functionality
 
-### Phase 5: Backup & Dashboard (Week 6)
-- Koan.Data.Backup integration
-- Automatic backup scheduling
-- Restore functionality
+### Phase 5: Backup & Dashboard (Week 5.75-6.5) ⚡ Accelerated
+- **Framework Integration**: IBackupService (replaces custom BackupJob)
+- Automatic backup scheduling (Koan.Scheduling)
+- Restore functionality using IEventBackupService
 - Dashboard metrics
-- Storage tier aging workflow
+- Storage tier aging workflow using IStorageService
 
-### Phase 6: Polish & Documentation (Week 6.5)
+### Phase 6: Polish & Documentation (Week 6.5-7)
 - Performance optimization pass
-- Comprehensive README
+- Comprehensive README (S5.Recs template)
 - Testing examples
-- Docker Compose setup
+- Docker Compose setup (MongoDB, Qdrant, OpenAI)
 - Demo video/screenshots
+
+**Total Timeline**: 5-6 weeks (reduced from 6.5 weeks due to framework usage)
 
 ---
 

@@ -1,0 +1,16 @@
+{
+  "Url": "http://ollama:11434",
+  "IntrospectedAt": "2025-10-17T01:17:21.2874715Z",
+  "Capabilities": {
+    "Chat": {
+      "Model": "all-minilm",
+      "Options": null,
+      "AutoDownload": true
+    },
+    "Embedding": {
+      "Model": "all-minilm",
+      "Options": null,
+      "AutoDownload": true
+    }
+  }
+}

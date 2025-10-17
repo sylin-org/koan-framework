@@ -1,7 +1,9 @@
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Instructions;
+using Koan.Data.Abstractions.Naming;
 using Koan.Data.Vector.Abstractions;
 using System.Net;
 using Newtonsoft.Json;
@@ -34,7 +36,24 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
             _http.Timeout = TimeSpan.FromSeconds(Math.Max(1, _options.DefaultTimeoutSeconds));
     }
 
-    private string ClassName => Core.Configuration.StorageNameRegistry.GetOrCompute<TEntity, TKey>(_sp);
+    private string ClassName
+    {
+        get
+        {
+            // Vector repository must use "weaviate" provider naming, not the entity's default DATA provider
+            var providers = _sp.GetServices<Koan.Data.Abstractions.Naming.INamingDefaultsProvider>();
+            var weaviateProvider = providers.FirstOrDefault(p => string.Equals(p.Provider, "weaviate", StringComparison.OrdinalIgnoreCase));
+            if (weaviateProvider == null)
+            {
+                // Fallback to simple type name if no naming provider found
+                return typeof(TEntity).Name;
+            }
+            var diResolver = _sp.GetRequiredService<Koan.Data.Abstractions.Naming.IStorageNameResolver>();
+            var convention = weaviateProvider.GetConvention(_sp);
+            var overrideFn = weaviateProvider.GetAdapterOverride(_sp);
+            return Koan.Data.Abstractions.Naming.StorageNameSelector.ResolveName(null, diResolver, typeof(TEntity), convention, overrideFn);
+        }
+    }
 
     private async Task EnsureSchemaAsync(CancellationToken ct)
     {

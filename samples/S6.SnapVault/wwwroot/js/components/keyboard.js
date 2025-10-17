@@ -1,0 +1,127 @@
+/**
+ * Keyboard Shortcuts Component
+ * Global keyboard navigation and shortcuts
+ */
+
+export class KeyboardShortcuts {
+  constructor(app) {
+    this.app = app;
+    this.setupListeners();
+  }
+
+  setupListeners() {
+    document.addEventListener('keydown', (e) => {
+      // Don't handle shortcuts when typing in input fields
+      if (e.target.matches('input, textarea, select')) {
+        // Allow Escape to blur inputs
+        if (e.key === 'Escape') {
+          e.target.blur();
+        }
+        return;
+      }
+
+      this.handleShortcut(e);
+    });
+  }
+
+  handleShortcut(e) {
+    // Navigation
+    if (e.key === '/') {
+      e.preventDefault();
+      this.app.components.search.focus();
+      return;
+    }
+
+    if (e.key === 'Escape') {
+      // Close any modals
+      if (this.app.components.lightbox.isOpen) {
+        this.app.components.lightbox.close();
+      }
+      if (this.app.components.upload.isOpen) {
+        this.app.components.upload.close();
+      }
+      return;
+    }
+
+    // Upload
+    if (e.key === 'u' || e.key === 'U') {
+      e.preventDefault();
+      this.app.components.upload.open();
+      return;
+    }
+
+    // Density controls
+    if (e.key === '1') {
+      this.app.setDensity(3);
+      return;
+    }
+    if (e.key === '2') {
+      this.app.setDensity(4);
+      return;
+    }
+    if (e.key === '3') {
+      this.app.setDensity(6);
+      return;
+    }
+
+    // Workspace navigation
+    if (e.key === 'g') {
+      // Wait for second key
+      document.addEventListener('keydown', (e2) => {
+        if (e2.key === 'e') {
+          this.app.switchWorkspace('gallery');
+        } else if (e2.key === 't') {
+          this.app.switchWorkspace('timeline');
+        }
+      }, { once: true });
+      return;
+    }
+
+    // Help
+    if (e.key === '?') {
+      this.showShortcutsHelp();
+      return;
+    }
+  }
+
+  showShortcutsHelp() {
+    const shortcuts = `
+      <div class="shortcuts-help">
+        <h3>Keyboard Shortcuts</h3>
+        <div class="shortcuts-grid">
+          <div class="shortcut-group">
+            <h4>Navigation</h4>
+            <dl>
+              <dt><kbd>/</kbd></dt><dd>Focus search</dd>
+              <dt><kbd>G</kbd> <kbd>E</kbd></dt><dd>Go to Gallery</dd>
+              <dt><kbd>G</kbd> <kbd>T</kbd></dt><dd>Go to Timeline</dd>
+              <dt><kbd>Esc</kbd></dt><dd>Close/Cancel</dd>
+            </dl>
+          </div>
+          <div class="shortcut-group">
+            <h4>Actions</h4>
+            <dl>
+              <dt><kbd>U</kbd></dt><dd>Upload photos</dd>
+              <dt><kbd>F</kbd></dt><dd>Toggle favorite</dd>
+              <dt><kbd>1-5</kbd></dt><dd>Rate photo</dd>
+            </dl>
+          </div>
+          <div class="shortcut-group">
+            <h4>View</h4>
+            <dl>
+              <dt><kbd>1</kbd></dt><dd>Sparse density</dd>
+              <dt><kbd>2</kbd></dt><dd>Normal density</dd>
+              <dt><kbd>3</kbd></dt><dd>Dense density</dd>
+            </dl>
+          </div>
+        </div>
+        <button class="btn-primary btn-close-help">Close</button>
+      </div>
+    `;
+
+    this.app.components.toast.show(shortcuts, {
+      duration: 0, // Don't auto-close
+      allowHtml: true
+    });
+  }
+}
