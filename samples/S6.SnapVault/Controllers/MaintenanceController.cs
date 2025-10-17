@@ -307,7 +307,8 @@ public class MaintenanceController : ControllerBase
         {
             await SendProgress(0, "Starting repository wipe...");
 
-            // Step 1: Delete all photos (50% of progress)
+            // Step 1: Delete ALL media entities (photos, thumbnails, galleries) - 60% of progress
+            await SendProgress(5, "Deleting all photos...");
             var photos = await PhotoAsset.All(ct);
             var totalPhotos = photos.Count;
             var deletedPhotos = 0;
@@ -316,52 +317,73 @@ public class MaintenanceController : ControllerBase
             {
                 await photo.Delete(ct);
                 deletedPhotos++;
-                var progress = (int)((deletedPhotos / (double)totalPhotos) * 50);
-                await SendProgress(progress, $"Deleting photos... {deletedPhotos}/{totalPhotos}");
+                if (deletedPhotos % 10 == 0 || deletedPhotos == totalPhotos)
+                {
+                    var progress = 5 + (int)((deletedPhotos / (double)Math.Max(totalPhotos, 1)) * 25);
+                    await SendProgress(progress, $"Deleting photos... {deletedPhotos}/{totalPhotos}");
+                }
             }
 
-            // Step 2: Delete all thumbnails and gallery images (20% of progress)
-            await SendProgress(50, "Deleting thumbnails...");
+            await SendProgress(30, "Deleting all thumbnails...");
             var thumbnails = await PhotoThumbnail.All(ct);
+            var totalThumbs = thumbnails.Count;
+            var deletedThumbs = 0;
             foreach (var thumb in thumbnails)
             {
                 await thumb.Delete(ct);
+                deletedThumbs++;
             }
+            await SendProgress(45, $"Deleted {deletedThumbs} thumbnails");
 
-            await SendProgress(60, "Deleting gallery images...");
+            await SendProgress(45, "Deleting all gallery images...");
             var galleries = await PhotoGallery.All(ct);
+            var totalGalleries = galleries.Count;
+            var deletedGalleries = 0;
             foreach (var gallery in galleries)
             {
                 await gallery.Delete(ct);
+                deletedGalleries++;
             }
+            await SendProgress(60, $"Deleted {deletedGalleries} gallery images");
 
-            // Step 3: Delete all events (10% of progress)
-            await SendProgress(70, "Deleting events...");
+            // Step 2: Delete all events (15% of progress)
+            await SendProgress(60, "Deleting events...");
             var events = await Event.All(ct);
             foreach (var evt in events)
             {
                 await evt.Delete(ct);
             }
+            await SendProgress(75, $"Deleted {events.Count} events");
 
-            // Step 4: Delete processing jobs (10% of progress)
-            await SendProgress(80, "Deleting processing jobs...");
+            // Step 3: Delete processing jobs (10% of progress)
+            await SendProgress(75, "Deleting processing jobs...");
             var jobs = await ProcessingJob.All(ct);
             foreach (var job in jobs)
             {
                 await job.Delete(ct);
             }
+            await SendProgress(85, $"Deleted {jobs.Count} processing jobs");
 
-            // Step 5: Clear file storage (10% of progress)
-            await SendProgress(90, "Clearing storage...");
+            // Step 4: Clear physical file storage (15% of progress)
+            await SendProgress(85, "Clearing physical storage...");
             var storageRoot = Path.Combine(_env.ContentRootPath, ".Koan", "storage");
             if (Directory.Exists(storageRoot))
             {
                 Directory.Delete(storageRoot, true);
             }
 
+            // Step 5: Clear AI cache
+            await SendProgress(95, "Clearing AI cache...");
+            var cacheRoot = Path.Combine(_env.ContentRootPath, ".Koan", "cache");
+            if (Directory.Exists(cacheRoot))
+            {
+                Directory.Delete(cacheRoot, true);
+            }
+
             await SendProgress(100, "Repository wiped successfully");
 
-            _logger.LogWarning("Repository wiped: {PhotoCount} photos deleted", totalPhotos);
+            _logger.LogWarning("Repository wiped: {PhotoCount} photos, {ThumbCount} thumbnails, {GalleryCount} galleries, {EventCount} events, {JobCount} jobs deleted",
+                totalPhotos, totalThumbs, totalGalleries, events.Count, jobs.Count);
         }
         catch (Exception ex)
         {
