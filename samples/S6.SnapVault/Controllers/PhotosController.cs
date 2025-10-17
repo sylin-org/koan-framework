@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 using Koan.Data.Core;
+using Koan.Web.Attributes;
 using Koan.Web.Controllers;
 using S6.SnapVault.Models;
 using S6.SnapVault.Services;
