@@ -57,6 +57,7 @@ class SnapVaultApp {
     this.setupDensityControls();
     this.setupUploadButtons();
     this.setupLibraryNavigation();
+    this.setupDragAndDrop();
 
     // Load initial data
     await this.loadPhotos();
@@ -357,6 +358,57 @@ class SnapVaultApp {
 
     this.state.selectedPhotos.clear();
     this.components.bulkActions.update(0);
+  }
+
+  setupDragAndDrop() {
+    const mainContent = document.querySelector('.main-content');
+    if (!mainContent) return;
+
+    let dragCounter = 0;
+
+    // Prevent default drag behavior on entire page
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+      document.body.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      });
+    });
+
+    // Drag enter - show drop zone
+    mainContent.addEventListener('dragenter', (e) => {
+      dragCounter++;
+      if (e.dataTransfer.types.includes('Files')) {
+        mainContent.classList.add('drag-over');
+      }
+    });
+
+    // Drag over - keep drop zone visible
+    mainContent.addEventListener('dragover', (e) => {
+      if (e.dataTransfer.types.includes('Files')) {
+        e.dataTransfer.dropEffect = 'copy';
+        mainContent.classList.add('drag-over');
+      }
+    });
+
+    // Drag leave - hide drop zone
+    mainContent.addEventListener('dragleave', () => {
+      dragCounter--;
+      if (dragCounter === 0) {
+        mainContent.classList.remove('drag-over');
+      }
+    });
+
+    // Drop - handle files
+    mainContent.addEventListener('drop', (e) => {
+      dragCounter = 0;
+      mainContent.classList.remove('drag-over');
+
+      const files = e.dataTransfer.files;
+      if (files.length > 0) {
+        // Open upload modal with pre-selected files
+        this.components.upload.open(files);
+      }
+    });
   }
 
   escapeHtml(text) {

@@ -515,6 +515,52 @@ body {
 .main-content {
   overflow-y: auto;
   background-color: var(--bg-canvas);
+  position: relative;
+  transition: background-color var(--duration-fast) var(--ease-out-cubic);
+}
+
+/* Drag-and-drop overlay */
+.main-content.drag-over::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(91, 159, 255, 0.1);
+  border: 3px dashed var(--accent-primary);
+  border-radius: var(--radius-lg);
+  z-index: var(--layer-overlay);
+  pointer-events: none;
+  animation: pulseGlow 1.5s ease-in-out infinite;
+}
+
+.main-content.drag-over::after {
+  content: '📤 Drop photos here to upload';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-semibold);
+  color: var(--accent-primary);
+  z-index: calc(var(--layer-overlay) + 1);
+  pointer-events: none;
+  text-align: center;
+  padding: var(--space-4);
+  background-color: rgba(10, 10, 10, 0.9);
+  border-radius: var(--radius-xl);
+  backdrop-filter: blur(12px);
+  box-shadow: var(--shadow-xl);
+}
+
+@keyframes pulseGlow {
+  0%, 100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
 }
 
 .workspace {

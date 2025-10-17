@@ -139,7 +139,7 @@ export class UploadModal {
     });
   }
 
-  async open() {
+  async open(preSelectedFiles = null) {
     this.isOpen = true;
     this.selectedFiles = [];
     this.selectedEventId = 'auto'; // Default to auto-organize
@@ -151,6 +151,11 @@ export class UploadModal {
 
     // Load events
     await this.loadEvents();
+
+    // Handle pre-selected files (from drag-and-drop on main area)
+    if (preSelectedFiles) {
+      this.handleFileSelect(preSelectedFiles);
+    }
   }
 
   close() {
