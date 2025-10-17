@@ -20,7 +20,7 @@ public class MediaController : ControllerBase
     }
 
     /// <summary>
-    /// Serve thumbnail image (150x150, hot-cdn tier)
+    /// Serve thumbnail image (150x150 square, hot-cdn tier)
     /// </summary>
     [HttpGet("photos/{id}/thumbnail")]
     [ResponseCache(Duration = 3600, Location = ResponseCacheLocation.Any)]
@@ -43,6 +43,26 @@ public class MediaController : ControllerBase
         // Stream directly from storage
         var stream = await thumbnail.OpenRead(ct);
         return File(stream, thumbnail.ContentType ?? "image/jpeg");
+    }
+
+    /// <summary>
+    /// Serve masonry thumbnail image (300px max, aspect-ratio preserved, hot-cdn tier)
+    /// </summary>
+    [HttpGet("masonry-thumbnails/{id}")]
+    [ResponseCache(Duration = 3600, Location = ResponseCacheLocation.Any)]
+    public async Task<IActionResult> GetMasonryThumbnail(string id, CancellationToken ct = default)
+    {
+        // Get masonry thumbnail entity directly
+        var masonryThumbnail = await PhotoMasonryThumbnail.Get(id, ct);
+        if (masonryThumbnail == null)
+        {
+            _logger.LogWarning("Masonry thumbnail not found for id {Id}", id);
+            return NotFound();
+        }
+
+        // Stream directly from storage
+        var stream = await masonryThumbnail.OpenRead(ct);
+        return File(stream, masonryThumbnail.ContentType ?? "image/jpeg");
     }
 
     /// <summary>

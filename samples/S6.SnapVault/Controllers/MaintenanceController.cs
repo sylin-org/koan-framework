@@ -333,7 +333,18 @@ public class MaintenanceController : ControllerBase
                 await thumb.Delete(ct);
                 deletedThumbs++;
             }
-            await SendProgress(45, $"Deleted {deletedThumbs} thumbnails");
+            await SendProgress(37, $"Deleted {deletedThumbs} thumbnails");
+
+            await SendProgress(37, "Deleting all masonry thumbnails...");
+            var masonryThumbs = await PhotoMasonryThumbnail.All(ct);
+            var totalMasonryThumbs = masonryThumbs.Count;
+            var deletedMasonryThumbs = 0;
+            foreach (var masonryThumb in masonryThumbs)
+            {
+                await masonryThumb.Delete(ct);
+                deletedMasonryThumbs++;
+            }
+            await SendProgress(45, $"Deleted {deletedMasonryThumbs} masonry thumbnails");
 
             await SendProgress(45, "Deleting all gallery images...");
             var galleries = await PhotoGallery.All(ct);
@@ -382,8 +393,8 @@ public class MaintenanceController : ControllerBase
 
             await SendProgress(100, "Repository wiped successfully");
 
-            _logger.LogWarning("Repository wiped: {PhotoCount} photos, {ThumbCount} thumbnails, {GalleryCount} galleries, {EventCount} events, {JobCount} jobs deleted",
-                totalPhotos, totalThumbs, totalGalleries, events.Count, jobs.Count);
+            _logger.LogWarning("Repository wiped: {PhotoCount} photos, {ThumbCount} thumbnails, {MasonryThumbCount} masonry thumbnails, {GalleryCount} galleries, {EventCount} events, {JobCount} jobs deleted",
+                totalPhotos, totalThumbs, totalMasonryThumbs, totalGalleries, events.Count, jobs.Count);
         }
         catch (Exception ex)
         {

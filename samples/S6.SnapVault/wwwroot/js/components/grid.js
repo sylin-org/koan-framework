@@ -80,7 +80,14 @@ export class PhotoGrid {
     article.dataset.photoId = photo.id;
     article.dataset.aspect = (photo.width / photo.height).toFixed(2);
 
-    const thumbnailUrl = `/api/media/photos/${photo.id}/thumbnail`;
+    // Use masonry thumbnails (aspect-ratio preserved) for densities 1-3
+    // Use square thumbnails for density 4 (compact grid view)
+    const density = this.app.state.density || 4;
+    const useMasonryThumbnail = density < 4;
+    const thumbnailUrl = useMasonryThumbnail
+      ? `/api/media/masonry-thumbnails/${photo.masonryThumbnailMediaId || photo.id}`
+      : `/api/media/photos/${photo.id}/thumbnail`;
+
     const isFavorite = photo.isFavorite || false;
     const rating = photo.rating || 0;
 

@@ -16,7 +16,8 @@ public class PhotoAsset : MediaEntity<PhotoAsset>
     public DateTime? CapturedAt { get; set; } // From EXIF
 
     // Derivative relationships (using framework's media graph)
-    // ThumbnailMediaId already provided by MediaEntity<T>
+    // ThumbnailMediaId already provided by MediaEntity<T> (square, for grid views)
+    public string? MasonryThumbnailMediaId { get; set; } // Aspect-ratio preserving, for masonry views
     public string? GalleryMediaId { get; set; }
 
     // Original file metadata

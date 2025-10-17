@@ -30,6 +30,16 @@ public static class EntityLifecycleConfiguration
                 }
             }
 
+            // Delete masonry thumbnail if it exists
+            if (!string.IsNullOrEmpty(photo.MasonryThumbnailMediaId))
+            {
+                var masonryThumb = await PhotoMasonryThumbnail.Get(photo.MasonryThumbnailMediaId, ct);
+                if (masonryThumb != null)
+                {
+                    await masonryThumb.Delete(ct);
+                }
+            }
+
             // Delete gallery image if it exists
             if (!string.IsNullOrEmpty(photo.GalleryMediaId))
             {

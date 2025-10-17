@@ -76,7 +76,7 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
 
             photo.GalleryMediaId = galleryEntity.Id;
 
-            // Branch 2: Thumbnail (150x150 square crop)
+            // Branch 2: Thumbnail (150x150 square crop for grid views)
             var thumbnailBranch = galleryResult.Branch();
             var cropped = await thumbnailBranch.CropSquare(ct: ct);
             var thumbnailStream = await cropped.ResizeFit(150, 150, ct);
@@ -86,14 +86,22 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
             // Set base MediaEntity ThumbnailMediaId (protected internal setter, but PhotoAsset is derived)
             typeof(PhotoAsset).BaseType!.GetProperty("ThumbnailMediaId")!.SetValue(photo, thumbnailEntity.Id);
 
+            // Branch 3: Masonry thumbnail (300px max, preserve aspect ratio for masonry layouts)
+            var masonryBranch = galleryResult.Branch();
+            var masonryResized = await masonryBranch.ResizeFit(300, 300, ct);
+            var masonryEntity = await PhotoMasonryThumbnail.Upload(masonryResized, $"{photo.Id}_masonry.jpg", "image/jpeg", ct: ct);
+            await masonryEntity.Save(ct); // Save masonry thumbnail entity to database
+
+            photo.MasonryThumbnailMediaId = masonryEntity.Id;
+
             await galleryResult.DisposeAsync();
 
             // Save photo entity (without AI metadata yet)
             await photo.Save(ct);
 
             _logger.LogInformation(
-                "Photo processed: {PhotoId} ({Width}x{Height}) -> Gallery: {GalleryId}, Thumbnail: {ThumbId}",
-                photo.Id, photo.Width, photo.Height, photo.GalleryMediaId, photo.ThumbnailMediaId);
+                "Photo processed: {PhotoId} ({Width}x{Height}) -> Gallery: {GalleryId}, Thumbnail: {ThumbId}, Masonry: {MasonryId}",
+                photo.Id, photo.Width, photo.Height, photo.GalleryMediaId, photo.ThumbnailMediaId, photo.MasonryThumbnailMediaId);
 
             // Generate AI metadata asynchronously
             _ = Task.Run(async () =>
