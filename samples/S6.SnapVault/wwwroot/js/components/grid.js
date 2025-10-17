@@ -20,7 +20,31 @@ export class PhotoGrid {
   }
 
   detectMasonrySupport() {
-    // Detect CSS Grid Masonry support (grid-template-rows: masonry)
+    // CSS Masonry Browser Landscape (as of 2025-01):
+    //
+    // TWO COMPETING SYNTAXES EXIST:
+    //
+    // 1. Firefox/Safari Syntax (SHIPPED):
+    //    - grid-template-rows: masonry
+    //    - Firefox 87+ (stable), Safari Technology Preview
+    //    - W3C CSS Grid Level 3 Draft: https://www.w3.org/TR/css-grid-3/
+    //
+    // 2. Chrome Syntax (EXPERIMENTAL FLAG):
+    //    - display: masonry
+    //    - Chrome behind #css-masonry-layout flag
+    //    - Different property model, uses grid-column/grid-row
+    //    - More details: https://www.w3.org/TR/css-grid-3/#masonry-model
+    //
+    // CURRENT IMPLEMENTATION:
+    // - Detects Firefox/Safari syntax (grid-template-rows: masonry)
+    // - Falls back to CSS columns for all other browsers (including Chrome)
+    // - Chrome users can enable flag and get native masonry via Firefox syntax
+    // - Future: May need to detect both syntaxes if Chrome ships different approach
+    //
+    // FALLBACK STRATEGY:
+    // - CSS columns (column-count) provides graceful degradation
+    // - All browsers get working masonry layout, just different ordering
+
     this.supportsMasonry = CSS.supports('grid-template-rows', 'masonry');
     console.log(`[Grid] CSS Masonry support: ${this.supportsMasonry ? 'Yes (native)' : 'No (using CSS columns fallback)'}`);
   }
@@ -119,7 +143,7 @@ export class PhotoGrid {
       const columns = getResponsiveColumns(preset, this.viewportWidth);
       const tileWidth = Math.floor(this.viewportWidth / columns);
       const effectivePixels = Math.floor(tileWidth * this.devicePixelRatio);
-      console.log(`🎯 Smart Resolution: ${tier} tier (${presetId} preset, ${columns} cols, ${tileWidth}px/tile × ${this.devicePixelRatio}x = ${effectivePixels}px effective)`);
+      console.log(`[Smart Resolution] ${tier} tier (${presetId} preset, ${columns} cols, ${tileWidth}px/tile × ${this.devicePixelRatio}x = ${effectivePixels}px effective)`);
       this._tierLogged = true;
     }
 
