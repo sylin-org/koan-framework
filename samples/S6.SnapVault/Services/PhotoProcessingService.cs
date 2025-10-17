@@ -441,58 +441,71 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
             await imageStream.CopyToAsync(ms, ct);
             var imageBytes = ms.ToArray();
 
-            // Detailed vision analysis prompt
-            var prompt = @"Role: You are a meticulous visual analyst. Describe what is visibly present in the image. Do not guess brand/model names, locations, or emotions beyond what is supported by the visuals.
+            // Detailed vision analysis prompt - structured format for precise visual description
+            var prompt = @"**Role:** You are a precise visual describer. Only state what's visible. No brand/IP/identity guesses.
 
-Output format: Markdown with the sections below. Keep it concise but specific. If a detail is unclear, write ""unclear"" or ""unreadable"" rather than guessing.
+**Output order (markdown).**
+Always include: **Type**, **Characters**, **Alt**, **Tags**.
+Include the others **only if you detect them**.
 
-1) Subject
+---
 
-Who/what is the main subject? (human/character/object/animal)
+### Type
 
-Visible attributes: age range, build/shape, notable features (hair, ears, markings), pose/gesture, facial expression (if readable).
+*(portrait | character | action | group | architecture | landscape | graphic/symbol | product | UI)*
 
-2) Wardrobe / Props / Key Elements
+### Count & Layout (≤14w)
 
-Garments or objects from top → bottom (or front → back for products).
+*e.g., ""1 subject, centered, half-body"".*
 
-For each, note: type, silhouette/cut, material/finish (matte/leather/satin/metal), color/undertone, hardware/trim (buckles, zippers, chains), patterns/graphics, wear/texture.
+### Characters
 
-3) Environment & Composition
+* **C1:** *primary/secondary; perceived gender (male/female/androgynous/ambiguous); age band (child/teen/young adult/adult/older); presentation (masc/fem/androgynous); build; skin; hair (color/length/style); distinctive face/ears/makeup; pose/gesture; visibility (full/half/close/silhouette/partial); 3 attire keys (material+color+part); notable items (weapons/jewelry/tattoos/etc.).*
+* **C2/C3:** *repeat as needed.*
 
-Setting (studio/backdrop/interior/exterior/scenic), background elements, set dressing.
+### Scene (Detailed)
 
-Framing (full body, half, close-up), angle (eye/low/high), camera distance, rule-of-thirds/centered, negative space.
+Provide **concise bullets**. Use only lines that apply; skip the rest.
 
-Depth of field (shallow/deep), bokeh or motion blur if present.
+* **Setting:** *(studio/backdrop/interior/exterior/city/temple/forest/beach/etc.)*
+* **Locale cues:** *architecture style, props, vegetation, furniture, water, terrain.*
+* **Topology:** *foreground/midground/background; platforms, stairs, bridges, paths.*
+* **Atmospherics:** *fog, haze, smoke, sparks, rain, snow, bloom, god rays.*
+* **Lighting:** *key/fill/rim practicals; direction (front/side/back/top); quality (soft/hard); intensity/contrast.*
+* **Color grade:** *warm/cool/neutral; tints (teal-orange, magenta, sepia).*
+* **Time/Weather:** *day/night/sunset/overcast/indoor practicals.*
+* **Depth cues:** *bokeh, DOF blur, parallax, scale references.*
+* **Motion/VFX:** *motion blur, energy rings, particles, magic circles.*
+* **Background text/symbols:** *transcribe short, visible text; else omit.*
+* **Sound/heat/light sources (visible):** *torches, neon, sun, LEDs, screens.*
 
-4) Lighting & Color
+### Composition (≤12w)
 
-Light sources (softbox, spotlight, window, daylight), direction (front/side/back/rim), quality (soft/hard), contrast ratio if clear.
+*framing, angle, symmetry/asymmetry, leading lines, horizon level.*
 
-Color temperature/grade (cool/warm/neutral), dominant palette, reflections/specular highlights.
+### Text/Symbols (≤20 chars)
 
-5) Technical/Surface Details
+*verbatim or omit.*
 
-Visible textures (gloss, grain, knit, suede, metal polish).
+### Palette (3–5 colors)
 
-Any legible text/symbols: transcribe exactly; if not readable, write ""unreadable"".
+*common names or hex.*
 
-Artifacts (film grain, compression), post effects (vignette, glow, color shift).
+### Alt (≤140 chars)
 
-6) Safety & Grounding
+*single sentence.*
 
-Avoid private info or identity claims.
+### Tags (8 single words)
 
-No brand/location/model IDs unless explicitly visible and legible.
+*materials, colors, setting, mood, shot type, etc.*
 
-7) One-Sentence Alt Text
+**Style rules**
 
-1–2 sentences, 140–200 characters, purely descriptive.
-
-8) Tags (8–15)
-
-Short, searchable keywords: subject, materials, colors, setting, mood, shot type (e.g., ""black leather, thigh-high boots, studio spotlight, dramatic rim light, cyberpunk, full-body portrait"").";
+* Use **material + color + part** (""black leather bodice"").
+* Concrete, visual facts only; no story or opinions.
+* **Silhouette present?** mark gender/age as **ambiguous**, focus on outline/costume shapes.
+* **Omit anything not clearly visible.** No ""unclear"".
+* Keep within word/character limits.";
 
             // Use vision model (qwen2.5vl) with explicit options
             var visionOptions = new Koan.AI.Contracts.Options.AiVisionOptions
