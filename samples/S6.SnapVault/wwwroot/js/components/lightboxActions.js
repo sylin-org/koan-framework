@@ -173,21 +173,24 @@ export class LightboxActions {
   async regenerateAI() {
     if (!this.currentPhoto) return;
 
-    const btn = this.lightbox.panel?.container.querySelector('#btn-regenerate');
-    if (!btn) return;
+    // Find any regenerate button (supports multiple IDs for different states)
+    const btn = this.lightbox.panel?.container.querySelector('.btn-regenerate-ai');
 
-    // Show loading state
-    const originalContent = btn.innerHTML;
-    btn.disabled = true;
-    btn.style.opacity = '0.5';
-    btn.innerHTML = `
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="animation: spin 1s linear infinite;">
-        <polyline points="23 4 23 10 17 10"></polyline>
-        <polyline points="1 20 1 14 7 14"></polyline>
-        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
-      </svg>
-      Regenerating...
-    `;
+    let originalContent = null;
+    if (btn) {
+      // Show loading state
+      originalContent = btn.innerHTML;
+      btn.disabled = true;
+      btn.style.opacity = '0.5';
+      btn.innerHTML = `
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="animation: spin 1s linear infinite;">
+          <polyline points="23 4 23 10 17 10"></polyline>
+          <polyline points="1 20 1 14 7 14"></polyline>
+          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+        </svg>
+        Regenerating...
+      `;
+    }
 
     try {
       // Call API to regenerate AI metadata
@@ -211,10 +214,13 @@ export class LightboxActions {
         // Fetch updated photo data
         const updatedPhoto = await this.app.api.get(`/api/photos/${this.currentPhoto.id}`);
 
-        // Check if AI description is updated
-        if (updatedPhoto.detailedDescription &&
-            updatedPhoto.detailedDescription !== this.currentPhoto.detailedDescription) {
+        // Check if AI analysis is updated (new structured format or legacy format)
+        const hasNewAnalysis = updatedPhoto.aiAnalysisJson &&
+                               updatedPhoto.aiAnalysisJson !== this.currentPhoto.aiAnalysisJson;
+        const hasUpdatedDescription = updatedPhoto.detailedDescription &&
+                                      updatedPhoto.detailedDescription !== this.currentPhoto.detailedDescription;
 
+        if (hasNewAnalysis || hasUpdatedDescription) {
           // Success: Update current photo
           this.currentPhoto = updatedPhoto;
 
@@ -223,10 +229,12 @@ export class LightboxActions {
             this.lightbox.panel.renderAIInsights(updatedPhoto);
           }
 
-          // Restore button
-          btn.disabled = false;
-          btn.style.opacity = '1';
-          btn.innerHTML = originalContent;
+          // Restore button (if it exists)
+          if (btn && originalContent) {
+            btn.disabled = false;
+            btn.style.opacity = '1';
+            btn.innerHTML = originalContent;
+          }
 
           this.app.components.toast.show('AI description regenerated successfully', {
             icon: '✅',
@@ -242,10 +250,12 @@ export class LightboxActions {
     } catch (error) {
       console.error('Failed to regenerate AI:', error);
 
-      // Restore button
-      btn.disabled = false;
-      btn.style.opacity = '1';
-      btn.innerHTML = originalContent;
+      // Restore button (if it exists)
+      if (btn && originalContent) {
+        btn.disabled = false;
+        btn.style.opacity = '1';
+        btn.innerHTML = originalContent;
+      }
 
       this.app.components.toast.show('Failed to regenerate AI description', {
         icon: '⚠️',

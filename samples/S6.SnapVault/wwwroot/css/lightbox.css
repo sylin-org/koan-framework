@@ -352,9 +352,16 @@
   transition: all var(--duration-fast) var(--ease-out-cubic);
 }
 
+.btn-regenerate-ai svg {
+  transition: transform var(--duration-fast) var(--ease-out-cubic);
+}
+
 .btn-regenerate-ai:hover {
   background-color: rgba(255, 255, 255, 0.1);
   color: var(--accent-primary);
+}
+
+.btn-regenerate-ai:hover svg {
   transform: rotate(180deg);
 }
 

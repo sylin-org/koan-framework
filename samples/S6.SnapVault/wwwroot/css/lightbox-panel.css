@@ -288,24 +288,94 @@
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin-bottom: 12px;
+  margin-bottom: 20px;
 }
 
 .ai-tag {
-  padding: 4px 10px;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
+  padding: 3px 8px;                  /* Down from 4px 10px - more compact */
+  background: rgba(59, 130, 246, 0.12);
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  border-radius: 10px;               /* Down from 12px */
+  font-size: 10.5px;                 /* Down from 11px */
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: rgba(96, 165, 250, 1);
+  cursor: pointer;
+  transition: all 150ms ease;
+  white-space: nowrap;
+  line-height: 1.4;                  /* Added for better vertical spacing */
+}
+
+.ai-tag:hover {
+  background: rgba(59, 130, 246, 0.2);
+  border-color: rgba(59, 130, 246, 0.4);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.2);
+}
+
+.ai-tag:active {
+  transform: translateY(0);
+}
+
+/* AI Summary Box - Hero Treatment */
+.ai-summary {
+  padding: 20px 18px;
+  background: rgba(59, 130, 246, 0.08);
+  border-left: 4px solid rgba(59, 130, 246, 0.6);
+  border-radius: 6px;
+  margin: 0 0 24px;
+}
+
+.ai-summary p {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.7;
+  color: rgba(255, 255, 255, 0.98);
+  font-weight: 400;
+}
+
+/* AI Facts Table - Compact & Dense */
+.ai-facts {
+  display: grid;
+  gap: 0;
+  margin-top: 4px;
+  margin-bottom: 20px;               /* Gap before regenerate button */
+}
+
+.fact-row {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  align-items: baseline;
+}
+
+.fact-row:last-child {
+  border-bottom: none;
+}
+
+.fact-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: rgba(255, 255, 255, 0.45);
+  flex-shrink: 0;
+}
+
+.fact-value {
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.8);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.85);
+  word-break: break-word;
 }
 
 .btn-regenerate-ai {
   display: flex;
   align-items: center;
-  justify-content: center;
+  /* justify-content removed - defaults to flex-start (left align) like action buttons */
   gap: 8px;
-  padding: 10px 16px;
+  padding: 12px 16px;                /* Match action buttons */
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 8px;

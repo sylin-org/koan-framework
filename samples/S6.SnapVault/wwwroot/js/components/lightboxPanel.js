@@ -238,23 +238,38 @@ export class LightboxPanel {
   }
 
   renderMetadata(photo) {
-    // Camera
-    const camera = photo.cameraModel || 'Unknown';
-    this.container.querySelector('#meta-camera').textContent = camera;
+    // Camera - hide if unknown
+    const cameraItem = this.container.querySelector('#meta-camera').closest('.metadata-item');
+    if (photo.cameraModel) {
+      this.container.querySelector('#meta-camera').textContent = photo.cameraModel;
+      cameraItem.style.display = '';
+    } else {
+      cameraItem.style.display = 'none';
+    }
 
-    // Lens
-    const lens = photo.lensModel || 'Unknown';
-    this.container.querySelector('#meta-lens').textContent = lens;
+    // Lens - hide if unknown
+    const lensItem = this.container.querySelector('#meta-lens').closest('.metadata-item');
+    if (photo.lensModel) {
+      this.container.querySelector('#meta-lens').textContent = photo.lensModel;
+      lensItem.style.display = '';
+    } else {
+      lensItem.style.display = 'none';
+    }
 
-    // Settings
+    // Settings - hide if no data
+    const settingsItem = this.container.querySelector('#meta-settings').closest('.metadata-item');
     const settings = [];
     if (photo.aperture) settings.push(photo.aperture);
     if (photo.shutterSpeed) settings.push(photo.shutterSpeed);
     if (photo.iso) settings.push(`ISO ${photo.iso}`);
-    this.container.querySelector('#meta-settings').textContent =
-      settings.length > 0 ? settings.join(' • ') : 'No settings data';
+    if (settings.length > 0) {
+      this.container.querySelector('#meta-settings').textContent = settings.join(' • ');
+      settingsItem.style.display = '';
+    } else {
+      settingsItem.style.display = 'none';
+    }
 
-    // Date
+    // Date - always show
     const dateText = photo.capturedAt
       ? new Date(photo.capturedAt).toLocaleString('en-US', {
           year: 'numeric', month: 'short', day: 'numeric',
@@ -265,43 +280,150 @@ export class LightboxPanel {
         });
     this.container.querySelector('#meta-date').textContent = dateText;
 
-    // Dimensions
+    // Dimensions - always show
     const dimensions = `${photo.width} × ${photo.height}`;
     this.container.querySelector('#meta-dimensions').textContent = dimensions;
   }
 
   renderAIInsights(photo) {
     const aiContent = this.container.querySelector('.ai-content');
-    const aiDescription = this.container.querySelector('#ai-description');
-    const aiTags = this.container.querySelector('#ai-tags');
     const regenerateBtn = this.container.querySelector('#btn-regenerate');
 
-    // Handle different states
-    if (!photo.detailedDescription || !photo.detailedDescription.trim()) {
-      aiContent.setAttribute('data-state', 'empty');
-      aiDescription.textContent = '';
-      aiTags.innerHTML = '';
-      regenerateBtn.style.display = 'flex';
+    // Try to parse structured AI analysis (new format)
+    let analysis = null;
+    if (photo.aiAnalysisJson) {
+      try {
+        analysis = JSON.parse(photo.aiAnalysisJson);
+      } catch (e) {
+        console.warn('Failed to parse AI analysis JSON:', e);
+      }
+    }
+
+    // Render structured format if available
+    if (analysis && analysis.tags && analysis.summary) {
+      aiContent.setAttribute('data-state', 'loaded');
+      aiContent.innerHTML = `
+        <!-- Tags (clickable chips) -->
+        <div class="ai-tags" role="list" aria-label="Photo tags">
+          ${analysis.tags.map(tag => `
+            <button
+              class="ai-tag"
+              data-tag="${this.escapeHtml(tag)}"
+              role="listitem"
+              aria-label="Tag: ${this.escapeHtml(tag)}"
+              title="Click to filter by ${this.escapeHtml(tag)}">
+              ${this.escapeHtml(tag)}
+            </button>
+          `).join('')}
+        </div>
+
+        <!-- Summary (highlighted) -->
+        <div class="ai-summary" role="region" aria-label="Photo description">
+          <p>${this.escapeHtml(analysis.summary)}</p>
+        </div>
+
+        <!-- Facts table -->
+        ${analysis.facts && Object.keys(analysis.facts).length > 0 ? `
+          <div class="ai-facts" role="table" aria-label="Photo details">
+            ${Object.entries(analysis.facts).map(([key, value]) => `
+              <div class="fact-row" role="row">
+                <span class="fact-label" role="rowheader">${this.escapeHtml(key)}</span>
+                <span class="fact-value" role="cell">${this.escapeHtml(value)}</span>
+              </div>
+            `).join('')}
+          </div>
+        ` : ''}
+
+        <!-- Regenerate button -->
+        <button class="btn-regenerate-ai" id="btn-regenerate-new" aria-label="Regenerate AI analysis">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="23 4 23 10 17 10"></polyline>
+            <polyline points="1 20 1 14 7 14"></polyline>
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+          </svg>
+          Regenerate Description
+        </button>
+      `;
+
+      // Add tag click handlers for filtering (future feature)
+      aiContent.querySelectorAll('.ai-tag').forEach(tagBtn => {
+        tagBtn.addEventListener('click', () => {
+          const tag = tagBtn.dataset.tag;
+          // TODO: Implement tag-based filtering in main gallery
+          this.app.components.toast.show(`Filter by "${tag}" - Coming soon!`, { icon: '🔍' });
+        });
+      });
+
+      // Regenerate button handler
+      const newRegenerateBtn = aiContent.querySelector('#btn-regenerate-new');
+      newRegenerateBtn.addEventListener('click', () => {
+        if (this.lightbox.actions) {
+          this.lightbox.actions.regenerateAI();
+        }
+      });
+
       return;
     }
 
-    aiContent.setAttribute('data-state', 'loaded');
+    // Fallback: Legacy markdown format or empty
+    if (!photo.detailedDescription || !photo.detailedDescription.trim()) {
+      aiContent.setAttribute('data-state', 'empty');
+      aiContent.innerHTML = `
+        <p class="ai-empty">No AI analysis available yet.</p>
+        <button class="btn-regenerate-ai" id="btn-regenerate-fallback" aria-label="Generate AI analysis">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="23 4 23 10 17 10"></polyline>
+            <polyline points="1 20 1 14 7 14"></polyline>
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+          </svg>
+          Generate Description
+        </button>
+      `;
 
-    // Format markdown-like description
-    aiDescription.innerHTML = this.formatMarkdown(photo.detailedDescription);
+      const fallbackBtn = aiContent.querySelector('#btn-regenerate-fallback');
+      fallbackBtn.addEventListener('click', () => {
+        if (this.lightbox.actions) {
+          this.lightbox.actions.regenerateAI();
+        }
+      });
 
-    // Render tags
-    const tags = [...(photo.autoTags || []), ...(photo.detectedObjects || [])];
-    if (tags.length > 0) {
-      aiTags.innerHTML = tags
-        .slice(0, 10)
-        .map(tag => `<span class="ai-tag">${tag}</span>`)
-        .join('');
-    } else {
-      aiTags.innerHTML = '';
+      return;
     }
 
-    regenerateBtn.style.display = 'flex';
+    // Render legacy markdown format
+    aiContent.setAttribute('data-state', 'loaded');
+    aiContent.innerHTML = `
+      <div class="ai-description">${this.formatMarkdown(photo.detailedDescription)}</div>
+      ${(photo.autoTags && photo.autoTags.length > 0) ? `
+        <div class="ai-tags">
+          ${photo.autoTags.slice(0, 10).map(tag =>
+            `<span class="ai-tag">${this.escapeHtml(tag)}</span>`
+          ).join('')}
+        </div>
+      ` : ''}
+      <button class="btn-regenerate-ai" id="btn-regenerate-legacy" aria-label="Regenerate AI analysis">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="23 4 23 10 17 10"></polyline>
+          <polyline points="1 20 1 14 7 14"></polyline>
+          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+        </svg>
+        Regenerate Description
+      </button>
+    `;
+
+    const legacyBtn = aiContent.querySelector('#btn-regenerate-legacy');
+    legacyBtn.addEventListener('click', () => {
+      if (this.lightbox.actions) {
+        this.lightbox.actions.regenerateAI();
+      }
+    });
+  }
+
+  escapeHtml(str) {
+    if (!str) return '';
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
   }
 
   updateActionStates(photo) {
