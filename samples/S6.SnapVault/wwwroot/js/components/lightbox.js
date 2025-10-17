@@ -22,6 +22,12 @@ export class Lightbox {
     this.container = null;
     this.photoElement = null;
     this.currentLayout = null;
+
+    // Progressive loading state
+    this.imageLoadState = 'idle'; // 'loading-gallery', 'gallery-loaded', 'loading-original', 'original-loaded'
+    this.originalLoadTimer = null;
+    this.originalLoadAbort = null;
+
     this.render();
 
     // Note: this.panel is initialized in render() method
@@ -117,32 +123,6 @@ export class Lightbox {
             <polyline points="9 18 15 12 9 6"></polyline>
           </svg>
         </button>
-
-        <!-- Zoom controls -->
-        <div class="lightbox-zoom-controls">
-          <button class="btn-icon btn-zoom-out" title="Zoom out (-)" aria-label="Zoom out">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="11" cy="11" r="8"></circle>
-              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-              <line x1="8" y1="11" x2="14" y2="11"></line>
-            </svg>
-          </button>
-          <span class="zoom-level">100%</span>
-          <button class="btn-icon btn-zoom-in" title="Zoom in (+)" aria-label="Zoom in">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="11" cy="11" r="8"></circle>
-              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-              <line x1="11" y1="8" x2="11" y2="14"></line>
-              <line x1="8" y1="11" x2="14" y2="11"></line>
-            </svg>
-          </button>
-          <button class="btn-icon btn-zoom-reset" title="Reset zoom (0)" aria-label="Reset zoom">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="11" cy="11" r="8"></circle>
-              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-            </svg>
-          </button>
-        </div>
       </div>
       </div>
     `;
@@ -171,9 +151,6 @@ export class Lightbox {
     const downloadBtn = this.container.querySelector('.btn-download');
     const favoriteBtn = this.container.querySelector('.btn-favorite');
     const infoBtn = this.container.querySelector('.btn-info');
-    const zoomInBtn = this.container.querySelector('.btn-zoom-in');
-    const zoomOutBtn = this.container.querySelector('.btn-zoom-out');
-    const zoomResetBtn = this.container.querySelector('.btn-zoom-reset');
     const chrome = this.container.querySelector('.lightbox-chrome');
 
     // Close
@@ -193,37 +170,7 @@ export class Lightbox {
     downloadBtn.addEventListener('click', () => this.download());
     favoriteBtn.addEventListener('click', () => this.toggleFavorite());
 
-    // Zoom (deprecated - kept for backward compatibility, redirects to new zoom system)
-    zoomInBtn.addEventListener('click', () => {
-      if (this.zoomSystem) {
-        const newScale = Math.min(this.zoomSystem.currentScale + 0.25, this.zoomSystem.maxScale);
-        this.zoomSystem.currentScale = newScale;
-        this.zoomSystem.mode = 'custom';
-        this.zoomSystem.apply();
-        this.zoomSystem.updateBadge();
-      }
-    });
-    zoomOutBtn.addEventListener('click', () => {
-      if (this.zoomSystem) {
-        const newScale = Math.max(this.zoomSystem.currentScale - 0.25, this.zoomSystem.minScale);
-        this.zoomSystem.currentScale = newScale;
-        if (newScale <= this.zoomSystem.calculateFitScale()) {
-          this.zoomSystem.mode = 'fit';
-          this.zoomSystem.panOffset = { x: 0, y: 0 };
-        } else {
-          this.zoomSystem.mode = 'custom';
-        }
-        this.zoomSystem.apply();
-        this.zoomSystem.updateBadge();
-      }
-    });
-    zoomResetBtn.addEventListener('click', () => {
-      if (this.zoomSystem) {
-        this.zoomSystem.reset();
-      }
-    });
-
-    // Setup new zoom system event listeners (Phase 3)
+    // Setup simplified zoom system event listeners (click-to-cycle)
     this.setupZoomListeners();
 
     // Mouse reveal chrome
@@ -246,39 +193,17 @@ export class Lightbox {
     const image = this.container.querySelector('.lightbox-image');
     if (!image) return;
 
-    // Click-to-cycle: Fit → Fill → 100% → Fit
+    // Click-to-cycle: Fit → Fill → Original → Fit (simplified 3-mode system)
     image.addEventListener('click', (e) => {
-      // Only cycle if not panning
-      if (!this.zoomSystem.panController.isDragging) {
+      // Only cycle if user didn't drag
+      if (!this.zoomSystem.panController.wasRecentDrag()) {
         this.zoomSystem.cycle();
       }
+      // Reset the drag flag after checking
+      this.zoomSystem.panController.resetDragFlag();
     });
 
-    // Scroll-wheel zoom (desktop)
-    image.addEventListener('wheel', (e) => {
-      this.zoomSystem.handleWheelZoom(e);
-    }, { passive: false });
-
-    // Pinch zoom (mobile/touchpad)
-    image.addEventListener('touchstart', (e) => {
-      if (e.touches.length === 2) {
-        e.preventDefault();
-        this.zoomSystem.handlePinchZoom(e);
-      }
-    }, { passive: false });
-
-    image.addEventListener('touchmove', (e) => {
-      if (e.touches.length === 2) {
-        e.preventDefault();
-        this.zoomSystem.handlePinchZoom(e);
-      }
-    }, { passive: false });
-
-    image.addEventListener('touchend', () => {
-      this.zoomSystem.pinchStartDistance = null;
-    });
-
-    // Pan when zoomed (works for both mouse and touch)
+    // Pan when in Fill or Original modes (works for both mouse and touch)
     image.addEventListener('pointerdown', (e) => {
       this.zoomSystem.panController.handlePointerDown(e);
     });
@@ -401,22 +326,257 @@ export class Lightbox {
   }
 
   async loadPhoto() {
+    // Progressive loading: Gallery (fast) → Original (high quality)
+    // Optimized for future web deployment with slow networks
+
     const image = this.container.querySelector('.lightbox-image');
     const galleryUrl = `/api/media/photos/${this.currentPhotoId}/gallery`;
+    const originalUrl = `/api/media/photos/${this.currentPhotoId}/original`;
+
+    // Cancel any pending original loads from previous photo
+    if (this.originalLoadAbort) {
+      this.originalLoadAbort.abort();
+      this.originalLoadAbort = null;
+    }
+    clearTimeout(this.originalLoadTimer);
+
+    // Reset state
+    this.imageLoadState = 'loading-gallery';
+    image.dataset.quality = 'gallery';
 
     // Show loading state
     image.style.opacity = '0.5';
 
-    // Load gallery resolution image
+    // PHASE 1: Load gallery version (fast, ~200KB)
     image.src = galleryUrl;
     image.alt = this.currentPhoto.originalFileName;
 
-    await new Promise((resolve, reject) => {
-      image.onload = resolve;
-      image.onerror = reject;
+    try {
+      await new Promise((resolve, reject) => {
+        image.onload = resolve;
+        image.onerror = reject;
+      });
+
+      image.style.opacity = '1';
+      this.imageLoadState = 'gallery-loaded';
+
+      // PHASE 2: Schedule original load after user engagement
+      // Only load original if:
+      // - User stays on photo >2s (engaged)
+      // - User zooms (quality needed)
+      this.scheduleOriginalLoad(image, originalUrl);
+
+    } catch (error) {
+      console.error('Failed to load gallery image:', error);
+      image.style.opacity = '1';
+      // Fallback: try original directly
+      await this.loadOriginalImage(image, originalUrl);
+    }
+  }
+
+  scheduleOriginalLoad(image, originalUrl) {
+    // Check if original is already cached - if so, load immediately
+    // Otherwise delay by 2 seconds to avoid wasting bandwidth for quick navigation
+    this.checkIfCached(originalUrl).then(isCached => {
+      if (isCached) {
+        // Cache hit - load immediately with no delay
+        console.log('Original cached - loading immediately');
+        this.loadOriginalImage(image, originalUrl);
+      } else {
+        // Not cached - delay load to avoid wasting bandwidth on quick browsing
+        this.originalLoadTimer = setTimeout(() => {
+          this.loadOriginalImage(image, originalUrl);
+        }, 2000);
+      }
+    });
+  }
+
+  async checkIfCached(url) {
+    // Use a HEAD request or image preload to check if resource is cached
+    // If it completes very quickly (<50ms), it's likely cached
+    const startTime = performance.now();
+
+    try {
+      // Create a test image to check cache
+      const testImage = new Image();
+
+      const loadPromise = new Promise((resolve, reject) => {
+        testImage.onload = () => resolve(true);
+        testImage.onerror = () => reject(false);
+      });
+
+      testImage.src = url;
+
+      // If image is cached, onload fires synchronously or very quickly
+      await loadPromise;
+
+      const loadTime = performance.now() - startTime;
+
+      // If it loaded in less than 50ms, it's almost certainly from cache
+      return loadTime < 50;
+
+    } catch {
+      return false;
+    }
+  }
+
+  async loadOriginalImage(image, originalUrl) {
+    if (this.imageLoadState === 'original-loaded') return; // Already loaded
+
+    this.imageLoadState = 'loading-original';
+
+    // Create AbortController for cancellation support
+    this.originalLoadAbort = new AbortController();
+
+    try {
+      // Capture current visual state before swap
+      const galleryNaturalWidth = image.naturalWidth;
+      const galleryNaturalHeight = image.naturalHeight;
+      const currentScale = this.zoomSystem ? this.zoomSystem.currentScale : 1.0;
+      const currentPanOffset = this.zoomSystem ? { ...this.zoomSystem.panOffset } : { x: 0, y: 0 };
+      const currentMode = this.zoomSystem ? this.zoomSystem.mode : 'fit';
+
+      // Preload original in background
+      const tempImage = new Image();
+      tempImage.src = originalUrl;
+
+      await new Promise((resolve, reject) => {
+        tempImage.onload = resolve;
+        tempImage.onerror = reject;
+
+        // Support cancellation
+        this.originalLoadAbort.signal.addEventListener('abort', () => {
+          tempImage.src = ''; // Cancel load
+          reject(new Error('Load cancelled'));
+        });
+      });
+
+      // Calculate scale adjustment to maintain same displayed size
+      // If gallery was 1200px scaled to 960px (scale 0.8),
+      // and original is 4000px, we need scale 0.24 to still show 960px
+      const dimensionRatio = galleryNaturalWidth / tempImage.naturalWidth;
+      const adjustedScale = currentScale * dimensionRatio;
+
+      // Disable transitions for seamless swap
+      if (image) {
+        image.style.transition = 'none';
+      }
+
+      // Seamless swap: update src and adjust scale simultaneously
+      image.src = originalUrl;
+      image.dataset.quality = 'original';
+      this.imageLoadState = 'original-loaded';
+
+      // Wait for browser to update naturalWidth/Height
+      await new Promise(resolve => {
+        if (image.complete && image.naturalWidth > 0) {
+          resolve();
+        } else {
+          image.onload = resolve;
+        }
+      });
+
+      // Recalculate zoom based on current mode with new dimensions
+      if (this.zoomSystem) {
+        // Preserve the mode and recalculate scale for new dimensions
+        // In simplified 3-mode system:
+        // - 'fit' always fits to screen
+        // - 'fill' always fills viewport
+        // - 'original' always shows 1:1
+        this.zoomSystem.mode = currentMode;
+
+        switch (currentMode) {
+          case 'fit':
+            this.zoomSystem.currentScale = this.zoomSystem.calculateFitScale();
+            this.zoomSystem.panOffset = { x: 0, y: 0 };
+            break;
+          case 'fill':
+            this.zoomSystem.currentScale = this.zoomSystem.calculateFillScale();
+            this.zoomSystem.panOffset = { x: 0, y: 0 };
+            break;
+          case 'original':
+            this.zoomSystem.currentScale = 1.0;
+            this.zoomSystem.panOffset = { x: 0, y: 0 };
+            break;
+        }
+
+        // Apply without transition (instant)
+        const photo = this.lightbox.photoElement;
+        if (photo) {
+          photo.style.transition = 'none';
+          photo.style.transform = `
+            translate(${this.zoomSystem.panOffset.x}px, ${this.zoomSystem.panOffset.y}px)
+            scale(${this.zoomSystem.currentScale})
+          `;
+
+          // Update zoom badge to reflect state
+          this.zoomSystem.updateBadge();
+
+          // Re-enable transitions after a frame
+          requestAnimationFrame(() => {
+            photo.style.transition = '';
+          });
+        }
+      }
+
+      // Show subtle quality indicator
+      this.showQualityIndicator();
+
+    } catch (error) {
+      if (error.message !== 'Load cancelled') {
+        console.warn('Failed to load original image:', error);
+      }
+      // Keep gallery version - it's good enough
+      this.imageLoadState = 'gallery-loaded';
+    }
+  }
+
+  showQualityIndicator() {
+    // Subtle toast: "Full Resolution"
+    const indicator = document.createElement('div');
+    indicator.className = 'quality-indicator';
+    indicator.innerHTML = '✨ Full Resolution';
+    indicator.style.cssText = `
+      position: fixed;
+      bottom: 80px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.75);
+      color: white;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 500;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 200ms ease;
+      z-index: 10001;
+    `;
+
+    document.body.appendChild(indicator);
+
+    // Fade in
+    requestAnimationFrame(() => {
+      indicator.style.opacity = '1';
     });
 
-    image.style.opacity = '1';
+    // Auto-remove after 2 seconds
+    setTimeout(() => {
+      indicator.style.opacity = '0';
+      setTimeout(() => indicator.remove(), 200);
+    }, 2000);
+  }
+
+  // Trigger immediate original load when user zooms
+  onUserZoom() {
+    if (this.imageLoadState === 'gallery-loaded') {
+      const image = this.container.querySelector('.lightbox-image');
+      const originalUrl = `/api/media/photos/${this.currentPhotoId}/original`;
+
+      // Cancel timer and load immediately
+      clearTimeout(this.originalLoadTimer);
+      this.loadOriginalImage(image, originalUrl);
+    }
   }
 
   updateMetadata() {
@@ -452,15 +612,18 @@ export class Lightbox {
       this.currentPhotoId = nextPhoto.id;
       this.currentIndex++;
 
+      // Preserve current zoom mode
+      const preservedMode = this.zoomSystem ? this.zoomSystem.mode : 'fit';
+
       // Fetch fresh data and update display
       await this.fetchPhotoData();
       await this.loadPhoto();
       this.updateMetadata();
       this.updateNavigation();
 
-      // Reset zoom to fit mode (Phase 3)
+      // Restore zoom mode (Phase 3)
       if (this.zoomSystem) {
-        this.zoomSystem.reset();
+        this.zoomSystem.setMode(preservedMode);
       }
 
       // Update unified panel
@@ -490,15 +653,18 @@ export class Lightbox {
       this.currentPhotoId = prevPhoto.id;
       this.currentIndex--;
 
+      // Preserve current zoom mode
+      const preservedMode = this.zoomSystem ? this.zoomSystem.mode : 'fit';
+
       // Fetch fresh data and update display
       await this.fetchPhotoData();
       await this.loadPhoto();
       this.updateMetadata();
       this.updateNavigation();
 
-      // Reset zoom to fit mode (Phase 3)
+      // Restore zoom mode (Phase 3)
       if (this.zoomSystem) {
-        this.zoomSystem.reset();
+        this.zoomSystem.setMode(preservedMode);
       }
 
       // Update unified panel

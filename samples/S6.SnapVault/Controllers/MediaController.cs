@@ -23,7 +23,7 @@ public class MediaController : ControllerBase
     /// Serve thumbnail image (150x150 square, hot-cdn tier)
     /// </summary>
     [HttpGet("photos/{id}/thumbnail")]
-    [ResponseCache(Duration = 3600, Location = ResponseCacheLocation.Any)]
+    [ResponseCache(Duration = 31536000, Location = ResponseCacheLocation.Any)] // 1 year - images are immutable
     public async Task<IActionResult> GetThumbnail(string id, CancellationToken ct = default)
     {
         var photo = await PhotoAsset.Get(id, ct);
@@ -40,6 +40,9 @@ public class MediaController : ControllerBase
             return NotFound();
         }
 
+        // Add aggressive caching headers (images are content-addressed, never change)
+        Response.Headers["Cache-Control"] = "public, max-age=31536000, immutable";
+
         // Stream directly from storage
         var stream = await thumbnail.OpenRead(ct);
         return File(stream, thumbnail.ContentType ?? "image/jpeg");
@@ -49,7 +52,7 @@ public class MediaController : ControllerBase
     /// Serve masonry thumbnail image (300px max, aspect-ratio preserved, hot-cdn tier)
     /// </summary>
     [HttpGet("masonry-thumbnails/{id}")]
-    [ResponseCache(Duration = 3600, Location = ResponseCacheLocation.Any)]
+    [ResponseCache(Duration = 31536000, Location = ResponseCacheLocation.Any)] // 1 year - images are immutable
     public async Task<IActionResult> GetMasonryThumbnail(string id, CancellationToken ct = default)
     {
         // Get masonry thumbnail entity directly
@@ -60,6 +63,9 @@ public class MediaController : ControllerBase
             return NotFound();
         }
 
+        // Add aggressive caching headers
+        Response.Headers["Cache-Control"] = "public, max-age=31536000, immutable";
+
         // Stream directly from storage
         var stream = await masonryThumbnail.OpenRead(ct);
         return File(stream, masonryThumbnail.ContentType ?? "image/jpeg");
@@ -69,7 +75,7 @@ public class MediaController : ControllerBase
     /// Serve gallery-size image (1200px max, warm tier)
     /// </summary>
     [HttpGet("photos/{id}/gallery")]
-    [ResponseCache(Duration = 3600, Location = ResponseCacheLocation.Any)]
+    [ResponseCache(Duration = 31536000, Location = ResponseCacheLocation.Any)] // 1 year - images are immutable
     public async Task<IActionResult> GetGallery(string id, CancellationToken ct = default)
     {
         var photo = await PhotoAsset.Get(id, ct);
@@ -86,6 +92,9 @@ public class MediaController : ControllerBase
             return NotFound();
         }
 
+        // Add aggressive caching headers
+        Response.Headers["Cache-Control"] = "public, max-age=31536000, immutable";
+
         // Stream directly from storage
         var stream = await gallery.OpenRead(ct);
         return File(stream, gallery.ContentType ?? "image/jpeg");
@@ -95,7 +104,7 @@ public class MediaController : ControllerBase
     /// Serve full-resolution original image (cold tier)
     /// </summary>
     [HttpGet("photos/{id}/original")]
-    [ResponseCache(Duration = 3600, Location = ResponseCacheLocation.Any)]
+    [ResponseCache(Duration = 31536000, Location = ResponseCacheLocation.Any)] // 1 year - images are immutable
     public async Task<IActionResult> GetOriginal(string id, CancellationToken ct = default)
     {
         var photo = await PhotoAsset.Get(id, ct);
@@ -110,6 +119,9 @@ public class MediaController : ControllerBase
             photo.ViewCount++;
             await photo.Save(CancellationToken.None);
         });
+
+        // Add aggressive caching headers
+        Response.Headers["Cache-Control"] = "public, max-age=31536000, immutable";
 
         // Stream directly from storage
         var stream = await photo.OpenRead(ct);

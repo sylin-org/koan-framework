@@ -165,8 +165,8 @@ class SnapVaultApp {
 
       case 'favorites':
         this.setLoading(true);
-        // Filter from current loaded photos
-        const allPhotos = await this.api.get('/api/photos');
+        // Load all photos sorted by ID descending, then filter favorites
+        const allPhotos = await this.api.get('/api/photos?sort=-id');
         this.state.photos = allPhotos.filter(p => p.isFavorite);
         this.components.grid.render();
         this.setLoading(false);
@@ -177,7 +177,8 @@ class SnapVaultApp {
   async loadPhotos() {
     try {
       this.setLoading(true);
-      const response = await this.api.get('/api/photos');
+      // Sort by ID descending (newest first - GUID v7 embeds timestamp)
+      const response = await this.api.get('/api/photos?sort=-id');
       this.state.photos = response || [];
       this.components.grid.render();
       this.updateLibraryCounts();

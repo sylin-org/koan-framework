@@ -1,20 +1,17 @@
 /**
- * Lightbox Zoom System
- * Zero-UI zoom with click-to-cycle, scroll-wheel, and pinch gestures
+ * Lightbox Zoom System (Simplified)
+ * Three fixed modes: Fit → Fill → Original
+ * Click to cycle, drag to pan when zoomed
  */
 
 export class LightboxZoom {
   constructor(lightbox) {
     this.lightbox = lightbox;
-    this.mode = 'fit'; // 'fit' | 'fill' | '100%' | 'custom'
+    this.mode = 'fit'; // 'fit' | 'fill' | 'original'
     this.currentScale = 1.0;
-    this.minScale = 0.5;
-    this.maxScale = 4.0;
     this.panOffset = { x: 0, y: 0 };
     this.panController = new PanController(this);
     this.badge = this.createBadge();
-    this.pinchStartDistance = null;
-    this.pinchStartScale = 1.0;
   }
 
   createBadge() {
@@ -34,11 +31,11 @@ export class LightboxZoom {
   }
 
   cycle() {
-    // Click-to-cycle: Fit → Fill → 100% → Fit
+    // Click-to-cycle: Fit → Fill → Original → Fit
     if (this.mode === 'fit') {
       this.setMode('fill');
     } else if (this.mode === 'fill') {
-      this.setMode('100%');
+      this.setMode('original');
     } else {
       this.setMode('fit');
     }
@@ -49,21 +46,33 @@ export class LightboxZoom {
 
     switch (mode) {
       case 'fit':
+        // Fit: Show entire photo, letterbox/pillarbox if needed
         this.currentScale = this.calculateFitScale();
         this.panOffset = { x: 0, y: 0 };
         break;
       case 'fill':
+        // Fill: Fill viewport, crop edges if needed (like object-fit: cover)
         this.currentScale = this.calculateFillScale();
         this.panOffset = { x: 0, y: 0 };
+        this.triggerOriginalLoad();
         break;
-      case '100%':
-        this.currentScale = this.calculate100Scale();
+      case 'original':
+        // Original: 1:1 pixel ratio (100%)
+        this.currentScale = 1.0;
         this.panOffset = { x: 0, y: 0 };
+        this.triggerOriginalLoad();
         break;
     }
 
     this.apply();
     this.updateBadge();
+  }
+
+  triggerOriginalLoad() {
+    // Notify lightbox to load original immediately when user zooms
+    if (this.lightbox && typeof this.lightbox.onUserZoom === 'function') {
+      this.lightbox.onUserZoom();
+    }
   }
 
   calculateFitScale() {
@@ -128,11 +137,6 @@ export class LightboxZoom {
     );
   }
 
-  calculate100Scale() {
-    // 1:1 pixel ratio
-    return 1.0;
-  }
-
   apply() {
     const photo = this.lightbox.photoElement;
     if (!photo) return;
@@ -143,8 +147,9 @@ export class LightboxZoom {
       scale(${this.currentScale})
     `;
 
-    // Update cursor
-    if (this.currentScale > this.calculateFitScale() + 0.01) {
+    // Update cursor based on mode
+    const isPannable = this.mode === 'fill' || this.mode === 'original';
+    if (isPannable) {
       photo.style.cursor = 'grab';
       photo.classList.add('zoomed');
     } else {
@@ -152,73 +157,8 @@ export class LightboxZoom {
       photo.classList.remove('zoomed');
     }
 
-    // Enable/disable pan
-    this.panController.setEnabled(this.currentScale > this.calculateFitScale() + 0.01);
-  }
-
-  handleWheelZoom(event) {
-    event.preventDefault();
-
-    const delta = event.deltaY > 0 ? -0.1 : 0.1; // 10% per notch
-    const newScale = Math.max(this.minScale, Math.min(this.maxScale, this.currentScale + delta));
-
-    if (Math.abs(newScale - this.currentScale) > 0.001) {
-      // Zoom toward cursor position
-      const rect = this.lightbox.photoElement.getBoundingClientRect();
-      const cursorX = (event.clientX - rect.left - rect.width / 2) / this.currentScale;
-      const cursorY = (event.clientY - rect.top - rect.height / 2) / this.currentScale;
-
-      const scaleDiff = newScale - this.currentScale;
-      this.panOffset.x -= cursorX * scaleDiff;
-      this.panOffset.y -= cursorY * scaleDiff;
-
-      this.currentScale = newScale;
-      this.mode = 'custom';
-      this.apply();
-      this.updateBadge();
-    }
-  }
-
-  handlePinchZoom(event) {
-    // Get pinch center and scale
-    const touch1 = event.touches[0];
-    const touch2 = event.touches[1];
-
-    const centerX = (touch1.clientX + touch2.clientX) / 2;
-    const centerY = (touch1.clientY + touch2.clientY) / 2;
-
-    const distance = Math.hypot(
-      touch2.clientX - touch1.clientX,
-      touch2.clientY - touch1.clientY
-    );
-
-    if (!this.pinchStartDistance) {
-      this.pinchStartDistance = distance;
-      this.pinchStartScale = this.currentScale;
-      return;
-    }
-
-    const scaleChange = distance / this.pinchStartDistance;
-    let newScale = this.pinchStartScale * scaleChange;
-
-    // Clamp (mobile: min 100%, max 400%)
-    newScale = Math.max(1.0, Math.min(this.maxScale, newScale));
-
-    if (Math.abs(newScale - this.currentScale) > 0.001) {
-      // Zoom toward pinch center
-      const rect = this.lightbox.photoElement.getBoundingClientRect();
-      const pinchX = (centerX - rect.left - rect.width / 2) / this.currentScale;
-      const pinchY = (centerY - rect.top - rect.height / 2) / this.currentScale;
-
-      const scaleDiff = newScale - this.currentScale;
-      this.panOffset.x -= pinchX * scaleDiff;
-      this.panOffset.y -= pinchY * scaleDiff;
-
-      this.currentScale = newScale;
-      this.mode = 'custom';
-      this.apply();
-      this.updateBadge();
-    }
+    // Enable pan for fill and original modes
+    this.panController.setEnabled(isPannable);
   }
 
   updateBadge() {
@@ -231,11 +171,8 @@ export class LightboxZoom {
       case 'fill':
         text = 'Fill';
         break;
-      case '100%':
+      case 'original':
         text = '100%';
-        break;
-      case 'custom':
-        text = `${Math.round(this.currentScale * 100)}%`;
         break;
     }
 
@@ -256,7 +193,9 @@ class PanController {
   constructor(zoom) {
     this.zoom = zoom;
     this.isDragging = false;
+    this.didDrag = false; // Track if user actually moved during drag
     this.startPos = { x: 0, y: 0 };
+    this.pointerDownPos = { x: 0, y: 0 }; // Track initial pointer position
     this.enabled = false;
   }
 
@@ -268,6 +207,8 @@ class PanController {
     if (!this.enabled) return;
 
     this.isDragging = true;
+    this.didDrag = false; // Reset drag flag
+    this.pointerDownPos = { x: event.clientX, y: event.clientY };
     this.startPos = {
       x: event.clientX - this.zoom.panOffset.x,
       y: event.clientY - this.zoom.panOffset.y
@@ -279,6 +220,13 @@ class PanController {
 
   handlePointerMove(event) {
     if (!this.isDragging) return;
+
+    // Check if user actually moved (>5px threshold to ignore tiny movements)
+    const deltaX = Math.abs(event.clientX - this.pointerDownPos.x);
+    const deltaY = Math.abs(event.clientY - this.pointerDownPos.y);
+    if (deltaX > 5 || deltaY > 5) {
+      this.didDrag = true;
+    }
 
     const newX = event.clientX - this.startPos.x;
     const newY = event.clientY - this.startPos.y;
@@ -310,5 +258,15 @@ class PanController {
     this.isDragging = false;
     this.zoom.lightbox.photoElement.style.cursor = 'grab';
     this.zoom.lightbox.photoElement.style.transition = '';
+  }
+
+  // Check if the last interaction was a drag (for click prevention)
+  wasRecentDrag() {
+    return this.didDrag;
+  }
+
+  // Reset drag flag (called after click handler checks it)
+  resetDragFlag() {
+    this.didDrag = false;
   }
 }

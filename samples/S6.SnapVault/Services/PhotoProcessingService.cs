@@ -512,6 +512,7 @@ Return ONLY valid JSON in this exact format (no markdown, no code blocks, just t
   ""summary"": ""One clear sentence describing the image"",
   ""facts"": {
     ""Type"": ""portrait|landscape|still-life|product|food|screenshot|architecture|wildlife|other"",
+    ""Style"": ""photography|painting|digital-art|illustration|abstract|ingame-screenshot|other"",
     ""Subject Count"": ""describe number and type of subjects"",
     ""Composition"": ""describe framing and arrangement"",
     ""Palette"": ""list 3-5 dominant colors"",

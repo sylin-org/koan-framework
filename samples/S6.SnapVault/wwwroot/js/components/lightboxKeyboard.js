@@ -25,19 +25,13 @@ export class LightboxKeyboard {
     this.register('i', () => this.lightbox.panel?.toggle());
     this.register('I', () => this.lightbox.panel?.toggle());
 
-    // Zoom
+    // Zoom (simplified 3-mode system: Fit → Fill → Original)
     this.register('z', () => this.lightbox.zoomSystem?.cycle());
     this.register('Z', () => this.lightbox.zoomSystem?.cycle());
     this.register('0', () => this.lightbox.zoomSystem?.setMode('fit'));
-    this.register('f', () => this.toggleFitFill());
-    this.register('F', () => this.toggleFitFill());
-    this.register('1', () => this.zoomToPercent(1.0));
-    this.register('2', () => this.zoomToPercent(2.0));
-    this.register('3', () => this.zoomToPercent(3.0));
-    this.register('4', () => this.zoomToPercent(4.0));
-    this.register('+', () => this.zoomIn());
-    this.register('=', () => this.zoomIn()); // + without shift
-    this.register('-', () => this.zoomOut());
+    this.register('1', () => this.lightbox.zoomSystem?.setMode('fit'));
+    this.register('2', () => this.lightbox.zoomSystem?.setMode('fill'));
+    this.register('3', () => this.lightbox.zoomSystem?.setMode('original'));
 
     // Actions
     this.register('s', () => this.lightbox.actions?.toggleFavorite());
@@ -136,54 +130,8 @@ export class LightboxKeyboard {
   isZoomed() {
     const zoom = this.lightbox.zoomSystem;
     if (!zoom) return false;
-    return zoom.currentScale > (zoom.calculateFitScale() + 0.01);
-  }
-
-  toggleFitFill() {
-    const zoom = this.lightbox.zoomSystem;
-    if (!zoom) return;
-
-    if (zoom.mode === 'fit') {
-      zoom.setMode('fill');
-    } else {
-      zoom.setMode('fit');
-    }
-  }
-
-  zoomToPercent(scale) {
-    const zoom = this.lightbox.zoomSystem;
-    if (!zoom) return;
-
-    zoom.currentScale = scale;
-    zoom.mode = scale === 1.0 ? '100%' : 'custom';
-    zoom.panOffset = { x: 0, y: 0 };
-    zoom.apply();
-    zoom.updateBadge();
-  }
-
-  zoomIn() {
-    const zoom = this.lightbox.zoomSystem;
-    if (!zoom) return;
-
-    zoom.currentScale = Math.min(zoom.maxScale, zoom.currentScale + 0.1);
-    zoom.mode = 'custom';
-    zoom.apply();
-    zoom.updateBadge();
-  }
-
-  zoomOut() {
-    const zoom = this.lightbox.zoomSystem;
-    if (!zoom) return;
-
-    zoom.currentScale = Math.max(zoom.minScale, zoom.currentScale - 0.1);
-    if (zoom.currentScale <= zoom.calculateFitScale()) {
-      zoom.mode = 'fit';
-      zoom.panOffset = { x: 0, y: 0 };
-    } else {
-      zoom.mode = 'custom';
-    }
-    zoom.apply();
-    zoom.updateBadge();
+    // In simplified system, fill and original modes are considered "zoomed" for pan purposes
+    return zoom.mode === 'fill' || zoom.mode === 'original';
   }
 
   pan(deltaX, deltaY) {
@@ -245,11 +193,11 @@ export class LightboxKeyboard {
           <div class="help-section">
             <h3>Zoom</h3>
             <div class="help-shortcuts">
-              <div><kbd>Z</kbd> Cycle zoom modes</div>
-              <div><kbd>0</kbd> Reset to Fit</div>
-              <div><kbd>F</kbd> Toggle Fit/Fill</div>
-              <div><kbd>1</kbd>-<kbd>4</kbd> Zoom 100%-400%</div>
-              <div><kbd>+</kbd> / <kbd>-</kbd> Zoom in/out 10%</div>
+              <div><kbd>Z</kbd> Cycle: Fit → Fill → Original</div>
+              <div><kbd>0</kbd> or <kbd>1</kbd> Fit to screen</div>
+              <div><kbd>2</kbd> Fill viewport</div>
+              <div><kbd>3</kbd> Original (100%)</div>
+              <div>or click photo to cycle</div>
             </div>
           </div>
 
