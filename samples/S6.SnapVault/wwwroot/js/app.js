@@ -88,6 +88,9 @@ class SnapVaultApp {
     // Initialize filters after photos are loaded
     await this.components.filters.init();
 
+    // Enable infinite scroll after initial load
+    this.components.grid.enableInfiniteScroll();
+
     console.log('[App] SnapVault Pro ready');
   }
 
@@ -138,6 +141,9 @@ class SnapVaultApp {
       return;
     }
 
+    // Disable infinite scroll during view preset switch
+    this.components.grid.disableInfiniteScroll();
+
     this.state.viewPreset = presetId;
 
     // Save preference
@@ -158,6 +164,13 @@ class SnapVaultApp {
 
     // Flush data and refetch with new resolution tier
     await this.loadPhotos();
+
+    // Delay re-enabling infinite scroll to prevent immediate trigger
+    // This gives the layout time to settle and user time to scroll
+    setTimeout(() => {
+      this.components.grid.enableInfiniteScroll();
+      console.log(`[setViewPreset] Infinite scroll re-enabled after delay`);
+    }, 500);
 
     console.log(`[setViewPreset] COMPLETE`);
   }
@@ -228,8 +241,8 @@ class SnapVaultApp {
 
       console.log(`[Photos] Initial load: ${response?.length || 0} photos (page 1)`);
 
-      // Enable infinite scroll after initial load
-      this.components.grid.enableInfiniteScroll();
+      // Note: Infinite scroll is enabled by caller (init or setViewPreset)
+      // This prevents immediate trigger when layout changes
     } catch (error) {
       console.error('Failed to load photos:', error);
       this.components.toast.show('Failed to load photos', { icon: '⚠️', duration: 5000 });
