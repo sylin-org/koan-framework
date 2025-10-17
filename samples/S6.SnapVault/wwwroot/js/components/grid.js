@@ -97,12 +97,7 @@ export class PhotoGrid {
             img.src = img.dataset.src;
             img.removeAttribute('data-src');
 
-            // Recalculate Macy layout when image loads
-            img.addEventListener('load', () => {
-              if (this.macy) {
-                this.macy.recalculate(true);
-              }
-            }, { once: true });
+            // No recalculation needed - aspect-ratio pre-allocation prevents layout shift
           }
         }
       });
@@ -217,7 +212,11 @@ export class PhotoGrid {
     const article = document.createElement('article');
     article.className = 'photo-card';
     article.dataset.photoId = photo.id;
-    article.dataset.aspect = (photo.width / photo.height).toFixed(2);
+
+    // Pre-allocate space using aspect-ratio to eliminate layout shift
+    const aspectRatio = photo.width / photo.height;
+    article.dataset.aspect = aspectRatio.toFixed(2);
+    article.style.aspectRatio = `${photo.width} / ${photo.height}`;
 
     // Smart tier selection based on view preset and display characteristics
     const thumbnailUrl = this.getOptimalImageUrl(photo);
