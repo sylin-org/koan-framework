@@ -632,32 +632,13 @@ body {
 /* ===== Photo Grid ===== */
 .photo-grid {
   padding: var(--space-3);
-  column-gap: var(--space-2);
-  transition: column-count var(--duration-normal) var(--ease-out-cubic);
-}
-
-/* View Preset Column Counts */
-.photo-grid[data-preset="gallery"] {
-  column-count: 2;
-}
-
-.photo-grid[data-preset="comfortable"] {
-  column-count: 4;
-}
-
-.photo-grid[data-preset="cozy"] {
-  column-count: 6;
-}
-
-.photo-grid[data-preset="compact"] {
-  column-count: 8;
+  /* Macy.js handles column layout and spacing dynamically */
 }
 
 /* Photo Card */
 .photo-card {
   position: relative;
-  break-inside: avoid;
-  margin-bottom: var(--space-2);
+  /* Macy.js handles positioning and spacing */
   border-radius: var(--radius-lg);
   overflow: hidden;
   background-color: var(--bg-surface);
@@ -1423,14 +1404,6 @@ body {
 
 /* ===== Responsive (Desktop-focused) ===== */
 @media (min-width: 2560px) {
-  .photo-grid[data-density="4"] {
-    column-count: 6;
-  }
-
-  .photo-grid[data-density="6"] {
-    column-count: 8;
-  }
-
   .sidebar-left,
   .sidebar-right {
     width: 280px;
@@ -1444,14 +1417,6 @@ body {
 
   .app-content {
     grid-template-columns: 1fr 320px;
-  }
-
-  .photo-grid[data-density="4"] {
-    column-count: 3;
-  }
-
-  .photo-grid[data-density="6"] {
-    column-count: 4;
   }
 }
 

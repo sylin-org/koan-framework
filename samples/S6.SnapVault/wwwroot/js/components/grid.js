@@ -11,6 +11,7 @@ export class PhotoGrid {
     this.container = document.querySelector('.photo-grid');
     this.photoCards = new Map();
     this.observer = null;
+    this.macy = null;
     this.viewportWidth = window.innerWidth;
     this.devicePixelRatio = window.devicePixelRatio || 1;
     this.setupIntersectionObserver();
@@ -27,28 +28,63 @@ export class PhotoGrid {
         this.devicePixelRatio = window.devicePixelRatio || 1;
         console.log(`📐 Viewport updated: ${this.viewportWidth}px @ ${this.devicePixelRatio}x DPI`);
 
-        // Recalculate column count for current preset
-        this.updateResponsiveColumns();
+        // Macy handles responsive columns automatically via breakAt
+        // Just update DPI for smart resolution selection
       }, 250);
     });
   }
 
   /**
-   * Update grid column count based on viewport width and current preset
+   * Generate Macy breakpoints from VIEW_PRESETS configuration
+   * Macy uses max-width breakpoints (opposite of min-width media queries)
    */
-  updateResponsiveColumns() {
-    const presetId = this.app.state.viewPreset || 'comfortable';
+  getMacyBreakpoints(presetId) {
     const preset = VIEW_PRESETS[presetId];
+    if (!preset) return {};
 
-    if (!preset || !this.container) return;
+    // Convert our responsive columns to Macy's breakAt format
+    // Macy uses max-width, so we define what happens AT and BELOW each breakpoint
+    return {
+      3839: preset.columns.ultra,    // 4K+ (≥3840px gets ultra columns)
+      2559: preset.columns.wide,     // QHD/4K (2560-3839px gets wide columns)
+      1919: preset.columns.desktop,  // 1080p (1920-2559px gets desktop columns)
+      1023: preset.columns.tablet,   // Tablet (1024-1919px gets tablet columns)
+      0: preset.columns.mobile       // Mobile (<1024px gets mobile columns)
+    };
+  }
 
-    // Get responsive column count
-    const columns = getResponsiveColumns(preset, this.viewportWidth);
+  /**
+   * Initialize or reinitialize Macy with current preset
+   */
+  initMacy() {
+    if (!this.container || typeof Macy === 'undefined') {
+      console.warn('Macy not available or container not found');
+      return;
+    }
 
-    // Apply to grid via CSS custom property
-    this.container.style.columnCount = columns.toString();
+    const presetId = this.app.state.viewPreset || 'comfortable';
+    const breakpoints = this.getMacyBreakpoints(presetId);
 
-    console.log(`📊 Responsive columns: ${columns} (${presetId} @ ${this.viewportWidth}px)`);
+    // Destroy existing instance if present
+    if (this.macy) {
+      this.macy.remove();
+      this.macy = null;
+    }
+
+    // Initialize Macy with responsive breakpoints
+    this.macy = Macy({
+      container: '.photo-grid',
+      columns: 4, // Default/fallback
+      breakAt: breakpoints,
+      margin: {
+        x: 16, // 1rem = 16px (matches --space-2)
+        y: 16
+      },
+      waitForImages: false, // We handle image loading with IntersectionObserver
+      useContainerForBreakpoints: false // Use viewport for consistency with our system
+    });
+
+    console.log(`🔧 Macy initialized: ${presetId} preset`, breakpoints);
   }
 
   setupIntersectionObserver() {
@@ -60,6 +96,13 @@ export class PhotoGrid {
           if (img.dataset.src && !img.src) {
             img.src = img.dataset.src;
             img.removeAttribute('data-src');
+
+            // Recalculate Macy layout when image loads
+            img.addEventListener('load', () => {
+              if (this.macy) {
+                this.macy.recalculate(true);
+              }
+            }, { once: true });
           }
         }
       });
@@ -87,9 +130,6 @@ export class PhotoGrid {
     // Reset tier logging flag for new render
     this._tierLogged = false;
 
-    // Update responsive columns for current preset and viewport
-    this.updateResponsiveColumns();
-
     // Clear existing photos (for re-render with different view preset)
     const existingCards = this.container.querySelectorAll('.photo-card');
     existingCards.forEach(card => card.remove());
@@ -98,6 +138,9 @@ export class PhotoGrid {
     photos.forEach(photo => {
       this.addPhotoCard(photo);
     });
+
+    // Initialize Macy with current preset (or reinitialize if preset changed)
+    this.initMacy();
   }
 
   renderEmpty() {
