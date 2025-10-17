@@ -630,20 +630,36 @@ body {
 }
 
 /* ===== Photo Grid ===== */
-.photo-grid {
+/* CSS Grid Masonry (native support) */
+.photo-grid.masonry-native {
   padding: var(--space-3);
-  /* Macy.js handles column layout and spacing dynamically */
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-template-rows: masonry;
+  gap: var(--space-2);
+}
+
+/* CSS Columns Fallback (browsers without masonry support) */
+.photo-grid.masonry-fallback {
+  padding: var(--space-3);
+  column-gap: var(--space-2);
+  column-count: 4;
 }
 
 /* Photo Card */
 .photo-card {
   position: relative;
-  /* Macy.js handles positioning and spacing */
   border-radius: var(--radius-lg);
   overflow: hidden;
   background-color: var(--bg-surface);
   cursor: pointer;
   transition: all var(--duration-fast) var(--ease-out-cubic);
+}
+
+/* CSS Columns fallback styling */
+.masonry-fallback .photo-card {
+  break-inside: avoid;
+  margin-bottom: var(--space-2);
 }
 
 .photo-card:hover {

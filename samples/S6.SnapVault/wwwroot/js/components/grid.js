@@ -11,12 +11,18 @@ export class PhotoGrid {
     this.container = document.querySelector('.photo-grid');
     this.photoCards = new Map();
     this.observer = null;
-    this.macy = null;
     this.infiniteScrollObserver = null;
     this.viewportWidth = window.innerWidth;
     this.devicePixelRatio = window.devicePixelRatio || 1;
     this.setupIntersectionObserver();
     this.setupViewportDetection();
+    this.detectMasonrySupport();
+  }
+
+  detectMasonrySupport() {
+    // Detect CSS Grid Masonry support (grid-template-rows: masonry)
+    this.supportsMasonry = CSS.supports('grid-template-rows', 'masonry');
+    console.log(`[Grid] CSS Masonry support: ${this.supportsMasonry ? 'Yes (native)' : 'No (using CSS columns fallback)'}`);
   }
 
   setupViewportDetection() {
@@ -27,65 +33,9 @@ export class PhotoGrid {
       resizeTimer = setTimeout(() => {
         this.viewportWidth = window.innerWidth;
         this.devicePixelRatio = window.devicePixelRatio || 1;
-        console.log(`📐 Viewport updated: ${this.viewportWidth}px @ ${this.devicePixelRatio}x DPI`);
-
-        // Macy handles responsive columns automatically via breakAt
-        // Just update DPI for smart resolution selection
+        console.log(`[Grid] Viewport updated: ${this.viewportWidth}px @ ${this.devicePixelRatio}x DPI`);
       }, 250);
     });
-  }
-
-  /**
-   * Generate Macy breakpoints from VIEW_PRESETS configuration
-   * Macy uses max-width breakpoints (opposite of min-width media queries)
-   */
-  getMacyBreakpoints(presetId) {
-    const preset = VIEW_PRESETS[presetId];
-    if (!preset) return {};
-
-    // Convert our responsive columns to Macy's breakAt format
-    // Macy uses max-width, so we define what happens AT and BELOW each breakpoint
-    return {
-      3839: preset.columns.ultra,    // 4K+ (≥3840px gets ultra columns)
-      2559: preset.columns.wide,     // QHD/4K (2560-3839px gets wide columns)
-      1919: preset.columns.desktop,  // 1080p (1920-2559px gets desktop columns)
-      1023: preset.columns.tablet,   // Tablet (1024-1919px gets tablet columns)
-      0: preset.columns.mobile       // Mobile (<1024px gets mobile columns)
-    };
-  }
-
-  /**
-   * Initialize or reinitialize Macy with current preset
-   */
-  initMacy() {
-    if (!this.container || typeof Macy === 'undefined') {
-      console.warn('Macy not available or container not found');
-      return;
-    }
-
-    const presetId = this.app.state.viewPreset || 'comfortable';
-    const breakpoints = this.getMacyBreakpoints(presetId);
-
-    // Destroy existing instance if present
-    if (this.macy) {
-      this.macy.remove();
-      this.macy = null;
-    }
-
-    // Initialize Macy with responsive breakpoints
-    this.macy = Macy({
-      container: '.photo-grid',
-      columns: 4, // Default/fallback
-      breakAt: breakpoints,
-      margin: {
-        x: 16, // 1rem = 16px (matches --space-2)
-        y: 16
-      },
-      waitForImages: false, // We handle image loading with IntersectionObserver
-      useContainerForBreakpoints: false // Use viewport for consistency with our system
-    });
-
-    console.log(`🔧 Macy initialized: ${presetId} preset`, breakpoints);
   }
 
   setupIntersectionObserver() {
@@ -130,13 +80,14 @@ export class PhotoGrid {
     const existingCards = this.container.querySelectorAll('.photo-card');
     existingCards.forEach(card => card.remove());
 
+    // Apply CSS class based on masonry support
+    this.container.classList.toggle('masonry-native', this.supportsMasonry);
+    this.container.classList.toggle('masonry-fallback', !this.supportsMasonry);
+
     // Render all photos in current state
     photos.forEach(photo => {
       this.addPhotoCard(photo);
     });
-
-    // Initialize Macy with current preset (or reinitialize if preset changed)
-    this.initMacy();
   }
 
   renderEmpty() {
@@ -390,11 +341,8 @@ export class PhotoGrid {
       this.addPhotoCard(photo);
     });
 
-    // Trigger Macy to recalculate positions for new cards
-    if (this.macy) {
-      this.macy.recalculate(true);
-      console.log(`[Grid] Macy recalculated layout for ${photos.length} new cards`);
-    }
+    // CSS handles layout automatically - no recalculation needed
+    console.log(`[Grid] Layout automatically updated by CSS`);
   }
 
   /**
