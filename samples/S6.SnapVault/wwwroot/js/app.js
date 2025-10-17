@@ -152,8 +152,14 @@ class SnapVaultApp {
       grid.dataset.preset = presetId;
     }
 
-    // Re-render grid with new resolution tier
-    this.components.grid.render();
+    // Re-render grid with new resolution tier (first page only for performance)
+    // User can scroll to load more in the new view
+    this.components.grid.render(true); // true = firstPageOnly
+
+    // Re-enable infinite scroll if we have more pages
+    if (this.state.hasMorePages) {
+      this.components.grid.enableInfiniteScroll();
+    }
 
     console.log(`📐 View preset: ${VIEW_PRESETS[presetId].label}`);
   }

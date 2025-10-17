@@ -107,7 +107,7 @@ export class PhotoGrid {
     });
   }
 
-  render() {
+  render(firstPageOnly = false) {
     if (!this.container) return;
 
     const photos = this.app.state.photos;
@@ -130,8 +130,9 @@ export class PhotoGrid {
     const existingCards = this.container.querySelectorAll('.photo-card');
     existingCards.forEach(card => card.remove());
 
-    // Render photos
-    photos.forEach(photo => {
+    // Render photos (first page only if switching view presets for performance)
+    const photosToRender = firstPageOnly ? photos.slice(0, 50) : photos;
+    photosToRender.forEach(photo => {
       this.addPhotoCard(photo);
     });
 
