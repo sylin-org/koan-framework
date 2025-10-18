@@ -319,7 +319,9 @@ export class LightboxPanel {
         ${analysis.facts && Object.keys(analysis.facts).length > 0 ? `
           <div class="ai-facts" role="table" aria-label="Photo details">
             ${Object.entries(analysis.facts).map(([key, value]) => {
-              const isLocked = analysis.lockedFactKeys && analysis.lockedFactKeys.includes(key);
+              // LockedFactKeys contains lowercase versions, so compare lowercase
+              const isLocked = analysis.lockedFactKeys &&
+                analysis.lockedFactKeys.includes(key.toLowerCase());
               return this.renderFactRow(key, value, isLocked);
             }).join('')}
           </div>
@@ -349,7 +351,7 @@ export class LightboxPanel {
       aiContent.querySelectorAll('.lock-btn').forEach(btn => {
         btn.addEventListener('click', async (e) => {
           e.stopPropagation();
-          // Use getAttribute to preserve exact case (e.g., "Subject Count" not "subject count")
+          // Get fact key and normalize to lowercase for API call
           const factKey = btn.getAttribute('data-fact-key');
           await this.toggleFactLock(factKey, btn);
         });
@@ -584,6 +586,9 @@ export class LightboxPanel {
     const factRow = btnElement.closest('.fact-row');
     const isCurrentlyLocked = btnElement.classList.contains('locked');
 
+    // Normalize fact key to lowercase (rule: all fact names are lowercase in storage)
+    const normalizedKey = factKey.toLowerCase();
+
     // Optimistic UI update
     btnElement.classList.toggle('locked');
     btnElement.setAttribute('aria-label', `${!isCurrentlyLocked ? 'Unlock' : 'Lock'} ${factKey}`);
@@ -596,9 +601,9 @@ export class LightboxPanel {
     svg.innerHTML = !isCurrentlyLocked ? lockedIcon : unlockedIcon;
 
     try {
-      // Call toggle API endpoint
+      // Call toggle API endpoint with lowercase key
       const response = await this.app.api.post(
-        `/api/photos/${this.currentPhotoData.id}/facts/${encodeURIComponent(factKey)}/toggle-lock`
+        `/api/photos/${this.currentPhotoData.id}/facts/${encodeURIComponent(normalizedKey)}/toggle-lock`
       );
 
       // Sync with server response to handle multi-tab scenarios

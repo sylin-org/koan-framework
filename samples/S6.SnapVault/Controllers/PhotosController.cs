@@ -327,26 +327,29 @@ public class PhotosController : EntityController<PhotoAsset>
             return BadRequest(new { Error = $"Fact key '{factKey}' not found in analysis" });
         }
 
-        // Toggle lock state (use actualFactKey to maintain consistent casing)
+        // Normalize to lowercase for storage (all fact names in LockedFactKeys are lowercase)
+        var normalizedKey = actualFactKey.ToLowerInvariant();
+
+        // Toggle lock state
         bool isNowLocked;
-        if (photo.AiAnalysis.LockedFactKeys.Contains(actualFactKey))
+        if (photo.AiAnalysis.LockedFactKeys.Contains(normalizedKey))
         {
-            photo.AiAnalysis.LockedFactKeys.Remove(actualFactKey);
+            photo.AiAnalysis.LockedFactKeys.Remove(normalizedKey);
             isNowLocked = false;
-            _logger.LogInformation("Unlocked fact {FactKey} for photo {PhotoId}", actualFactKey, id);
+            _logger.LogInformation("Unlocked fact {FactKey} for photo {PhotoId}", normalizedKey, id);
         }
         else
         {
-            photo.AiAnalysis.LockedFactKeys.Add(actualFactKey);
+            photo.AiAnalysis.LockedFactKeys.Add(normalizedKey);
             isNowLocked = true;
-            _logger.LogInformation("Locked fact {FactKey} for photo {PhotoId}", actualFactKey, id);
+            _logger.LogInformation("Locked fact {FactKey} for photo {PhotoId}", normalizedKey, id);
         }
 
         await photo.Save(ct);
 
         return Ok(new
         {
-            FactKey = actualFactKey,
+            FactKey = normalizedKey,
             IsLocked = isNowLocked,
             LockedFactKeys = photo.AiAnalysis.LockedFactKeys.ToList()
         });
@@ -369,8 +372,10 @@ public class PhotosController : EntityController<PhotoAsset>
             return BadRequest(new { Error = "Photo has no AI analysis" });
         }
 
-        // Lock all existing fact keys
-        photo.AiAnalysis.LockedFactKeys = new HashSet<string>(photo.AiAnalysis.Facts.Keys);
+        // Lock all existing fact keys (normalize to lowercase)
+        photo.AiAnalysis.LockedFactKeys = new HashSet<string>(
+            photo.AiAnalysis.Facts.Keys.Select(k => k.ToLowerInvariant())
+        );
         await photo.Save(ct);
 
         _logger.LogInformation("Locked all {Count} facts for photo {PhotoId}", photo.AiAnalysis.LockedFactKeys.Count, id);

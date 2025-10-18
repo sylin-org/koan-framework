@@ -793,19 +793,24 @@ Analyze the image and return the JSON now.";
         }
 
         // 1. Buffer locked facts before regeneration
-        var lockedFacts = new Dictionary<string, string>();
+        // LockedFactKeys stores lowercase versions, but Facts has original casing
+        var lockedFacts = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var lockedFactKeys = new HashSet<string>();
 
         if (photo.AiAnalysis?.LockedFactKeys != null)
         {
             lockedFactKeys = new HashSet<string>(photo.AiAnalysis.LockedFactKeys);
 
-            foreach (var key in lockedFactKeys)
+            foreach (var lowercaseKey in lockedFactKeys)
             {
-                if (photo.AiAnalysis.Facts.ContainsKey(key))
+                // Find actual key in Facts using case-insensitive comparison
+                var actualKey = photo.AiAnalysis.Facts.Keys
+                    .FirstOrDefault(k => k.Equals(lowercaseKey, StringComparison.OrdinalIgnoreCase));
+
+                if (actualKey != null)
                 {
-                    lockedFacts[key] = photo.AiAnalysis.Facts[key];
-                    _logger.LogDebug("Buffered locked fact: {FactKey} = {FactValue}", key, lockedFacts[key]);
+                    lockedFacts[lowercaseKey] = photo.AiAnalysis.Facts[actualKey];
+                    _logger.LogDebug("Buffered locked fact: {FactKey} = {FactValue}", lowercaseKey, lockedFacts[lowercaseKey]);
                 }
             }
         }
@@ -816,13 +821,20 @@ Analyze the image and return the JSON now.";
         // 3. Restore locked facts (overwrite AI-generated values for locked keys)
         if (photo.AiAnalysis != null && lockedFacts.Count > 0)
         {
-            foreach (var (key, value) in lockedFacts)
+            foreach (var (lowercaseKey, value) in lockedFacts)
             {
-                photo.AiAnalysis.Facts[key] = value;
-                _logger.LogDebug("Restored locked fact: {FactKey} = {FactValue}", key, value);
+                // Find actual key in new Facts using case-insensitive comparison
+                var actualKey = photo.AiAnalysis.Facts.Keys
+                    .FirstOrDefault(k => k.Equals(lowercaseKey, StringComparison.OrdinalIgnoreCase));
+
+                if (actualKey != null)
+                {
+                    photo.AiAnalysis.Facts[actualKey] = value;
+                    _logger.LogDebug("Restored locked fact: {FactKey} = {FactValue}", actualKey, value);
+                }
             }
 
-            // Restore locked keys set
+            // Restore locked keys set (maintain lowercase)
             photo.AiAnalysis.LockedFactKeys = lockedFactKeys;
         }
 
