@@ -371,6 +371,7 @@
   color: rgba(255, 255, 255, 0.45);
   flex-shrink: 0;
   white-space: nowrap;
+  transition: color 200ms ease;
 }
 
 /* Subtle lock button */
@@ -427,9 +428,20 @@
   font-weight: 500;
   letter-spacing: 0.02em;
   color: rgba(96, 165, 250, 1);
-  transition: all 150ms ease;
+  transition: all 200ms ease;
   white-space: nowrap;
   line-height: 1.4;
+}
+
+/* Locked fact state - subtle gold warmth */
+.fact-row[data-locked="true"] .fact-label {
+  color: rgba(212, 175, 55, 0.7);
+}
+
+.fact-row[data-locked="true"] .fact-pill {
+  background: rgba(212, 175, 55, 0.08);
+  border-color: rgba(212, 175, 55, 0.35);
+  color: rgba(234, 192, 80, 1);
 }
 
 .btn-regenerate-ai {
