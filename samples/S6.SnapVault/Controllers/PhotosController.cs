@@ -318,32 +318,35 @@ public class PhotosController : EntityController<PhotoAsset>
             return BadRequest(new { Error = "Photo has no AI analysis" });
         }
 
-        // Validate fact key exists
-        if (!photo.AiAnalysis.Facts.ContainsKey(factKey))
+        // Find the actual fact key using case-insensitive comparison
+        var actualFactKey = photo.AiAnalysis.Facts.Keys
+            .FirstOrDefault(k => k.Equals(factKey, StringComparison.OrdinalIgnoreCase));
+
+        if (actualFactKey == null)
         {
             return BadRequest(new { Error = $"Fact key '{factKey}' not found in analysis" });
         }
 
-        // Toggle lock state
+        // Toggle lock state (use actualFactKey to maintain consistent casing)
         bool isNowLocked;
-        if (photo.AiAnalysis.LockedFactKeys.Contains(factKey))
+        if (photo.AiAnalysis.LockedFactKeys.Contains(actualFactKey))
         {
-            photo.AiAnalysis.LockedFactKeys.Remove(factKey);
+            photo.AiAnalysis.LockedFactKeys.Remove(actualFactKey);
             isNowLocked = false;
-            _logger.LogInformation("Unlocked fact {FactKey} for photo {PhotoId}", factKey, id);
+            _logger.LogInformation("Unlocked fact {FactKey} for photo {PhotoId}", actualFactKey, id);
         }
         else
         {
-            photo.AiAnalysis.LockedFactKeys.Add(factKey);
+            photo.AiAnalysis.LockedFactKeys.Add(actualFactKey);
             isNowLocked = true;
-            _logger.LogInformation("Locked fact {FactKey} for photo {PhotoId}", factKey, id);
+            _logger.LogInformation("Locked fact {FactKey} for photo {PhotoId}", actualFactKey, id);
         }
 
         await photo.Save(ct);
 
         return Ok(new
         {
-            FactKey = factKey,
+            FactKey = actualFactKey,
             IsLocked = isNowLocked,
             LockedFactKeys = photo.AiAnalysis.LockedFactKeys.ToList()
         });
