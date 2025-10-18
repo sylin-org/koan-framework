@@ -1,29 +1,11 @@
 using Koan.Core;
 using Koan.Web;
 using Koan.Web.Extensions;
-using Microsoft.AspNetCore.Http.Features;
-using Microsoft.AspNetCore.Server.Kestrel.Core;
 using S6.SnapVault.Configuration;
 using S6.SnapVault.Services;
 using S6.SnapVault.Hubs;
 
 var builder = WebApplication.CreateBuilder(args);
-
-// Configure Kestrel for large file uploads
-builder.Services.Configure<KestrelServerOptions>(options =>
-{
-    options.Limits.MaxRequestBodySize = 524288000; // 500MB for batch uploads
-    options.Limits.RequestHeadersTimeout = TimeSpan.FromMinutes(10);
-    options.Limits.KeepAliveTimeout = TimeSpan.FromMinutes(10);
-});
-
-// Configure FormOptions for multipart form data
-builder.Services.Configure<FormOptions>(options =>
-{
-    options.MultipartBodyLengthLimit = 524288000; // 500MB
-    options.ValueLengthLimit = int.MaxValue;
-    options.MultipartHeadersLengthLimit = int.MaxValue;
-});
 
 // Koan Framework - "Reference = Intent"
 builder.Services

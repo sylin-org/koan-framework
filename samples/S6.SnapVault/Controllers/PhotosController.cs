@@ -39,8 +39,7 @@ public class PhotosController : EntityController<PhotoAsset>
     /// Demonstrates: File upload, batch processing, background jobs, auto-organization
     /// </summary>
     [HttpPost("upload")]
-    [RequestSizeLimit(524288000)] // 500MB limit for batch uploads
-    [RequestFormLimits(MultipartBodyLengthLimit = 524288000)]
+    [RequestSizeLimit(104857600)] // 100MB limit
     public async Task<ActionResult<UploadResponse>> UploadPhotos(
         [FromForm] string? eventId,
         [FromForm] List<IFormFile> files,
