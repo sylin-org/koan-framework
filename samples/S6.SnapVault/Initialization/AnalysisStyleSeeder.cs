@@ -42,7 +42,8 @@ public static class AnalysisStyleSeeder
             CreateLandscapeStyle(),
             CreateArchitectureStyle(),
             CreateActionStyle(),
-            CreateMacroStyle()
+            CreateMacroStyle(),
+            CreateGamingStyle()
         };
     }
 
@@ -241,5 +242,40 @@ When describing macro subjects, include:
         EnhanceExamples = new List<string> { "atmospherics" },
         RequiredOptionalFacts = new List<string> { "depth cues", "subject 1" },
         OmittedOptionalFacts = new List<string> { "setting", "locale cues" }
+    };
+
+    private static AnalysisStyle CreateGamingStyle() => new()
+    {
+        Id = "gaming",
+        Name = "In-Game Screenshot",
+        Icon = "🎮",
+        Description = "Game UI, art style, and gameplay context",
+        Priority = 7,
+        IsSystemStyle = true,
+        IsActive = true,
+        TemplateVersion = 1,
+        ClassificationKeywords = "game, gaming, screenshot, video game, gameplay, UI, HUD, menu, ingame, playstation, xbox, pc gaming",
+        FocusInstructions = @"ANALYSIS FOCUS:
+Analyze as a video game screenshot with gaming-specific terminology:
+- Game UI elements (HUD, health bars, minimaps, menus, quest markers, inventory, crosshairs)
+- Art style and graphics (realistic, stylized, pixel-art, cel-shaded, low-poly, photorealistic, retro, anime-style)
+- Game genre indicators (FPS, RPG, platformer, strategy, racing, fighting, adventure, simulation)
+- In-game environment (dungeon, city, battlefield, space, fantasy world, sci-fi setting)
+- Character models and player avatars (character design, armor, weapons, animations)
+- Visual effects (particle effects, lighting, shadows, post-processing, motion blur, depth of field)
+- Gameplay context (menu screen, combat, exploration, dialogue, cutscene, loading screen)
+- Graphics quality (resolution, anti-aliasing, texture detail, rendering quality)
+
+When describing gaming screenshots, include:
+- Specific UI elements visible (health bar, minimap, quest log, etc.)
+- Art style classification (photorealistic, stylized, pixel-art, etc.)
+- Game genre if identifiable
+- In-game setting and environment type
+- Character/player model details if visible
+- Visual effects and post-processing
+- Gameplay state (active gameplay, menu, cutscene)",
+        EnhanceExamples = new List<string>(),
+        RequiredOptionalFacts = new List<string> { "visible text", "subject 1", "themes", "color grade" },
+        OmittedOptionalFacts = new List<string> { "weather", "time", "era cues", "locale cues" }
     };
 }

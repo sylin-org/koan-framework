@@ -27,8 +27,8 @@ Return JSON in this format:
   ""tags"": [""tag1"",""tag2"",""tag3""],
   ""summary"": ""30–80 words describing subject, action, setting, lighting, and any evident aesthetics/themes."",
   ""facts"": {
-    ""type"": [""portrait"",""landscape"",""still-life"",""product"",""food"",""screenshot"",""architecture"",""wildlife"",""macro"",""abstract"",""other""],
-    ""style"": [""photography"",""painting"",""digital-art"",""illustration"",""abstract"",""ingame-screenshot"",""other""],
+    ""type"": [""portrait"",""landscape"",""still-life"",""product"",""food"",""ingame-screenshot"",""architecture"",""wildlife"",""macro"",""abstract"",""other""],
+    ""style"": [""photography"",""painting"",""digital-art"",""illustration"",""3d-render"",""pixel-art"",""cel-shaded"",""game-graphics"",""other""],
     ""subject count"": [""no subjects"",""1 person"",""2 people"",""3+ people"",""single object"",""multiple items"",""animals""],
     ""composition"": [""centered"",""rule-of-thirds"",""symmetrical"",""diagonal"",""leading-lines"",""framed"",""off-center"",""close-up"",""wide""],
     ""palette"": [""color1"",""color2"",""color3""],
