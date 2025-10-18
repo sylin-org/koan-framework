@@ -581,11 +581,13 @@ export class LightboxPanel {
   async toggleFactLock(factKey, btnElement) {
     if (!this.currentPhotoData || !this.currentPhotoData.id) return;
 
+    const factRow = btnElement.closest('.fact-row');
     const isCurrentlyLocked = btnElement.classList.contains('locked');
 
     // Optimistic UI update
     btnElement.classList.toggle('locked');
     btnElement.setAttribute('aria-label', `${!isCurrentlyLocked ? 'Unlock' : 'Lock'} ${factKey}`);
+    factRow.setAttribute('data-locked', !isCurrentlyLocked);
 
     // Update SVG icon
     const svg = btnElement.querySelector('svg');
@@ -611,6 +613,7 @@ export class LightboxPanel {
       const serverIsLocked = response.isLocked;
       btnElement.classList.toggle('locked', serverIsLocked);
       btnElement.setAttribute('aria-label', `${serverIsLocked ? 'Unlock' : 'Lock'} ${factKey}`);
+      factRow.setAttribute('data-locked', serverIsLocked);
       svg.innerHTML = serverIsLocked ? lockedIcon : unlockedIcon;
 
     } catch (error) {
@@ -619,6 +622,7 @@ export class LightboxPanel {
       // Revert UI on error
       btnElement.classList.toggle('locked', isCurrentlyLocked);
       btnElement.setAttribute('aria-label', `${isCurrentlyLocked ? 'Unlock' : 'Lock'} ${factKey}`);
+      factRow.setAttribute('data-locked', isCurrentlyLocked);
       svg.innerHTML = isCurrentlyLocked ? lockedIcon : unlockedIcon;
 
       this.app.components.toast.show('Failed to toggle lock', { icon: '⚠️', type: 'error' });
