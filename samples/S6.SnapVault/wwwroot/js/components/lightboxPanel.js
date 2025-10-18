@@ -436,16 +436,6 @@ export class LightboxPanel {
            role="row">
         <span class="fact-label" role="rowheader">
           ${this.escapeHtml(label)}
-          <button class="lock-btn ${isLocked ? 'locked' : ''}"
-                  data-fact-key="${this.escapeHtml(label)}"
-                  aria-label="${isLocked ? 'Unlock' : 'Lock'} ${this.escapeHtml(label)}"
-                  title="Click to ${isLocked ? 'unlock' : 'lock'} this fact">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              ${isLocked
-                ? '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path>'
-                : '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 9.9-1"></path>'}
-            </svg>
-          </button>
         </span>
         <div class="fact-values" role="cell">
           ${values.map(v => `
@@ -454,6 +444,16 @@ export class LightboxPanel {
             </span>
           `).join('')}
         </div>
+        <button class="lock-btn ${isLocked ? 'locked' : ''}"
+                data-fact-key="${this.escapeHtml(label)}"
+                aria-label="${isLocked ? 'Unlock' : 'Lock'} ${this.escapeHtml(label)}"
+                title="Click to ${isLocked ? 'unlock' : 'lock'} this fact">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            ${isLocked
+              ? '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path>'
+              : '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 9.9-1"></path>'}
+          </svg>
+        </button>
       </div>
     `;
   }
@@ -581,44 +581,37 @@ export class LightboxPanel {
   async toggleFactLock(factKey, btnElement) {
     if (!this.currentPhotoData || !this.currentPhotoData.id) return;
 
-    const factRow = btnElement.closest('.fact-row');
     const isCurrentlyLocked = btnElement.classList.contains('locked');
-    const newLockedState = !isCurrentlyLocked;
 
     // Optimistic UI update
-    btnElement.classList.toggle('locked', newLockedState);
-    btnElement.setAttribute('aria-label', `${newLockedState ? 'Unlock' : 'Lock'} ${factKey}`);
+    btnElement.classList.toggle('locked');
+    btnElement.setAttribute('aria-label', `${!isCurrentlyLocked ? 'Unlock' : 'Lock'} ${factKey}`);
 
     // Update SVG icon
     const svg = btnElement.querySelector('svg');
-    if (newLockedState) {
-      svg.innerHTML = '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path>';
-    } else {
-      svg.innerHTML = '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 9.9-1"></path>';
-    }
+    const lockedIcon = '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path>';
+    const unlockedIcon = '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 9.9-1"></path>';
+    svg.innerHTML = !isCurrentlyLocked ? lockedIcon : unlockedIcon;
 
     try {
-      // Call API to persist lock state
-      await this.app.api.post(
-        `/api/photos/${this.currentPhotoData.id}/facts/${encodeURIComponent(factKey)}/lock`,
-        { lock: newLockedState }
+      // Call toggle API endpoint
+      const response = await this.app.api.post(
+        `/api/photos/${this.currentPhotoData.id}/facts/${encodeURIComponent(factKey)}/toggle-lock`
       );
 
-      // Update current photo data
+      // Sync with server response to handle multi-tab scenarios
       if (!this.currentPhotoData.aiAnalysis.lockedFactKeys) {
         this.currentPhotoData.aiAnalysis.lockedFactKeys = [];
       }
 
-      if (newLockedState) {
-        if (!this.currentPhotoData.aiAnalysis.lockedFactKeys.includes(factKey)) {
-          this.currentPhotoData.aiAnalysis.lockedFactKeys.push(factKey);
-        }
-      } else {
-        const index = this.currentPhotoData.aiAnalysis.lockedFactKeys.indexOf(factKey);
-        if (index > -1) {
-          this.currentPhotoData.aiAnalysis.lockedFactKeys.splice(index, 1);
-        }
-      }
+      // Update entire locked facts list from server response
+      this.currentPhotoData.aiAnalysis.lockedFactKeys = response.lockedFactKeys || [];
+
+      // Ensure UI is in sync with server state
+      const serverIsLocked = response.isLocked;
+      btnElement.classList.toggle('locked', serverIsLocked);
+      btnElement.setAttribute('aria-label', `${serverIsLocked ? 'Unlock' : 'Lock'} ${factKey}`);
+      svg.innerHTML = serverIsLocked ? lockedIcon : unlockedIcon;
 
     } catch (error) {
       console.error('Failed to toggle fact lock:', error);
@@ -626,14 +619,9 @@ export class LightboxPanel {
       // Revert UI on error
       btnElement.classList.toggle('locked', isCurrentlyLocked);
       btnElement.setAttribute('aria-label', `${isCurrentlyLocked ? 'Unlock' : 'Lock'} ${factKey}`);
+      svg.innerHTML = isCurrentlyLocked ? lockedIcon : unlockedIcon;
 
-      if (isCurrentlyLocked) {
-        svg.innerHTML = '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path>';
-      } else {
-        svg.innerHTML = '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 9.9-1"></path>';
-      }
-
-      this.app.components.toast.show('Failed to lock fact', { icon: '⚠️', type: 'error' });
+      this.app.components.toast.show('Failed to toggle lock', { icon: '⚠️', type: 'error' });
     }
   }
 
