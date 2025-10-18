@@ -24,4 +24,10 @@ public interface IPhotoProcessingService
     /// </summary>
     /// <param name="alpha">Search mode: 0.0 = pure keyword, 1.0 = pure semantic, 0.5 = hybrid</param>
     Task<List<PhotoAsset>> SemanticSearchAsync(string query, string? eventId = null, double alpha = 0.5, int topK = 20, CancellationToken ct = default);
+
+    /// <summary>
+    /// Regenerate AI analysis for a photo while preserving locked facts
+    /// Used for "reroll with holds" mechanic - users can lock specific facts and reroll the rest
+    /// </summary>
+    Task<PhotoAsset> RegenerateAIAnalysisAsync(string photoId, CancellationToken ct = default);
 }

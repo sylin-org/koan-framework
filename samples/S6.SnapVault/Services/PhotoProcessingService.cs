@@ -777,4 +777,71 @@ Analyze the image and return the JSON now.";
             _logger.LogWarning(ex, "Failed to update event photo count for {EventId}", eventId);
         }
     }
+
+    /// <summary>
+    /// Regenerate AI analysis for a photo while preserving locked facts
+    /// "Reroll with holds" mechanic - locked facts are buffered and reapplied after regeneration
+    /// </summary>
+    public async Task<PhotoAsset> RegenerateAIAnalysisAsync(string photoId, CancellationToken ct = default)
+    {
+        _logger.LogInformation("Regenerating AI analysis for photo {PhotoId}", photoId);
+
+        var photo = await PhotoAsset.Get(photoId, ct);
+        if (photo == null)
+        {
+            throw new InvalidOperationException($"Photo {photoId} not found");
+        }
+
+        // 1. Buffer locked facts before regeneration
+        var lockedFacts = new Dictionary<string, string>();
+        var lockedFactKeys = new HashSet<string>();
+
+        if (photo.AiAnalysis?.LockedFactKeys != null)
+        {
+            lockedFactKeys = new HashSet<string>(photo.AiAnalysis.LockedFactKeys);
+
+            foreach (var key in lockedFactKeys)
+            {
+                if (photo.AiAnalysis.Facts.ContainsKey(key))
+                {
+                    lockedFacts[key] = photo.AiAnalysis.Facts[key];
+                    _logger.LogDebug("Buffered locked fact: {FactKey} = {FactValue}", key, lockedFacts[key]);
+                }
+            }
+        }
+
+        // 2. Regenerate AI analysis (this will replace photo.AiAnalysis)
+        await GenerateDetailedDescriptionAsync(photo, ct);
+
+        // 3. Restore locked facts (overwrite AI-generated values for locked keys)
+        if (photo.AiAnalysis != null && lockedFacts.Count > 0)
+        {
+            foreach (var (key, value) in lockedFacts)
+            {
+                photo.AiAnalysis.Facts[key] = value;
+                _logger.LogDebug("Restored locked fact: {FactKey} = {FactValue}", key, value);
+            }
+
+            // Restore locked keys set
+            photo.AiAnalysis.LockedFactKeys = lockedFactKeys;
+        }
+
+        // 4. Regenerate embedding with the merged facts
+        var embeddingText = BuildEmbeddingText(photo);
+        var embedding = await Koan.AI.Ai.Embed(embeddingText, ct);
+
+        var vectorMetadata = new Dictionary<string, object>
+        {
+            ["originalFileName"] = photo.OriginalFileName,
+            ["eventId"] = photo.EventId,
+            ["searchText"] = embeddingText
+        };
+
+        await Data<PhotoAsset, string>.SaveWithVector(photo, embedding, vectorMetadata, ct);
+
+        _logger.LogInformation("AI analysis regenerated for photo {PhotoId} with {LockedCount} locked facts preserved",
+            photoId, lockedFacts.Count);
+
+        return photo;
+    }
 }

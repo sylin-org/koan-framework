@@ -40,6 +40,14 @@ export class LightboxKeyboard {
     this.register('D', () => this.lightbox.actions?.download());
     this.register('Delete', () => this.lightbox.actions?.deletePhoto());
 
+    // AI Analysis (fact lock shortcuts)
+    this.register('r', () => this.handleRegenerateAI());
+    this.register('R', () => this.handleRegenerateAI());
+    this.register('l', () => this.handleLockAllFacts());
+    this.register('L', () => this.handleLockAllFacts());
+    this.register('u', () => this.handleUnlockAllFacts());
+    this.register('U', () => this.handleUnlockAllFacts());
+
     // Rating (1-5 already handled in lightbox.js)
     // Help
     this.register('?', () => this.toggleHelpOverlay());
@@ -160,6 +168,59 @@ export class LightboxKeyboard {
     zoom.apply();
   }
 
+  async handleRegenerateAI() {
+    if (this.lightbox.panel && this.lightbox.panel.isOpen) {
+      await this.lightbox.panel.regenerateAIAnalysis();
+    }
+  }
+
+  async handleLockAllFacts() {
+    if (!this.lightbox.currentPhoto || !this.lightbox.currentPhoto.id) return;
+    if (!this.lightbox.currentPhoto.aiAnalysis) return;
+
+    try {
+      const api = this.lightbox.app.api;
+      await api.post(`/api/photos/${this.lightbox.currentPhoto.id}/facts/lock-all`);
+
+      // Update local state
+      const allFactKeys = Object.keys(this.lightbox.currentPhoto.aiAnalysis.facts);
+      this.lightbox.currentPhoto.aiAnalysis.lockedFactKeys = allFactKeys;
+
+      // Re-render panel if open
+      if (this.lightbox.panel && this.lightbox.panel.isOpen) {
+        this.lightbox.panel.render(this.lightbox.currentPhoto);
+      }
+
+      this.lightbox.app.components.toast.show(`Locked ${allFactKeys.length} facts`, { icon: '🔒', type: 'success' });
+    } catch (error) {
+      console.error('Failed to lock all facts:', error);
+      this.lightbox.app.components.toast.show('Failed to lock all facts', { icon: '⚠️', type: 'error' });
+    }
+  }
+
+  async handleUnlockAllFacts() {
+    if (!this.lightbox.currentPhoto || !this.lightbox.currentPhoto.id) return;
+    if (!this.lightbox.currentPhoto.aiAnalysis) return;
+
+    try {
+      const api = this.lightbox.app.api;
+      await api.post(`/api/photos/${this.lightbox.currentPhoto.id}/facts/unlock-all`);
+
+      // Update local state
+      this.lightbox.currentPhoto.aiAnalysis.lockedFactKeys = [];
+
+      // Re-render panel if open
+      if (this.lightbox.panel && this.lightbox.panel.isOpen) {
+        this.lightbox.panel.render(this.lightbox.currentPhoto);
+      }
+
+      this.lightbox.app.components.toast.show('Unlocked all facts', { icon: '🔓', type: 'success' });
+    } catch (error) {
+      console.error('Failed to unlock all facts:', error);
+      this.lightbox.app.components.toast.show('Failed to unlock all facts', { icon: '⚠️', type: 'error' });
+    }
+  }
+
   toggleHelpOverlay() {
     this.helpOverlayOpen = !this.helpOverlayOpen;
 
@@ -215,6 +276,16 @@ export class LightboxKeyboard {
               <div><kbd>S</kbd> Toggle favorite</div>
               <div><kbd>D</kbd> Download photo</div>
               <div><kbd>Delete</kbd> Delete photo</div>
+            </div>
+          </div>
+
+          <div class="help-section">
+            <h3>AI Analysis</h3>
+            <div class="help-shortcuts">
+              <div><kbd>R</kbd> Regenerate (reroll unlocked facts)</div>
+              <div><kbd>L</kbd> Lock all facts</div>
+              <div><kbd>U</kbd> Unlock all facts</div>
+              <div>or click fact cards to lock/unlock</div>
             </div>
           </div>
 

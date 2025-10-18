@@ -239,6 +239,7 @@ public class PhotosController : EntityController<PhotoAsset>
 
     /// <summary>
     /// Regenerate AI description and embedding for a photo
+    /// DEPRECATED: Use /regenerate-ai-analysis instead for better lock support
     /// </summary>
     [HttpPost("{id}/regenerate-ai")]
     public async Task<ActionResult> RegenerateAI(string id, CancellationToken ct = default)
@@ -274,6 +275,134 @@ public class PhotosController : EntityController<PhotoAsset>
         }, CancellationToken.None);
 
         return Ok(new { Message = "AI regeneration started in background", PhotoId = id });
+    }
+
+    /// <summary>
+    /// Regenerate AI analysis for a photo while preserving locked facts
+    /// "Reroll with holds" - locked facts are preserved during regeneration
+    /// </summary>
+    [HttpPost("{id}/regenerate-ai-analysis")]
+    public async Task<ActionResult<PhotoAsset>> RegenerateAIAnalysis(string id, CancellationToken ct = default)
+    {
+        try
+        {
+            var photo = await _processingService.RegenerateAIAnalysisAsync(id, ct);
+            return Ok(photo);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return NotFound(new { Error = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to regenerate AI analysis for photo {PhotoId}", id);
+            return StatusCode(500, new { Error = "Failed to regenerate AI analysis", Details = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Lock or unlock a specific fact in the AI analysis
+    /// </summary>
+    [HttpPost("{id}/facts/{factKey}/lock")]
+    public async Task<ActionResult> LockFact(string id, string factKey, [FromBody] LockFactRequest request, CancellationToken ct = default)
+    {
+        var photo = await PhotoAsset.Get(id, ct);
+        if (photo == null)
+        {
+            return NotFound();
+        }
+
+        if (photo.AiAnalysis == null)
+        {
+            return BadRequest(new { Error = "Photo has no AI analysis" });
+        }
+
+        // Validate fact key exists
+        if (!photo.AiAnalysis.Facts.ContainsKey(factKey))
+        {
+            return BadRequest(new { Error = $"Fact key '{factKey}' not found in analysis" });
+        }
+
+        // Update lock state
+        if (request.Lock)
+        {
+            photo.AiAnalysis.LockedFactKeys.Add(factKey);
+            _logger.LogInformation("Locked fact {FactKey} for photo {PhotoId}", factKey, id);
+        }
+        else
+        {
+            photo.AiAnalysis.LockedFactKeys.Remove(factKey);
+            _logger.LogInformation("Unlocked fact {FactKey} for photo {PhotoId}", factKey, id);
+        }
+
+        await photo.Save(ct);
+
+        return Ok(new
+        {
+            FactKey = factKey,
+            IsLocked = photo.AiAnalysis.LockedFactKeys.Contains(factKey),
+            LockedFactKeys = photo.AiAnalysis.LockedFactKeys
+        });
+    }
+
+    /// <summary>
+    /// Lock all facts in the AI analysis
+    /// </summary>
+    [HttpPost("{id}/facts/lock-all")]
+    public async Task<ActionResult> LockAllFacts(string id, CancellationToken ct = default)
+    {
+        var photo = await PhotoAsset.Get(id, ct);
+        if (photo == null)
+        {
+            return NotFound();
+        }
+
+        if (photo.AiAnalysis == null)
+        {
+            return BadRequest(new { Error = "Photo has no AI analysis" });
+        }
+
+        // Lock all existing fact keys
+        photo.AiAnalysis.LockedFactKeys = new HashSet<string>(photo.AiAnalysis.Facts.Keys);
+        await photo.Save(ct);
+
+        _logger.LogInformation("Locked all {Count} facts for photo {PhotoId}", photo.AiAnalysis.LockedFactKeys.Count, id);
+
+        return Ok(new
+        {
+            LockedCount = photo.AiAnalysis.LockedFactKeys.Count,
+            LockedFactKeys = photo.AiAnalysis.LockedFactKeys
+        });
+    }
+
+    /// <summary>
+    /// Unlock all facts in the AI analysis
+    /// </summary>
+    [HttpPost("{id}/facts/unlock-all")]
+    public async Task<ActionResult> UnlockAllFacts(string id, CancellationToken ct = default)
+    {
+        var photo = await PhotoAsset.Get(id, ct);
+        if (photo == null)
+        {
+            return NotFound();
+        }
+
+        if (photo.AiAnalysis == null)
+        {
+            return BadRequest(new { Error = "Photo has no AI analysis" });
+        }
+
+        var previousCount = photo.AiAnalysis.LockedFactKeys.Count;
+        photo.AiAnalysis.LockedFactKeys.Clear();
+        await photo.Save(ct);
+
+        _logger.LogInformation("Unlocked all {Count} facts for photo {PhotoId}", previousCount, id);
+
+        return Ok(new
+        {
+            UnlockedCount = previousCount,
+            LockedFactKeys = photo.AiAnalysis.LockedFactKeys
+        });
     }
 
     /// <summary>
@@ -597,6 +726,11 @@ public class SearchRequest
 public class RateRequest
 {
     public int Rating { get; set; }
+}
+
+public class LockFactRequest
+{
+    public bool Lock { get; set; }
 }
 
 public class SearchResponse

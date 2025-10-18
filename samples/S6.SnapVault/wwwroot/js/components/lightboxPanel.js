@@ -318,7 +318,10 @@ export class LightboxPanel {
         <!-- Facts table with pill values -->
         ${analysis.facts && Object.keys(analysis.facts).length > 0 ? `
           <div class="ai-facts" role="table" aria-label="Photo details">
-            ${Object.entries(analysis.facts).map(([key, value]) => this.renderFactRow(key, value)).join('')}
+            ${Object.entries(analysis.facts).map(([key, value]) => {
+              const isLocked = analysis.lockedFactKeys && analysis.lockedFactKeys.includes(key);
+              return this.renderFactRow(key, value, isLocked);
+            }).join('')}
           </div>
         ` : ''}
 
@@ -342,12 +345,28 @@ export class LightboxPanel {
         });
       });
 
+      // Add fact card click handlers for locking/unlocking
+      aiContent.querySelectorAll('.fact-card').forEach(card => {
+        const factKey = card.dataset.factKey;
+
+        // Click handler
+        card.addEventListener('click', async (e) => {
+          await this.toggleFactLock(factKey, card);
+        });
+
+        // Keyboard handler
+        card.addEventListener('keydown', async (e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            await this.toggleFactLock(factKey, card);
+          }
+        });
+      });
+
       // Regenerate button handler
       const newRegenerateBtn = aiContent.querySelector('#btn-regenerate-new');
-      newRegenerateBtn.addEventListener('click', () => {
-        if (this.lightbox.actions) {
-          this.lightbox.actions.regenerateAI();
-        }
+      newRegenerateBtn.addEventListener('click', async () => {
+        await this.regenerateAIAnalysis();
       });
 
       return;
@@ -414,16 +433,25 @@ export class LightboxPanel {
     return div.innerHTML;
   }
 
-  renderFactRow(label, value) {
+  renderFactRow(label, value, isLocked = false) {
     // Split comma-separated values into individual pills
     const values = value.split(',').map(v => v.trim()).filter(v => v.length > 0);
 
     return `
-      <div class="fact-row" role="row">
-        <span class="fact-label" role="rowheader">${this.escapeHtml(label)}</span>
+      <div class="fact-card ${isLocked ? 'locked' : 'unlocked'}"
+           data-fact-key="${this.escapeHtml(label)}"
+           data-locked="${isLocked}"
+           role="button"
+           tabindex="0"
+           aria-pressed="${isLocked}"
+           aria-label="${this.escapeHtml(label)}: ${this.escapeHtml(value)}. Click to ${isLocked ? 'unlock' : 'lock'} this fact.">
+        <div class="fact-header">
+          <span class="fact-label" role="rowheader">${this.escapeHtml(label)}</span>
+          <span class="lock-indicator" aria-hidden="true">${isLocked ? '🔒' : '🔓'}</span>
+        </div>
         <div class="fact-values" role="cell">
           ${values.map(v => `
-            <span class="fact-pill" data-fact-type="${this.escapeHtml(label)}" data-fact-value="${this.escapeHtml(v)}">
+            <span class="value-tag" data-fact-type="${this.escapeHtml(label)}" data-fact-value="${this.escapeHtml(v)}">
               ${this.escapeHtml(v)}
             </span>
           `).join('')}
@@ -549,6 +577,103 @@ export class LightboxPanel {
       this.close();
     } else {
       this.open();
+    }
+  }
+
+  async toggleFactLock(factKey, cardElement) {
+    if (!this.currentPhotoData || !this.currentPhotoData.id) return;
+
+    const isCurrentlyLocked = cardElement.dataset.locked === 'true';
+    const newLockedState = !isCurrentlyLocked;
+
+    // Optimistic UI update
+    cardElement.classList.add('locking');
+    cardElement.dataset.locked = newLockedState;
+    cardElement.classList.toggle('locked', newLockedState);
+    cardElement.classList.toggle('unlocked', !newLockedState);
+    cardElement.setAttribute('aria-pressed', newLockedState);
+
+    // Update lock indicator
+    const lockIndicator = cardElement.querySelector('.lock-indicator');
+    lockIndicator.textContent = newLockedState ? '🔒' : '🔓';
+
+    try {
+      // Call API to persist lock state
+      const response = await this.app.api.post(
+        `/api/photos/${this.currentPhotoData.id}/facts/${encodeURIComponent(factKey)}/lock`,
+        { lock: newLockedState }
+      );
+
+      // Update current photo data
+      if (!this.currentPhotoData.aiAnalysis.lockedFactKeys) {
+        this.currentPhotoData.aiAnalysis.lockedFactKeys = [];
+      }
+
+      if (newLockedState) {
+        if (!this.currentPhotoData.aiAnalysis.lockedFactKeys.includes(factKey)) {
+          this.currentPhotoData.aiAnalysis.lockedFactKeys.push(factKey);
+        }
+      } else {
+        const index = this.currentPhotoData.aiAnalysis.lockedFactKeys.indexOf(factKey);
+        if (index > -1) {
+          this.currentPhotoData.aiAnalysis.lockedFactKeys.splice(index, 1);
+        }
+      }
+
+      // Remove animation class
+      setTimeout(() => cardElement.classList.remove('locking'), 300);
+
+    } catch (error) {
+      console.error('Failed to toggle fact lock:', error);
+
+      // Revert UI on error
+      cardElement.dataset.locked = isCurrentlyLocked;
+      cardElement.classList.toggle('locked', isCurrentlyLocked);
+      cardElement.classList.toggle('unlocked', !isCurrentlyLocked);
+      cardElement.setAttribute('aria-pressed', isCurrentlyLocked);
+      lockIndicator.textContent = isCurrentlyLocked ? '🔒' : '🔓';
+      cardElement.classList.remove('locking');
+
+      this.app.components.toast.show('Failed to lock fact', { icon: '⚠️', type: 'error' });
+    }
+  }
+
+  async regenerateAIAnalysis() {
+    if (!this.currentPhotoData || !this.currentPhotoData.id) return;
+
+    const regenerateBtn = this.container.querySelector('#btn-regenerate-new');
+    if (!regenerateBtn) return;
+
+    // Show loading state
+    regenerateBtn.disabled = true;
+    regenerateBtn.classList.add('loading');
+    const originalText = regenerateBtn.querySelector('.action-label').textContent;
+    regenerateBtn.querySelector('.action-label').textContent = 'Regenerating...';
+
+    try {
+      this.app.components.toast.show('Regenerating AI analysis...', { icon: '🎲', duration: 2000 });
+
+      // Call new regenerate endpoint that preserves locked facts
+      const updatedPhoto = await this.app.api.post(
+        `/api/photos/${this.currentPhotoData.id}/regenerate-ai-analysis`
+      );
+
+      // Update current photo data
+      this.currentPhotoData = updatedPhoto;
+
+      // Re-render AI insights
+      this.renderAIInsights(updatedPhoto);
+
+      this.app.components.toast.show('AI analysis regenerated!', { icon: '✨', type: 'success' });
+
+    } catch (error) {
+      console.error('Failed to regenerate AI analysis:', error);
+      this.app.components.toast.show('Failed to regenerate AI analysis', { icon: '⚠️', type: 'error' });
+
+      // Restore button state
+      regenerateBtn.disabled = false;
+      regenerateBtn.classList.remove('loading');
+      regenerateBtn.querySelector('.action-label').textContent = originalText;
     }
   }
 

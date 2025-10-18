@@ -30,6 +30,13 @@ public class AiAnalysis
     public Dictionary<string, string> Facts { get; set; } = new();
 
     /// <summary>
+    /// Fact keys that are locked and should be preserved during AI regeneration
+    /// Used for "reroll with holds" mechanic - users can lock specific facts and reroll the rest
+    /// </summary>
+    [JsonPropertyName("lockedFactKeys")]
+    public HashSet<string> LockedFactKeys { get; set; } = new();
+
+    /// <summary>
     /// Converts analysis to embedding text for vector search
     /// Format: "tag1, tag2, tag3, summary sentence, fact1-value, fact2-value, ..."
     /// </summary>
