@@ -325,13 +325,34 @@
   transform: translateY(0);
 }
 
+/* AI Summary Container with Lock Button */
+.ai-summary-container {
+  margin: 0 0 24px;
+}
+
+.summary-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.summary-header h4 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: rgba(255, 255, 255, 0.45);
+}
+
 /* AI Summary Box - Hero Treatment */
 .ai-summary {
   padding: 20px 18px;
   background: rgba(59, 130, 246, 0.08);
   border-left: 4px solid rgba(59, 130, 246, 0.6);
   border-radius: 6px;
-  margin: 0 0 24px;
+  transition: all 200ms ease;
 }
 
 .ai-summary p {
@@ -340,6 +361,16 @@
   line-height: 1.7;
   color: rgba(255, 255, 255, 0.98);
   font-weight: 400;
+}
+
+/* Locked summary state - subtle gold warmth */
+.ai-summary.locked {
+  background: rgba(212, 175, 55, 0.08);
+  border-left-color: rgba(212, 175, 55, 0.5);
+}
+
+.ai-summary.locked p {
+  color: rgba(255, 255, 255, 1);
 }
 
 /* AI Facts Table - Compact & Dense */

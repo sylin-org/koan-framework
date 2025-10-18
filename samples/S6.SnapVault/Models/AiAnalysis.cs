@@ -22,6 +22,13 @@ public class AiAnalysis
     public string Summary { get; set; } = "";
 
     /// <summary>
+    /// Whether the summary is locked and should be preserved during AI regeneration
+    /// Part of "reroll with holds" mechanic - users can lock the summary and regenerate facts/tags
+    /// </summary>
+    [JsonPropertyName("summaryLocked")]
+    public bool SummaryLocked { get; set; } = false;
+
+    /// <summary>
     /// Structured facts about the photo, displayable as a table
     /// Core facts: Type, Composition, Palette, Lighting
     /// Optional contextual facts based on photo type

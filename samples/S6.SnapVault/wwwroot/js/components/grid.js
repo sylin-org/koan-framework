@@ -9,9 +9,10 @@ export class PhotoGrid {
   constructor(app) {
     this.app = app;
     this.container = document.querySelector('.photo-grid');
+    this.scrollContainer = document.querySelector('.main-content');
     this.photoCards = new Map();
     this.observer = null;
-    this.infiniteScrollObserver = null;
+    this.scrollHandler = null;
     this.viewportWidth = window.innerWidth;
     this.devicePixelRatio = window.devicePixelRatio || 1;
     this.setupIntersectionObserver();
@@ -31,22 +32,39 @@ export class PhotoGrid {
     //
     // 2. Chrome Syntax (EXPERIMENTAL FLAG):
     //    - display: masonry
-    //    - Chrome behind #css-masonry-layout flag
+    //    - Chrome behind #enable-experimental-web-platform-features flag
     //    - Different property model, uses grid-column/grid-row
     //    - More details: https://www.w3.org/TR/css-grid-3/#masonry-model
     //
     // CURRENT IMPLEMENTATION:
-    // - Detects Firefox/Safari syntax (grid-template-rows: masonry)
-    // - Falls back to CSS columns for all other browsers (including Chrome)
-    // - Chrome users can enable flag and get native masonry via Firefox syntax
-    // - Future: May need to detect both syntaxes if Chrome ships different approach
+    // - Detects BOTH syntaxes (Firefox/Safari AND Chrome)
+    // - Applies appropriate CSS class for detected syntax
+    // - Falls back to CSS columns if neither is supported
     //
     // FALLBACK STRATEGY:
     // - CSS columns (column-count) provides graceful degradation
     // - All browsers get working masonry layout, just different ordering
 
-    this.supportsMasonry = CSS.supports('grid-template-rows', 'masonry');
-    console.log(`[Grid] CSS Masonry support: ${this.supportsMasonry ? 'Yes (native)' : 'No (using CSS columns fallback)'}`);
+    // Check for Firefox/Safari syntax first (stable implementation)
+    const supportsGridMasonry = CSS.supports('grid-template-rows', 'masonry');
+
+    // Check for Chrome syntax (experimental flag)
+    const supportsDisplayMasonry = CSS.supports('display', 'masonry');
+
+    // Determine which masonry mode to use
+    if (supportsGridMasonry) {
+      this.masonryMode = 'grid'; // Firefox/Safari
+      this.supportsMasonry = true;
+      console.log('[Grid] CSS Masonry support: Yes (Firefox/Safari syntax: grid-template-rows)');
+    } else if (supportsDisplayMasonry) {
+      this.masonryMode = 'display'; // Chrome
+      this.supportsMasonry = true;
+      console.log('[Grid] CSS Masonry support: Yes (Chrome syntax: display: masonry)');
+    } else {
+      this.masonryMode = null;
+      this.supportsMasonry = false;
+      console.log('[Grid] CSS Masonry support: No (using CSS columns fallback)');
+    }
   }
 
   setupViewportDetection() {
@@ -122,9 +140,15 @@ export class PhotoGrid {
     // Clear the photoCards map
     this.photoCards.clear();
 
-    // Apply CSS class based on masonry support
-    this.container.classList.toggle('masonry-native', this.supportsMasonry);
-    this.container.classList.toggle('masonry-fallback', !this.supportsMasonry);
+    // Apply CSS class based on masonry support and mode
+    this.container.classList.remove('masonry-grid', 'masonry-display', 'masonry-fallback');
+    if (this.masonryMode === 'grid') {
+      this.container.classList.add('masonry-grid');
+    } else if (this.masonryMode === 'display') {
+      this.container.classList.add('masonry-display');
+    } else {
+      this.container.classList.add('masonry-fallback');
+    }
 
     // Apply view preset to grid container
     const currentPreset = this.app.state.viewPreset || 'comfortable';
@@ -395,49 +419,87 @@ export class PhotoGrid {
 
   /**
    * Enable infinite scroll to load more photos when near bottom
+   * Uses scroll position detection instead of sentinel (masonry-compatible)
    */
   enableInfiniteScroll() {
-    // Disconnect existing observer if present
-    if (this.infiniteScrollObserver) {
-      this.infiniteScrollObserver.disconnect();
+    if (!this.scrollContainer) {
+      console.error('[Infinite Scroll] Could not find .main-content scroll container');
+      return;
     }
 
-    // Create sentinel element at the end of the grid
-    let sentinel = this.container.querySelector('.infinite-scroll-sentinel');
-    if (!sentinel) {
-      sentinel = document.createElement('div');
-      sentinel.className = 'infinite-scroll-sentinel';
-      sentinel.style.height = '1px';
-      sentinel.style.width = '100%';
-      this.container.appendChild(sentinel);
+    // Remove any existing scroll listener
+    if (this.scrollHandler) {
+      this.scrollContainer.removeEventListener('scroll', this.scrollHandler);
     }
 
-    // Observe when sentinel enters viewport
-    this.infiniteScrollObserver = new IntersectionObserver(
-      (entries) => {
-        entries.forEach(entry => {
-          if (entry.isIntersecting && this.app.state.hasMorePages && !this.app.state.loadingMore) {
-            console.log(`[Infinite Scroll] Sentinel visible - triggering load (400px margin)`);
-            this.app.loadMorePhotos();
-          }
-        });
-      },
-      {
-        rootMargin: '400px' // Trigger 400px before sentinel visible
+    // Remove old sentinel if it exists (from previous implementation)
+    const oldSentinel = this.container.querySelector('.infinite-scroll-sentinel');
+    if (oldSentinel) {
+      oldSentinel.remove();
+    }
+
+    // Create scroll handler with throttling - use arrow function to preserve 'this'
+    const checkScroll = () => {
+      const hasMorePages = this.app.state.hasMorePages;
+      const loadingMore = this.app.state.loadingMore;
+
+      if (!hasMorePages || loadingMore) return;
+
+      // Use scrollContainer measurements instead of window
+      const scrollTop = this.scrollContainer.scrollTop;
+      const scrollHeight = this.scrollContainer.scrollHeight;
+      const clientHeight = this.scrollContainer.clientHeight;
+
+      // Calculate distance from bottom
+      const distanceFromBottom = scrollHeight - (scrollTop + clientHeight);
+
+      // Trigger when within 400px of bottom
+      if (distanceFromBottom < 400) {
+        this.app.loadMorePhotos();
       }
-    );
+    };
 
-    this.infiniteScrollObserver.observe(sentinel);
-    console.log('[Infinite Scroll] Enabled with 400px preload margin');
+    this.scrollHandler = this.throttle(checkScroll, 200); // Throttle to every 200ms
+
+    this.scrollContainer.addEventListener('scroll', this.scrollHandler);
+    console.log('[Infinite Scroll] Enabled with scroll-based detection on .main-content (400px preload)');
+  }
+
+  /**
+   * Throttle function to limit execution rate
+   */
+  throttle(func, wait) {
+    let timeout = null;
+    let previous = 0;
+
+    return (...args) => {
+      const now = Date.now();
+      const remaining = wait - (now - previous);
+
+      if (remaining <= 0 || remaining > wait) {
+        if (timeout) {
+          clearTimeout(timeout);
+          timeout = null;
+        }
+        previous = now;
+        func(...args);
+      } else if (!timeout) {
+        timeout = setTimeout(() => {
+          previous = Date.now();
+          timeout = null;
+          func(...args);
+        }, remaining);
+      }
+    };
   }
 
   /**
    * Disable infinite scroll
    */
   disableInfiniteScroll() {
-    if (this.infiniteScrollObserver) {
-      this.infiniteScrollObserver.disconnect();
-      this.infiniteScrollObserver = null;
+    if (this.scrollHandler && this.scrollContainer) {
+      this.scrollContainer.removeEventListener('scroll', this.scrollHandler);
+      this.scrollHandler = null;
     }
   }
 }

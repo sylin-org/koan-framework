@@ -353,7 +353,38 @@ public class PhotosController : EntityController<PhotoAsset>
     }
 
     /// <summary>
-    /// Lock all facts in the AI analysis
+    /// Toggle lock state of the AI summary
+    /// Locked summaries are preserved during regeneration
+    /// </summary>
+    [HttpPost("{id}/summary/toggle-lock")]
+    public async Task<ActionResult> ToggleLockSummary(string id, CancellationToken ct = default)
+    {
+        var photo = await PhotoAsset.Get(id, ct);
+        if (photo == null)
+        {
+            return NotFound();
+        }
+
+        if (photo.AiAnalysis == null)
+        {
+            return BadRequest(new { Error = "Photo has no AI analysis" });
+        }
+
+        // Toggle lock state
+        photo.AiAnalysis.SummaryLocked = !photo.AiAnalysis.SummaryLocked;
+        await photo.Save(ct);
+
+        _logger.LogInformation("{Action} summary for photo {PhotoId}",
+            photo.AiAnalysis.SummaryLocked ? "Locked" : "Unlocked", id);
+
+        return Ok(new
+        {
+            SummaryLocked = photo.AiAnalysis.SummaryLocked
+        });
+    }
+
+    /// <summary>
+    /// Lock all content in the AI analysis (summary and facts)
     /// </summary>
     [HttpPost("{id}/facts/lock-all")]
     public async Task<ActionResult> LockAllFacts(string id, CancellationToken ct = default)
@@ -369,21 +400,25 @@ public class PhotosController : EntityController<PhotoAsset>
             return BadRequest(new { Error = "Photo has no AI analysis" });
         }
 
+        // Lock summary
+        photo.AiAnalysis.SummaryLocked = true;
+
         // Lock all existing fact keys (all keys are already lowercase)
         photo.AiAnalysis.LockedFactKeys = new HashSet<string>(photo.AiAnalysis.Facts.Keys);
         await photo.Save(ct);
 
-        _logger.LogInformation("Locked all {Count} facts for photo {PhotoId}", photo.AiAnalysis.LockedFactKeys.Count, id);
+        _logger.LogInformation("Locked summary and all {Count} facts for photo {PhotoId}", photo.AiAnalysis.LockedFactKeys.Count, id);
 
         return Ok(new
         {
+            SummaryLocked = photo.AiAnalysis.SummaryLocked,
             LockedCount = photo.AiAnalysis.LockedFactKeys.Count,
             LockedFactKeys = photo.AiAnalysis.LockedFactKeys
         });
     }
 
     /// <summary>
-    /// Unlock all facts in the AI analysis
+    /// Unlock all content in the AI analysis (summary and facts)
     /// </summary>
     [HttpPost("{id}/facts/unlock-all")]
     public async Task<ActionResult> UnlockAllFacts(string id, CancellationToken ct = default)
@@ -400,13 +435,19 @@ public class PhotosController : EntityController<PhotoAsset>
         }
 
         var previousCount = photo.AiAnalysis.LockedFactKeys.Count;
+
+        // Unlock summary
+        photo.AiAnalysis.SummaryLocked = false;
+
+        // Unlock facts
         photo.AiAnalysis.LockedFactKeys.Clear();
         await photo.Save(ct);
 
-        _logger.LogInformation("Unlocked all {Count} facts for photo {PhotoId}", previousCount, id);
+        _logger.LogInformation("Unlocked summary and all {Count} facts for photo {PhotoId}", previousCount, id);
 
         return Ok(new
         {
+            SummaryLocked = photo.AiAnalysis.SummaryLocked,
             UnlockedCount = previousCount,
             LockedFactKeys = photo.AiAnalysis.LockedFactKeys
         });

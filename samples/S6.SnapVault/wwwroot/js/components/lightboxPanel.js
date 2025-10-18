@@ -310,9 +310,24 @@ export class LightboxPanel {
           `).join('')}
         </div>
 
-        <!-- Summary (highlighted) -->
-        <div class="ai-summary" role="region" aria-label="Photo description">
-          <p>${this.escapeHtml(analysis.summary)}</p>
+        <!-- Summary with lock button -->
+        <div class="ai-summary-container">
+          <div class="summary-header">
+            <h4>Summary</h4>
+            <button class="lock-btn ${analysis.summaryLocked ? 'locked' : ''}"
+                    data-summary-lock
+                    aria-label="${analysis.summaryLocked ? 'Unlock' : 'Lock'} summary"
+                    title="Click to ${analysis.summaryLocked ? 'unlock' : 'lock'} this summary">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                ${analysis.summaryLocked
+                  ? '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path>'
+                  : '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 9.9-1"></path>'}
+              </svg>
+            </button>
+          </div>
+          <div class="ai-summary ${analysis.summaryLocked ? 'locked' : ''}" role="region" aria-label="Photo description">
+            <p>${this.escapeHtml(analysis.summary)}</p>
+          </div>
         </div>
 
         <!-- Facts table with pill values -->
@@ -347,13 +362,19 @@ export class LightboxPanel {
         });
       });
 
-      // Add lock button click handlers
+      // Add lock button click handlers (for both summary and facts)
       aiContent.querySelectorAll('.lock-btn').forEach(btn => {
         btn.addEventListener('click', async (e) => {
           e.stopPropagation();
-          // Get fact key and normalize to lowercase for API call
-          const factKey = btn.getAttribute('data-fact-key');
-          await this.toggleFactLock(factKey, btn);
+
+          // Check if this is a summary lock or fact lock
+          if (btn.hasAttribute('data-summary-lock')) {
+            await this.toggleSummaryLock(btn);
+          } else {
+            // Get fact key and normalize to lowercase for API call
+            const factKey = btn.getAttribute('data-fact-key');
+            await this.toggleFactLock(factKey, btn);
+          }
         });
       });
 
@@ -631,6 +652,52 @@ export class LightboxPanel {
       svg.innerHTML = isCurrentlyLocked ? lockedIcon : unlockedIcon;
 
       this.app.components.toast.show('Failed to toggle lock', { icon: '⚠️', type: 'error' });
+    }
+  }
+
+  async toggleSummaryLock(btnElement) {
+    if (!this.currentPhotoData || !this.currentPhotoData.id) return;
+
+    const summaryContainer = btnElement.closest('.ai-summary-container');
+    const summaryElement = summaryContainer.querySelector('.ai-summary');
+    const isCurrentlyLocked = btnElement.classList.contains('locked');
+
+    // Optimistic UI update
+    btnElement.classList.toggle('locked');
+    btnElement.setAttribute('aria-label', `${!isCurrentlyLocked ? 'Unlock' : 'Lock'} summary`);
+    summaryElement.classList.toggle('locked');
+
+    // Update SVG icon
+    const svg = btnElement.querySelector('svg');
+    const lockedIcon = '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path>';
+    const unlockedIcon = '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 9.9-1"></path>';
+    svg.innerHTML = !isCurrentlyLocked ? lockedIcon : unlockedIcon;
+
+    try {
+      // Call toggle API endpoint
+      const response = await this.app.api.post(
+        `/api/photos/${this.currentPhotoData.id}/summary/toggle-lock`
+      );
+
+      // Update local state from server response
+      this.currentPhotoData.aiAnalysis.summaryLocked = response.summaryLocked;
+
+      // Ensure UI is in sync with server state
+      btnElement.classList.toggle('locked', response.summaryLocked);
+      btnElement.setAttribute('aria-label', `${response.summaryLocked ? 'Unlock' : 'Lock'} summary`);
+      summaryElement.classList.toggle('locked', response.summaryLocked);
+      svg.innerHTML = response.summaryLocked ? lockedIcon : unlockedIcon;
+
+    } catch (error) {
+      console.error('Failed to toggle summary lock:', error);
+
+      // Revert UI on error
+      btnElement.classList.toggle('locked', isCurrentlyLocked);
+      btnElement.setAttribute('aria-label', `${isCurrentlyLocked ? 'Unlock' : 'Lock'} summary`);
+      summaryElement.classList.toggle('locked', isCurrentlyLocked);
+      svg.innerHTML = isCurrentlyLocked ? lockedIcon : unlockedIcon;
+
+      this.app.components.toast.show('Failed to toggle summary lock', { icon: '⚠️', type: 'error' });
     }
   }
 

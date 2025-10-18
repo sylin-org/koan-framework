@@ -810,8 +810,19 @@ Analyze the image and return the JSON now.";
             throw new InvalidOperationException($"Photo {photoId} not found");
         }
 
-        // 1. Buffer locked facts before regeneration
-        // All fact keys are now lowercase, so we can use direct dictionary access
+        // 1. Buffer locked content before regeneration
+        // Buffer locked summary
+        string? lockedSummary = null;
+        bool summaryWasLocked = false;
+
+        if (photo.AiAnalysis?.SummaryLocked == true)
+        {
+            lockedSummary = photo.AiAnalysis.Summary;
+            summaryWasLocked = true;
+            _logger.LogDebug("Buffered locked summary: {Summary}", lockedSummary);
+        }
+
+        // Buffer locked facts (all fact keys are lowercase, so we can use direct dictionary access)
         var lockedFacts = new Dictionary<string, string>();
 
         if (photo.AiAnalysis?.LockedFactKeys != null)
@@ -829,18 +840,30 @@ Analyze the image and return the JSON now.";
         // 2. Regenerate AI analysis (this will replace photo.AiAnalysis)
         await GenerateDetailedDescriptionAsync(photo, ct);
 
-        // 3. Restore locked facts (add them back if missing, overwrite if present)
-        if (photo.AiAnalysis != null && lockedFacts.Count > 0)
+        // 3. Restore locked content (add them back if missing, overwrite if present)
+        if (photo.AiAnalysis != null)
         {
-            foreach (var (factKey, value) in lockedFacts)
+            // Restore locked summary
+            if (summaryWasLocked && lockedSummary != null)
             {
-                // Add or overwrite the fact with the locked value
-                photo.AiAnalysis.Facts[factKey] = value;
-                _logger.LogDebug("Restored locked fact: {FactKey} = {FactValue}", factKey, value);
+                photo.AiAnalysis.Summary = lockedSummary;
+                photo.AiAnalysis.SummaryLocked = true;
+                _logger.LogDebug("Restored locked summary");
             }
 
-            // Restore locked keys set
-            photo.AiAnalysis.LockedFactKeys = new HashSet<string>(lockedFacts.Keys);
+            // Restore locked facts
+            if (lockedFacts.Count > 0)
+            {
+                foreach (var (factKey, value) in lockedFacts)
+                {
+                    // Add or overwrite the fact with the locked value
+                    photo.AiAnalysis.Facts[factKey] = value;
+                    _logger.LogDebug("Restored locked fact: {FactKey} = {FactValue}", factKey, value);
+                }
+
+                // Restore locked keys set
+                photo.AiAnalysis.LockedFactKeys = new HashSet<string>(lockedFacts.Keys);
+            }
         }
 
         // 4. Regenerate embedding with the merged facts
@@ -856,8 +879,19 @@ Analyze the image and return the JSON now.";
 
         await Data<PhotoAsset, string>.SaveWithVector(photo, embedding, vectorMetadata, ct);
 
-        _logger.LogInformation("AI analysis regenerated for photo {PhotoId} with {LockedCount} locked facts preserved",
-            photoId, lockedFacts.Count);
+        var lockedItems = new List<string>();
+        if (summaryWasLocked) lockedItems.Add("summary");
+        if (lockedFacts.Count > 0) lockedItems.Add($"{lockedFacts.Count} facts");
+
+        if (lockedItems.Count > 0)
+        {
+            _logger.LogInformation("AI analysis regenerated for photo {PhotoId} with locked {Items} preserved",
+                photoId, string.Join(" and ", lockedItems));
+        }
+        else
+        {
+            _logger.LogInformation("AI analysis regenerated for photo {PhotoId}", photoId);
+        }
 
         return photo;
     }
