@@ -345,21 +345,12 @@ export class LightboxPanel {
         });
       });
 
-      // Add fact card click handlers for locking/unlocking
-      aiContent.querySelectorAll('.fact-card').forEach(card => {
-        const factKey = card.dataset.factKey;
-
-        // Click handler
-        card.addEventListener('click', async (e) => {
-          await this.toggleFactLock(factKey, card);
-        });
-
-        // Keyboard handler
-        card.addEventListener('keydown', async (e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            await this.toggleFactLock(factKey, card);
-          }
+      // Add lock button click handlers
+      aiContent.querySelectorAll('.lock-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          const factKey = btn.dataset.factKey;
+          await this.toggleFactLock(factKey, btn);
         });
       });
 
@@ -438,20 +429,26 @@ export class LightboxPanel {
     const values = value.split(',').map(v => v.trim()).filter(v => v.length > 0);
 
     return `
-      <div class="fact-card ${isLocked ? 'locked' : 'unlocked'}"
+      <div class="fact-row"
            data-fact-key="${this.escapeHtml(label)}"
            data-locked="${isLocked}"
-           role="button"
-           tabindex="0"
-           aria-pressed="${isLocked}"
-           aria-label="${this.escapeHtml(label)}: ${this.escapeHtml(value)}. Click to ${isLocked ? 'unlock' : 'lock'} this fact.">
-        <div class="fact-header">
-          <span class="fact-label" role="rowheader">${this.escapeHtml(label)}</span>
-          <span class="lock-indicator" aria-hidden="true">${isLocked ? '🔒' : '🔓'}</span>
-        </div>
+           role="row">
+        <span class="fact-label" role="rowheader">
+          ${this.escapeHtml(label)}
+          <button class="lock-btn ${isLocked ? 'locked' : ''}"
+                  data-fact-key="${this.escapeHtml(label)}"
+                  aria-label="${isLocked ? 'Unlock' : 'Lock'} ${this.escapeHtml(label)}"
+                  title="Click to ${isLocked ? 'unlock' : 'lock'} this fact">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              ${isLocked
+                ? '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path>'
+                : '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 9.9-1"></path>'}
+            </svg>
+          </button>
+        </span>
         <div class="fact-values" role="cell">
           ${values.map(v => `
-            <span class="value-tag" data-fact-type="${this.escapeHtml(label)}" data-fact-value="${this.escapeHtml(v)}">
+            <span class="fact-pill" data-fact-type="${this.escapeHtml(label)}" data-fact-value="${this.escapeHtml(v)}">
               ${this.escapeHtml(v)}
             </span>
           `).join('')}
@@ -580,26 +577,28 @@ export class LightboxPanel {
     }
   }
 
-  async toggleFactLock(factKey, cardElement) {
+  async toggleFactLock(factKey, btnElement) {
     if (!this.currentPhotoData || !this.currentPhotoData.id) return;
 
-    const isCurrentlyLocked = cardElement.dataset.locked === 'true';
+    const factRow = btnElement.closest('.fact-row');
+    const isCurrentlyLocked = btnElement.classList.contains('locked');
     const newLockedState = !isCurrentlyLocked;
 
     // Optimistic UI update
-    cardElement.classList.add('locking');
-    cardElement.dataset.locked = newLockedState;
-    cardElement.classList.toggle('locked', newLockedState);
-    cardElement.classList.toggle('unlocked', !newLockedState);
-    cardElement.setAttribute('aria-pressed', newLockedState);
+    btnElement.classList.toggle('locked', newLockedState);
+    btnElement.setAttribute('aria-label', `${newLockedState ? 'Unlock' : 'Lock'} ${factKey}`);
 
-    // Update lock indicator
-    const lockIndicator = cardElement.querySelector('.lock-indicator');
-    lockIndicator.textContent = newLockedState ? '🔒' : '🔓';
+    // Update SVG icon
+    const svg = btnElement.querySelector('svg');
+    if (newLockedState) {
+      svg.innerHTML = '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path>';
+    } else {
+      svg.innerHTML = '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 9.9-1"></path>';
+    }
 
     try {
       // Call API to persist lock state
-      const response = await this.app.api.post(
+      await this.app.api.post(
         `/api/photos/${this.currentPhotoData.id}/facts/${encodeURIComponent(factKey)}/lock`,
         { lock: newLockedState }
       );
@@ -620,19 +619,18 @@ export class LightboxPanel {
         }
       }
 
-      // Remove animation class
-      setTimeout(() => cardElement.classList.remove('locking'), 300);
-
     } catch (error) {
       console.error('Failed to toggle fact lock:', error);
 
       // Revert UI on error
-      cardElement.dataset.locked = isCurrentlyLocked;
-      cardElement.classList.toggle('locked', isCurrentlyLocked);
-      cardElement.classList.toggle('unlocked', !isCurrentlyLocked);
-      cardElement.setAttribute('aria-pressed', isCurrentlyLocked);
-      lockIndicator.textContent = isCurrentlyLocked ? '🔒' : '🔓';
-      cardElement.classList.remove('locking');
+      btnElement.classList.toggle('locked', isCurrentlyLocked);
+      btnElement.setAttribute('aria-label', `${isCurrentlyLocked ? 'Unlock' : 'Lock'} ${factKey}`);
+
+      if (isCurrentlyLocked) {
+        svg.innerHTML = '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path>';
+      } else {
+        svg.innerHTML = '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 9.9-1"></path>';
+      }
 
       this.app.components.toast.show('Failed to lock fact', { icon: '⚠️', type: 'error' });
     }
