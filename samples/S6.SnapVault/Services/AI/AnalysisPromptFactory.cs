@@ -24,33 +24,33 @@ Guidelines:
 
 Return JSON in this format:
 {
-  ""tags"": [""tag1"",""tag2"",""...""],
+  ""tags"": [""tag1"",""tag2"",""tag3""],
   ""summary"": ""30–80 words describing subject, action, setting, lighting, and any evident aesthetics/themes."",
   ""facts"": {
-    ""type"": [""portrait"",""landscape"",""still-life"",""product"",""food"",""screenshot"",""architecture"",""wildlife"",""macro"",""abstract"",""other"",""...""],
-    ""style"": [""photography"",""painting"",""digital-art"",""illustration"",""abstract"",""ingame-screenshot"",""other"",""...""],
-    ""subject count"": [""no subjects"",""1 person"",""2 people"",""3+ people"",""single object"",""multiple items"",""animals"",""...""],
-    ""composition"": [""centered"",""rule-of-thirds"",""symmetrical"",""diagonal"",""leading-lines"",""framed"",""off-center"",""close-up"",""wide"",""...""],
-    ""palette"": [""color1"",""color2"",""color3"",""...""],
-    ""lighting"": [""overcast"",""golden-hour"",""studio"",""natural"",""soft"",""dramatic"",""backlit"",""low-key"",""high-key"",""neon"",""spotlit"",""...""],
-    ""setting"": [""indoor"",""outdoor"",""studio"",""urban"",""nature"",""...""],
-    ""mood"": [""mysterious"",""cheerful"",""serene"",""dramatic"",""playful"",""somber"",""energetic"",""contemplative"",""romantic"",""tense"",""...""],
-    ""themes"": [""b&w"",""film-noir"",""gothic-lolita"",""decora"",""western"",""60s"",""y2k"",""cyberpunk"",""minimalist"",""...""],
+    ""type"": [""portrait"",""landscape"",""still-life"",""product"",""food"",""screenshot"",""architecture"",""wildlife"",""macro"",""abstract"",""other""],
+    ""style"": [""photography"",""painting"",""digital-art"",""illustration"",""abstract"",""ingame-screenshot"",""other""],
+    ""subject count"": [""no subjects"",""1 person"",""2 people"",""3+ people"",""single object"",""multiple items"",""animals""],
+    ""composition"": [""centered"",""rule-of-thirds"",""symmetrical"",""diagonal"",""leading-lines"",""framed"",""off-center"",""close-up"",""wide""],
+    ""palette"": [""color1"",""color2"",""color3""],
+    ""lighting"": [""overcast"",""golden-hour"",""studio"",""natural"",""soft"",""dramatic"",""backlit"",""low-key"",""high-key"",""neon"",""spotlit""],
+    ""setting"": [""indoor"",""outdoor"",""studio"",""urban"",""nature""],
+    ""mood"": [""mysterious"",""cheerful"",""serene"",""dramatic"",""playful"",""somber"",""energetic"",""contemplative"",""romantic"",""tense""],
+    ""themes"": [""b&w"",""film-noir"",""gothic-lolita"",""decora"",""western"",""60s"",""y2k"",""cyberpunk"",""minimalist""],
 
     // Per-subject facts (arrays; MUST be present if at least one subject is shown):
-    // ""subject 1"": [""person"",""black-hoodie"",""smiling"",""looking-left"",""streetwear"",""...""],
-    // ""subject 2"": [""building"",""brick-facade"",""arched-windows"",""centered"",""...""],
-    // ""subject 3"": [""tree"",""bare-branches"",""midground"",""...""],
+    // ""subject 1"": [""person"",""black-hoodie"",""smiling"",""looking-left"",""streetwear""],
+    // ""subject 2"": [""building"",""brick-facade"",""arched-windows"",""centered""],
+    // ""subject 3"": [""tree"",""bare-branches"",""midground""],
 
     // Optional facts (arrays; only if clearly visible, omit otherwise; 2+ items per fact preferred if applicable):
-    // ""era cues"": [""1960s"",""disco"",""vintage"",""retro"",""silver-age"",""...""],
-    // ""color grade"": [""black-and-white"",""sepia"",""teal-orange"",""cool"",""warm"",""neutral"",""monochrome"",""duotone"",""...""],
-    // ""light sources"": [""sun"",""neon-signs"",""led-panels"",""...""],
-    // ""depth cues"": [""bokeh"",""shallow-focus"",""deep-focus"",""motion-blur"",""...""],
-    // ""atmospherics"": [""fog"",""haze"",""smoke"",""rain"",""snow"",""sparks"",""god-rays"",""dust"",""...""],
-    // ""locale cues"": [""architecture"",""props"",""vegetation"",""...""],
-    // ""time"": [""day"",""night"",""sunset"",""sunrise"",""...""],
-    // ""weather"": [""clear"",""overcast"",""rainy"",""snowy"",""indoor"",""...""],
+    // ""era cues"": [""1960s"",""disco"",""vintage"",""retro"",""silver-age""],
+    // ""color grade"": [""black-and-white"",""sepia"",""teal-orange"",""cool"",""warm"",""neutral"",""monochrome"",""duotone""],
+    // ""light sources"": [""sun"",""neon-signs"",""led-panels""],
+    // ""depth cues"": [""bokeh"",""shallow-focus"",""deep-focus"",""motion-blur""],
+    // ""atmospherics"": [""fog"",""haze"",""smoke"",""rain"",""snow"",""sparks"",""god-rays"",""dust""],
+    // ""locale cues"": [""architecture"",""props"",""vegetation""],
+    // ""time"": [""day"",""night"",""sunset"",""sunrise""],
+    // ""weather"": [""clear"",""overcast"",""rainy"",""snowy"",""indoor""],
     // ""visible text"": [""exact text if readable""]
   }
 }
@@ -125,8 +125,8 @@ Return ONLY the style name (lowercase), no explanation.";
         if (style.EnhanceExamples?.Contains("subject clothing") == true)
         {
             result = result.Replace(
-                @"""subject 1"": [""person"",""black-hoodie"",""smiling"",""looking-left"",""streetwear"",""...""]",
-                @"""subject 1"": [""person"",""joyful-expression"",""black-hoodie"",""red-headphones"",""relaxed-pose"",""looking-left"",""confident-demeanor"",""streetwear"",""...""]"
+                @"""subject 1"": [""person"",""black-hoodie"",""smiling"",""looking-left"",""streetwear""]",
+                @"""subject 1"": [""person"",""joyful-expression"",""black-hoodie"",""red-headphones"",""relaxed-pose"",""looking-left"",""confident-demeanor"",""streetwear""]"
             );
         }
 
@@ -134,8 +134,8 @@ Return ONLY the style name (lowercase), no explanation.";
         if (style.EnhanceExamples?.Contains("facial expressions") == true)
         {
             result = result.Replace(
-                @"""subject 1"": [""person"",""black-hoodie"",""smiling"",""looking-left"",""streetwear"",""...""]",
-                @"""subject 1"": [""person"",""smiling"",""joyful-expression"",""black-hoodie"",""looking-left"",""...""]"
+                @"""subject 1"": [""person"",""black-hoodie"",""smiling"",""looking-left"",""streetwear""]",
+                @"""subject 1"": [""person"",""smiling"",""joyful-expression"",""black-hoodie"",""looking-left""]"
             );
         }
 
@@ -143,8 +143,8 @@ Return ONLY the style name (lowercase), no explanation.";
         if (style.EnhanceExamples?.Contains("composition details") == true)
         {
             result = result.Replace(
-                @"""composition"": [""centered"",""rule-of-thirds"",""symmetrical"",""diagonal"",""leading-lines"",""framed"",""off-center"",""close-up"",""wide"",""...""]",
-                @"""composition"": [""centered"",""rule-of-thirds"",""symmetrical"",""diagonal"",""leading-lines"",""framed"",""off-center"",""close-up"",""wide"",""foreground-interest"",""depth-layers"",""golden-ratio"",""...""]"
+                @"""composition"": [""centered"",""rule-of-thirds"",""symmetrical"",""diagonal"",""leading-lines"",""framed"",""off-center"",""close-up"",""wide""]",
+                @"""composition"": [""centered"",""rule-of-thirds"",""symmetrical"",""diagonal"",""leading-lines"",""framed"",""off-center"",""close-up"",""wide"",""foreground-interest"",""depth-layers"",""golden-ratio""]"
             );
         }
 
@@ -152,8 +152,8 @@ Return ONLY the style name (lowercase), no explanation.";
         if (style.EnhanceExamples?.Contains("lighting setup") == true)
         {
             result = result.Replace(
-                @"""lighting"": [""overcast"",""golden-hour"",""studio"",""natural"",""soft"",""dramatic"",""backlit"",""low-key"",""high-key"",""neon"",""spotlit"",""...""]",
-                @"""lighting"": [""studio"",""three-point-lit"",""soft"",""even"",""product-lit"",""rim-light"",""key-light"",""fill-light"",""diffused"",""...""]"
+                @"""lighting"": [""overcast"",""golden-hour"",""studio"",""natural"",""soft"",""dramatic"",""backlit"",""low-key"",""high-key"",""neon"",""spotlit""]",
+                @"""lighting"": [""studio"",""three-point-lit"",""soft"",""even"",""product-lit"",""rim-light"",""key-light"",""fill-light"",""diffused""]"
             );
         }
 
@@ -161,8 +161,8 @@ Return ONLY the style name (lowercase), no explanation.";
         if (style.EnhanceExamples?.Contains("atmospherics") == true)
         {
             result = result.Replace(
-                @"""atmospherics"": [""fog"",""haze"",""smoke"",""rain"",""snow"",""sparks"",""god-rays"",""dust"",""...""]",
-                @"""atmospherics"": [""fog"",""haze"",""mist"",""clouds"",""rain"",""snow"",""god-rays"",""dust"",""morning-dew"",""...""]"
+                @"""atmospherics"": [""fog"",""haze"",""smoke"",""rain"",""snow"",""sparks"",""god-rays"",""dust""]",
+                @"""atmospherics"": [""fog"",""haze"",""mist"",""clouds"",""rain"",""snow"",""god-rays"",""dust"",""morning-dew""]"
             );
         }
 
