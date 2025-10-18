@@ -479,7 +479,15 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
             // Extract tags array
             if (json["tags"] is JArray tagsArray)
             {
-                analysis.Tags = tagsArray.ToObject<List<string>>() ?? new List<string>();
+                var tags = tagsArray.ToObject<List<string>>() ?? new List<string>();
+
+                // Deduplicate tags (case-insensitive) and remove empty values
+                analysis.Tags = tags
+                    .Select(t => t?.Trim())
+                    .Where(t => !string.IsNullOrWhiteSpace(t))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .Cast<string>()
+                    .ToList();
             }
 
             // Extract summary string
@@ -496,23 +504,33 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
                 foreach (var property in factsObject.Properties())
                 {
                     var value = property.Value;
+                    // Normalize fact key to lowercase
+                    var normalizedKey = property.Name.ToLowerInvariant();
 
                     // Facts are now arrays - convert to comma-separated string for storage
                     if (value.Type == JTokenType.Array)
                     {
                         var arrayValues = value.ToObject<List<string>>() ?? new List<string>();
-                        analysis.Facts[property.Name] = string.Join(", ", arrayValues);
+
+                        // Deduplicate values (case-insensitive) - common with "visible text" repeating
+                        var uniqueValues = arrayValues
+                            .Select(v => v?.Trim())
+                            .Where(v => !string.IsNullOrWhiteSpace(v))
+                            .Distinct(StringComparer.OrdinalIgnoreCase)
+                            .ToList();
+
+                        analysis.Facts[normalizedKey] = string.Join(", ", uniqueValues);
                     }
                     // Fallback for legacy/malformed responses (single strings)
                     else if (value.Type == JTokenType.String)
                     {
-                        analysis.Facts[property.Name] = value.ToString();
-                        _logger.LogWarning("Fact '{FactName}' was string instead of array - model didn't follow prompt", property.Name);
+                        analysis.Facts[normalizedKey] = value.ToString();
+                        _logger.LogWarning("Fact '{FactName}' was string instead of array - model didn't follow prompt", normalizedKey);
                     }
                     else
                     {
                         // Convert other types to string
-                        analysis.Facts[property.Name] = value.ToString();
+                        analysis.Facts[normalizedKey] = value.ToString();
                     }
                 }
             }
@@ -598,7 +616,7 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
 Guidelines:
 - ""tags"": 6–10 searchable keywords; lowercase; hyphenate multi-word terms (e.g., ""red-hoodie"", ""neon-lights""); include evident aesthetics (e.g., ""b&w"", ""gothic-lolita"", ""decora"", ""western"", ""60s"").
 - ""summary"": single sentence with concrete visual facts + evident aesthetic cues.
-- ""facts"": ALL values MUST be arrays, even single values, to enable uniform filtering. Each fact CAN have multiple entries; examples are non-exhaustive, complement the fact's list as necessary;
+- ""facts"": ALL keys MUST be lowercase (e.g., ""type"", ""style"", ""subject count""). ALL values MUST be arrays, even single values, to enable uniform filtering. Each fact CAN have multiple entries; examples are non-exhaustive, complement the fact's list as necessary.
 - Add optional fact fields ONLY when clearly visible; omit otherwise.
 - Escape all strings properly; return the JSON object only.
 
@@ -607,15 +625,15 @@ Return JSON in this format:
   ""tags"": [""tag1"",""tag2"",""...""],
   ""summary"": ""30–80 words describing subject, action, setting, lighting, and any evident aesthetics/themes."",
   ""facts"": {
-    ""Type"": [""portrait"",""landscape"",""still-life"",""product"",""food"",""screenshot"",""architecture"",""wildlife"",""macro"",""abstract"",""other"",""...""],
-    ""Style"": [""photography"",""painting"",""digital-art"",""illustration"",""abstract"",""ingame-screenshot"",""other"",""...""],
-    ""Subject Count"": [""no subjects"",""1 person"",""2 people"",""3+ people"",""single object"",""multiple items"",""animals"",""...""],
-    ""Composition"": [""centered"",""rule-of-thirds"",""symmetrical"",""diagonal"",""leading-lines"",""framed"",""off-center"",""close-up"",""wide"",""...""],
-    ""Palette"": [""color1"",""color2"",""color3"",""...""],
-    ""Lighting"": [""overcast"",""golden-hour"",""studio"",""natural"",""soft"",""dramatic"",""backlit"",""low-key"",""high-key"",""neon"",""spotlit"",""...""],
-    ""Setting"": [""indoor"",""outdoor"",""studio"",""urban"",""nature"",""...""],
-    ""Mood"": [""mysterious"",""cheerful"",""serene"",""dramatic"",""playful"",""somber"",""energetic"",""contemplative"",""romantic"",""tense"",""...""],
-    ""Themes"": [""b&w"",""film-noir"",""gothic-lolita"",""decora"",""western"",""60s"",""y2k"",""cyberpunk"",""minimalist"",""...""],
+    ""type"": [""portrait"",""landscape"",""still-life"",""product"",""food"",""screenshot"",""architecture"",""wildlife"",""macro"",""abstract"",""other"",""...""],
+    ""style"": [""photography"",""painting"",""digital-art"",""illustration"",""abstract"",""ingame-screenshot"",""other"",""...""],
+    ""subject count"": [""no subjects"",""1 person"",""2 people"",""3+ people"",""single object"",""multiple items"",""animals"",""...""],
+    ""composition"": [""centered"",""rule-of-thirds"",""symmetrical"",""diagonal"",""leading-lines"",""framed"",""off-center"",""close-up"",""wide"",""...""],
+    ""palette"": [""color1"",""color2"",""color3"",""...""],
+    ""lighting"": [""overcast"",""golden-hour"",""studio"",""natural"",""soft"",""dramatic"",""backlit"",""low-key"",""high-key"",""neon"",""spotlit"",""...""],
+    ""setting"": [""indoor"",""outdoor"",""studio"",""urban"",""nature"",""...""],
+    ""mood"": [""mysterious"",""cheerful"",""serene"",""dramatic"",""playful"",""somber"",""energetic"",""contemplative"",""romantic"",""tense"",""...""],
+    ""themes"": [""b&w"",""film-noir"",""gothic-lolita"",""decora"",""western"",""60s"",""y2k"",""cyberpunk"",""minimalist"",""...""],
 
     // Per-subject facts (arrays; MUST be present if at least one subject is shown):
     // ""subject 1"": [""person"",""black-hoodie"",""smiling"",""looking-left"",""streetwear"",""...""],
@@ -623,19 +641,19 @@ Return JSON in this format:
     // ""subject 3"": [""tree"",""bare-branches"",""midground"",""...""],
 
     // Optional facts (arrays; only if clearly visible, omit otherwise; 2+ items per fact preferred if applicable):
-    // ""Era Cues"": [""1960s"",""disco"",""vintage"",""retro"",""silver-age"",""...""],
-    // ""Color Grade"": [""black-and-white"",""sepia"",""teal-orange"",""cool"",""warm"",""neutral"",""monochrome"",""duotone"",""...""],
-    // ""Light Sources"": [""sun"",""neon-signs"",""led-panels"",""...""],
-    // ""Depth Cues"": [""bokeh"",""shallow-focus"",""deep-focus"",""motion-blur"",""...""],
-    // ""Atmospherics"": [""fog"",""haze"",""smoke"",""rain"",""snow"",""sparks"",""god-rays"",""dust"",""...""],
-    // ""Locale Cues"": [""architecture"",""props"",""vegetation"",""...""],
-    // ""Time"": [""day"",""night"",""sunset"",""sunrise"",""...""],
-    // ""Weather"": [""clear"",""overcast"",""rainy"",""snowy"",""indoor"",""...""],
-    // ""Visible Text"": [""exact text if readable""]
+    // ""era cues"": [""1960s"",""disco"",""vintage"",""retro"",""silver-age"",""...""],
+    // ""color grade"": [""black-and-white"",""sepia"",""teal-orange"",""cool"",""warm"",""neutral"",""monochrome"",""duotone"",""...""],
+    // ""light sources"": [""sun"",""neon-signs"",""led-panels"",""...""],
+    // ""depth cues"": [""bokeh"",""shallow-focus"",""deep-focus"",""motion-blur"",""...""],
+    // ""atmospherics"": [""fog"",""haze"",""smoke"",""rain"",""snow"",""sparks"",""god-rays"",""dust"",""...""],
+    // ""locale cues"": [""architecture"",""props"",""vegetation"",""...""],
+    // ""time"": [""day"",""night"",""sunset"",""sunrise"",""...""],
+    // ""weather"": [""clear"",""overcast"",""rainy"",""snowy"",""indoor"",""...""],
+    // ""visible text"": [""exact text if readable""]
   }
 }
 
-IMPORTANT: All fact values MUST be arrays, even single items. Example: ""Type"": [""portrait""], not ""Type"": ""portrait"".
+IMPORTANT: All fact keys MUST be lowercase. All fact values MUST be arrays, even single items. Example: ""type"": [""portrait""], not ""Type"": ""portrait"".
 
 Analyze the image and return the JSON now.";
 
@@ -793,24 +811,17 @@ Analyze the image and return the JSON now.";
         }
 
         // 1. Buffer locked facts before regeneration
-        // LockedFactKeys stores lowercase versions, but Facts has original casing
-        var lockedFacts = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        var lockedFactKeys = new HashSet<string>();
+        // All fact keys are now lowercase, so we can use direct dictionary access
+        var lockedFacts = new Dictionary<string, string>();
 
         if (photo.AiAnalysis?.LockedFactKeys != null)
         {
-            lockedFactKeys = new HashSet<string>(photo.AiAnalysis.LockedFactKeys);
-
-            foreach (var lowercaseKey in lockedFactKeys)
+            foreach (var factKey in photo.AiAnalysis.LockedFactKeys)
             {
-                // Find actual key in Facts using case-insensitive comparison
-                var actualKey = photo.AiAnalysis.Facts.Keys
-                    .FirstOrDefault(k => k.Equals(lowercaseKey, StringComparison.OrdinalIgnoreCase));
-
-                if (actualKey != null)
+                if (photo.AiAnalysis.Facts.TryGetValue(factKey, out var value))
                 {
-                    lockedFacts[lowercaseKey] = photo.AiAnalysis.Facts[actualKey];
-                    _logger.LogDebug("Buffered locked fact: {FactKey} = {FactValue}", lowercaseKey, lockedFacts[lowercaseKey]);
+                    lockedFacts[factKey] = value;
+                    _logger.LogDebug("Buffered locked fact: {FactKey} = {FactValue}", factKey, value);
                 }
             }
         }
@@ -818,24 +829,18 @@ Analyze the image and return the JSON now.";
         // 2. Regenerate AI analysis (this will replace photo.AiAnalysis)
         await GenerateDetailedDescriptionAsync(photo, ct);
 
-        // 3. Restore locked facts (overwrite AI-generated values for locked keys)
+        // 3. Restore locked facts (add them back if missing, overwrite if present)
         if (photo.AiAnalysis != null && lockedFacts.Count > 0)
         {
-            foreach (var (lowercaseKey, value) in lockedFacts)
+            foreach (var (factKey, value) in lockedFacts)
             {
-                // Find actual key in new Facts using case-insensitive comparison
-                var actualKey = photo.AiAnalysis.Facts.Keys
-                    .FirstOrDefault(k => k.Equals(lowercaseKey, StringComparison.OrdinalIgnoreCase));
-
-                if (actualKey != null)
-                {
-                    photo.AiAnalysis.Facts[actualKey] = value;
-                    _logger.LogDebug("Restored locked fact: {FactKey} = {FactValue}", actualKey, value);
-                }
+                // Add or overwrite the fact with the locked value
+                photo.AiAnalysis.Facts[factKey] = value;
+                _logger.LogDebug("Restored locked fact: {FactKey} = {FactValue}", factKey, value);
             }
 
-            // Restore locked keys set (maintain lowercase)
-            photo.AiAnalysis.LockedFactKeys = lockedFactKeys;
+            // Restore locked keys set
+            photo.AiAnalysis.LockedFactKeys = new HashSet<string>(lockedFacts.Keys);
         }
 
         // 4. Regenerate embedding with the merged facts

@@ -319,9 +319,9 @@ export class LightboxPanel {
         ${analysis.facts && Object.keys(analysis.facts).length > 0 ? `
           <div class="ai-facts" role="table" aria-label="Photo details">
             ${Object.entries(analysis.facts).map(([key, value]) => {
-              // LockedFactKeys contains lowercase versions, so compare lowercase
+              // All fact keys are lowercase, so direct comparison works
               const isLocked = analysis.lockedFactKeys &&
-                analysis.lockedFactKeys.includes(key.toLowerCase());
+                analysis.lockedFactKeys.includes(key);
               return this.renderFactRow(key, value, isLocked);
             }).join('')}
           </div>
@@ -586,12 +586,12 @@ export class LightboxPanel {
     const factRow = btnElement.closest('.fact-row');
     const isCurrentlyLocked = btnElement.classList.contains('locked');
 
-    // Normalize fact key to lowercase (rule: all fact names are lowercase in storage)
+    // All fact keys are already lowercase
     const normalizedKey = factKey.toLowerCase();
 
     // Optimistic UI update
     btnElement.classList.toggle('locked');
-    btnElement.setAttribute('aria-label', `${!isCurrentlyLocked ? 'Unlock' : 'Lock'} ${factKey}`);
+    btnElement.setAttribute('aria-label', `${!isCurrentlyLocked ? 'Unlock' : 'Lock'} ${normalizedKey}`);
     factRow.setAttribute('data-locked', !isCurrentlyLocked);
 
     // Update SVG icon
@@ -617,7 +617,7 @@ export class LightboxPanel {
       // Ensure UI is in sync with server state
       const serverIsLocked = response.isLocked;
       btnElement.classList.toggle('locked', serverIsLocked);
-      btnElement.setAttribute('aria-label', `${serverIsLocked ? 'Unlock' : 'Lock'} ${factKey}`);
+      btnElement.setAttribute('aria-label', `${serverIsLocked ? 'Unlock' : 'Lock'} ${normalizedKey}`);
       factRow.setAttribute('data-locked', serverIsLocked);
       svg.innerHTML = serverIsLocked ? lockedIcon : unlockedIcon;
 
@@ -626,7 +626,7 @@ export class LightboxPanel {
 
       // Revert UI on error
       btnElement.classList.toggle('locked', isCurrentlyLocked);
-      btnElement.setAttribute('aria-label', `${isCurrentlyLocked ? 'Unlock' : 'Lock'} ${factKey}`);
+      btnElement.setAttribute('aria-label', `${isCurrentlyLocked ? 'Unlock' : 'Lock'} ${normalizedKey}`);
       factRow.setAttribute('data-locked', isCurrentlyLocked);
       svg.innerHTML = isCurrentlyLocked ? lockedIcon : unlockedIcon;
 

@@ -366,7 +366,7 @@
 .fact-label {
   font-size: 11px;
   font-weight: 600;
-  text-transform: uppercase;
+  text-transform: capitalize;
   letter-spacing: 0.05em;
   color: rgba(255, 255, 255, 0.45);
   flex-shrink: 0;

@@ -318,17 +318,14 @@ public class PhotosController : EntityController<PhotoAsset>
             return BadRequest(new { Error = "Photo has no AI analysis" });
         }
 
-        // Find the actual fact key using case-insensitive comparison
-        var actualFactKey = photo.AiAnalysis.Facts.Keys
-            .FirstOrDefault(k => k.Equals(factKey, StringComparison.OrdinalIgnoreCase));
+        // Normalize to lowercase (all fact keys are stored lowercase)
+        var normalizedKey = factKey.ToLowerInvariant();
 
-        if (actualFactKey == null)
+        // Verify fact exists
+        if (!photo.AiAnalysis.Facts.ContainsKey(normalizedKey))
         {
-            return BadRequest(new { Error = $"Fact key '{factKey}' not found in analysis" });
+            return BadRequest(new { Error = $"Fact key '{normalizedKey}' not found in analysis" });
         }
-
-        // Normalize to lowercase for storage (all fact names in LockedFactKeys are lowercase)
-        var normalizedKey = actualFactKey.ToLowerInvariant();
 
         // Toggle lock state
         bool isNowLocked;
@@ -372,10 +369,8 @@ public class PhotosController : EntityController<PhotoAsset>
             return BadRequest(new { Error = "Photo has no AI analysis" });
         }
 
-        // Lock all existing fact keys (normalize to lowercase)
-        photo.AiAnalysis.LockedFactKeys = new HashSet<string>(
-            photo.AiAnalysis.Facts.Keys.Select(k => k.ToLowerInvariant())
-        );
+        // Lock all existing fact keys (all keys are already lowercase)
+        photo.AiAnalysis.LockedFactKeys = new HashSet<string>(photo.AiAnalysis.Facts.Keys);
         await photo.Save(ct);
 
         _logger.LogInformation("Locked all {Count} facts for photo {PhotoId}", photo.AiAnalysis.LockedFactKeys.Count, id);
