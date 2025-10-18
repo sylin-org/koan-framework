@@ -301,10 +301,11 @@ public class PhotosController : EntityController<PhotoAsset>
     }
 
     /// <summary>
-    /// Lock or unlock a specific fact in the AI analysis
+    /// Toggle lock state of a specific fact in the AI analysis
+    /// Returns the updated list of locked facts to support multi-tab scenarios
     /// </summary>
-    [HttpPost("{id}/facts/{factKey}/lock")]
-    public async Task<ActionResult> LockFact(string id, string factKey, [FromBody] LockFactRequest request, CancellationToken ct = default)
+    [HttpPost("{id}/facts/{factKey}/toggle-lock")]
+    public async Task<ActionResult> ToggleLockFact(string id, string factKey, CancellationToken ct = default)
     {
         var photo = await PhotoAsset.Get(id, ct);
         if (photo == null)
@@ -323,16 +324,19 @@ public class PhotosController : EntityController<PhotoAsset>
             return BadRequest(new { Error = $"Fact key '{factKey}' not found in analysis" });
         }
 
-        // Update lock state
-        if (request.Lock)
+        // Toggle lock state
+        bool isNowLocked;
+        if (photo.AiAnalysis.LockedFactKeys.Contains(factKey))
         {
-            photo.AiAnalysis.LockedFactKeys.Add(factKey);
-            _logger.LogInformation("Locked fact {FactKey} for photo {PhotoId}", factKey, id);
+            photo.AiAnalysis.LockedFactKeys.Remove(factKey);
+            isNowLocked = false;
+            _logger.LogInformation("Unlocked fact {FactKey} for photo {PhotoId}", factKey, id);
         }
         else
         {
-            photo.AiAnalysis.LockedFactKeys.Remove(factKey);
-            _logger.LogInformation("Unlocked fact {FactKey} for photo {PhotoId}", factKey, id);
+            photo.AiAnalysis.LockedFactKeys.Add(factKey);
+            isNowLocked = true;
+            _logger.LogInformation("Locked fact {FactKey} for photo {PhotoId}", factKey, id);
         }
 
         await photo.Save(ct);
@@ -340,8 +344,8 @@ public class PhotosController : EntityController<PhotoAsset>
         return Ok(new
         {
             FactKey = factKey,
-            IsLocked = photo.AiAnalysis.LockedFactKeys.Contains(factKey),
-            LockedFactKeys = photo.AiAnalysis.LockedFactKeys
+            IsLocked = isNowLocked,
+            LockedFactKeys = photo.AiAnalysis.LockedFactKeys.ToList()
         });
     }
 
@@ -726,11 +730,6 @@ public class SearchRequest
 public class RateRequest
 {
     public int Rating { get; set; }
-}
-
-public class LockFactRequest
-{
-    public bool Lock { get; set; }
 }
 
 public class SearchResponse
