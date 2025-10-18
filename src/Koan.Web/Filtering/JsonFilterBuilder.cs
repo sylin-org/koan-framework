@@ -12,6 +12,8 @@ namespace Koan.Web.Filtering;
 /// - $not with object operand
 /// - $in: { "status": { "$in": ["a","b"] } }
 /// - $exists: { "middleName": { "$exists": true } }
+/// - Range operators: $gte, $lte, $gt, $lt { "rating": { "$gte": 4 } }
+/// - Array matching: $all { "tags": { "$all": ["portrait", "studio"] } }
 /// Notes: Top-level fields only in v1; relaxed single-quote JSON is accepted.
 /// </summary>
 public static class JsonFilterBuilder
@@ -135,6 +137,11 @@ public static class JsonFilterBuilder
             {
                 "$in" => BuildIn(member, op.Value, opts),
                 "$exists" => BuildExists(member, op.Value),
+                "$gte" => BuildComparison(member, op.Value, ExpressionType.GreaterThanOrEqual),
+                "$lte" => BuildComparison(member, op.Value, ExpressionType.LessThanOrEqual),
+                "$gt" => BuildComparison(member, op.Value, ExpressionType.GreaterThan),
+                "$lt" => BuildComparison(member, op.Value, ExpressionType.LessThan),
+                "$all" => BuildAll(member, op.Value, opts),
                 _ => BuildEquality(member, op.Value, opts)
             };
             acc = acc == null ? piece : Expression.AndAlso(acc, piece);
@@ -192,6 +199,67 @@ public static class JsonFilterBuilder
                 .MakeGenericMethod(member.Type);
             return Expression.Call(contains, constExpr, member);
         }
+    }
+
+    private static Expression BuildComparison(MemberExpression member, JToken value, ExpressionType comparisonType)
+    {
+        // Convert JSON value to member type
+        var rhs = JsonToObject(value, member.Type);
+        var constant = Expression.Constant(rhs, member.Type);
+
+        // Build comparison expression
+        return Expression.MakeBinary(comparisonType, member, constant);
+    }
+
+    private static Expression BuildAll(MemberExpression member, JToken arrayNode, BuildOptions opts)
+    {
+        if (arrayNode.Type != JTokenType.Array)
+            throw new InvalidOperationException("$all expects an array");
+
+        // $all: all values in arrayNode must be present in the member collection
+        // This is for List<T> or array properties
+        // Example: AutoTags must contain all of ["portrait", "studio", "cool-tones"]
+
+        var itemsToMatch = (JArray)arrayNode;
+        if (itemsToMatch.Count == 0)
+            return Expression.Constant(true); // Empty $all always matches
+
+        // Get the element type of the collection
+        var memberType = member.Type;
+        Type? elementType = null;
+
+        if (memberType.IsGenericType && memberType.GetGenericTypeDefinition() == typeof(List<>))
+        {
+            elementType = memberType.GetGenericArguments()[0];
+        }
+        else if (memberType.IsArray)
+        {
+            elementType = memberType.GetElementType();
+        }
+        else
+        {
+            throw new InvalidOperationException($"$all can only be used with List<T> or array properties, not {memberType.Name}");
+        }
+
+        // Build expression for each required value
+        Expression? acc = null;
+        var containsMethod = typeof(Enumerable)
+            .GetMethods()
+            .First(m => m.Name == "Contains" && m.GetParameters().Length == 2)
+            .MakeGenericMethod(elementType!);
+
+        foreach (var item in itemsToMatch)
+        {
+            var itemValue = JsonToObject(item, elementType!);
+            var itemConstant = Expression.Constant(itemValue, elementType!);
+
+            // member.Contains(itemValue)
+            var containsCall = Expression.Call(containsMethod, member, itemConstant);
+
+            acc = acc == null ? containsCall : Expression.AndAlso(acc, containsCall);
+        }
+
+        return acc ?? Expression.Constant(true);
     }
 
     private static Expression BuildEquality(MemberExpression member, JToken value, BuildOptions opts)
