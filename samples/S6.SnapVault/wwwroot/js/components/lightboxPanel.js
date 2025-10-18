@@ -349,7 +349,8 @@ export class LightboxPanel {
       aiContent.querySelectorAll('.lock-btn').forEach(btn => {
         btn.addEventListener('click', async (e) => {
           e.stopPropagation();
-          const factKey = btn.dataset.factKey;
+          // Use getAttribute to preserve exact case (e.g., "Subject Count" not "subject count")
+          const factKey = btn.getAttribute('data-fact-key');
           await this.toggleFactLock(factKey, btn);
         });
       });
