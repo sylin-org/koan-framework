@@ -293,39 +293,71 @@ export class UploadModal {
     uploadBtn.disabled = true;
     cancelBtn.textContent = 'Close';
 
-    // Create FormData
-    const formData = new FormData();
+    // Chunk files into batches of 10 to stay under 100MB limit
+    const CHUNK_SIZE = 10;
+    const totalFiles = this.selectedFiles.length;
+    const chunks = [];
 
-    // Only append eventId if not auto-organize
-    if (this.selectedEventId && this.selectedEventId !== 'auto') {
-      formData.append('eventId', this.selectedEventId);
+    for (let i = 0; i < totalFiles; i += CHUNK_SIZE) {
+      chunks.push(this.selectedFiles.slice(i, i + CHUNK_SIZE));
     }
 
-    this.selectedFiles.forEach(file => {
-      formData.append('files', file);
-    });
+    progressContainer.innerHTML = `
+      <div class="chunk-progress">
+        Uploading batch <span class="current-chunk">1</span> of <span class="total-chunks">${chunks.length}</span>...
+      </div>
+    `;
 
     try {
-      // Start upload - this will queue files and return immediately
-      const response = await fetch('/api/photos/upload', {
-        method: 'POST',
-        body: formData
-      });
+      const jobIds = [];
+      let totalQueued = 0;
 
-      if (!response.ok) {
-        throw new Error(`Upload failed: ${response.statusText}`);
+      // Upload chunks sequentially
+      for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex++) {
+        const chunk = chunks[chunkIndex];
+
+        // Update progress
+        const currentChunkSpan = progressContainer.querySelector('.current-chunk');
+        if (currentChunkSpan) {
+          currentChunkSpan.textContent = chunkIndex + 1;
+        }
+
+        // Create FormData for this chunk
+        const formData = new FormData();
+
+        // Only append eventId if not auto-organize
+        if (this.selectedEventId && this.selectedEventId !== 'auto') {
+          formData.append('eventId', this.selectedEventId);
+        }
+
+        chunk.forEach(file => {
+          formData.append('files', file);
+        });
+
+        // Upload this chunk
+        const response = await fetch('/api/photos/upload', {
+          method: 'POST',
+          body: formData
+        });
+
+        if (!response.ok) {
+          throw new Error(`Batch ${chunkIndex + 1} upload failed: ${response.statusText}`);
+        }
+
+        const uploadResponse = await response.json();
+        jobIds.push(uploadResponse.jobId);
+        totalQueued += uploadResponse.totalQueued;
       }
 
-      const uploadResponse = await response.json();
-      const jobId = uploadResponse.jobId;
-
-      this.app.components.toast.show(`Queued ${uploadResponse.totalQueued} photo(s) for processing`, {
+      this.app.components.toast.show(`Queued ${totalQueued} photo(s) for processing`, {
         icon: '📤',
         duration: 2000
       });
 
-      // Start process monitor (floating progress card)
-      this.app.components.processMonitor.startJob(jobId, uploadResponse.totalQueued);
+      // Start process monitor for the first job (they'll all process)
+      if (jobIds.length > 0) {
+        this.app.components.processMonitor.startJob(jobIds[0], totalQueued);
+      }
 
       // Close modal immediately - processing continues in background
       this.close();
