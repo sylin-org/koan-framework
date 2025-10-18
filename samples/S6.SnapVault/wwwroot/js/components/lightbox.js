@@ -501,7 +501,7 @@ export class Lightbox {
         }
 
         // Apply without transition (instant)
-        const photo = this.lightbox.photoElement;
+        const photo = this.photoElement;
         if (photo) {
           photo.style.transition = 'none';
           photo.style.transform = `
