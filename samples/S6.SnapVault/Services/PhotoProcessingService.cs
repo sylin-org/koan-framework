@@ -598,39 +598,39 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
 Guidelines:
 - ""tags"": 6–10 searchable keywords; lowercase; hyphenate multi-word terms (e.g., ""red-hoodie"", ""neon-lights""); include evident aesthetics (e.g., ""b&w"", ""gothic-lolita"", ""decora"", ""western"", ""60s"").
 - ""summary"": single sentence with concrete visual facts + evident aesthetic cues.
-- ""facts"": ALL values MUST be arrays, even single values, to enable uniform filtering. Each fact may have multiple entries if applicable.
+- ""facts"": ALL values MUST be arrays, even single values, to enable uniform filtering. Each fact CAN have multiple entries; examples are non-exhaustive, complement the fact's list as necessary;
 - Add optional fact fields ONLY when clearly visible; omit otherwise.
 - Escape all strings properly; return the JSON object only.
 
 Return JSON in this format:
 {
-  ""tags"": [""tag1"", ""tag2"", ""...""],
+  ""tags"": [""tag1"",""tag2"",""...""],
   ""summary"": ""30–80 words describing subject, action, setting, lighting, and any evident aesthetics/themes."",
   ""facts"": {
-    ""Type"": [""portrait|landscape|still-life|product|food|screenshot|architecture|wildlife|macro|abstract|other""],
-    ""Style"": [""photography|painting|digital-art|illustration|abstract|ingame-screenshot|other""],
-    ""Subject Count"": [""no subjects|1 person|2 people|3+ people|single object|multiple items|animals""],
-    ""Composition"": [""centered|rule-of-thirds|symmetrical|diagonal|leading-lines|framed|off-center|close-up|wide""],
-    ""Palette"": [""color1"", ""color2"", ""color3""],
-    ""Lighting"": [""overcast|golden-hour|studio|natural|soft|dramatic|backlit|low-key|high-key|neon|spotlit""],
-    ""Setting"": [""indoor|outdoor|studio|urban|nature""],
-    ""Mood"": [""mysterious|cheerful|serene|dramatic|playful|somber|energetic|contemplative|romantic|tense""],
-    ""Themes"": [""aesthetics or styles as concise slugs (e.g., 'b&w', 'film-noir', 'gothic-lolita', 'decora', 'western', '60s', 'y2k', 'cyberpunk', 'minimalist')""]
+    ""Type"": [""portrait"",""landscape"",""still-life"",""product"",""food"",""screenshot"",""architecture"",""wildlife"",""macro"",""abstract"",""other"",""...""],
+    ""Style"": [""photography"",""painting"",""digital-art"",""illustration"",""abstract"",""ingame-screenshot"",""other"",""...""],
+    ""Subject Count"": [""no subjects"",""1 person"",""2 people"",""3+ people"",""single object"",""multiple items"",""animals"",""...""],
+    ""Composition"": [""centered"",""rule-of-thirds"",""symmetrical"",""diagonal"",""leading-lines"",""framed"",""off-center"",""close-up"",""wide"",""...""],
+    ""Palette"": [""color1"",""color2"",""color3"",""...""],
+    ""Lighting"": [""overcast"",""golden-hour"",""studio"",""natural"",""soft"",""dramatic"",""backlit"",""low-key"",""high-key"",""neon"",""spotlit"",""...""],
+    ""Setting"": [""indoor"",""outdoor"",""studio"",""urban"",""nature"",""...""],
+    ""Mood"": [""mysterious"",""cheerful"",""serene"",""dramatic"",""playful"",""somber"",""energetic"",""contemplative"",""romantic"",""tense"",""...""],
+    ""Themes"": [""b&w"",""film-noir"",""gothic-lolita"",""decora"",""western"",""60s"",""y2k"",""cyberpunk"",""minimalist"",""...""],
 
-    // Per-subject facts (arrays; MUST be present if at least one subject is shown; the following examples are non-exhaustive):
-    // ""subject 1"": [""person"",""black-hoodie"",""smiling"",""looking-left"",""streetwear""],
-    // ""subject 2"": [""building"",""brick-facade"",""arched-windows"",""centered""],
-    // ""subject 3"": [""tree"",""bare-branches"",""midground""],
+    // Per-subject facts (arrays; MUST be present if at least one subject is shown):
+    // ""subject 1"": [""person"",""black-hoodie"",""smiling"",""looking-left"",""streetwear"",""...""],
+    // ""subject 2"": [""building"",""brick-facade"",""arched-windows"",""centered"",""...""],
+    // ""subject 3"": [""tree"",""bare-branches"",""midground"",""...""],
 
-    // Optional facts (arrays; only if clearly visible, omit otherwise; 2+ items per fact preferred if applicable; the following examples are non-exhaustive):
-    // ""Era Cues"": [""1960s"", ""disco"", ""vintage"", ""retro"", ""silver-age""],
-    // ""Color Grade"": [""black-and-white|sepia|teal-orange|cool|warm|neutral|monochrome|duotone""],
-    // ""Light Sources"": [""sun"", ""neon-signs"", ""led-panels""],
-    // ""Depth Cues"": [""bokeh|shallow-focus|deep-focus|motion-blur""],
-    // ""Atmospherics"": [""fog|haze|smoke|rain|snow|sparks|god-rays|dust""],
-    // ""Locale Cues"": [""architecture"", ""props"", ""vegetation""],
-    // ""Time"": [""day|night|sunset|sunrise""],
-    // ""Weather"": [""clear|overcast|rainy|snowy""],
+    // Optional facts (arrays; only if clearly visible, omit otherwise; 2+ items per fact preferred if applicable):
+    // ""Era Cues"": [""1960s"",""disco"",""vintage"",""retro"",""silver-age"",""...""],
+    // ""Color Grade"": [""black-and-white"",""sepia"",""teal-orange"",""cool"",""warm"",""neutral"",""monochrome"",""duotone"",""...""],
+    // ""Light Sources"": [""sun"",""neon-signs"",""led-panels"",""...""],
+    // ""Depth Cues"": [""bokeh"",""shallow-focus"",""deep-focus"",""motion-blur"",""...""],
+    // ""Atmospherics"": [""fog"",""haze"",""smoke"",""rain"",""snow"",""sparks"",""god-rays"",""dust"",""...""],
+    // ""Locale Cues"": [""architecture"",""props"",""vegetation"",""...""],
+    // ""Time"": [""day"",""night"",""sunset"",""sunrise"",""...""],
+    // ""Weather"": [""clear"",""overcast"",""rainy"",""snowy"",""indoor"",""...""],
     // ""Visible Text"": [""exact text if readable""]
   }
 }
