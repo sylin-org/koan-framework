@@ -41,6 +41,9 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
+// Set AppHost.Current to enable entity operations before app.Run()
+Koan.Core.Hosting.App.AppHost.Current ??= app.Services;
+
 // Seed default analysis styles (S5.Recs pattern)
 var logger = app.Services.GetRequiredService<ILogger<Program>>();
 await AnalysisStyleSeeder.SeedDefaultStylesAsync(logger);
