@@ -8,7 +8,7 @@ export class API {
     this.baseUrl = window.location.origin;
   }
 
-  async get(url, params = {}) {
+  async get(url, params = {}, options = {}) {
     const queryString = new URLSearchParams(params).toString();
     const fullUrl = `${this.baseUrl}${url}${queryString ? `?${queryString}` : ''}`;
 
@@ -23,7 +23,22 @@ export class API {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
 
-    return await response.json();
+    const data = await response.json();
+
+    // If caller wants headers, return both data and headers
+    if (options.includeHeaders) {
+      return {
+        data,
+        headers: {
+          totalCount: parseInt(response.headers.get('X-Total-Count') || '0'),
+          page: parseInt(response.headers.get('X-Page') || '1'),
+          pageSize: parseInt(response.headers.get('X-Page-Size') || '30'),
+          totalPages: parseInt(response.headers.get('X-Total-Pages') || '0')
+        }
+      };
+    }
+
+    return data;
   }
 
   async post(url, data = null) {

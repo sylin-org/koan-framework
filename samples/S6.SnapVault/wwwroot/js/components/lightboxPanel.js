@@ -315,15 +315,10 @@ export class LightboxPanel {
           <p>${this.escapeHtml(analysis.summary)}</p>
         </div>
 
-        <!-- Facts table -->
+        <!-- Facts table with pill values -->
         ${analysis.facts && Object.keys(analysis.facts).length > 0 ? `
           <div class="ai-facts" role="table" aria-label="Photo details">
-            ${Object.entries(analysis.facts).map(([key, value]) => `
-              <div class="fact-row" role="row">
-                <span class="fact-label" role="rowheader">${this.escapeHtml(key)}</span>
-                <span class="fact-value" role="cell">${this.escapeHtml(value)}</span>
-              </div>
-            `).join('')}
+            ${Object.entries(analysis.facts).map(([key, value]) => this.renderFactRow(key, value)).join('')}
           </div>
         ` : ''}
 
@@ -417,6 +412,24 @@ export class LightboxPanel {
     const div = document.createElement('div');
     div.textContent = str;
     return div.innerHTML;
+  }
+
+  renderFactRow(label, value) {
+    // Split comma-separated values into individual pills
+    const values = value.split(',').map(v => v.trim()).filter(v => v.length > 0);
+
+    return `
+      <div class="fact-row" role="row">
+        <span class="fact-label" role="rowheader">${this.escapeHtml(label)}</span>
+        <div class="fact-values" role="cell">
+          ${values.map(v => `
+            <span class="fact-pill" data-fact-type="${this.escapeHtml(label)}" data-fact-value="${this.escapeHtml(v)}">
+              ${this.escapeHtml(v)}
+            </span>
+          `).join('')}
+        </div>
+      </div>
+    `;
   }
 
   updateActionStates(photo) {

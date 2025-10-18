@@ -1253,139 +1253,51 @@ body {
 }
 
 /* ===== Filters Panel ===== */
-.filter-section {
-  margin-bottom: var(--space-4);
-}
+/*
+ * Filter components now use the Design System (components.css).
+ * See DESIGN_SYSTEM.md for component documentation.
+ *
+ * Component mapping:
+ * - Sections: .section, .section-header, .section-content
+ * - Tags: .tag-pill, .tag-cloud
+ * - Active filters: .active-filters-summary, .filter-pill, .filter-pill-remove
+ * - Forms: .form-input, .checkbox-label, .radio-group
+ * - Buttons: .btn, .btn-ghost, .preset-btn
+ * - Sliders: .slider, .slider-container
+ *
+ * Filter-specific layouts below:
+ */
 
-.filter-section h4 {
-  font-size: var(--text-sm);
-  font-weight: var(--weight-semibold);
-  color: var(--text-primary);
-  margin-bottom: var(--space-2);
-}
-
-.filter-select {
-  width: 100%;
-  padding: var(--space-1) var(--space-2);
-  background-color: var(--bg-canvas);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  color: var(--text-primary);
-  font-family: var(--font-sans);
-  font-size: var(--text-sm);
-  cursor: pointer;
-  transition: all var(--duration-fast) var(--ease-out-cubic);
-}
-
-.filter-select:hover {
-  border-color: var(--border-medium);
-}
-
-.filter-select:focus {
-  outline: none;
-  border-color: var(--accent-primary);
-  background-color: var(--bg-surface-hover);
-}
-
-.rating-filter {
+/* Date Custom Layout */
+.date-custom {
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
+  gap: var(--space-2);
 }
 
-.rating-option {
+.date-label {
   display: flex;
-  align-items: center;
-  gap: var(--space-1);
-  padding: var(--space-1);
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  transition: all var(--duration-fast) var(--ease-out-cubic);
+  flex-direction: column;
+  gap: 4px;
 }
 
-.rating-option:hover {
-  background-color: var(--bg-surface-hover);
+.date-label span {
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+  font-weight: var(--weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
 }
 
-.rating-option input[type="checkbox"] {
-  width: 16px;
-  height: 16px;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-}
-
+/* Rating Display (stars visualization) */
 .rating-stars {
   display: flex;
   gap: 2px;
 }
 
 .star-icon {
-  color: var(--accent-favorite);
+  color: var(--color-accent-favorite);
   flex-shrink: 0;
-}
-
-.rating-label {
-  font-size: var(--text-sm);
-  color: var(--text-secondary);
-}
-
-.tag-cloud {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-1);
-}
-
-.tag-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 8px;
-  border-radius: var(--radius-md);
-  font-size: var(--text-xs);
-  font-weight: var(--weight-medium);
-  background-color: var(--bg-surface-hover);
-  border: 1px solid var(--border-subtle);
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: all var(--duration-fast) var(--ease-out-cubic);
-}
-
-.tag-chip:hover {
-  background-color: var(--bg-surface-active);
-  border-color: var(--border-medium);
-  color: var(--text-primary);
-}
-
-.tag-chip.active {
-  background-color: var(--accent-primary);
-  border-color: var(--accent-primary);
-  color: var(--bg-canvas);
-}
-
-.tag-count {
-  font-size: var(--text-xs);
-  opacity: 0.7;
-}
-
-.btn-reset-filters {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-1);
-  width: 100%;
-  padding: var(--space-1) var(--space-2);
-  border-radius: var(--radius-md);
-  font-size: var(--text-sm);
-  font-weight: var(--weight-medium);
-  background-color: var(--bg-surface-hover);
-  color: var(--text-secondary);
-  transition: all var(--duration-fast) var(--ease-out-cubic);
-  margin-top: var(--space-3);
-}
-
-.btn-reset-filters:hover {
-  background-color: var(--bg-surface-active);
-  color: var(--text-primary);
 }
 
 /* ===== Status Bar ===== */

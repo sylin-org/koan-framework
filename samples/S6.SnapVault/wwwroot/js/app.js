@@ -12,7 +12,7 @@ import { ProcessMonitor } from './components/processMonitor.js';
 import { Timeline } from './components/timeline.js';
 import { KeyboardShortcuts } from './components/keyboard.js';
 import { BulkActions } from './components/bulkActions.js';
-import { Filters } from './components/filters.js';
+import { DiscoveryPanel } from './components/discovery-panel.js';
 import { Toast } from './components/toast.js';
 import { API } from './api.js';
 import { VIEW_PRESETS, migrateOldDensity } from './viewPresets.js';
@@ -30,7 +30,8 @@ class SnapVaultApp {
       events: [],
       selectedPhotos: new Set(),
       filters: {},
-      viewPreset: this.loadViewPreset() // NEW: View preset instead of density
+      viewPreset: this.loadViewPreset(), // NEW: View preset instead of density
+      totalPhotosCount: 0 // Total photos in library
     };
   }
 
@@ -72,7 +73,7 @@ class SnapVaultApp {
     this.components.timeline = new Timeline(this);
     this.components.keyboard = new KeyboardShortcuts(this);
     this.components.bulkActions = new BulkActions(this);
-    this.components.filters = new Filters(this);
+    this.components.discoveryPanel = new DiscoveryPanel(this);
 
     // Setup event listeners
     this.setupWorkspaceNavigation();
@@ -85,8 +86,8 @@ class SnapVaultApp {
     await this.loadPhotos();
     await this.loadEvents();
 
-    // Initialize filters after photos are loaded
-    await this.components.filters.init();
+    // Initialize Discovery Panel after photos are loaded
+    await this.components.discoveryPanel.init();
 
     // Enable infinite scroll after initial load
     this.components.grid.enableInfiniteScroll();
@@ -221,19 +222,25 @@ class SnapVaultApp {
     }
   }
 
-  async loadPhotos() {
+  async loadPhotos(filterQuery = '') {
     try {
       this.setLoading(true);
       // Initial load: first page only (30 photos for fast FCP)
       // Sort by ID descending (newest first - GUID v7 embeds timestamp)
-      const response = await this.api.get('/api/photos?sort=-id&page=1&pageSize=30');
-      this.state.photos = response || [];
+      const baseQuery = '/api/photos?sort=-id&page=1&pageSize=30';
+      const query = filterQuery ? `${baseQuery}&${filterQuery.substring(1)}` : baseQuery;
+
+      const response = await this.api.get(query, {}, { includeHeaders: true });
+      this.state.photos = response.data || [];
+      this.state.totalPhotosCount = response.headers.totalCount;
       this.state.currentPage = 1;
       this.state.hasMorePages = true; // Assume more until proven otherwise
+      this.state.activeFilter = filterQuery; // Store active filter for infinite scroll
       this.components.grid.render();
       this.updateLibraryCounts();
+      this.updateStatusBar();
 
-      console.log(`[Photos] Initial load: ${response?.length || 0} photos (page 1)`);
+      console.log(`[Photos] Initial load: ${response.data?.length || 0} photos (page 1), total: ${this.state.totalPhotosCount}`);
 
       // Note: Infinite scroll is enabled by caller (init or setViewPreset)
       // This prevents immediate trigger when layout changes
@@ -254,14 +261,19 @@ class SnapVaultApp {
 
       console.log(`[Infinite Scroll] Triggered - Loading page ${nextPage}...`);
 
-      const response = await this.api.get(`/api/photos?sort=-id&page=${nextPage}&pageSize=30`);
+      // Include active filter in pagination
+      const baseQuery = `/api/photos?sort=-id&page=${nextPage}&pageSize=30`;
+      const query = this.state.activeFilter ? `${baseQuery}&${this.state.activeFilter.substring(1)}` : baseQuery;
+
+      const response = await this.api.get(query);
 
       if (response && response.length > 0) {
         this.state.photos.push(...response);
         this.state.currentPage = nextPage;
         this.components.grid.appendPhotos(response);
+        this.updateStatusBar();
 
-        console.log(`[Infinite Scroll] Loaded ${response.length} photos (page ${nextPage}, total: ${this.state.photos.length})`);
+        console.log(`[Infinite Scroll] Loaded ${response.length} photos (page ${nextPage}, total loaded: ${this.state.photos.length} of ${this.state.totalPhotosCount})`);
       } else {
         // No more photos
         this.state.hasMorePages = false;
@@ -289,7 +301,27 @@ class SnapVaultApp {
   setLoading(isLoading) {
     const statusBar = document.querySelector('.status-bar .status-text');
     if (statusBar) {
-      statusBar.textContent = isLoading ? 'Loading...' : `${this.state.photos.length} photos`;
+      if (isLoading) {
+        statusBar.textContent = 'Loading...';
+      } else {
+        this.updateStatusBar();
+      }
+    }
+  }
+
+  updateStatusBar() {
+    const statusBar = document.querySelector('.status-bar .status-text');
+    if (!statusBar) return;
+
+    const loadedCount = this.state.photos.length;
+    const totalCount = this.state.totalPhotosCount;
+
+    if (totalCount > 0 && loadedCount < totalCount) {
+      statusBar.textContent = `${loadedCount} out of ${totalCount} photos`;
+    } else if (totalCount > 0) {
+      statusBar.textContent = `${totalCount} photos`;
+    } else {
+      statusBar.textContent = `${loadedCount} photos`;
     }
   }
 

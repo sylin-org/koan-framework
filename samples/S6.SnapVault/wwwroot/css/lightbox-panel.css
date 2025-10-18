@@ -378,6 +378,41 @@
   word-break: break-word;
 }
 
+/* Fact Pills - Tag-like display for fact values */
+.fact-values {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.fact-pill {
+  display: inline-block;
+  padding: 3px 8px;
+  background: rgba(59, 130, 246, 0.12);
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  border-radius: 10px;
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: rgba(96, 165, 250, 1);
+  cursor: pointer;
+  transition: all 150ms ease;
+  white-space: nowrap;
+  line-height: 1.4;
+}
+
+.fact-pill:hover {
+  background: rgba(59, 130, 246, 0.2);
+  border-color: rgba(59, 130, 246, 0.4);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.2);
+}
+
+.fact-pill:active {
+  transform: translateY(0);
+}
+
 .btn-regenerate-ai {
   display: flex;
   align-items: center;

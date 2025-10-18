@@ -8,8 +8,8 @@ using Koan.Media.Core.Extensions;
 using Koan.AI;
 using Koan.Data.Core;
 using Koan.Data.Vector;
-using System.Text.Json;
 using System.Text.RegularExpressions;
+using Newtonsoft.Json.Linq;
 
 namespace S6.SnapVault.Services;
 
@@ -429,63 +429,145 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
     }
 
     /// <summary>
-    /// Robust JSON parsing with multiple fallback strategies
+    /// Robust JSON parsing using JObject navigation
     /// </summary>
     private AiAnalysis? ParseAiResponse(string response)
     {
         if (string.IsNullOrWhiteSpace(response))
             return null;
 
-        // Strategy 1: Direct parse (model returned clean JSON)
-        try
-        {
-            return JsonSerializer.Deserialize<AiAnalysis>(response);
-        }
-        catch
-        {
-            // Continue to fallback strategies
-        }
+        string jsonText = response;
 
-        // Strategy 2: Strip markdown code blocks
-        var cleanedResponse = Regex.Replace(
-            response,
-            @"```(?:json)?\s*|\s*```",
-            "",
-            RegexOptions.IgnoreCase | RegexOptions.Multiline
-        ).Trim();
+        // Strategy 1: Try direct parse
+        JObject? json = TryParseJson(jsonText);
 
-        try
+        if (json == null)
         {
-            return JsonSerializer.Deserialize<AiAnalysis>(cleanedResponse);
-        }
-        catch
-        {
-            // Continue to fallback strategies
+            // Strategy 2: Strip markdown code blocks (```json ... ``` or ``` ... ```)
+            jsonText = Regex.Replace(
+                response,
+                @"```(?:json)?\s*|\s*```",
+                "",
+                RegexOptions.IgnoreCase | RegexOptions.Multiline
+            ).Trim();
+
+            json = TryParseJson(jsonText);
         }
 
-        // Strategy 3: Extract first JSON object from mixed content
-        var jsonMatch = Regex.Match(
-            cleanedResponse,
-            @"\{[\s\S]*?\}(?=\s*(?:$|[^,\}\]]))",
-            RegexOptions.Multiline
-        );
-
-        if (jsonMatch.Success)
+        if (json == null)
         {
-            try
+            // Strategy 3: Extract JSON by finding balanced braces
+            jsonText = ExtractJsonByBalancedBraces(jsonText);
+            if (!string.IsNullOrEmpty(jsonText))
             {
-                return JsonSerializer.Deserialize<AiAnalysis>(jsonMatch.Value);
-            }
-            catch
-            {
-                // All strategies failed
+                json = TryParseJson(jsonText);
             }
         }
 
-        _logger.LogWarning("All JSON parsing strategies failed. Response preview: {Preview}",
-            response.Length > 200 ? response.Substring(0, 200) + "..." : response);
+        if (json == null)
+        {
+            _logger.LogWarning("All JSON parsing strategies failed. Response preview: {Preview}",
+                response.Length > 200 ? response.Substring(0, 200) + "..." : response);
+            return null;
+        }
 
-        return null;
+        // Navigate JObject to build AiAnalysis
+        try
+        {
+            var analysis = new AiAnalysis();
+
+            // Extract tags array
+            if (json["tags"] is JArray tagsArray)
+            {
+                analysis.Tags = tagsArray.ToObject<List<string>>() ?? new List<string>();
+            }
+
+            // Extract summary string
+            if (json["summary"]?.Type == JTokenType.String)
+            {
+                analysis.Summary = json["summary"]?.ToString() ?? "";
+            }
+
+            // Extract facts object - ALL values should be arrays now
+            if (json["facts"] is JObject factsObject)
+            {
+                analysis.Facts = new Dictionary<string, string>();
+
+                foreach (var property in factsObject.Properties())
+                {
+                    var value = property.Value;
+
+                    // Facts are now arrays - convert to comma-separated string for storage
+                    if (value.Type == JTokenType.Array)
+                    {
+                        var arrayValues = value.ToObject<List<string>>() ?? new List<string>();
+                        analysis.Facts[property.Name] = string.Join(", ", arrayValues);
+                    }
+                    // Fallback for legacy/malformed responses (single strings)
+                    else if (value.Type == JTokenType.String)
+                    {
+                        analysis.Facts[property.Name] = value.ToString();
+                        _logger.LogWarning("Fact '{FactName}' was string instead of array - model didn't follow prompt", property.Name);
+                    }
+                    else
+                    {
+                        // Convert other types to string
+                        analysis.Facts[property.Name] = value.ToString();
+                    }
+                }
+            }
+
+            _logger.LogInformation("Successfully parsed AI response: {TagCount} tags, {FactCount} facts",
+                analysis.Tags.Count, analysis.Facts.Count);
+
+            return analysis;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to navigate JObject structure");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Try to parse JSON text into JObject, returns null if failed
+    /// </summary>
+    private JObject? TryParseJson(string text)
+    {
+        try
+        {
+            return JObject.Parse(text);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Extract JSON object by counting balanced braces
+    /// </summary>
+    private string ExtractJsonByBalancedBraces(string text)
+    {
+        int startIndex = text.IndexOf('{');
+        if (startIndex < 0) return "";
+
+        int braceCount = 0;
+        for (int i = startIndex; i < text.Length; i++)
+        {
+            char c = text[i];
+
+            if (c == '{') braceCount++;
+            else if (c == '}') braceCount--;
+
+            if (braceCount == 0)
+            {
+                // Found matching closing brace
+                return text.Substring(startIndex, i - startIndex + 1);
+            }
+        }
+
+        return ""; // No balanced JSON found
     }
 
     /// <summary>
@@ -510,75 +592,50 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
             await imageStream.CopyToAsync(ms, ct);
             var imageBytes = ms.ToArray();
 
-            // Refined JSON prompt - captures detailed facts while maintaining accuracy
-            var prompt = @"Analyze this photograph and return a JSON object. Be accurate and only describe what you clearly see.
+            // Refined JSON prompt - ALL facts as arrays for uniform filtering
+            var prompt = @"Analyze the image and output ONLY valid JSON (no markdown, no comments). Describe ONLY what is clearly visible—never guess. Use concise, concrete language.
 
-Return ONLY valid JSON in this exact format (no markdown, no code blocks, just the JSON):
+Guidelines:
+- ""tags"": 6–10 searchable keywords; lowercase; hyphenate multi-word terms (e.g., ""red-hoodie"", ""neon-lights""); include evident aesthetics (e.g., ""b&w"", ""gothic-lolita"", ""decora"", ""western"", ""60s"").
+- ""summary"": single sentence with concrete visual facts + evident aesthetic cues.
+- ""facts"": ALL values MUST be arrays, even single values, to enable uniform filtering. Each fact may have multiple entries if applicable.
+- Add optional fact fields ONLY when clearly visible; omit otherwise.
+- Escape all strings properly; return the JSON object only.
 
+Return JSON in this format:
 {
-  ""tags"": [""tag1"", ""tag2"", ""tag3"", ""...""],
-  ""summary"": ""One clear sentence describing the image"",
+  ""tags"": [""tag1"", ""tag2"", ""...""],
+  ""summary"": ""30–80 words describing subject, action, setting, lighting, and any evident aesthetics/themes."",
   ""facts"": {
-    ""Type"": ""portrait|landscape|still-life|product|food|screenshot|architecture|wildlife|other"",
-    ""Style"": ""photography|painting|digital-art|illustration|abstract|ingame-screenshot|other"",
-    ""Subject Count"": ""describe number and type of subjects"",
-    ""Composition"": ""describe framing and arrangement"",
-    ""Palette"": ""list 3-5 dominant colors"",
-    ""Lighting"": ""describe light source and quality"",
-    ""Setting"": ""describe location context"",
-    ""Mood"": ""describe emotional tone or atmosphere""
+    ""Type"": [""portrait|landscape|still-life|product|food|screenshot|architecture|wildlife|macro|abstract|other""],
+    ""Style"": [""photography|painting|digital-art|illustration|abstract|ingame-screenshot|other""],
+    ""Subject Count"": [""no subjects|1 person|2 people|3+ people|single object|multiple items|animals""],
+    ""Composition"": [""centered|rule-of-thirds|symmetrical|diagonal|leading-lines|framed|off-center|close-up|wide""],
+    ""Palette"": [""color1"", ""color2"", ""color3""],
+    ""Lighting"": [""overcast|golden-hour|studio|natural|soft|dramatic|backlit|low-key|high-key|neon|spotlit""],
+    ""Setting"": [""indoor|outdoor|studio|urban|nature""],
+    ""Mood"": [""mysterious|cheerful|serene|dramatic|playful|somber|energetic|contemplative|romantic|tense""],
+    ""Themes"": [""aesthetics or styles as concise slugs (e.g., 'b&w', 'film-noir', 'gothic-lolita', 'decora', 'western', '60s', 'y2k', 'cyberpunk', 'minimalist')""]
+
+    // Per-subject facts (arrays; MUST be present if at least one subject is shown; the following examples are non-exhaustive):
+    // ""subject 1"": [""person"",""black-hoodie"",""smiling"",""looking-left"",""streetwear""],
+    // ""subject 2"": [""building"",""brick-facade"",""arched-windows"",""centered""],
+    // ""subject 3"": [""tree"",""bare-branches"",""midground""],
+
+    // Optional facts (arrays; only if clearly visible, omit otherwise; 2+ items per fact preferred if applicable; the following examples are non-exhaustive):
+    // ""Era Cues"": [""1960s"", ""disco"", ""vintage"", ""retro"", ""silver-age""],
+    // ""Color Grade"": [""black-and-white|sepia|teal-orange|cool|warm|neutral|monochrome|duotone""],
+    // ""Light Sources"": [""sun"", ""neon-signs"", ""led-panels""],
+    // ""Depth Cues"": [""bokeh|shallow-focus|deep-focus|motion-blur""],
+    // ""Atmospherics"": [""fog|haze|smoke|rain|snow|sparks|god-rays|dust""],
+    // ""Locale Cues"": [""architecture"", ""props"", ""vegetation""],
+    // ""Time"": [""day|night|sunset|sunrise""],
+    // ""Weather"": [""clear|overcast|rainy|snowy""],
+    // ""Visible Text"": [""exact text if readable""]
   }
 }
 
-IMPORTANT: Add additional fact fields for clearly visible details. Use descriptive field names.
-Example with optional fields: { ""Character"": ""female, dark hair, elf ears"", ""Atmospherics"": ""soft fog, god rays"", ""Light Sources"": ""neon signs, LED panels"" }
-
-GUIDELINES:
-- tags: 6-10 searchable keywords (lowercase, use hyphens for multi-word like ""red-hoodie"")
-  Examples: character, portrait, studio, graffiti, black-hoodie, red-headphones, cool-tones, centered
-
-- summary: 30-80 words describing subject, action, setting, and visual characteristics
-  Example: ""A female character with dark brown hair and elf-like ears, wearing a black hoodie and red headphones, stands against a graffiti-style backdrop in a cool-toned, evenly lit studio.""
-
-- facts.Type: Main category of the photo
-  Examples: portrait, landscape, still-life, product, food, screenshot, architecture, wildlife, macro, abstract
-
-- facts.SubjectCount: Number and type of main subjects
-  Examples: ""no subjects"", ""1 person"", ""2 people"", ""3 characters"", ""single object"", ""multiple items""
-
-- facts.Composition: How elements are arranged
-  Examples: centered, rule-of-thirds, symmetrical, diagonal, leading-lines, framed, off-center
-
-- facts.Palette: 3-5 dominant colors (comma-separated)
-  Examples: ""blue, gray, brown"", ""black, red, white"", ""warm-tones, orange, yellow""
-
-- facts.Lighting: Light source and characteristics
-  Examples: overcast, golden-hour, studio, natural, soft, dramatic, backlit, low-key, high-key
-
-- facts.Setting: Location or environment context
-  Examples: ""outdoor, castle"", ""indoor, studio"", ""urban, street"", ""nature, forest"", ""home, kitchen""
-
-- facts.Mood: Emotional tone or atmosphere
-  Examples: mysterious, cheerful, serene, dramatic, playful, somber, energetic, contemplative
-
-- Additional facts: Include any other clearly visible details. Only add fields you can see - never force details that aren't there.
-  * Character details: gender, hair, expression, clothing, accessories, pose
-  * Locale cues: architecture style, props, vegetation, furniture, water, terrain
-  * Topology: foreground/midground/background elements, platforms, stairs, bridges, paths
-  * Atmospherics: fog, haze, smoke, sparks, rain, snow, bloom, god-rays
-  * Color grade: warm/cool/neutral tints (teal-orange, magenta, sepia)
-  * Time/Weather: day/night/sunset/overcast (if discernible)
-  * Depth cues: bokeh, DOF blur, shallow/deep focus
-  * Motion/VFX: motion blur, particles, energy effects, magic circles
-  * Visible text: transcribe short, clearly readable text only
-  * Light sources: torches, neon, sun, LEDs, screens, practicals
-
-CRITICAL RULES:
-1. Return ONLY the JSON object - no explanatory text
-2. Only include what you can CLEARLY see - never guess or hallucinate
-3. Use simple, factual descriptions
-4. Keep all strings properly escaped for JSON
-5. If uncertain about a field, use generic but accurate descriptions
+IMPORTANT: All fact values MUST be arrays, even single items. Example: ""Type"": [""portrait""], not ""Type"": ""portrait"".
 
 Analyze the image and return the JSON now.";
 

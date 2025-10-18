@@ -373,6 +373,157 @@ public class PhotosController : EntityController<PhotoAsset>
     }
 
     /// <summary>
+    /// Get Smart Collections for Discovery Panel
+    /// Returns intelligent photo groupings with counts and preview thumbnails
+    /// </summary>
+    [HttpGet("smart-collections")]
+    public async Task<ActionResult<SmartCollectionsResponse>> GetSmartCollections(CancellationToken ct = default)
+    {
+        var allPhotos = await PhotoAsset.All(ct);
+        var now = DateTime.UtcNow;
+        var sevenDaysAgo = now.AddDays(-7);
+        var thirtyDaysAgo = now.AddDays(-30);
+
+        var collections = new List<SmartCollection>();
+
+        // 1. Recent Uploads
+        var recentUploads = allPhotos
+            .Where(p => p.UploadedAt >= sevenDaysAgo)
+            .OrderByDescending(p => p.UploadedAt)
+            .ToList();
+
+        if (recentUploads.Any())
+        {
+            collections.Add(new SmartCollection
+            {
+                Id = "recent-uploads",
+                Name = "Recent Uploads",
+                Type = "system",
+                PhotoCount = recentUploads.Count,
+                Thumbnails = recentUploads.Take(4).Select(p => $"/storage/{p.MasonryThumbnailMediaId}").ToList(),
+                LastUpdated = recentUploads.First().UploadedAt,
+                Icon = "camera"
+            });
+        }
+
+        // 2. Needs Attention (unrated or untagged photos older than 30 days)
+        var needsAttention = allPhotos
+            .Where(p => p.UploadedAt < thirtyDaysAgo && (p.Rating == 0 || p.AutoTags.Count == 0))
+            .OrderByDescending(p => p.UploadedAt)
+            .ToList();
+
+        if (needsAttention.Any())
+        {
+            collections.Add(new SmartCollection
+            {
+                Id = "needs-attention",
+                Name = "Needs Attention",
+                Type = "system",
+                PhotoCount = needsAttention.Count,
+                Thumbnails = needsAttention.Take(4).Select(p => $"/storage/{p.MasonryThumbnailMediaId}").ToList(),
+                LastUpdated = needsAttention.First().UploadedAt,
+                Icon = "alert-circle",
+                Description = "Unrated or untagged"
+            });
+        }
+
+        // 3. This Week's Best (4-5 star photos from last 7 days)
+        var thisWeeksBest = allPhotos
+            .Where(p => p.Rating >= 4 && p.UploadedAt >= sevenDaysAgo)
+            .OrderByDescending(p => p.Rating)
+            .ThenByDescending(p => p.UploadedAt)
+            .ToList();
+
+        if (thisWeeksBest.Any())
+        {
+            collections.Add(new SmartCollection
+            {
+                Id = "this-weeks-best",
+                Name = "This Week's Best",
+                Type = "system",
+                PhotoCount = thisWeeksBest.Count,
+                Thumbnails = thisWeeksBest.Take(4).Select(p => $"/storage/{p.MasonryThumbnailMediaId}").ToList(),
+                LastUpdated = thisWeeksBest.First().UploadedAt,
+                Icon = "star",
+                Description = "4-5 star ratings"
+            });
+        }
+        else
+        {
+            // Fallback: Last Month's Best
+            var lastMonthsBest = allPhotos
+                .Where(p => p.Rating >= 4 && p.UploadedAt >= thirtyDaysAgo)
+                .OrderByDescending(p => p.Rating)
+                .ThenByDescending(p => p.UploadedAt)
+                .ToList();
+
+            if (lastMonthsBest.Any())
+            {
+                collections.Add(new SmartCollection
+                {
+                    Id = "last-months-best",
+                    Name = "Last Month's Best",
+                    Type = "system",
+                    PhotoCount = lastMonthsBest.Count,
+                    Thumbnails = lastMonthsBest.Take(4).Select(p => $"/storage/{p.MasonryThumbnailMediaId}").ToList(),
+                    LastUpdated = lastMonthsBest.First().UploadedAt,
+                    Icon = "star",
+                    Description = "4-5 star ratings"
+                });
+            }
+        }
+
+        // 4. Camera Profiles (grouped by camera model)
+        var cameraGroups = allPhotos
+            .Where(p => !string.IsNullOrEmpty(p.CameraModel))
+            .GroupBy(p => p.CameraModel)
+            .OrderByDescending(g => g.Count())
+            .Take(5) // Top 5 cameras
+            .ToList();
+
+        foreach (var group in cameraGroups)
+        {
+            var cameraPhotos = group.OrderByDescending(p => p.UploadedAt).ToList();
+            collections.Add(new SmartCollection
+            {
+                Id = $"camera-{group.Key?.Replace(" ", "-").ToLower()}",
+                Name = group.Key ?? "Unknown Camera",
+                Type = "camera",
+                PhotoCount = group.Count(),
+                Thumbnails = cameraPhotos.Take(4).Select(p => $"/storage/{p.MasonryThumbnailMediaId}").ToList(),
+                LastUpdated = cameraPhotos.First().UploadedAt,
+                Icon = "camera-slr"
+            });
+        }
+
+        // 5. Favorites
+        var favorites = allPhotos
+            .Where(p => p.IsFavorite)
+            .OrderByDescending(p => p.UploadedAt)
+            .ToList();
+
+        if (favorites.Any())
+        {
+            collections.Add(new SmartCollection
+            {
+                Id = "favorites",
+                Name = "Favorites",
+                Type = "system",
+                PhotoCount = favorites.Count,
+                Thumbnails = favorites.Take(4).Select(p => $"/storage/{p.MasonryThumbnailMediaId}").ToList(),
+                LastUpdated = favorites.First().UploadedAt,
+                Icon = "heart"
+            });
+        }
+
+        return Ok(new SmartCollectionsResponse
+        {
+            Collections = collections,
+            TotalPhotos = allPhotos.Count
+        });
+    }
+
+    /// <summary>
     /// Bulk favorite/unfavorite photos
     /// </summary>
     [HttpPost("bulk/favorite")]
@@ -482,4 +633,22 @@ public class TagInfo
 {
     public string Tag { get; set; } = "";
     public int Count { get; set; }
+}
+
+public class SmartCollectionsResponse
+{
+    public List<SmartCollection> Collections { get; set; } = new();
+    public int TotalPhotos { get; set; }
+}
+
+public class SmartCollection
+{
+    public string Id { get; set; } = "";
+    public string Name { get; set; } = "";
+    public string Type { get; set; } = ""; // "system", "camera", "ai", "custom"
+    public int PhotoCount { get; set; }
+    public List<string> Thumbnails { get; set; } = new(); // Up to 4 thumbnail URLs
+    public DateTime LastUpdated { get; set; }
+    public string Icon { get; set; } = ""; // Icon name for frontend
+    public string? Description { get; set; } // Optional subtitle
 }
