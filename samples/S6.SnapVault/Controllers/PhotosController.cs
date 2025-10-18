@@ -495,7 +495,7 @@ public class PhotosController : EntityController<PhotoAsset>
                 var photo = await PhotoAsset.Get(id, ct);
                 if (photo != null)
                 {
-                    await photo.Delete(ct);
+                    await photo.Remove(ct);
                     deleted++;
                 }
                 else
