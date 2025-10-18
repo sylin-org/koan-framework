@@ -42,6 +42,10 @@ public class PhotoAsset : MediaEntity<PhotoAsset>
     public string DetailedDescription { get; set; } = ""; // AI vision-generated detailed analysis (legacy)
     public AiAnalysis? AiAnalysis { get; set; } // Structured AI analysis (tags, summary, facts)
 
+    // Smart mode classification cache (avoids repeated classification API calls)
+    public string? InferredStyleId { get; set; } // FK to AnalysisStyle (detected style)
+    public DateTime? InferredAt { get; set; } // When classification was performed
+
     // Vector for semantic search (no attribute needed - framework detects float[] automatically)
     public float[]? Embedding { get; set; }
 

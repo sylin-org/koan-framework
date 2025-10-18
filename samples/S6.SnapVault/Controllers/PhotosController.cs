@@ -5,6 +5,7 @@ using Koan.Web.Attributes;
 using Koan.Web.Controllers;
 using S6.SnapVault.Models;
 using S6.SnapVault.Services;
+using S6.SnapVault.Services.AI;
 using S6.SnapVault.Hubs;
 
 namespace S6.SnapVault.Controllers;
@@ -280,13 +281,17 @@ public class PhotosController : EntityController<PhotoAsset>
     /// <summary>
     /// Regenerate AI analysis for a photo while preserving locked facts
     /// "Reroll with holds" - locked facts are preserved during regeneration
+    /// Optionally specify an analysis style ID (smart, portrait, product, landscape, etc.)
     /// </summary>
     [HttpPost("{id}/regenerate-ai-analysis")]
-    public async Task<ActionResult<PhotoAsset>> RegenerateAIAnalysis(string id, CancellationToken ct = default)
+    public async Task<ActionResult<PhotoAsset>> RegenerateAIAnalysis(
+        string id,
+        [FromBody] RegenerateAIAnalysisRequest? request = null,
+        CancellationToken ct = default)
     {
         try
         {
-            var photo = await _processingService.RegenerateAIAnalysisAsync(id, ct);
+            var photo = await _processingService.RegenerateAIAnalysisAsync(id, request?.AnalysisStyleId, ct);
             return Ok(photo);
         }
         catch (InvalidOperationException ex)
@@ -828,4 +833,16 @@ public class SmartCollection
     public DateTime LastUpdated { get; set; }
     public string Icon { get; set; } = ""; // Icon name for frontend
     public string? Description { get; set; } // Optional subtitle
+}
+
+/// <summary>
+/// Request model for regenerating AI analysis with optional style selection
+/// </summary>
+public class RegenerateAIAnalysisRequest
+{
+    /// <summary>
+    /// Optional analysis style ID (smart, portrait, product, landscape, architecture, action, macro)
+    /// If null, uses last-used style or defaults to base prompt
+    /// </summary>
+    public string? AnalysisStyleId { get; set; }
 }

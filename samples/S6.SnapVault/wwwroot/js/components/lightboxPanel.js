@@ -3,6 +3,8 @@
  * Consolidates metadata, AI insights, actions, and keyboard shortcuts
  */
 
+import { SplitButton } from './splitButton.js';
+
 export class LightboxPanel {
   constructor(lightbox, app) {
     this.lightbox = lightbox;
@@ -10,8 +12,11 @@ export class LightboxPanel {
     this.isOpen = false;
     this.currentPhotoData = null;
     this.container = null;
+    this.splitButton = null;
+    this.analysisStyles = []; // Cached analysis styles from API
     this.createDOM();
     this.setupMobileGestures();
+    this.loadAnalysisStyles(); // Load styles on initialization
   }
 
   createDOM() {
@@ -342,15 +347,8 @@ export class LightboxPanel {
           </div>
         ` : ''}
 
-        <!-- Regenerate button -->
-        <button class="btn-regenerate-ai" id="btn-regenerate-new" aria-label="Regenerate AI analysis">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="23 4 23 10 17 10"></polyline>
-            <polyline points="1 20 1 14 7 14"></polyline>
-            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
-          </svg>
-          <span class="action-label">Regenerate Description</span>
-        </button>
+        <!-- Regenerate button container (will be replaced with SplitButton) -->
+        <div id="regenerate-button-container"></div>
       `;
 
       // Add tag click handlers for filtering (future feature)
@@ -378,11 +376,40 @@ export class LightboxPanel {
         });
       });
 
-      // Regenerate button handler
-      const newRegenerateBtn = aiContent.querySelector('#btn-regenerate-new');
-      newRegenerateBtn.addEventListener('click', async () => {
-        await this.regenerateAIAnalysis();
-      });
+      // Create SplitButton for regenerate action
+      const buttonContainer = aiContent.querySelector('#regenerate-button-container');
+      if (buttonContainer) {
+        // Clean up existing split button if any
+        if (this.splitButton) {
+          this.splitButton.destroy();
+        }
+
+        // Get last used style from photo analysis
+        const lastUsedStyle = analysis.analysisStyle || 'smart';
+
+        // Create new split button
+        this.splitButton = new SplitButton({
+          primaryLabel: 'Regenerate Description',
+          primaryIcon: `
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="23 4 23 10 17 10"></polyline>
+              <polyline points="1 20 1 14 7 14"></polyline>
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+            </svg>
+          `,
+          onPrimaryClick: async () => {
+            await this.regenerateAIAnalysis(); // Use last-used style
+          },
+          onStyleSelect: async (styleId) => {
+            await this.regenerateAIAnalysis(styleId); // Use selected style
+          },
+          styles: this.analysisStyles,
+          lastUsedStyle: lastUsedStyle,
+          ariaLabel: 'Regenerate AI analysis'
+        });
+
+        buttonContainer.appendChild(this.splitButton.getElement());
+      }
 
       return;
     }
@@ -701,28 +728,50 @@ export class LightboxPanel {
     }
   }
 
-  async regenerateAIAnalysis() {
+  async loadAnalysisStyles() {
+    try {
+      const response = await this.app.api.get('/api/analysis-styles/active');
+      this.analysisStyles = response || [];
+    } catch (error) {
+      console.error('Failed to load analysis styles:', error);
+      // Fallback to default smart style
+      this.analysisStyles = [{
+        id: 'smart',
+        label: 'Smart Analysis',
+        icon: '🤖',
+        description: 'AI automatically determines best approach',
+        priority: 0
+      }];
+    }
+  }
+
+  async regenerateAIAnalysis(analysisStyle = null) {
     if (!this.currentPhotoData || !this.currentPhotoData.id) return;
 
-    const regenerateBtn = this.container.querySelector('#btn-regenerate-new');
-    if (!regenerateBtn) return;
-
-    // Show loading state
-    regenerateBtn.disabled = true;
-    regenerateBtn.classList.add('loading');
-    const originalText = regenerateBtn.querySelector('.action-label').textContent;
-    regenerateBtn.querySelector('.action-label').textContent = 'Regenerating...';
+    // If using split button, set loading state
+    if (this.splitButton) {
+      this.splitButton.setLoading(true);
+    }
 
     try {
       this.app.components.toast.show('Regenerating AI analysis...', { icon: '🎲', duration: 2000 });
 
+      // Prepare request body with optional analysis style
+      const requestBody = analysisStyle ? { analysisStyleId: analysisStyle } : null;
+
       // Call new regenerate endpoint that preserves locked facts
       const updatedPhoto = await this.app.api.post(
-        `/api/photos/${this.currentPhotoData.id}/regenerate-ai-analysis`
+        `/api/photos/${this.currentPhotoData.id}/regenerate-ai-analysis`,
+        requestBody
       );
 
       // Update current photo data
       this.currentPhotoData = updatedPhoto;
+
+      // Update last used style in split button
+      if (this.splitButton && updatedPhoto.aiAnalysis?.analysisStyle) {
+        this.splitButton.updateLastUsedStyle(updatedPhoto.aiAnalysis.analysisStyle);
+      }
 
       // Re-render AI insights
       this.renderAIInsights(updatedPhoto);
@@ -732,11 +781,11 @@ export class LightboxPanel {
     } catch (error) {
       console.error('Failed to regenerate AI analysis:', error);
       this.app.components.toast.show('Failed to regenerate AI analysis', { icon: '⚠️', type: 'error' });
-
+    } finally {
       // Restore button state
-      regenerateBtn.disabled = false;
-      regenerateBtn.classList.remove('loading');
-      regenerateBtn.querySelector('.action-label').textContent = originalText;
+      if (this.splitButton) {
+        this.splitButton.setLoading(false);
+      }
     }
   }
 

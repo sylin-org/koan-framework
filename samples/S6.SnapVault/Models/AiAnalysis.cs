@@ -44,6 +44,25 @@ public class AiAnalysis
     public HashSet<string> LockedFactKeys { get; set; } = new();
 
     /// <summary>
+    /// Analysis style used for last generation (smart, portrait, product, landscape, etc.)
+    /// Enables "regenerate with same style" and preference learning
+    /// </summary>
+    [JsonPropertyName("analysisStyle")]
+    public string? AnalysisStyle { get; set; } = "smart";
+
+    /// <summary>
+    /// Timestamp of last analysis generation
+    /// </summary>
+    [JsonPropertyName("analyzedAt")]
+    public DateTime? AnalyzedAt { get; set; }
+
+    /// <summary>
+    /// Token count for observability and cost tracking
+    /// </summary>
+    [JsonPropertyName("tokensUsed")]
+    public int? TokensUsed { get; set; }
+
+    /// <summary>
     /// Converts analysis to embedding text for vector search
     /// Format: "tag1, tag2, tag3, summary sentence, fact1-value, fact2-value, ..."
     /// </summary>

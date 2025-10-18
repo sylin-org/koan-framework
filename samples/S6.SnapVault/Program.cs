@@ -3,7 +3,9 @@ using Koan.Web;
 using Koan.Web.Extensions;
 using S6.SnapVault.Configuration;
 using S6.SnapVault.Services;
+using S6.SnapVault.Services.AI;
 using S6.SnapVault.Hubs;
+using S6.SnapVault.Initialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -17,6 +19,7 @@ EntityLifecycleConfiguration.Configure();
 
 // Register application services
 builder.Services.AddScoped<IPhotoProcessingService, PhotoProcessingService>();
+builder.Services.AddSingleton<IAnalysisPromptFactory, AnalysisPromptFactory>();
 
 // Register background processing queue and worker
 builder.Services.AddSingleton<IPhotoProcessingQueue, InMemoryPhotoProcessingQueue>();
@@ -37,6 +40,10 @@ builder.Services.AddCors(options =>
 });
 
 var app = builder.Build();
+
+// Seed default analysis styles (S5.Recs pattern)
+var logger = app.Services.GetRequiredService<ILogger<Program>>();
+await AnalysisStyleSeeder.SeedDefaultStylesAsync(logger);
 
 // Configure middleware pipeline
 if (app.Environment.IsDevelopment())

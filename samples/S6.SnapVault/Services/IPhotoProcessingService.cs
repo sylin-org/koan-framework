@@ -29,5 +29,8 @@ public interface IPhotoProcessingService
     /// Regenerate AI analysis for a photo while preserving locked facts
     /// Used for "reroll with holds" mechanic - users can lock specific facts and reroll the rest
     /// </summary>
-    Task<PhotoAsset> RegenerateAIAnalysisAsync(string photoId, CancellationToken ct = default);
+    /// <param name="photoId">Photo ID to regenerate analysis for</param>
+    /// <param name="analysisStyle">Optional analysis style (smart, portrait, product, etc.). If null, uses last style or default.</param>
+    /// <param name="ct">Cancellation token</param>
+    Task<PhotoAsset> RegenerateAIAnalysisAsync(string photoId, string? analysisStyle = null, CancellationToken ct = default);
 }

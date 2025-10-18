@@ -4,12 +4,14 @@ using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Metadata.Profiles.Exif;
 using S6.SnapVault.Models;
 using S6.SnapVault.Hubs;
+using S6.SnapVault.Services.AI;
 using Koan.Media.Core.Extensions;
 using Koan.AI;
 using Koan.Data.Core;
 using Koan.Data.Vector;
 using System.Text.RegularExpressions;
 using Newtonsoft.Json.Linq;
+using System.Diagnostics;
 
 namespace S6.SnapVault.Services;
 
@@ -20,13 +22,16 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
 {
     private readonly ILogger<PhotoProcessingService> _logger;
     private readonly IHubContext<PhotoProcessingHub> _hubContext;
+    private readonly IAnalysisPromptFactory _promptFactory;
 
     public PhotoProcessingService(
         ILogger<PhotoProcessingService> logger,
-        IHubContext<PhotoProcessingHub> hubContext)
+        IHubContext<PhotoProcessingHub> hubContext,
+        IAnalysisPromptFactory promptFactory)
     {
         _logger = logger;
         _hubContext = hubContext;
+        _promptFactory = promptFactory;
     }
 
     public async Task<PhotoAsset> ProcessUploadAsync(string? eventId, IFormFile file, string jobId, CancellationToken ct = default)
@@ -221,7 +226,7 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
             _logger.LogInformation("Generating AI metadata for photo {PhotoId}", photo.Id);
 
             // Generate detailed description using vision AI
-            await GenerateDetailedDescriptionAsync(photo, ct);
+            await GenerateDetailedDescriptionAsync(photo, null, ct);
 
             // Build embedding text from available metadata (including detailed description)
             var embeddingText = BuildEmbeddingText(photo);
@@ -590,12 +595,21 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
 
     /// <summary>
     /// Generate structured AI analysis for a photo using vision model
+    /// Uses factory pattern for prompt assembly with entity-based style customization
     /// </summary>
-    private async Task GenerateDetailedDescriptionAsync(PhotoAsset photo, CancellationToken ct)
+    private async Task GenerateDetailedDescriptionAsync(PhotoAsset photo, string? analysisStyleId = null, CancellationToken ct = default)
     {
         try
         {
-            _logger.LogInformation("Generating structured AI analysis for photo {PhotoId}", photo.Id);
+            var stopwatch = Stopwatch.StartNew();
+
+            // Resolve analysis style entity (requested → last used → null=default)
+            var styleEntity = await ResolveAnalysisStyleAsync(analysisStyleId, photo, ct);
+            var effectiveStyleName = styleEntity?.Name ?? "default";
+
+            _logger.LogInformation(
+                "Generating structured AI analysis for photo {PhotoId} with style '{Style}'",
+                photo.Id, effectiveStyleName);
 
             // Load gallery image
             var gallery = await PhotoGallery.Get(photo.GalleryMediaId, ct);
@@ -610,52 +624,39 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
             await imageStream.CopyToAsync(ms, ct);
             var imageBytes = ms.ToArray();
 
-            // Refined JSON prompt - ALL facts as arrays for uniform filtering
-            var prompt = @"Analyze the image and output ONLY valid JSON (no markdown, no comments). Describe ONLY what is clearly visible—never guess. Use concise, concrete language.
+            // Build photo context for variable substitution
+            var context = new PhotoContext(
+                PhotoId: photo.Id,
+                Width: photo.Width,
+                Height: photo.Height,
+                AspectRatio: (double)photo.Width / photo.Height,
+                CameraModel: photo.CameraModel,
+                CapturedAt: photo.CapturedAt,
+                ExifData: null
+            );
 
-Guidelines:
-- ""tags"": 6–10 searchable keywords; lowercase; hyphenate multi-word terms (e.g., ""red-hoodie"", ""neon-lights""); include evident aesthetics (e.g., ""b&w"", ""gothic-lolita"", ""decora"", ""western"", ""60s"").
-- ""summary"": single sentence with concrete visual facts + evident aesthetic cues.
-- ""facts"": ALL keys MUST be lowercase (e.g., ""type"", ""style"", ""subject count""). ALL values MUST be arrays, even single values, to enable uniform filtering. Each fact CAN have multiple entries; examples are non-exhaustive, complement the fact's list as necessary.
-- Add optional fact fields ONLY when clearly visible; omit otherwise.
-- Escape all strings properly; return the JSON object only.
+            // Assemble prompt from factory
+            string prompt;
+            if (styleEntity == null)
+            {
+                // Default: base prompt only
+                prompt = _promptFactory.RenderPrompt();
+            }
+            else if (styleEntity.IsSmartStyle)
+            {
+                // Smart mode: classify first, then render for detected style
+                var detectedStyle = await ClassifyImageStyleAsync(photo, imageBytes, ct);
+                prompt = _promptFactory.RenderPromptFor(detectedStyle);
+                effectiveStyleName = $"smart→{detectedStyle.Name}";
+            }
+            else
+            {
+                // Direct style selection
+                prompt = _promptFactory.RenderPromptFor(styleEntity);
+            }
 
-Return JSON in this format:
-{
-  ""tags"": [""tag1"",""tag2"",""...""],
-  ""summary"": ""30–80 words describing subject, action, setting, lighting, and any evident aesthetics/themes."",
-  ""facts"": {
-    ""type"": [""portrait"",""landscape"",""still-life"",""product"",""food"",""screenshot"",""architecture"",""wildlife"",""macro"",""abstract"",""other"",""...""],
-    ""style"": [""photography"",""painting"",""digital-art"",""illustration"",""abstract"",""ingame-screenshot"",""other"",""...""],
-    ""subject count"": [""no subjects"",""1 person"",""2 people"",""3+ people"",""single object"",""multiple items"",""animals"",""...""],
-    ""composition"": [""centered"",""rule-of-thirds"",""symmetrical"",""diagonal"",""leading-lines"",""framed"",""off-center"",""close-up"",""wide"",""...""],
-    ""palette"": [""color1"",""color2"",""color3"",""...""],
-    ""lighting"": [""overcast"",""golden-hour"",""studio"",""natural"",""soft"",""dramatic"",""backlit"",""low-key"",""high-key"",""neon"",""spotlit"",""...""],
-    ""setting"": [""indoor"",""outdoor"",""studio"",""urban"",""nature"",""...""],
-    ""mood"": [""mysterious"",""cheerful"",""serene"",""dramatic"",""playful"",""somber"",""energetic"",""contemplative"",""romantic"",""tense"",""...""],
-    ""themes"": [""b&w"",""film-noir"",""gothic-lolita"",""decora"",""western"",""60s"",""y2k"",""cyberpunk"",""minimalist"",""...""],
-
-    // Per-subject facts (arrays; MUST be present if at least one subject is shown):
-    // ""subject 1"": [""person"",""black-hoodie"",""smiling"",""looking-left"",""streetwear"",""...""],
-    // ""subject 2"": [""building"",""brick-facade"",""arched-windows"",""centered"",""...""],
-    // ""subject 3"": [""tree"",""bare-branches"",""midground"",""...""],
-
-    // Optional facts (arrays; only if clearly visible, omit otherwise; 2+ items per fact preferred if applicable):
-    // ""era cues"": [""1960s"",""disco"",""vintage"",""retro"",""silver-age"",""...""],
-    // ""color grade"": [""black-and-white"",""sepia"",""teal-orange"",""cool"",""warm"",""neutral"",""monochrome"",""duotone"",""...""],
-    // ""light sources"": [""sun"",""neon-signs"",""led-panels"",""...""],
-    // ""depth cues"": [""bokeh"",""shallow-focus"",""deep-focus"",""motion-blur"",""...""],
-    // ""atmospherics"": [""fog"",""haze"",""smoke"",""rain"",""snow"",""sparks"",""god-rays"",""dust"",""...""],
-    // ""locale cues"": [""architecture"",""props"",""vegetation"",""...""],
-    // ""time"": [""day"",""night"",""sunset"",""sunrise"",""...""],
-    // ""weather"": [""clear"",""overcast"",""rainy"",""snowy"",""indoor"",""...""],
-    // ""visible text"": [""exact text if readable""]
-  }
-}
-
-IMPORTANT: All fact keys MUST be lowercase. All fact values MUST be arrays, even single items. Example: ""type"": [""portrait""], not ""Type"": ""portrait"".
-
-Analyze the image and return the JSON now.";
+            // Apply variable substitution
+            prompt = _promptFactory.SubstituteVariables(prompt, context);
 
             // Use vision model
             var visionOptions = new Koan.AI.Contracts.Options.AiVisionOptions
@@ -677,19 +678,133 @@ Analyze the image and return the JSON now.";
                 analysis = AiAnalysis.CreateError("Failed to parse AI vision response");
             }
 
+            // Update analysis metadata
+            analysis.AnalysisStyle = styleEntity?.Id ?? "default";
+            analysis.AnalyzedAt = DateTime.UtcNow;
+            analysis.TokensUsed = null; // TODO: Extract from response if available
+
             // Store structured analysis
             photo.AiAnalysis = analysis;
             await photo.Save(ct);
 
+            stopwatch.Stop();
+
             _logger.LogInformation(
-                "Structured AI analysis generated for photo {PhotoId}: {TagCount} tags, {FactCount} facts",
-                photo.Id, analysis.Tags.Count, analysis.Facts.Count);
+                "Structured AI analysis generated for photo {PhotoId} in {ElapsedMs}ms: style={Style}, tags={TagCount}, facts={FactCount}",
+                photo.Id, stopwatch.ElapsedMilliseconds, effectiveStyleName, analysis.Tags.Count, analysis.Facts.Count);
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Failed to generate AI analysis for photo {PhotoId}, continuing without it", photo.Id);
             // Non-fatal - continue processing
         }
+    }
+
+    /// <summary>
+    /// Resolve the analysis style entity to use based on priority: explicit request → last used → null (default)
+    /// </summary>
+    private async Task<AnalysisStyle?> ResolveAnalysisStyleAsync(string? requestedId, PhotoAsset photo, CancellationToken ct)
+    {
+        // Priority 1: Explicit request
+        if (!string.IsNullOrEmpty(requestedId))
+        {
+            var requested = await AnalysisStyle.Get(requestedId, ct);
+            if (requested != null && requested.IsActive)
+            {
+                return requested;
+            }
+            else
+            {
+                _logger.LogWarning("Invalid or inactive analysis style '{StyleId}' requested, falling back to default", requestedId);
+            }
+        }
+
+        // Priority 2: Last used style from existing analysis
+        if (!string.IsNullOrEmpty(photo.AiAnalysis?.AnalysisStyle))
+        {
+            var lastUsed = await AnalysisStyle.Get(photo.AiAnalysis.AnalysisStyle, ct);
+            if (lastUsed != null && lastUsed.IsActive)
+            {
+                return lastUsed;
+            }
+        }
+
+        // Priority 3: Null = use default base prompt (no customization)
+        return null;
+    }
+
+    /// <summary>
+    /// Classify image style for smart mode using two-stage analysis
+    /// Caches result in PhotoAsset.InferredStyleId to avoid repeated classification
+    /// </summary>
+    private async Task<AnalysisStyle> ClassifyImageStyleAsync(PhotoAsset photo, byte[] imageBytes, CancellationToken ct)
+    {
+        // Check cache first
+        if (!string.IsNullOrEmpty(photo.InferredStyleId))
+        {
+            var cached = await AnalysisStyle.Get(photo.InferredStyleId, ct);
+            if (cached != null && cached.IsActive && !cached.IsSmartStyle)
+            {
+                _logger.LogDebug("Using cached style inference for photo {PhotoId}: {StyleName}", photo.Id, cached.Name);
+                return cached;
+            }
+        }
+
+        // Get available styles for classification (exclude smart itself)
+        var availableStyles = await AnalysisStyle.Query(s =>
+            !s.IsSmartStyle && s.IsActive && s.IsSystemStyle, ct);
+
+        if (!availableStyles.Any())
+        {
+            _logger.LogWarning("No styles available for classification, using first active style");
+            var fallback = await AnalysisStyle.Query(s => s.IsActive, ct);
+            return fallback.FirstOrDefault() ?? throw new InvalidOperationException("No active analysis styles found");
+        }
+
+        // Generate classification prompt
+        var classificationPrompt = _promptFactory.GetClassificationPrompt(availableStyles);
+
+        _logger.LogDebug("Classifying image style for photo {PhotoId}...", photo.Id);
+        var classificationStart = Stopwatch.StartNew();
+
+        // Call AI for classification
+        var classificationOptions = new Koan.AI.Contracts.Options.AiVisionOptions
+        {
+            ImageBytes = imageBytes,
+            Prompt = classificationPrompt,
+            Model = "qwen2.5vl",
+            Temperature = 0.3 // Lower temperature for more consistent classification
+        };
+
+        var classificationResponse = await Koan.AI.Ai.Understand(classificationOptions, ct);
+        classificationStart.Stop();
+
+        // Parse classification result (should be style name like "portrait" or "landscape")
+        var detectedStyleName = classificationResponse.Trim().ToLower();
+
+        // Find matching style
+        var detectedStyle = availableStyles.FirstOrDefault(s =>
+            s.Name.ToLower().Contains(detectedStyleName) ||
+            s.Id.ToLower() == detectedStyleName);
+
+        if (detectedStyle == null)
+        {
+            _logger.LogWarning(
+                "Classification returned unrecognized style '{DetectedStyle}', defaulting to first style",
+                detectedStyleName);
+            detectedStyle = availableStyles.OrderBy(s => s.Priority).First();
+        }
+
+        // Cache the inference
+        photo.InferredStyleId = detectedStyle.Id;
+        photo.InferredAt = DateTime.UtcNow;
+        await photo.Save(ct);
+
+        _logger.LogInformation(
+            "Classified photo {PhotoId} as '{StyleName}' in {ElapsedMs}ms",
+            photo.Id, detectedStyle.Name, classificationStart.ElapsedMilliseconds);
+
+        return detectedStyle;
     }
 
     /// <summary>
@@ -800,7 +915,7 @@ Analyze the image and return the JSON now.";
     /// Regenerate AI analysis for a photo while preserving locked facts
     /// "Reroll with holds" mechanic - locked facts are buffered and reapplied after regeneration
     /// </summary>
-    public async Task<PhotoAsset> RegenerateAIAnalysisAsync(string photoId, CancellationToken ct = default)
+    public async Task<PhotoAsset> RegenerateAIAnalysisAsync(string photoId, string? analysisStyle = null, CancellationToken ct = default)
     {
         _logger.LogInformation("Regenerating AI analysis for photo {PhotoId}", photoId);
 
@@ -838,7 +953,7 @@ Analyze the image and return the JSON now.";
         }
 
         // 2. Regenerate AI analysis (this will replace photo.AiAnalysis)
-        await GenerateDetailedDescriptionAsync(photo, ct);
+        await GenerateDetailedDescriptionAsync(photo, analysisStyle, ct);
 
         // 3. Restore locked content (add them back if missing, overwrite if present)
         if (photo.AiAnalysis != null)
