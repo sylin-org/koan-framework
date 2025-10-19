@@ -5,7 +5,6 @@
  */
 
 import { escapeHtml } from '../utils/html.js';
-import { confirmDeleteCollection } from '../utils/dialogs.js';
 
 export class CollectionsSidebar {
   constructor(app) {
@@ -167,7 +166,8 @@ export class CollectionsSidebar {
     const collection = this.collections.find(c => c.id === collectionId);
     if (!collection) return;
 
-    if (!confirmDeleteCollection(collection.name, collection.photoCount)) return;
+    // NOTE: Confirmation is now handled by ActionRegistry (collection.delete action)
+    // No need to confirm again here
 
     try {
       await this.app.api.delete(`/api/collections/${collectionId}`);
@@ -182,16 +182,14 @@ export class CollectionsSidebar {
 
       await this.loadCollections();
       this.render();
-      this.app.components.toast.show(`Collection "${collection.name}" deleted`, {
-        icon: '🗑️',
-        duration: 2000
-      });
+
+      // NOTE: Success feedback is now handled by ActionExecutor
+      // No need to show toast here
+
+      return collection; // Return collection for ActionRegistry feedback
     } catch (error) {
       console.error('[CollectionsSidebar] Failed to delete collection:', error);
-      this.app.components.toast.show('Failed to delete collection', {
-        icon: '⚠️',
-        duration: 3000
-      });
+      throw error; // Let ActionExecutor handle error feedback
     }
   }
 

@@ -374,13 +374,14 @@ export const ActionRegistry = {
     async execute(app, collection) {
       // Delegate to collectionsSidebar
       if (app.components.collectionsSidebar) {
-        await app.components.collectionsSidebar.deleteCollection(collection.id);
+        const deletedCollection = await app.components.collectionsSidebar.deleteCollection(collection.id);
+        return deletedCollection; // Return collection for feedback
       }
       return Promise.resolve({ deleted: true });
     },
 
     feedback: {
-      single: (collection) => `Collection "${collection.name}" deleted`,
+      single: (result) => result.name ? `Collection "${result.name}" deleted` : 'Collection deleted',
       error: 'Failed to delete collection',
       icon: '🗑️'
     },
