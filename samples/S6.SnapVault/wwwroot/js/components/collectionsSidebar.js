@@ -23,7 +23,8 @@ export class CollectionsSidebar {
   async loadCollections() {
     try {
       const response = await this.app.api.get('/api/collections');
-      this.collections = response || [];
+      // Sort by ID descending (newest first - GUID v7 has timestamp embedded)
+      this.collections = (response || []).sort((a, b) => b.id.localeCompare(a.id));
       console.log(`[CollectionsSidebar] Loaded ${this.collections.length} collections`);
     } catch (error) {
       console.error('[CollectionsSidebar] Failed to load collections:', error);
@@ -89,9 +90,6 @@ export class CollectionsSidebar {
            data-droppable="true"
            role="button"
            tabindex="0">
-        <svg class="item-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
-        </svg>
         <span class="item-label">${escapeHtml(collection.name)}</span>
         <span class="item-badge${nearLimit ? ' near-limit' : ''}">${collection.photoCount}</span>
       </div>

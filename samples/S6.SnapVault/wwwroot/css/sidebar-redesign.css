@@ -249,6 +249,37 @@
   box-shadow: 0 0 0 2px rgba(212, 175, 55, 0.3);
 }
 
+/* Collections Section - Compact Layout with Scrolling */
+.collections-section .section-items {
+  gap: 4px; /* Tighter spacing for collections */
+  max-height: 400px; /* Allow scrolling when list gets long */
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 4px; /* Space for scrollbar */
+}
+
+.collections-section .sidebar-item {
+  padding: 8px 12px; /* Reduced vertical padding */
+}
+
+/* Collection items scrollbar */
+.collections-section .section-items::-webkit-scrollbar {
+  width: 4px;
+}
+
+.collections-section .section-items::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.collections-section .section-items::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 2px;
+}
+
+.collections-section .section-items::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
 /* Scrollbar Styling - Minimal (macOS-like) */
 .sidebar-left::-webkit-scrollbar {
   width: 6px;
