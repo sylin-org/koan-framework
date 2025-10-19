@@ -147,7 +147,13 @@ class SnapVaultApp {
 
   setupViewPresetControls() {
     const presetButtons = document.querySelectorAll('.view-toggle');
+    const currentPreset = this.state.viewPreset;
+
     presetButtons.forEach(btn => {
+      // Set initial active state based on loaded preference
+      btn.classList.toggle('active', btn.dataset.preset === currentPreset);
+
+      // Add click handler
       btn.addEventListener('click', () => {
         const preset = btn.dataset.preset;
         this.setViewPreset(preset);
