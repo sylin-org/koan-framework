@@ -432,7 +432,7 @@ class SnapVaultApp {
 
     // Only calculate favorites count from loaded photos when in All Photos view
     // Otherwise it will be inaccurate (shows only favorites in current collection)
-    const { viewState } = this.app.components.collectionView || {};
+    const { viewState } = this.components.collectionView || {};
     const favoritesCount = viewState?.type === 'all-photos'
       ? this.state.photos.filter(p => p.isFavorite).length
       : this.state.favoritesCount || 0;
