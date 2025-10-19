@@ -107,7 +107,7 @@ class SnapVaultApp {
     await this.components.collectionsSidebar.init();
     this.components.photoSelection.init();
     this.components.dragDrop.init();
-    await this.components.collectionView.load('all-photos');
+    await this.components.collectionView.setView('all-photos');
 
     // Enable infinite scroll after initial load
     this.components.grid.enableInfiniteScroll();

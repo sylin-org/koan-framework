@@ -125,7 +125,7 @@ export class CollectionsSidebar {
 
     // Update main content
     if (this.app.components.collectionView) {
-      this.app.components.collectionView.load(viewId);
+      this.app.components.collectionView.setView(viewId);
     }
 
     // Clear library section active state
@@ -178,7 +178,7 @@ export class CollectionsSidebar {
       if (this.activeViewId === collectionId) {
         this.activeViewId = 'all-photos';
         if (this.app.components.collectionView) {
-          this.app.components.collectionView.load('all-photos');
+          this.app.components.collectionView.setView('all-photos');
         }
       }
 

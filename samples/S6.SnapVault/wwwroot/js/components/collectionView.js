@@ -2,6 +2,12 @@
  * CollectionView Component
  * Manages the main content area header and actions for different views
  * Handles context-specific actions: All Photos, Favorites, Collection views
+ *
+ * State Management:
+ * Single viewState object determines all UI rendering and behavior
+ * - { type: 'all-photos' }
+ * - { type: 'favorites' }
+ * - { type: 'collection', collection: {...} }
  */
 
 import { getSelectedPhotoIds, formatActionMessage } from '../utils/selection.js';
@@ -12,21 +18,29 @@ import { pluralize } from '../utils/html.js';
 export class CollectionView {
   constructor(app) {
     this.app = app;
-    this.currentViewId = 'all-photos'; // 'all-photos' | 'favorites' | collectionId
-    this.collection = null;
+    this.viewState = { type: 'all-photos' }; // Single source of truth
   }
 
   /**
-   * Load and display a specific view
+   * Set view and load data
+   * Single entry point for all view transitions
    */
-  async load(viewId) {
-    this.currentViewId = viewId;
-    this.collection = null;
+  async setView(viewId) {
+    console.log(`[CollectionView] Setting view to: ${viewId}`);
 
-    // Load collection data if viewing a collection
-    if (viewId !== 'all-photos' && viewId !== 'favorites') {
+    // Build new state object based on viewId
+    if (viewId === 'all-photos') {
+      this.viewState = { type: 'all-photos' };
+    } else if (viewId === 'favorites') {
+      this.viewState = { type: 'favorites' };
+    } else {
+      // It's a collection ID - load the data
       try {
-        this.collection = await this.app.api.get(`/api/collections/${viewId}`);
+        const collection = await this.app.api.get(`/api/collections/${viewId}`);
+        this.viewState = {
+          type: 'collection',
+          collection: collection
+        };
       } catch (error) {
         console.error('[CollectionView] Failed to load collection:', error);
         this.app.components.toast.show('Failed to load collection', {
@@ -34,21 +48,23 @@ export class CollectionView {
           duration: 3000
         });
         // Fallback to all photos
-        this.currentViewId = 'all-photos';
+        this.viewState = { type: 'all-photos' };
       }
     }
 
-    // Show/hide right sidebar based on view type
-    // Only show for collection views, hide for All Photos and Favorites
+    // Update all UI based on new state
+    this.updateUI();
+
+    console.log(`[CollectionView] View state:`, this.viewState);
+  }
+
+  /**
+   * Update all UI components based on current viewState
+   */
+  updateUI() {
     this.updateRightSidebarVisibility();
-
-    // Render header
     this.renderHeader();
-
-    // Load photos for this view
-    await this.loadPhotos();
-
-    console.log(`[CollectionView] Loaded view: ${viewId}`);
+    this.loadPhotos();
   }
 
   /**
@@ -60,9 +76,7 @@ export class CollectionView {
     const rightSidebar = document.querySelector('.sidebar-right');
     if (!rightSidebar) return;
 
-    const isCollectionView = this.currentViewId !== 'all-photos' && this.currentViewId !== 'favorites';
-
-    if (isCollectionView) {
+    if (this.viewState.type === 'collection') {
       rightSidebar.style.display = 'block';
     } else {
       rightSidebar.style.display = 'none';
@@ -79,36 +93,41 @@ export class CollectionView {
       return;
     }
 
-    // Keep view controls, just update title and actions
     const titleElement = header.querySelector('.page-title');
     if (!titleElement) return;
 
     // Clear any previous edit handlers
     this.cleanupTitleEditHandlers(titleElement);
 
-    // Update title based on view
-    if (this.currentViewId === 'all-photos') {
-      titleElement.textContent = 'All Photos';
-      titleElement.contentEditable = false;
-      titleElement.classList.remove('editable');
-      this.renderAllPhotosActions(header);
-    } else if (this.currentViewId === 'favorites') {
-      titleElement.textContent = '⭐ Favorites';
-      titleElement.contentEditable = false;
-      titleElement.classList.remove('editable');
-      this.renderFavoritesActions(header);
-    } else if (this.collection) {
-      // Collection view - title is clickable to edit (not editable by default)
-      titleElement.textContent = `📁 ${this.collection.name}`;
-      titleElement.contentEditable = false; // NOT editable by default!
-      titleElement.classList.add('editable'); // Indicates it CAN be edited (cursor hint)
-      titleElement.dataset.collectionId = this.collection.id;
-      titleElement.dataset.originalName = this.collection.name;
+    // Render based on view type
+    switch (this.viewState.type) {
+      case 'all-photos':
+        titleElement.textContent = 'All Photos';
+        titleElement.contentEditable = false;
+        titleElement.classList.remove('editable');
+        this.renderAllPhotosActions(header);
+        break;
 
-      // Attach edit handlers (click to activate edit mode)
-      this.attachTitleEditHandlers(titleElement);
+      case 'favorites':
+        titleElement.textContent = '⭐ Favorites';
+        titleElement.contentEditable = false;
+        titleElement.classList.remove('editable');
+        this.renderFavoritesActions(header);
+        break;
 
-      this.renderCollectionActions(header);
+      case 'collection':
+        const { collection } = this.viewState;
+        titleElement.textContent = `📁 ${collection.name}`;
+        titleElement.contentEditable = false;
+        titleElement.classList.add('editable');
+        titleElement.dataset.collectionId = collection.id;
+        titleElement.dataset.originalName = collection.name;
+        this.attachTitleEditHandlers(titleElement);
+        this.renderCollectionActions(header);
+        break;
+
+      default:
+        console.warn('[CollectionView] Unknown view type:', this.viewState.type);
     }
   }
 
@@ -160,9 +179,11 @@ export class CollectionView {
             name: newName
           });
 
-          // Update stored original name
+          // Update state
           titleElement.dataset.originalName = newName;
-          this.collection.name = newName;
+          if (this.viewState.type === 'collection') {
+            this.viewState.collection.name = newName;
+          }
 
           // Reload sidebar to reflect change
           if (this.app.components.collectionsSidebar) {
@@ -210,8 +231,6 @@ export class CollectionView {
     titleElement.addEventListener('click', clickHandler);
     titleElement.addEventListener('blur', blurHandler);
     titleElement.addEventListener('keydown', keydownHandler);
-
-    console.log('[CollectionView] Attached title edit handlers for collection:', collectionId);
   }
 
   /**
@@ -294,7 +313,8 @@ export class CollectionView {
       header.appendChild(actionsContainer);
     }
 
-    const percentage = (this.collection.photoCount / 2048) * 100;
+    const { collection } = this.viewState;
+    const percentage = (collection.photoCount / 2048) * 100;
     const isNearLimit = percentage > 75;
 
     actionsContainer.innerHTML = `
@@ -302,7 +322,7 @@ export class CollectionView {
         <div class="capacity-bar">
           <div class="capacity-fill ${percentage > 90 ? 'warning' : ''}" style="width: ${percentage}%"></div>
         </div>
-        <span class="capacity-text">${this.collection.photoCount} / 2,048</span>
+        <span class="capacity-text">${collection.photoCount} / 2,048</span>
       </div>
       <button class="btn-remove-from-collection btn-secondary" title="Remove selected photos from this collection">
         <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -436,8 +456,13 @@ export class CollectionView {
     const selectedIds = getSelectedPhotoIds(this.app.state.selectedPhotos, this.app.components.toast);
     if (!selectedIds) return;
 
+    if (this.viewState.type !== 'collection') {
+      console.error('[CollectionView] Cannot remove from collection - not in collection view');
+      return;
+    }
+
     await executeWithFeedback(
-      () => this.app.api.post(`/api/collections/${this.currentViewId}/photos/remove`, {
+      () => this.app.api.post(`/api/collections/${this.viewState.collection.id}/photos/remove`, {
         photoIds: selectedIds
       }),
       {
@@ -455,52 +480,25 @@ export class CollectionView {
 
   /**
    * Load photos for current view
-   * Simplified: all views use same structure, just different data sources
+   * Delegates to appropriate loading strategy based on view type
    */
   async loadPhotos() {
     try {
-      if (this.currentViewId === 'all-photos') {
-        await this.app.loadPhotos();
-      } else if (this.currentViewId === 'favorites') {
-        await this.app.filterPhotos('favorites');
-      } else if (this.collection) {
-        // STEP 1: Flush existing state completely
-        this.app.state.photos = [];
-        this.app.state.currentPage = 1;
-        this.app.state.hasMorePages = false;
+      switch (this.viewState.type) {
+        case 'all-photos':
+          await this.app.loadPhotos();
+          break;
 
-        // STEP 2: Clear DOM immediately (don't wait for render)
-        const photoGrid = document.querySelector('.photo-grid');
-        if (photoGrid) {
-          const existingCards = photoGrid.querySelectorAll('.photo-card');
-          existingCards.forEach(card => card.remove());
-        }
+        case 'favorites':
+          await this.app.filterPhotos('favorites');
+          break;
 
-        // STEP 3: Load photos for this collection using available photoIds
-        if (this.collection.photoIds && this.collection.photoIds.length > 0) {
-          console.log('[CollectionView] Loading', this.collection.photoIds.length, 'photos for collection');
+        case 'collection':
+          await this.loadCollectionPhotos();
+          break;
 
-          // Fetch each photo individually using the IDs we have
-          const photoPromises = this.collection.photoIds.map(id =>
-            this.app.api.get(`/api/photos/${id}`)
-              .catch(err => {
-                console.warn('[CollectionView] Failed to load photo', id, err);
-                return null;
-              })
-          );
-
-          const photos = await Promise.all(photoPromises);
-          this.app.state.photos = photos.filter(p => p != null);
-
-          console.log('[CollectionView] Successfully loaded', this.app.state.photos.length, 'of', this.collection.photoIds.length, 'photos');
-        } else {
-          console.log('[CollectionView] Collection has no photos');
-        }
-
-        // STEP 4: Rebuild grid from scratch
-        this.app.components.grid.render();
-        this.app.updateLibraryCounts();
-        this.app.updateStatusBar();
+        default:
+          console.warn('[CollectionView] Unknown view type:', this.viewState.type);
       }
     } catch (error) {
       console.error('[CollectionView] Failed to load photos:', error);
@@ -509,5 +507,50 @@ export class CollectionView {
         duration: 3000
       });
     }
+  }
+
+  /**
+   * Load photos for a specific collection
+   */
+  async loadCollectionPhotos() {
+    const { collection } = this.viewState;
+
+    // STEP 1: Flush existing state completely
+    this.app.state.photos = [];
+    this.app.state.currentPage = 1;
+    this.app.state.hasMorePages = false;
+
+    // STEP 2: Clear DOM immediately (don't wait for render)
+    const photoGrid = document.querySelector('.photo-grid');
+    if (photoGrid) {
+      const existingCards = photoGrid.querySelectorAll('.photo-card');
+      existingCards.forEach(card => card.remove());
+    }
+
+    // STEP 3: Load photos for this collection using available photoIds
+    if (collection.photoIds && collection.photoIds.length > 0) {
+      console.log('[CollectionView] Loading', collection.photoIds.length, 'photos for collection');
+
+      // Fetch each photo individually using the IDs we have
+      const photoPromises = collection.photoIds.map(id =>
+        this.app.api.get(`/api/photos/${id}`)
+          .catch(err => {
+            console.warn('[CollectionView] Failed to load photo', id, err);
+            return null;
+          })
+      );
+
+      const photos = await Promise.all(photoPromises);
+      this.app.state.photos = photos.filter(p => p != null);
+
+      console.log('[CollectionView] Successfully loaded', this.app.state.photos.length, 'of', collection.photoIds.length, 'photos');
+    } else {
+      console.log('[CollectionView] Collection has no photos');
+    }
+
+    // STEP 4: Rebuild grid from scratch
+    this.app.components.grid.render();
+    this.app.updateLibraryCounts();
+    this.app.updateStatusBar();
   }
 }
