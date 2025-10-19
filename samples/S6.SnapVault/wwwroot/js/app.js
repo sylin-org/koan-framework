@@ -14,6 +14,10 @@ import { KeyboardShortcuts } from './components/keyboard.js';
 import { BulkActions } from './components/bulkActions.js';
 import { DiscoveryPanel } from './components/discovery-panel.js';
 import { Toast } from './components/toast.js';
+import { CollectionsSidebar } from './components/collectionsSidebar.js';
+import { PhotoSelection } from './components/photoSelection.js';
+import { DragDropManager } from './components/dragDropManager.js';
+import { CollectionView } from './components/collectionView.js';
 import { API } from './api.js';
 import { VIEW_PRESETS, migrateOldDensity } from './viewPresets.js';
 
@@ -75,6 +79,12 @@ class SnapVaultApp {
     this.components.bulkActions = new BulkActions(this);
     this.components.discoveryPanel = new DiscoveryPanel(this);
 
+    // Collection management components
+    this.components.collectionsSidebar = new CollectionsSidebar(this);
+    this.components.photoSelection = new PhotoSelection(this);
+    this.components.dragDrop = new DragDropManager(this);
+    this.components.collectionView = new CollectionView(this);
+
     // Setup event listeners
     this.setupWorkspaceNavigation();
     this.setupViewPresetControls(); // NEW: View preset controls
@@ -88,6 +98,12 @@ class SnapVaultApp {
 
     // Initialize Discovery Panel after photos are loaded
     await this.components.discoveryPanel.init();
+
+    // Initialize collection management
+    await this.components.collectionsSidebar.init();
+    this.components.photoSelection.init();
+    this.components.dragDrop.init();
+    await this.components.collectionView.load('all-photos');
 
     // Enable infinite scroll after initial load
     this.components.grid.enableInfiniteScroll();

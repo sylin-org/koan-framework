@@ -706,6 +706,66 @@ public class PhotosController : EntityController<PhotoAsset>
     }
 
     /// <summary>
+    /// Toggle favorite status for a single photo
+    /// PUT /api/photos/{id}/favorite
+    /// Body: { isFavorite: boolean }
+    /// </summary>
+    [HttpPut("{id}/favorite")]
+    public async Task<ActionResult> SetFavorite(
+        string id,
+        [FromBody] SetFavoriteRequest request,
+        CancellationToken ct = default)
+    {
+        try
+        {
+            var photo = await PhotoAsset.Get(id, ct);
+            if (photo == null)
+                return NotFound(new { Error = $"Photo '{id}' not found" });
+
+            photo.IsFavorite = request.IsFavorite;
+            await photo.Save(ct);
+
+            _logger.LogInformation("Set favorite status for photo {PhotoId} to {Status}",
+                id, request.IsFavorite);
+
+            return Ok(new
+            {
+                PhotoId = photo.Id,
+                IsFavorite = photo.IsFavorite
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to set favorite status for photo {PhotoId}", id);
+            return StatusCode(500, new { Error = "Failed to update favorite status" });
+        }
+    }
+
+    /// <summary>
+    /// Get all favorited photos
+    /// GET /api/photos/favorites
+    /// </summary>
+    [HttpGet("favorites")]
+    public async Task<ActionResult> GetFavorites(CancellationToken ct = default)
+    {
+        try
+        {
+            var favorites = await PhotoAsset.Query(p => p.IsFavorite == true, ct);
+
+            return Ok(new
+            {
+                Count = favorites.Count,
+                Photos = favorites
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to retrieve favorite photos");
+            return StatusCode(500, new { Error = "Failed to retrieve favorites" });
+        }
+    }
+
+    /// <summary>
     /// Bulk favorite/unfavorite photos
     /// </summary>
     [HttpPost("bulk/favorite")]
@@ -779,6 +839,11 @@ public class SearchRequest
 public class RateRequest
 {
     public int Rating { get; set; }
+}
+
+public class SetFavoriteRequest
+{
+    public bool IsFavorite { get; set; }
 }
 
 public class SearchResponse

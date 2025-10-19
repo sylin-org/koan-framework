@@ -1,0 +1,162 @@
+/**
+ * Minimal Collections CSS - Drop Zone Highlighting Only
+ * No user-select rules to avoid blocking text selection
+ */
+
+/* Show drop zones when photos are selected - Gold tone like locked AI chips */
+.photos-selected .collection-item,
+.photos-selected .btn-new-collection {
+  position: relative;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+/* Highlight on hover when photos selected */
+.photos-selected .collection-item:hover,
+.photos-selected .btn-new-collection:hover {
+  background-color: rgba(212, 175, 55, 0.1);
+  border-color: rgba(212, 175, 55, 0.5);
+}
+
+/* Active drop target during dragover */
+.collection-item.drop-target,
+.btn-new-collection.drop-target {
+  background-color: rgba(212, 175, 55, 0.15) !important;
+  border-color: rgba(212, 175, 55, 0.6) !important;
+  box-shadow: 0 0 0 2px rgba(212, 175, 55, 0.3);
+}
+
+/* Visual feedback that drop is possible - Gold dashed border */
+.photos-selected .collection-item::after,
+.photos-selected .btn-new-collection::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border: 2px dashed rgba(212, 175, 55, 0.5);
+  border-radius: 6px;
+  pointer-events: none;
+  transition: border-color 0.2s ease;
+}
+
+.photos-selected .collection-item:hover::after,
+.photos-selected .btn-new-collection:hover::after {
+  border-color: rgba(234, 192, 80, 0.8);
+}
+
+/* Collections panel header */
+.collections-panel .panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.collections-panel h3 {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+/* New collection button */
+.btn-new-collection {
+  padding: 0.5rem;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.8);
+  transition: all 0.2s ease;
+}
+
+.btn-new-collection:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: white;
+}
+
+/* Collection items */
+.collections-list {
+  padding: 0.5rem 0;
+}
+
+.collection-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+  width: 100%;
+  position: relative;
+}
+
+.collection-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.collection-item.active {
+  background: rgba(99, 102, 241, 0.15);
+  border-color: #6366f1;
+}
+
+.collection-item .icon {
+  flex-shrink: 0;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.collection-item .collection-name {
+  flex: 1;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.875rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.collection-item .badge {
+  flex-shrink: 0;
+  padding: 0.125rem 0.5rem;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+/* Delete button */
+.btn-delete-collection {
+  flex-shrink: 0;
+  padding: 0.25rem;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.4);
+  cursor: pointer;
+  font-size: 1.25rem;
+  line-height: 1;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  opacity: 0;
+}
+
+.collection-item:hover .btn-delete-collection {
+  opacity: 1;
+}
+
+.btn-delete-collection:hover {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+}
+
+/* Empty state */
+.collections-list .empty-state {
+  padding: 2rem 1rem;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 0.875rem;
+}

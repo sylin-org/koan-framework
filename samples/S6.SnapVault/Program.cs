@@ -6,6 +6,7 @@ using S6.SnapVault.Services;
 using S6.SnapVault.Services.AI;
 using S6.SnapVault.Hubs;
 using S6.SnapVault.Initialization;
+using S6.SnapVault.Controllers;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -16,6 +17,10 @@ builder.Services
 
 // Configure entity lifecycle events (cascade deletes, etc.)
 EntityLifecycleConfiguration.Configure();
+
+// Configure application options from appsettings.json
+builder.Services.Configure<CollectionOptions>(
+    builder.Configuration.GetSection("SnapVault:Collections"));
 
 // Register application services
 builder.Services.AddScoped<IPhotoProcessingService, PhotoProcessingService>();
