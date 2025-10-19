@@ -177,6 +177,11 @@ export class PhotoSelection {
       sidebar.classList.remove('photos-selected');
       console.log('[PhotoSelection] Selection cleared');
     }
+
+    // Update context panel to reflect selection changes
+    if (this.app.components.contextPanel) {
+      this.app.components.contextPanel.update();
+    }
   }
 
   /**

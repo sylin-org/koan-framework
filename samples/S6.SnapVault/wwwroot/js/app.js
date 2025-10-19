@@ -12,7 +12,7 @@ import { ProcessMonitor } from './components/processMonitor.js';
 import { Timeline } from './components/timeline.js';
 import { KeyboardShortcuts } from './components/keyboard.js';
 import { BulkActions } from './components/bulkActions.js';
-import { DiscoveryPanel } from './components/discovery-panel.js';
+import { ContextPanel } from './components/contextPanel.js';
 import { Toast } from './components/toast.js';
 import { CollectionsSidebar } from './components/collectionsSidebar.js';
 import { PhotoSelection } from './components/photoSelection.js';
@@ -81,7 +81,7 @@ class SnapVaultApp {
     this.components.timeline = new Timeline(this);
     this.components.keyboard = new KeyboardShortcuts(this);
     this.components.bulkActions = new BulkActions(this);
-    this.components.discoveryPanel = new DiscoveryPanel(this);
+    this.components.contextPanel = new ContextPanel(this);
 
     // Collection management components
     this.components.collectionsSidebar = new CollectionsSidebar(this);
@@ -99,9 +99,6 @@ class SnapVaultApp {
     // Load initial data
     await this.loadPhotos();
     await this.loadEvents();
-
-    // Initialize Discovery Panel after photos are loaded
-    await this.components.discoveryPanel.init();
 
     // Initialize collection management
     await this.components.collectionsSidebar.init();

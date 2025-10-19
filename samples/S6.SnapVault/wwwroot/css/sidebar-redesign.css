@@ -26,7 +26,7 @@
   /* Spacing - matches photo panel rhythm */
   --sidebar-section-gap: 32px;
   --sidebar-item-gap: 10px;
-  --sidebar-padding-horizontal: 24px;
+  --sidebar-padding-horizontal: 0;
 
   /* Active State - blue accent */
   --sidebar-active-border: rgba(99, 102, 241, 1);

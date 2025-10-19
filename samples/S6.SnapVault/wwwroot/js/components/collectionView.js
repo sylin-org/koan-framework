@@ -1,7 +1,7 @@
 /**
  * CollectionView Component
- * Manages the main content area header and actions for different views
- * Handles context-specific actions: All Photos, Favorites, Collection views
+ * Manages the main content area header (title + view modes)
+ * Actions are now handled by ContextPanel in the right sidebar
  *
  * State Management:
  * Single viewState object determines all UI rendering and behavior
@@ -9,11 +9,6 @@
  * - { type: 'favorites' }
  * - { type: 'collection', collection: {...} }
  */
-
-import { getSelectedPhotoIds, formatActionMessage } from '../utils/selection.js';
-import { confirmDelete } from '../utils/dialogs.js';
-import { executeWithFeedback } from '../utils/operations.js';
-import { pluralize } from '../utils/html.js';
 
 export class CollectionView {
   constructor(app) {
@@ -84,7 +79,8 @@ export class CollectionView {
   }
 
   /**
-   * Render context-specific header with actions
+   * Render context-specific header (title and icon only)
+   * Actions are now handled by ContextPanel in right sidebar
    */
   renderHeader() {
     const header = document.querySelector('.content-header');
@@ -93,6 +89,8 @@ export class CollectionView {
       return;
     }
 
+    // Update icon
+    const iconElement = header.querySelector('.collection-icon');
     const titleElement = header.querySelector('.page-title');
     if (!titleElement) return;
 
@@ -102,32 +100,37 @@ export class CollectionView {
     // Render based on view type
     switch (this.viewState.type) {
       case 'all-photos':
+        if (iconElement) iconElement.textContent = '📷';
         titleElement.textContent = 'All Photos';
         titleElement.contentEditable = false;
         titleElement.classList.remove('editable');
-        this.renderAllPhotosActions(header);
         break;
 
       case 'favorites':
-        titleElement.textContent = '⭐ Favorites';
+        if (iconElement) iconElement.textContent = '⭐';
+        titleElement.textContent = 'Favorites';
         titleElement.contentEditable = false;
         titleElement.classList.remove('editable');
-        this.renderFavoritesActions(header);
         break;
 
       case 'collection':
         const { collection } = this.viewState;
-        titleElement.textContent = `📁 ${collection.name}`;
+        if (iconElement) iconElement.textContent = '📁';
+        titleElement.textContent = collection.name;
         titleElement.contentEditable = false;
         titleElement.classList.add('editable');
         titleElement.dataset.collectionId = collection.id;
         titleElement.dataset.originalName = collection.name;
         this.attachTitleEditHandlers(titleElement);
-        this.renderCollectionActions(header);
         break;
 
       default:
         console.warn('[CollectionView] Unknown view type:', this.viewState.type);
+    }
+
+    // Update context panel
+    if (this.app.components.contextPanel) {
+      this.app.components.contextPanel.update();
     }
   }
 
@@ -256,231 +259,9 @@ export class CollectionView {
   }
 
   /**
-   * Render actions for All Photos view
-   */
-  renderAllPhotosActions(header) {
-    let actionsContainer = header.querySelector('.view-actions');
-    if (!actionsContainer) {
-      actionsContainer = document.createElement('div');
-      actionsContainer.className = 'view-actions';
-      header.appendChild(actionsContainer);
-    }
-
-    actionsContainer.innerHTML = `
-      <button class="btn-delete-selected btn-secondary" title="Permanently delete selected photos">
-        <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <polyline points="3 6 5 6 21 6"></polyline>
-          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-        </svg>
-        Delete Selected
-      </button>
-    `;
-
-    this.attachAllPhotosHandlers();
-  }
-
-  /**
-   * Render actions for Favorites view
-   */
-  renderFavoritesActions(header) {
-    let actionsContainer = header.querySelector('.view-actions');
-    if (!actionsContainer) {
-      actionsContainer = document.createElement('div');
-      actionsContainer.className = 'view-actions';
-      header.appendChild(actionsContainer);
-    }
-
-    actionsContainer.innerHTML = `
-      <button class="btn-unfavorite-selected btn-secondary" title="Remove selected photos from favorites">
-        <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
-        </svg>
-        Remove from Favorites
-      </button>
-    `;
-
-    this.attachFavoritesHandlers();
-  }
-
-  /**
-   * Render actions for Collection view
-   */
-  renderCollectionActions(header) {
-    let actionsContainer = header.querySelector('.view-actions');
-    if (!actionsContainer) {
-      actionsContainer = document.createElement('div');
-      actionsContainer.className = 'view-actions';
-      header.appendChild(actionsContainer);
-    }
-
-    const { collection } = this.viewState;
-    const percentage = (collection.photoCount / 2048) * 100;
-    const isNearLimit = percentage > 75;
-
-    actionsContainer.innerHTML = `
-      <div class="collection-capacity ${isNearLimit ? 'warning' : ''}">
-        <div class="capacity-bar">
-          <div class="capacity-fill ${percentage > 90 ? 'warning' : ''}" style="width: ${percentage}%"></div>
-        </div>
-        <span class="capacity-text">${collection.photoCount} / 2,048</span>
-      </div>
-      <button class="btn-remove-from-collection btn-secondary" title="Remove selected photos from this collection">
-        <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <line x1="18" y1="6" x2="6" y2="18"></line>
-          <line x1="6" y1="6" x2="18" y2="18"></line>
-        </svg>
-        Remove from Collection
-      </button>
-    `;
-
-    this.attachCollectionHandlers();
-  }
-
-  /**
-   * Attach event handlers for All Photos view actions
-   */
-  attachAllPhotosHandlers() {
-    const btnDelete = document.querySelector('.btn-delete-selected');
-    if (btnDelete) {
-      btnDelete.addEventListener('click', async () => {
-        await this.handleDeleteSelected();
-      });
-    }
-
-    // Keyboard shortcut: Delete key
-    this.attachKeyboardHandler('Delete', () => this.handleDeleteSelected());
-  }
-
-  /**
-   * Attach event handlers for Favorites view actions
-   */
-  attachFavoritesHandlers() {
-    const btnUnfavorite = document.querySelector('.btn-unfavorite-selected');
-    if (btnUnfavorite) {
-      btnUnfavorite.addEventListener('click', async () => {
-        await this.handleUnfavoriteSelected();
-      });
-    }
-
-    // Keyboard shortcut: Delete key (unfavorite in Favorites view)
-    this.attachKeyboardHandler('Delete', () => this.handleUnfavoriteSelected());
-  }
-
-  /**
-   * Attach event handlers for Collection view actions
-   */
-  attachCollectionHandlers() {
-    const btnRemove = document.querySelector('.btn-remove-from-collection');
-    if (btnRemove) {
-      btnRemove.addEventListener('click', async () => {
-        await this.handleRemoveFromCollection();
-      });
-    }
-
-    // Keyboard shortcut: Delete key (remove from collection)
-    this.attachKeyboardHandler('Delete', () => this.handleRemoveFromCollection());
-  }
-
-  /**
-   * Attach keyboard handler (removes previous handler first)
-   */
-  attachKeyboardHandler(key, handler) {
-    // Remove existing handler
-    if (this.keyboardHandler) {
-      document.removeEventListener('keydown', this.keyboardHandler);
-    }
-
-    // Attach new handler
-    this.keyboardHandler = (e) => {
-      if (e.key === key && !e.target.closest('input, textarea, [contenteditable="true"]')) {
-        e.preventDefault();
-        handler();
-      }
-    };
-
-    document.addEventListener('keydown', this.keyboardHandler);
-  }
-
-  /**
-   * Handle permanent delete (All Photos view only)
-   */
-  async handleDeleteSelected() {
-    const selectedIds = getSelectedPhotoIds(this.app.state.selectedPhotos, this.app.components.toast);
-    if (!selectedIds) return;
-
-    const additionalInfo = `This will delete the ${pluralize(selectedIds.length, 'photo')} and all thumbnails from storage.`;
-    if (!confirmDelete(selectedIds.length, 'photo', { additionalInfo })) return;
-
-    await executeWithFeedback(
-      () => this.app.api.post('/api/photos/bulk/delete', { photoIds: selectedIds }),
-      {
-        successMessage: formatActionMessage(selectedIds.length, 'deleted'),
-        errorMessage: 'Failed to delete photos',
-        successIcon: '🗑️',
-        reloadCurrentView: true,
-        clearSelection: true,
-        toast: this.app.components.toast,
-        app: this.app
-      }
-    );
-  }
-
-  /**
-   * Handle unfavorite (Favorites view)
-   */
-  async handleUnfavoriteSelected() {
-    const selectedIds = getSelectedPhotoIds(this.app.state.selectedPhotos, this.app.components.toast);
-    if (!selectedIds) return;
-
-    await executeWithFeedback(
-      () => this.app.api.post('/api/photos/bulk/favorite', {
-        photoIds: selectedIds,
-        isFavorite: false
-      }),
-      {
-        successMessage: formatActionMessage(selectedIds.length, 'removed', { from: 'Favorites' }),
-        errorMessage: 'Failed to update favorites',
-        successIcon: '⭐',
-        reloadCurrentView: true,
-        clearSelection: true,
-        toast: this.app.components.toast,
-        app: this.app
-      }
-    );
-  }
-
-  /**
-   * Handle remove from collection (Collection view)
-   */
-  async handleRemoveFromCollection() {
-    const selectedIds = getSelectedPhotoIds(this.app.state.selectedPhotos, this.app.components.toast);
-    if (!selectedIds) return;
-
-    if (this.viewState.type !== 'collection') {
-      console.error('[CollectionView] Cannot remove from collection - not in collection view');
-      return;
-    }
-
-    await executeWithFeedback(
-      () => this.app.api.post(`/api/collections/${this.viewState.collection.id}/photos/remove`, {
-        photoIds: selectedIds
-      }),
-      {
-        successMessage: formatActionMessage(selectedIds.length, 'removed', { from: 'collection' }),
-        errorMessage: 'Failed to remove photos',
-        successIcon: '✓',
-        reloadCurrentView: true,
-        reloadCollections: true,
-        clearSelection: true,
-        toast: this.app.components.toast,
-        app: this.app
-      }
-    );
-  }
-
-  /**
    * Load photos for current view
    * Delegates to appropriate loading strategy based on view type
+   * NOTE: Actions are now handled by ContextPanel component
    */
   async loadPhotos() {
     try {

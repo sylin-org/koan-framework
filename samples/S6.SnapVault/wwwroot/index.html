@@ -10,7 +10,7 @@
     <link rel="stylesheet" href="/css/components.css">
     <!-- Application Styles -->
     <link rel="stylesheet" href="/css/app.css">
-    <link rel="stylesheet" href="/css/discovery-panel.css">
+    <link rel="stylesheet" href="/css/context-panel.css">
     <link rel="stylesheet" href="/css/lightbox.css">
     <link rel="stylesheet" href="/css/lightbox-panel.css">
     <link rel="stylesheet" href="/css/lightbox-zoom.css">
@@ -111,47 +111,56 @@
             <!-- Gallery View -->
             <div class="workspace workspace-gallery active" data-workspace="gallery">
                 <div class="content-header">
-                    <h2 class="page-title">All Photos</h2>
-                    <div class="view-controls">
-                        <button class="view-preset-btn" data-preset="gallery" aria-label="Gallery view - Large tiles (1)" title="Gallery">
-                            <svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <rect x="3" y="3" width="18" height="18" rx="2"></rect>
-                            </svg>
-                            <span class="label">Gallery</span>
-                        </button>
-                        <button class="view-preset-btn active" data-preset="comfortable" aria-label="Comfortable view - Medium tiles (2)" title="Comfortable">
-                            <svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <rect x="3" y="3" width="7" height="7"></rect>
-                                <rect x="14" y="3" width="7" height="7"></rect>
-                                <rect x="14" y="14" width="7" height="7"></rect>
-                                <rect x="3" y="14" width="7" height="7"></rect>
-                            </svg>
-                            <span class="label">Comfortable</span>
-                        </button>
-                        <button class="view-preset-btn" data-preset="cozy" aria-label="Cozy view - Smaller tiles (3)" title="Cozy">
-                            <svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <rect x="2" y="2" width="6" height="6"></rect>
-                                <rect x="10" y="2" width="6" height="6"></rect>
-                                <rect x="18" y="2" width="4" height="6"></rect>
-                                <rect x="2" y="10" width="6" height="6"></rect>
-                                <rect x="10" y="10" width="6" height="6"></rect>
-                                <rect x="18" y="10" width="4" height="6"></rect>
-                            </svg>
-                            <span class="label">Cozy</span>
-                        </button>
-                        <button class="view-preset-btn" data-preset="compact" aria-label="Compact view - Tiny tiles (4)" title="Compact">
-                            <svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <rect x="2" y="2" width="4" height="4"></rect>
-                                <rect x="7" y="2" width="4" height="4"></rect>
-                                <rect x="12" y="2" width="4" height="4"></rect>
-                                <rect x="17" y="2" width="5" height="4"></rect>
-                                <rect x="2" y="7" width="4" height="4"></rect>
-                                <rect x="7" y="7" width="4" height="4"></rect>
-                                <rect x="12" y="7" width="4" height="4"></rect>
-                                <rect x="17" y="7" width="5" height="4"></rect>
-                            </svg>
-                            <span class="label">Compact</span>
-                        </button>
+                    <div class="header-title-zone">
+                        <span class="collection-icon">📷</span>
+                        <h2 class="page-title">All Photos</h2>
+                    </div>
+                    <div class="header-controls-zone">
+                        <div class="view-controls" role="group" aria-label="View modes">
+                            <button class="view-toggle" data-preset="gallery" aria-label="Gallery view - Large tiles (1)">
+                                <svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="3" y="3" width="18" height="18" rx="2"></rect>
+                                </svg>
+                                <span class="label">Gallery</span>
+                                <kbd class="shortcut">1</kbd>
+                            </button>
+                            <button class="view-toggle active" data-preset="comfortable" aria-label="Comfortable view - Medium tiles (2)">
+                                <svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="3" y="3" width="7" height="7"></rect>
+                                    <rect x="14" y="3" width="7" height="7"></rect>
+                                    <rect x="14" y="14" width="7" height="7"></rect>
+                                    <rect x="3" y="14" width="7" height="7"></rect>
+                                </svg>
+                                <span class="label">Comfortable</span>
+                                <kbd class="shortcut">2</kbd>
+                            </button>
+                            <button class="view-toggle" data-preset="cozy" aria-label="Cozy view - Smaller tiles (3)">
+                                <svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="2" y="2" width="6" height="6"></rect>
+                                    <rect x="10" y="2" width="6" height="6"></rect>
+                                    <rect x="18" y="2" width="4" height="6"></rect>
+                                    <rect x="2" y="10" width="6" height="6"></rect>
+                                    <rect x="10" y="10" width="6" height="6"></rect>
+                                    <rect x="18" y="10" width="4" height="6"></rect>
+                                </svg>
+                                <span class="label">Cozy</span>
+                                <kbd class="shortcut">3</kbd>
+                            </button>
+                            <button class="view-toggle" data-preset="compact" aria-label="Compact view - Tiny tiles (4)">
+                                <svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="2" y="2" width="4" height="4"></rect>
+                                    <rect x="7" y="2" width="4" height="4"></rect>
+                                    <rect x="12" y="2" width="4" height="4"></rect>
+                                    <rect x="17" y="2" width="5" height="4"></rect>
+                                    <rect x="2" y="7" width="4" height="4"></rect>
+                                    <rect x="7" y="7" width="4" height="4"></rect>
+                                    <rect x="12" y="7" width="4" height="4"></rect>
+                                    <rect x="17" y="7" width="5" height="4"></rect>
+                                </svg>
+                                <span class="label">Compact</span>
+                                <kbd class="shortcut">4</kbd>
+                            </button>
+                        </div>
                     </div>
                 </div>
 
