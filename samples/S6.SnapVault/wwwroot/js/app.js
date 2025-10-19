@@ -260,6 +260,10 @@ class SnapVaultApp {
       this.state.currentPage = 1;
       this.state.hasMorePages = true; // Assume more until proven otherwise
       this.state.activeFilter = filterQuery; // Store active filter for infinite scroll
+
+      // Calculate favorites count from loaded photos (accurate for All Photos view)
+      this.state.favoritesCount = this.state.photos.filter(p => p.isFavorite).length;
+
       this.components.grid.render();
       this.updateLibraryCounts();
       this.updateStatusBar();
@@ -298,7 +302,12 @@ class SnapVaultApp {
       if (response && response.length > 0) {
         this.state.photos.push(...response);
         this.state.currentPage = nextPage;
+
+        // Update favorites count as more photos load
+        this.state.favoritesCount = this.state.photos.filter(p => p.isFavorite).length;
+
         this.components.grid.appendPhotos(response);
+        this.updateLibraryCounts();
         this.updateStatusBar();
 
         console.log(`[Infinite Scroll] Loaded ${response.length} photos (page ${nextPage}, total loaded: ${this.state.photos.length} of ${this.state.totalPhotosCount})`);
@@ -412,8 +421,15 @@ class SnapVaultApp {
   }
 
   updateLibraryCounts() {
-    const allCount = this.state.photos.length;
-    const favoritesCount = this.state.photos.filter(p => p.isFavorite).length;
+    // Use totalPhotosCount from API (accurate even when viewing collections)
+    const allCount = this.state.totalPhotosCount || 0;
+
+    // Only calculate favorites count from loaded photos when in All Photos view
+    // Otherwise it will be inaccurate (shows only favorites in current collection)
+    const { viewState } = this.app.components.collectionView || {};
+    const favoritesCount = viewState?.type === 'all-photos'
+      ? this.state.photos.filter(p => p.isFavorite).length
+      : this.state.favoritesCount || 0;
 
     document.querySelectorAll('.library-item').forEach(item => {
       const label = item.querySelector('.label').textContent;
@@ -500,6 +516,10 @@ class SnapVaultApp {
 
     // Optimistic UI update
     photo.isFavorite = !photo.isFavorite;
+
+    // Update favorites count
+    this.state.favoritesCount = this.state.photos.filter(p => p.isFavorite).length;
+
     this.components.grid.updatePhotoCard(photoId, photo);
     this.updateLibraryCounts();
 
@@ -512,6 +532,10 @@ class SnapVaultApp {
     } catch (error) {
       // Rollback on failure
       photo.isFavorite = !photo.isFavorite;
+
+      // Rollback favorites count
+      this.state.favoritesCount = this.state.photos.filter(p => p.isFavorite).length;
+
       this.components.grid.updatePhotoCard(photoId, photo);
       this.updateLibraryCounts();
 
