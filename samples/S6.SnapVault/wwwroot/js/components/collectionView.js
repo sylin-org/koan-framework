@@ -38,6 +38,10 @@ export class CollectionView {
       }
     }
 
+    // Show/hide right sidebar based on view type
+    // Only show for collection views, hide for All Photos and Favorites
+    this.updateRightSidebarVisibility();
+
     // Render header
     this.renderHeader();
 
@@ -45,6 +49,24 @@ export class CollectionView {
     await this.loadPhotos();
 
     console.log(`[CollectionView] Loaded view: ${viewId}`);
+  }
+
+  /**
+   * Show or hide right sidebar based on current view
+   * Collections: show discovery panel for smart collections
+   * All Photos/Favorites: hide (not applicable for global views)
+   */
+  updateRightSidebarVisibility() {
+    const rightSidebar = document.querySelector('.sidebar-right');
+    if (!rightSidebar) return;
+
+    const isCollectionView = this.currentViewId !== 'all-photos' && this.currentViewId !== 'favorites';
+
+    if (isCollectionView) {
+      rightSidebar.style.display = 'block';
+    } else {
+      rightSidebar.style.display = 'none';
+    }
   }
 
   /**
