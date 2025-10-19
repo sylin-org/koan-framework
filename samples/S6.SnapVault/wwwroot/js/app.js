@@ -514,14 +514,23 @@ class SnapVaultApp {
     // Drag enter - show drop zone
     mainContent.addEventListener('dragenter', (e) => {
       dragCounter++;
-      if (e.dataTransfer.types.includes('Files')) {
+      // Only show file upload interface for EXTERNAL file drags
+      // Internal photo drags have 'text/plain' data (photo ID)
+      const isInternalPhotoDrag = e.dataTransfer.types.includes('text/plain');
+      const isExternalFileDrag = e.dataTransfer.types.includes('Files') && !isInternalPhotoDrag;
+
+      if (isExternalFileDrag) {
         mainContent.classList.add('drag-over');
       }
     });
 
     // Drag over - keep drop zone visible
     mainContent.addEventListener('dragover', (e) => {
-      if (e.dataTransfer.types.includes('Files')) {
+      // Only show file upload interface for EXTERNAL file drags
+      const isInternalPhotoDrag = e.dataTransfer.types.includes('text/plain');
+      const isExternalFileDrag = e.dataTransfer.types.includes('Files') && !isInternalPhotoDrag;
+
+      if (isExternalFileDrag) {
         e.dataTransfer.dropEffect = 'copy';
         mainContent.classList.add('drag-over');
       }
@@ -540,8 +549,11 @@ class SnapVaultApp {
       dragCounter = 0;
       mainContent.classList.remove('drag-over');
 
+      // Only handle EXTERNAL file drops (not internal photo drags)
+      const isInternalPhotoDrag = e.dataTransfer.types.includes('text/plain');
       const files = e.dataTransfer.files;
-      if (files.length > 0) {
+
+      if (files.length > 0 && !isInternalPhotoDrag) {
         // Open upload modal with pre-selected files
         this.components.upload.open(files);
       }
