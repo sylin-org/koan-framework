@@ -437,14 +437,26 @@ class SnapVaultApp {
       ? this.state.photos.filter(p => p.isFavorite).length
       : this.state.favoritesCount || 0;
 
-    document.querySelectorAll('.library-item').forEach(item => {
-      const label = item.querySelector('.label').textContent;
-      const badge = item.querySelector('.badge');
+    console.log('[updateLibraryCounts]', { allCount, favoritesCount, viewState: viewState?.type });
+
+    // Use more specific selector to avoid conflicts
+    document.querySelectorAll('.library-section .sidebar-item').forEach(item => {
+      const labelElement = item.querySelector('.item-label');
+      const badgeElement = item.querySelector('.item-badge');
+
+      if (!labelElement || !badgeElement) {
+        console.warn('[updateLibraryCounts] Missing label or badge element', item);
+        return;
+      }
+
+      const label = labelElement.textContent;
 
       if (label === 'All Photos') {
-        badge.textContent = allCount;
+        badgeElement.textContent = allCount;
+        console.log('[updateLibraryCounts] Set All Photos badge to', allCount);
       } else if (label === 'Favorites') {
-        badge.textContent = favoritesCount;
+        badgeElement.textContent = favoritesCount;
+        console.log('[updateLibraryCounts] Set Favorites badge to', favoritesCount);
       }
     });
   }
