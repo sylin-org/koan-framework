@@ -24,6 +24,7 @@ import { escapeHtml } from './utils/html.js';
 import { StateManager } from './utils/StateManager.js';
 import { EventBus } from './utils/EventBus.js';
 import { ActionExecutor } from './system/ActionExecutor.js';
+import { StateRegistry } from './utils/StateRegistry.js';
 
 class SnapVaultApp {
   constructor() {
@@ -34,6 +35,9 @@ class SnapVaultApp {
     this.stateManager = new StateManager();
     this.eventBus = new EventBus();
 
+    // Initialize StateRegistry for global shared state (NEW)
+    this.registry = new StateRegistry();
+
     // Migrate old density preference to new view preset
     this.migrateUserPreferences();
 
@@ -42,6 +46,9 @@ class SnapVaultApp {
 
     // Backward compatibility: expose state for components that still use it
     this.state = this.stateManager.state;
+
+    // Setup state subscriptions for auto-updating UI
+    this.setupStateSubscriptions();
   }
 
   migrateUserPreferences() {
@@ -61,6 +68,62 @@ class SnapVaultApp {
     return (saved && VIEW_PRESETS[saved]) ? saved : 'comfortable';
   }
 
+  /**
+   * Setup state subscriptions for automatic UI updates
+   * Event-driven architecture: UI automatically updates when state changes
+   */
+  setupStateSubscriptions() {
+    // Subscribe library badges to count changes
+    this.registry.subscribe('counts', (counts) => {
+      console.log('[StateRegistry] Counts updated:', counts);
+      this.updateLibraryBadges(counts);
+    });
+  }
+
+  /**
+   * Load accurate photo statistics from API
+   * Updates StateRegistry which triggers UI updates automatically
+   */
+  async loadStats() {
+    try {
+      const stats = await this.api.get('/api/photos/stats');
+      console.log('[loadStats] Fetched stats:', stats);
+
+      // Update registry (this will automatically trigger UI updates via subscriptions)
+      this.registry.batchUpdate({
+        'counts.totalPhotos': stats.totalPhotos,
+        'counts.favorites': stats.favorites
+      });
+
+      // Also update old state for backward compatibility
+      this.state.totalPhotosCount = stats.totalPhotos;
+      this.state.favoritesCount = stats.favorites;
+    } catch (error) {
+      console.error('[loadStats] Failed to load stats:', error);
+    }
+  }
+
+  /**
+   * Update library badges (called automatically via state subscription)
+   * @param {object} counts - { totalPhotos, favorites, collections }
+   */
+  updateLibraryBadges(counts) {
+    document.querySelectorAll('.library-section .sidebar-item').forEach(item => {
+      const labelElement = item.querySelector('.item-label');
+      const badgeElement = item.querySelector('.item-badge');
+
+      if (!labelElement || !badgeElement) return;
+
+      const label = labelElement.textContent;
+
+      if (label === 'All Photos') {
+        badgeElement.textContent = counts.totalPhotos || 0;
+      } else if (label === 'Favorites') {
+        badgeElement.textContent = counts.favorites || 0;
+      }
+    });
+  }
+
   // Expose photos array for components
   get photos() {
     return this.state.photos;
@@ -71,6 +134,9 @@ class SnapVaultApp {
 
     // Initialize API client
     this.api = new API();
+
+    // Load accurate stats from API
+    await this.loadStats();
 
     // Initialize action system (PHASE 2)
     this.actions = new ActionExecutor(this);

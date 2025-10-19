@@ -59,8 +59,11 @@ export const ActionRegistry = {
     },
 
     refresh: {
-      clearSelection: true
-      // No view reload - state updated optimistically
+      clearSelection: true,
+      // Refresh stats to update library badges
+      custom: async (app) => {
+        await app.loadStats();
+      }
     }
   },
 

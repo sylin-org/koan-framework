@@ -34,6 +34,22 @@ public class PhotosController : EntityController<PhotoAsset>
         _hubContext = hubContext;
     }
 
+    /// <summary>
+    /// Get library statistics (total photos, favorites count, etc.)
+    /// Used for accurate UI counts regardless of pagination
+    /// </summary>
+    [HttpGet("stats")]
+    public async Task<ActionResult<PhotoStats>> GetStats(CancellationToken ct = default)
+    {
+        var allPhotos = await PhotoAsset.All(ct);
+
+        return Ok(new PhotoStats
+        {
+            TotalPhotos = allPhotos.Count,
+            Favorites = allPhotos.Count(p => p.IsFavorite)
+        });
+    }
+
 
     /// <summary>
     /// Upload photos to an event (or auto-create daily album if eventId not provided)
