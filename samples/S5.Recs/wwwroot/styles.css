@@ -469,10 +469,10 @@ button {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 1rem;
-  padding: 1.5rem;
-  background: var(--bg-tertiary);
-  border-radius: var(--radius-lg);
-  margin-top: 1rem;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border:0;
 }
 
 .filter-group {

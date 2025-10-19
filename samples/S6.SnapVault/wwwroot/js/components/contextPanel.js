@@ -3,12 +3,16 @@
  * Right sidebar that transforms based on application state:
  * - Collection Properties: When viewing a collection (no selection)
  * - Selection Actions: When photos are selected
+ *
+ * REFACTORED: Now uses centralized Button and Icon components
  */
 
 import { getSelectedPhotoIds, formatActionMessage } from '../utils/selection.js';
 import { confirmDelete } from '../utils/dialogs.js';
 import { executeWithFeedback } from '../utils/operations.js';
 import { pluralize } from '../utils/html.js';
+import { Button } from '../system/Button.js';
+import { Icon } from '../system/Icon.js';
 
 export class ContextPanel {
   constructor(app) {
@@ -42,216 +46,202 @@ export class ContextPanel {
   /**
    * Render Collection View (properties + optional selection actions)
    * Shows collection properties at top, selection actions below when photos selected
+   * REFACTORED: Uses Button component system
    */
   renderCollectionView(collection, selectionCount) {
     const photoCount = collection.photoCount || 0;
 
-    // Build collection sections HTML
-    const collectionHTML = `
-      <!-- Details Section -->
-      <section class="panel-section">
-        <h3>Details</h3>
-        <div class="metadata-grid">
-          <div class="metadata-item">
-            <span class="label">Name</span>
-            <span class="value">${this.escapeHtml(collection.name)}</span>
-          </div>
-          <div class="metadata-item">
-            <span class="label">Capacity</span>
-            <span class="value">${photoCount} / 2,048 photos</span>
-          </div>
-          <div class="metadata-item">
-            <span class="label">Type</span>
-            <span class="value">Manual Collection</span>
-          </div>
-          <div class="metadata-item">
-            <span class="label">Created</span>
-            <span class="value">${this.formatDate(collection.createdAt)}</span>
-          </div>
+    // Create panel content container
+    const panelContent = document.createElement('div');
+    panelContent.className = 'panel-content';
+
+    // Details Section (still HTML for simplicity, could be componentized later)
+    const detailsSection = document.createElement('section');
+    detailsSection.className = 'panel-section';
+    detailsSection.innerHTML = `
+      <h3>Details</h3>
+      <div class="metadata-grid">
+        <div class="metadata-item">
+          <span class="label">Name</span>
+          <span class="value">${this.escapeHtml(collection.name)}</span>
         </div>
-      </section>
-
-      <!-- Collection Actions Section -->
-      <section class="panel-section">
-        <h3>Actions</h3>
-        <div class="actions-grid">
-          <button class="btn-action" data-action="rename">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-            </svg>
-            <span class="action-label">Rename Collection</span>
-          </button>
-
-          <button class="btn-action" data-action="duplicate">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-            </svg>
-            <span class="action-label">Duplicate Collection</span>
-          </button>
-
-          <button class="btn-action" data-action="export">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-              <polyline points="7 10 12 15 17 10"></polyline>
-              <line x1="12" y1="15" x2="12" y2="3"></line>
-            </svg>
-            <span class="action-label">Export Collection...</span>
-          </button>
-
-          <button class="btn-action btn-destructive" data-action="delete">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polyline points="3 6 5 6 21 6"></polyline>
-              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-            </svg>
-            <span class="action-label">Delete Collection</span>
-          </button>
+        <div class="metadata-item">
+          <span class="label">Capacity</span>
+          <span class="value">${photoCount} / 2,048 photos</span>
         </div>
-      </section>
-    `;
-
-    // Build selection actions HTML if photos selected (no delete button in collections)
-    const selectionHTML = selectionCount > 0 ? this.buildSelectionActionsHTML(selectionCount, false) : '';
-
-    // Combine both sections
-    this.container.innerHTML = `
-      <div class="panel-content">
-        ${collectionHTML}
-        ${selectionHTML}
+        <div class="metadata-item">
+          <span class="label">Type</span>
+          <span class="value">Manual Collection</span>
+        </div>
+        <div class="metadata-item">
+          <span class="label">Created</span>
+          <span class="value">${this.formatDate(collection.createdAt)}</span>
+        </div>
       </div>
     `;
+    panelContent.appendChild(detailsSection);
 
-    // Attach handlers for both collection and selection actions
-    this.attachCollectionHandlers(collection);
+    // Actions Section - REFACTORED with Button component
+    const actionsSection = document.createElement('section');
+    actionsSection.className = 'panel-section';
+
+    const actionsTitle = document.createElement('h3');
+    actionsTitle.textContent = 'Actions';
+    actionsSection.appendChild(actionsTitle);
+
+    // Create collection action buttons using Button component
+    const collectionActions = Button.createGroup([
+      {
+        label: 'Rename Collection',
+        icon: 'edit',
+        dataAction: 'rename',
+        onClick: () => this.triggerHeaderTitleEdit()
+      },
+      {
+        label: 'Duplicate Collection',
+        icon: 'copy',
+        dataAction: 'duplicate',
+        onClick: () => this.handleDuplicateCollection(collection)
+      },
+      {
+        label: 'Export Collection...',
+        icon: 'download',
+        dataAction: 'export',
+        onClick: () => this.handleExportCollection(collection)
+      },
+      {
+        label: 'Delete Collection',
+        icon: 'trash',
+        variant: 'destructive',
+        dataAction: 'delete',
+        onClick: () => this.handleDeleteCollection(collection)
+      }
+    ]);
+
+    actionsSection.appendChild(collectionActions);
+    panelContent.appendChild(actionsSection);
+
+    // Add selection actions if photos are selected
     if (selectionCount > 0) {
-      this.attachSelectionHandlers();
+      const selectionSection = this.createSelectionActionsSection(selectionCount, false);
+      panelContent.appendChild(selectionSection);
     }
+
+    // Replace container content
+    this.container.innerHTML = '';
+    this.container.appendChild(panelContent);
   }
 
   /**
    * Render Selection Actions state (for All Photos/Favorites views)
-   * Uses exact same structure as Photo Information lightbox panel
+   * REFACTORED: Uses Button component system
    */
   renderSelectionActions(count, allowDelete = true) {
-    this.container.innerHTML = `
-      <div class="panel-content">
-        ${this.buildSelectionActionsHTML(count, allowDelete)}
-      </div>
-    `;
+    const panelContent = document.createElement('div');
+    panelContent.className = 'panel-content';
 
-    this.attachSelectionHandlers();
+    const selectionSection = this.createSelectionActionsSection(count, allowDelete);
+    panelContent.appendChild(selectionSection);
+
+    this.container.innerHTML = '';
+    this.container.appendChild(panelContent);
   }
 
   /**
-   * Build Selection Actions HTML
+   * Create Selection Actions Section (DOM element)
+   * REFACTORED: Uses Button component system
    * @param {number} count - Number of selected photos
    * @param {boolean} allowDelete - Whether to show Delete button (false in collections)
+   * @returns {HTMLElement} Section element with photo actions
    */
-  buildSelectionActionsHTML(count, allowDelete = true) {
+  createSelectionActionsSection(count, allowDelete = true) {
     const { viewState } = this.app.components.collectionView;
     const isInCollection = viewState.type === 'collection';
     const isInFavorites = viewState.type === 'favorites';
 
-    return `
-      <!-- Photo Selection Actions Section -->
-      <section class="panel-section">
-        <h3>${count} ${pluralize(count, 'Photo')} Selected</h3>
-        <div class="actions-grid">
-          <button class="btn-action" data-action="add-favorites">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
-            </svg>
-            <span class="action-label">Add to Favorites</span>
-          </button>
+    const section = document.createElement('section');
+    section.className = 'panel-section';
 
-          ${isInFavorites ? `
-          <button class="btn-action" data-action="remove-favorites">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
-            </svg>
-            <span class="action-label">Remove from Favorites</span>
-          </button>
-          ` : ''}
+    const title = document.createElement('h3');
+    title.textContent = `${count} ${pluralize(count, 'Photo')} Selected`;
+    section.appendChild(title);
 
-          ${!isInCollection ? `
-          <button class="btn-action" data-action="add-to-collection">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
-              <line x1="12" y1="11" x2="12" y2="17"></line>
-              <line x1="9" y1="14" x2="15" y2="14"></line>
-            </svg>
-            <span class="action-label">Add to Collection...</span>
-          </button>
-          ` : ''}
+    // Build actions array based on context
+    const actions = [];
 
-          ${isInCollection ? `
-          <button class="btn-action" data-action="remove-from-collection">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <line x1="18" y1="6" x2="6" y2="18"></line>
-              <line x1="6" y1="6" x2="18" y2="18"></line>
-            </svg>
-            <span class="action-label">Remove from Collection</span>
-          </button>
-          ` : ''}
-
-          <button class="btn-action" data-action="download">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-              <polyline points="7 10 12 15 17 10"></polyline>
-              <line x1="12" y1="15" x2="12" y2="3"></line>
-            </svg>
-            <span class="action-label">Download (${count})</span>
-          </button>
-
-          <button class="btn-action" data-action="analyze-ai">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="12" cy="12" r="10"></circle>
-              <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
-              <line x1="12" y1="17" x2="12.01" y2="17"></line>
-            </svg>
-            <span class="action-label">Analyze with AI</span>
-          </button>
-
-          ${allowDelete ? `
-          <button class="btn-action btn-destructive" data-action="delete-photos">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polyline points="3 6 5 6 21 6"></polyline>
-              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-            </svg>
-            <span class="action-label">Delete (${count})</span>
-          </button>
-          ` : ''}
-        </div>
-      </section>
-    `;
-  }
-
-  /**
-   * Attach event handlers for collection actions
-   */
-  attachCollectionHandlers(collection) {
-    // Action buttons
-    this.container.querySelectorAll('[data-action]').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const action = btn.dataset.action;
-        switch (action) {
-          case 'rename':
-            this.triggerHeaderTitleEdit();
-            break;
-          case 'duplicate':
-            await this.handleDuplicateCollection(collection);
-            break;
-          case 'export':
-            await this.handleExportCollection(collection);
-            break;
-          case 'delete':
-            await this.handleDeleteCollection(collection);
-            break;
-        }
-      });
+    // Add to Favorites (always show)
+    actions.push({
+      label: 'Add to Favorites',
+      icon: 'star',
+      dataAction: 'add-favorites',
+      onClick: () => this.handleAddToFavorites()
     });
+
+    // Remove from Favorites (only in favorites view)
+    if (isInFavorites) {
+      actions.push({
+        label: 'Remove from Favorites',
+        icon: 'star',
+        dataAction: 'remove-favorites',
+        onClick: () => this.handleRemoveFromFavorites()
+      });
+    }
+
+    // Add to Collection (not in collection view)
+    if (!isInCollection) {
+      actions.push({
+        label: 'Add to Collection...',
+        icon: 'folderPlus',
+        dataAction: 'add-to-collection',
+        onClick: () => this.handleAddToCollection()
+      });
+    }
+
+    // Remove from Collection (only in collection view)
+    if (isInCollection) {
+      actions.push({
+        label: 'Remove from Collection',
+        icon: 'x',
+        dataAction: 'remove-from-collection',
+        onClick: () => this.handleRemoveFromCollection()
+      });
+    }
+
+    // Download (always show)
+    actions.push({
+      label: `Download (${count})`,
+      icon: 'download',
+      dataAction: 'download',
+      onClick: () => this.handleDownload()
+    });
+
+    // Analyze with AI (always show)
+    actions.push({
+      label: 'Analyze with AI',
+      icon: 'sparkles',
+      dataAction: 'analyze-ai',
+      onClick: () => this.handleAnalyzeAI()
+    });
+
+    // Delete (conditional)
+    if (allowDelete) {
+      actions.push({
+        label: `Delete (${count})`,
+        icon: 'trash',
+        variant: 'destructive',
+        dataAction: 'delete-photos',
+        onClick: () => this.handleDeletePhotos()
+      });
+    }
+
+    // Create button group using Button component
+    const actionsGrid = Button.createGroup(actions);
+    section.appendChild(actionsGrid);
+
+    return section;
   }
+
+  // NOTE: attachCollectionHandlers() removed - now using onClick in Button component
 
   /**
    * Trigger edit mode on the main header title
@@ -263,42 +253,7 @@ export class ContextPanel {
     }
   }
 
-  /**
-   * Attach event handlers for selection actions
-   */
-  attachSelectionHandlers() {
-    this.container.querySelectorAll('[data-action]').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const action = btn.dataset.action;
-        const selectedIds = getSelectedPhotoIds(this.app.state.selectedPhotos, this.app.components.toast);
-        if (!selectedIds) return;
-
-        switch (action) {
-          case 'add-favorites':
-            await this.handleAddToFavorites(selectedIds);
-            break;
-          case 'remove-favorites':
-            await this.handleRemoveFromFavorites(selectedIds);
-            break;
-          case 'add-to-collection':
-            await this.handleAddToCollection(selectedIds);
-            break;
-          case 'remove-from-collection':
-            await this.handleRemoveFromCollection(selectedIds);
-            break;
-          case 'download':
-            this.handleDownload(selectedIds);
-            break;
-          case 'analyze-ai':
-            await this.handleAnalyzeAI(selectedIds);
-            break;
-          case 'delete-photos':
-            await this.handleDeletePhotos(selectedIds);
-            break;
-        }
-      });
-    });
-  }
+  // NOTE: attachSelectionHandlers() removed - now using onClick in Button component
 
   // ==================== Collection Actions ====================
 
@@ -326,7 +281,10 @@ export class ContextPanel {
 
   // ==================== Selection Actions ====================
 
-  async handleAddToFavorites(photoIds) {
+  async handleAddToFavorites() {
+    const photoIds = getSelectedPhotoIds(this.app.state.selectedPhotos, this.app.components.toast);
+    if (!photoIds) return;
+
     await executeWithFeedback(
       () => this.app.api.post('/api/photos/bulk/favorite', {
         photoIds: photoIds,
@@ -344,7 +302,10 @@ export class ContextPanel {
     );
   }
 
-  async handleRemoveFromFavorites(photoIds) {
+  async handleRemoveFromFavorites() {
+    const photoIds = getSelectedPhotoIds(this.app.state.selectedPhotos, this.app.components.toast);
+    if (!photoIds) return;
+
     await executeWithFeedback(
       () => this.app.api.post('/api/photos/bulk/favorite', {
         photoIds: photoIds,
@@ -362,7 +323,10 @@ export class ContextPanel {
     );
   }
 
-  async handleAddToCollection(photoIds) {
+  async handleAddToCollection() {
+    const photoIds = getSelectedPhotoIds(this.app.state.selectedPhotos, this.app.components.toast);
+    if (!photoIds) return;
+
     // TODO: Show collection picker dialog
     this.app.components.toast.show('Collection picker coming soon', {
       icon: 'ℹ️',
@@ -370,7 +334,10 @@ export class ContextPanel {
     });
   }
 
-  async handleRemoveFromCollection(photoIds) {
+  async handleRemoveFromCollection() {
+    const photoIds = getSelectedPhotoIds(this.app.state.selectedPhotos, this.app.components.toast);
+    if (!photoIds) return;
+
     const { viewState } = this.app.components.collectionView;
     if (viewState.type !== 'collection') return;
 
@@ -391,7 +358,10 @@ export class ContextPanel {
     );
   }
 
-  handleDownload(photoIds) {
+  handleDownload() {
+    const photoIds = getSelectedPhotoIds(this.app.state.selectedPhotos, this.app.components.toast);
+    if (!photoIds) return;
+
     this.app.components.toast.show(
       formatActionMessage(photoIds.length, 'downloading'),
       { icon: '⬇️', duration: 2000 }
@@ -403,7 +373,10 @@ export class ContextPanel {
     });
   }
 
-  async handleAnalyzeAI(photoIds) {
+  async handleAnalyzeAI() {
+    const photoIds = getSelectedPhotoIds(this.app.state.selectedPhotos, this.app.components.toast);
+    if (!photoIds) return;
+
     // TODO: Implement AI analysis
     this.app.components.toast.show('AI analysis coming soon', {
       icon: '🤖',
@@ -411,7 +384,9 @@ export class ContextPanel {
     });
   }
 
-  async handleDeletePhotos(photoIds) {
+  async handleDeletePhotos() {
+    const photoIds = getSelectedPhotoIds(this.app.state.selectedPhotos, this.app.components.toast);
+    if (!photoIds) return;
     const additionalInfo = `This will delete the ${pluralize(photoIds.length, 'photo')} and all thumbnails from storage.`;
     if (!confirmDelete(photoIds.length, 'photo', { additionalInfo })) return;
 
