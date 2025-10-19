@@ -552,6 +552,40 @@
   flex: 1;
 }
 
+/* Panel action button shortcuts */
+.btn-action .shortcut {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.4);
+  padding: 2px 5px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  transition: all 0.15s ease;
+}
+
+.btn-action:hover .shortcut {
+  color: rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.btn-action.active .shortcut {
+  color: rgba(96, 165, 250, 0.9);
+  background: rgba(59, 130, 246, 0.15);
+  border-color: rgba(59, 130, 246, 0.3);
+}
+
+.btn-action.btn-destructive .shortcut {
+  color: rgba(239, 68, 68, 0.6);
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.btn-action.btn-destructive:hover .shortcut {
+  color: rgba(239, 68, 68, 0.8);
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.4);
+}
+
 /* ==================== Action Animations ==================== */
 /* Favorite heartbeat animation */
 @keyframes heartbeat {

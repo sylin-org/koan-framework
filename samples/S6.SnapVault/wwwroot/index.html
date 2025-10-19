@@ -29,7 +29,8 @@
                         <rect x="14" y="14" width="7" height="7"></rect>
                         <rect x="3" y="14" width="7" height="7"></rect>
                     </svg>
-                    Gallery
+                    <span class="label">Gallery</span>
+                    <kbd class="shortcut">G</kbd><kbd class="shortcut">E</kbd>
                 </button>
                 <button class="workspace-btn" data-workspace="timeline" aria-label="Timeline View">
                     <svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -38,7 +39,8 @@
                         <line x1="8" y1="2" x2="8" y2="6"></line>
                         <line x1="3" y1="10" x2="21" y2="10"></line>
                     </svg>
-                    Timeline
+                    <span class="label">Timeline</span>
+                    <kbd class="shortcut">G</kbd><kbd class="shortcut">T</kbd>
                 </button>
             </nav>
         </div>
@@ -56,7 +58,8 @@
                     <polyline points="17 8 12 3 7 8"></polyline>
                     <line x1="12" y1="3" x2="12" y2="15"></line>
                 </svg>
-                Upload
+                <span class="label">Upload</span>
+                <kbd class="shortcut">U</kbd>
             </button>
             <a href="/settings.html" class="btn-icon" aria-label="Settings">
                 <svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -83,14 +86,20 @@
                             <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
                         </svg>
                         <span class="item-label">All Photos</span>
-                        <span class="item-badge">0</span>
+                        <div class="item-meta">
+                            <kbd class="shortcut">G</kbd><kbd class="shortcut">A</kbd>
+                            <span class="item-badge">0</span>
+                        </div>
                     </button>
                     <button class="sidebar-item">
                         <svg class="item-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
                         </svg>
                         <span class="item-label">Favorites</span>
-                        <span class="item-badge">0</span>
+                        <div class="item-meta">
+                            <kbd class="shortcut">G</kbd><kbd class="shortcut">F</kbd>
+                            <span class="item-badge">0</span>
+                        </div>
                     </button>
                 </nav>
             </section>
@@ -220,7 +229,8 @@
                     <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
                     <line x1="12" y1="17" x2="12.01" y2="17"></line>
                 </svg>
-                Shortcuts
+                <span class="label">Shortcuts</span>
+                <kbd class="shortcut">?</kbd>
             </button>
         </div>
     </footer>

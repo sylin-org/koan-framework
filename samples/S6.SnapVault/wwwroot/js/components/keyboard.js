@@ -73,7 +73,7 @@ export class KeyboardShortcuts {
       return;
     }
 
-    // Workspace navigation
+    // Workspace and Library navigation
     if (e.key === 'g') {
       // Wait for second key
       document.addEventListener('keydown', (e2) => {
@@ -81,6 +81,16 @@ export class KeyboardShortcuts {
           this.app.switchWorkspace('gallery');
         } else if (e2.key === 't') {
           this.app.switchWorkspace('timeline');
+        } else if (e2.key === 'a') {
+          // Go to All Photos
+          if (this.app.components.collectionView) {
+            this.app.components.collectionView.setView('all-photos');
+          }
+        } else if (e2.key === 'f') {
+          // Go to Favorites
+          if (this.app.components.collectionView) {
+            this.app.components.collectionView.setView('favorites');
+          }
         }
       }, { once: true });
       return;
@@ -104,6 +114,8 @@ export class KeyboardShortcuts {
               <dt><kbd>/</kbd></dt><dd>Focus search</dd>
               <dt><kbd>G</kbd> <kbd>E</kbd></dt><dd>Go to Gallery</dd>
               <dt><kbd>G</kbd> <kbd>T</kbd></dt><dd>Go to Timeline</dd>
+              <dt><kbd>G</kbd> <kbd>A</kbd></dt><dd>Go to All Photos</dd>
+              <dt><kbd>G</kbd> <kbd>F</kbd></dt><dd>Go to Favorites</dd>
               <dt><kbd>Esc</kbd></dt><dd>Close/Cancel</dd>
             </dl>
           </div>

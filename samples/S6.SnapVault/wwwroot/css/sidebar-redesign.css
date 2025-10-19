@@ -131,6 +131,37 @@
   text-overflow: ellipsis;
 }
 
+/* Item Meta - Container for shortcuts and badge */
+.sidebar-item .item-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+/* Sidebar shortcuts - matches view preset pattern */
+.sidebar-item .shortcut {
+  font-size: 9px;
+  color: rgba(255, 255, 255, 0.4);
+  padding: 2px 4px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  transition: all 0.15s ease;
+}
+
+.sidebar-item:hover .shortcut {
+  color: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.sidebar-item.active .shortcut {
+  color: rgba(99, 102, 241, 0.9);
+  background: rgba(99, 102, 241, 0.12);
+  border-color: rgba(99, 102, 241, 0.25);
+}
+
 /* Item Badge - Pill Format (matches AI insight chips) */
 .sidebar-item .item-badge {
   flex-shrink: 0;

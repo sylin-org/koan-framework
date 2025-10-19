@@ -229,6 +229,25 @@
   right: var(--space-3);
 }
 
+/* Navigation arrow shortcuts */
+.lightbox-nav .shortcut {
+  position: absolute;
+  bottom: 4px;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.6);
+  padding: 2px 5px;
+  background: rgba(0, 0, 0, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+  pointer-events: none;
+  transition: all var(--duration-fast) var(--ease-out-cubic);
+}
+
+.lightbox-nav:hover .shortcut {
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(0, 0, 0, 0.9);
+}
+
 /* Zoom Controls */
 .lightbox-zoom-controls {
   position: absolute;
@@ -282,6 +301,31 @@
 
 .btn-favorite.active:hover {
   color: var(--accent-favorite);
+}
+
+/* Lightbox icon button shortcuts */
+.btn-icon {
+  position: relative;
+}
+
+.btn-icon .shortcut {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  font-size: 9px;
+  color: rgba(255, 255, 255, 0.5);
+  padding: 2px 4px;
+  background: rgba(0, 0, 0, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+  pointer-events: none;
+  transition: all var(--duration-fast) var(--ease-out-cubic);
+}
+
+.btn-icon:hover .shortcut {
+  color: rgba(255, 255, 255, 0.8);
+  background: rgba(0, 0, 0, 0.9);
+  border-color: rgba(255, 255, 255, 0.3);
 }
 
 .btn-close:hover {

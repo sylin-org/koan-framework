@@ -90,6 +90,7 @@ export class Lightbox {
                 <line x1="12" y1="16" x2="12" y2="12"></line>
                 <line x1="12" y1="8" x2="12.01" y2="8"></line>
               </svg>
+              <kbd class="shortcut">I</kbd>
             </button>
             <button class="btn-icon btn-download" title="Download original (D)" aria-label="Download">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -97,17 +98,20 @@ export class Lightbox {
                 <polyline points="7 10 12 15 17 10"></polyline>
                 <line x1="12" y1="15" x2="12" y2="3"></line>
               </svg>
+              <kbd class="shortcut">D</kbd>
             </button>
             <button class="btn-icon btn-favorite" title="Favorite (F)" aria-label="Toggle favorite">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
               </svg>
+              <kbd class="shortcut">F</kbd>
             </button>
             <button class="btn-icon btn-close" title="Close (Esc)" aria-label="Close">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <line x1="18" y1="6" x2="6" y2="18"></line>
                 <line x1="6" y1="6" x2="18" y2="18"></line>
               </svg>
+              <kbd class="shortcut">Esc</kbd>
             </button>
           </div>
         </div>
@@ -117,11 +121,13 @@ export class Lightbox {
           <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <polyline points="15 18 9 12 15 6"></polyline>
           </svg>
+          <kbd class="shortcut">←</kbd>
         </button>
         <button class="lightbox-nav lightbox-next" title="Next (→, J)" aria-label="Next photo">
           <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <polyline points="9 18 15 12 9 6"></polyline>
           </svg>
+          <kbd class="shortcut">→</kbd>
         </button>
       </div>
       </div>

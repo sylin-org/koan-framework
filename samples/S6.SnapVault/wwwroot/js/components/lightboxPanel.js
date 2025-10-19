@@ -100,6 +100,7 @@ export class LightboxPanel {
                 <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
               </svg>
               <span class="action-label">Favorite</span>
+              <kbd class="shortcut">F</kbd>
             </button>
             <button class="btn-action" id="btn-download">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -108,6 +109,7 @@ export class LightboxPanel {
                 <line x1="12" y1="15" x2="12" y2="3"></line>
               </svg>
               <span class="action-label">Download</span>
+              <kbd class="shortcut">D</kbd>
             </button>
             <button class="btn-action btn-destructive" id="btn-delete">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -115,6 +117,7 @@ export class LightboxPanel {
                 <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
               </svg>
               <span class="action-label">Delete</span>
+              <kbd class="shortcut">Del</kbd>
             </button>
           </div>
 

@@ -218,6 +218,27 @@ body {
   color: var(--accent-primary);
 }
 
+.workspace-btn .shortcut {
+  font-size: 10px;
+  color: var(--text-tertiary);
+  padding: 2px 4px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-sm);
+  transition: all var(--duration-fast) var(--ease-out-cubic);
+}
+
+.workspace-btn:hover .shortcut {
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.workspace-btn.active .shortcut {
+  color: var(--accent-primary);
+  background: rgba(91, 159, 255, 0.15);
+  border-color: var(--accent-primary);
+}
+
 /* ===== Search Component ===== */
 .search-container {
   width: 100%;
@@ -413,6 +434,21 @@ body {
   background-color: #4A8FEF;
   transform: translateY(-1px);
   box-shadow: var(--shadow-md);
+}
+
+.btn-upload .shortcut {
+  font-size: 10px;
+  color: rgba(0, 0, 0, 0.5);
+  padding: 2px 4px;
+  background: rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: var(--radius-sm);
+  transition: all var(--duration-fast) var(--ease-out-cubic);
+}
+
+.btn-upload:hover .shortcut {
+  color: rgba(0, 0, 0, 0.6);
+  background: rgba(0, 0, 0, 0.15);
 }
 
 .btn-user {
@@ -1462,6 +1498,21 @@ body {
 .btn-shortcuts:hover {
   background-color: var(--bg-surface-hover);
   color: var(--text-secondary);
+}
+
+.btn-shortcuts .shortcut {
+  font-size: 10px;
+  color: var(--text-tertiary);
+  padding: 2px 4px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-sm);
+  transition: all var(--duration-fast) var(--ease-out-cubic);
+}
+
+.btn-shortcuts:hover .shortcut {
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 /* ===== Icons ===== */
