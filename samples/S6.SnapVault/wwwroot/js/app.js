@@ -20,23 +20,27 @@ import { DragDropManager } from './components/dragDropManager.js';
 import { CollectionView } from './components/collectionView.js';
 import { API } from './api.js';
 import { VIEW_PRESETS, migrateOldDensity } from './viewPresets.js';
+import { escapeHtml } from './utils/html.js';
+import { StateManager } from './utils/StateManager.js';
+import { EventBus } from './utils/EventBus.js';
 
 class SnapVaultApp {
   constructor() {
     this.currentWorkspace = 'gallery';
     this.components = {};
 
+    // Initialize centralized state management
+    this.stateManager = new StateManager();
+    this.eventBus = new EventBus();
+
     // Migrate old density preference to new view preset
     this.migrateUserPreferences();
 
-    this.state = {
-      photos: [],
-      events: [],
-      selectedPhotos: new Set(),
-      filters: {},
-      viewPreset: this.loadViewPreset(), // NEW: View preset instead of density
-      totalPhotosCount: 0 // Total photos in library
-    };
+    // Set initial view preset
+    this.stateManager.set('viewPreset', this.loadViewPreset());
+
+    // Backward compatibility: expose state for components that still use it
+    this.state = this.stateManager.state;
   }
 
   migrateUserPreferences() {
@@ -439,7 +443,7 @@ class SnapVaultApp {
           <line x1="8" y1="2" x2="8" y2="6"></line>
           <line x1="3" y1="10" x2="21" y2="10"></line>
         </svg>
-        <span class="label">${this.escapeHtml(event.name)}</span>
+        <span class="label">${escapeHtml(event.name)}</span>
         <span class="badge">${event.photoCount || 0}</span>
       </button>
     `).join('');
@@ -555,8 +559,9 @@ class SnapVaultApp {
       }
     });
 
-    this.state.selectedPhotos.clear();
+    this.stateManager.clearSelection();
     this.components.bulkActions.update(0);
+    this.eventBus.emit('selection:cleared');
   }
 
   setupDragAndDrop() {
@@ -622,11 +627,6 @@ class SnapVaultApp {
     });
   }
 
-  escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-  }
 }
 
 // Initialize app when DOM is ready

@@ -3,6 +3,8 @@
  * Vertical event timeline view
  */
 
+
+import { escapeHtml } from '../utils/html.js';
 export class Timeline {
   constructor(app) {
     this.app = app;
@@ -89,7 +91,7 @@ export class Timeline {
           ${this.formatDate(event.date || event.createdAt)}
         </div>
         <div class="event-content">
-          <h4 class="event-title">${this.escapeHtml(event.name)}</h4>
+          <h4 class="event-title">${escapeHtml(event.name)}</h4>
           <p class="event-meta">${event.photoCount || 0} photos</p>
         </div>
       </article>
@@ -104,9 +106,4 @@ export class Timeline {
     }).format(date);
   }
 
-  escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-  }
 }

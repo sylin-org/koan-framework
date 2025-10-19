@@ -158,9 +158,14 @@ export class PhotoSelection {
 
   /**
    * Store selected IDs and update UI feedback
+   * IMPORTANT: Sync with app.state.selectedPhotos so delete handlers work
    */
   setSelectedPhotoIds(photoIds) {
     this.selectedPhotoIds = photoIds;
+
+    // Sync with app.state.selectedPhotos (used by delete/remove handlers)
+    this.app.state.selectedPhotos.clear();
+    photoIds.forEach(id => this.app.state.selectedPhotos.add(id));
 
     const sidebar = document.querySelector('.sidebar-left');
     if (!sidebar) return;

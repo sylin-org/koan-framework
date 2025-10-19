@@ -3,6 +3,8 @@
  * Temporary notifications with actions
  */
 
+
+import { escapeHtml } from '../utils/html.js';
 export class Toast {
   constructor() {
     this.container = document.querySelector('.toast-container');
@@ -21,7 +23,7 @@ export class Toast {
     toast.className = 'toast';
     const toastId = Date.now() + Math.random();
 
-    const content = allowHtml ? message : this.escapeHtml(message);
+    const content = allowHtml ? message : escapeHtml(message);
 
     toast.innerHTML = `
       <div class="toast-content">
@@ -32,7 +34,7 @@ export class Toast {
         <div class="toast-actions">
           ${actions.map((action, index) => `
             <button class="toast-action" data-action-index="${index}">
-              ${this.escapeHtml(action.label)}
+              ${escapeHtml(action.label)}
             </button>
           `).join('')}
         </div>
@@ -93,9 +95,4 @@ export class Toast {
     }, 200);
   }
 
-  escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-  }
 }

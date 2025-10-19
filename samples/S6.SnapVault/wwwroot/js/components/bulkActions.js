@@ -3,6 +3,10 @@
  * Toolbar for batch operations on selected photos
  */
 
+import { getSelectedPhotoIds, formatActionMessage } from '../utils/selection.js';
+import { confirmDelete } from '../utils/dialogs.js';
+import { executeWithFeedback } from '../utils/operations.js';
+
 export class BulkActions {
   constructor(app) {
     this.app = app;
@@ -103,38 +107,32 @@ export class BulkActions {
   }
 
   async bulkFavorite() {
-    const photoIds = Array.from(this.app.state.selectedPhotos);
-    if (photoIds.length === 0) return;
+    const photoIds = getSelectedPhotoIds(this.app.state.selectedPhotos, this.app.components.toast);
+    if (!photoIds) return;
 
-    try {
-      const response = await this.app.api.post('/api/photos/bulk/favorite', {
+    await executeWithFeedback(
+      () => this.app.api.post('/api/photos/bulk/favorite', {
         photoIds: photoIds,
         isFavorite: true
-      });
-
-      this.app.components.toast.show(
-        `Added ${response.updated} photos to favorites`,
-        { icon: '⭐', duration: 2000 }
-      );
-
-      // Refresh photos to reflect changes
-      await this.app.loadPhotos();
-      this.app.clearSelection();
-    } catch (error) {
-      console.error('Bulk favorite failed:', error);
-      this.app.components.toast.show(
-        'Failed to add photos to favorites',
-        { icon: '⚠️', duration: 3000 }
-      );
-    }
+      }),
+      {
+        successMessage: formatActionMessage(photoIds.length, 'added', { target: 'Favorites' }),
+        errorMessage: 'Failed to add photos to favorites',
+        successIcon: '⭐',
+        reloadPhotos: true,
+        clearSelection: true,
+        toast: this.app.components.toast,
+        app: this.app
+      }
+    );
   }
 
   async bulkDownload() {
-    const photoIds = Array.from(this.app.state.selectedPhotos);
-    if (photoIds.length === 0) return;
+    const photoIds = getSelectedPhotoIds(this.app.state.selectedPhotos, this.app.components.toast);
+    if (!photoIds) return;
 
     this.app.components.toast.show(
-      `Downloading ${photoIds.length} photos...`,
+      formatActionMessage(photoIds.length, 'downloading'),
       { icon: '⬇️', duration: 2000 }
     );
 
@@ -146,35 +144,22 @@ export class BulkActions {
   }
 
   async bulkDelete() {
-    const photoIds = Array.from(this.app.state.selectedPhotos);
-    if (photoIds.length === 0) return;
+    const photoIds = getSelectedPhotoIds(this.app.state.selectedPhotos, this.app.components.toast);
+    if (!photoIds) return;
 
-    // Confirm deletion
-    const confirmed = confirm(
-      `Are you sure you want to delete ${photoIds.length} photo${photoIds.length > 1 ? 's' : ''}? This cannot be undone.`
+    if (!confirmDelete(photoIds.length, 'photo')) return;
+
+    await executeWithFeedback(
+      () => this.app.api.post('/api/photos/bulk/delete', { photoIds }),
+      {
+        successMessage: formatActionMessage(photoIds.length, 'deleted'),
+        errorMessage: 'Failed to delete photos',
+        successIcon: '🗑️',
+        reloadPhotos: true,
+        clearSelection: true,
+        toast: this.app.components.toast,
+        app: this.app
+      }
     );
-
-    if (!confirmed) return;
-
-    try {
-      const response = await this.app.api.post('/api/photos/bulk/delete', {
-        photoIds: photoIds
-      });
-
-      this.app.components.toast.show(
-        `Deleted ${response.deleted} photo${response.deleted > 1 ? 's' : ''}`,
-        { icon: '🗑️', duration: 2000 }
-      );
-
-      // Refresh photos to reflect changes
-      await this.app.loadPhotos();
-      this.app.clearSelection();
-    } catch (error) {
-      console.error('Bulk delete failed:', error);
-      this.app.components.toast.show(
-        'Failed to delete photos',
-        { icon: '⚠️', duration: 3000 }
-      );
-    }
   }
 }

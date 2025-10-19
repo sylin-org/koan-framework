@@ -4,6 +4,9 @@
  * Follows existing vanilla JS component architecture
  */
 
+import { escapeHtml } from '../utils/html.js';
+import { confirmDeleteCollection } from '../utils/dialogs.js';
+
 export class CollectionsSidebar {
   constructor(app) {
     this.app = app;
@@ -89,7 +92,7 @@ export class CollectionsSidebar {
         <svg class="item-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
         </svg>
-        <span class="item-label">${this.escapeHtml(collection.name)}</span>
+        <span class="item-label">${escapeHtml(collection.name)}</span>
         <span class="item-badge${nearLimit ? ' near-limit' : ''}">${collection.photoCount}</span>
       </div>
     `;
@@ -166,12 +169,7 @@ export class CollectionsSidebar {
     const collection = this.collections.find(c => c.id === collectionId);
     if (!collection) return;
 
-    const confirmed = confirm(
-      `Delete collection "${collection.name}"?\n\n` +
-      `${collection.photoCount} photo${collection.photoCount !== 1 ? 's' : ''} will remain in your library.`
-    );
-
-    if (!confirmed) return;
+    if (!confirmDeleteCollection(collection.name, collection.photoCount)) return;
 
     try {
       await this.app.api.delete(`/api/collections/${collectionId}`);
@@ -290,9 +288,4 @@ export class CollectionsSidebar {
     });
   }
 
-  escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-  }
 }

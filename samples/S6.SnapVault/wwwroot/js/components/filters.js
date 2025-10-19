@@ -7,6 +7,8 @@
  * See /DESIGN_SYSTEM.md for component documentation.
  */
 
+
+import { escapeHtml } from '../utils/html.js';
 export class Filters {
   constructor(app) {
     this.app = app;
@@ -106,10 +108,10 @@ export class Filters {
                 <input
                   type="checkbox"
                   class="checkbox camera-checkbox"
-                  value="${this.escapeHtml(camera)}"
+                  value="${escapeHtml(camera)}"
                   ${this.state.cameras.includes(camera) ? 'checked' : ''}
                 />
-                <span class="checkbox-text">${this.escapeHtml(camera)}</span>
+                <span class="checkbox-text">${escapeHtml(camera)}</span>
               </label>
             `).join('')}
           </div>
@@ -235,9 +237,9 @@ export class Filters {
             ${topTags.map(tag => `
               <button
                 class="tag-pill ${this.state.tags.includes(tag.tag) ? 'active' : ''}"
-                data-tag="${this.escapeHtml(tag.tag)}"
+                data-tag="${escapeHtml(tag.tag)}"
               >
-                ${this.escapeHtml(tag.tag)}
+                ${escapeHtml(tag.tag)}
                 <span class="tag-pill-count">${tag.count}</span>
               </button>
             `).join('')}
@@ -666,7 +668,7 @@ export class Filters {
         <span class="filter-count">ACTIVE (${pills.length})</span>
         ${pills.map(pill => `
           <span class="filter-pill">
-            ${this.escapeHtml(pill.label)}
+            ${escapeHtml(pill.label)}
             <button class="filter-pill-remove" data-type="${pill.type}" data-value="${pill.value || ''}">×</button>
           </span>
         `).join('')}
@@ -773,9 +775,4 @@ export class Filters {
     return count;
   }
 
-  escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-  }
 }

@@ -12,6 +12,8 @@
  * See: /docs/DISCOVERY-PANEL-REDESIGN.md
  */
 
+
+import { escapeHtml } from '../utils/html.js';
 export class DiscoveryPanel {
   constructor(app) {
     this.app = app;
@@ -129,11 +131,11 @@ export class DiscoveryPanel {
         <div class="collection-details">
           <div class="collection-header">
             <div class="collection-icon">${icon}</div>
-            <h4 class="collection-name">${this.escapeHtml(collection.name)}</h4>
+            <h4 class="collection-name">${escapeHtml(collection.name)}</h4>
           </div>
           <div class="collection-meta">
             <span class="collection-count">${this.formatNumber(collection.photoCount)} photos</span>
-            ${collection.description ? `<span class="collection-description">· ${this.escapeHtml(collection.description)}</span>` : ''}
+            ${collection.description ? `<span class="collection-description">· ${escapeHtml(collection.description)}</span>` : ''}
           </div>
           ${this.renderLastUpdated(collection.lastUpdated)}
         </div>
@@ -387,13 +389,7 @@ export class DiscoveryPanel {
   }
 
   // Utility: Escape HTML
-  escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-  }
-
-  // Public API: Refresh collections
+// Public API: Refresh collections
   async refresh() {
     await this.loadSmartCollections();
     this.render();

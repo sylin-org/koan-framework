@@ -3,6 +3,8 @@
  * Consolidates metadata, AI insights, actions, and keyboard shortcuts
  */
 
+
+import { escapeHtml } from '../utils/html.js';
 import { SplitButton } from './splitButton.js';
 
 export class LightboxPanel {
@@ -306,11 +308,11 @@ export class LightboxPanel {
           ${analysis.tags.map(tag => `
             <button
               class="ai-tag"
-              data-tag="${this.escapeHtml(tag)}"
+              data-tag="${escapeHtml(tag)}"
               role="listitem"
-              aria-label="Tag: ${this.escapeHtml(tag)}"
-              title="Click to filter by ${this.escapeHtml(tag)}">
-              ${this.escapeHtml(tag)}
+              aria-label="Tag: ${escapeHtml(tag)}"
+              title="Click to filter by ${escapeHtml(tag)}">
+              ${escapeHtml(tag)}
             </button>
           `).join('')}
         </div>
@@ -331,7 +333,7 @@ export class LightboxPanel {
             </button>
           </div>
           <div class="ai-summary ${analysis.summaryLocked ? 'locked' : ''}" role="region" aria-label="Photo description">
-            <p>${this.escapeHtml(analysis.summary)}</p>
+            <p>${escapeHtml(analysis.summary)}</p>
           </div>
         </div>
 
@@ -446,7 +448,7 @@ export class LightboxPanel {
       ${(photo.autoTags && photo.autoTags.length > 0) ? `
         <div class="ai-tags">
           ${photo.autoTags.slice(0, 10).map(tag =>
-            `<span class="ai-tag">${this.escapeHtml(tag)}</span>`
+            `<span class="ai-tag">${escapeHtml(tag)}</span>`
           ).join('')}
         </div>
       ` : ''}
@@ -481,22 +483,22 @@ export class LightboxPanel {
 
     return `
       <div class="fact-row"
-           data-fact-key="${this.escapeHtml(label)}"
+           data-fact-key="${escapeHtml(label)}"
            data-locked="${isLocked}"
            role="row">
         <span class="fact-label" role="rowheader">
-          ${this.escapeHtml(label)}
+          ${escapeHtml(label)}
         </span>
         <div class="fact-values" role="cell">
           ${values.map(v => `
-            <span class="fact-pill" data-fact-type="${this.escapeHtml(label)}" data-fact-value="${this.escapeHtml(v)}">
-              ${this.escapeHtml(v)}
+            <span class="fact-pill" data-fact-type="${escapeHtml(label)}" data-fact-value="${escapeHtml(v)}">
+              ${escapeHtml(v)}
             </span>
           `).join('')}
         </div>
         <button class="lock-btn ${isLocked ? 'locked' : ''}"
-                data-fact-key="${this.escapeHtml(label)}"
-                aria-label="${isLocked ? 'Unlock' : 'Lock'} ${this.escapeHtml(label)}"
+                data-fact-key="${escapeHtml(label)}"
+                aria-label="${isLocked ? 'Unlock' : 'Lock'} ${escapeHtml(label)}"
                 title="Click to ${isLocked ? 'unlock' : 'lock'} this fact">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             ${isLocked

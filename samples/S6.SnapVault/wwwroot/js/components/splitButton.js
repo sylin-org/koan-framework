@@ -5,6 +5,8 @@
  * Dropdown: Select specific analysis style (portrait, product, landscape, etc.)
  */
 
+
+import { escapeHtml } from '../utils/html.js';
 export class SplitButton {
   constructor(options) {
     this.options = {
@@ -72,13 +74,13 @@ export class SplitButton {
     if (this.options.styles.length > 0) {
       dropdown.innerHTML = this.options.styles.map((style, index) => `
         <button class="split-button-menu-item"
-                data-style-id="${this.escapeHtml(style.id)}"
+                data-style-id="${escapeHtml(style.id)}"
                 role="menuitem"
                 tabindex="${index === 0 ? '0' : '-1'}">
           <span class="menu-item-icon">${style.icon || '🔍'}</span>
           <div class="menu-item-content">
-            <div class="menu-item-label">${this.escapeHtml(style.label)}</div>
-            <div class="menu-item-desc">${this.escapeHtml(style.description)}</div>
+            <div class="menu-item-label">${escapeHtml(style.label)}</div>
+            <div class="menu-item-desc">${escapeHtml(style.description)}</div>
           </div>
         </button>
       `).join('');
@@ -202,13 +204,13 @@ export class SplitButton {
     // Re-render dropdown menu
     this.dropdown.innerHTML = styles.map((style, index) => `
       <button class="split-button-menu-item"
-              data-style-id="${this.escapeHtml(style.id)}"
+              data-style-id="${escapeHtml(style.id)}"
               role="menuitem"
               tabindex="${index === 0 ? '0' : '-1'}">
         <span class="menu-item-icon">${style.icon || '🔍'}</span>
         <div class="menu-item-content">
-          <div class="menu-item-label">${this.escapeHtml(style.label)}</div>
-          <div class="menu-item-desc">${this.escapeHtml(style.description)}</div>
+          <div class="menu-item-label">${escapeHtml(style.label)}</div>
+          <div class="menu-item-desc">${escapeHtml(style.description)}</div>
         </div>
       </button>
     `).join('');

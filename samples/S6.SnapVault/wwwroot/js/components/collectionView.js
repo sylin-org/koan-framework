@@ -4,6 +4,11 @@
  * Handles context-specific actions: All Photos, Favorites, Collection views
  */
 
+import { getSelectedPhotoIds, formatActionMessage } from '../utils/selection.js';
+import { confirmDelete } from '../utils/dialogs.js';
+import { executeWithFeedback } from '../utils/operations.js';
+import { pluralize } from '../utils/html.js';
+
 export class CollectionView {
   constructor(app) {
     this.app = app;
@@ -358,119 +363,72 @@ export class CollectionView {
    * Handle permanent delete (All Photos view only)
    */
   async handleDeleteSelected() {
-    const selectedIds = Array.from(this.app.state.selectedPhotos);
-    if (selectedIds.length === 0) {
-      this.app.components.toast.show('No photos selected', { icon: 'ℹ️', duration: 2000 });
-      return;
-    }
+    const selectedIds = getSelectedPhotoIds(this.app.state.selectedPhotos, this.app.components.toast);
+    if (!selectedIds) return;
 
-    const confirmed = confirm(
-      `Permanently delete ${selectedIds.length} photo${selectedIds.length > 1 ? 's' : ''}?\n\n` +
-      `This will delete the photo${selectedIds.length > 1 ? 's' : ''} and all thumbnails from storage.\n` +
-      `This cannot be undone.`
+    const additionalInfo = `This will delete the ${pluralize(selectedIds.length, 'photo')} and all thumbnails from storage.`;
+    if (!confirmDelete(selectedIds.length, 'photo', { additionalInfo })) return;
+
+    await executeWithFeedback(
+      () => this.app.api.post('/api/photos/bulk/delete', { photoIds: selectedIds }),
+      {
+        successMessage: formatActionMessage(selectedIds.length, 'deleted'),
+        errorMessage: 'Failed to delete photos',
+        successIcon: '🗑️',
+        reloadCurrentView: true,
+        clearSelection: true,
+        toast: this.app.components.toast,
+        app: this.app
+      }
     );
-
-    if (!confirmed) return;
-
-    try {
-      // Use bulk delete endpoint
-      const result = await this.app.api.post('/api/photos/bulk/delete', {
-        photoIds: selectedIds
-      });
-
-      this.app.components.toast.show(
-        `Deleted ${result.deleted} photo${result.deleted !== 1 ? 's' : ''}`,
-        { icon: '🗑️', duration: 3000 }
-      );
-
-      // Reload photos
-      await this.loadPhotos();
-
-      // Clear selection
-      this.app.clearSelection();
-    } catch (error) {
-      console.error('[CollectionView] Failed to delete photos:', error);
-      this.app.components.toast.show('Failed to delete photos', {
-        icon: '⚠️',
-        duration: 3000
-      });
-    }
   }
 
   /**
    * Handle unfavorite (Favorites view)
    */
   async handleUnfavoriteSelected() {
-    const selectedIds = Array.from(this.app.state.selectedPhotos);
-    if (selectedIds.length === 0) {
-      this.app.components.toast.show('No photos selected', { icon: 'ℹ️', duration: 2000 });
-      return;
-    }
+    const selectedIds = getSelectedPhotoIds(this.app.state.selectedPhotos, this.app.components.toast);
+    if (!selectedIds) return;
 
-    try {
-      // Use bulk favorite endpoint with isFavorite: false
-      await this.app.api.post('/api/photos/bulk/favorite', {
+    await executeWithFeedback(
+      () => this.app.api.post('/api/photos/bulk/favorite', {
         photoIds: selectedIds,
         isFavorite: false
-      });
-
-      this.app.components.toast.show(
-        `Removed ${selectedIds.length} photo${selectedIds.length !== 1 ? 's' : ''} from Favorites`,
-        { icon: '⭐', duration: 2000 }
-      );
-
-      // Reload photos
-      await this.loadPhotos();
-
-      // Clear selection
-      this.app.clearSelection();
-    } catch (error) {
-      console.error('[CollectionView] Failed to unfavorite photos:', error);
-      this.app.components.toast.show('Failed to update favorites', {
-        icon: '⚠️',
-        duration: 3000
-      });
-    }
+      }),
+      {
+        successMessage: formatActionMessage(selectedIds.length, 'removed', { from: 'Favorites' }),
+        errorMessage: 'Failed to update favorites',
+        successIcon: '⭐',
+        reloadCurrentView: true,
+        clearSelection: true,
+        toast: this.app.components.toast,
+        app: this.app
+      }
+    );
   }
 
   /**
    * Handle remove from collection (Collection view)
    */
   async handleRemoveFromCollection() {
-    const selectedIds = Array.from(this.app.state.selectedPhotos);
-    if (selectedIds.length === 0) {
-      this.app.components.toast.show('No photos selected', { icon: 'ℹ️', duration: 2000 });
-      return;
-    }
+    const selectedIds = getSelectedPhotoIds(this.app.state.selectedPhotos, this.app.components.toast);
+    if (!selectedIds) return;
 
-    try {
-      await this.app.api.post(`/api/collections/${this.currentViewId}/photos/remove`, {
+    await executeWithFeedback(
+      () => this.app.api.post(`/api/collections/${this.currentViewId}/photos/remove`, {
         photoIds: selectedIds
-      });
-
-      this.app.components.toast.show(
-        `Removed ${selectedIds.length} photo${selectedIds.length !== 1 ? 's' : ''} from collection`,
-        { icon: '✓', duration: 2000 }
-      );
-
-      // Reload photos
-      await this.loadPhotos();
-
-      // Reload collections sidebar to update counts
-      if (this.app.components.collectionsSidebar) {
-        await this.app.components.collectionsSidebar.loadCollections();
-        this.app.components.collectionsSidebar.render();
+      }),
+      {
+        successMessage: formatActionMessage(selectedIds.length, 'removed', { from: 'collection' }),
+        errorMessage: 'Failed to remove photos',
+        successIcon: '✓',
+        reloadCurrentView: true,
+        reloadCollections: true,
+        clearSelection: true,
+        toast: this.app.components.toast,
+        app: this.app
       }
-
-      // Clear selection
-      this.app.clearSelection();
-    } catch (error) {
-      console.error('[CollectionView] Failed to remove photos from collection:', error);
-      this.app.components.toast.show('Failed to remove photos', {
-        icon: '⚠️',
-        duration: 3000
-      });
-    }
+    );
   }
 
   /**

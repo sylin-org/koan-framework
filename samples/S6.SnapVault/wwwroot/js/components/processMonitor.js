@@ -4,6 +4,8 @@
  * Inspired by modern download managers and background task indicators
  */
 
+
+import { escapeHtml } from '../utils/html.js';
 export class ProcessMonitor {
   constructor(app) {
     this.app = app;
@@ -237,7 +239,7 @@ export class ProcessMonitor {
         <div class="detail-item ${statusClass}">
           <span class="detail-icon">${statusIcon}</span>
           <div class="detail-content">
-            <div class="detail-filename">${this.escapeHtml(progress.fileName)}</div>
+            <div class="detail-filename">${escapeHtml(progress.fileName)}</div>
             <div class="detail-stage">${stageText}</div>
           </div>
         </div>
@@ -354,9 +356,4 @@ export class ProcessMonitor {
     }
   }
 
-  escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-  }
 }

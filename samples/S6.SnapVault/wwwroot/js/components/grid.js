@@ -4,6 +4,7 @@
  */
 
 import { VIEW_PRESETS, selectOptimalImageTier, getResponsiveColumns } from '../viewPresets.js';
+import { escapeHtml } from '../utils/html.js';
 
 export class PhotoGrid {
   constructor(app) {
@@ -251,7 +252,7 @@ export class PhotoGrid {
 
     article.innerHTML = `
       <div class="photo-skeleton"></div>
-      <img class="photo-image draggable" data-src="${thumbnailUrl}" alt="${this.escapeHtml(photo.originalFileName)}" loading="lazy" />
+      <img class="photo-image draggable" data-src="${thumbnailUrl}" alt="${escapeHtml(photo.originalFileName)}" loading="lazy" />
       <div class="photo-overlay">
         <div class="actions-top">
           <button class="btn-favorite ${isFavorite ? 'active' : ''}" aria-label="Favorite (F)" data-photo-id="${photo.id}">
@@ -436,11 +437,6 @@ export class PhotoGrid {
     return formatter.format(date);
   }
 
-  escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-  }
 
   /**
    * Append new photos to the grid (for pagination/infinite scroll)
