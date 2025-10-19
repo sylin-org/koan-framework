@@ -71,14 +71,14 @@ export class CollectionView {
       titleElement.classList.remove('editable');
       this.renderFavoritesActions(header);
     } else if (this.collection) {
-      // Collection view - make title editable
+      // Collection view - title is clickable to edit (not editable by default)
       titleElement.textContent = `📁 ${this.collection.name}`;
-      titleElement.contentEditable = true;
-      titleElement.classList.add('editable');
+      titleElement.contentEditable = false; // NOT editable by default!
+      titleElement.classList.add('editable'); // Indicates it CAN be edited (cursor hint)
       titleElement.dataset.collectionId = this.collection.id;
       titleElement.dataset.originalName = this.collection.name;
 
-      // Attach edit handlers
+      // Attach edit handlers (click to activate edit mode)
       this.attachTitleEditHandlers(titleElement);
 
       this.renderCollectionActions(header);
@@ -87,19 +87,26 @@ export class CollectionView {
 
   /**
    * Attach edit handlers to collection title
-   * Large, prominent editing in main content area
+   * Click to activate edit mode, then large prominent editing in main content area
    */
   attachTitleEditHandlers(titleElement) {
     const collectionId = titleElement.dataset.collectionId;
     const originalName = titleElement.dataset.originalName;
 
-    // Focus event - select all text
-    const focusHandler = () => {
+    // Click event - activate edit mode
+    const clickHandler = () => {
+      // Only activate if not already editing
+      if (titleElement.contentEditable === 'true') return;
+
+      // Activate edit mode
+      titleElement.contentEditable = true;
+
       // Remove emoji prefix for editing
       const textWithoutEmoji = titleElement.textContent.replace('📁 ', '');
       titleElement.textContent = textWithoutEmoji;
 
-      // Select all text
+      // Focus and select all text
+      titleElement.focus();
       setTimeout(() => {
         const range = document.createRange();
         range.selectNodeContents(titleElement);
@@ -109,9 +116,12 @@ export class CollectionView {
       }, 0);
     };
 
-    // Blur event - save changes
+    // Blur event - save changes and deactivate edit mode
     const blurHandler = async () => {
       const newName = titleElement.textContent.trim();
+
+      // Deactivate edit mode
+      titleElement.contentEditable = false;
 
       // Restore emoji prefix
       titleElement.textContent = `📁 ${newName || originalName}`;
@@ -155,20 +165,22 @@ export class CollectionView {
     const keydownHandler = (e) => {
       if (e.key === 'Enter') {
         e.preventDefault();
-        titleElement.blur();
+        titleElement.blur(); // Triggers blurHandler which saves and deactivates
       } else if (e.key === 'Escape') {
+        // Deactivate edit mode without saving
+        titleElement.contentEditable = false;
         titleElement.textContent = `📁 ${originalName}`;
         titleElement.blur();
       }
     };
 
     // Store handlers for cleanup
-    titleElement._focusHandler = focusHandler;
+    titleElement._clickHandler = clickHandler;
     titleElement._blurHandler = blurHandler;
     titleElement._keydownHandler = keydownHandler;
 
     // Attach handlers
-    titleElement.addEventListener('focus', focusHandler);
+    titleElement.addEventListener('click', clickHandler);
     titleElement.addEventListener('blur', blurHandler);
     titleElement.addEventListener('keydown', keydownHandler);
 
@@ -179,9 +191,9 @@ export class CollectionView {
    * Clean up edit handlers to prevent memory leaks
    */
   cleanupTitleEditHandlers(titleElement) {
-    if (titleElement._focusHandler) {
-      titleElement.removeEventListener('focus', titleElement._focusHandler);
-      delete titleElement._focusHandler;
+    if (titleElement._clickHandler) {
+      titleElement.removeEventListener('click', titleElement._clickHandler);
+      delete titleElement._clickHandler;
     }
     if (titleElement._blurHandler) {
       titleElement.removeEventListener('blur', titleElement._blurHandler);
@@ -463,6 +475,7 @@ export class CollectionView {
 
   /**
    * Load photos for current view
+   * Simplified: all views use same structure, just different data sources
    */
   async loadPhotos() {
     try {
@@ -471,11 +484,40 @@ export class CollectionView {
       } else if (this.currentViewId === 'favorites') {
         await this.app.filterPhotos('favorites');
       } else if (this.collection) {
-        // Load collection photos
-        const response = await this.app.api.get(`/api/collections/${this.currentViewId}/photos`);
-        this.app.state.photos = response.photos || [];
+        // STEP 1: Flush existing state completely
+        this.app.state.photos = [];
         this.app.state.currentPage = 1;
-        this.app.state.hasMorePages = false; // Collections don't support infinite scroll yet
+        this.app.state.hasMorePages = false;
+
+        // STEP 2: Clear DOM immediately (don't wait for render)
+        const photoGrid = document.querySelector('.photo-grid');
+        if (photoGrid) {
+          const existingCards = photoGrid.querySelectorAll('.photo-card');
+          existingCards.forEach(card => card.remove());
+        }
+
+        // STEP 3: Load photos for this collection using available photoIds
+        if (this.collection.photoIds && this.collection.photoIds.length > 0) {
+          console.log('[CollectionView] Loading', this.collection.photoIds.length, 'photos for collection');
+
+          // Fetch each photo individually using the IDs we have
+          const photoPromises = this.collection.photoIds.map(id =>
+            this.app.api.get(`/api/photos/${id}`)
+              .catch(err => {
+                console.warn('[CollectionView] Failed to load photo', id, err);
+                return null;
+              })
+          );
+
+          const photos = await Promise.all(photoPromises);
+          this.app.state.photos = photos.filter(p => p != null);
+
+          console.log('[CollectionView] Successfully loaded', this.app.state.photos.length, 'of', this.collection.photoIds.length, 'photos');
+        } else {
+          console.log('[CollectionView] Collection has no photos');
+        }
+
+        // STEP 4: Rebuild grid from scratch
         this.app.components.grid.render();
         this.app.updateLibraryCounts();
         this.app.updateStatusBar();

@@ -178,21 +178,28 @@
 /* Delete Button on Collection Items - Hidden by Default */
 .sidebar-item .btn-delete-collection {
   flex-shrink: 0;
-  padding: 4px;
+  width: 20px;
+  height: 20px;
+  padding: 0;
   background: transparent;
   border: none;
   color: rgba(255, 255, 255, 0.4);
   cursor: pointer;
-  font-size: 18px;
+  font-size: 16px;
+  font-weight: 300;
   line-height: 1;
   border-radius: 4px;
   transition: all 0.15s ease;
   opacity: 0;
-  margin-left: auto;
+  pointer-events: none; /* Prevent accidental clicks when hidden */
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .sidebar-item:hover .btn-delete-collection {
   opacity: 1;
+  pointer-events: auto; /* Re-enable clicks on hover */
 }
 
 .btn-delete-collection:hover {
