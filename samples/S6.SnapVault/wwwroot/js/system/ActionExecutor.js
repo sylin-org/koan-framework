@@ -139,6 +139,12 @@ export class ActionExecutor {
       return null;
     }
 
+    console.log(`[ActionExecutor] Creating button for "${actionId}":`, {
+      label: action.label,
+      icon: action.icon,
+      buttonOptions
+    });
+
     // Determine if action is available
     const isAvailable = action.isAvailable(this.app, context);
 
@@ -170,7 +176,7 @@ export class ActionExecutor {
     const buttons = actions
       .map(actionConfig => {
         const actionId = typeof actionConfig === 'string' ? actionConfig : actionConfig.id;
-        const buttonOptions = typeof actionConfig === 'object' ? actionConfig.options : {};
+        const buttonOptions = (typeof actionConfig === 'object' && actionConfig.options) ? actionConfig.options : {};
 
         return this.createButton(actionId, context, buttonOptions);
       })
