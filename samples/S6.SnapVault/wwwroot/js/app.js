@@ -261,6 +261,10 @@ class SnapVaultApp {
 
       console.log(`[Photos] Initial load: ${response.data?.length || 0} photos (page 1), total: ${this.state.totalPhotosCount}`);
 
+      // Auto-fill viewport if grid doesn't fill the visible area
+      // Particularly important for compact modes on large screens (4K)
+      await this.fillViewport();
+
       // Note: Infinite scroll is enabled by caller (init or setViewPreset)
       // This prevents immediate trigger when layout changes
     } catch (error) {
@@ -304,6 +308,64 @@ class SnapVaultApp {
     } finally {
       this.state.loadingMore = false;
     }
+  }
+
+  /**
+   * Auto-fill viewport with photos on initial load
+   * Particularly important for compact grid modes on large screens (4K)
+   * Keeps loading pages until viewport is filled or collection end is reached
+   */
+  async fillViewport() {
+    const MAX_ITERATIONS = 10; // Safety limit to prevent infinite loops
+    let iterations = 0;
+
+    while (iterations < MAX_ITERATIONS) {
+      // Check if we need more photos
+      if (!this.needsMorePhotosToFillViewport()) {
+        console.log('[Viewport Fill] Grid fills viewport - stopping auto-pagination');
+        break;
+      }
+
+      // Check if more pages are available
+      if (!this.state.hasMorePages) {
+        console.log('[Viewport Fill] No more pages available - collection end reached');
+        break;
+      }
+
+      // Load next page
+      console.log(`[Viewport Fill] Loading page ${this.state.currentPage + 1} to fill viewport...`);
+      await this.loadMorePhotos();
+
+      // Small delay to let DOM update and images load
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      iterations++;
+    }
+
+    if (iterations > 0) {
+      console.log(`[Viewport Fill] Completed after ${iterations} additional page(s)`);
+    }
+  }
+
+  /**
+   * Check if grid needs more photos to fill the viewport
+   * Returns true if grid bottom is above viewport bottom (needs more content)
+   */
+  needsMorePhotosToFillViewport() {
+    const gridContainer = document.querySelector('.photo-grid');
+    if (!gridContainer) return false;
+
+    const gridRect = gridContainer.getBoundingClientRect();
+    const viewportHeight = window.innerHeight;
+
+    // Check if grid bottom is above viewport bottom (with small buffer)
+    const needsMore = gridRect.bottom < (viewportHeight - 100);
+
+    if (needsMore) {
+      console.log('[Viewport Fill] Check: Grid bottom at', Math.round(gridRect.bottom), 'px, viewport height', viewportHeight, 'px - needs more');
+    }
+
+    return needsMore;
   }
 
   async loadEvents() {
