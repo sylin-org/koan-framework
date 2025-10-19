@@ -33,10 +33,6 @@ export class DragDropManager {
       const collectionItem = e.target.closest('.collection-item[data-droppable="true"]');
       const newCollectionBtn = e.target.closest('.btn-new-collection');
 
-      if (collectionItem || newCollectionBtn) {
-        console.log('[DragDropManager] Dragover target:', collectionItem ? 'collection' : 'new-collection-btn');
-      }
-
       // Clear previous highlights
       if (this.dragOverTarget && this.dragOverTarget !== collectionItem && this.dragOverTarget !== newCollectionBtn) {
         this.clearDropTargetHighlight();
@@ -65,7 +61,6 @@ export class DragDropManager {
 
     // Drop handler - add photos to collection or create new collection
     sidebar.addEventListener('drop', async (e) => {
-      console.log('[DragDropManager] Drop event fired!', e.target);
       e.preventDefault();
 
       // Clear visual feedback
@@ -73,7 +68,6 @@ export class DragDropManager {
 
       // Get selected photo IDs from current text selection
       const photoIds = this.app.components.photoSelection.getSelectedPhotoIds();
-      console.log('[DragDropManager] Got photoIds:', photoIds);
 
       if (photoIds.length === 0) {
         console.warn('[DragDropManager] No photos selected');
@@ -83,7 +77,6 @@ export class DragDropManager {
       // Determine drop target
       const collectionItem = e.target.closest('.collection-item[data-droppable="true"]');
       const newCollectionBtn = e.target.closest('.btn-new-collection');
-      console.log('[DragDropManager] Drop targets - collection:', collectionItem, 'newBtn:', newCollectionBtn);
 
       if (newCollectionBtn) {
         // Create new collection with these photos
@@ -99,20 +92,34 @@ export class DragDropManager {
   }
 
   /**
+   * Generate timestamp-based collection name
+   * Format: "Collection YYYY-MM-DD HH:mm"
+   */
+  generateTimestampName() {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const hour = String(now.getHours()).padStart(2, '0');
+    const minute = String(now.getMinutes()).padStart(2, '0');
+
+    return `Collection ${year}-${month}-${day} ${hour}:${minute}`;
+  }
+
+  /**
    * Create new collection and add photos to it
+   * INSTANT creation with auto-rename - no prompts
    */
   async createCollectionWithPhotos(photoIds) {
     console.log('[DragDropManager] Creating collection with photos:', photoIds);
-    const collectionName = prompt('New collection name:');
-    if (!collectionName || collectionName.trim() === '') {
-      console.log('[DragDropManager] Collection creation cancelled');
-      return;
-    }
+
+    // Generate auto-name (no prompt!)
+    const autoName = this.generateTimestampName();
 
     try {
       // Create collection
       const collection = await this.app.api.post('/api/collections', {
-        name: collectionName.trim()
+        name: autoName
       });
 
       // Add photos to collection
@@ -120,21 +127,32 @@ export class DragDropManager {
         photoIds: photoIds
       });
 
-      // Reload collections sidebar
-      if (this.app.components.collectionsSidebar) {
-        await this.app.components.collectionsSidebar.loadCollections();
-        this.app.components.collectionsSidebar.render();
-      }
-
+      // Brief toast - don't interrupt flow
       this.app.components.toast.show(
-        `Created "${collectionName}" with ${addResult.added} photo${addResult.added !== 1 ? 's' : ''}`,
-        { icon: '📁', duration: 3000 }
+        `Created collection with ${addResult.added} photo${addResult.added !== 1 ? 's' : ''}`,
+        { icon: '📁', duration: 2000 }
       );
 
-      // Clear text selection after successful drop
+      // Clear text selection
       this.app.components.photoSelection.clearSelection();
 
-      console.log(`[DragDropManager] Created collection "${collectionName}" with ${addResult.added} photos`);
+      // Reload sidebar and trigger auto-rename (non-blocking)
+      if (this.app.components.collectionsSidebar) {
+        this.app.components.collectionsSidebar.loadCollections().then(() => {
+          // Render updated sidebar
+          this.app.components.collectionsSidebar.render();
+
+          // Navigate to the new collection
+          this.app.components.collectionsSidebar.selectView(collection.id);
+
+          // CRITICAL: Start rename mode after render settles
+          setTimeout(() => {
+            this.app.components.collectionsSidebar.startRenameById(collection.id);
+          }, 150); // Small delay for DOM to stabilize
+        });
+      }
+
+      console.log(`[DragDropManager] Created collection "${autoName}" (ID: ${collection.id})`);
     } catch (error) {
       console.error('[DragDropManager] Failed to create collection:', error);
 

@@ -223,6 +223,37 @@ export class CollectionsSidebar {
     }
   }
 
+  /**
+   * Programmatically start rename mode for a collection by ID
+   * Used after instant collection creation to trigger auto-rename
+   */
+  startRenameById(collectionId) {
+    // Find the collection item by ID
+    const collectionItem = document.querySelector(`.collection-item[data-collection-id="${collectionId}"]`);
+
+    if (!collectionItem) {
+      console.warn('[CollectionsSidebar] Collection item not found for rename:', collectionId);
+      return;
+    }
+
+    // Find the name element
+    const nameElement = collectionItem.querySelector('.collection-name');
+
+    if (!nameElement) {
+      console.warn('[CollectionsSidebar] Name element not found');
+      return;
+    }
+
+    // Use existing rename logic
+    this.startRename(nameElement);
+
+    console.log('[CollectionsSidebar] Auto-started rename for collection:', collectionId);
+  }
+
+  /**
+   * Start inline rename mode for a collection
+   * Handles Enter (save), Escape (cancel), and blur (save) events
+   */
   startRename(nameElement) {
     const collectionItem = nameElement.closest('.collection-item');
     const collectionId = collectionItem.dataset.collectionId;
@@ -242,6 +273,7 @@ export class CollectionsSidebar {
       const newName = nameElement.textContent.trim();
       nameElement.contentEditable = false;
 
+      // Only save if name actually changed
       if (newName && newName !== originalName) {
         try {
           await this.app.api.put(`/api/collections/${collectionId}`, {
@@ -262,15 +294,19 @@ export class CollectionsSidebar {
           });
         }
       } else {
+        // No change or empty - revert to original
         nameElement.textContent = originalName;
       }
     };
 
+    // Save on blur (user clicks away)
     nameElement.addEventListener('blur', finishRename, { once: true });
+
+    // Handle keyboard shortcuts
     nameElement.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
         e.preventDefault();
-        finishRename();
+        nameElement.blur(); // Triggers finishRename via blur event
       } else if (e.key === 'Escape') {
         nameElement.textContent = originalName;
         nameElement.blur();

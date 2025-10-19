@@ -93,36 +93,29 @@ export class PhotoSelection {
    */
   getSelectedPhotoIds() {
     const selection = window.getSelection();
-    console.log('[PhotoSelection] Getting selected photo IDs, selection:', selection);
 
     if (!selection || selection.rangeCount === 0) {
-      console.log('[PhotoSelection] No selection or ranges');
       return [];
     }
 
     const gridContainer = document.querySelector('.photo-grid');
     if (!gridContainer) {
-      console.log('[PhotoSelection] Grid container not found');
       return [];
     }
 
     // Find all photo cards in the current selection
     const photoCards = Array.from(gridContainer.querySelectorAll('.photo-card'));
-    console.log('[PhotoSelection] Found', photoCards.length, 'photo cards');
-
     const selectedPhotoIds = [];
 
     photoCards.forEach(card => {
       if (selection.containsNode(card, true)) {
         const photoId = card.dataset.photoId;
-        console.log('[PhotoSelection] Card selected, photoId:', photoId);
         if (photoId) {
           selectedPhotoIds.push(photoId);
         }
       }
     });
 
-    console.log('[PhotoSelection] Selected photo IDs:', selectedPhotoIds);
     return selectedPhotoIds;
   }
 

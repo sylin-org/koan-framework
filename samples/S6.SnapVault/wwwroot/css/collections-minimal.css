@@ -118,6 +118,33 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  transition: all 0.15s ease;
+}
+
+/* Edit mode - Blue underline indicator (matches photo panel fact editing) */
+.collection-item .collection-name[contenteditable="true"] {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid rgba(99, 102, 241, 0.5);
+  border-radius: 0;
+  padding-bottom: 2px;
+  outline: none;
+  color: rgba(255, 255, 255, 1.0); /* Full brightness when editing */
+
+  /* Allow text to expand during edit */
+  overflow: visible;
+  white-space: normal;
+  text-overflow: clip;
+}
+
+.collection-item .collection-name[contenteditable="true"]:focus {
+  border-bottom-color: rgba(99, 102, 241, 1.0); /* Solid blue on focus */
+}
+
+/* Subtle hover hint that name is editable */
+.collection-item:not(.active) .collection-name:hover {
+  opacity: 0.8;
+  cursor: text;
 }
 
 .collection-item .badge {
