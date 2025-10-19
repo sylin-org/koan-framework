@@ -212,11 +212,11 @@ class SnapVaultApp {
         // Clear collection active state
         document.querySelectorAll('.collection-item').forEach(c => c.classList.remove('active'));
 
-        // Filter photos based on selection
+        // Route to collection view for proper state management
         if (label === 'All Photos') {
-          this.filterPhotos('all');
+          this.components.collectionView.setView('all-photos');
         } else if (label === 'Favorites') {
-          this.filterPhotos('favorites');
+          this.components.collectionView.setView('favorites');
         }
       });
     });
