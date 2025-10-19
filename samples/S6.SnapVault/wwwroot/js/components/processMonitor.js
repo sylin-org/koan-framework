@@ -181,8 +181,8 @@ export class ProcessMonitor {
     // Show completion state
     this.showCompletionState(event);
 
-    // Reload photos
-    this.app.loadPhotos();
+    // Reload current view to show newly processed photos
+    this.app.components.collectionView.loadPhotos();
 
     // Disconnect SignalR safely
     this.disconnectSignalR(event.jobId);

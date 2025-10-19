@@ -759,8 +759,8 @@ export class Filters {
       eventId: null
     };
 
-    // Reload all photos
-    this.app.loadPhotos();
+    // Reload current view (preserves All Photos / Favorites / Collection context)
+    this.app.components.collectionView.loadPhotos();
 
     this.app.components.toast.show('Filters reset', { icon: '🔄', duration: 1500 });
   }

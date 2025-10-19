@@ -119,7 +119,7 @@ export class BulkActions {
         successMessage: formatActionMessage(photoIds.length, 'added', { target: 'Favorites' }),
         errorMessage: 'Failed to add photos to favorites',
         successIcon: '⭐',
-        reloadPhotos: true,
+        reloadCurrentView: true,
         clearSelection: true,
         toast: this.app.components.toast,
         app: this.app
@@ -155,7 +155,7 @@ export class BulkActions {
         successMessage: formatActionMessage(photoIds.length, 'deleted'),
         errorMessage: 'Failed to delete photos',
         successIcon: '🗑️',
-        reloadPhotos: true,
+        reloadCurrentView: true,
         clearSelection: true,
         toast: this.app.components.toast,
         app: this.app

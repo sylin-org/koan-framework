@@ -151,8 +151,8 @@ export class LightboxActions {
         // Success: Close lightbox
         this.lightbox.close();
 
-        // Remove from gallery
-        this.app.loadPhotos();
+        // Reload current view (preserves All Photos / Favorites / Collection context)
+        this.app.components.collectionView.loadPhotos();
 
         this.app.components.toast.show('Photo deleted', {
           icon: '✅',

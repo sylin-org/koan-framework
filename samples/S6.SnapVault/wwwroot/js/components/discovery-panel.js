@@ -27,6 +27,8 @@ export class DiscoveryPanel {
       context: 'all-photos' // 'all-photos', 'event', 'search-results'
     };
 
+    this.previousViewState = null; // Track view before applying smart collection filter
+
     // Icon mapping (Lucide Icons compatible)
     this.iconMap = {
       'camera': this.createIcon('camera'),
@@ -308,6 +310,11 @@ export class DiscoveryPanel {
           }
       }
 
+      // Save current view state before first filter application
+      if (!this.previousViewState) {
+        this.previousViewState = { ...this.app.components.collectionView.viewState };
+      }
+
       // Apply filter to gallery
       console.log('Applying filter:', filter);
 
@@ -343,8 +350,23 @@ export class DiscoveryPanel {
     this.state.context = 'all-photos';
     this.state.activeCollection = null;
 
-    // Reset gallery
-    this.app.loadPhotos();
+    // Restore previous view state if we have it
+    if (this.previousViewState) {
+      const { type } = this.previousViewState;
+
+      if (type === 'all-photos') {
+        this.app.components.collectionView.setView('all-photos');
+      } else if (type === 'favorites') {
+        this.app.components.collectionView.setView('favorites');
+      } else if (type === 'collection') {
+        this.app.components.collectionView.setView(this.previousViewState.collection.id);
+      }
+
+      this.previousViewState = null; // Clear saved state
+    } else {
+      // No previous state, default to all photos
+      this.app.components.collectionView.setView('all-photos');
+    }
 
     // Update UI
     this.container.querySelectorAll('.collection-item').forEach(el => el.classList.remove('active'));

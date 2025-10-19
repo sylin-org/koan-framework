@@ -18,7 +18,7 @@
  *     successMessage: 'Deleted 5 photos',
  *     errorMessage: 'Failed to delete photos',
  *     successIcon: '🗑️',
- *     reloadPhotos: true,
+ *     reloadCurrentView: true,  // Recommended - preserves user's view context
  *     clearSelection: true,
  *     toast: app.components.toast,
  *     app: app
@@ -33,7 +33,7 @@ export async function executeWithFeedback(operation, options = {}) {
     errorIcon = '⚠️',
     successDuration = 2000,
     errorDuration = 3000,
-    reloadPhotos = false,
+    reloadPhotos = false,  // @deprecated Use reloadCurrentView instead
     reloadCurrentView = false,
     reloadCollections = false,
     clearSelection = false,
@@ -50,8 +50,10 @@ export async function executeWithFeedback(operation, options = {}) {
     }
 
     // Reload data as needed
-    if (reloadPhotos && app) {
-      await app.loadPhotos();
+    if (reloadPhotos && app?.components.collectionView) {
+      // @deprecated: Use reloadCurrentView instead
+      // For backward compatibility, this now reloads current view instead of forcing "All Photos"
+      await app.components.collectionView.loadPhotos();
     }
 
     if (reloadCurrentView && app?.components.collectionView) {
