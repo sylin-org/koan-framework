@@ -35,10 +35,20 @@ export const ActionRegistry = {
 
     // Execute for multiple photos
     async executeBulk(app, photoIds) {
-      return await app.api.post('/api/photos/bulk/favorite', {
+      const response = await app.api.post('/api/photos/bulk/favorite', {
         photoIds: photoIds,
         isFavorite: true
       });
+
+      // Update photo state optimistically
+      if (app.state.photos) {
+        photoIds.forEach(photoId => {
+          const photo = app.state.photos.find(p => p.id === photoId);
+          if (photo) photo.isFavorite = true;
+        });
+      }
+
+      return response;
     },
 
     feedback: {
@@ -49,9 +59,8 @@ export const ActionRegistry = {
     },
 
     refresh: {
-      reloadView: true,
-      clearSelection: true,
-      updatePhoto: true
+      clearSelection: true
+      // No view reload - state updated optimistically
     }
   },
 
