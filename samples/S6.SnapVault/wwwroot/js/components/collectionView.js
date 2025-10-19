@@ -294,6 +294,21 @@ export class CollectionView {
    * Load photos for a specific collection
    */
   async loadCollectionPhotos() {
+    // STEP 0: Refresh collection data from server to get current photoIds
+    // This ensures we have the latest data after operations like remove/add
+    try {
+      const freshCollection = await this.app.api.get(`/api/collections/${this.viewState.collection.id}`);
+      this.viewState.collection = freshCollection;
+      console.log('[CollectionView] Refreshed collection data:', freshCollection.photoIds?.length || 0, 'photos');
+    } catch (error) {
+      console.error('[CollectionView] Failed to refresh collection data:', error);
+      this.app.components.toast.show('Failed to refresh collection', {
+        icon: '⚠️',
+        duration: 3000
+      });
+      return;
+    }
+
     const { collection } = this.viewState;
 
     // STEP 1: Flush existing state completely

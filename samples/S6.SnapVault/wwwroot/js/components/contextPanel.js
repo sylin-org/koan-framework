@@ -27,10 +27,12 @@ export class ContextPanel {
     const selectionCount = this.app.state.selectedPhotos.size;
 
     // Determine which state to show
-    if (selectionCount > 0) {
-      this.renderSelectionActions(selectionCount);
-    } else if (viewState.type === 'collection') {
-      this.renderCollectionProperties(viewState.collection);
+    if (viewState.type === 'collection') {
+      // Collection view: show collection properties + selection actions (if any)
+      this.renderCollectionView(viewState.collection, selectionCount);
+    } else if (selectionCount > 0) {
+      // All Photos/Favorites with selection: show only selection actions
+      this.renderSelectionActions(selectionCount, true); // true = allow delete
     } else {
       // All Photos or Favorites - hide panel
       this.container.innerHTML = '<div class="context-panel-empty"></div>';
@@ -38,163 +40,191 @@ export class ContextPanel {
   }
 
   /**
-   * Render Collection Properties state
-   * Uses exact same structure as Photo Information lightbox panel
+   * Render Collection View (properties + optional selection actions)
+   * Shows collection properties at top, selection actions below when photos selected
    */
-  renderCollectionProperties(collection) {
-    const percentage = (collection.photoCount / 2048) * 100;
+  renderCollectionView(collection, selectionCount) {
     const photoCount = collection.photoCount || 0;
 
+    // Build collection sections HTML
+    const collectionHTML = `
+      <!-- Details Section -->
+      <section class="panel-section">
+        <h3>Details</h3>
+        <div class="metadata-grid">
+          <div class="metadata-item">
+            <span class="label">Name</span>
+            <span class="value">${this.escapeHtml(collection.name)}</span>
+          </div>
+          <div class="metadata-item">
+            <span class="label">Capacity</span>
+            <span class="value">${photoCount} / 2,048 photos</span>
+          </div>
+          <div class="metadata-item">
+            <span class="label">Type</span>
+            <span class="value">Manual Collection</span>
+          </div>
+          <div class="metadata-item">
+            <span class="label">Created</span>
+            <span class="value">${this.formatDate(collection.createdAt)}</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Collection Actions Section -->
+      <section class="panel-section">
+        <h3>Actions</h3>
+        <div class="actions-grid">
+          <button class="btn-action" data-action="rename">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+            </svg>
+            <span class="action-label">Rename Collection</span>
+          </button>
+
+          <button class="btn-action" data-action="duplicate">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+            <span class="action-label">Duplicate Collection</span>
+          </button>
+
+          <button class="btn-action" data-action="export">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            <span class="action-label">Export Collection...</span>
+          </button>
+
+          <button class="btn-action btn-destructive" data-action="delete">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="3 6 5 6 21 6"></polyline>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+            </svg>
+            <span class="action-label">Delete Collection</span>
+          </button>
+        </div>
+      </section>
+    `;
+
+    // Build selection actions HTML if photos selected (no delete button in collections)
+    const selectionHTML = selectionCount > 0 ? this.buildSelectionActionsHTML(selectionCount, false) : '';
+
+    // Combine both sections
     this.container.innerHTML = `
       <div class="panel-content">
-        <!-- Details Section -->
-        <section class="panel-section">
-          <h3>Details</h3>
-          <div class="metadata-grid">
-            <div class="metadata-item">
-              <span class="label">Name</span>
-              <span class="value">${this.escapeHtml(collection.name)}</span>
-            </div>
-            <div class="metadata-item">
-              <span class="label">Capacity</span>
-              <span class="value">${photoCount} / 2,048 photos</span>
-            </div>
-            <div class="metadata-item">
-              <span class="label">Type</span>
-              <span class="value">Manual Collection</span>
-            </div>
-            <div class="metadata-item">
-              <span class="label">Created</span>
-              <span class="value">${this.formatDate(collection.createdAt)}</span>
-            </div>
-          </div>
-        </section>
-
-        <!-- Actions Section -->
-        <section class="panel-section">
-          <h3>Actions</h3>
-          <div class="actions-grid">
-            <button class="btn-action" data-action="rename">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-              </svg>
-              <span class="action-label">Rename Collection</span>
-            </button>
-
-            <button class="btn-action" data-action="duplicate">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-              </svg>
-              <span class="action-label">Duplicate Collection</span>
-            </button>
-
-            <button class="btn-action" data-action="export">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                <polyline points="7 10 12 15 17 10"></polyline>
-                <line x1="12" y1="15" x2="12" y2="3"></line>
-              </svg>
-              <span class="action-label">Export Collection...</span>
-            </button>
-
-            <button class="btn-action btn-destructive" data-action="delete">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="3 6 5 6 21 6"></polyline>
-                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-              </svg>
-              <span class="action-label">Delete Collection</span>
-            </button>
-          </div>
-        </section>
+        ${collectionHTML}
+        ${selectionHTML}
       </div>
     `;
 
+    // Attach handlers for both collection and selection actions
     this.attachCollectionHandlers(collection);
+    if (selectionCount > 0) {
+      this.attachSelectionHandlers();
+    }
   }
 
   /**
-   * Render Selection Actions state
+   * Render Selection Actions state (for All Photos/Favorites views)
    * Uses exact same structure as Photo Information lightbox panel
    */
-  renderSelectionActions(count) {
-    const { viewState } = this.app.components.collectionView;
-    const isInCollection = viewState.type === 'collection';
-    const isInFavorites = viewState.type === 'favorites';
-
+  renderSelectionActions(count, allowDelete = true) {
     this.container.innerHTML = `
       <div class="panel-content">
-        <!-- Selection Info Section -->
-        <section class="panel-section">
-          <h3>${count} ${pluralize(count, 'Photo')} Selected</h3>
-          <div class="actions-grid">
-            <button class="btn-action" data-action="add-favorites">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
-              </svg>
-              <span class="action-label">Add to Favorites</span>
-            </button>
-
-            ${isInFavorites ? `
-            <button class="btn-action" data-action="remove-favorites">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
-              </svg>
-              <span class="action-label">Remove from Favorites</span>
-            </button>
-            ` : ''}
-
-            <button class="btn-action" data-action="add-to-collection">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
-                <line x1="12" y1="11" x2="12" y2="17"></line>
-                <line x1="9" y1="14" x2="15" y2="14"></line>
-              </svg>
-              <span class="action-label">Add to Collection...</span>
-            </button>
-
-            ${isInCollection ? `
-            <button class="btn-action" data-action="remove-from-collection">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <line x1="18" y1="6" x2="6" y2="18"></line>
-                <line x1="6" y1="6" x2="18" y2="18"></line>
-              </svg>
-              <span class="action-label">Remove from Collection</span>
-            </button>
-            ` : ''}
-
-            <button class="btn-action" data-action="download">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                <polyline points="7 10 12 15 17 10"></polyline>
-                <line x1="12" y1="15" x2="12" y2="3"></line>
-              </svg>
-              <span class="action-label">Download (${count})</span>
-            </button>
-
-            <button class="btn-action" data-action="analyze-ai">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="12" cy="12" r="10"></circle>
-                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
-                <line x1="12" y1="17" x2="12.01" y2="17"></line>
-              </svg>
-              <span class="action-label">Analyze with AI</span>
-            </button>
-
-            <button class="btn-action btn-destructive" data-action="delete-photos">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="3 6 5 6 21 6"></polyline>
-                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-              </svg>
-              <span class="action-label">Delete (${count})</span>
-            </button>
-          </div>
-        </section>
+        ${this.buildSelectionActionsHTML(count, allowDelete)}
       </div>
     `;
 
     this.attachSelectionHandlers();
+  }
+
+  /**
+   * Build Selection Actions HTML
+   * @param {number} count - Number of selected photos
+   * @param {boolean} allowDelete - Whether to show Delete button (false in collections)
+   */
+  buildSelectionActionsHTML(count, allowDelete = true) {
+    const { viewState } = this.app.components.collectionView;
+    const isInCollection = viewState.type === 'collection';
+    const isInFavorites = viewState.type === 'favorites';
+
+    return `
+      <!-- Photo Selection Actions Section -->
+      <section class="panel-section">
+        <h3>${count} ${pluralize(count, 'Photo')} Selected</h3>
+        <div class="actions-grid">
+          <button class="btn-action" data-action="add-favorites">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+            </svg>
+            <span class="action-label">Add to Favorites</span>
+          </button>
+
+          ${isInFavorites ? `
+          <button class="btn-action" data-action="remove-favorites">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+            </svg>
+            <span class="action-label">Remove from Favorites</span>
+          </button>
+          ` : ''}
+
+          ${!isInCollection ? `
+          <button class="btn-action" data-action="add-to-collection">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+              <line x1="12" y1="11" x2="12" y2="17"></line>
+              <line x1="9" y1="14" x2="15" y2="14"></line>
+            </svg>
+            <span class="action-label">Add to Collection...</span>
+          </button>
+          ` : ''}
+
+          ${isInCollection ? `
+          <button class="btn-action" data-action="remove-from-collection">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+            <span class="action-label">Remove from Collection</span>
+          </button>
+          ` : ''}
+
+          <button class="btn-action" data-action="download">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            <span class="action-label">Download (${count})</span>
+          </button>
+
+          <button class="btn-action" data-action="analyze-ai">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+              <line x1="12" y1="17" x2="12.01" y2="17"></line>
+            </svg>
+            <span class="action-label">Analyze with AI</span>
+          </button>
+
+          ${allowDelete ? `
+          <button class="btn-action btn-destructive" data-action="delete-photos">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="3 6 5 6 21 6"></polyline>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+            </svg>
+            <span class="action-label">Delete (${count})</span>
+          </button>
+          ` : ''}
+        </div>
+      </section>
+    `;
   }
 
   /**

@@ -434,7 +434,6 @@ body {
 /* ===== Sidebars ===== */
 .sidebar-left,
 .sidebar-right {
-  background: rgba(20, 20, 30, 0.95);
   backdrop-filter: blur(10px);
 }
 
