@@ -1,0 +1,293 @@
+/**
+ * Sidebar Redesign - Matches Photo Information Panel Aesthetics
+ * Borderless, elegant design with consistent typography and spacing
+ */
+
+/* Design Tokens - Aligned with Photo Panel */
+:root {
+  /* Section Headers - matches "DETAILS", "AI INSIGHTS", "SUMMARY" */
+  --sidebar-header-size: 11px;
+  --sidebar-header-weight: 600;
+  --sidebar-header-spacing: 0.08em;
+  --sidebar-header-color: rgba(255, 255, 255, 0.4);
+  --sidebar-header-transform: uppercase;
+
+  /* Navigation Items - matches metadata values */
+  --sidebar-item-size: 14px;
+  --sidebar-item-weight: 400;
+  --sidebar-item-color: rgba(255, 255, 255, 0.85);
+  --sidebar-item-color-active: rgba(255, 255, 255, 1.0);
+
+  /* Badges - matches pill format from AI insights */
+  --sidebar-badge-bg: rgba(255, 255, 255, 0.08);
+  --sidebar-badge-border: rgba(255, 255, 255, 0.15);
+  --sidebar-badge-color: rgba(255, 255, 255, 0.7);
+
+  /* Spacing - matches photo panel rhythm */
+  --sidebar-section-gap: 32px;
+  --sidebar-item-gap: 10px;
+  --sidebar-padding-horizontal: 24px;
+
+  /* Active State - blue accent */
+  --sidebar-active-border: rgba(99, 102, 241, 1);
+  --sidebar-active-bg: rgba(99, 102, 241, 0.08);
+}
+
+/* Sidebar Container - Borderless, Clean */
+.sidebar-left {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sidebar-section-gap); /* 32px like photo panel */
+  padding: 24px 0;
+  background: transparent; /* No background! */
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* Section Structure - No Boxes! */
+.sidebar-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sidebar-item-gap); /* 10px */
+  padding: 0 var(--sidebar-padding-horizontal);
+}
+
+/* Section Headers - Uppercase, Muted (matches photo panel) */
+.section-header {
+  font-size: var(--sidebar-header-size); /* 11px */
+  font-weight: var(--sidebar-header-weight); /* 600 */
+  letter-spacing: var(--sidebar-header-spacing); /* 0.08em */
+  text-transform: var(--sidebar-header-transform); /* uppercase */
+  color: var(--sidebar-header-color); /* rgba(255,255,255,0.4) */
+  margin: 0;
+  padding: 0;
+  user-select: none;
+}
+
+/* Section Header Row (for headers with action buttons) */
+.section-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Section Items Container */
+.section-items {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sidebar-item-gap); /* 10px */
+}
+
+/* Sidebar Item - Clean, Borderless by Default */
+.sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: transparent; /* No background by default! */
+  border: none;
+  border-left: 2px solid transparent; /* Only left accent for active */
+  margin-left: -2px; /* Compensate for border */
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: left;
+  width: 100%;
+  color: var(--sidebar-item-color);
+  font-size: var(--sidebar-item-size);
+  font-weight: var(--sidebar-item-weight);
+}
+
+/* Hover State - Subtle Background */
+.sidebar-item:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+/* Active State - Blue Left Border + Subtle Background */
+.sidebar-item.active {
+  border-left-color: var(--sidebar-active-border);
+  background: var(--sidebar-active-bg);
+  color: var(--sidebar-item-color-active);
+}
+
+/* Item Icon */
+.sidebar-item .item-icon {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.sidebar-item.active .item-icon {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+/* Item Label */
+.sidebar-item .item-label {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Item Badge - Pill Format (matches AI insight chips) */
+.sidebar-item .item-badge {
+  flex-shrink: 0;
+  padding: 2px 10px;
+  background: var(--sidebar-badge-bg);
+  border: 1px solid var(--sidebar-badge-border);
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--sidebar-badge-color);
+  transition: all 0.15s ease;
+}
+
+.sidebar-item.active .item-badge {
+  background: rgba(99, 102, 241, 0.15);
+  border-color: rgba(99, 102, 241, 0.3);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+/* New Collection Button - Minimal Icon Button */
+.btn-new-collection {
+  padding: 6px 8px;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  color: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-new-collection:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.3);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.btn-new-collection .icon {
+  width: 14px;
+  height: 14px;
+}
+
+/* Delete Button on Collection Items - Hidden by Default */
+.sidebar-item .btn-delete-collection {
+  flex-shrink: 0;
+  padding: 4px;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.4);
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+  opacity: 0;
+  margin-left: auto;
+}
+
+.sidebar-item:hover .btn-delete-collection {
+  opacity: 1;
+}
+
+.btn-delete-collection:hover {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+}
+
+/* Empty State */
+.section-items .empty-state {
+  padding: 20px 12px;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 13px;
+  font-style: italic;
+}
+
+/* Gold Drop Zone Highlighting - Preserve from Previous Implementation */
+.sidebar-left.photos-selected .sidebar-item.collection-item,
+.sidebar-left.photos-selected .btn-new-collection {
+  position: relative;
+}
+
+.sidebar-left.photos-selected .sidebar-item.collection-item::after,
+.sidebar-left.photos-selected .btn-new-collection::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border: 2px dashed rgba(212, 175, 55, 0.5);
+  border-radius: 6px;
+  pointer-events: none;
+  transition: border-color 0.2s ease;
+}
+
+.sidebar-left.photos-selected .sidebar-item.collection-item:hover::after,
+.sidebar-left.photos-selected .btn-new-collection:hover::after {
+  border-color: rgba(234, 192, 80, 0.8);
+}
+
+/* Active drop target during dragover */
+.sidebar-item.drop-target,
+.btn-new-collection.drop-target {
+  background-color: rgba(212, 175, 55, 0.15) !important;
+  border-color: rgba(212, 175, 55, 0.6) !important;
+  box-shadow: 0 0 0 2px rgba(212, 175, 55, 0.3);
+}
+
+/* Scrollbar Styling - Minimal (macOS-like) */
+.sidebar-left::-webkit-scrollbar {
+  width: 6px;
+}
+
+.sidebar-left::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sidebar-left::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+}
+
+.sidebar-left::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* Capacity Indicator for Collections Near Limit */
+.collection-capacity-warning {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: rgba(212, 175, 55, 0.08);
+  border: 1px solid rgba(212, 175, 55, 0.3);
+  border-radius: 4px;
+  font-size: 11px;
+  color: rgba(234, 192, 80, 1);
+  margin-top: 4px;
+}
+
+.collection-capacity-warning .icon {
+  width: 12px;
+  height: 12px;
+}
+
+/* Responsive: Collapse sidebar on small screens (future) */
+@media (max-width: 768px) {
+  .sidebar-left {
+    padding: 16px 0;
+  }
+
+  .sidebar-section {
+    padding: 0 16px;
+  }
+
+  :root {
+    --sidebar-section-gap: 24px;
+    --sidebar-item-gap: 8px;
+  }
+}

@@ -196,14 +196,17 @@ class SnapVaultApp {
   }
 
   setupLibraryNavigation() {
-    const libraryItems = document.querySelectorAll('.library-panel .library-item');
+    const libraryItems = document.querySelectorAll('.library-section .sidebar-item');
     libraryItems.forEach(item => {
       item.addEventListener('click', () => {
-        const label = item.querySelector('.label').textContent;
+        const label = item.querySelector('.item-label').textContent;
 
         // Update active state
         libraryItems.forEach(i => i.classList.remove('active'));
         item.classList.add('active');
+
+        // Clear collection active state
+        document.querySelectorAll('.collection-item').forEach(c => c.classList.remove('active'));
 
         // Filter photos based on selection
         if (label === 'All Photos') {

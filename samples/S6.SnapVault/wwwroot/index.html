@@ -14,7 +14,7 @@
     <link rel="stylesheet" href="/css/lightbox.css">
     <link rel="stylesheet" href="/css/lightbox-panel.css">
     <link rel="stylesheet" href="/css/lightbox-zoom.css">
-    <link rel="stylesheet" href="/css/collections-minimal.css">
+    <link rel="stylesheet" href="/css/sidebar-redesign.css">
 </head>
 <body>
     <!-- App Header -->
@@ -74,32 +74,36 @@
     <div class="app-content">
         <!-- Left Sidebar -->
         <aside class="sidebar-left">
-            <div class="panel library-panel">
-                <h3>Library</h3>
-                <nav class="library-nav">
-                    <button class="library-item active">
-                        <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <!-- Library Section - Borderless -->
+            <section class="sidebar-section library-section">
+                <h2 class="section-header">LIBRARY</h2>
+                <nav class="section-items">
+                    <button class="sidebar-item active">
+                        <svg class="item-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
                         </svg>
-                        <span class="label">All Photos</span>
-                        <span class="badge">0</span>
+                        <span class="item-label">All Photos</span>
+                        <span class="item-badge">0</span>
                     </button>
-                    <button class="library-item">
-                        <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <button class="sidebar-item">
+                        <svg class="item-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
                         </svg>
-                        <span class="label">Favorites</span>
-                        <span class="badge">0</span>
+                        <span class="item-label">Favorites</span>
+                        <span class="item-badge">0</span>
                     </button>
                 </nav>
-            </div>
+            </section>
 
-            <div class="panel events-panel">
-                <h3>Events</h3>
-                <div class="events-list">
+            <!-- Collections section inserted here by collectionsSidebar.js -->
+
+            <!-- Events Section - Borderless -->
+            <section class="sidebar-section events-section">
+                <h2 class="section-header">EVENTS</h2>
+                <div class="section-items events-list">
                     <p class="empty-state">No events yet</p>
                 </div>
-            </div>
+            </section>
         </aside>
 
         <!-- Main Content Area -->

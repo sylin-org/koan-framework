@@ -136,19 +136,15 @@ export class DragDropManager {
       // Clear text selection
       this.app.components.photoSelection.clearSelection();
 
-      // Reload sidebar and trigger auto-rename (non-blocking)
+      // Reload sidebar and navigate to new collection (non-blocking)
       if (this.app.components.collectionsSidebar) {
         this.app.components.collectionsSidebar.loadCollections().then(() => {
           // Render updated sidebar
           this.app.components.collectionsSidebar.render();
 
           // Navigate to the new collection
+          // Collection title is editable in main header (not sidebar)
           this.app.components.collectionsSidebar.selectView(collection.id);
-
-          // CRITICAL: Start rename mode after render settles
-          setTimeout(() => {
-            this.app.components.collectionsSidebar.startRenameById(collection.id);
-          }, 150); // Small delay for DOM to stabilize
         });
       }
 

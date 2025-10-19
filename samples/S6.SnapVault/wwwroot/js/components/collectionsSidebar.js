@@ -31,7 +31,7 @@ export class CollectionsSidebar {
 
   /**
    * Render collections section in the sidebar
-   * Updates existing library panel instead of replacing
+   * Borderless design matching photo information panel
    */
   render() {
     const sidebar = document.querySelector('.sidebar-left');
@@ -40,37 +40,37 @@ export class CollectionsSidebar {
       return;
     }
 
-    // Find or create collections panel
-    let collectionsPanel = sidebar.querySelector('.collections-panel');
+    // Find or create collections section (NOT panel!)
+    let collectionsSection = sidebar.querySelector('.sidebar-section.collections-section');
 
-    if (!collectionsPanel) {
-      // Create panel after library panel
-      const libraryPanel = sidebar.querySelector('.library-panel');
-      collectionsPanel = document.createElement('div');
-      collectionsPanel.className = 'panel collections-panel';
+    if (!collectionsSection) {
+      // Create section after library section
+      const librarySection = sidebar.querySelector('.sidebar-section.library-section');
+      collectionsSection = document.createElement('section');
+      collectionsSection.className = 'sidebar-section collections-section';
 
-      if (libraryPanel && libraryPanel.nextSibling) {
-        libraryPanel.parentNode.insertBefore(collectionsPanel, libraryPanel.nextSibling);
+      if (librarySection && librarySection.nextSibling) {
+        librarySection.parentNode.insertBefore(collectionsSection, librarySection.nextSibling);
       } else {
-        sidebar.appendChild(collectionsPanel);
+        sidebar.appendChild(collectionsSection);
       }
     }
 
-    // Render panel content
-    collectionsPanel.innerHTML = `
-      <div class="panel-header">
-        <h3>Collections</h3>
-        <button class="btn-new-collection btn-icon" title="New collection">
-          <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    // Render section content - no boxes, clean structure
+    collectionsSection.innerHTML = `
+      <div class="section-header-row">
+        <h2 class="section-header">COLLECTIONS</h2>
+        <button class="btn-new-collection" title="New collection">
+          <svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <line x1="12" y1="5" x2="12" y2="19"></line>
             <line x1="5" y1="12" x2="19" y2="12"></line>
           </svg>
         </button>
       </div>
-      <div class="collections-list">
+      <nav class="section-items">
         ${this.collections.length === 0 ? '<p class="empty-state">No collections yet</p>' : ''}
         ${this.collections.map(c => this.renderCollectionItem(c)).join('')}
-      </div>
+      </nav>
     `;
 
     this.attachEventHandlers();
@@ -78,25 +78,18 @@ export class CollectionsSidebar {
 
   renderCollectionItem(collection) {
     const isActive = this.activeViewId === collection.id;
-    const percentage = (collection.photoCount / 2048) * 100;
+    const nearLimit = collection.photoCount > 1800;
 
     return `
-      <button class="library-item collection-item ${isActive ? 'active' : ''}"
+      <button class="sidebar-item collection-item ${isActive ? 'active' : ''}"
               data-collection-id="${collection.id}"
               data-droppable="true">
-        <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <svg class="item-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
         </svg>
-        <span class="label collection-name" contenteditable="false">${this.escapeHtml(collection.name)}</span>
-        <span class="badge">${collection.photoCount}</span>
+        <span class="item-label">${this.escapeHtml(collection.name)}</span>
+        <span class="item-badge${nearLimit ? ' near-limit' : ''}">${collection.photoCount}</span>
         <button class="btn-delete-collection" data-collection-id="${collection.id}" title="Delete collection" aria-label="Delete collection">×</button>
-        ${collection.photoCount > 1800 ? `
-          <div class="capacity-indicator" title="${collection.photoCount} / 2048 photos">
-            <div class="capacity-bar">
-              <div class="capacity-fill ${percentage > 90 ? 'warning' : ''}" style="width: ${percentage}%"></div>
-            </div>
-          </div>
-        ` : ''}
       </button>
     `;
   }
@@ -115,7 +108,8 @@ export class CollectionsSidebar {
     document.querySelectorAll('.collection-item').forEach(item => {
       // Click to select collection view
       item.addEventListener('click', (e) => {
-        if (!e.target.closest('.btn-delete-collection') && !e.target.closest('.collection-name[contenteditable="true"]')) {
+        // Don't navigate if clicking delete button
+        if (!e.target.closest('.btn-delete-collection')) {
           this.selectView(e.currentTarget.dataset.collectionId);
         }
       });
@@ -129,14 +123,7 @@ export class CollectionsSidebar {
         });
       }
 
-      // Double-click collection name to rename
-      const nameEl = item.querySelector('.collection-name');
-      if (nameEl) {
-        nameEl.addEventListener('dblclick', (e) => {
-          e.stopPropagation();
-          this.startRename(e.currentTarget);
-        });
-      }
+      // Note: Rename now happens in main content header, not sidebar
     });
   }
 
@@ -149,8 +136,8 @@ export class CollectionsSidebar {
       this.app.components.collectionView.load(viewId);
     }
 
-    // Clear library panel active state
-    document.querySelectorAll('.library-panel .library-item').forEach(i => i.classList.remove('active'));
+    // Clear library section active state
+    document.querySelectorAll('.library-section .sidebar-item').forEach(i => i.classList.remove('active'));
 
     console.log(`[CollectionsSidebar] Selected view: ${viewId}`);
   }

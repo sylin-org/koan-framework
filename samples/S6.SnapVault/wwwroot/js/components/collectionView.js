@@ -56,17 +56,145 @@ export class CollectionView {
     const titleElement = header.querySelector('.page-title');
     if (!titleElement) return;
 
-    // Update title
+    // Clear any previous edit handlers
+    this.cleanupTitleEditHandlers(titleElement);
+
+    // Update title based on view
     if (this.currentViewId === 'all-photos') {
       titleElement.textContent = 'All Photos';
+      titleElement.contentEditable = false;
+      titleElement.classList.remove('editable');
       this.renderAllPhotosActions(header);
     } else if (this.currentViewId === 'favorites') {
       titleElement.textContent = '⭐ Favorites';
+      titleElement.contentEditable = false;
+      titleElement.classList.remove('editable');
       this.renderFavoritesActions(header);
     } else if (this.collection) {
+      // Collection view - make title editable
       titleElement.textContent = `📁 ${this.collection.name}`;
+      titleElement.contentEditable = true;
+      titleElement.classList.add('editable');
+      titleElement.dataset.collectionId = this.collection.id;
+      titleElement.dataset.originalName = this.collection.name;
+
+      // Attach edit handlers
+      this.attachTitleEditHandlers(titleElement);
+
       this.renderCollectionActions(header);
     }
+  }
+
+  /**
+   * Attach edit handlers to collection title
+   * Large, prominent editing in main content area
+   */
+  attachTitleEditHandlers(titleElement) {
+    const collectionId = titleElement.dataset.collectionId;
+    const originalName = titleElement.dataset.originalName;
+
+    // Focus event - select all text
+    const focusHandler = () => {
+      // Remove emoji prefix for editing
+      const textWithoutEmoji = titleElement.textContent.replace('📁 ', '');
+      titleElement.textContent = textWithoutEmoji;
+
+      // Select all text
+      setTimeout(() => {
+        const range = document.createRange();
+        range.selectNodeContents(titleElement);
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+      }, 0);
+    };
+
+    // Blur event - save changes
+    const blurHandler = async () => {
+      const newName = titleElement.textContent.trim();
+
+      // Restore emoji prefix
+      titleElement.textContent = `📁 ${newName || originalName}`;
+
+      // Only save if name actually changed
+      if (newName && newName !== originalName) {
+        try {
+          await this.app.api.put(`/api/collections/${collectionId}`, {
+            name: newName
+          });
+
+          // Update stored original name
+          titleElement.dataset.originalName = newName;
+          this.collection.name = newName;
+
+          // Reload sidebar to reflect change
+          if (this.app.components.collectionsSidebar) {
+            await this.app.components.collectionsSidebar.loadCollections();
+            this.app.components.collectionsSidebar.render();
+          }
+
+          this.app.components.toast.show(`Renamed to "${newName}"`, {
+            icon: '✏️',
+            duration: 2000
+          });
+        } catch (error) {
+          console.error('[CollectionView] Failed to rename collection:', error);
+          titleElement.textContent = `📁 ${originalName}`;
+          this.app.components.toast.show('Failed to rename collection', {
+            icon: '⚠️',
+            duration: 3000
+          });
+        }
+      } else if (!newName) {
+        // Empty name - revert
+        titleElement.textContent = `📁 ${originalName}`;
+      }
+    };
+
+    // Keydown event - handle Enter and Escape
+    const keydownHandler = (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        titleElement.blur();
+      } else if (e.key === 'Escape') {
+        titleElement.textContent = `📁 ${originalName}`;
+        titleElement.blur();
+      }
+    };
+
+    // Store handlers for cleanup
+    titleElement._focusHandler = focusHandler;
+    titleElement._blurHandler = blurHandler;
+    titleElement._keydownHandler = keydownHandler;
+
+    // Attach handlers
+    titleElement.addEventListener('focus', focusHandler);
+    titleElement.addEventListener('blur', blurHandler);
+    titleElement.addEventListener('keydown', keydownHandler);
+
+    console.log('[CollectionView] Attached title edit handlers for collection:', collectionId);
+  }
+
+  /**
+   * Clean up edit handlers to prevent memory leaks
+   */
+  cleanupTitleEditHandlers(titleElement) {
+    if (titleElement._focusHandler) {
+      titleElement.removeEventListener('focus', titleElement._focusHandler);
+      delete titleElement._focusHandler;
+    }
+    if (titleElement._blurHandler) {
+      titleElement.removeEventListener('blur', titleElement._blurHandler);
+      delete titleElement._blurHandler;
+    }
+    if (titleElement._keydownHandler) {
+      titleElement.removeEventListener('keydown', titleElement._keydownHandler);
+      delete titleElement._keydownHandler;
+    }
+
+    // Clean up dataset
+    delete titleElement.dataset.collectionId;
+    delete titleElement.dataset.originalName;
   }
 
   /**

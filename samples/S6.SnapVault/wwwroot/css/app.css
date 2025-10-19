@@ -584,6 +584,23 @@ body {
   font-size: var(--text-xl);
   font-weight: var(--weight-semibold);
   color: var(--text-primary);
+  transition: all 0.15s ease;
+}
+
+/* Editable collection title - matches photo panel fact editing */
+.page-title.editable {
+  cursor: text;
+}
+
+.page-title[contenteditable="true"] {
+  outline: none;
+  border-bottom: 2px solid rgba(99, 102, 241, 0.5);
+  padding-bottom: 4px;
+  color: rgba(255, 255, 255, 1.0); /* Full brightness when editing */
+}
+
+.page-title[contenteditable="true"]:focus {
+  border-bottom-color: rgba(99, 102, 241, 1.0); /* Solid blue on focus */
 }
 
 /* View Controls */
