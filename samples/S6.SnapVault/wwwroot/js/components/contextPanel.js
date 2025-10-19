@@ -45,11 +45,6 @@ export class ContextPanel {
    * REFACTORED: Uses Button component system
    */
   renderCollectionView(collection, selectionCount) {
-    if (!this.app.actions) {
-      console.error('[ContextPanel] app.actions is not initialized!');
-      return;
-    }
-
     const photoCount = collection.photoCount || 0;
 
     // Create panel content container
@@ -117,11 +112,6 @@ export class ContextPanel {
    * REFACTORED: Uses Button component system
    */
   renderSelectionActions(count, allowDelete = true) {
-    if (!this.app.actions) {
-      console.error('[ContextPanel] app.actions is not initialized!');
-      return;
-    }
-
     const panelContent = document.createElement('div');
     panelContent.className = 'panel-content';
 

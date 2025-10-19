@@ -139,12 +139,6 @@ export class ActionExecutor {
       return null;
     }
 
-    console.log(`[ActionExecutor] Creating button for "${actionId}":`, {
-      label: action.label,
-      icon: action.icon,
-      buttonOptions
-    });
-
     // Determine if action is available
     const isAvailable = action.isAvailable(this.app, context);
 
@@ -173,6 +167,8 @@ export class ActionExecutor {
    * @returns {HTMLDivElement} Button group element
    */
   createButtonGroup(actions, context = null, groupOptions = {}) {
+    const { className = 'actions-grid' } = groupOptions;
+
     const buttons = actions
       .map(actionConfig => {
         const actionId = typeof actionConfig === 'string' ? actionConfig : actionConfig.id;
@@ -182,7 +178,12 @@ export class ActionExecutor {
       })
       .filter(btn => btn !== null); // Filter out unavailable actions
 
-    return Button.createGroup(buttons, groupOptions);
+    // Create container and append already-created buttons
+    const group = document.createElement('div');
+    group.className = className;
+    buttons.forEach(btn => group.appendChild(btn));
+
+    return group;
   }
 
   /**
