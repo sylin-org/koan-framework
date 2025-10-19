@@ -834,6 +834,22 @@ body {
   width: 100%;
   height: 100%;
   object-fit: cover; /* Fill pre-allocated aspect-ratio container */
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Photo images are draggable by default (via JavaScript draggable attribute) */
+.photo-image.draggable {
+  cursor: grab;
+}
+
+.photo-image.draggable:active {
+  cursor: grabbing;
+}
+
+/* During brush selection, disable image dragging to allow text selection */
+.photo-grid.brush-selecting .photo-image.draggable {
+  pointer-events: none;
 }
 
 /* Photo Overlay */

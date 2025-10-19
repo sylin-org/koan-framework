@@ -251,7 +251,7 @@ export class PhotoGrid {
 
     article.innerHTML = `
       <div class="photo-skeleton"></div>
-      <img class="photo-image" data-src="${thumbnailUrl}" alt="${this.escapeHtml(photo.originalFileName)}" loading="lazy" draggable="true" />
+      <img class="photo-image draggable" data-src="${thumbnailUrl}" alt="${this.escapeHtml(photo.originalFileName)}" loading="lazy" />
       <div class="photo-overlay">
         <div class="actions-top">
           <button class="btn-favorite ${isFavorite ? 'active' : ''}" aria-label="Favorite (F)" data-photo-id="${photo.id}">
@@ -284,13 +284,13 @@ export class PhotoGrid {
 
     // Event listeners
     const img = article.querySelector('.photo-image');
+
+    // Make image draggable via JavaScript (controlled by CSS class)
+    img.draggable = true;
+
     img.addEventListener('load', () => {
       article.querySelector('.photo-skeleton')?.remove();
     });
-
-    // Prevent text selection on image (allows drag to work cleanly)
-    img.style.userSelect = 'none';
-    img.style.webkitUserSelect = 'none';
 
     // Dragstart on image - simulate two-step flow in one gesture
     img.addEventListener('dragstart', (e) => {

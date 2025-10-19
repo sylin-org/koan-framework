@@ -26,8 +26,21 @@ export class PhotoSelection {
       return;
     }
 
-    // When selection ends (mouseup on grid), check what's selected
+    // Detect brush selection start (mousedown outside photo cards)
+    gridContainer.addEventListener('mousedown', (e) => {
+      // Only start brush selection if clicking directly on grid (not on a card or its children)
+      if (e.target === gridContainer || e.target.closest('.photo-card') === null) {
+        gridContainer.classList.add('brush-selecting');
+        console.log('[PhotoSelection] Brush selection started');
+      }
+    });
+
+    // When selection ends (mouseup on grid), check what's selected and end brush mode
     gridContainer.addEventListener('mouseup', () => {
+      // Remove brush-selecting class
+      gridContainer.classList.remove('brush-selecting');
+      console.log('[PhotoSelection] Brush selection ended');
+
       // Small delay to let selection finalize
       setTimeout(() => {
         this.updateSelection();
@@ -204,6 +217,12 @@ export class PhotoSelection {
     // Clear visual feedback
     this.clearVisualFeedback();
     this.setSelectedPhotoIds([]);
+
+    // Remove brush-selecting class
+    const gridContainer = document.querySelector('.photo-grid');
+    if (gridContainer) {
+      gridContainer.classList.remove('brush-selecting');
+    }
 
     // Also clear clicked selections (single photo drag or multi-select)
     if (this.app.clearSelection) {
