@@ -21,5 +21,6 @@
     <ProjectReference Include="..\..\..\..\Shared\Koan.Testing\Koan.Testing.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Koan.AI\Koan.AI.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Koan.AI.Contracts\Koan.AI.Contracts.csproj" />
+    <ProjectReference Include="..\..\..\..\..\src\Connectors\AI\LMStudio\Koan.AI.Connector.LMStudio.csproj" />
   </ItemGroup>
 </Project>

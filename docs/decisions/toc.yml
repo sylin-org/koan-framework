@@ -4,6 +4,44 @@
   items:
     - name: AAAA-0000 ADR authoring template
       href: AAAA-0000-template.md
+- name: AI (AI)
+  items:
+    - name: AI-0001 AI baseline
+      href: AI-0001-ai-baseline.md
+    - name: AI-0002 API contracts and SSE
+      href: AI-0002-api-contracts-and-sse.md
+    - name: AI-0003 Tokenization and cost
+      href: AI-0003-tokenization-and-cost.md
+    - name: AI-0004 Secrets provider
+      href: AI-0004-secrets-provider.md
+    - name: AI-0005 Protocol surfaces
+      href: AI-0005-protocol-surfaces.md
+    - name: AI-0006 Data formats and grounding
+      href: AI-0006-data-formats-and-grounding.md
+    - name: AI-0007 Inference servers interop
+      href: AI-0007-inference-servers-interop.md
+    - name: AI-0008 AI adapters and registry
+      href: AI-0008-adapters-and-registry.md
+    - name: AI-0009 Multi-service routing and policies
+      href: AI-0009-multi-service-routing-and-policies.md
+    - name: AI-0010 Entrypoint and augmentations
+      href: AI-0010-entrypoint-and-augmentations.md
+    - name: AI-0011 AI engine facade and selection
+      href: AI-0011-ai-engine-facade-and-selection.md
+    - name: AI-0012 MCP JSON-RPC runtime
+      href: AI-0012-mcp-jsonrpc-runtime.md
+    - name: AI-0013 MCP HTTP SSE deployment
+      href: AI-0013-mcp-http-sse-deployment.md
+    - name: AI-0013 S12 MedTrials sample
+      href: AI-0013-s12-medtrials-sample.md
+    - name: AI-0014 AI modernization sources and fallbacks
+      href: AI-0014-ai-modernization-sources-capabilities-fallback.md
+    - name: AI-0014 MCP code mode
+      href: AI-0014-mcp-code-mode.md
+    - name: AI-0015 Canonical source member architecture
+      href: AI-0015-canonical-source-member-architecture.md
+    - name: AI-0016 LM Studio adapter for Koan AI
+      href: AI-0016-lm-studio-adapter.md
 - name: Architecture (ARCH)
   items:
     - name: ARCH-0001 Rename generic parameter to TEntity
