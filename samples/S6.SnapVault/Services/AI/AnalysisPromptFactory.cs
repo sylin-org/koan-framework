@@ -16,7 +16,7 @@ public class AnalysisPromptFactory : IAnalysisPromptFactory
     private const string BASE_PROMPT = @"Analyze the image and output ONLY valid JSON (no markdown, no comments). Describe ONLY what is clearly visible—never guess. Use concise, concrete language.
 
 Guidelines:
-- ""tags"": 6–10 searchable keywords; lowercase; hyphenate multi-word terms (e.g., ""red-hoodie"", ""neon-lights""); include evident aesthetics (e.g., ""b&w"", ""gothic-lolita"", ""decora"", ""western"", ""60s"").
+- ""tags"": 6–10 searchable keywords; lowercase; hyphenate multi-word terms (e.g., ""red-hoodie"", ""neon-lights""); include evident visual elements, clothing styles if present, and aesthetic cues (e.g., ""b&w"", ""minimalist"", ""vintage"").
 - ""summary"": single sentence with concrete visual facts + evident aesthetic cues.
 - ""facts"": ALL keys MUST be lowercase (e.g., ""type"", ""style"", ""subject count""). ALL values MUST be arrays, even single values, to enable uniform filtering. Each fact CAN have multiple entries; examples are non-exhaustive, complement the fact's list as necessary.
 - Add optional fact fields ONLY when clearly visible; omit otherwise.
@@ -35,7 +35,9 @@ Return JSON in this format:
     ""lighting"": [""overcast"",""golden-hour"",""studio"",""natural"",""soft"",""dramatic"",""backlit"",""low-key"",""high-key"",""neon"",""spotlit""],
     ""setting"": [""indoor"",""outdoor"",""studio"",""urban"",""nature""],
     ""mood"": [""mysterious"",""cheerful"",""serene"",""dramatic"",""playful"",""somber"",""energetic"",""contemplative"",""romantic"",""tense""],
-    ""themes"": [""b&w"",""film-noir"",""gothic-lolita"",""decora"",""western"",""60s"",""y2k"",""cyberpunk"",""minimalist""],
+    ""themes"": [""minimalist"",""vintage"",""retro"",""modern"",""rustic"",""industrial"",""bohemian"",""film-noir"",""cyberpunk"",""y2k"",""cottagecore"",""art-deco""],
+    ""fashion-style"": [""streetwear"",""formal"",""casual"",""athletic"",""business-casual"",""evening-wear"",""workwear"",""bohemian"",""preppy"",""punk"",""goth"",""vintage"",""minimalist"",""avant-garde"",""traditional""],
+    ""cultural-style"": [""western"",""eastern"",""japanese-street"",""korean-street"",""scandinavian"",""mediterranean"",""african"",""latin-american"",""middle-eastern"",""indigenous"",""traditional-dress"",""cultural-fusion""],
 
     // Per-subject facts (arrays; MUST be present if at least one subject is shown):
     // ""subject 1"": [""person"",""black-hoodie"",""smiling"",""looking-left"",""streetwear""],
@@ -43,19 +45,24 @@ Return JSON in this format:
     // ""subject 3"": [""tree"",""bare-branches"",""midground""],
 
     // Optional facts (arrays; only if clearly visible, omit otherwise; 2+ items per fact preferred if applicable):
-    // ""era cues"": [""1960s"",""disco"",""vintage"",""retro"",""silver-age""],
-    // ""color grade"": [""black-and-white"",""sepia"",""teal-orange"",""cool"",""warm"",""neutral"",""monochrome"",""duotone""],
-    // ""light sources"": [""sun"",""neon-signs"",""led-panels""],
-    // ""depth cues"": [""bokeh"",""shallow-focus"",""deep-focus"",""motion-blur""],
-    // ""atmospherics"": [""fog"",""haze"",""smoke"",""rain"",""snow"",""sparks"",""god-rays"",""dust""],
-    // ""locale cues"": [""architecture"",""props"",""vegetation""],
-    // ""time"": [""day"",""night"",""sunset"",""sunrise""],
-    // ""weather"": [""clear"",""overcast"",""rainy"",""snowy"",""indoor""],
-    // ""visible text"": [""exact text if readable""]
+    // ""era cues"": [""1920s"",""1960s"",""1980s"",""2000s"",""art-deco"",""mid-century"",""vintage"",""retro"",""contemporary""],
+    // ""color grade"": [""black-and-white"",""sepia"",""teal-orange"",""cool"",""warm"",""neutral"",""monochrome"",""duotone"",""desaturated"",""vibrant""],
+    // ""light sources"": [""sun"",""neon-signs"",""led-panels"",""candles"",""firelight"",""streetlamps""],
+    // ""depth cues"": [""bokeh"",""shallow-focus"",""deep-focus"",""motion-blur"",""rack-focus""],
+    // ""atmospherics"": [""fog"",""haze"",""smoke"",""rain"",""snow"",""sparks"",""god-rays"",""dust"",""mist""],
+    // ""locale cues"": [""architecture-type"",""region-specific-props"",""local-vegetation""],
+    // ""time"": [""day"",""night"",""sunset"",""sunrise"",""twilight"",""midday""],
+    // ""weather"": [""clear"",""overcast"",""rainy"",""snowy"",""foggy"",""indoor""],
+    // ""visible text"": [""exact text if readable""],
+    // ""fashion-style"": [""specific-style-if-clearly-identifiable""] // Use only when fashion is prominent and identifiable
+    // ""cultural-style"": [""specific-culture-if-clearly-evident""] // Use only when cultural elements are distinctive and visible
   }
 }
 
-IMPORTANT: All fact keys MUST be lowercase. All fact values MUST be arrays, even single items. Example: ""type"": [""portrait""], not ""Type"": ""portrait"".";
+IMPORTANT:
+- All fact keys MUST be lowercase. All fact values MUST be arrays, even single items. Example: ""type"": [""portrait""], not ""Type"": ""portrait"".
+- For clothing/fashion: Be specific and descriptive (e.g., ""black-leather-jacket"", ""white-button-down"", ""red-sneakers""). Only use ""fashion-style"" or ""cultural-style"" facts when the overall style is CLEARLY and CONFIDENTLY identifiable.
+- Avoid labeling generic clothing as specific subcultures. A black outfit is not automatically ""goth""; casual streetwear is not automatically ""japanese-street"". Use precise descriptors instead of broad style categories unless absolutely certain.";
 
     public AnalysisPromptFactory(ILogger<AnalysisPromptFactory> logger)
     {
