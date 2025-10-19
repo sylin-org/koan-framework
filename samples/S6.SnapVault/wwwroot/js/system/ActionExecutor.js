@@ -20,6 +20,8 @@ export class ActionExecutor {
    * @returns {Promise<any>} Action result
    */
   async execute(actionId, context = null, options = {}) {
+    console.log(`[ActionExecutor.execute] Starting: "${actionId}"`, { context });
+
     const action = getAction(actionId);
     if (!action) {
       console.error(`[ActionExecutor] Action "${actionId}" not found`);
@@ -148,11 +150,16 @@ export class ActionExecutor {
       variant: action.variant || 'default',
       disabled: !isAvailable,
       onClick: async () => {
-        if (context !== null) {
-          await this.execute(actionId, context);
-        } else {
-          // Use selection context
-          await this.executeForSelection(actionId);
+        console.log(`[ActionExecutor] Button clicked: "${actionId}"`, { context });
+        try {
+          if (context !== null) {
+            await this.execute(actionId, context);
+          } else {
+            // Use selection context
+            await this.executeForSelection(actionId);
+          }
+        } catch (error) {
+          console.error(`[ActionExecutor] Button click failed for "${actionId}":`, error);
         }
       },
       ...buttonOptions
