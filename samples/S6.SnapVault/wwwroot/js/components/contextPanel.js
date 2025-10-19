@@ -4,15 +4,11 @@
  * - Collection Properties: When viewing a collection (no selection)
  * - Selection Actions: When photos are selected
  *
- * REFACTORED: Now uses centralized Button and Icon components
+ * REFACTORED Phase 1: Uses centralized Button and Icon components
+ * REFACTORED Phase 2: Uses ActionExecutor for all operations
  */
 
-import { getSelectedPhotoIds, formatActionMessage } from '../utils/selection.js';
-import { confirmDelete } from '../utils/dialogs.js';
-import { executeWithFeedback } from '../utils/operations.js';
 import { pluralize } from '../utils/html.js';
-import { Button } from '../system/Button.js';
-import { Icon } from '../system/Icon.js';
 
 export class ContextPanel {
   constructor(app) {
@@ -81,7 +77,7 @@ export class ContextPanel {
     `;
     panelContent.appendChild(detailsSection);
 
-    // Actions Section - REFACTORED with Button component
+    // Actions Section - REFACTORED Phase 2: Uses ActionExecutor
     const actionsSection = document.createElement('section');
     actionsSection.className = 'panel-section';
 
@@ -89,34 +85,13 @@ export class ContextPanel {
     actionsTitle.textContent = 'Actions';
     actionsSection.appendChild(actionsTitle);
 
-    // Create collection action buttons using Button component
-    const collectionActions = Button.createGroup([
-      {
-        label: 'Rename Collection',
-        icon: 'edit',
-        dataAction: 'rename',
-        onClick: () => this.triggerHeaderTitleEdit()
-      },
-      {
-        label: 'Duplicate Collection',
-        icon: 'copy',
-        dataAction: 'duplicate',
-        onClick: () => this.handleDuplicateCollection(collection)
-      },
-      {
-        label: 'Export Collection...',
-        icon: 'download',
-        dataAction: 'export',
-        onClick: () => this.handleExportCollection(collection)
-      },
-      {
-        label: 'Delete Collection',
-        icon: 'trash',
-        variant: 'destructive',
-        dataAction: 'delete',
-        onClick: () => this.handleDeleteCollection(collection)
-      }
-    ]);
+    // Create collection action buttons using ActionExecutor
+    const collectionActions = this.app.actions.createButtonGroup([
+      'collection.rename',
+      'collection.duplicate',
+      'collection.export',
+      'collection.delete'
+    ], collection);
 
     actionsSection.appendChild(collectionActions);
     panelContent.appendChild(actionsSection);
@@ -149,7 +124,7 @@ export class ContextPanel {
 
   /**
    * Create Selection Actions Section (DOM element)
-   * REFACTORED: Uses Button component system
+   * REFACTORED Phase 2: Uses ActionExecutor
    * @param {number} count - Number of selected photos
    * @param {boolean} allowDelete - Whether to show Delete button (false in collections)
    * @returns {HTMLElement} Section element with photo actions
@@ -167,241 +142,52 @@ export class ContextPanel {
     section.appendChild(title);
 
     // Build actions array based on context
-    const actions = [];
+    const actionIds = [];
 
     // Add to Favorites (always show)
-    actions.push({
-      label: 'Add to Favorites',
-      icon: 'star',
-      dataAction: 'add-favorites',
-      onClick: () => this.handleAddToFavorites()
-    });
+    actionIds.push('photo.favorite');
 
     // Remove from Favorites (only in favorites view)
     if (isInFavorites) {
-      actions.push({
-        label: 'Remove from Favorites',
-        icon: 'star',
-        dataAction: 'remove-favorites',
-        onClick: () => this.handleRemoveFromFavorites()
-      });
+      actionIds.push('photo.unfavorite');
     }
 
     // Add to Collection (not in collection view)
     if (!isInCollection) {
-      actions.push({
-        label: 'Add to Collection...',
-        icon: 'folderPlus',
-        dataAction: 'add-to-collection',
-        onClick: () => this.handleAddToCollection()
-      });
+      actionIds.push('photo.addToCollection');
     }
 
     // Remove from Collection (only in collection view)
     if (isInCollection) {
-      actions.push({
-        label: 'Remove from Collection',
-        icon: 'x',
-        dataAction: 'remove-from-collection',
-        onClick: () => this.handleRemoveFromCollection()
-      });
+      actionIds.push('photo.removeFromCollection');
     }
 
-    // Download (always show)
-    actions.push({
-      label: `Download (${count})`,
-      icon: 'download',
-      dataAction: 'download',
-      onClick: () => this.handleDownload()
+    // Download (always show) - with custom label showing count
+    actionIds.push({
+      id: 'photo.download',
+      options: {
+        label: this.app.actions.getLabelWithCount('photo.download', count)
+      }
     });
 
     // Analyze with AI (always show)
-    actions.push({
-      label: 'Analyze with AI',
-      icon: 'sparkles',
-      dataAction: 'analyze-ai',
-      onClick: () => this.handleAnalyzeAI()
-    });
+    actionIds.push('photo.analyzeAI');
 
     // Delete (conditional)
     if (allowDelete) {
-      actions.push({
-        label: `Delete (${count})`,
-        icon: 'trash',
-        variant: 'destructive',
-        dataAction: 'delete-photos',
-        onClick: () => this.handleDeletePhotos()
+      actionIds.push({
+        id: 'photo.delete',
+        options: {
+          label: this.app.actions.getLabelWithCount('photo.delete', count)
+        }
       });
     }
 
-    // Create button group using Button component
-    const actionsGrid = Button.createGroup(actions);
+    // Create button group using ActionExecutor (context=null means use selection)
+    const actionsGrid = this.app.actions.createButtonGroup(actionIds, null);
     section.appendChild(actionsGrid);
 
     return section;
-  }
-
-  // NOTE: attachCollectionHandlers() removed - now using onClick in Button component
-
-  /**
-   * Trigger edit mode on the main header title
-   */
-  triggerHeaderTitleEdit() {
-    const titleElement = document.querySelector('.content-header .page-title');
-    if (titleElement && titleElement.classList.contains('editable')) {
-      titleElement.click();
-    }
-  }
-
-  // NOTE: attachSelectionHandlers() removed - now using onClick in Button component
-
-  // ==================== Collection Actions ====================
-
-  async handleDuplicateCollection(collection) {
-    // TODO: Implement duplicate functionality
-    this.app.components.toast.show('Duplicate collection coming soon', {
-      icon: 'ℹ️',
-      duration: 2000
-    });
-  }
-
-  async handleExportCollection(collection) {
-    // TODO: Implement export functionality
-    this.app.components.toast.show('Export collection coming soon', {
-      icon: 'ℹ️',
-      duration: 2000
-    });
-  }
-
-  async handleDeleteCollection(collection) {
-    if (this.app.components.collectionsSidebar) {
-      await this.app.components.collectionsSidebar.deleteCollection(collection.id);
-    }
-  }
-
-  // ==================== Selection Actions ====================
-
-  async handleAddToFavorites() {
-    const photoIds = getSelectedPhotoIds(this.app.state.selectedPhotos, this.app.components.toast);
-    if (!photoIds) return;
-
-    await executeWithFeedback(
-      () => this.app.api.post('/api/photos/bulk/favorite', {
-        photoIds: photoIds,
-        isFavorite: true
-      }),
-      {
-        successMessage: formatActionMessage(photoIds.length, 'added', { target: 'Favorites' }),
-        errorMessage: 'Failed to add to favorites',
-        successIcon: '⭐',
-        reloadCurrentView: true,
-        clearSelection: true,
-        toast: this.app.components.toast,
-        app: this.app
-      }
-    );
-  }
-
-  async handleRemoveFromFavorites() {
-    const photoIds = getSelectedPhotoIds(this.app.state.selectedPhotos, this.app.components.toast);
-    if (!photoIds) return;
-
-    await executeWithFeedback(
-      () => this.app.api.post('/api/photos/bulk/favorite', {
-        photoIds: photoIds,
-        isFavorite: false
-      }),
-      {
-        successMessage: formatActionMessage(photoIds.length, 'removed', { from: 'Favorites' }),
-        errorMessage: 'Failed to update favorites',
-        successIcon: '⭐',
-        reloadCurrentView: true,
-        clearSelection: true,
-        toast: this.app.components.toast,
-        app: this.app
-      }
-    );
-  }
-
-  async handleAddToCollection() {
-    const photoIds = getSelectedPhotoIds(this.app.state.selectedPhotos, this.app.components.toast);
-    if (!photoIds) return;
-
-    // TODO: Show collection picker dialog
-    this.app.components.toast.show('Collection picker coming soon', {
-      icon: 'ℹ️',
-      duration: 2000
-    });
-  }
-
-  async handleRemoveFromCollection() {
-    const photoIds = getSelectedPhotoIds(this.app.state.selectedPhotos, this.app.components.toast);
-    if (!photoIds) return;
-
-    const { viewState } = this.app.components.collectionView;
-    if (viewState.type !== 'collection') return;
-
-    await executeWithFeedback(
-      () => this.app.api.post(`/api/collections/${viewState.collection.id}/photos/remove`, {
-        photoIds: photoIds
-      }),
-      {
-        successMessage: formatActionMessage(photoIds.length, 'removed', { from: 'collection' }),
-        errorMessage: 'Failed to remove photos',
-        successIcon: '✓',
-        reloadCurrentView: true,
-        reloadCollections: true,
-        clearSelection: true,
-        toast: this.app.components.toast,
-        app: this.app
-      }
-    );
-  }
-
-  handleDownload() {
-    const photoIds = getSelectedPhotoIds(this.app.state.selectedPhotos, this.app.components.toast);
-    if (!photoIds) return;
-
-    this.app.components.toast.show(
-      formatActionMessage(photoIds.length, 'downloading'),
-      { icon: '⬇️', duration: 2000 }
-    );
-
-    photoIds.forEach(photoId => {
-      const url = `/api/photos/${photoId}/download`;
-      window.open(url, '_blank');
-    });
-  }
-
-  async handleAnalyzeAI() {
-    const photoIds = getSelectedPhotoIds(this.app.state.selectedPhotos, this.app.components.toast);
-    if (!photoIds) return;
-
-    // TODO: Implement AI analysis
-    this.app.components.toast.show('AI analysis coming soon', {
-      icon: '🤖',
-      duration: 2000
-    });
-  }
-
-  async handleDeletePhotos() {
-    const photoIds = getSelectedPhotoIds(this.app.state.selectedPhotos, this.app.components.toast);
-    if (!photoIds) return;
-    const additionalInfo = `This will delete the ${pluralize(photoIds.length, 'photo')} and all thumbnails from storage.`;
-    if (!confirmDelete(photoIds.length, 'photo', { additionalInfo })) return;
-
-    await executeWithFeedback(
-      () => this.app.api.post('/api/photos/bulk/delete', { photoIds }),
-      {
-        successMessage: formatActionMessage(photoIds.length, 'deleted'),
-        errorMessage: 'Failed to delete photos',
-        successIcon: '🗑️',
-        reloadCurrentView: true,
-        clearSelection: true,
-        toast: this.app.components.toast,
-        app: this.app
-      }
-    );
   }
 
   // ==================== Utilities ====================

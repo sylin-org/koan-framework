@@ -23,6 +23,7 @@ import { VIEW_PRESETS, migrateOldDensity } from './viewPresets.js';
 import { escapeHtml } from './utils/html.js';
 import { StateManager } from './utils/StateManager.js';
 import { EventBus } from './utils/EventBus.js';
+import { ActionExecutor } from './system/ActionExecutor.js';
 
 class SnapVaultApp {
   constructor() {
@@ -70,6 +71,9 @@ class SnapVaultApp {
 
     // Initialize API client
     this.api = new API();
+
+    // Initialize action system (PHASE 2)
+    this.actions = new ActionExecutor(this);
 
     // Initialize components
     this.components.toast = new Toast();
