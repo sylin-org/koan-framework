@@ -81,16 +81,17 @@ export class CollectionsSidebar {
     const nearLimit = collection.photoCount > 1800;
 
     return `
-      <button class="sidebar-item collection-item ${isActive ? 'active' : ''}"
-              data-collection-id="${collection.id}"
-              data-droppable="true">
+      <div class="sidebar-item collection-item ${isActive ? 'active' : ''}"
+           data-collection-id="${collection.id}"
+           data-droppable="true"
+           role="button"
+           tabindex="0">
         <svg class="item-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
         </svg>
         <span class="item-label">${this.escapeHtml(collection.name)}</span>
         <span class="item-badge${nearLimit ? ' near-limit' : ''}">${collection.photoCount}</span>
-        <button class="btn-delete-collection" data-collection-id="${collection.id}" title="Delete collection" aria-label="Delete collection">×</button>
-      </button>
+      </div>
     `;
   }
 
@@ -108,22 +109,10 @@ export class CollectionsSidebar {
     document.querySelectorAll('.collection-item').forEach(item => {
       // Click to select collection view
       item.addEventListener('click', (e) => {
-        // Don't navigate if clicking delete button
-        if (!e.target.closest('.btn-delete-collection')) {
-          this.selectView(e.currentTarget.dataset.collectionId);
-        }
+        this.selectView(e.currentTarget.dataset.collectionId);
       });
 
-      // Delete button
-      const deleteBtn = item.querySelector('.btn-delete-collection');
-      if (deleteBtn) {
-        deleteBtn.addEventListener('click', async (e) => {
-          e.stopPropagation();
-          await this.deleteCollection(e.currentTarget.dataset.collectionId);
-        });
-      }
-
-      // Note: Rename now happens in main content header, not sidebar
+      // Note: Rename and delete now happen in main content header, not sidebar
     });
   }
 

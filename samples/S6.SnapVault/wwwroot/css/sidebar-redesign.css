@@ -177,7 +177,10 @@
 
 /* Delete Button on Collection Items - Hidden by Default */
 .sidebar-item .btn-delete-collection {
-  flex-shrink: 0;
+  position: absolute;
+  right: 12px; /* Align with padding */
+  top: 50%;
+  transform: translateY(-50%);
   width: 20px;
   height: 20px;
   padding: 0;

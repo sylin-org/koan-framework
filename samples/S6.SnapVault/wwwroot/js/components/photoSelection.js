@@ -53,6 +53,7 @@ export class PhotoSelection {
     // Check if selection is within photo grid
     const gridContainer = document.querySelector('.photo-grid');
     if (!gridContainer || !selection || selection.rangeCount === 0) {
+      this.clearVisualFeedback();
       this.setSelectedPhotoIds([]);
       return;
     }
@@ -60,13 +61,70 @@ export class PhotoSelection {
     // Check if selection is actually in the grid
     const range = selection.getRangeAt(0);
     if (!gridContainer.contains(range.commonAncestorContainer)) {
+      this.clearVisualFeedback();
       this.setSelectedPhotoIds([]);
       return;
     }
 
-    // Get selected photo IDs
-    const photoIds = this.getSelectedPhotoIds();
-    this.setSelectedPhotoIds(photoIds);
+    // Get selected photo IDs from text selection
+    const photoCards = Array.from(gridContainer.querySelectorAll('.photo-card'));
+    const selectedPhotoIds = [];
+
+    photoCards.forEach(card => {
+      if (selection.containsNode(card, true)) {
+        const photoId = card.dataset.photoId;
+        if (photoId) {
+          selectedPhotoIds.push(photoId);
+        }
+      }
+    });
+
+    // Update visual feedback
+    this.updateVisualFeedback(selectedPhotoIds, photoCards);
+    this.setSelectedPhotoIds(selectedPhotoIds);
+  }
+
+  /**
+   * Update visual feedback on photo cards (blue overlay)
+   */
+  updateVisualFeedback(selectedPhotoIds, photoCards) {
+    const selectedSet = new Set(selectedPhotoIds);
+
+    photoCards.forEach(card => {
+      const photoId = card.dataset.photoId;
+      const indicator = card.querySelector('.selection-indicator');
+
+      if (selectedSet.has(photoId)) {
+        // Add visual feedback
+        card.classList.add('selected');
+        if (indicator) {
+          indicator.style.display = 'flex';
+        }
+      } else {
+        // Remove visual feedback
+        card.classList.remove('selected');
+        if (indicator) {
+          indicator.style.display = 'none';
+        }
+      }
+    });
+  }
+
+  /**
+   * Clear visual feedback from all photo cards
+   */
+  clearVisualFeedback() {
+    const gridContainer = document.querySelector('.photo-grid');
+    if (!gridContainer) return;
+
+    const photoCards = gridContainer.querySelectorAll('.photo-card');
+    photoCards.forEach(card => {
+      card.classList.remove('selected');
+      const indicator = card.querySelector('.selection-indicator');
+      if (indicator) {
+        indicator.style.display = 'none';
+      }
+    });
   }
 
   /**
@@ -88,43 +146,58 @@ export class PhotoSelection {
   }
 
   /**
-   * Get photo IDs from current text selection
+   * Get photo IDs from current selection (text selection OR clicked selections)
    * Called by DragDropManager when user drops on a collection
    */
   getSelectedPhotoIds() {
+    // FIRST: Check for text selection (brush selection) - takes priority
     const selection = window.getSelection();
-
-    if (!selection || selection.rangeCount === 0) {
-      return [];
-    }
-
     const gridContainer = document.querySelector('.photo-grid');
-    if (!gridContainer) {
-      return [];
+
+    if (selection && selection.rangeCount > 0 && gridContainer) {
+      // Find all photo cards in the current text selection
+      const photoCards = Array.from(gridContainer.querySelectorAll('.photo-card'));
+      const textSelectedIds = [];
+
+      photoCards.forEach(card => {
+        if (selection.containsNode(card, true)) {
+          const photoId = card.dataset.photoId;
+          if (photoId) {
+            textSelectedIds.push(photoId);
+          }
+        }
+      });
+
+      // If we found photos in text selection, return those
+      if (textSelectedIds.length > 0) {
+        return textSelectedIds;
+      }
     }
 
-    // Find all photo cards in the current selection
-    const photoCards = Array.from(gridContainer.querySelectorAll('.photo-card'));
-    const selectedPhotoIds = [];
+    // SECOND: Fall back to clicked selections (single photo drag or multi-select via click)
+    // This supports dragging a single photo without text selection
+    if (this.app.state.selectedPhotos && this.app.state.selectedPhotos.size > 0) {
+      return Array.from(this.app.state.selectedPhotos);
+    }
 
-    photoCards.forEach(card => {
-      if (selection.containsNode(card, true)) {
-        const photoId = card.dataset.photoId;
-        if (photoId) {
-          selectedPhotoIds.push(photoId);
-        }
-      }
-    });
-
-    return selectedPhotoIds;
+    return [];
   }
 
   /**
    * Clear selection after successful drop
    */
   clearSelection() {
+    // Clear text selection (brush selection)
     window.getSelection().removeAllRanges();
+
+    // Clear visual feedback
+    this.clearVisualFeedback();
     this.setSelectedPhotoIds([]);
+
+    // Also clear clicked selections (single photo drag or multi-select)
+    if (this.app.clearSelection) {
+      this.app.clearSelection();
+    }
   }
 
   /**

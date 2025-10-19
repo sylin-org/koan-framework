@@ -11,9 +11,10 @@ export class KeyboardShortcuts {
 
   setupListeners() {
     document.addEventListener('keydown', (e) => {
-      // Don't handle shortcuts when typing in input fields
-      if (e.target.matches('input, textarea, select')) {
-        // Allow Escape to blur inputs
+      // Don't handle shortcuts when typing in input fields or contentEditable elements
+      if (e.target.matches('input, textarea, select') ||
+          e.target.isContentEditable) {
+        // Allow Escape to blur inputs and contentEditable
         if (e.key === 'Escape') {
           e.target.blur();
         }

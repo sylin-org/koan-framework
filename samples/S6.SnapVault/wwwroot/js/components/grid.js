@@ -236,6 +236,7 @@ export class PhotoGrid {
     const article = document.createElement('article');
     article.className = 'photo-card';
     article.dataset.photoId = photo.id;
+    article.draggable = false; // Card is NOT draggable (allows text selection)
 
     // Pre-allocate space using aspect-ratio to eliminate layout shift
     const aspectRatio = photo.width / photo.height;
@@ -250,7 +251,7 @@ export class PhotoGrid {
 
     article.innerHTML = `
       <div class="photo-skeleton"></div>
-      <img class="photo-image" data-src="${thumbnailUrl}" alt="${this.escapeHtml(photo.originalFileName)}" loading="lazy" />
+      <img class="photo-image" data-src="${thumbnailUrl}" alt="${this.escapeHtml(photo.originalFileName)}" loading="lazy" draggable="true" />
       <div class="photo-overlay">
         <div class="actions-top">
           <button class="btn-favorite ${isFavorite ? 'active' : ''}" aria-label="Favorite (F)" data-photo-id="${photo.id}">
@@ -285,6 +286,24 @@ export class PhotoGrid {
     const img = article.querySelector('.photo-image');
     img.addEventListener('load', () => {
       article.querySelector('.photo-skeleton')?.remove();
+    });
+
+    // Dragstart on image - simple selection logic
+    img.addEventListener('dragstart', (e) => {
+      // Check if there's any selection
+      const clickSelectedIds = this.app.state.selectedPhotos || new Set();
+      const isClickSelected = clickSelectedIds.has(photo.id);
+
+      // If no click selection, auto-select this photo
+      if (!isClickSelected && clickSelectedIds.size === 0) {
+        this.app.clearSelection();
+        this.toggleSelection(photo.id);
+        console.log('[Grid] Dragstart - auto-selected single photo:', photo.id);
+      } else {
+        console.log('[Grid] Dragstart - using existing selection:', clickSelectedIds.size, 'photos');
+      }
+
+      e.dataTransfer.effectAllowed = 'copy';
     });
 
     // Click card to open lightbox
