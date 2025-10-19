@@ -28,18 +28,34 @@ export class PhotoSelection {
 
     // Detect brush selection start (mousedown outside photo cards)
     gridContainer.addEventListener('mousedown', (e) => {
+      const targetElement = e.target;
+      const isGrid = targetElement === gridContainer;
+      const nearestCard = targetElement.closest('.photo-card');
+      const isOutsideCards = nearestCard === null;
+
+      console.log('[PhotoSelection] Mousedown detected:', {
+        target: targetElement.tagName + (targetElement.className ? '.' + targetElement.className : ''),
+        isGrid,
+        isOutsideCards,
+        nearestCard: nearestCard ? nearestCard.dataset.photoId : 'none'
+      });
+
       // Only start brush selection if clicking directly on grid (not on a card or its children)
-      if (e.target === gridContainer || e.target.closest('.photo-card') === null) {
+      if (isGrid || isOutsideCards) {
         gridContainer.classList.add('brush-selecting');
-        console.log('[PhotoSelection] Brush selection started');
+        console.log('[PhotoSelection] ✓ Brush selection started - grid has class:', gridContainer.classList.contains('brush-selecting'));
+      } else {
+        console.log('[PhotoSelection] ✗ Not starting brush selection - click is on/inside a card');
       }
     });
 
     // When selection ends (mouseup on grid), check what's selected and end brush mode
     gridContainer.addEventListener('mouseup', () => {
+      const hadBrushClass = gridContainer.classList.contains('brush-selecting');
+
       // Remove brush-selecting class
       gridContainer.classList.remove('brush-selecting');
-      console.log('[PhotoSelection] Brush selection ended');
+      console.log('[PhotoSelection] Mouseup - ending brush selection. Had class:', hadBrushClass, ', removed:', !gridContainer.classList.contains('brush-selecting'));
 
       // Small delay to let selection finalize
       setTimeout(() => {

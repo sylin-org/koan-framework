@@ -294,7 +294,17 @@ export class PhotoGrid {
 
     // Dragstart on image - simulate two-step flow in one gesture
     img.addEventListener('dragstart', (e) => {
+      const gridContainer = document.querySelector('.photo-grid');
+      const isBrushSelecting = gridContainer?.classList.contains('brush-selecting');
       const brushSelection = this.app.components.photoSelection.selectedPhotoIds || [];
+
+      console.log('[Grid] Dragstart event fired:', {
+        photoId: photo.id,
+        imageDraggable: img.draggable,
+        imageClasses: img.className,
+        gridHasBrushClass: isBrushSelecting,
+        existingBrushSelection: brushSelection.length
+      });
 
       if (brushSelection.length === 0) {
         // STEP 1: Auto-range-select this image (simulate selection stage ending)
@@ -304,14 +314,20 @@ export class PhotoGrid {
           Array.from(document.querySelectorAll('.photo-card'))
         );
         this.app.components.photoSelection.setSelectedPhotoIds([photo.id]);
-        console.log('[Grid] Dragstart - auto-selected image:', photo.id);
+        console.log('[Grid] ✓ Auto-selected single image:', photo.id);
       } else {
-        console.log('[Grid] Dragstart - using existing brush selection:', brushSelection.length, 'photos');
+        console.log('[Grid] ✓ Using existing brush selection:', brushSelection.length, 'photos');
       }
 
       // STEP 2: Start drag action (happens automatically, just set drag data)
       e.dataTransfer.effectAllowed = 'copy';
       e.dataTransfer.setData('text/plain', photo.id);
+      console.log('[Grid] ✓ Drag data set, drag action initiated');
+    });
+
+    // Dragend for debugging
+    img.addEventListener('dragend', (e) => {
+      console.log('[Grid] Dragend event fired for photo:', photo.id);
     });
 
     // Click card to open lightbox
