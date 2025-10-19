@@ -146,11 +146,13 @@ export class PhotoSelection {
   }
 
   /**
-   * Get photo IDs from current selection (text selection OR clicked selections)
+   * Get photo IDs from current selection (text selection OR clicked selections OR stored brush selection)
    * Called by DragDropManager when user drops on a collection
    */
   getSelectedPhotoIds() {
-    // FIRST: Check for text selection (brush selection) - takes priority
+    console.log('[PhotoSelection] getSelectedPhotoIds called');
+
+    // FIRST: Check for active text selection (brush selection in progress)
     const selection = window.getSelection();
     const gridContainer = document.querySelector('.photo-grid');
 
@@ -170,16 +172,25 @@ export class PhotoSelection {
 
       // If we found photos in text selection, return those
       if (textSelectedIds.length > 0) {
+        console.log('[PhotoSelection] Using active text selection:', textSelectedIds);
         return textSelectedIds;
       }
     }
 
-    // SECOND: Fall back to clicked selections (single photo drag or multi-select via click)
-    // This supports dragging a single photo without text selection
-    if (this.app.state.selectedPhotos && this.app.state.selectedPhotos.size > 0) {
-      return Array.from(this.app.state.selectedPhotos);
+    // SECOND: Check stored brush selection (text selection was made, but may have been cleared during drag)
+    if (this.selectedPhotoIds && this.selectedPhotoIds.length > 0) {
+      console.log('[PhotoSelection] Using stored brush selection:', this.selectedPhotoIds);
+      return this.selectedPhotoIds;
     }
 
+    // THIRD: Fall back to clicked selections (single photo drag or multi-select via click)
+    if (this.app.state.selectedPhotos && this.app.state.selectedPhotos.size > 0) {
+      const clickedIds = Array.from(this.app.state.selectedPhotos);
+      console.log('[PhotoSelection] Using clicked selection:', clickedIds);
+      return clickedIds;
+    }
+
+    console.log('[PhotoSelection] No selection found');
     return [];
   }
 

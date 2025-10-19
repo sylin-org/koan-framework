@@ -288,22 +288,30 @@ export class PhotoGrid {
       article.querySelector('.photo-skeleton')?.remove();
     });
 
-    // Dragstart on image - simple selection logic
-    img.addEventListener('dragstart', (e) => {
-      // Check if there's any selection
-      const clickSelectedIds = this.app.state.selectedPhotos || new Set();
-      const isClickSelected = clickSelectedIds.has(photo.id);
+    // Prevent text selection on image (allows drag to work cleanly)
+    img.style.userSelect = 'none';
+    img.style.webkitUserSelect = 'none';
 
-      // If no click selection, auto-select this photo
-      if (!isClickSelected && clickSelectedIds.size === 0) {
-        this.app.clearSelection();
-        this.toggleSelection(photo.id);
-        console.log('[Grid] Dragstart - auto-selected single photo:', photo.id);
+    // Dragstart on image - simulate two-step flow in one gesture
+    img.addEventListener('dragstart', (e) => {
+      const brushSelection = this.app.components.photoSelection.selectedPhotoIds || [];
+
+      if (brushSelection.length === 0) {
+        // STEP 1: Auto-range-select this image (simulate selection stage ending)
+        this.app.components.photoSelection.selectedPhotoIds = [photo.id];
+        this.app.components.photoSelection.updateVisualFeedback(
+          [photo.id],
+          Array.from(document.querySelectorAll('.photo-card'))
+        );
+        this.app.components.photoSelection.setSelectedPhotoIds([photo.id]);
+        console.log('[Grid] Dragstart - auto-selected image:', photo.id);
       } else {
-        console.log('[Grid] Dragstart - using existing selection:', clickSelectedIds.size, 'photos');
+        console.log('[Grid] Dragstart - using existing brush selection:', brushSelection.length, 'photos');
       }
 
+      // STEP 2: Start drag action (happens automatically, just set drag data)
       e.dataTransfer.effectAllowed = 'copy';
+      e.dataTransfer.setData('text/plain', photo.id);
     });
 
     // Click card to open lightbox

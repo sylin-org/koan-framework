@@ -66,8 +66,10 @@ export class DragDropManager {
       // Clear visual feedback
       this.clearDropTargetHighlight();
 
-      // Get selected photo IDs from current text selection
+      // Get selected photo IDs
       const photoIds = this.app.components.photoSelection.getSelectedPhotoIds();
+
+      console.log('[DragDropManager] Drop detected, selected photo IDs:', photoIds);
 
       if (photoIds.length === 0) {
         console.warn('[DragDropManager] No photos selected');
