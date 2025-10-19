@@ -4,16 +4,16 @@ using System.Text;
 namespace S6.SnapVault.Services.AI;
 
 /// <summary>
-/// Factory for assembling AI analysis prompts
-/// Base prompt is protected constant (version-controlled in code)
-/// Style customizations applied via parameter injection (stored in database)
+/// Factory for assembling AI analysis prompts using template-based approach
+/// Base prompt template is version-controlled in code
+/// Style customizations applied via field collections (stored in database)
 /// </summary>
 public class AnalysisPromptFactory : IAnalysisPromptFactory
 {
     private readonly ILogger<AnalysisPromptFactory> _logger;
 
-    // Base prompt - Single Source of Truth (user's original high-quality prompt)
-    private const string BASE_PROMPT = @"Analyze the image and output ONLY valid JSON (no markdown, no comments). Describe ONLY what is clearly visible—never guess. Use concise, concrete language.
+    // Base prompt template - Single Source of Truth
+    private const string PROMPT_TEMPLATE = @"Analyze the image and output ONLY valid JSON (no markdown, no comments). Describe ONLY what is clearly visible—never guess. Use concise, concrete language.
 
 Guidelines:
 - ""tags"": 6–10 searchable keywords; lowercase; hyphenate multi-word terms (e.g., ""red-hoodie"", ""neon-lights""); include evident visual elements, clothing styles if present, and aesthetic cues (e.g., ""b&w"", ""minimalist"", ""vintage"").
@@ -22,40 +22,16 @@ Guidelines:
 - Add optional fact fields ONLY when clearly visible; omit otherwise.
 - Escape all strings properly; return the JSON object only.
 
+{{FOCUS_INSTRUCTIONS}}
+
 Return JSON in this format:
 {
   ""tags"": [""tag1"",""tag2"",""tag3""],
   ""summary"": ""30–80 words describing subject, action, setting, lighting, and any evident aesthetics/themes."",
   ""facts"": {
-    ""type"": [""portrait"",""landscape"",""still-life"",""product"",""food"",""ingame-screenshot"",""architecture"",""wildlife"",""macro"",""abstract"",""other""],
-    ""style"": [""photography"",""painting"",""digital-art"",""illustration"",""3d-render"",""pixel-art"",""cel-shaded"",""game-graphics"",""other""],
-    ""subject count"": [""no subjects"",""1 person"",""2 people"",""3+ people"",""single object"",""multiple items"",""animals""],
-    ""composition"": [""centered"",""rule-of-thirds"",""symmetrical"",""diagonal"",""leading-lines"",""framed"",""off-center"",""close-up"",""wide""],
-    ""palette"": [""color1"",""color2"",""color3""],
-    ""lighting"": [""overcast"",""golden-hour"",""studio"",""natural"",""soft"",""dramatic"",""backlit"",""low-key"",""high-key"",""neon"",""spotlit""],
-    ""setting"": [""indoor"",""outdoor"",""studio"",""urban"",""nature""],
-    ""mood"": [""mysterious"",""cheerful"",""serene"",""dramatic"",""playful"",""somber"",""energetic"",""contemplative"",""romantic"",""tense""],
-    ""themes"": [""minimalist"",""vintage"",""retro"",""modern"",""rustic"",""industrial"",""bohemian"",""film-noir"",""cyberpunk"",""y2k"",""cottagecore"",""art-deco""],
-    ""fashion-style"": [""streetwear"",""formal"",""casual"",""athletic"",""business-casual"",""evening-wear"",""workwear"",""bohemian"",""preppy"",""punk"",""goth"",""vintage"",""minimalist"",""avant-garde"",""traditional""],
-    ""cultural-style"": [""western"",""eastern"",""japanese-street"",""korean-street"",""scandinavian"",""mediterranean"",""african"",""latin-american"",""middle-eastern"",""indigenous"",""traditional-dress"",""cultural-fusion""],
+{{MANDATORY_FACTS}}
 
-    // Per-subject facts (arrays; MUST be present if at least one subject is shown):
-    // ""subject 1"": [""person"",""black-hoodie"",""smiling"",""looking-left"",""streetwear""],
-    // ""subject 2"": [""building"",""brick-facade"",""arched-windows"",""centered""],
-    // ""subject 3"": [""tree"",""bare-branches"",""midground""],
-
-    // Optional facts (arrays; only if clearly visible, omit otherwise; 2+ items per fact preferred if applicable):
-    // ""era cues"": [""1920s"",""1960s"",""1980s"",""2000s"",""art-deco"",""mid-century"",""vintage"",""retro"",""contemporary""],
-    // ""color grade"": [""black-and-white"",""sepia"",""teal-orange"",""cool"",""warm"",""neutral"",""monochrome"",""duotone"",""desaturated"",""vibrant""],
-    // ""light sources"": [""sun"",""neon-signs"",""led-panels"",""candles"",""firelight"",""streetlamps""],
-    // ""depth cues"": [""bokeh"",""shallow-focus"",""deep-focus"",""motion-blur"",""rack-focus""],
-    // ""atmospherics"": [""fog"",""haze"",""smoke"",""rain"",""snow"",""sparks"",""god-rays"",""dust"",""mist""],
-    // ""locale cues"": [""architecture-type"",""region-specific-props"",""local-vegetation""],
-    // ""time"": [""day"",""night"",""sunset"",""sunrise"",""twilight"",""midday""],
-    // ""weather"": [""clear"",""overcast"",""rainy"",""snowy"",""foggy"",""indoor""],
-    // ""visible text"": [""exact text if readable""],
-    // ""fashion-style"": [""specific-style-if-clearly-identifiable""] // Use only when fashion is prominent and identifiable
-    // ""cultural-style"": [""specific-culture-if-clearly-evident""] // Use only when cultural elements are distinctive and visible
+{{OPTIONAL_FACTS}}
   }
 }
 
@@ -71,32 +47,37 @@ IMPORTANT:
 
     public string RenderPrompt()
     {
-        return BASE_PROMPT;
+        return RenderPromptFor(null);
     }
 
-    public string RenderPromptFor(AnalysisStyle style)
+    public string RenderPromptFor(AnalysisStyle? style)
     {
         // Escape hatch: If user provides full override, use it
-        if (!string.IsNullOrEmpty(style.FullPromptOverride))
+        if (style != null && !string.IsNullOrEmpty(style.FullPromptOverride))
         {
             _logger.LogDebug("Using full prompt override for style '{StyleName}'", style.Name);
             return style.FullPromptOverride;
         }
 
-        var builder = new StringBuilder();
+        var prompt = PROMPT_TEMPLATE;
 
-        // 1. Add style-specific focus instructions (prepended)
-        if (!string.IsNullOrEmpty(style.FocusInstructions))
+        // 1. Inject focus instructions (prepended context)
+        var focusInstructions = style?.FocusInstructions ?? "";
+        if (!string.IsNullOrEmpty(focusInstructions))
         {
-            builder.AppendLine(style.FocusInstructions);
-            builder.AppendLine();
+            focusInstructions = focusInstructions + "\n";
         }
+        prompt = prompt.Replace("{{FOCUS_INSTRUCTIONS}}", focusInstructions);
 
-        // 2. Apply style enhancements to base prompt
-        var enhancedPrompt = ApplyStyleEnhancements(BASE_PROMPT, style);
-        builder.Append(enhancedPrompt);
+        // 2. Build mandatory facts section
+        var mandatoryFacts = BuildMandatoryFactsSection(style);
+        prompt = prompt.Replace("{{MANDATORY_FACTS}}", mandatoryFacts);
 
-        return builder.ToString();
+        // 3. Build optional facts section
+        var optionalFacts = BuildOptionalFactsSection(style);
+        prompt = prompt.Replace("{{OPTIONAL_FACTS}}", optionalFacts);
+
+        return prompt;
     }
 
     public string GetClassificationPrompt(IEnumerable<AnalysisStyle> availableStyles)
@@ -124,76 +105,133 @@ Return ONLY the style name (lowercase), no explanation.";
             .Replace("{{orientation}}", GetOrientation(context.AspectRatio));
     }
 
-    private string ApplyStyleEnhancements(string basePrompt, AnalysisStyle style)
+    /// <summary>
+    /// Build mandatory facts section from base mandatory + style-specific mandatory fields
+    /// </summary>
+    private string BuildMandatoryFactsSection(AnalysisStyle? style)
     {
-        var result = basePrompt;
+        var lines = new List<string>();
 
-        // Enhance subject examples with clothing/expression details (for portrait style)
-        if (style.EnhanceExamples?.Contains("subject clothing") == true)
+        // 1. Always include base mandatory fields
+        foreach (var field in FactFieldRegistry.BaseMandatoryFields)
         {
-            result = result.Replace(
-                @"""subject 1"": [""person"",""black-hoodie"",""smiling"",""looking-left"",""streetwear""]",
-                @"""subject 1"": [""person"",""joyful-expression"",""black-hoodie"",""red-headphones"",""relaxed-pose"",""looking-left"",""confident-demeanor"",""streetwear""]"
-            );
+            // Check if style provides enhanced examples for this field
+            var enhancedExamples = GetEnhancedExamples(field.Key, style);
+            if (enhancedExamples != null)
+            {
+                lines.Add(field.RenderAsJsonLine(enhancedExamples) + ",");
+            }
+            else
+            {
+                lines.Add(field.RenderAsJsonLine() + ",");
+            }
         }
 
-        // Enhance subject examples with facial expressions (for portrait style)
-        if (style.EnhanceExamples?.Contains("facial expressions") == true)
+        // 2. Add style-specific mandatory fields (promoted from optional)
+        if (style?.MandatoryFields != null)
         {
-            result = result.Replace(
-                @"""subject 1"": [""person"",""black-hoodie"",""smiling"",""looking-left"",""streetwear""]",
-                @"""subject 1"": [""person"",""smiling"",""joyful-expression"",""black-hoodie"",""looking-left""]"
-            );
+            foreach (var fieldKey in style.MandatoryFields)
+            {
+                var field = FactFieldRegistry.GetField(fieldKey);
+                if (field != null && !field.IsAlwaysMandatory)
+                {
+                    var enhancedExamples = GetEnhancedExamples(field.Key, style);
+                    if (enhancedExamples != null)
+                    {
+                        lines.Add(field.RenderAsJsonLine(enhancedExamples) + ",");
+                    }
+                    else
+                    {
+                        lines.Add(field.RenderAsJsonLine() + ",");
+                    }
+                }
+            }
         }
 
-        // Enhance composition examples (for landscape/architecture styles)
-        if (style.EnhanceExamples?.Contains("composition details") == true)
+        // Remove trailing comma from last line
+        if (lines.Any())
         {
-            result = result.Replace(
-                @"""composition"": [""centered"",""rule-of-thirds"",""symmetrical"",""diagonal"",""leading-lines"",""framed"",""off-center"",""close-up"",""wide""]",
-                @"""composition"": [""centered"",""rule-of-thirds"",""symmetrical"",""diagonal"",""leading-lines"",""framed"",""off-center"",""close-up"",""wide"",""foreground-interest"",""depth-layers"",""golden-ratio""]"
-            );
+            var lastLine = lines[^1];
+            lines[^1] = lastLine.TrimEnd(',');
         }
 
-        // Enhance lighting examples (for product/studio styles)
-        if (style.EnhanceExamples?.Contains("lighting setup") == true)
+        return string.Join("\n", lines);
+    }
+
+    /// <summary>
+    /// Build optional facts section (commented examples)
+    /// Excludes de-emphasized fields and mandatory fields
+    /// Highlights emphasis fields
+    /// </summary>
+    private string BuildOptionalFactsSection(AnalysisStyle? style)
+    {
+        var lines = new List<string>
         {
-            result = result.Replace(
-                @"""lighting"": [""overcast"",""golden-hour"",""studio"",""natural"",""soft"",""dramatic"",""backlit"",""low-key"",""high-key"",""neon"",""spotlit""]",
-                @"""lighting"": [""studio"",""three-point-lit"",""soft"",""even"",""product-lit"",""rim-light"",""key-light"",""fill-light"",""diffused""]"
-            );
+            "    // Optional facts (arrays; only if clearly visible, omit otherwise):"
+        };
+
+        var mandatoryKeys = style?.MandatoryFields?.ToHashSet() ?? new HashSet<string>();
+        var emphasizedKeys = style?.EmphasisFields?.ToHashSet() ?? new HashSet<string>();
+        var deemphasizedKeys = style?.DeemphasizedFields?.ToHashSet() ?? new HashSet<string>();
+
+        foreach (var kvp in FactFieldRegistry.OptionalFields)
+        {
+            var fieldKey = kvp.Key;
+            var field = kvp.Value;
+
+            // Skip if already in mandatory
+            if (mandatoryKeys.Contains(fieldKey))
+                continue;
+
+            // Skip if de-emphasized
+            if (deemphasizedKeys.Contains(fieldKey))
+                continue;
+
+            // Add with enhanced examples if emphasized
+            var enhancedExamples = emphasizedKeys.Contains(fieldKey)
+                ? GetEnhancedExamples(fieldKey, style)
+                : null;
+
+            if (enhancedExamples != null)
+            {
+                lines.Add(field.RenderAsJsonLine(enhancedExamples, commented: true));
+            }
+            else
+            {
+                lines.Add(field.RenderAsJsonLine(commented: true));
+            }
         }
 
-        // Enhance atmospherics examples (for landscape/nature styles)
-        if (style.EnhanceExamples?.Contains("atmospherics") == true)
+        return string.Join("\n", lines);
+    }
+
+    /// <summary>
+    /// Get enhanced example values for specific fields based on style
+    /// Returns null if no enhancements for this field
+    /// </summary>
+    private string[]? GetEnhancedExamples(string fieldKey, AnalysisStyle? style)
+    {
+        if (style == null) return null;
+
+        // Composition enhancements (Landscape, Architecture)
+        if (fieldKey == "composition" && style.EmphasisFields?.Contains("composition details") == true)
         {
-            result = result.Replace(
-                @"""atmospherics"": [""fog"",""haze"",""smoke"",""rain"",""snow"",""sparks"",""god-rays"",""dust""]",
-                @"""atmospherics"": [""fog"",""haze"",""mist"",""clouds"",""rain"",""snow"",""god-rays"",""dust"",""morning-dew""]"
-            );
+            return new[] { "centered", "rule-of-thirds", "symmetrical", "diagonal", "leading-lines", "framed", "off-center", "close-up", "wide", "foreground-interest", "depth-layers", "golden-ratio" };
         }
 
-        // Add required optional facts reminder
-        if (style.RequiredOptionalFacts?.Any() == true)
+        // Lighting enhancements (Product)
+        if (fieldKey == "lighting" && style.EmphasisFields?.Contains("lighting setup") == true)
         {
-            var factsHint = $"\n\nIMPORTANT: For this image type, ensure these optional facts are included if visible: {string.Join(", ", style.RequiredOptionalFacts)}";
-            result = result.Replace(
-                "IMPORTANT: All fact keys MUST be lowercase.",
-                $"IMPORTANT: All fact keys MUST be lowercase.{factsHint}"
-            );
+            return new[] { "studio", "three-point-lit", "soft", "even", "product-lit", "rim-light", "key-light", "fill-light", "diffused" };
         }
 
-        // Add omitted facts reminder
-        if (style.OmittedOptionalFacts?.Any() == true)
+        // Atmospherics enhancements (Landscape, Macro)
+        if (fieldKey == "atmospherics" && style.EmphasisFields?.Contains("atmospherics") == true)
         {
-            var omitHint = $" Omit these facts unless highly relevant: {string.Join(", ", style.OmittedOptionalFacts)}";
-            result = result.Replace(
-                "IMPORTANT: All fact keys MUST be lowercase.",
-                $"IMPORTANT: All fact keys MUST be lowercase.{omitHint}"
-            );
+            return new[] { "fog", "haze", "mist", "clouds", "rain", "snow", "god-rays", "dust", "morning-dew" };
         }
 
-        return result;
+        return null;
     }
 
     private static string GetOrientation(double aspectRatio)

@@ -12,12 +12,12 @@ public static class AnalysisStyleSeeder
     public static async Task SeedDefaultStylesAsync(ILogger logger)
     {
         // Check if styles already seeded
-        var existingStyles = await AnalysisStyle.All();
-        if (existingStyles.Any())
-        {
-            logger.LogInformation("Analysis styles already seeded ({Count} styles found)", existingStyles.Count);
-            return;
-        }
+        //var existingStyles = await AnalysisStyle.All();
+        //if (existingStyles.Any())
+        //{
+        //    logger.LogInformation("Analysis styles already seeded ({Count} styles found)", existingStyles.Count);
+        //    return;
+        //}
 
         logger.LogInformation("Seeding default analysis styles...");
 
@@ -70,23 +70,28 @@ public static class AnalysisStyleSeeder
         Priority = 1,
         IsSystemStyle = true,
         IsActive = true,
-        TemplateVersion = 1,
+        TemplateVersion = 2,  // v2: Refactored to template-based mandatory fields
         ClassificationKeywords = "people, faces, portraits, human subjects, emotion, person, group",
-        FocusInstructions = @"ANALYSIS FOCUS:
-Pay special attention to:
-- Facial expressions and emotional content (joy, contemplation, tension, serenity, vulnerability, confidence)
-- Clothing details and fashion choices (specific garments, colors, patterns, accessories, style era)
-- Body language, pose, and gaze direction (relaxed, tense, dynamic, static, eye contact)
-- Interpersonal relationships between subjects (proximity, interaction, group dynamics)
+        FocusInstructions = @"PORTRAIT & PEOPLE ANALYSIS - Enhanced Guidelines:
 
-When describing subjects, ALWAYS include:
-- Expression/emotion cues (not just ""person"")
-- Specific clothing items with colors (""black-hoodie"", ""red-headphones"")
-- Pose description (""relaxed-pose"", ""arms-crossed"", ""leaning"")
-- Gaze direction (""looking-left"", ""eye-contact"", ""looking-away"")",
-        EnhanceExamples = new List<string> { "subject clothing", "facial expressions" },
-        RequiredOptionalFacts = new List<string> { "subject 1", "subject 2", "subject 3" },
-        OmittedOptionalFacts = new List<string> { "atmospherics", "locale cues" }
+For each visible person, provide detailed ""subject N"" facts with rich descriptors (5-10 elements per person):
+- Emotional expressions: joy, contemplation, serenity, confidence, vulnerability, tension, surprise
+- Clothing specifics: ""black-leather-jacket"", ""white-button-down"", ""red-knit-beanie"", ""silver-hoop-earrings""
+- Body language: ""relaxed-pose"", ""arms-crossed"", ""leaning-forward"", ""sitting"", ""standing-confidently""
+- Gaze direction: ""looking-left"", ""direct-eye-contact"", ""looking-away"", ""eyes-closed""
+- Physical traits: hair-color, hair-length, hair-style, build, distinctive-features
+- Group dynamics: proximity, interaction-type, relative-positioning (if multiple people)
+
+Each subject fact should contain 5-10 descriptive elements covering emotion, clothing, pose, gaze, and physical characteristics.",
+
+        // Promote subject 1 to mandatory (always required for portrait analysis)
+        MandatoryFields = new List<string> { "subject 1" },
+
+        // Emphasize subject 2/3 (encouraged if multiple people visible)
+        EmphasisFields = new List<string> { "subject 2", "subject 3" },
+
+        // De-emphasize environmental facts (less relevant for portraits)
+        DeemphasizedFields = new List<string> { "atmospherics", "locale cues" }
     };
 
     private static AnalysisStyle CreateProductStyle() => new()
@@ -98,9 +103,10 @@ When describing subjects, ALWAYS include:
         Priority = 2,
         IsSystemStyle = true,
         IsActive = true,
-        TemplateVersion = 1,
+        TemplateVersion = 2,
         ClassificationKeywords = "product, commercial, item, object, merchandise, packaging, branding",
-        FocusInstructions = @"ANALYSIS FOCUS:
+        FocusInstructions = @"PRODUCT & COMMERCIAL ANALYSIS - Enhanced Guidelines:
+
 Focus on product presentation and commercial viability:
 - Product clarity and feature visibility (what is being sold?)
 - Material quality and finish (matte, glossy, textured, metallic)
@@ -110,14 +116,15 @@ Focus on product presentation and commercial viability:
 - Commercial appeal and market readiness
 
 When describing products, include:
-- Specific product type and category
+- Specific product type and category (in subject 1)
 - Visible materials and finishes
 - Color accuracy and palette
 - Brand elements if visible
 - Presentation style (studio, lifestyle, flat-lay)",
-        EnhanceExamples = new List<string> { "lighting setup" },
-        RequiredOptionalFacts = new List<string> { "subject 1", "light sources" },
-        OmittedOptionalFacts = new List<string> { "mood", "themes", "atmospherics" }
+
+        MandatoryFields = new List<string> { "subject 1" },
+        EmphasisFields = new List<string> { "light sources" },  // Encouraged but not all products have visible sources
+        DeemphasizedFields = new List<string> { "mood", "themes", "atmospherics" }
     };
 
     private static AnalysisStyle CreateLandscapeStyle() => new()
@@ -129,7 +136,7 @@ When describing products, include:
         Priority = 3,
         IsSystemStyle = true,
         IsActive = true,
-        TemplateVersion = 1,
+        TemplateVersion = 2,
         ClassificationKeywords = "landscape, nature, scenery, outdoor, mountains, forest, water, sky, vista",
         FocusInstructions = @"ANALYSIS FOCUS:
 Emphasize natural elements and environmental storytelling:
@@ -146,9 +153,9 @@ When describing landscapes, include:
 - Lighting quality and direction
 - Weather and atmospheric cues
 - Season indicators if visible",
-        EnhanceExamples = new List<string> { "composition details", "atmospherics" },
-        RequiredOptionalFacts = new List<string> { "atmospherics", "time", "weather", "locale cues" },
-        OmittedOptionalFacts = new List<string> { "subject 1", "subject 2" }
+        MandatoryFields = new List<string> { "time", "weather" },  // Always determinable
+        EmphasisFields = new List<string> { "atmospherics", "composition details", "locale cues" },  // Atmospherics not always present (clear days)
+        DeemphasizedFields = new List<string> { "subject 1", "subject 2", "subject 3" }
     };
 
     private static AnalysisStyle CreateArchitectureStyle() => new()
@@ -160,7 +167,7 @@ When describing landscapes, include:
         Priority = 4,
         IsSystemStyle = true,
         IsActive = true,
-        TemplateVersion = 1,
+        TemplateVersion = 2,
         ClassificationKeywords = "architecture, building, interior, structure, design, geometric, lines, facade",
         FocusInstructions = @"ANALYSIS FOCUS:
 Analyze structural and design elements:
@@ -177,9 +184,9 @@ When describing architecture, include:
 - Geometric patterns and symmetry
 - Architectural style or period
 - Spatial qualities (vast, intimate, open, closed)",
-        EnhanceExamples = new List<string> { "composition details" },
-        RequiredOptionalFacts = new List<string> { "locale cues", "era cues" },
-        OmittedOptionalFacts = new List<string> { "subject 1", "atmospherics" }
+        MandatoryFields = new List<string> { "locale cues", "era cues" },
+        EmphasisFields = new List<string> { "composition details" },
+        DeemphasizedFields = new List<string> { "subject 1", "subject 2", "subject 3", "atmospherics" }
     };
 
     private static AnalysisStyle CreateActionStyle() => new()
@@ -191,7 +198,7 @@ When describing architecture, include:
         Priority = 5,
         IsSystemStyle = true,
         IsActive = true,
-        TemplateVersion = 1,
+        TemplateVersion = 2,
         ClassificationKeywords = "action, motion, movement, sports, dynamic, activity, energy, speed",
         FocusInstructions = @"ANALYSIS FOCUS:
 Capture dynamic energy and timing:
@@ -208,9 +215,9 @@ When describing action, include:
 - Energy level and dynamics
 - Subject positioning and tracking
 - Timing quality (peak moment, transitional)",
-        EnhanceExamples = new List<string> { "subject clothing" },
-        RequiredOptionalFacts = new List<string> { "subject 1", "depth cues" },
-        OmittedOptionalFacts = new List<string> { "atmospherics" }
+        MandatoryFields = new List<string> { "subject 1", "depth cues" },
+        EmphasisFields = new List<string>(),
+        DeemphasizedFields = new List<string> { "atmospherics", "locale cues" }
     };
 
     private static AnalysisStyle CreateMacroStyle() => new()
@@ -222,7 +229,7 @@ When describing action, include:
         Priority = 6,
         IsSystemStyle = true,
         IsActive = true,
-        TemplateVersion = 1,
+        TemplateVersion = 2,
         ClassificationKeywords = "macro, detail, close-up, texture, pattern, small, intricate, fine",
         FocusInstructions = @"ANALYSIS FOCUS:
 Emphasize fine details and textures:
@@ -239,9 +246,9 @@ When describing macro subjects, include:
 - Depth of field characteristics
 - Material quality
 - Abstract visual elements",
-        EnhanceExamples = new List<string> { "atmospherics" },
-        RequiredOptionalFacts = new List<string> { "depth cues", "subject 1" },
-        OmittedOptionalFacts = new List<string> { "setting", "locale cues" }
+        MandatoryFields = new List<string> { "depth cues", "subject 1" },
+        EmphasisFields = new List<string> { "atmospherics" },
+        DeemphasizedFields = new List<string> { "setting", "locale cues", "time", "weather" }
     };
 
     private static AnalysisStyle CreateGamingStyle() => new()
@@ -253,7 +260,7 @@ When describing macro subjects, include:
         Priority = 7,
         IsSystemStyle = true,
         IsActive = true,
-        TemplateVersion = 1,
+        TemplateVersion = 2,
         ClassificationKeywords = "game, gaming, screenshot, video game, gameplay, UI, HUD, menu, ingame, playstation, xbox, pc gaming",
         FocusInstructions = @"ANALYSIS FOCUS:
 Analyze as a video game screenshot with gaming-specific terminology:
@@ -274,8 +281,8 @@ When describing gaming screenshots, include:
 - Character/player model details if visible
 - Visual effects and post-processing
 - Gameplay state (active gameplay, menu, cutscene)",
-        EnhanceExamples = new List<string>(),
-        RequiredOptionalFacts = new List<string> { "visible text", "subject 1", "themes", "color grade" },
-        OmittedOptionalFacts = new List<string> { "weather", "time", "era cues", "locale cues" }
+        MandatoryFields = new List<string> { "subject 1", "color grade" },  // Core gaming elements always present
+        EmphasisFields = new List<string> { "visible text" },  // UI text common but not in cutscenes/cinematic modes
+        DeemphasizedFields = new List<string> { "weather", "time", "era cues", "locale cues" }
     };
 }

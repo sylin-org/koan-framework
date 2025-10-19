@@ -41,23 +41,25 @@ public class AnalysisStyle : Entity<AnalysisStyle>
     public string? FocusInstructions { get; set; }
 
     /// <summary>
-    /// List of example categories to enhance in base prompt
-    /// Options: "subject clothing", "facial expressions", "composition details",
-    ///          "lighting setup", "atmospherics"
+    /// Fact fields that are MANDATORY for this style (promoted from optional to required in JSON structure)
+    /// These fields will appear as uncommented required fields in the JSON template
+    /// Example: Portrait style makes ["subject 1"] mandatory
+    /// Base mandatory facts (type, style, composition, etc.) are always included - this ADDS to that list
     /// </summary>
-    public List<string> EnhanceExamples { get; set; } = new();
+    public List<string> MandatoryFields { get; set; } = new();
 
     /// <summary>
-    /// Optional facts that MUST be included if visible for this style
-    /// Example: Portrait style requires ["subject 1", "subject 2"]
+    /// Optional fact fields that should be emphasized/encouraged for this style
+    /// These remain commented examples but may have enhanced example values
+    /// Example: Portrait emphasizes ["subject 2", "subject 3"] (conditional on visibility)
     /// </summary>
-    public List<string> RequiredOptionalFacts { get; set; } = new();
+    public List<string> EmphasisFields { get; set; } = new();
 
     /// <summary>
-    /// Optional facts that should be omitted unless highly relevant
-    /// Example: Product style omits ["atmospherics", "locale cues"]
+    /// Optional facts that should be de-emphasized or omitted unless highly relevant
+    /// Example: Product style de-emphasizes ["atmospherics", "locale cues"]
     /// </summary>
-    public List<string> OmittedOptionalFacts { get; set; } = new();
+    public List<string> DeemphasizedFields { get; set; } = new();
 
     // ==================== Smart Classification ====================
 
