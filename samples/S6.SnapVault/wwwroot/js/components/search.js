@@ -54,7 +54,6 @@ export class SearchBar {
               <span class="label-right">Semantic</span>
             </div>
           </div>
-          <output class="search-mode-output">Hybrid (50%)</output>
         </div>
 
         <label class="realtime-toggle">
@@ -110,15 +109,8 @@ export class SearchBar {
 
   updateSliderUI(value) {
     const fill = this.container.querySelector('.slider-fill');
-    const output = this.container.querySelector('.search-mode-output');
 
     fill.style.width = `${value}%`;
-
-    let mode = 'Hybrid';
-    if (value < 30) mode = 'Exact';
-    else if (value > 70) mode = 'Semantic';
-
-    output.textContent = `${mode} (${value}%)`;
 
     // Update slider gradient color
     const slider = this.container.querySelector('.search-slider');
