@@ -87,13 +87,7 @@ export class Button {
 
     // Attach click handler
     if (onClick) {
-      console.log(`[Button.create] Attaching onClick handler for "${label}"`);
-      btn.addEventListener('click', (e) => {
-        console.log(`[Button] Click event fired for "${label}"`, e);
-        onClick(e);
-      });
-    } else {
-      console.warn(`[Button.create] No onClick handler for "${label}"`);
+      btn.addEventListener('click', onClick);
     }
 
     return btn;

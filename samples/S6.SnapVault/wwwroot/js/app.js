@@ -146,7 +146,7 @@ class SnapVaultApp {
   }
 
   setupViewPresetControls() {
-    const presetButtons = document.querySelectorAll('.view-preset-btn');
+    const presetButtons = document.querySelectorAll('.view-toggle');
     presetButtons.forEach(btn => {
       btn.addEventListener('click', () => {
         const preset = btn.dataset.preset;
@@ -172,7 +172,7 @@ class SnapVaultApp {
     localStorage.setItem('snapvault-view-preset', presetId);
 
     // Update active button
-    document.querySelectorAll('.view-preset-btn').forEach(btn => {
+    document.querySelectorAll('.view-toggle').forEach(btn => {
       btn.classList.toggle('active', btn.dataset.preset === presetId);
     });
 
