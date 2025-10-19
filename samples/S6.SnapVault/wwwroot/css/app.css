@@ -871,6 +871,7 @@ body {
   );
   opacity: 0;
   transition: opacity var(--duration-fast) var(--ease-out-cubic);
+  pointer-events: none; /* Let clicks pass through to image for dragging */
 }
 
 .photo-card:hover .photo-overlay {
@@ -883,6 +884,7 @@ body {
   align-items: center;
   justify-content: space-between;
   padding: var(--space-1);
+  pointer-events: auto; /* Re-enable pointer events for interactive elements */
 }
 
 .actions-top {
