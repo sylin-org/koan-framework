@@ -324,7 +324,7 @@ public class PhotoSetsController : ControllerBase
                     FileName = p.OriginalFileName,
                     CapturedAt = p.CapturedAt,
                     CreatedAt = p.CreatedAt.UtcDateTime,
-                    ThumbnailUrl = $"/api/photos/{p.Id}/thumbnail",
+                    ThumbnailUrl = $"/api/media/photos/{p.Id}/thumbnail",
                     Rating = p.Rating,
                     IsFavorite = p.IsFavorite,
                     Width = p.Width,
