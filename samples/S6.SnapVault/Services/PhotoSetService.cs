@@ -1,3 +1,4 @@
+using Koan.Data.Abstractions;
 using Koan.Data.Core;
 using S6.SnapVault.Models;
 
@@ -131,14 +132,21 @@ public sealed class PhotoSetService
     {
         List<PhotoAsset> photos;
 
+        // Use large page size to get ALL records (bypass default 50-record limit)
+        // Sessions need complete photo list for consistent navigation
+        // Note: Will be capped by provider's maxPageSize (typically 1000)
+        var options = new DataQueryOptions(page: 1, pageSize: 10000);
+
         switch (definition.Context)
         {
             case "all-photos":
-                photos = (await PhotoAsset.All(ct)).ToList();
+                var allResult = await PhotoAsset.AllWithCount(options, ct);
+                photos = allResult.Items.ToList();
                 break;
 
             case "favorites":
-                photos = (await PhotoAsset.Query(p => p.IsFavorite, ct)).ToList();
+                var favoritesResult = await PhotoAsset.QueryWithCount(p => p.IsFavorite, options, ct);
+                photos = favoritesResult.Items.ToList();
                 break;
 
             case "collection":
@@ -157,9 +165,11 @@ public sealed class PhotoSetService
                 // Query photos by IDs from collection
                 if (collection.PhotoIds.Count > 0)
                 {
-                    photos = (await PhotoAsset.Query(
+                    var collectionResult = await PhotoAsset.QueryWithCount(
                         p => collection.PhotoIds.Contains(p.Id),
-                        ct)).ToList();
+                        options,
+                        ct);
+                    photos = collectionResult.Items.ToList();
                 }
                 else
                 {
