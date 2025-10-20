@@ -298,6 +298,9 @@ export class CollectionView {
       const definition = this.getSetDefinition();
       this.photoSet = new PhotoSetManager(definition, this.app.api);
 
+      // Wire up cache event listeners
+      this._setupCacheEventListeners();
+
       console.log('[CollectionView] Initializing PhotoSet for', definition.type);
 
       // Load initial window of photos (centered at index 0)
@@ -322,6 +325,52 @@ export class CollectionView {
         duration: 3000
       });
     }
+  }
+
+  /**
+   * Setup cache event listeners for background refresh UX
+   */
+  _setupCacheEventListeners() {
+    if (!this.photoSet) return;
+
+    // Import cache indicator dynamically
+    import('./PhotoSetCacheIndicator.js').then(module => {
+      const { cacheIndicator } = module;
+
+      // Cache loaded - show info
+      this.photoSet.on('cacheLoaded', (data) => {
+        cacheIndicator.showCacheInfo(data);
+      });
+
+      // Refresh started - show indicator
+      this.photoSet.on('refreshStart', () => {
+        cacheIndicator.showRefreshing();
+      });
+
+      // Refresh completed
+      this.photoSet.on('refreshComplete', (data) => {
+        cacheIndicator.hideRefreshing();
+
+        if (data.changes && data.changes.hasChanges) {
+          // Show changes notification with refresh callback
+          cacheIndicator.showChanges(data.changes, () => {
+            // Reload the view
+            this.app.state.photos = this.photoSet.getPhotosInWindow();
+            this.app.state.totalPhotosCount = this.photoSet.totalCount;
+            this.app.components.grid.render();
+            this.app.updateLibraryCounts();
+            this.app.updateStatusBar();
+          });
+        }
+      });
+
+      // Refresh error
+      this.photoSet.on('refreshError', () => {
+        cacheIndicator.hideRefreshing();
+      });
+    }).catch(err => {
+      console.error('[CollectionView] Failed to load cache indicator:', err);
+    });
   }
 
   /**

@@ -103,17 +103,85 @@ export class PhotoSetManager {
   /**
    * Initialize photo set for grid display (no specific photo required)
    * Loads from beginning of set for initial grid rendering
+   * Uses cache for instant response, then refreshes in background
    */
   async initializeForGrid(startIndex = 0) {
     console.log('[PhotoSet] Initializing for grid at index:', startIndex);
 
     try {
-      // Load initial window starting from specified index
+      // Build definition for cache lookup
+      const cacheDefinition = {
+        context: this.definition.type,
+        searchQuery: this.definition.searchQuery,
+        searchAlpha: this.definition.searchAlpha,
+        collectionId: this.definition.id,
+        sortBy: this.definition.sortBy || 'capturedAt',
+        sortOrder: this.definition.sortOrder || 'desc'
+      };
+
+      // Check cache first
+      const cached = window.photoSetCache?.get(cacheDefinition);
+
+      if (cached) {
+        const cacheAge = Date.now() - cached.timestamp;
+        const ageMinutes = Math.round(cacheAge / 1000 / 60);
+        const ageText = ageMinutes < 1 ? 'just now' :
+                       ageMinutes < 60 ? `${ageMinutes}m ago` :
+                       `${Math.round(ageMinutes / 60)}h ago`;
+
+        console.log(`%c[PhotoSet Cache] 📦 LOADED from cache`, 'color: #00a8ff; font-weight: bold', {
+          context: cacheDefinition.context,
+          photoCount: cached.photos.length,
+          cachedAt: new Date(cached.timestamp).toLocaleTimeString(),
+          age: ageText,
+          sessionId: cached.session.id
+        });
+
+        // Store cached session and photos
+        this.sessionId = cached.session.id;
+        this.totalCount = cached.session.totalCount;
+        this.currentIndex = startIndex;
+        this.window.setRange(0, cached.photos);
+        this.isInitialized = true;
+
+        // Emit event that we're using cached data
+        this.emit('cacheLoaded', {
+          photoCount: cached.photos.length,
+          totalCount: this.totalCount,
+          age: cacheAge
+        });
+
+        // Start background refresh (non-blocking)
+        console.log(`%c[PhotoSet Cache] 🔄 Starting background refresh...`, 'color: #ffa502; font-weight: bold');
+        this._refreshInBackground(cacheDefinition, cached).catch(error => {
+          console.error('[PhotoSet] Background refresh failed:', error);
+        });
+
+        return true;
+      }
+
+      // No cache - load fresh data
+      console.log(`%c[PhotoSet Cache] ❌ No cache found - loading fresh data`, 'color: #ff6348; font-weight: bold', {
+        context: cacheDefinition.context
+      });
       const response = await this.loadWindow(startIndex);
 
       this.totalCount = response.totalCount;
       this.currentIndex = startIndex;
       this.isInitialized = true;
+
+      // Cache the result
+      if (window.photoSetCache) {
+        const session = {
+          id: this.sessionId,
+          totalCount: this.totalCount
+        };
+        window.photoSetCache.set(cacheDefinition, session, response.photos);
+        console.log(`%c[PhotoSet Cache] 💾 SAVED to cache`, 'color: #2ecc71; font-weight: bold', {
+          context: cacheDefinition.context,
+          photoCount: response.photos.length
+        });
+      }
 
       console.log(`[PhotoSet] Grid initialized with ${response.photos.length} photos, total: ${this.totalCount}`);
 
@@ -122,6 +190,125 @@ export class PhotoSetManager {
       console.error('[PhotoSet] Grid initialization failed:', error);
       throw error;
     }
+  }
+
+  /**
+   * Refresh photoset data in background and compare with cached version
+   */
+  async _refreshInBackground(cacheDefinition, cached) {
+    console.log('[PhotoSet] Starting background refresh...');
+
+    this.emit('refreshStart', {});
+
+    try {
+      // Force fresh load by clearing session ID temporarily
+      const oldSessionId = this.sessionId;
+      this.sessionId = null;
+
+      const response = await this.loadWindow(0, 200);
+
+      // Restore session ID
+      this.sessionId = response.sessionId;
+
+      // Compare with cached data
+      const changes = this._detectChanges(cached.photos, response.photos);
+
+      if (changes.hasChanges) {
+        console.log(`%c[PhotoSet Cache] 🔄 REPLACED with fresh data`, 'color: #9b59b6; font-weight: bold', {
+          context: cacheDefinition.context,
+          changes: {
+            added: changes.added,
+            removed: changes.removed,
+            modified: changes.modified
+          },
+          oldCount: cached.photos.length,
+          newCount: response.photos.length
+        });
+
+        // Update cache
+        const session = {
+          id: this.sessionId,
+          totalCount: response.totalCount
+        };
+        window.photoSetCache.set(cacheDefinition, session, response.photos);
+
+        // Update window cache
+        this.window.setRange(0, response.photos);
+        this.totalCount = response.totalCount;
+
+        // Emit changes event
+        this.emit('refreshComplete', {
+          changes: changes,
+          newTotal: response.totalCount,
+          oldTotal: cached.session.totalCount
+        });
+      } else {
+        console.log(`%c[PhotoSet Cache] ✅ Refresh complete - no changes detected`, 'color: #2ecc71; font-weight: bold', {
+          context: cacheDefinition.context,
+          photoCount: response.photos.length
+        });
+        this.emit('refreshComplete', { changes: null });
+      }
+
+    } catch (error) {
+      console.error('[PhotoSet] Background refresh error:', error);
+      this.emit('refreshError', { error: error.message });
+    }
+  }
+
+  /**
+   * Detect changes between cached and fresh photo lists
+   */
+  _detectChanges(cachedPhotos, freshPhotos) {
+    const changes = {
+      hasChanges: false,
+      added: 0,
+      removed: 0,
+      modified: 0,
+      newPhotoIds: []
+    };
+
+    // Quick check - total count different
+    if (cachedPhotos.length !== freshPhotos.length) {
+      changes.hasChanges = true;
+      changes.added = Math.max(0, freshPhotos.length - cachedPhotos.length);
+      changes.removed = Math.max(0, cachedPhotos.length - freshPhotos.length);
+    }
+
+    // Build ID sets for comparison
+    const cachedIds = new Set(cachedPhotos.map(p => p.id));
+    const freshIds = new Set(freshPhotos.map(p => p.id));
+
+    // Find new photos
+    for (const photo of freshPhotos) {
+      if (!cachedIds.has(photo.id)) {
+        changes.hasChanges = true;
+        changes.newPhotoIds.push(photo.id);
+      }
+    }
+
+    // Check for modified metadata (first 10 photos for performance)
+    const checkCount = Math.min(10, cachedPhotos.length, freshPhotos.length);
+    for (let i = 0; i < checkCount; i++) {
+      if (cachedPhotos[i].id === freshPhotos[i].id) {
+        // Same photo - check if metadata changed
+        if (this._photoMetadataChanged(cachedPhotos[i], freshPhotos[i])) {
+          changes.hasChanges = true;
+          changes.modified++;
+        }
+      }
+    }
+
+    return changes;
+  }
+
+  /**
+   * Check if photo metadata has changed
+   */
+  _photoMetadataChanged(cached, fresh) {
+    return cached.isFavorite !== fresh.isFavorite ||
+           cached.rating !== fresh.rating ||
+           cached.fileName !== fresh.fileName;
   }
 
   /**
@@ -483,6 +670,32 @@ export class PhotoSetManager {
     this.currentIndex = -1;
     this.currentPhoto = null;
     this.isInitialized = false;
+  }
+
+  /**
+   * Invalidate photoset cache (called after mutations)
+   */
+  static invalidateCache(context, photoId = null) {
+    if (!window.photoSetCache) return;
+
+    if (photoId) {
+      console.log(`%c[PhotoSet Cache] 🗑️ INVALIDATED (photo deleted)`, 'color: #e74c3c; font-weight: bold', {
+        photoId,
+        reason: 'Photo was deleted'
+      });
+      // Specific photo changed - invalidate all caches containing it
+      window.photoSetCache.invalidatePhoto(photoId);
+    } else if (context) {
+      console.log(`%c[PhotoSet Cache] 🗑️ INVALIDATED (${context})`, 'color: #e74c3c; font-weight: bold', {
+        context,
+        reason: 'Data mutation occurred'
+      });
+      // Context changed - invalidate all caches for that context
+      window.photoSetCache.invalidateContext(context);
+    } else {
+      // Invalidate everything
+      window.photoSetCache.invalidateAll();
+    }
   }
 
   /**

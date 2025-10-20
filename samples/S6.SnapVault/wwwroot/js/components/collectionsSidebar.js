@@ -5,6 +5,7 @@
  */
 
 import { escapeHtml } from '../utils/html.js';
+import { PhotoSetManager } from '../services/PhotoSetManager.js';
 
 export class CollectionsSidebar {
   constructor(app) {
@@ -171,6 +172,9 @@ export class CollectionsSidebar {
 
     try {
       await this.app.api.delete(`/api/collections/${collectionId}`);
+
+      // Invalidate collection cache
+      PhotoSetManager.invalidateCache('collection');
 
       // If we're viewing this collection, switch to All Photos
       if (this.activeViewId === collectionId) {

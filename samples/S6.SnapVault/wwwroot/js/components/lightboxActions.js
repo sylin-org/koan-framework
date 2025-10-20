@@ -3,6 +3,8 @@
  * Handles all photo actions: favorite, rating, download, delete, AI regeneration
  */
 
+import { PhotoSetManager } from '../services/PhotoSetManager.js';
+
 export class LightboxActions {
   constructor(lightbox, app) {
     this.lightbox = lightbox;
@@ -31,6 +33,9 @@ export class LightboxActions {
 
       // Update UI in panel
       this.updateFavoriteButton(response.isFavorite);
+
+      // Invalidate favorites cache
+      PhotoSetManager.invalidateCache('favorites');
 
       // Show toast
       this.app.components.toast.show(
@@ -148,6 +153,9 @@ export class LightboxActions {
       });
 
       if (response.deleted > 0) {
+        // Invalidate cache for this photo
+        PhotoSetManager.invalidateCache(null, this.currentPhoto.id);
+
         // Success: Close lightbox
         this.lightbox.close();
 

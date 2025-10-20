@@ -4,6 +4,8 @@
  * Handles photo drag-and-drop to organize into collections
  */
 
+import { PhotoSetManager } from '../services/PhotoSetManager.js';
+
 export class DragDropManager {
   constructor(app) {
     this.app = app;
@@ -129,6 +131,9 @@ export class DragDropManager {
         photoIds: photoIds
       });
 
+      // Invalidate collection cache
+      PhotoSetManager.invalidateCache('collection');
+
       // Brief toast - don't interrupt flow
       this.app.components.toast.show(
         `Created collection with ${addResult.added} photo${addResult.added !== 1 ? 's' : ''}`,
@@ -184,6 +189,9 @@ export class DragDropManager {
       const result = await this.app.api.post(`/api/collections/${collectionId}/photos`, {
         photoIds: photoIds
       });
+
+      // Invalidate collection cache
+      PhotoSetManager.invalidateCache('collection');
 
       // Reload collections sidebar to update counts
       if (this.app.components.collectionsSidebar) {

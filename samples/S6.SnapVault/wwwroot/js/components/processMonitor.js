@@ -4,8 +4,9 @@
  * Inspired by modern download managers and background task indicators
  */
 
-
 import { escapeHtml } from '../utils/html.js';
+import { PhotoSetManager } from '../services/PhotoSetManager.js';
+
 export class ProcessMonitor {
   constructor(app) {
     this.app = app;
@@ -180,6 +181,9 @@ export class ProcessMonitor {
 
     // Show completion state
     this.showCompletionState(event);
+
+    // Invalidate all-photos cache (new photos uploaded)
+    PhotoSetManager.invalidateCache('all-photos');
 
     // Reload current view to show newly processed photos
     this.app.components.collectionView.loadPhotos();

@@ -637,8 +637,8 @@ export class Lightbox {
 
     // Use PhotoSet navigation state for unbounded navigation
     if (this.photoSet) {
-      prevBtn.style.display = this.photoSet.canGoPrevious() ? 'flex' : 'none';
-      nextBtn.style.display = this.photoSet.canGoNext() ? 'flex' : 'none';
+      prevBtn.style.display = this.photoSet.canGoPrevious ? 'flex' : 'none';
+      nextBtn.style.display = this.photoSet.canGoNext ? 'flex' : 'none';
     } else {
       // Fallback to old behavior if PhotoSet not initialized
       prevBtn.style.display = this.currentIndex > 0 ? 'flex' : 'none';
@@ -679,24 +679,24 @@ export class Lightbox {
   async next() {
     if (!this.photoSet) return;
 
-    if (!this.photoSet.canGoNext()) {
+    if (!this.photoSet.canGoNext) {
       console.log('[Lightbox] Already at last photo');
       return;
     }
 
     try {
       // Navigate to next photo using PhotoSet
-      const nextPhoto = await this.photoSet.next();
+      const success = await this.photoSet.next();
 
-      if (!nextPhoto) {
+      if (!success) {
         console.warn('[Lightbox] Failed to load next photo');
         return;
       }
 
-      // Update current state
-      this.currentPhotoId = nextPhoto.id;
+      // Update current state from PhotoSet
+      this.currentPhoto = this.photoSet.currentPhoto;
+      this.currentPhotoId = this.currentPhoto.id;
       this.currentIndex = this.photoSet.currentIndex;
-      this.currentPhoto = nextPhoto;
 
       // Preserve current zoom mode
       const preservedMode = this.zoomSystem ? this.zoomSystem.mode : 'fit';
@@ -742,24 +742,24 @@ export class Lightbox {
   async previous() {
     if (!this.photoSet) return;
 
-    if (!this.photoSet.canGoPrevious()) {
+    if (!this.photoSet.canGoPrevious) {
       console.log('[Lightbox] Already at first photo');
       return;
     }
 
     try {
       // Navigate to previous photo using PhotoSet
-      const prevPhoto = await this.photoSet.previous();
+      const success = await this.photoSet.previous();
 
-      if (!prevPhoto) {
+      if (!success) {
         console.warn('[Lightbox] Failed to load previous photo');
         return;
       }
 
-      // Update current state
-      this.currentPhotoId = prevPhoto.id;
+      // Update current state from PhotoSet
+      this.currentPhoto = this.photoSet.currentPhoto;
+      this.currentPhotoId = this.currentPhoto.id;
       this.currentIndex = this.photoSet.currentIndex;
-      this.currentPhoto = prevPhoto;
 
       // Preserve current zoom mode
       const preservedMode = this.zoomSystem ? this.zoomSystem.mode : 'fit';
