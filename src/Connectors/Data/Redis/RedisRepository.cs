@@ -49,6 +49,28 @@ internal sealed class RedisRepository<TEntity, TKey> :
     return JsonConvert.DeserializeObject<TEntity>(v!);
     }
 
+    public async Task<IReadOnlyList<TEntity?>> GetManyAsync(IEnumerable<TKey> ids, CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        var idList = ids as IReadOnlyList<TKey> ?? ids.ToList();
+        if (idList.Count == 0)
+        {
+            return Array.Empty<TEntity?>();
+        }
+
+        var keyspace = Keyspace();
+        var keys = idList.Select(id => (RedisKey)$"{keyspace}:{id}").ToArray();
+        var values = await Db().StringGetAsync(keys);
+
+        var results = new TEntity?[idList.Count];
+        for (var i = 0; i < values.Length; i++)
+        {
+            results[i] = values[i].IsNullOrEmpty ? null : JsonConvert.DeserializeObject<TEntity>(values[i]!);
+        }
+
+        return results;
+    }
+
     public async Task<IReadOnlyList<TEntity>> QueryAsync(object? query, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();

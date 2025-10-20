@@ -342,6 +342,57 @@ internal sealed class PostgresRepository<
         return row == default ? null : FromRow(row);
     }
 
+    public async Task<IReadOnlyList<TEntity?>> GetManyAsync(IEnumerable<TKey> ids, CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        using var act = PgTelemetry.Activity.StartActivity("pg.get.many");
+        act?.SetTag("entity", typeof(TEntity).FullName);
+
+        var idList = ids as IReadOnlyList<TKey> ?? ids.ToList();
+        if (idList.Count == 0)
+        {
+            return Array.Empty<TEntity?>();
+        }
+
+        await using var conn = Open();
+
+        // Optimize IDs for query
+        var optimizedIds = new List<string>(idList.Count);
+        foreach (var id in idList)
+        {
+            string optimizedId;
+            if (_optimizationInfo.IsOptimized && typeof(TKey) == typeof(string) && id is string stringId)
+            {
+                if (_optimizationInfo.OptimizationType == StorageOptimizationType.Guid && Guid.TryParse(stringId, out var guid))
+                    optimizedId = guid.ToString("D");
+                else
+                    optimizedId = stringId;
+            }
+            else
+            {
+                optimizedId = id!.ToString()!;
+            }
+            optimizedIds.Add(optimizedId);
+        }
+
+        // Use IN clause for bulk query
+        var rows = await conn.QueryAsync<(string Id, string Json)>(
+            $"SELECT \"Id\"::text, \"Json\"::text FROM {QualifiedTable} WHERE \"Id\" = ANY(@Ids)",
+            new { Ids = optimizedIds.ToArray() });
+
+        // Build dictionary for O(1) lookup
+        var entityMap = rows.Select(FromRow).ToDictionary(e => e.Id);
+
+        // Preserve order and include nulls
+        var results = new TEntity?[idList.Count];
+        for (var i = 0; i < idList.Count; i++)
+        {
+            results[i] = entityMap.TryGetValue(idList[i], out var entity) ? entity : null;
+        }
+
+        return results;
+    }
+
     public async Task<IReadOnlyList<TEntity>> QueryAsync(object? query, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();

@@ -156,6 +156,18 @@ public sealed class CacheRepositoryDecoratorSpec
             return Task.FromResult(entity is null ? null : Clone(entity));
         }
 
+        public Task<IReadOnlyList<TestEntity?>> GetManyAsync(IEnumerable<Guid> ids, CancellationToken ct = default)
+        {
+            var idList = ids as IReadOnlyList<Guid> ?? ids.ToList();
+            var results = new TestEntity?[idList.Count];
+            for (var i = 0; i < idList.Count; i++)
+            {
+                _entries.TryGetValue(idList[i], out var entity);
+                results[i] = entity is null ? null : Clone(entity);
+            }
+            return Task.FromResult((IReadOnlyList<TestEntity?>)results);
+        }
+
         public Task<IReadOnlyList<TestEntity>> QueryAsync(object? query, CancellationToken ct = default)
             => throw new NotSupportedException();
 

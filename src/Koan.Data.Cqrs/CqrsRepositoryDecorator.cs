@@ -29,6 +29,13 @@ internal sealed class CqrsRepositoryDecorator<TEntity, TKey> : IDataRepository<T
         var repo = _routing.GetReadRepository<TEntity, TKey>();
         return repo.GetAsync(id, ct);
     }
+
+    public Task<IReadOnlyList<TEntity?>> GetManyAsync(IEnumerable<TKey> ids, CancellationToken ct = default)
+    {
+        var repo = _routing.GetReadRepository<TEntity, TKey>();
+        return repo.GetManyAsync(ids, ct);
+    }
+
     public Task<IReadOnlyList<TEntity>> QueryAsync(object? query, CancellationToken ct = default)
     {
         var repo = _routing.GetReadRepository<TEntity, TKey>();

@@ -148,6 +148,69 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
             }
         }, ct);
 
+    public Task<IReadOnlyList<TEntity?>> GetManyAsync(IEnumerable<TKey> ids, CancellationToken ct = default)
+        => ExecuteWithReadinessAsync(async () =>
+        {
+            ct.ThrowIfCancellationRequested();
+            using var act = CouchbaseTelemetry.Activity.StartActivity("couchbase.get.many");
+            act?.SetTag("entity", typeof(TEntity).FullName);
+
+            var idList = ids as IReadOnlyList<TKey> ?? ids.ToList();
+            if (idList.Count == 0)
+            {
+                return (IReadOnlyList<TEntity?>)Array.Empty<TEntity?>();
+            }
+
+            var ctx = await ResolveCollectionAsync(ct).ConfigureAwait(false);
+
+            // Build list of keys for batch get
+            var keys = idList.Select(id => GetKey(id)).ToList();
+
+            try
+            {
+                // Couchbase supports batch get via GetAsync for multiple keys
+                var tasks = keys.Select(key => ctx.Collection.GetAsync(key, new GetOptions().CancellationToken(ct)));
+                var allResults = await Task.WhenAll(tasks).ConfigureAwait(false);
+
+                // Build dictionary for O(1) lookup
+                var entityMap = new Dictionary<TKey, TEntity>();
+                for (var i = 0; i < allResults.Length; i++)
+                {
+                    if (allResults[i] != null)
+                    {
+                        entityMap[idList[i]] = allResults[i].ContentAs<TEntity>();
+                    }
+                }
+
+                // Preserve order and include nulls
+                var results = new TEntity?[idList.Count];
+                for (var i = 0; i < idList.Count; i++)
+                {
+                    results[i] = entityMap.TryGetValue(idList[i], out var entity) ? entity : null;
+                }
+
+                return (IReadOnlyList<TEntity?>)results;
+            }
+            catch (DocumentNotFoundException)
+            {
+                // Some documents don't exist - return nulls for missing
+                var results = new TEntity?[idList.Count];
+                for (var i = 0; i < idList.Count; i++)
+                {
+                    try
+                    {
+                        var result = await ctx.Collection.GetAsync(keys[i], new GetOptions().CancellationToken(ct)).ConfigureAwait(false);
+                        results[i] = result.ContentAs<TEntity>();
+                    }
+                    catch (DocumentNotFoundException)
+                    {
+                        results[i] = null;
+                    }
+                }
+                return (IReadOnlyList<TEntity?>)results;
+            }
+        }, ct);
+
     public Task<IReadOnlyList<TEntity>> QueryAsync(object? query, CancellationToken ct = default)
         => ExecuteWithReadinessAsync(() => QueryInternalAsync(query, null, ct), ct);
 

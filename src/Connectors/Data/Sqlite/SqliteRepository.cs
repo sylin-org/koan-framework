@@ -434,6 +434,39 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         return row == default ? null : FromRow(row);
     }
 
+    public async Task<IReadOnlyList<TEntity?>> GetManyAsync(IEnumerable<TKey> ids, CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        using var act = SqliteTelemetry.Activity.StartActivity("sqlite.get.many");
+        act?.SetTag("entity", typeof(TEntity).FullName);
+
+        var idList = ids as IReadOnlyList<TKey> ?? ids.ToList();
+        if (idList.Count == 0)
+        {
+            return Array.Empty<TEntity?>();
+        }
+
+        using var conn = Open();
+        var stringIds = idList.Select(id => id!.ToString()!).ToArray();
+
+        // Use IN clause for bulk query
+        var rows = await conn.QueryAsync<(string Id, string Json)>(
+            $"SELECT Id, Json FROM [{TableName}] WHERE Id IN @Ids",
+            new { Ids = stringIds });
+
+        // Build dictionary for O(1) lookup
+        var entityMap = rows.Select(FromRow).ToDictionary(e => e.Id);
+
+        // Preserve order and include nulls
+        var results = new TEntity?[idList.Count];
+        for (var i = 0; i < idList.Count; i++)
+        {
+            results[i] = entityMap.TryGetValue(idList[i], out var entity) ? entity : null;
+        }
+
+        return results;
+    }
+
     public async Task<IReadOnlyList<TEntity>> QueryAsync(object? query, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();

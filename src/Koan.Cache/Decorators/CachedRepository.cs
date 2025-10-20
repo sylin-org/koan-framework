@@ -115,6 +115,13 @@ internal sealed class CachedRepository<TEntity, TKey> :
         }
     }
 
+    public Task<IReadOnlyList<TEntity?>> GetManyAsync(IEnumerable<TKey> ids, CancellationToken ct = default)
+    {
+        // Pass-through to inner repository
+        // TODO: Future enhancement - implement batch caching strategy
+        return _inner.GetManyAsync(ids, ct);
+    }
+
     public Task<IReadOnlyList<TEntity>> QueryAsync(object? query, CancellationToken ct = default)
         => _inner.QueryAsync(query, ct);
 

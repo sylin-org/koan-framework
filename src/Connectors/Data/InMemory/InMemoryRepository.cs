@@ -59,6 +59,20 @@ internal sealed class InMemoryRepository<TEntity, TKey> :
         return Task.FromResult(Store.TryGetValue(id, out var value) ? value : null);
     }
 
+    public Task<IReadOnlyList<TEntity?>> GetManyAsync(IEnumerable<TKey> ids, CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        var idList = ids as IReadOnlyList<TKey> ?? ids.ToList();
+        var results = new TEntity?[idList.Count];
+
+        for (var i = 0; i < idList.Count; i++)
+        {
+            results[i] = Store.TryGetValue(idList[i], out var entity) ? entity : null;
+        }
+
+        return Task.FromResult((IReadOnlyList<TEntity?>)results);
+    }
+
     public Task<IReadOnlyList<TEntity>> QueryAsync(object? query, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
