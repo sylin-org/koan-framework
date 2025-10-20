@@ -58,16 +58,33 @@ export class PhotoSetManager {
     console.log('[PhotoSet] Initializing with photo:', startPhotoId);
 
     try {
-      // Get photo's index in this set
-      const indexData = await this.getPhotoIndex(startPhotoId);
+      // Create session first to get full photo list
+      // Load initial window starting from beginning (creates session)
+      const response = await this.loadWindow(0, 200);
 
-      this.currentIndex = indexData.index;
-      this.totalCount = indexData.totalCount;
+      this.totalCount = response.totalCount;
 
-      // Load initial window of metadata around this position
-      await this.loadWindow(this.currentIndex);
+      // Find photo's index in the session
+      // First check the loaded window
+      let foundIndex = -1;
+      for (const [index, photo] of this.window.cache.entries()) {
+        if (photo.id === startPhotoId) {
+          foundIndex = index;
+          break;
+        }
+      }
 
-      // Get current photo metadata
+      // If not in initial window, need to search or use fallback
+      if (foundIndex === -1) {
+        console.log('[PhotoSet] Photo not in initial window, using index endpoint');
+        const indexData = await this.getPhotoIndex(startPhotoId);
+        foundIndex = indexData.index;
+
+        // Load window around the found position
+        await this.loadWindow(foundIndex);
+      }
+
+      this.currentIndex = foundIndex;
       this.currentPhoto = this.window.get(this.currentIndex);
 
       // Start preloading images
@@ -344,20 +361,36 @@ export class PhotoSetManager {
 
   /**
    * Fetch a single photo at index (fallback for cache misses)
+   * Uses session endpoint to ensure consistency
    */
   async fetchPhotoAtIndex(index) {
-    // Fetch a small range containing the target index
-    const response = await this.api.get('/api/photos/range', {
-      context: this.definition.type,
-      collectionId: this.definition.id,
-      searchQuery: this.definition.searchQuery,
-      searchAlpha: this.definition.searchAlpha,
+    // Build request using session if available
+    const request = {
       startIndex: index,
-      count: 1,
-      sortBy: this.definition.sortBy || 'capturedAt',
-      sortOrder: this.definition.sortOrder || 'desc',
-      filters: this.definition.filters ? JSON.stringify(this.definition.filters) : undefined
-    });
+      count: 1
+    };
+
+    if (this.sessionId) {
+      request.sessionId = this.sessionId;
+    } else {
+      // Shouldn't happen (session created during initialization), but provide fallback
+      request.definition = {
+        context: this.definition.type,
+        searchQuery: this.definition.searchQuery,
+        searchAlpha: this.definition.searchAlpha,
+        collectionId: this.definition.id,
+        sortBy: this.definition.sortBy || 'capturedAt',
+        sortOrder: this.definition.sortOrder || 'desc'
+      };
+    }
+
+    const response = await this.api.post('/api/photosets/query', request);
+
+    // Store session ID if not already set
+    if (response.sessionId && !this.sessionId) {
+      this.sessionId = response.sessionId;
+      this.sessionName = response.sessionName;
+    }
 
     return response.photos[0];
   }
