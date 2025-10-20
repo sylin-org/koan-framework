@@ -24,6 +24,7 @@ builder.Services.Configure<CollectionOptions>(
 
 // Register application services
 builder.Services.AddScoped<IPhotoProcessingService, PhotoProcessingService>();
+builder.Services.AddScoped<PhotoSetService>();
 builder.Services.AddSingleton<IAnalysisPromptFactory, AnalysisPromptFactory>();
 
 // Register background processing queue and worker
