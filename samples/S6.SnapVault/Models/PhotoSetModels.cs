@@ -75,16 +75,6 @@ public class PhotoSetQueryResponse
     public string SessionId { get; set; } = "";
 
     /// <summary>
-    /// User-defined session name (if any)
-    /// </summary>
-    public string? SessionName { get; set; }
-
-    /// <summary>
-    /// Session description
-    /// </summary>
-    public string? SessionDescription { get; set; }
-
-    /// <summary>
     /// Photos in this range
     /// </summary>
     public List<PhotoMetadata> Photos { get; set; } = new();
@@ -105,33 +95,3 @@ public class PhotoSetQueryResponse
     public bool HasMore { get; set; }
 }
 
-/// <summary>
-/// Request model for updating session metadata
-/// </summary>
-public class PhotoSetUpdateRequest
-{
-    /// <summary>
-    /// New name for the session
-    /// </summary>
-    public string? Name { get; set; }
-
-    /// <summary>
-    /// New description
-    /// </summary>
-    public string? Description { get; set; }
-
-    /// <summary>
-    /// Pin/unpin session
-    /// </summary>
-    public bool? IsPinned { get; set; }
-
-    /// <summary>
-    /// UI accent color
-    /// </summary>
-    public string? Color { get; set; }
-
-    /// <summary>
-    /// Custom icon
-    /// </summary>
-    public string? Icon { get; set; }
-}

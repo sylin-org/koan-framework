@@ -23,70 +23,10 @@ public sealed class PhotoSetService
     }
 
     /// <summary>
-    /// Get existing session or create new one based on definition
-    /// Deduplicates identical queries to avoid redundant sessions
-    /// </summary>
-    public async Task<PhotoSetSession> GetOrCreateSessionAsync(
-        PhotoSetDefinition definition,
-        CancellationToken ct = default)
-    {
-        // Check for existing identical session
-        var existing = await FindExistingSessionAsync(definition, ct);
-        if (existing != null)
-        {
-            _logger.LogInformation(
-                "[PhotoSetService] Reusing existing session {SessionId} for context={Context}",
-                existing.Id, definition.Context);
-
-            // Update access time
-            existing.LastAccessedAt = DateTimeOffset.UtcNow;
-            existing.ViewCount++;
-            await existing.Save(ct);
-
-            return existing;
-        }
-
-        // Create new session
-        _logger.LogInformation(
-            "[PhotoSetService] Creating new session for context={Context}, query={Query}",
-            definition.Context, definition.SearchQuery ?? "(none)");
-
-        var session = await CreateSessionAsync(definition, ct);
-        return session;
-    }
-
-    /// <summary>
-    /// Find existing session with identical definition
-    /// Prevents duplicate sessions for same query/filter combination
-    /// </summary>
-    public async Task<PhotoSetSession?> FindExistingSessionAsync(
-        PhotoSetDefinition definition,
-        CancellationToken ct = default)
-    {
-        // Query all sessions matching context
-        var sessions = await PhotoSetSession.Query(
-            s => s.Context == definition.Context &&
-                 s.SortBy == definition.SortBy &&
-                 s.SortOrder == definition.SortOrder,
-            ct);
-
-        // Filter by context-specific criteria
-        foreach (var session in sessions)
-        {
-            if (IsMatchingSession(session, definition))
-            {
-                return session;
-            }
-        }
-
-        return null;
-    }
-
-    /// <summary>
     /// Create new session from definition
-    /// Executes query and captures photo ID snapshot
+    /// Always creates fresh session - no deduplication
     /// </summary>
-    private async Task<PhotoSetSession> CreateSessionAsync(
+    public async Task<PhotoSetSession> CreateSessionAsync(
         PhotoSetDefinition definition,
         CancellationToken ct = default)
     {
@@ -104,13 +44,8 @@ public sealed class PhotoSetService
             SortOrder = definition.SortOrder,
             PhotoIds = photoIds,
             TotalCount = photoIds.Count,
-            CreatedAt = DateTimeOffset.UtcNow,
-            LastAccessedAt = DateTimeOffset.UtcNow,
-            ViewCount = 1
+            CreatedAt = DateTimeOffset.UtcNow
         };
-
-        // Auto-generate description
-        session.Description = GenerateDescription(definition);
 
         // Save using Koan Entity pattern
         await session.Save(ct);
@@ -204,87 +139,6 @@ public sealed class PhotoSetService
         return photos.Select(p => p.Id).ToList();
     }
 
-    /// <summary>
-    /// Refresh session with current photo set
-    /// Rebuilds PhotoIds snapshot with latest data
-    /// </summary>
-    public async Task<PhotoSetSession> RefreshSessionAsync(
-        string sessionId,
-        CancellationToken ct = default)
-    {
-        var session = await PhotoSetSession.Get(sessionId, ct);
-        if (session == null)
-        {
-            throw new KeyNotFoundException($"Session {sessionId} not found");
-        }
-
-        _logger.LogInformation("[PhotoSetService] Refreshing session {SessionId}", sessionId);
-
-        // Rebuild photo list with current data
-        var definition = new PhotoSetDefinition
-        {
-            Context = session.Context,
-            SearchQuery = session.SearchQuery,
-            SearchAlpha = session.SearchAlpha,
-            CollectionId = session.CollectionId,
-            SortBy = session.SortBy,
-            SortOrder = session.SortOrder
-        };
-
-        var photoIds = await BuildPhotoListAsync(definition, ct);
-
-        // Update session
-        session.PhotoIds = photoIds;
-        session.TotalCount = photoIds.Count;
-        session.LastAccessedAt = DateTimeOffset.UtcNow;
-
-        await session.Save(ct);
-
-        _logger.LogInformation(
-            "[PhotoSetService] Refreshed session {SessionId}, now {Count} photos",
-            sessionId, session.TotalCount);
-
-        return session;
-    }
-
-    /// <summary>
-    /// Check if session matches definition
-    /// Used for session deduplication
-    /// </summary>
-    private bool IsMatchingSession(PhotoSetSession session, PhotoSetDefinition definition)
-    {
-        switch (definition.Context)
-        {
-            case "all-photos":
-            case "favorites":
-                return true; // No additional criteria
-
-            case "collection":
-                return session.CollectionId == definition.CollectionId;
-
-            case "search":
-                return session.SearchQuery == definition.SearchQuery &&
-                       Math.Abs((session.SearchAlpha ?? 0.5) - (definition.SearchAlpha ?? 0.5)) < 0.01;
-
-            default:
-                return false;
-        }
-    }
-
-    /// <summary>
-    /// Generate auto description for session
-    /// </summary>
-    private string GenerateDescription(PhotoSetDefinition definition)
-    {
-        return definition.Context switch
-        {
-            "all-photos" => "All Photos",
-            "favorites" => "Favorite Photos",
-            "collection" => $"Collection: {definition.CollectionId}",
-            "search" => $"Search: \"{definition.SearchQuery}\" (α={definition.SearchAlpha:F2})",
-            _ => definition.Context
-        };
-    }
 
     /// <summary>
     /// Apply sorting to photo list
