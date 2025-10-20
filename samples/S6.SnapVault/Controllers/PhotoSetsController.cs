@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using S6.SnapVault.Models;
 using S6.SnapVault.Services;
-using Koan.Web.Controllers;
 using Koan.Data.Core;
 
 namespace S6.SnapVault.Controllers;
@@ -9,11 +8,11 @@ namespace S6.SnapVault.Controllers;
 /// <summary>
 /// PhotoSet Session API
 /// Manages stateful photo browsing contexts with persistent sessions
-/// Extends Koan EntityController for automatic CRUD operations
+/// Uses custom session-aware endpoints instead of standard CRUD
 /// </summary>
 [Route("api/photosets")]
 [ApiController]
-public class PhotoSetsController : EntityController<PhotoSetSession>
+public class PhotoSetsController : ControllerBase
 {
     private readonly PhotoSetService _service;
     private readonly ILogger<PhotoSetsController> _logger;
@@ -106,6 +105,34 @@ public class PhotoSetsController : EntityController<PhotoSetSession>
         {
             _logger.LogError(ex, "[PhotoSets] Query failed");
             return StatusCode(500, new { error = "Failed to query photo set", details = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Get specific session by ID
+    /// </summary>
+    /// <param name="id">Session ID</param>
+    /// <param name="ct">Cancellation token</param>
+    /// <returns>Session details</returns>
+    [HttpGet("{id}")]
+    public async Task<ActionResult<PhotoSetSession>> GetSession(
+        string id,
+        CancellationToken ct = default)
+    {
+        try
+        {
+            var session = await PhotoSetSession.Get(id, ct);
+            if (session == null)
+            {
+                return NotFound(new { error = $"Session {id} not found" });
+            }
+
+            return Ok(session);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[PhotoSets] Get session failed");
+            return StatusCode(500, new { error = "Failed to get session", details = ex.Message });
         }
     }
 
@@ -241,12 +268,31 @@ public class PhotoSetsController : EntityController<PhotoSetSession>
 
     /// <summary>
     /// Delete session
-    /// Inherited from EntityController, but documented here for API clarity
     /// </summary>
+    /// <param name="id">Session ID</param>
+    /// <param name="ct">Cancellation token</param>
     [HttpDelete("{id}")]
-    public override async Task<IActionResult> Delete(string id, CancellationToken ct = default)
+    public async Task<IActionResult> Delete(string id, CancellationToken ct = default)
     {
-        return await base.Delete(id, ct);
+        try
+        {
+            var session = await PhotoSetSession.Get(id, ct);
+            if (session == null)
+            {
+                return NotFound(new { error = $"Session {id} not found" });
+            }
+
+            await session.Remove(ct);
+
+            _logger.LogInformation("[PhotoSets] Deleted session {SessionId}", id);
+
+            return NoContent();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[PhotoSets] Delete session failed");
+            return StatusCode(500, new { error = "Failed to delete session", details = ex.Message });
+        }
     }
 
     /// <summary>
