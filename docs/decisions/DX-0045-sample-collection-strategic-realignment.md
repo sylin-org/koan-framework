@@ -103,13 +103,17 @@ Streamline the sample collection from **19 samples to 14 core samples** while ad
 
 ### Phase 2: Consolidation
 
-**Merge Operations:**
-- 🔄 **S7.TechDocs + S7.ContentPlatform → S7.DocPlatform**
-  - Combines mode-based architecture with moderation workflows
-  - One comprehensive content management sample
-  - Demonstrates: moderation, soft-delete, roles, search, workflow
+**Status Update**: Phase 2 consolidation was replaced with removal. S7.TechDocs and S7.ContentPlatform have been removed entirely rather than merged.
 
-**Rationale**: Both S7 samples address content management with overlapping concerns. Merging creates one authoritative content platform sample.
+**Original Plan (Superseded):**
+- ~~🔄 **S7.TechDocs + S7.ContentPlatform → S7.DocPlatform**~~
+  - ~~Combines mode-based architecture with moderation workflows~~
+  - ~~One comprehensive content management sample~~
+  - ~~Demonstrates: moderation, soft-delete, roles, search, workflow~~
+
+**Actual Implementation**: Both S7 samples removed. Port block 5104 (5100-5109) now reserved for future sample.
+
+**Rationale**: Both S7 samples were incomplete prototypes. Removed to make way for a new, better-designed sample in the future.
 
 ### Phase 3: New Themed Applications
 

@@ -514,7 +514,6 @@ grep -r "AddRazorRuntimeCompilation" --include="*.cs" samples/ src/
 ```
 
 **Likely Affected Samples**:
-- S7.TechDocs (content platform)
 - S10.DevPortal (developer portal)
 
 **Remediation**:
@@ -953,14 +952,6 @@ cd samples/S6.SocialCreator
 dotnet run --configuration Release
 
 # Test authentication flows (critical after .NET 10 auth changes)
-```
-
-**S7.TechDocs** (Content Platform):
-```bash
-cd samples/S7.TechDocs
-dotnet run --configuration Release
-
-# Verify Razor views work (no runtime compilation)
 ```
 
 ### 5.5 Service Composition Samples

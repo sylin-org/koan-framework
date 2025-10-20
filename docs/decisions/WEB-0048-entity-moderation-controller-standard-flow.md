@@ -92,7 +92,7 @@ Out-of-scope for this controller:
 - Add a CompositeFlow<TEntity> to allow ordered composition of multiple flows when a real use case arises.
 - Provide a lightweight analyzer or guidance discouraging external I/O in Before\* hooks.
 - Document the moderation endpoints and flow contracts under docs/api/web-http-api.md or a dedicated reference page, and update sample apps to the drop-in controller.
-- Migrate S7.TechDocs: remove action overrides from its controller; implement a DocumentModerationFlow for status sync (Draft/Review/Published), PublishedAt, and ReviewNotes, or rely on StandardModerationFlow when no deltas are required.
+- ~~Migrate S7.TechDocs: remove action overrides from its controller; implement a DocumentModerationFlow for status sync (Draft/Review/Published), PublishedAt, and ReviewNotes, or rely on StandardModerationFlow when no deltas are required.~~ (Sample removed)
 
 ## References
 

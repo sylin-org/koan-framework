@@ -26,8 +26,6 @@ Follow this progression for optimal learning:
 | **S4** | DevHub | Integration | ⭐⭐ Intermediate | Secrets management, Vault, configuration *(planned)* |
 | **S5** | Recs (AnimeRadar) | AI & Intelligence | ⭐⭐⭐ Advanced | AI integration, vector search, recommendations |
 | **S6** | MediaHub | AI & Intelligence | ⭐⭐ Intermediate | Media processing, storage, backup *(planned)* |
-| **S7** | TechDocs | Domain | ⭐⭐ Intermediate | Mode-based architecture, roles, moderation |
-| **S7** | ContentPlatform | Domain | ⭐⭐ Intermediate | Moderation workflows, soft-delete *(to merge with TechDocs)* |
 | **S8** | Canon | Advanced Patterns | ⭐⭐⭐ Advanced | Canon Runtime, pipelines, validation/enrichment |
 | **S9** | OrderFlow | Advanced Patterns | ⭐⭐⭐⭐ Expert | Event sourcing, CQRS, outbox pattern *(planned)* |
 | **S10** | DevPortal | Framework Showcase | ⭐⭐ Demo | Multi-provider, capability detection, live switching |
@@ -44,7 +42,7 @@ Follow this progression for optimal learning:
 | S4 | 5074 | 5070-5079 | 🔨 Planned |
 | S5 | 5084 | 5080-5089 | ✅ Active |
 | S6 | 5094 | 5090-5099 | 🔨 Planned |
-| S7 | 5104 | 5100-5109 | ⚠️ Needs merge |
+| S7 | 5104 | 5100-5109 | ⚠️ Reserved for future |
 | S8 | 5114 | 5110-5119 | ✅ Active |
 | S9 | 5124 | 5120-5129 | 🔨 Planned |
 | S10 | 5134 | 5130-5139 | ✅ Active |
@@ -322,53 +320,6 @@ Use this table to find samples demonstrating specific framework capabilities.
 **Status**: 🔨 **In Development** (Phase 4: Weeks 11-15)
 
 **Best For**: Media-centric applications, learning storage patterns, backup/restore workflows
-
----
-
-### 🏛️ Domain Samples
-
-#### S7.TechDocs - Documentation Platform
-
-**What**: Documentation platform with mode-based architecture and role-aware UI
-
-**Purpose**: Show real-world content management with Koan patterns
-
-**Key Features**:
-- Mode-based architecture (Browse/View/Edit/Moderate/Admin)
-- Role-based access control (Reader/Author/Moderator/Admin)
-- Article management with rich metadata
-- Enhanced view mode with TOC, breadcrumbs, related articles
-- Moderation workflow
-- Mock AI features (quality scoring, tag suggestions)
-- Mobile-responsive design
-
-**Run**: `dotnet run` from S7.TechDocs directory
-
-**Learning Time**: 45-60 minutes
-
-**Status**: ⚠️ **To be merged with S7.ContentPlatform into S7.DocPlatform**
-
----
-
-#### S7.ContentPlatform - Content Management with Moderation
-
-**What**: Blog/publishing workflow with editorial approval and soft-delete
-
-**Purpose**: Demonstrate moderation workflows and soft-delete capabilities
-
-**Key Features**:
-- Moderation workflow (Draft → Review → Published)
-- Editorial approval/rejection with feedback
-- Soft-delete capabilities (archive without data loss)
-- Articles move between "sets" based on status
-- Multi-role author system
-- Category-based organization
-
-**Run**: `dotnet run` from S7.ContentPlatform directory
-
-**Learning Time**: 30-45 minutes
-
-**Status**: ⚠️ **To be merged with S7.TechDocs into S7.DocPlatform**
 
 ---
 

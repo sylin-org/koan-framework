@@ -101,7 +101,7 @@ Samples should showcase the canonical Koan experience:
 | **GraphQL module**                  | `Koan.Web.Connector.GraphQl` self-registers via `Initialization/KoanAutoRegistrar`, binds GraphQL options, and reports path + debug settings alongside discovery hints.                                           |
 | **Service Inbox Redis module**      | `Koan.Service.Inbox.Connector.Redis` ships as a reusable module with options binding, hosted announcement service, and controller registration surfaced through its auto-registrar.                               |
 | **Redis cache discovery**           | The Redis cache adapter now reuses the shared discovery coordinator, logging a redacted connection string and aligning provider elections across cache/data pillars.                                              |
-| **Sample conformance**              | `KoanAspireIntegration`, `S7.TechDocs`, `S8.Location.Api`, and the new `S15.RedisInbox` sample all rely on `.AddKoan()` fluents with Koan-provided helpers for Swagger, authorization, and static file handling.  |
+| **Sample conformance**              | `KoanAspireIntegration`, `S8.Location.Api`, and `S15.RedisInbox` sample all rely on `.AddKoan()` fluents with Koan-provided helpers for Swagger, authorization, and static file handling.  |
 | **Authorization helper**            | `Koan.Web.Extensions.Authorization.AddKoanAuthorization` centralises policy registration and capability mapping, letting samples declare role policies without re-wiring MVC or capability infrastructure.        |
 
 ### Misalignment register
@@ -112,8 +112,7 @@ Samples should showcase the canonical Koan experience:
 | **Connector – Web GraphQL** (`Koan.Web.Connector.GraphQl`)                                          | ✅ Resolved | Auto-registration now invokes `AddKoanGraphQl()`, binds options, and emits boot notes for schema endpoints.                                             | Expand diagnostics when schema guards land.                          |
 | **Connector – Service Inbox Redis** (`Koan.Service.Inbox.Connector.Redis`)                          | ✅ Resolved | Module exposes options, hosted announcement service, and controller registration via auto-registrar; executable host moved to `samples/S15.RedisInbox`. | Validate future inbox connectors follow the same pattern.            |
 | **Cache Redis adapter discovery**                                                                   | ✅ Resolved | Cache adapter reuses the Redis discovery coordinator, logging redacted connection data and sharing provider elections with the data pillar.             | Keep adapter + data discovery in sync as new features arrive.        |
-| **Samples – `KoanAspireIntegration`, `S7.TechDocs`, `S8.Location.Api`**                             | ✅ Resolved | Samples depend on `.AddKoan()` fluents, Koan-provided Swagger/authorization helpers, and no longer re-wire MVC manually.                                | Periodically audit additional samples to prevent regressions.        |
-| **Samples – Authorization scaffolding** (`S7.TechDocs`)                                             | ✅ Resolved | New `AddKoanAuthorization` helper centralises policy + capability mapping, simplifying the sample’s startup code.                                       | Document advanced policy scenarios once stabilised.                  |
+| **Samples – `KoanAspireIntegration`, `S8.Location.Api`**                                            | ✅ Resolved | Samples depend on `.AddKoan()` fluents, Koan-provided Swagger/authorization helpers, and no longer re-wire MVC manually.                                | Periodically audit additional samples to prevent regressions.        |
 
 ### Recommended fixes
 

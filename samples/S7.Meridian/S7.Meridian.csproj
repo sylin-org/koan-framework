@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Koan.Samples.Meridian</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Koan Framework Core -->
+    <ProjectReference Include="..\..\src\Koan\Koan.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Web\Koan.Web.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Web.Extensions\Koan.Web.Extensions.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Canon.Domain\Koan.Canon.Domain.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Canon.Web\Koan.Canon.Web.csproj" />
+
+    <!-- Data Layer -->
+    <ProjectReference Include="..\..\src\Connectors\Data\Mongo\Koan.Data.Connector.Mongo.csproj" />
+
+    <!-- Storage -->
+    <ProjectReference Include="..\..\src\Connectors\Storage\Local\Koan.Storage.Connector.Local.csproj" />
+
+    <!-- Web -->
+    <ProjectReference Include="..\..\src\Connectors\Web\Swagger\Koan.Web.Connector.Swagger.csproj" />
+
+    <!-- External Dependencies -->
+    <PackageReference Include="PdfPig" Version="0.1.9" />
+    <PackageReference Include="Tesseract" Version="5.2.0" />
+    <PackageReference Include="Stubble.Core" Version="1.10.8" />
+    <PackageReference Include="NJsonSchema" Version="11.0.0" />
+  </ItemGroup>
+
+</Project>

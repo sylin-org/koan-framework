@@ -25,7 +25,7 @@ Reserve contiguous blocks of 10 ports per sample starting at 5034 (visual hint t
   - S4: 5074 (block 5070–5079). ~~ARCHIVED (S4.Web)~~ - Reserved for S4.DevHub.
   - S5: 5084 (block 5080–5089). HTTP binds to 5084 (S5.Recs).
   - S6: 5094 (block 5090–5099). ~~ARCHIVED (S6.Auth, S6.SocialCreator)~~ - Reserved for S6.MediaHub.
-  - S7: 5104 (block 5100–5109). Reserved for S7.DocPlatform (merged S7.TechDocs + S7.ContentPlatform).
+  - S7: 5104 (block 5100–5109). Reserved for future sample.
   - S8: 5114 (block 5110–5119). HTTP binds to 5114 (S8.Canon).
   - S9: 5124 (block 5120–5129). Reserved for S9.OrderFlow.
   - S10: 5134 (block 5130–5139). HTTP binds to 5134 (S10.DevPortal).

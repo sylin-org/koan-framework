@@ -18,8 +18,6 @@
 | **S4.DevHub** | Secret management & DevOps dashboard | ⭐⭐ Intermediate | 🔨 Building |
 | **S5.Recs** | AI-powered recommendation engine | ⭐⭐⭐ Advanced | ✅ Active |
 | **S6.MediaHub** | Media processing & storage pipeline | ⭐⭐ Intermediate | 🔨 Building |
-| **S7.TechDocs** | Documentation platform | ⭐⭐ Intermediate | ⚠️ Merging |
-| **S7.ContentPlatform** | Content management & moderation | ⭐⭐ Intermediate | ⚠️ Merging |
 | **S8.Canon** | Canon Runtime pipelines | ⭐⭐⭐ Advanced | ✅ Active |
 | **S9.OrderFlow** | Event sourcing & CQRS | ⭐⭐⭐⭐ Expert | 🔨 Building |
 | **S10.DevPortal** | Framework capabilities showcase | ⭐⭐ Demo | ✅ Active |
