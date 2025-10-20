@@ -31,7 +31,6 @@ export class PhotoSetManager {
 
     // Session state
     this.sessionId = null;      // Server-assigned session ID
-    this.sessionName = null;    // User-defined session name
 
     // Current state
     this.currentIndex = -1;
@@ -328,8 +327,7 @@ export class PhotoSetManager {
       // Store session ID for subsequent requests
       if (response.sessionId) {
         this.sessionId = response.sessionId;
-        this.sessionName = response.sessionName;
-        console.log(`[PhotoSet] Session: ${this.sessionId}${this.sessionName ? ' (' + this.sessionName + ')' : ''}`);
+        console.log(`[PhotoSet] Session: ${this.sessionId}`);
       }
 
       // Store photos in window cache
@@ -389,7 +387,6 @@ export class PhotoSetManager {
     // Store session ID if not already set
     if (response.sessionId && !this.sessionId) {
       this.sessionId = response.sessionId;
-      this.sessionName = response.sessionName;
     }
 
     return response.photos[0];
@@ -474,7 +471,6 @@ export class PhotoSetManager {
     this.window.clear();
     this.preloader.clear();
     this.sessionId = null;
-    this.sessionName = null;
     this.currentIndex = -1;
     this.currentPhoto = null;
     this.isInitialized = false;
