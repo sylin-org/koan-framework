@@ -61,6 +61,11 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
         await GuardAsync(ct).ConfigureAwait(false);
         return await _inner.GetAsync(id, ct).ConfigureAwait(false);
     }
+    public async Task<IReadOnlyList<TEntity?>> GetManyAsync(IEnumerable<TKey> ids, CancellationToken ct = default)
+    {
+        await GuardAsync(ct).ConfigureAwait(false);
+        return await _inner.GetManyAsync(ids, ct).ConfigureAwait(false);
+    }
     public async Task<IReadOnlyList<TEntity>> QueryAsync(object? query, CancellationToken ct = default)
     {
         await GuardAsync(ct).ConfigureAwait(false);

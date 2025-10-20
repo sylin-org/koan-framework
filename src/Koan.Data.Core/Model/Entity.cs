@@ -65,9 +65,13 @@ namespace Koan.Data.Core.Model
         // Static conveniences forward to the data facade without exposing its namespace in domain types
         public static Task<TEntity?> Get(TKey id, CancellationToken ct = default)
             => EntityEventExecutor<TEntity, TKey>.ExecuteLoadAsync(token => Data<TEntity, TKey>.GetAsync(id, token), ct);
+        public static Task<IReadOnlyList<TEntity?>> Get(IEnumerable<TKey> ids, CancellationToken ct = default)
+            => EntityEventExecutor<TEntity, TKey>.ExecuteLoadManyAsync(token => Data<TEntity, TKey>.GetManyAsync(ids, token), ct);
         // Partition-aware variants
         public static Task<TEntity?> Get(TKey id, string partition, CancellationToken ct = default)
             => EntityEventExecutor<TEntity, TKey>.ExecuteLoadAsync(token => Data<TEntity, TKey>.GetAsync(id, partition, token), ct);
+        public static Task<IReadOnlyList<TEntity?>> Get(IEnumerable<TKey> ids, string partition, CancellationToken ct = default)
+            => EntityEventExecutor<TEntity, TKey>.ExecuteLoadManyAsync(token => Data<TEntity, TKey>.GetManyAsync(ids, partition, token), ct);
 
         public static Task<IReadOnlyList<TEntity>> All(CancellationToken ct = default)
             => Data<TEntity, TKey>.All(ct);

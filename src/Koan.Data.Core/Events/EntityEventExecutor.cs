@@ -42,6 +42,50 @@ internal static class EntityEventExecutor<TEntity, TKey>
         return context.Current;
     }
 
+    public static async Task<IReadOnlyList<TEntity?>> ExecuteLoadManyAsync(
+        Func<CancellationToken, Task<IReadOnlyList<TEntity?>>> loader,
+        CancellationToken cancellationToken)
+    {
+        if (loader == null) throw new ArgumentNullException(nameof(loader));
+
+        var entities = await loader(cancellationToken).ConfigureAwait(false);
+
+        if (!EntityEventRegistry<TEntity, TKey>.HasLoadPipeline)
+        {
+            return entities;
+        }
+
+        // Process each non-null entity through load pipeline, preserving nulls and order
+        var results = new TEntity?[entities.Count];
+        for (var i = 0; i < entities.Count; i++)
+        {
+            var entity = entities[i];
+            if (entity is null)
+            {
+                results[i] = null;
+                continue;
+            }
+
+            var state = new EntityEventOperationState();
+            var context = new EntityEventContext<TEntity>(entity, EntityEventOperation.Load, EntityEventPrior<TEntity>.Empty, state, cancellationToken);
+            await RunSetupAsync(context).ConfigureAwait(false);
+            context.CaptureProtectionSnapshot();
+
+            var before = await RunBeforeAsync(context, EntityEventOperation.Load).ConfigureAwait(false);
+            if (before.IsCancelled)
+            {
+                throw new EntityEventCancelledException(EntityEventOperation.Load, before.Reason!, before.Code);
+            }
+
+            context.ValidateProtection();
+            await RunAfterAsync(context, EntityEventOperation.Load).ConfigureAwait(false);
+            context.ValidateProtection();
+            results[i] = context.Current;
+        }
+
+        return results;
+    }
+
     public static async Task<TEntity> ExecuteUpsertAsync(
         TEntity entity,
         Func<TEntity, CancellationToken, Task<TEntity>> persist,

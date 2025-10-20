@@ -77,6 +77,7 @@ public static class Data<TEntity, TKey>
         return await repo.QueryAsync(payload, ct).ConfigureAwait(false);
     }
     public static Task<TEntity?> GetAsync(TKey id, CancellationToken ct = default) => Repo.GetAsync(id, ct);
+    public static Task<IReadOnlyList<TEntity?>> GetManyAsync(IEnumerable<TKey> ids, CancellationToken ct = default) => Repo.GetManyAsync(ids, ct);
 
     // Full scan - no pagination applied unless explicitly requested by user
     public static Task<IReadOnlyList<TEntity>> All(CancellationToken ct = default)
@@ -479,6 +480,9 @@ public static class Data<TEntity, TKey>
 
     public static Task<TEntity?> GetAsync(TKey id, string partition, CancellationToken ct = default)
     { using var _ = WithPartition(partition); return Repo.GetAsync(id, ct); }
+
+    public static Task<IReadOnlyList<TEntity?>> GetManyAsync(IEnumerable<TKey> ids, string partition, CancellationToken ct = default)
+    { using var _ = WithPartition(partition); return Repo.GetManyAsync(ids, ct); }
 
     public static Task<IReadOnlyList<TEntity>> All(string partition, CancellationToken ct = default)
     { using var _ = WithPartition(partition); return Repo.QueryAsync(null, ct); }
