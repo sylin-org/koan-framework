@@ -28,7 +28,7 @@ Introduce **Vector Workflows** and **Vector Profiles** as opinionated orchestrat
 ### 1. VectorWorkflow<T>
 
 - New facade in `Koan.Data.Vector` that composes document persistence + vector operations.
-- Aligns with Koan semantics (`Save`, `Delete`, `QueryAsync`, `IsAvailable`).
+- Aligns with Koan semantics (`Save`, `Delete`, `Query`, `IsAvailable`).
 - Supports fluent chaining for metadata, quality gates, fallbacks.
 - Automatically emits telemetry via `RunLog` and `Koan.Data.Vector` diagnostics.
 
@@ -38,7 +38,7 @@ await workflow.Save(passage, embedding,
     metadata: BuildMetadata(passage),
     ct: ct);
 
-var hits = await workflow.QueryAsync(
+var hits = await workflow.Query(
     vector: queryEmbedding,
     text: query,     // Enables hybrid retrieval
     topK: 12,
@@ -96,7 +96,7 @@ await VectorTestPlan.For<Passage>(profile: "meridian:evidence")
 
 - **Koan.Data.Vector**: Adds workflow facade, profile registry, options binding, and telemetry.
 - **Koan.Data.Core**: `Data<TEntity, TKey>.SaveWithVector` delegates to workflows when available.
-- **Samples**: S7.Meridian, S5.Recs, S6.SnapVault adopt `VectorWorkflow<T>.Save/QueryAsync`.
+- **Samples**: S7.Meridian, S5.Recs, S6.SnapVault adopt `VectorWorkflow<T>.Save/Query`.
 - **Docs**: Updated guidance promotes profile-first ergonomics and configuration patterns.
 - **Tests**: New vector test plan covers profile discovery + hybrid semantics.
 

@@ -368,7 +368,7 @@ public class PipelineQualityMetrics
 
 ```
 Anti-pattern: Inline vector client calls → provider lock-in, adhoc parameters
-Meridian: VectorWorkflow<T>.Save/QueryAsync → profiles, defaults, observability
+Meridian: VectorWorkflow<T>.Save/Query → profiles, defaults, observability
 
 Usage:
 await VectorWorkflow<Passage>.Save(passage, embedding,
@@ -378,7 +378,7 @@ await VectorWorkflow<Passage>.Save(passage, embedding,
 
 var hits = await VectorWorkflow<Passage>
     .For("meridian:evidence")
-    .QueryAsync(vector, text: query, ct: ct);
+    .Query(vector, text: query, ct: ct);
 ```
 
 **Profiles & Defaults:**
@@ -1902,7 +1902,7 @@ public class FieldExtractor : IFieldExtractor
         var workflow = VectorWorkflow<Passage>.For("meridian:evidence");
 
         // Hybrid search (BM25 + vector) with increased k for noisy PDFs
-        var results = await workflow.QueryAsync(
+        var results = await workflow.Query(
             vector: queryEmbedding,
             text: query,
             alpha: 0.5,
