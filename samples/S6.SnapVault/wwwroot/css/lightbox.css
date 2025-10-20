@@ -117,6 +117,21 @@
   color: var(--text-tertiary);
 }
 
+/* Position Indicator */
+.position-indicator {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--text-secondary);
+  padding: 4px 10px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  font-variant-numeric: tabular-nums; /* Consistent width for numbers */
+  letter-spacing: 0.02em;
+  margin-left: var(--space-3);
+  white-space: nowrap;
+}
+
 .lightbox-actions {
   display: flex;
   gap: var(--space-1);

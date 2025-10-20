@@ -23,6 +23,10 @@ export class Lightbox {
     this.photoElement = null;
     this.currentLayout = null;
 
+    // PhotoSet for unbounded navigation
+    this.photoSet = null;
+    this.totalCount = 0;
+
     // Progressive loading state
     this.imageLoadState = 'idle'; // 'loading-gallery', 'gallery-loaded', 'loading-original', 'original-loaded'
     this.originalLoadTimer = null;
@@ -225,24 +229,39 @@ export class Lightbox {
 
   async open(photoId) {
     this.currentPhotoId = photoId;
-    this.currentIndex = this.app.photos.findIndex(p => p.id === photoId);
 
     this.isOpen = true;
     this.container.classList.add('show');
 
-    // Fetch fresh photo data from backend (includes latest AI description)
-    await this.fetchPhotoData();
+    // Use PhotoSet from CollectionView (shared instance)
+    this.photoSet = this.app.components.collectionView.getPhotoSet();
 
-    if (!this.currentPhoto) {
-      console.error('Photo not found:', photoId);
+    if (!this.photoSet) {
+      console.error('[Lightbox] No PhotoSet available from CollectionView');
       this.close();
       return;
     }
 
-    // Load photo and metadata
-    await this.loadPhoto();
-    this.updateMetadata();
-    this.updateNavigation();
+    try {
+      // Initialize PhotoSet with specific photo for navigation
+      await this.photoSet.initialize(photoId);
+
+      this.currentIndex = this.photoSet.currentIndex;
+      this.totalCount = this.photoSet.totalCount;
+      this.currentPhoto = this.photoSet.getCurrentPhoto();
+
+      console.log(`[Lightbox] Opened photo ${this.currentIndex + 1} of ${this.totalCount}`);
+
+      // Load photo and metadata
+      await this.loadPhoto();
+      this.updateMetadata();
+      this.updateNavigation();
+      this.updatePositionIndicator();
+    } catch (error) {
+      console.error('[Lightbox] Failed to open photo:', error);
+      this.close();
+      return;
+    }
 
     // Update unified panel with photo data
     if (this.panel && this.currentPhoto) {
@@ -281,7 +300,7 @@ export class Lightbox {
     if (this.announcer && this.currentPhoto) {
       this.announcer.announcePhotoChange(
         this.currentIndex,
-        this.app.photos.length,
+        this.totalCount,
         this.currentPhoto.originalFileName
       );
     }
@@ -295,6 +314,10 @@ export class Lightbox {
     }, 3000);
   }
 
+  /**
+   * @deprecated This method is no longer used with PhotoSet navigation
+   * PhotoSet manages photo data directly. Kept for backward compatibility.
+   */
   async fetchPhotoData() {
     try {
       // Fetch fresh photo data from API
@@ -323,11 +346,15 @@ export class Lightbox {
       this.focusManager.restoreFocus();
     }
 
+    // Release reference to PhotoSet (owned by CollectionView, don't clear)
+    this.photoSet = null;
+
     this.isOpen = false;
     this.container.classList.remove('show');
     this.currentPhotoId = null;
     this.currentPhoto = null;
     this.currentIndex = -1;
+    this.totalCount = 0;
     clearTimeout(this.chromeTimeout);
   }
 
@@ -608,24 +635,77 @@ export class Lightbox {
     const prevBtn = this.container.querySelector('.lightbox-prev');
     const nextBtn = this.container.querySelector('.lightbox-next');
 
-    prevBtn.style.display = this.currentIndex > 0 ? 'flex' : 'none';
-    nextBtn.style.display = this.currentIndex < this.app.photos.length - 1 ? 'flex' : 'none';
+    // Use PhotoSet navigation state for unbounded navigation
+    if (this.photoSet) {
+      prevBtn.style.display = this.photoSet.canGoPrevious() ? 'flex' : 'none';
+      nextBtn.style.display = this.photoSet.canGoNext() ? 'flex' : 'none';
+    } else {
+      // Fallback to old behavior if PhotoSet not initialized
+      prevBtn.style.display = this.currentIndex > 0 ? 'flex' : 'none';
+      nextBtn.style.display = this.currentIndex < this.app.photos.length - 1 ? 'flex' : 'none';
+    }
+  }
+
+  updatePositionIndicator() {
+    // Update position indicator UI showing "X / Y"
+    let indicator = this.container.querySelector('.position-indicator');
+
+    if (!indicator) {
+      // Create indicator if it doesn't exist
+      const topBar = this.container.querySelector('.lightbox-top-bar');
+      if (!topBar) return;
+
+      indicator = document.createElement('div');
+      indicator.className = 'position-indicator';
+
+      // Insert after photo info
+      const photoInfo = topBar.querySelector('.lightbox-photo-info');
+      if (photoInfo) {
+        photoInfo.insertAdjacentElement('afterend', indicator);
+      } else {
+        topBar.insertAdjacentElement('afterbegin', indicator);
+      }
+    }
+
+    // Update content with current position
+    if (this.photoSet && this.totalCount > 0) {
+      indicator.textContent = `${this.currentIndex + 1} / ${this.totalCount}`;
+      indicator.style.display = 'block';
+    } else {
+      indicator.style.display = 'none';
+    }
   }
 
   async next() {
-    if (this.currentIndex < this.app.photos.length - 1) {
-      const nextPhoto = this.app.photos[this.currentIndex + 1];
+    if (!this.photoSet) return;
+
+    if (!this.photoSet.canGoNext()) {
+      console.log('[Lightbox] Already at last photo');
+      return;
+    }
+
+    try {
+      // Navigate to next photo using PhotoSet
+      const nextPhoto = await this.photoSet.next();
+
+      if (!nextPhoto) {
+        console.warn('[Lightbox] Failed to load next photo');
+        return;
+      }
+
+      // Update current state
       this.currentPhotoId = nextPhoto.id;
-      this.currentIndex++;
+      this.currentIndex = this.photoSet.currentIndex;
+      this.currentPhoto = nextPhoto;
 
       // Preserve current zoom mode
       const preservedMode = this.zoomSystem ? this.zoomSystem.mode : 'fit';
 
-      // Fetch fresh data and update display
-      await this.fetchPhotoData();
+      // Load and display photo
       await this.loadPhoto();
       this.updateMetadata();
       this.updateNavigation();
+      this.updatePositionIndicator();
 
       // Restore zoom mode (Phase 3)
       if (this.zoomSystem) {
@@ -646,27 +726,49 @@ export class Lightbox {
       if (this.announcer && this.currentPhoto) {
         this.announcer.announcePhotoChange(
           this.currentIndex,
-          this.app.photos.length,
+          this.totalCount,
           this.currentPhoto.originalFileName
         );
       }
+    } catch (error) {
+      console.error('[Lightbox] Error navigating to next photo:', error);
+      this.app.components.toast.show('Failed to load next photo', {
+        icon: '⚠️',
+        duration: 3000
+      });
     }
   }
 
   async previous() {
-    if (this.currentIndex > 0) {
-      const prevPhoto = this.app.photos[this.currentIndex - 1];
+    if (!this.photoSet) return;
+
+    if (!this.photoSet.canGoPrevious()) {
+      console.log('[Lightbox] Already at first photo');
+      return;
+    }
+
+    try {
+      // Navigate to previous photo using PhotoSet
+      const prevPhoto = await this.photoSet.previous();
+
+      if (!prevPhoto) {
+        console.warn('[Lightbox] Failed to load previous photo');
+        return;
+      }
+
+      // Update current state
       this.currentPhotoId = prevPhoto.id;
-      this.currentIndex--;
+      this.currentIndex = this.photoSet.currentIndex;
+      this.currentPhoto = prevPhoto;
 
       // Preserve current zoom mode
       const preservedMode = this.zoomSystem ? this.zoomSystem.mode : 'fit';
 
-      // Fetch fresh data and update display
-      await this.fetchPhotoData();
+      // Load and display photo
       await this.loadPhoto();
       this.updateMetadata();
       this.updateNavigation();
+      this.updatePositionIndicator();
 
       // Restore zoom mode (Phase 3)
       if (this.zoomSystem) {
@@ -687,10 +789,16 @@ export class Lightbox {
       if (this.announcer && this.currentPhoto) {
         this.announcer.announcePhotoChange(
           this.currentIndex,
-          this.app.photos.length,
+          this.totalCount,
           this.currentPhoto.originalFileName
         );
       }
+    } catch (error) {
+      console.error('[Lightbox] Error navigating to previous photo:', error);
+      this.app.components.toast.show('Failed to load previous photo', {
+        icon: '⚠️',
+        duration: 3000
+      });
     }
   }
 

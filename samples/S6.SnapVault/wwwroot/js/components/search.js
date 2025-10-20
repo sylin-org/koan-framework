@@ -10,7 +10,6 @@ export class SearchBar {
     this.alpha = 0.5; // 50% semantic, 50% exact (hybrid default)
     this.realtime = true;
     this.debounceTimer = null;
-    this.previousViewState = null; // Track view before search
     this.render();
   }
 
@@ -131,23 +130,10 @@ export class SearchBar {
     }
 
     try {
-      // Save current view state before first search
-      if (!this.previousViewState) {
-        this.previousViewState = { ...this.app.components.collectionView.viewState };
-      }
-
-      const response = await this.app.api.post('/api/photos/search', {
+      // Use CollectionView's native search support
+      await this.app.components.collectionView.setView('search', {
         query: query,
-        alpha: this.alpha,
-        limit: 100
-      });
-
-      this.app.state.photos = response.photos || [];
-      this.app.components.grid.render();
-
-      this.app.components.toast.show(`Found ${response.resultCount || 0} photos`, {
-        icon: '🔍',
-        duration: 2000
+        alpha: this.alpha
       });
     } catch (error) {
       console.error('Search failed:', error);
@@ -159,23 +145,8 @@ export class SearchBar {
   }
 
   clearSearch() {
-    // Restore previous view state if we have it
-    if (this.previousViewState) {
-      const { type } = this.previousViewState;
-
-      if (type === 'all-photos') {
-        this.app.components.collectionView.setView('all-photos');
-      } else if (type === 'favorites') {
-        this.app.components.collectionView.setView('favorites');
-      } else if (type === 'collection') {
-        this.app.components.collectionView.setView(this.previousViewState.collection.id);
-      }
-
-      this.previousViewState = null; // Clear saved state
-    } else {
-      // No previous state, default to all photos
-      this.app.components.collectionView.setView('all-photos');
-    }
+    // Clear search and return to all photos
+    this.app.components.collectionView.setView('all-photos');
   }
 
   focus() {

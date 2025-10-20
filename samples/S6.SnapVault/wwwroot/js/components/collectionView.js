@@ -8,26 +8,43 @@
  * - { type: 'all-photos' }
  * - { type: 'favorites' }
  * - { type: 'collection', collection: {...} }
+ * - { type: 'search', searchQuery: '...', searchAlpha: 0.5 }
+ *
+ * PhotoSet Integration:
+ * CollectionView owns the PhotoSet instance for the current view
+ * Grid renders from PhotoSet cache, Lightbox navigates same PhotoSet
  */
+
+import { PhotoSetManager } from '../services/PhotoSetManager.js';
 
 export class CollectionView {
   constructor(app) {
     this.app = app;
     this.viewState = { type: 'all-photos' }; // Single source of truth
+    this.photoSet = null; // PhotoSet instance for current view
   }
 
   /**
    * Set view and load data
    * Single entry point for all view transitions
+   * @param {string} viewId - View identifier ('all-photos', 'favorites', collectionId, 'search')
+   * @param {object} options - Additional options for specific view types (e.g., search query)
    */
-  async setView(viewId) {
-    console.log(`[CollectionView] Setting view to: ${viewId}`);
+  async setView(viewId, options = {}) {
+    console.log(`[CollectionView] Setting view to: ${viewId}`, options);
 
     // Build new state object based on viewId
     if (viewId === 'all-photos') {
       this.viewState = { type: 'all-photos' };
     } else if (viewId === 'favorites') {
       this.viewState = { type: 'favorites' };
+    } else if (viewId === 'search') {
+      // Search view with query and alpha from options
+      this.viewState = {
+        type: 'search',
+        searchQuery: options.query || '',
+        searchAlpha: options.alpha !== undefined ? options.alpha : 0.5
+      };
     } else {
       // It's a collection ID - load the data
       try {
@@ -109,6 +126,13 @@ export class CollectionView {
       case 'favorites':
         if (iconElement) iconElement.textContent = '⭐';
         titleElement.textContent = 'Favorites';
+        titleElement.contentEditable = false;
+        titleElement.classList.remove('editable');
+        break;
+
+      case 'search':
+        if (iconElement) iconElement.textContent = '🔍';
+        titleElement.textContent = `Search: "${this.viewState.searchQuery}"`;
         titleElement.contentEditable = false;
         titleElement.classList.remove('editable');
         break;
@@ -259,28 +283,38 @@ export class CollectionView {
   }
 
   /**
-   * Load photos for current view
-   * Delegates to appropriate loading strategy based on view type
-   * NOTE: Actions are now handled by ContextPanel component
+   * Load photos for current view using PhotoSet
+   * PhotoSet is the SINGLE SOURCE for all photo data
    */
   async loadPhotos() {
     try {
-      switch (this.viewState.type) {
-        case 'all-photos':
-          await this.app.loadPhotos();
-          break;
-
-        case 'favorites':
-          await this.app.filterPhotos('favorites');
-          break;
-
-        case 'collection':
-          await this.loadCollectionPhotos();
-          break;
-
-        default:
-          console.warn('[CollectionView] Unknown view type:', this.viewState.type);
+      // Clear old PhotoSet
+      if (this.photoSet) {
+        this.photoSet.clear();
+        this.photoSet = null;
       }
+
+      // Create PhotoSet for current view
+      const definition = this.getSetDefinition();
+      this.photoSet = new PhotoSetManager(definition, this.app.api);
+
+      console.log('[CollectionView] Initializing PhotoSet for', definition.type);
+
+      // Load initial window of photos (centered at index 0)
+      await this.photoSet.initializeForGrid(0);
+
+      // Update app state from PhotoSet
+      this.app.state.photos = this.photoSet.getPhotosInWindow();
+      this.app.state.currentPage = 1;
+      this.app.state.hasMorePages = this.photoSet.totalCount > this.photoSet.window.windowSize;
+
+      console.log(`[CollectionView] Loaded ${this.app.state.photos.length} of ${this.photoSet.totalCount} photos via PhotoSet`);
+
+      // Render grid
+      this.app.components.grid.render();
+      this.app.updateLibraryCounts();
+      this.app.updateStatusBar();
+
     } catch (error) {
       console.error('[CollectionView] Failed to load photos:', error);
       this.app.components.toast.show('Failed to load photos', {
@@ -291,62 +325,34 @@ export class CollectionView {
   }
 
   /**
-   * Load photos for a specific collection
+   * Get PhotoSet instance for current view
+   * Used by Lightbox to access the same PhotoSet
    */
-  async loadCollectionPhotos() {
-    // STEP 0: Refresh collection data from server to get current photoIds
-    // This ensures we have the latest data after operations like remove/add
-    try {
-      const freshCollection = await this.app.api.get(`/api/collections/${this.viewState.collection.id}`);
-      this.viewState.collection = freshCollection;
-      console.log('[CollectionView] Refreshed collection data:', freshCollection.photoIds?.length || 0, 'photos');
-    } catch (error) {
-      console.error('[CollectionView] Failed to refresh collection data:', error);
-      this.app.components.toast.show('Failed to refresh collection', {
-        icon: '⚠️',
-        duration: 3000
-      });
-      return;
+  getPhotoSet() {
+    return this.photoSet;
+  }
+
+  /**
+   * Get PhotoSet definition for current view
+   * Used by Lightbox to initialize unbounded navigation
+   */
+  getSetDefinition() {
+    const definition = {
+      type: this.viewState.type,
+      id: this.viewState.collection?.id || null,
+      filters: null,  // Future: add filter support
+      sortBy: 'capturedAt',
+      sortOrder: 'desc',
+      searchQuery: null,
+      searchAlpha: 0.5
+    };
+
+    // Add search-specific parameters
+    if (this.viewState.type === 'search') {
+      definition.searchQuery = this.viewState.searchQuery;
+      definition.searchAlpha = this.viewState.searchAlpha;
     }
 
-    const { collection } = this.viewState;
-
-    // STEP 1: Flush existing state completely
-    this.app.state.photos = [];
-    this.app.state.currentPage = 1;
-    this.app.state.hasMorePages = false;
-
-    // STEP 2: Clear DOM immediately (don't wait for render)
-    const photoGrid = document.querySelector('.photo-grid');
-    if (photoGrid) {
-      const existingCards = photoGrid.querySelectorAll('.photo-card');
-      existingCards.forEach(card => card.remove());
-    }
-
-    // STEP 3: Load photos for this collection using available photoIds
-    if (collection.photoIds && collection.photoIds.length > 0) {
-      console.log('[CollectionView] Loading', collection.photoIds.length, 'photos for collection');
-
-      // Fetch each photo individually using the IDs we have
-      const photoPromises = collection.photoIds.map(id =>
-        this.app.api.get(`/api/photos/${id}`)
-          .catch(err => {
-            console.warn('[CollectionView] Failed to load photo', id, err);
-            return null;
-          })
-      );
-
-      const photos = await Promise.all(photoPromises);
-      this.app.state.photos = photos.filter(p => p != null);
-
-      console.log('[CollectionView] Successfully loaded', this.app.state.photos.length, 'of', collection.photoIds.length, 'photos');
-    } else {
-      console.log('[CollectionView] Collection has no photos');
-    }
-
-    // STEP 4: Rebuild grid from scratch
-    this.app.components.grid.render();
-    this.app.updateLibraryCounts();
-    this.app.updateStatusBar();
+    return definition;
   }
 }

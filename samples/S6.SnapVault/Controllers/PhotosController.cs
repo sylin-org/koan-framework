@@ -50,6 +50,233 @@ public class PhotosController : EntityController<PhotoAsset>
         });
     }
 
+    /// <summary>
+    /// Get photo's index in a sorted/filtered context
+    /// Used by PhotoSet to determine navigation boundaries
+    /// </summary>
+    [HttpGet("{id}/index")]
+    public async Task<ActionResult<PhotoIndexResponse>> GetPhotoIndex(
+        string id,
+        [FromQuery] string context = "all-photos",
+        [FromQuery] string? collectionId = null,
+        [FromQuery] string? searchQuery = null,
+        [FromQuery] double searchAlpha = 0.5,
+        [FromQuery] string sortBy = "capturedAt",
+        [FromQuery] string sortOrder = "desc",
+        CancellationToken ct = default)
+    {
+        // Build query based on context
+        var photos = await BuildPhotoQuery(context, collectionId, searchQuery, searchAlpha, sortBy, sortOrder, ct);
+
+        // Find index of requested photo
+        var index = photos.FindIndex(p => p.Id == id);
+
+        if (index == -1)
+        {
+            return NotFound(new { Error = "Photo not found in current context" });
+        }
+
+        return Ok(new PhotoIndexResponse
+        {
+            Index = index,
+            TotalCount = photos.Count,
+            HasNext = index < photos.Count - 1,
+            HasPrevious = index > 0
+        });
+    }
+
+    /// <summary>
+    /// Get a range of photos with lightweight metadata
+    /// Used by PhotoSet's sliding window cache
+    /// </summary>
+    [HttpGet("range")]
+    public async Task<ActionResult<PhotoRangeResponse>> GetPhotoRange(
+        [FromQuery] string context = "all-photos",
+        [FromQuery] string? collectionId = null,
+        [FromQuery] string? searchQuery = null,
+        [FromQuery] double searchAlpha = 0.5,
+        [FromQuery] int startIndex = 0,
+        [FromQuery] int count = 100,
+        [FromQuery] string sortBy = "capturedAt",
+        [FromQuery] string sortOrder = "desc",
+        CancellationToken ct = default)
+    {
+        // Limit max batch size
+        if (count > 200)
+        {
+            count = 200;
+        }
+
+        // Build query based on context
+        var photos = await BuildPhotoQuery(context, collectionId, searchQuery, searchAlpha, sortBy, sortOrder, ct);
+
+        // Extract requested range
+        var rangePhotos = photos
+            .Skip(startIndex)
+            .Take(count)
+            .Select(p => new PhotoMetadata
+            {
+                Id = p.Id,
+                FileName = p.OriginalFileName,
+                CapturedAt = p.CapturedAt,
+                CreatedAt = p.CreatedAt.UtcDateTime,
+                ThumbnailUrl = $"/api/media/photos/{p.Id}/thumbnail",
+                Rating = p.Rating,
+                IsFavorite = p.IsFavorite,
+                Width = p.Width,
+                Height = p.Height
+            })
+            .ToList();
+
+        return Ok(new PhotoRangeResponse
+        {
+            Photos = rangePhotos,
+            StartIndex = startIndex,
+            Count = rangePhotos.Count,
+            TotalCount = photos.Count
+        });
+    }
+
+    /// <summary>
+    /// Get adjacent photo (next/previous) in current context
+    /// Optimized single-query endpoint for navigation
+    /// </summary>
+    [HttpGet("{id}/adjacent")]
+    public async Task<ActionResult<PhotoAsset>> GetAdjacentPhoto(
+        string id,
+        [FromQuery] string direction = "next",
+        [FromQuery] string context = "all-photos",
+        [FromQuery] string? collectionId = null,
+        [FromQuery] string? searchQuery = null,
+        [FromQuery] double searchAlpha = 0.5,
+        [FromQuery] string sortBy = "capturedAt",
+        [FromQuery] string sortOrder = "desc",
+        [FromQuery] int distance = 1,
+        CancellationToken ct = default)
+    {
+        // Build query based on context
+        var photos = await BuildPhotoQuery(context, collectionId, searchQuery, searchAlpha, sortBy, sortOrder, ct);
+
+        // Find current photo's index
+        var currentIndex = photos.FindIndex(p => p.Id == id);
+
+        if (currentIndex == -1)
+        {
+            return NotFound(new { Error = "Photo not found in current context" });
+        }
+
+        // Calculate target index
+        var targetIndex = direction == "next"
+            ? currentIndex + distance
+            : currentIndex - distance;
+
+        // Check bounds
+        if (targetIndex < 0 || targetIndex >= photos.Count)
+        {
+            return NotFound(new { Error = "No adjacent photo found", Reason = "at_end_of_set" });
+        }
+
+        return Ok(photos[targetIndex]);
+    }
+
+    /// <summary>
+    /// Build a photo query based on context (all-photos, collection, favorites, search)
+    /// </summary>
+    private async Task<List<PhotoAsset>> BuildPhotoQuery(
+        string context,
+        string? collectionId,
+        string? searchQuery,
+        double searchAlpha,
+        string sortBy,
+        string sortOrder,
+        CancellationToken ct)
+    {
+        List<PhotoAsset> photos;
+
+        // Filter by context
+        switch (context)
+        {
+            case "favorites":
+                photos = (await PhotoAsset.All(ct)).Where(p => p.IsFavorite).ToList();
+                break;
+
+            case "search":
+                if (string.IsNullOrEmpty(searchQuery))
+                {
+                    throw new ArgumentException("searchQuery required for search context");
+                }
+
+                // Use semantic search service (returns List<PhotoAsset>)
+                photos = await _processingService.SemanticSearchAsync(
+                    query: searchQuery,
+                    eventId: null,
+                    alpha: searchAlpha,
+                    topK: int.MaxValue  // Get all results for consistent navigation
+                );
+
+                // Search results already have relevance sorting, skip additional sorting
+                return photos;
+
+            case "collection":
+                if (string.IsNullOrEmpty(collectionId))
+                {
+                    throw new ArgumentException("collectionId required for collection context");
+                }
+
+                var collection = await Collection.Get(collectionId, ct);
+                if (collection == null)
+                {
+                    throw new ArgumentException("Collection not found");
+                }
+
+                // Get photos in collection order
+                photos = new List<PhotoAsset>();
+                foreach (var photoId in collection.PhotoIds)
+                {
+                    var photo = await PhotoAsset.Get(photoId, ct);
+                    if (photo != null)
+                    {
+                        photos.Add(photo);
+                    }
+                }
+                // For collections, respect the PhotoIds order if sortBy is not specified
+                if (sortBy == "capturedAt" && sortOrder == "desc")
+                {
+                    // Default: use collection order (skip sorting)
+                    return photos;
+                }
+                break;
+
+            case "all-photos":
+            default:
+                photos = (await PhotoAsset.All(ct)).ToList();
+                break;
+        }
+
+        // Sort
+        photos = sortBy.ToLower() switch
+        {
+            "capturedat" => sortOrder == "asc"
+                ? photos.OrderBy(p => p.CapturedAt ?? p.CreatedAt).ToList()
+                : photos.OrderByDescending(p => p.CapturedAt ?? p.CreatedAt).ToList(),
+
+            "createdat" => sortOrder == "asc"
+                ? photos.OrderBy(p => p.CreatedAt).ToList()
+                : photos.OrderByDescending(p => p.CreatedAt).ToList(),
+
+            "rating" => sortOrder == "asc"
+                ? photos.OrderBy(p => p.Rating).ToList()
+                : photos.OrderByDescending(p => p.Rating).ToList(),
+
+            "filename" => sortOrder == "asc"
+                ? photos.OrderBy(p => p.OriginalFileName).ToList()
+                : photos.OrderByDescending(p => p.OriginalFileName).ToList(),
+
+            _ => photos.OrderByDescending(p => p.CapturedAt ?? p.CreatedAt).ToList()
+        };
+
+        return photos;
+    }
 
     /// <summary>
     /// Upload photos to an event (or auto-create daily album if eventId not provided)
