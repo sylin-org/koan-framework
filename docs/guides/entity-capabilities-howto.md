@@ -18,6 +18,7 @@ This section summarizes best practices and recommendations for maximizing the va
 ## Key Koan Features to Prefer
 
 - **Entity<T> Patterns:** Use static and instance methods (`All`, `Get`, `Save`, `Remove`, `Page`, `Query`, etc.) for all data access. Prefer `EntityController<T>` for CRUD APIs to minimize boilerplate and maximize consistency.
+- **Batch Retrieval:** Use `Entity.Get(IEnumerable<TKey>)` to fetch multiple entities efficiently in a single query. Returns results with preserved order and nulls for missing entities, avoiding N+1 query problems.
 - **Querying, Pagination, and Streaming:** Use `Page`, `FirstPage`, and `QueryStream`/`AllStream` for large datasets and web UI pagination. Use `QueryWithCount` for efficient UI pagination controls. Use LINQ and string queries for flexible filtering.
 - **Batch Operations:** Use `List<T>.Save()` and `Entity.Batch()` for bulk persistence and updates. Leverage lifecycle hooks (`BeforeUpsert`, `AfterLoad`, etc.) for validation and projections.
 - **Bulk Removal Strategies:** Use `RemoveAll()` with the appropriate strategy (`Safe`, `Fast`, `Optimized`) for test cleanup, production, or audit scenarios.
@@ -28,6 +29,7 @@ This section summarizes best practices and recommendations for maximizing the va
 
 ## Application Guidance
 
+- Use batch retrieval (`Entity.Get(ids)`) instead of loops with individual Gets to avoid N+1 query problems.
 - Refactor all in-memory queries to use `Page`, `QueryStream`, or `AllStream`.
 - Use `EntityController<T>` for all CRUD endpoints.
 - Implement batch operations and lifecycle hooks for bulk updates and validation.
@@ -113,9 +115,66 @@ var fetched = await Todo.Get(todo.Id);
 await fetched!.Remove();
 ```
 
+**Batch Retrieval**
+
+Koan provides efficient batch retrieval when you need to fetch multiple entities by ID. Returns results in the same order as input IDs, with null for missing entities.
+
+```csharp
+// Batch fetch by IDs - preserves order, returns nulls for missing
+var ids = new[] { id1, id2, id3, id4 };
+var todos = await Todo.Get(ids, ct);
+// Result: [Todo?, Todo?, null, Todo?] - third ID not found
+
+// Filter out nulls if needed
+var foundTodos = todos.Where(t => t != null).Select(t => t!).ToList();
+
+// Partition-aware batch retrieval
+using (EntityContext.Partition("archive"))
+{
+    var archivedTodos = await Todo.Get(ids, ct);
+}
+```
+
+**Performance Benefits**
+
+Batch Get uses provider-optimized bulk queries instead of N individual requests:
+
+```csharp
+// ❌ Inefficient: N database round-trips
+var todos = new List<Todo?>();
+foreach (var id in collectionIds)
+{
+    todos.Add(await Todo.Get(id, ct));  // N queries
+}
+
+// ✅ Efficient: Single bulk query with IN clause
+var todos = await Todo.Get(collectionIds, ct);  // 1 query
+```
+
+**Common Use Cases**
+
+```csharp
+// Collection/playlist pagination - fetch page of items by stored IDs
+var collection = await Collection.Get(collectionId, ct);
+var pageIds = collection.ItemIds.Skip(skip).Take(pageSize).ToList();
+var items = await Item.Get(pageIds, ct);
+
+// Relationship navigation - fetch all related entities
+var order = await Order.Get(orderId, ct);
+var orderItems = await OrderItem.Get(order.ItemIds, ct);
+
+// Bulk validation - check which IDs exist
+var requestedIds = GetRequestedIds();
+var existing = await Todo.Get(requestedIds, ct);
+var missingIds = requestedIds.Zip(existing)
+    .Where(pair => pair.Second == null)
+    .Select(pair => pair.First)
+    .ToList();
+```
+
 **Usage Scenarios**
 
-Applications seed initial data without DbContext or repository plumbing, keeping focus on domain logic. Architects get immediate provider neutrality: swap the adapter in configuration, entity code stays untouched.
+Applications efficiently load collection items or playlists by fetching a page of pre-ordered IDs in a single query. Relationship navigation loads multiple related entities without N+1 queries. Result order preservation ensures UI displays items in the intended sequence.
 
 **Custom Keys**
 
