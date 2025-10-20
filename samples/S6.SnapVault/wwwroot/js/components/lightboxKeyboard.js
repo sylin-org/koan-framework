@@ -60,6 +60,7 @@ export class LightboxKeyboard {
   enable() {
     if (this.enabled) return;
     this.enabled = true;
+    console.log('[LightboxKeyboard] Keyboard shortcuts enabled');
     // Use capture phase to run before main app's keyboard handlers
     document.addEventListener('keydown', this.handleKeyDown, { capture: true });
   }
@@ -67,12 +68,16 @@ export class LightboxKeyboard {
   disable() {
     if (!this.enabled) return;
     this.enabled = false;
+    console.log('[LightboxKeyboard] Keyboard shortcuts disabled');
     document.removeEventListener('keydown', this.handleKeyDown, { capture: true });
     this.hideHelpOverlay();
   }
 
   handleKeyDown = (event) => {
-    if (!this.enabled) return;
+    if (!this.enabled) {
+      console.log('[LightboxKeyboard] Handler not enabled');
+      return;
+    }
 
     // Ignore if typing in input/textarea/select
     if (event.target.matches('input, textarea, select, [contenteditable="true"]')) {
@@ -82,6 +87,7 @@ export class LightboxKeyboard {
     const handler = this.handlers.get(event.key);
 
     if (handler) {
+      console.log('[LightboxKeyboard] Handling key:', event.key);
       event.preventDefault();
       event.stopPropagation(); // Prevent main app shortcuts from firing
       handler();
@@ -102,21 +108,25 @@ export class LightboxKeyboard {
   }
 
   handleLeftArrow() {
+    console.log('[LightboxKeyboard] Left arrow pressed, isZoomed:', this.isZoomed());
     // If zoomed, pan left
     if (this.isZoomed()) {
       this.pan(-50, 0);
     } else {
       // Navigate to previous photo
+      console.log('[LightboxKeyboard] Calling previous()');
       this.lightbox.previous();
     }
   }
 
   handleRightArrow() {
+    console.log('[LightboxKeyboard] Right arrow pressed, isZoomed:', this.isZoomed());
     // If zoomed, pan right
     if (this.isZoomed()) {
       this.pan(50, 0);
     } else {
       // Navigate to next photo
+      console.log('[LightboxKeyboard] Calling next()');
       this.lightbox.next();
     }
   }

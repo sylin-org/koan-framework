@@ -116,14 +116,14 @@ public static class FactFieldRegistry
 
     public static readonly FactFieldDefinition FashionStyle = new()
     {
-        Key = "fashion-style",
+        Key = "fashion style",
         ExampleValues = new[] { "streetwear", "formal", "casual", "athletic", "business-casual", "evening-wear", "workwear", "bohemian", "preppy", "punk", "goth", "vintage", "minimalist", "avant-garde", "traditional" },
         IsAlwaysMandatory = true
     };
 
     public static readonly FactFieldDefinition CulturalStyle = new()
     {
-        Key = "cultural-style",
+        Key = "cultural style",
         ExampleValues = new[] { "western", "eastern", "japanese-street", "korean-street", "scandinavian", "mediterranean", "african", "latin-american", "middle-eastern", "indigenous", "traditional-dress", "cultural-fusion" },
         IsAlwaysMandatory = true
     };

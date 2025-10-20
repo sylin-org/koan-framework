@@ -248,15 +248,20 @@ export class Lightbox {
 
       this.currentIndex = this.photoSet.currentIndex;
       this.totalCount = this.photoSet.totalCount;
+
+      // Get lightweight metadata from PhotoSet for initial display
       this.currentPhoto = this.photoSet.getCurrentPhoto();
 
       console.log(`[Lightbox] Opened photo ${this.currentIndex + 1} of ${this.totalCount}`);
 
-      // Load photo and metadata
+      // Load photo image and update UI
       await this.loadPhoto();
       this.updateMetadata();
       this.updateNavigation();
       this.updatePositionIndicator();
+
+      // Fetch full photo details including AI analysis in background
+      this.fetchFullPhotoDetails(photoId);
     } catch (error) {
       console.error('[Lightbox] Failed to open photo:', error);
       this.close();
@@ -315,18 +320,37 @@ export class Lightbox {
   }
 
   /**
-   * @deprecated This method is no longer used with PhotoSet navigation
-   * PhotoSet manages photo data directly. Kept for backward compatibility.
+   * Fetch full photo details including AI analysis from backend
+   * Updates the panel with complete data after initial lightweight display
    */
-  async fetchPhotoData() {
+  async fetchFullPhotoDetails(photoId) {
     try {
-      // Fetch fresh photo data from API
-      this.currentPhoto = await this.app.api.get(`/api/photos/${this.currentPhotoId}`);
+      console.log('[Lightbox] Fetching full photo details including AI analysis...');
+
+      // Fetch complete photo data from backend
+      const fullPhoto = await this.app.api.get(`/api/photos/${photoId}`);
+
+      // Update current photo with full details
+      this.currentPhoto = fullPhoto;
+
+      console.log('[Lightbox] Full photo details loaded:', {
+        hasAiAnalysis: !!fullPhoto.aiAnalysis,
+        factCount: fullPhoto.aiAnalysis?.facts ? Object.keys(fullPhoto.aiAnalysis.facts).length : 0
+      });
+
+      // Update panel with complete data including AI analysis
+      if (this.panel && this.currentPhoto) {
+        this.panel.render(this.currentPhoto);
+      }
+
+      // Update actions with complete photo data
+      if (this.actions && this.currentPhoto) {
+        this.actions.setPhoto(this.currentPhoto);
+      }
+
     } catch (error) {
-      console.error('Failed to fetch photo data:', error);
-      this.app.components.toast.show('Failed to load photo details', { icon: '⚠️', duration: 3000 });
-      // Fallback to cached data
-      this.currentPhoto = this.app.photos.find(p => p.id === this.currentPhotoId);
+      console.error('[Lightbox] Failed to fetch full photo details:', error);
+      // Keep using lightweight cached data - it's good enough for basic viewing
     }
   }
 
@@ -677,6 +701,7 @@ export class Lightbox {
   }
 
   async next() {
+    console.log('[Lightbox] next() called, photoSet:', !!this.photoSet, 'canGoNext:', this.photoSet?.canGoNext);
     if (!this.photoSet) return;
 
     if (!this.photoSet.canGoNext) {
@@ -730,6 +755,10 @@ export class Lightbox {
           this.currentPhoto.originalFileName
         );
       }
+
+      // Fetch full photo details including AI analysis in background
+      this.fetchFullPhotoDetails(this.currentPhotoId);
+
     } catch (error) {
       console.error('[Lightbox] Error navigating to next photo:', error);
       this.app.components.toast.show('Failed to load next photo', {
@@ -740,6 +769,7 @@ export class Lightbox {
   }
 
   async previous() {
+    console.log('[Lightbox] previous() called, photoSet:', !!this.photoSet, 'canGoPrevious:', this.photoSet?.canGoPrevious);
     if (!this.photoSet) return;
 
     if (!this.photoSet.canGoPrevious) {
@@ -793,6 +823,10 @@ export class Lightbox {
           this.currentPhoto.originalFileName
         );
       }
+
+      // Fetch full photo details including AI analysis in background
+      this.fetchFullPhotoDetails(this.currentPhotoId);
+
     } catch (error) {
       console.error('[Lightbox] Error navigating to previous photo:', error);
       this.app.components.toast.show('Failed to load previous photo', {
