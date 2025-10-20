@@ -313,6 +313,37 @@ internal sealed class MongoRepository<TEntity, TKey> :
             return result;
         }, ct);
 
+    public Task<IReadOnlyList<TEntity?>> GetManyAsync(IEnumerable<TKey> ids, CancellationToken ct = default)
+        => ExecuteWithReadinessAsync(async () =>
+        {
+            ct.ThrowIfCancellationRequested();
+            using var activity = MongoTelemetry.Activity.StartActivity("mongo.get.many");
+            activity?.SetTag("entity", typeof(TEntity).FullName);
+
+            // Materialize IDs to preserve order and count
+            var idList = ids as IReadOnlyList<TKey> ?? ids.ToList();
+            if (idList.Count == 0)
+            {
+                return (IReadOnlyList<TEntity?>)Array.Empty<TEntity?>();
+            }
+
+            var collection = await GetCollectionAsync(ct).ConfigureAwait(false);
+            var filter = Builders<TEntity>.Filter.In(x => x.Id, idList);
+            var found = await collection.Find(filter).ToListAsync(ct).ConfigureAwait(false);
+
+            // Build dictionary for O(1) lookup
+            var entityMap = found.ToDictionary(e => e.Id);
+
+            // Preserve order and include nulls for missing entities
+            var results = new TEntity?[idList.Count];
+            for (var i = 0; i < idList.Count; i++)
+            {
+                results[i] = entityMap.TryGetValue(idList[i], out var entity) ? entity : null;
+            }
+
+            return (IReadOnlyList<TEntity?>)results;
+        }, ct);
+
     public Task<IReadOnlyList<TEntity>> QueryAsync(object? query, CancellationToken ct = default)
         => ExecuteWithReadinessAsync(async () =>
         {
