@@ -443,17 +443,23 @@ export class PhotoGrid {
    * @param {Array} photos - Array of new photos to append
    */
   appendPhotos(photos) {
-    if (!photos || photos.length === 0) return;
+    console.log(`[DEBUG Grid.appendPhotos] CALLED with ${photos ? photos.length : 0} photos`);
 
-    console.log(`[Grid] Appending ${photos.length} photos to DOM...`);
+    if (!photos || photos.length === 0) {
+      console.log(`[DEBUG Grid.appendPhotos] No photos to append - returning`);
+      return;
+    }
+
+    console.log(`[DEBUG Grid.appendPhotos] Appending ${photos.length} photos to DOM...`);
 
     // Add new photo cards to DOM
-    photos.forEach(photo => {
+    photos.forEach((photo, index) => {
+      console.log(`[DEBUG Grid.appendPhotos] Adding photo ${index + 1}/${photos.length}: ${photo.id}`);
       this.addPhotoCard(photo);
     });
 
     // CSS handles layout automatically - no recalculation needed
-    console.log(`[Grid] Layout automatically updated by CSS`);
+    console.log(`[DEBUG Grid.appendPhotos] Layout automatically updated by CSS - DONE`);
   }
 
   /**
@@ -482,7 +488,12 @@ export class PhotoGrid {
       const hasMorePages = this.app.state.hasMorePages;
       const loadingMore = this.app.state.loadingMore;
 
-      if (!hasMorePages || loadingMore) return;
+      console.log(`[DEBUG Scroll] hasMorePages: ${hasMorePages}, loadingMore: ${loadingMore}`);
+
+      if (!hasMorePages || loadingMore) {
+        console.log(`[DEBUG Scroll] BLOCKED - hasMorePages: ${hasMorePages}, loadingMore: ${loadingMore}`);
+        return;
+      }
 
       // Use scrollContainer measurements instead of window
       const scrollTop = this.scrollContainer.scrollTop;
@@ -492,8 +503,11 @@ export class PhotoGrid {
       // Calculate distance from bottom
       const distanceFromBottom = scrollHeight - (scrollTop + clientHeight);
 
+      console.log(`[DEBUG Scroll] scrollTop: ${scrollTop}, scrollHeight: ${scrollHeight}, clientHeight: ${clientHeight}, distanceFromBottom: ${distanceFromBottom}`);
+
       // Trigger when within 400px of bottom
       if (distanceFromBottom < 400) {
+        console.log(`[DEBUG Scroll] TRIGGERING loadMorePhotos - distanceFromBottom: ${distanceFromBottom}`);
         this.app.loadMorePhotos();
       }
     };

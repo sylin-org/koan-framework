@@ -26,12 +26,11 @@ export class StateRegistry {
         collectionName: null
       },
 
-      // Loaded photos (paginated subset)
+      // Loaded photos (from PhotoSet)
       photos: [],
       loadedPhotosCount: 0,
 
-      // Pagination state
-      currentPage: 1,
+      // Infinite scroll state
       hasMorePages: true,
 
       // Selection state

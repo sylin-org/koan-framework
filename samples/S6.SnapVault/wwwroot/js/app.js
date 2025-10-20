@@ -167,13 +167,14 @@ class SnapVaultApp {
     this.setupDragAndDrop();
 
     // Load initial data
-    await this.loadPhotos();
     await this.loadEvents();
 
     // Initialize collection management
     await this.components.collectionsSidebar.init();
     this.components.photoSelection.init();
     this.components.dragDrop.init();
+
+    // Load photos via CollectionView (PhotoSet-based)
     await this.components.collectionView.setView('all-photos');
 
     // Enable infinite scroll after initial load
@@ -295,104 +296,71 @@ class SnapVaultApp {
     });
   }
 
-  async filterPhotos(filter) {
-    this.state.currentFilter = filter;
-
-    switch (filter) {
-      case 'all':
-        await this.loadPhotos();
-        break;
-
-      case 'favorites':
-        this.setLoading(true);
-        // TODO: Backend should support filter=isFavorite:true for server-side filtering
-        // For now, load first page and filter client-side
-        const allPhotos = await this.api.get('/api/photos?sort=-id&page=1&pageSize=200');
-        this.state.photos = allPhotos.filter(p => p.isFavorite);
-        this.state.currentPage = 1;
-        this.state.hasMorePages = false; // Disable infinite scroll for filtered views
-        this.components.grid.render();
-        this.components.grid.disableInfiniteScroll();
-        this.setLoading(false);
-        break;
-    }
-  }
-
-  async loadPhotos(filterQuery = '') {
-    try {
-      this.setLoading(true);
-      // Initial load: first page only (30 photos for fast FCP)
-      // Sort by ID descending (newest first - GUID v7 embeds timestamp)
-      const baseQuery = '/api/photos?sort=-id&page=1&pageSize=30';
-      const query = filterQuery ? `${baseQuery}&${filterQuery.substring(1)}` : baseQuery;
-
-      const response = await this.api.get(query, {}, { includeHeaders: true });
-      this.state.photos = response.data || [];
-      this.state.totalPhotosCount = response.headers.totalCount;
-      this.state.currentPage = 1;
-      this.state.hasMorePages = true; // Assume more until proven otherwise
-      this.state.activeFilter = filterQuery; // Store active filter for infinite scroll
-
-      // Calculate favorites count from loaded photos (accurate for All Photos view)
-      this.state.favoritesCount = this.state.photos.filter(p => p.isFavorite).length;
-
-      this.components.grid.render();
-      this.updateLibraryCounts();
-      this.updateStatusBar();
-
-      console.log(`[Photos] Initial load: ${response.data?.length || 0} photos (page 1), total: ${this.state.totalPhotosCount}`);
-
-      // Auto-fill viewport if grid doesn't fill the visible area
-      // Particularly important for compact modes on large screens (4K)
-      await this.fillViewport();
-
-      // Note: Infinite scroll is enabled by caller (init or setViewPreset)
-      // This prevents immediate trigger when layout changes
-    } catch (error) {
-      console.error('Failed to load photos:', error);
-      this.components.toast.show('Failed to load photos', { icon: '⚠️', duration: 5000 });
-    } finally {
-      this.setLoading(false);
-    }
-  }
+  // filterPhotos and loadPhotos removed - CollectionView handles all photo loading via PhotoSet
 
   async loadMorePhotos() {
-    if (!this.state.hasMorePages || this.state.loadingMore) return;
+    console.log(`[DEBUG loadMorePhotos] CALLED - hasMorePages: ${this.state.hasMorePages}, loadingMore: ${this.state.loadingMore}`);
+
+    if (!this.state.hasMorePages || this.state.loadingMore) {
+      console.log(`[DEBUG loadMorePhotos] EARLY RETURN - hasMorePages: ${this.state.hasMorePages}, loadingMore: ${this.state.loadingMore}`);
+      return;
+    }
 
     try {
       this.state.loadingMore = true;
-      const nextPage = this.state.currentPage + 1;
+      console.log(`[DEBUG loadMorePhotos] Set loadingMore = true`);
 
-      console.log(`[Infinite Scroll] Triggered - Loading page ${nextPage}...`);
+      // Get PhotoSet instance from CollectionView
+      const photoSet = this.components.collectionView.getPhotoSet();
+      console.log(`[DEBUG loadMorePhotos] PhotoSet:`, photoSet ? 'EXISTS' : 'NULL');
 
-      // Include active filter in pagination
-      const baseQuery = `/api/photos?sort=-id&page=${nextPage}&pageSize=30`;
-      const query = this.state.activeFilter ? `${baseQuery}&${this.state.activeFilter.substring(1)}` : baseQuery;
+      if (!photoSet) {
+        console.error('[DEBUG loadMorePhotos] No PhotoSet available - cannot load more');
+        return;
+      }
 
-      const response = await this.api.get(query);
+      console.log(`[DEBUG loadMorePhotos] Current photos.length: ${this.state.photos.length}, PhotoSet.totalCount: ${photoSet.totalCount}`);
 
-      if (response && response.length > 0) {
-        this.state.photos.push(...response);
-        this.state.currentPage = nextPage;
+      // Calculate next window position
+      const currentLoadedCount = this.state.photos.length;
+      const nextStartIndex = currentLoadedCount;
+      const batchSize = 50; // Load 50 more photos at a time
 
-        // Update favorites count as more photos load
+      console.log(`[DEBUG loadMorePhotos] Calling photoSet.loadWindow(${nextStartIndex}, ${batchSize})`);
+
+      // Load next window using PhotoSet session
+      const response = await photoSet.loadWindow(nextStartIndex, batchSize);
+      console.log(`[DEBUG loadMorePhotos] Response:`, response);
+
+      if (response && response.photos && response.photos.length > 0) {
+        console.log(`[DEBUG loadMorePhotos] Got ${response.photos.length} photos`);
+
+        // Append new photos to state and grid
+        this.state.photos.push(...response.photos);
+
+        // Update favorites count
         this.state.favoritesCount = this.state.photos.filter(p => p.isFavorite).length;
 
-        this.components.grid.appendPhotos(response);
+        this.components.grid.appendPhotos(response.photos);
         this.updateLibraryCounts();
         this.updateStatusBar();
 
-        console.log(`[Infinite Scroll] Loaded ${response.length} photos (page ${nextPage}, total loaded: ${this.state.photos.length} of ${this.state.totalPhotosCount})`);
+        // Check if there are more photos to load
+        const totalLoaded = this.state.photos.length;
+        this.state.hasMorePages = totalLoaded < photoSet.totalCount;
+
+        console.log(`[DEBUG loadMorePhotos] SUCCESS - Loaded ${response.photos.length} photos (total: ${totalLoaded} of ${photoSet.totalCount}), hasMorePages: ${this.state.hasMorePages}`);
       } else {
         // No more photos
         this.state.hasMorePages = false;
-        console.log(`[Infinite Scroll] No more pages - reached end of library`);
+        console.log(`[DEBUG loadMorePhotos] No more pages - reached end of library`);
       }
     } catch (error) {
-      console.error('[Infinite Scroll] Failed to load page:', error);
+      console.error('[DEBUG loadMorePhotos] ERROR:', error);
       this.components.toast.show('Failed to load more photos', { icon: '⚠️', duration: 3000 });
     } finally {
       this.state.loadingMore = false;
+      console.log(`[DEBUG loadMorePhotos] FINALLY - Set loadingMore = false`);
     }
   }
 

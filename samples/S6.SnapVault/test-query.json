@@ -1,0 +1,9 @@
+{
+  "definition": {
+    "context": "all-photos",
+    "sortBy": "capturedAt",
+    "sortOrder": "desc"
+  },
+  "startIndex": 0,
+  "count": 50
+}

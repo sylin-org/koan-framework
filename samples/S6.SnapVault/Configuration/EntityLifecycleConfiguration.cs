@@ -11,7 +11,7 @@ public static class EntityLifecycleConfiguration
     public static void Configure()
     {
         ConfigurePhotoAssetLifecycle();
-        ConfigurePhotoSessionInvalidation();
+        // Note: PhotoSetSessions use on-demand queries, no snapshot invalidation needed
     }
 
     private static void ConfigurePhotoAssetLifecycle()
@@ -74,28 +74,4 @@ public static class EntityLifecycleConfiguration
         });
     }
 
-    private static void ConfigurePhotoSessionInvalidation()
-    {
-        // When a photo is deleted, remove it from all session snapshots
-        PhotoAsset.Events.AfterRemove(async ctx =>
-        {
-            var photo = ctx.Current;
-            var ct = ctx.CancellationToken;
-
-            // Find all sessions that contain this photo
-            var allSessions = await PhotoSetSession.All(ct);
-
-            foreach (var session in allSessions)
-            {
-                if (session.PhotoIds.Contains(photo.Id))
-                {
-                    // Remove photo from snapshot
-                    session.PhotoIds.Remove(photo.Id);
-                    session.TotalCount = session.PhotoIds.Count;
-
-                    await session.Save(ct);
-                }
-            }
-        });
-    }
 }

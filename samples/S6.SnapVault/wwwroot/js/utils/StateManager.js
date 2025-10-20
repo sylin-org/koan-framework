@@ -9,11 +9,9 @@ export class StateManager {
       // Photo Management
       photos: [],
       selectedPhotos: new Set(),
-      currentPage: 1,
       hasMorePages: false,
       totalPhotosCount: 0,
       loadingMore: false,
-      activeFilter: '',
 
       // Collections
       collections: [],
@@ -167,7 +165,6 @@ export class StateManager {
   reset() {
     this.set('photos', []);
     this.clearSelection();
-    this.set('currentPage', 1);
     this.set('hasMorePages', false);
     this.set('totalPhotosCount', 0);
   }

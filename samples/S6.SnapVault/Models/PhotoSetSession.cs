@@ -4,7 +4,7 @@ namespace S6.SnapVault.Models;
 
 /// <summary>
 /// PhotoSet Session - Volatile browsing context
-/// Stores photo ID snapshot for consistent navigation
+/// Stores query definition for on-demand materialization
 /// Auto-expires, no cleanup needed
 /// </summary>
 public class PhotoSetSession : Entity<PhotoSetSession>
@@ -40,13 +40,7 @@ public class PhotoSetSession : Entity<PhotoSetSession>
     public string SortOrder { get; set; } = "desc";
 
     /// <summary>
-    /// Snapshot of photo IDs in sorted order
-    /// Consistent results during navigation
-    /// </summary>
-    public List<string> PhotoIds { get; set; } = new();
-
-    /// <summary>
-    /// Total count (cached)
+    /// Total count (computed once and cached)
     /// </summary>
     public int TotalCount { get; set; }
 

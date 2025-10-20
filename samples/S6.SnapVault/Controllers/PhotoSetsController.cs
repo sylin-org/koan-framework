@@ -73,14 +73,23 @@ public class PhotoSetsController : ControllerBase
                 return BadRequest(new { error = "Must provide sessionId or definition" });
             }
 
-            // Get range from snapshot
-            var photoIds = session.PhotoIds
-                .Skip(request.StartIndex)
-                .Take(request.Count)
-                .ToList();
+            // Execute query on-demand for this range
+            var photoAssets = await _service.ExecuteQueryAsync(session, request.StartIndex, request.Count, ct);
 
-            // Load photo metadata
-            var photos = await LoadPhotoMetadataAsync(photoIds, ct);
+            // Convert to metadata
+            var photos = photoAssets.Select(p => new PhotoMetadata
+            {
+                Id = p.Id,
+                FileName = p.OriginalFileName,
+                CapturedAt = p.CapturedAt,
+                CreatedAt = p.CreatedAt.UtcDateTime,
+                ThumbnailUrl = $"/api/media/photos/{p.Id}/thumbnail",
+                MasonryThumbnailMediaId = p.MasonryThumbnailMediaId,
+                Rating = p.Rating,
+                IsFavorite = p.IsFavorite,
+                Width = p.Width,
+                Height = p.Height
+            }).ToList();
 
             return Ok(new PhotoSetQueryResponse
             {
@@ -96,48 +105,5 @@ public class PhotoSetsController : ControllerBase
             _logger.LogError(ex, "[PhotoSets] Query failed");
             return StatusCode(500, new { error = "Failed to query photo set", details = ex.Message });
         }
-    }
-
-    /// <summary>
-    /// Load photo metadata for given IDs
-    /// Maintains order from PhotoIds snapshot
-    /// </summary>
-    private async Task<List<PhotoMetadata>> LoadPhotoMetadataAsync(
-        List<string> photoIds,
-        CancellationToken ct = default)
-    {
-        var photos = new List<PhotoMetadata>();
-
-        // Load photos in batches for efficiency
-        const int batchSize = 100;
-        for (int i = 0; i < photoIds.Count; i += batchSize)
-        {
-            var batch = photoIds.Skip(i).Take(batchSize).ToList();
-            var batchPhotos = await PhotoAsset.Query(
-                p => batch.Contains(p.Id),
-                ct);
-
-            // Maintain snapshot order
-            var orderedBatch = batch
-                .Select(id => batchPhotos.FirstOrDefault(p => p.Id == id))
-                .Where(p => p != null)
-                .Select(p => new PhotoMetadata
-                {
-                    Id = p!.Id,
-                    FileName = p.OriginalFileName,
-                    CapturedAt = p.CapturedAt,
-                    CreatedAt = p.CreatedAt.UtcDateTime,
-                    ThumbnailUrl = $"/api/media/photos/{p.Id}/thumbnail",
-                    Rating = p.Rating,
-                    IsFavorite = p.IsFavorite,
-                    Width = p.Width,
-                    Height = p.Height
-                })
-                .ToList();
-
-            photos.AddRange(orderedBatch);
-        }
-
-        return photos;
     }
 }

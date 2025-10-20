@@ -305,10 +305,10 @@ export class CollectionView {
 
       // Update app state from PhotoSet
       this.app.state.photos = this.photoSet.getPhotosInWindow();
-      this.app.state.currentPage = 1;
-      this.app.state.hasMorePages = this.photoSet.totalCount > this.photoSet.window.windowSize;
+      this.app.state.totalPhotosCount = this.photoSet.totalCount;
+      this.app.state.hasMorePages = this.app.state.photos.length < this.photoSet.totalCount;
 
-      console.log(`[CollectionView] Loaded ${this.app.state.photos.length} of ${this.photoSet.totalCount} photos via PhotoSet`);
+      console.log(`[CollectionView] Loaded ${this.app.state.photos.length} of ${this.photoSet.totalCount} photos via PhotoSet, hasMorePages: ${this.app.state.hasMorePages}`);
 
       // Render grid
       this.app.components.grid.render();

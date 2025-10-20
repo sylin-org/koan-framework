@@ -290,14 +290,17 @@ export class PhotoSetManager {
    * Load a window of photo metadata using session endpoint
    */
   async loadWindow(startIndex, count = null) {
+    console.log(`[DEBUG PhotoSet.loadWindow] CALLED with startIndex: ${startIndex}, count: ${count}`);
+
     if (count === null) {
       // Calculate window size based on current position
       const range = this.window.calculateNewRange(startIndex, this.totalCount);
       startIndex = range.start;
       count = range.end - range.start;
+      console.log(`[DEBUG PhotoSet.loadWindow] Calculated range - startIndex: ${startIndex}, count: ${count}`);
     }
 
-    console.log(`[PhotoSet] Loading window [${startIndex}, ${startIndex + count}]`);
+    console.log(`[DEBUG PhotoSet.loadWindow] Loading window [${startIndex}, ${startIndex + count}]`);
 
     try {
       // Build request for session endpoint
@@ -309,6 +312,7 @@ export class PhotoSetManager {
       // Include session ID if available (reuse existing session)
       if (this.sessionId) {
         request.sessionId = this.sessionId;
+        console.log(`[DEBUG PhotoSet.loadWindow] Reusing session: ${this.sessionId}`);
       } else {
         // First request - include definition to create session
         request.definition = {
@@ -319,23 +323,28 @@ export class PhotoSetManager {
           sortBy: this.definition.sortBy || 'capturedAt',
           sortOrder: this.definition.sortOrder || 'desc'
         };
+        console.log(`[DEBUG PhotoSet.loadWindow] Creating new session with definition:`, request.definition);
       }
+
+      console.log(`[DEBUG PhotoSet.loadWindow] Calling API: /api/photosets/query with request:`, request);
 
       // Use session-aware endpoint
       const response = await this.api.post('/api/photosets/query', request);
+      console.log(`[DEBUG PhotoSet.loadWindow] API Response:`, response);
 
       // Store session ID for subsequent requests
       if (response.sessionId) {
         this.sessionId = response.sessionId;
-        console.log(`[PhotoSet] Session: ${this.sessionId}`);
+        console.log(`[DEBUG PhotoSet.loadWindow] Session ID: ${this.sessionId}`);
       }
 
       // Store photos in window cache
       this.window.setRange(response.startIndex, response.photos);
+      console.log(`[DEBUG PhotoSet.loadWindow] Stored ${response.photos.length} photos in window cache`);
 
       return response;
     } catch (error) {
-      console.error('[PhotoSet] Failed to load window:', error);
+      console.error('[DEBUG PhotoSet.loadWindow] ERROR:', error);
       throw error;
     }
   }

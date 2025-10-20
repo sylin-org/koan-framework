@@ -58,6 +58,11 @@ public class PhotoMetadata
     public string ThumbnailUrl { get; set; } = "";
 
     /// <summary>
+    /// Masonry thumbnail media ID (for grid display)
+    /// </summary>
+    public string? MasonryThumbnailMediaId { get; set; }
+
+    /// <summary>
     /// Star rating (0-5)
     /// </summary>
     public int Rating { get; set; }
