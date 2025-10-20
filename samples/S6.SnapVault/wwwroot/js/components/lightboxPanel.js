@@ -320,20 +320,14 @@ export class LightboxPanel {
           `).join('')}
         </div>
 
-        <!-- Summary with lock button -->
-        <div class="ai-summary-container">
+        <!-- Summary with interactive header -->
+        <div class="ai-summary-container" data-locked="${analysis.summaryLocked}">
           <div class="summary-header">
-            <h4>Summary</h4>
-            <button class="lock-btn ${analysis.summaryLocked ? 'locked' : ''}"
-                    data-summary-lock
-                    aria-label="${analysis.summaryLocked ? 'Unlock' : 'Lock'} summary"
-                    title="Click to ${analysis.summaryLocked ? 'unlock' : 'lock'} this summary">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                ${analysis.summaryLocked
-                  ? '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path>'
-                  : '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 9.9-1"></path>'}
-              </svg>
-            </button>
+            <h4 data-summary-lock
+                aria-label="${analysis.summaryLocked ? 'Unlock' : 'Lock'} summary"
+                title="Click to ${analysis.summaryLocked ? 'unlock' : 'lock'} this summary">
+              Summary
+            </h4>
           </div>
           <div class="ai-summary ${analysis.summaryLocked ? 'locked' : ''}" role="region" aria-label="Photo description">
             <p>${escapeHtml(analysis.summary)}</p>
@@ -350,6 +344,9 @@ export class LightboxPanel {
               return this.renderFactRow(key, value, isLocked);
             }).join('')}
           </div>
+          <div class="facts-hint">
+            Tip: Click labels to lock/unlock facts
+          </div>
         ` : ''}
 
         <!-- Regenerate button container (will be replaced with SplitButton) -->
@@ -365,19 +362,22 @@ export class LightboxPanel {
         });
       });
 
-      // Add lock button click handlers (for both summary and facts)
-      aiContent.querySelectorAll('.lock-btn').forEach(btn => {
-        btn.addEventListener('click', async (e) => {
+      // Add click handlers for interactive labels (both summary and facts)
+      // Handle summary lock toggle
+      const summaryLockBtn = aiContent.querySelector('[data-summary-lock]');
+      if (summaryLockBtn) {
+        summaryLockBtn.addEventListener('click', async (e) => {
           e.stopPropagation();
+          await this.toggleSummaryLock(summaryLockBtn);
+        });
+      }
 
-          // Check if this is a summary lock or fact lock
-          if (btn.hasAttribute('data-summary-lock')) {
-            await this.toggleSummaryLock(btn);
-          } else {
-            // Get fact key and normalize to lowercase for API call
-            const factKey = btn.getAttribute('data-fact-key');
-            await this.toggleFactLock(factKey, btn);
-          }
+      // Handle fact lock toggles
+      aiContent.querySelectorAll('.fact-label').forEach(label => {
+        label.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          const factKey = label.getAttribute('data-fact-key');
+          await this.toggleFactLock(factKey, label);
         });
       });
 
@@ -484,14 +484,22 @@ export class LightboxPanel {
     // Split comma-separated values into individual pills
     const values = value.split(',').map(v => v.trim()).filter(v => v.length > 0);
 
+    const tooltipText = isLocked
+      ? `Click to unlock ${label}`
+      : `Click to lock ${label}`;
+
     return `
       <div class="fact-row"
            data-fact-key="${escapeHtml(label)}"
            data-locked="${isLocked}"
            role="row">
-        <span class="fact-label" role="rowheader">
+        <button class="fact-label"
+                data-fact-key="${escapeHtml(label)}"
+                role="rowheader"
+                aria-label="${isLocked ? 'Unlock' : 'Lock'} ${escapeHtml(label)}"
+                title="${escapeHtml(tooltipText)}">
           ${escapeHtml(label)}
-        </span>
+        </button>
         <div class="fact-values" role="cell">
           ${values.map(v => `
             <span class="fact-pill" data-fact-type="${escapeHtml(label)}" data-fact-value="${escapeHtml(v)}">
@@ -499,16 +507,6 @@ export class LightboxPanel {
             </span>
           `).join('')}
         </div>
-        <button class="lock-btn ${isLocked ? 'locked' : ''}"
-                data-fact-key="${escapeHtml(label)}"
-                aria-label="${isLocked ? 'Unlock' : 'Lock'} ${escapeHtml(label)}"
-                title="Click to ${isLocked ? 'unlock' : 'lock'} this fact">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            ${isLocked
-              ? '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path>'
-              : '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 9.9-1"></path>'}
-          </svg>
-        </button>
       </div>
     `;
   }
@@ -633,25 +631,20 @@ export class LightboxPanel {
     }
   }
 
-  async toggleFactLock(factKey, btnElement) {
+  async toggleFactLock(factKey, labelElement) {
     if (!this.currentPhotoData || !this.currentPhotoData.id) return;
 
-    const factRow = btnElement.closest('.fact-row');
-    const isCurrentlyLocked = btnElement.classList.contains('locked');
+    const factRow = labelElement.closest('.fact-row');
+    const isCurrentlyLocked = factRow.getAttribute('data-locked') === 'true';
 
     // All fact keys are already lowercase
     const normalizedKey = factKey.toLowerCase();
 
     // Optimistic UI update
-    btnElement.classList.toggle('locked');
-    btnElement.setAttribute('aria-label', `${!isCurrentlyLocked ? 'Unlock' : 'Lock'} ${normalizedKey}`);
-    factRow.setAttribute('data-locked', !isCurrentlyLocked);
-
-    // Update SVG icon
-    const svg = btnElement.querySelector('svg');
-    const lockedIcon = '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path>';
-    const unlockedIcon = '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 9.9-1"></path>';
-    svg.innerHTML = !isCurrentlyLocked ? lockedIcon : unlockedIcon;
+    const newLockState = !isCurrentlyLocked;
+    factRow.setAttribute('data-locked', newLockState);
+    labelElement.setAttribute('aria-label', `${newLockState ? 'Unlock' : 'Lock'} ${normalizedKey}`);
+    labelElement.setAttribute('title', `Click to ${newLockState ? 'unlock' : 'lock'} ${normalizedKey}`);
 
     try {
       // Call toggle API endpoint with lowercase key
@@ -669,41 +662,35 @@ export class LightboxPanel {
 
       // Ensure UI is in sync with server state
       const serverIsLocked = response.isLocked;
-      btnElement.classList.toggle('locked', serverIsLocked);
-      btnElement.setAttribute('aria-label', `${serverIsLocked ? 'Unlock' : 'Lock'} ${normalizedKey}`);
       factRow.setAttribute('data-locked', serverIsLocked);
-      svg.innerHTML = serverIsLocked ? lockedIcon : unlockedIcon;
+      labelElement.setAttribute('aria-label', `${serverIsLocked ? 'Unlock' : 'Lock'} ${normalizedKey}`);
+      labelElement.setAttribute('title', `Click to ${serverIsLocked ? 'unlock' : 'lock'} ${normalizedKey}`);
 
     } catch (error) {
       console.error('Failed to toggle fact lock:', error);
 
       // Revert UI on error
-      btnElement.classList.toggle('locked', isCurrentlyLocked);
-      btnElement.setAttribute('aria-label', `${isCurrentlyLocked ? 'Unlock' : 'Lock'} ${normalizedKey}`);
       factRow.setAttribute('data-locked', isCurrentlyLocked);
-      svg.innerHTML = isCurrentlyLocked ? lockedIcon : unlockedIcon;
+      labelElement.setAttribute('aria-label', `${isCurrentlyLocked ? 'Unlock' : 'Lock'} ${normalizedKey}`);
+      labelElement.setAttribute('title', `Click to ${isCurrentlyLocked ? 'unlock' : 'lock'} ${normalizedKey}`);
 
       this.app.components.toast.show('Failed to toggle lock', { icon: '⚠️', type: 'error' });
     }
   }
 
-  async toggleSummaryLock(btnElement) {
+  async toggleSummaryLock(headerElement) {
     if (!this.currentPhotoData || !this.currentPhotoData.id) return;
 
-    const summaryContainer = btnElement.closest('.ai-summary-container');
+    const summaryContainer = headerElement.closest('.ai-summary-container');
     const summaryElement = summaryContainer.querySelector('.ai-summary');
-    const isCurrentlyLocked = btnElement.classList.contains('locked');
+    const isCurrentlyLocked = summaryContainer.getAttribute('data-locked') === 'true';
 
     // Optimistic UI update
-    btnElement.classList.toggle('locked');
-    btnElement.setAttribute('aria-label', `${!isCurrentlyLocked ? 'Unlock' : 'Lock'} summary`);
-    summaryElement.classList.toggle('locked');
-
-    // Update SVG icon
-    const svg = btnElement.querySelector('svg');
-    const lockedIcon = '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path>';
-    const unlockedIcon = '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 9.9-1"></path>';
-    svg.innerHTML = !isCurrentlyLocked ? lockedIcon : unlockedIcon;
+    const newLockState = !isCurrentlyLocked;
+    summaryContainer.setAttribute('data-locked', newLockState);
+    headerElement.setAttribute('aria-label', `${newLockState ? 'Unlock' : 'Lock'} summary`);
+    headerElement.setAttribute('title', `Click to ${newLockState ? 'unlock' : 'lock'} this summary`);
+    summaryElement.classList.toggle('locked', newLockState);
 
     try {
       // Call toggle API endpoint
@@ -715,19 +702,19 @@ export class LightboxPanel {
       this.currentPhotoData.aiAnalysis.summaryLocked = response.summaryLocked;
 
       // Ensure UI is in sync with server state
-      btnElement.classList.toggle('locked', response.summaryLocked);
-      btnElement.setAttribute('aria-label', `${response.summaryLocked ? 'Unlock' : 'Lock'} summary`);
+      summaryContainer.setAttribute('data-locked', response.summaryLocked);
+      headerElement.setAttribute('aria-label', `${response.summaryLocked ? 'Unlock' : 'Lock'} summary`);
+      headerElement.setAttribute('title', `Click to ${response.summaryLocked ? 'unlock' : 'lock'} this summary`);
       summaryElement.classList.toggle('locked', response.summaryLocked);
-      svg.innerHTML = response.summaryLocked ? lockedIcon : unlockedIcon;
 
     } catch (error) {
       console.error('Failed to toggle summary lock:', error);
 
       // Revert UI on error
-      btnElement.classList.toggle('locked', isCurrentlyLocked);
-      btnElement.setAttribute('aria-label', `${isCurrentlyLocked ? 'Unlock' : 'Lock'} summary`);
+      summaryContainer.setAttribute('data-locked', isCurrentlyLocked);
+      headerElement.setAttribute('aria-label', `${isCurrentlyLocked ? 'Unlock' : 'Lock'} summary`);
+      headerElement.setAttribute('title', `Click to ${isCurrentlyLocked ? 'unlock' : 'lock'} this summary`);
       summaryElement.classList.toggle('locked', isCurrentlyLocked);
-      svg.innerHTML = isCurrentlyLocked ? lockedIcon : unlockedIcon;
 
       this.app.components.toast.show('Failed to toggle summary lock', { icon: '⚠️', type: 'error' });
     }

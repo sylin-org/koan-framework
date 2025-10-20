@@ -420,7 +420,8 @@ private async Task<Dictionary<TKey, TParent>> LoadParentsBatch<TParent>(
         .Distinct()
         .ToList();
 
-    // Single batch query using existing Data facade
+    // Single batch query using Data facade
+    // Note: At Entity<T> layer, prefer: await Parent.Get(parentIds, ct)
     var parents = await Data<TParent, TKey>.GetManyAsync(parentIds, ct);
     return parents.ToDictionary(p => p.Id, p => p);
 }

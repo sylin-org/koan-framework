@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
+using Koan.Data.Abstractions;
 using Koan.Data.Core;
 using Koan.Web.Attributes;
 using Koan.Web.Controllers;
@@ -61,7 +62,7 @@ public class PhotosController : EntityController<PhotoAsset>
         [FromQuery] string? collectionId = null,
         [FromQuery] string? searchQuery = null,
         [FromQuery] double searchAlpha = 0.5,
-        [FromQuery] string sortBy = "capturedAt",
+        [FromQuery] string sortBy = "id",
         [FromQuery] string sortOrder = "desc",
         CancellationToken ct = default)
     {
@@ -97,7 +98,7 @@ public class PhotosController : EntityController<PhotoAsset>
         [FromQuery] double searchAlpha = 0.5,
         [FromQuery] int startIndex = 0,
         [FromQuery] int count = 100,
-        [FromQuery] string sortBy = "capturedAt",
+        [FromQuery] string sortBy = "id",
         [FromQuery] string sortOrder = "desc",
         CancellationToken ct = default)
     {
@@ -181,6 +182,7 @@ public class PhotosController : EntityController<PhotoAsset>
 
     /// <summary>
     /// Build a photo query based on context (all-photos, collection, favorites, search)
+    /// Uses DataQueryOptions for provider-level sort pushdown (avoids in-memory sorting)
     /// </summary>
     private async Task<List<PhotoAsset>> BuildPhotoQuery(
         string context,
@@ -191,14 +193,17 @@ public class PhotosController : EntityController<PhotoAsset>
         string sortOrder,
         CancellationToken ct)
     {
-        List<PhotoAsset> photos;
+        // Build sort expression for provider pushdown (e.g., "-id" for descending, "id" for ascending)
+        var sortExpression = BuildSortExpression(sortBy, sortOrder);
 
         // Filter by context
         switch (context)
         {
             case "favorites":
-                photos = (await PhotoAsset.All(ct)).Where(p => p.IsFavorite).ToList();
-                break;
+                // Use Query with DataQueryOptions for pushdown
+                var queryOptions = new DataQueryOptions { Sort = sortExpression };
+                var favorites = await PhotoAsset.Query(p => p.IsFavorite, queryOptions, ct);
+                return favorites.ToList();
 
             case "search":
                 if (string.IsNullOrEmpty(searchQuery))
@@ -207,7 +212,7 @@ public class PhotosController : EntityController<PhotoAsset>
                 }
 
                 // Use semantic search service (returns List<PhotoAsset>)
-                photos = await _processingService.SemanticSearchAsync(
+                var searchResults = await _processingService.SemanticSearchAsync(
                     query: searchQuery,
                     eventId: null,
                     alpha: searchAlpha,
@@ -215,7 +220,7 @@ public class PhotosController : EntityController<PhotoAsset>
                 );
 
                 // Search results already have relevance sorting, skip additional sorting
-                return photos;
+                return searchResults;
 
             case "collection":
                 if (string.IsNullOrEmpty(collectionId))
@@ -229,53 +234,53 @@ public class PhotosController : EntityController<PhotoAsset>
                     throw new ArgumentException("Collection not found");
                 }
 
-                // Get photos in collection order
-                photos = new List<PhotoAsset>();
+                // Get photos in collection order using batch retrieval
+                var collectionPhotos = await PhotoAsset.Get(collection.PhotoIds, ct);
+
+                // Collections always preserve manual PhotoIds order (curated ordering)
+                // Sort parameters are ignored - collections are meant to have explicit order
+                var orderedPhotos = new List<PhotoAsset>();
                 foreach (var photoId in collection.PhotoIds)
                 {
-                    var photo = await PhotoAsset.Get(photoId, ct);
+                    var photo = collectionPhotos.FirstOrDefault(p => p.Id == photoId);
                     if (photo != null)
                     {
-                        photos.Add(photo);
+                        orderedPhotos.Add(photo);
                     }
                 }
-                // For collections, respect the PhotoIds order if sortBy is not specified
-                if (sortBy == "capturedAt" && sortOrder == "desc")
-                {
-                    // Default: use collection order (skip sorting)
-                    return photos;
-                }
-                break;
+                return orderedPhotos;
 
             case "all-photos":
             default:
-                photos = (await PhotoAsset.All(ct)).ToList();
-                break;
+                // Use DataQueryOptions for provider-level sort pushdown
+                var allOptions = new DataQueryOptions { Sort = sortExpression };
+                var allPhotos = await PhotoAsset.All(allOptions, ct);
+                return allPhotos.ToList();
         }
+    }
 
-        // Sort
-        photos = sortBy.ToLower() switch
+    /// <summary>
+    /// Build sort expression string for DataQueryOptions pushdown
+    /// Format: "-field" for descending, "field" for ascending
+    /// </summary>
+    private string BuildSortExpression(string sortBy, string sortOrder)
+    {
+        var normalizedSort = sortBy.ToLower();
+        var prefix = sortOrder.ToLower() == "desc" ? "-" : "";
+
+        // Map to actual entity property names
+        var fieldName = normalizedSort switch
         {
-            "capturedat" => sortOrder == "asc"
-                ? photos.OrderBy(p => p.CapturedAt ?? p.CreatedAt).ToList()
-                : photos.OrderByDescending(p => p.CapturedAt ?? p.CreatedAt).ToList(),
-
-            "createdat" => sortOrder == "asc"
-                ? photos.OrderBy(p => p.CreatedAt).ToList()
-                : photos.OrderByDescending(p => p.CreatedAt).ToList(),
-
-            "rating" => sortOrder == "asc"
-                ? photos.OrderBy(p => p.Rating).ToList()
-                : photos.OrderByDescending(p => p.Rating).ToList(),
-
-            "filename" => sortOrder == "asc"
-                ? photos.OrderBy(p => p.OriginalFileName).ToList()
-                : photos.OrderByDescending(p => p.OriginalFileName).ToList(),
-
-            _ => photos.OrderByDescending(p => p.CapturedAt ?? p.CreatedAt).ToList()
+            "id" => "Id",
+            "uploadedat" => "UploadedAt",
+            "capturedat" => "CapturedAt",  // Note: CapturedAt can be null
+            "createdat" => "CreatedAt",
+            "rating" => "Rating",
+            "filename" => "OriginalFileName",
+            _ => "Id"  // Default to Id (GUID v7 time-ordered)
         };
 
-        return photos;
+        return $"{prefix}{fieldName}";
     }
 
     /// <summary>
