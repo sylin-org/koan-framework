@@ -532,6 +532,123 @@
   color: rgba(234, 192, 80, 1);
 }
 
+/* Quick Regenerate Icons */
+.quick-regenerate-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin-top: 8px;
+}
+
+.quick-regenerate-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: capitalize;
+  letter-spacing: 0.05em;
+  color: rgba(96, 165, 250, 0.7);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 150ms ease;
+  white-space: nowrap;
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.quick-regenerate-icons {
+  display: inline-flex;
+  margin-left: auto;
+}
+
+.quick-regen-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 8px;
+  font-size: 18px;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(37, 99, 235, 0.15));
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  border-radius: 0;
+  color: rgba(96, 165, 250, 1);
+  cursor: pointer;
+  transition: all 150ms ease-in-out;
+  line-height: 1;
+
+  /* Blue monochrome tint to match regenerate icon - not gray (disabled) */
+  filter: grayscale(100%) brightness(0.7) sepia(100%) hue-rotate(190deg) saturate(500%);
+  opacity: 0.8;
+}
+
+/* First icon - rounded left */
+.quick-regen-icon:first-child {
+  border-radius: 8px 0 0 8px;
+}
+
+/* Last icon - rounded right */
+.quick-regen-icon:last-child {
+  border-radius: 0 8px 8px 0;
+  border-left: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+/* Only one icon - rounded both sides */
+.quick-regen-icon:only-child {
+  border-radius: 8px;
+  border-left: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+/* Remove right border for all except last */
+.quick-regen-icon:not(:last-child) {
+  border-right: none;
+}
+
+/* Middle icons - lighter left border */
+.quick-regen-icon:not(:first-child):not(:last-child) {
+  border-left: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+.quick-regen-icon:hover {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.25), rgba(37, 99, 235, 0.25));
+  border-color: rgba(59, 130, 246, 0.5);
+  z-index: 1;
+
+  /* Reveal full color on hover */
+  filter: none;
+  opacity: 1;
+}
+
+.quick-regen-icon:active {
+  transform: scale(0.98);
+}
+
+.quick-regen-icon.active {
+  border-bottom: 2px solid rgba(212, 175, 55, 0.8);
+
+  /* Brighter blue for active/MRU - stays monochrome but more prominent */
+  filter: grayscale(100%) brightness(1.1) sepia(100%) hue-rotate(190deg) saturate(600%);
+  opacity: 1;
+}
+
+.quick-regen-icon.loading {
+  pointer-events: none;
+  opacity: 0.5;
+  animation: pulse 1s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+.quick-regen-icon:focus-visible {
+  outline: 2px solid rgba(59, 130, 246, 0.6);
+  outline-offset: 2px;
+}
+
 .btn-regenerate-ai {
   display: flex;
   align-items: center;

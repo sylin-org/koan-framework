@@ -351,6 +351,12 @@ export class LightboxPanel {
 
         <!-- Regenerate button container (will be replaced with SplitButton) -->
         <div id="regenerate-button-container"></div>
+
+        <!-- Quick regenerate icons -->
+        <div class="quick-regenerate-container">
+          <div class="quick-regenerate-label" id="quick-regenerate-label"></div>
+          <div class="quick-regenerate-icons" id="quick-regenerate-icons"></div>
+        </div>
       `;
 
       // Add tag click handlers for filtering (future feature)
@@ -415,6 +421,9 @@ export class LightboxPanel {
 
         buttonContainer.appendChild(this.splitButton.getElement());
       }
+
+      // Populate quick regenerate icons
+      this.renderQuickRegenerateIcons(analysis.analysisStyle);
 
       return;
     }
@@ -735,6 +744,111 @@ export class LightboxPanel {
         priority: 0
       }];
     }
+  }
+
+  // Get recent analysis styles from localStorage
+  getRecentStyles() {
+    try {
+      const stored = localStorage.getItem('recentAnalysisStyles');
+      return stored ? JSON.parse(stored) : [];
+    } catch (error) {
+      console.error('Failed to load recent styles:', error);
+      return [];
+    }
+  }
+
+  // Update recent styles (add to front, remove duplicates, keep max 4)
+  updateRecentStyles(styleId) {
+    let recent = this.getRecentStyles();
+
+    // Remove if already exists (to move to front)
+    recent = recent.filter(id => id !== styleId);
+
+    // Add to front
+    recent.unshift(styleId);
+
+    // Keep only unique styles and limit to 4
+    recent = [...new Set(recent)].slice(0, 4);
+
+    // Save to localStorage
+    try {
+      localStorage.setItem('recentAnalysisStyles', JSON.stringify(recent));
+    } catch (error) {
+      console.error('Failed to save recent styles:', error);
+    }
+
+    return recent;
+  }
+
+  // Render quick regenerate icons
+  renderQuickRegenerateIcons(currentStyleId = null) {
+    const iconsContainer = document.getElementById('quick-regenerate-icons');
+    const labelContainer = document.getElementById('quick-regenerate-label');
+
+    if (!iconsContainer || !labelContainer) return;
+
+    // Update recent styles with current style
+    if (currentStyleId) {
+      this.updateRecentStyles(currentStyleId);
+    }
+
+    // Get recent styles
+    const recentStyleIds = this.getRecentStyles();
+
+    // Filter to only include styles that exist in analysisStyles
+    const recentStyles = recentStyleIds
+      .map(id => this.analysisStyles.find(s => s.id === id))
+      .filter(s => s != null)
+      .slice(0, 4); // Max 4 icons
+
+    // Clear existing icons
+    iconsContainer.innerHTML = '';
+
+    if (recentStyles.length === 0) {
+      iconsContainer.style.display = 'none';
+      return;
+    }
+
+    iconsContainer.style.display = 'flex';
+
+    // Render each style as an icon button
+    recentStyles.forEach((style, index) => {
+      const button = document.createElement('button');
+      button.className = 'quick-regen-icon';
+      button.dataset.styleId = style.id;
+      button.setAttribute('aria-label', `Regenerate with ${style.name || style.label}`);
+      button.innerHTML = style.icon || '📸';
+
+      // Mark first (most recent) as active
+      if (index === 0) {
+        button.classList.add('active');
+      }
+
+      // Hover to show label
+      button.addEventListener('mouseenter', () => {
+        labelContainer.textContent = style.name || style.label || style.id;
+        labelContainer.style.opacity = '1';
+      });
+
+      button.addEventListener('mouseleave', () => {
+        labelContainer.style.opacity = '0';
+      });
+
+      // Click to regenerate
+      button.addEventListener('click', async (e) => {
+        e.stopPropagation();
+
+        // Set loading state
+        button.classList.add('loading');
+
+        // Regenerate with this style
+        await this.regenerateAIAnalysis(style.id);
+
+        // Loading state will be cleared on re-render
+      });
+
+      iconsContainer.appendChild(button);
+    });
   }
 
   async regenerateAIAnalysis(analysisStyle = null) {
