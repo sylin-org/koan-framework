@@ -29,6 +29,10 @@ export class PhotoSetManager {
       tier4Range: 20
     });
 
+    // Session state
+    this.sessionId = null;      // Server-assigned session ID
+    this.sessionName = null;    // User-defined session name
+
     // Current state
     this.currentIndex = -1;
     this.currentPhoto = null;
@@ -267,7 +271,7 @@ export class PhotoSetManager {
   }
 
   /**
-   * Load a window of photo metadata
+   * Load a window of photo metadata using session endpoint
    */
   async loadWindow(startIndex, count = null) {
     if (count === null) {
@@ -280,17 +284,36 @@ export class PhotoSetManager {
     console.log(`[PhotoSet] Loading window [${startIndex}, ${startIndex + count}]`);
 
     try {
-      const response = await this.api.get('/api/photos/range', {
-        context: this.definition.type,
-        collectionId: this.definition.id,
-        searchQuery: this.definition.searchQuery,
-        searchAlpha: this.definition.searchAlpha,
-        startIndex: startIndex,
-        count: count,
-        sortBy: this.definition.sortBy || 'capturedAt',
-        sortOrder: this.definition.sortOrder || 'desc',
-        filters: this.definition.filters ? JSON.stringify(this.definition.filters) : undefined
-      });
+      // Build request for session endpoint
+      const request = {
+        startIndex,
+        count: count || 200
+      };
+
+      // Include session ID if available (reuse existing session)
+      if (this.sessionId) {
+        request.sessionId = this.sessionId;
+      } else {
+        // First request - include definition to create session
+        request.definition = {
+          context: this.definition.type,
+          searchQuery: this.definition.searchQuery,
+          searchAlpha: this.definition.searchAlpha,
+          collectionId: this.definition.id,
+          sortBy: this.definition.sortBy || 'capturedAt',
+          sortOrder: this.definition.sortOrder || 'desc'
+        };
+      }
+
+      // Use session-aware endpoint
+      const response = await this.api.post('/api/photosets/query', request);
+
+      // Store session ID for subsequent requests
+      if (response.sessionId) {
+        this.sessionId = response.sessionId;
+        this.sessionName = response.sessionName;
+        console.log(`[PhotoSet] Session: ${this.sessionId}${this.sessionName ? ' (' + this.sessionName + ')' : ''}`);
+      }
 
       // Store photos in window cache
       this.window.setRange(response.startIndex, response.photos);
@@ -412,11 +435,13 @@ export class PhotoSetManager {
   }
 
   /**
-   * Clear all caches
+   * Clear all caches and session
    */
   clear() {
     this.window.clear();
     this.preloader.clear();
+    this.sessionId = null;
+    this.sessionName = null;
     this.currentIndex = -1;
     this.currentPhoto = null;
     this.isInitialized = false;
