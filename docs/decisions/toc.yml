@@ -198,6 +198,8 @@
       href: DATA-0076-mongo-id-index-governance.md
     - name: DATA-0077 Canonical patch operations
       href: DATA-0077-canonical-patch-operations.md
+    - name: DATA-0084 Vector workflows and profiles
+      href: DATA-0084-vector-workflows-and-profiles.md
 - name: Web (WEB)
   items:
     - name: WEB-0010 Separate AI web surface

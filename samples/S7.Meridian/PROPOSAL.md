@@ -75,7 +75,7 @@ Meridian approach (corrected):
 ```
 PDF → Text extraction (PdfPig/Tesseract)
     → Chunk into passages (semantic boundaries)
-    → Embed + index in Weaviate (hybrid search)
+    → Embed + index via Koan vector workflow (hybrid search)
     → Per-field RAG query:
        "Find passages about annual revenue"
        → Retrieve top-K passages (BM25 + vector)
@@ -364,6 +364,34 @@ public class PipelineQualityMetrics
 └──────────────────────────────────────────────┘
 ```
 
+**9. Provider-Agnostic Vector Workflows**
+
+```
+Anti-pattern: Inline vector client calls → provider lock-in, adhoc parameters
+Meridian: VectorWorkflow<T>.Save/QueryAsync → profiles, defaults, observability
+
+Usage:
+await VectorWorkflow<Passage>.Save(passage, embedding,
+    metadata: BuildMetadata(passage),
+    profile: "meridian:evidence",
+    ct: ct);
+
+var hits = await VectorWorkflow<Passage>
+    .For("meridian:evidence")
+    .QueryAsync(vector, text: query, ct: ct);
+```
+
+**Profiles & Defaults:**
+- Zero-config: `VectorWorkflow<Passage>.Save(...)` picks the active vector provider and default profile (`TopK = 10`, `Alpha = 0.5`).
+- Named profiles: `VectorProfile.For<Passage>("meridian:evidence").TopK(12).Alpha(0.55);` registered via `KoanAutoRegistrar` or configuration (`Koan:Data:Vector:Profiles`).
+- Progressive ergonomics: metadata helpers (`.WithMetadata(...)`), quality gates (`.WithQualityGate(...)`), and fallbacks (`.FallbackTo(...)`) mirror Koan scheduling/task DSL patterns.
+
+**DX Guardrails:**
+- `VectorWorkflow<T>.IsAvailable()` mirrors existing `Vector<T>.IsAvailable` checks for graceful degradation.
+- Profiles can opt into telemetry (`EmitMetrics = true`) so `RunLog` entries and `PipelineQualityMetrics` stay in sync without custom logging.
+- Hybrid search defaults derive from profile settings—operators override via configuration without redeploying code.
+- Reference: `DATA-0084` covers the platform-wide decision for workflows and profiles.
+
 ---
 
 ## System Architecture (Revised)
@@ -377,7 +405,7 @@ public class PipelineQualityMetrics
 └──────────┘    └───────────┘    └──────────┘    └─────────┘    └───────────┘    └─────────┘
      │               │                │                │              │                │
      ↓               ↓                ↓                ↓              ↓                ↓
-Storage         PdfPig/          Weaviate        Per-field       Precedence      Mustache
+Storage         PdfPig/          Vector WF       Per-field       Precedence      Mustache
 (Cold)         Tesseract        (passages)         RAG            Rules            + Pandoc
                                                  Query                              → PDF
 ```
@@ -457,7 +485,7 @@ public class SourceDocument : MediaEntity<SourceDocument>
 
     // Processing state
     public DateTime UploadedAt { get; set; }
-    public DateTime? IndexedAt { get; set; } // When passages embedded in Weaviate
+    public DateTime? IndexedAt { get; set; } // When passages synced to the vector store
     public ProcessingStatus Status { get; set; }
 }
 
@@ -470,13 +498,13 @@ public enum ClassificationMethod
 }
 ```
 
-#### 3. Passage (NEW - Weaviate-Only Vectors)
+#### 3. Passage (NEW - Vector Workflow Backed)
 ```csharp
 /// <summary>
-/// Chunked text segment from source document, indexed in Weaviate.
+/// Chunked text segment from source document, indexed through Koan's vector workflow facade.
 /// Enables passage-level retrieval and citation.
 /// Uses compound natural key for idempotent re-indexing.
-/// CRITICAL: Embeddings stored in Weaviate ONLY (not in Mongo) to keep docs light.
+/// CRITICAL: Embeddings live in the configured vector provider (not Mongo) to keep docs light.
 /// </summary>
 public class Passage : Entity<Passage>
 {
@@ -499,9 +527,9 @@ public class Passage : Entity<Passage>
     // Content hash (for detecting text changes on re-index)
     public string? TextHash { get; set; } // SHA-256 of Text
 
-    // Embedding NOT stored in Mongo (Weaviate-only for vectors)
+    // Embeddings are not stored in Mongo (vector provider only)
     // This keeps Mongo documents light and backups fast
-    // Weaviate is the source of truth for vectors; use naturalKey for lookups
+    // The vector store is the source of truth; use naturalKey for lookups
 
     // Metadata for hybrid search
     public DateTime IndexedAt { get; set; }
@@ -509,7 +537,7 @@ public class Passage : Entity<Passage>
     /// <summary>
     /// Generates a compound key for idempotent indexing.
     /// Format: "{SourceDocumentId}#{SequenceNumber}"
-    /// Used for Weaviate upsert and Mongo queries.
+    /// Used for vector store upsert and Mongo queries.
     /// </summary>
     public string GetNaturalKey()
     {
@@ -1057,7 +1085,7 @@ public class DocumentProcessingWorker : BackgroundService
         var chunkingService = _sp.GetRequiredService<IPassageChunker>();
         var passages = await chunkingService.ChunkAsync(doc, ct);
 
-        // Stage 3: Embed and index in Weaviate
+    // Stage 3: Embed and index via vector workflow
         var indexService = _sp.GetRequiredService<IPassageIndexer>();
         await indexService.IndexAsync(passages, ct);
 
@@ -1650,7 +1678,7 @@ public async Task<IActionResult> Upload(
 }
 ```
 
-**Passage Indexing Service (Weaviate with Idempotent Upsert)**
+**Passage Indexing Service (Vector Workflow with Idempotent Save)**
 ```csharp
 public class PassageIndexer : IPassageIndexer
 {
@@ -1659,6 +1687,8 @@ public class PassageIndexer : IPassageIndexer
 
     public async Task IndexAsync(List<Passage> passages, CancellationToken ct)
     {
+        var workflow = VectorWorkflow<Passage>.For("meridian:evidence");
+
         // IDEMPOTENT UPSERT: Check for existing passages by natural key
         var toEmbed = new List<(Passage passage, string text, bool isNew)>();
         var cached = new List<(Passage passage, float[] embedding)>();
@@ -1720,42 +1750,33 @@ public class PassageIndexer : IPassageIndexer
                 var contentHash = EmbeddingCache.ComputeContentHash(text);
                 await _cache.SetAsync(contentHash, "nomic-embed-text", embedding, "Passage", ct);
 
-                // Save to Passage entity
-                passage.Embedding = embedding;
+                // Update passage metadata
                 passage.IndexedAt = DateTime.UtcNow;
                 await passage.Save(ct);
 
-                // Upsert in Weaviate (use passage.Id for consistency)
-                await UpsertInWeaviate(passage, embedding, ct);
+                // Persist via Koan vector workflow
+                await workflow.Save(passage, embedding, metadata: BuildMetadata(passage), ct);
             }
         }
 
         // Index cached passages
         foreach (var (passage, embedding) in cached)
         {
-            passage.Embedding = embedding;
             passage.IndexedAt = DateTime.UtcNow;
             await passage.Save(ct);
-            await UpsertInWeaviate(passage, embedding, ct);
+            await workflow.Save(passage, embedding, metadata: BuildMetadata(passage), ct);
         }
     }
 
-    private async Task UpsertInWeaviate(Passage passage, float[] embedding, CancellationToken ct)
+    private static IReadOnlyDictionary<string, object> BuildMetadata(Passage passage) => new Dictionary<string, object>
     {
-        // Use Koan's vector abstraction with passage.Id for idempotent upsert
-        var metadata = new Dictionary<string, object>
-        {
-            ["naturalKey"] = passage.GetNaturalKey(),
-            ["sourceDocumentId"] = passage.SourceDocumentId,
-            ["pipelineId"] = passage.PipelineId,
-            ["pageNumber"] = passage.PageNumber,
-            ["sectionHeading"] = passage.SectionHeading ?? "",
-            ["searchText"] = passage.Text // For hybrid search (BM25)
-        };
-
-        // Weaviate will update if ID exists, insert if new
-        await Data<Passage, string>.SaveWithVector(passage, embedding, metadata, ct);
-    }
+        ["naturalKey"] = passage.GetNaturalKey(),
+        ["sourceDocumentId"] = passage.SourceDocumentId,
+        ["pipelineId"] = passage.PipelineId,
+        ["pageNumber"] = passage.PageNumber,
+        ["sectionHeading"] = passage.SectionHeading ?? string.Empty,
+        ["searchText"] = passage.Text
+    };
 
     private string ComputeTextHash(string text)
     {
@@ -1878,23 +1899,25 @@ public class FieldExtractor : IFieldExtractor
         // Embed query
         var queryEmbedding = await Koan.AI.Ai.Embed(query, ct);
 
+        var workflow = VectorWorkflow<Passage>.For("meridian:evidence");
+
         // Hybrid search (BM25 + vector) with increased k for noisy PDFs
-        var results = await Vector<Passage>.Search(
+        var results = await workflow.QueryAsync(
             vector: queryEmbedding,
-            text: query, // Enables hybrid search
-            alpha: 0.5,  // 50/50 semantic + keyword
-            topK: 12,    // Increased from 5 to handle noisy PDFs better
+            text: query,
+            alpha: 0.5,
+            topK: 12,
             ct: ct
         );
 
         // Load passages, filter by source document
-        var passages = new List<Passage>();
+        var passages = new List<(Passage passage, double score, float[]? vector)>();
         foreach (var match in results.Matches)
         {
             var passage = await Passage.Get(match.Id, ct);
             if (passage != null && passage.SourceDocumentId == sourceDocumentId)
             {
-                passages.Add((passage, match.Score));
+                passages.Add((passage, match.Score, match.Vector));
             }
         }
 
@@ -1912,19 +1935,19 @@ public class FieldExtractor : IFieldExtractor
     }
 
     private List<Passage> ApplyMMR(
-        List<(Passage passage, double score)> rankedPassages,
+        List<(Passage passage, double score, float[]? vector)> rankedPassages,
         float[] queryEmbedding,
         int maxPassages,
         double lambda = 0.7)
     {
         // MMR balances relevance (query similarity) with diversity (inter-passage dissimilarity)
-        var selected = new List<Passage>();
+        var selected = new List<(Passage passage, float[]? vector)>();
         var remaining = rankedPassages.ToList();
 
         while (selected.Count < maxPassages && remaining.Count > 0)
         {
             double bestScore = double.MinValue;
-            (Passage passage, double score)? bestCandidate = null;
+            (Passage passage, double score, float[]? vector)? bestCandidate = null;
             int bestIndex = -1;
 
             for (int i = 0; i < remaining.Count; i++)
@@ -1936,14 +1959,14 @@ public class FieldExtractor : IFieldExtractor
 
                 // Max similarity to already selected passages (diversity penalty)
                 var maxSimilarity = 0.0;
-                if (selected.Count > 0 && candidate.passage.Embedding != null)
+                if (selected.Count > 0 && candidate.vector is { Length: > 0 })
                 {
                     foreach (var selectedPassage in selected)
                     {
-                        if (selectedPassage.Embedding != null)
+                        if (selectedPassage.vector is { Length: > 0 })
                         {
                             var similarity = CosineSimilarity(
-                                candidate.passage.Embedding, selectedPassage.Embedding);
+                                candidate.vector!, selectedPassage.vector!);
                             maxSimilarity = Math.Max(maxSimilarity, similarity);
                         }
                     }
@@ -1962,7 +1985,7 @@ public class FieldExtractor : IFieldExtractor
 
             if (bestCandidate.HasValue)
             {
-                selected.Add(bestCandidate.Value.passage);
+                selected.Add((bestCandidate.Value.passage, bestCandidate.Value.vector));
                 remaining.RemoveAt(bestIndex);
             }
             else
@@ -1971,7 +1994,7 @@ public class FieldExtractor : IFieldExtractor
             }
         }
 
-        return selected;
+        return selected.Select(pair => pair.passage).ToList();
     }
 
     private List<Passage> TournamentSelection(List<Passage> passages, int maxTokens)
@@ -4249,7 +4272,7 @@ Then run: `sudo update-texmf`
 ✅ **Performance**
 - [ ] MMR/topK/alpha configurable in `appsettings.json`
 - [ ] Parallelism capped at `min(cores, 8)` with backpressure
-- [ ] Embeddings stored in Weaviate only (not Mongo)
+- [ ] Embeddings stored only in the vector provider (not Mongo)
 - [ ] PDF cache keyed by `(dataHash, templateHash)`
 - [ ] Classification metadata cached in-memory
 
@@ -4265,7 +4288,7 @@ Then run: `sudo update-texmf`
 ### Phase 1: Text-First RAG + Durable Processing (Week 1-2)
 - ✅ Text extraction (PdfPig + Tesseract)
 - ✅ Passage chunking (semantic boundaries)
-- ✅ Weaviate indexing (hybrid search)
+- ✅ Vector workflow indexing (hybrid search)
 - ✅ Per-field RAG extraction
 - ✅ Durable job queue (Mongo + BackgroundService)
 
@@ -4306,7 +4329,7 @@ Then run: `sudo update-texmf`
 - Demonstrates **NOT** using EntityController for complex workflows
 - Validates text-first RAG over vision-only extraction
 - Shows durable background processing pattern
-- Exercises vector hybrid search + embedding cache
+- Exercises vector workflow hybrid search + embedding cache
 - Proves Mustache + Pandoc narrative rendering
 
 **Next Steps:**
@@ -4327,7 +4350,7 @@ Then run: `sudo update-texmf`
 1. ✅ **Typed JSON End-to-End** - `ExtractedField` now stores typed JSON strings with `ValueType` enum; pre-save validation enforces type fidelity
 2. ✅ **Atomic Job Claim** - Single MongoDB `findOneAndUpdate` with compound filter documented; indexes specified
 3. ✅ **Compact Schema Excerpts** - `SchemaExcerptHelper` targets <300 tokens per field schema
-4. ✅ **Weaviate-Only Embeddings** - Removed embedding storage from Mongo `Passage` entity for light docs/fast backups
+4. ✅ **Vector-Store-Only Embeddings** - Removed embedding storage from Mongo `Passage` entity for light docs/fast backups
 5. ✅ **Classification Versioning** - `SourceDocument.ClassifiedTypeVersion` prevents silent behavior shifts during refresh
 6. ✅ **Unique Index for Dedupe** - `(pipelineId, key)` unique index + pre-save hash lookup prevents duplicate uploads
 7. ✅ **Transform Provenance** - `MergeTransforms.NormalizeToUSDWithProvenance()` stores rate source + timestamp in `RuleConfig`
