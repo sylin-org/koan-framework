@@ -1407,6 +1407,36 @@ public class PassageChunker : IPassageChunker
 - Stage 2: Vector similarity (embed preview, compare to cached SourceType vectors) – accept when cosine similarity ≥0.75.
 - Stage 3: LLM fallback (prompt with SourceType catalog, parse {typeId, confidence, reasoning}) – default to confidence 0.3 if parsing fails.
 - Persist ClassifiedTypeId, ClassifiedTypeVersion, ClassificationConfidence, ClassificationMethod, and reasoning.
+## Usage Scenario Story Scripts
+
+### Scenario A – Enterprise Architecture Review (Cross-Type Cascade)
+1. Define SourceTypes (AI-assisted or manual) for meeting notes, customer technical bulletin, vendor prescreen questionnaire, and cybersecurity risk assessment.
+2. Upload one .txt document per SourceType.
+3. Create an AnalysisType named "Enterprise Architecture Review" with instructions and output template.
+4. Create an analysis referencing the AnalysisType and attach all uploaded documents.
+5. Run pipeline; verify classification, extraction, merge, and deliverable reflect the defined types.
+
+### Scenario B – Single-Field Manual Override
+1. Run pipeline, fetch deliverable.
+2. POST /api/pipelines/{id}/fields/$.revenue/override with reviewer value + reason.
+3. Fetch deliverable – revenue reflects override; merge decision logs override.
+4. DELETE override; rerun to confirm AI value restored.
+
+### Scenario C – Targeted Incremental Refresh
+1. Baseline pipeline with two docs; capture deliverable + timestamps.
+2. Upload third doc; POST /api/pipelines/{id}/refresh.
+3. On completion, verify only impacted fields reprocessed and refresh logged.
+
+### Scenario D – Override Persistence Through Refresh
+1. Override compliance status via API.
+2. Upload new doc; run refresh – override still applied (confidence 1.0).
+3. DELETE override; refresh – AI value returns.
+4. Review merge decisions/run logs for override lifecycle.
+
+### Scenario E – Override Escalation & Reversion
+1. Override employees count; realize mistake; DELETE override.
+2. Run refresh to ensure AI value reinstated.
+3. Confirm merge decisions capture override + revert, final deliverable matches AI output.
 ### Source & Analysis Type Authoring (Phase 4.5)
 
 #### SourceType Enhancements
@@ -4743,4 +4773,5 @@ Then run: `sudo update-texmf`
 16. ✅ Comprehensive acceptance criteria with 6 key tests
 
 **Total Lines**: 4400+ (production-locked specification with full implementation details)
+
 
