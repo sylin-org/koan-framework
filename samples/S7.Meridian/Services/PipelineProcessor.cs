@@ -1,6 +1,10 @@
+using System;
 using System.Collections.Generic;
-using Koan.Data.Core;
+using System.Globalization;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using Koan.Data.Core;
 using Koan.Samples.Meridian.Infrastructure;
 using Koan.Samples.Meridian.Models;
 using Microsoft.Extensions.Logging;
@@ -21,6 +25,7 @@ public sealed class PipelineProcessor : IPipelineProcessor
     private readonly IDocumentMerger _merger;
     private readonly IDocumentClassifier _classifier;
     private readonly IRunLogWriter _runLog;
+    private readonly IIncrementalRefreshPlanner _refreshPlanner;
     private readonly MeridianOptions _options;
     private readonly ILogger<PipelineProcessor> _logger;
 
@@ -32,6 +37,7 @@ public sealed class PipelineProcessor : IPipelineProcessor
         IDocumentMerger merger,
         IDocumentClassifier classifier,
         IRunLogWriter runLog,
+        IIncrementalRefreshPlanner refreshPlanner,
         MeridianOptions options,
         ILogger<PipelineProcessor> logger)
     {
@@ -42,6 +48,7 @@ public sealed class PipelineProcessor : IPipelineProcessor
         _merger = merger;
         _classifier = classifier;
         _runLog = runLog;
+        _refreshPlanner = refreshPlanner;
         _options = options;
         _logger = logger;
     }
@@ -51,7 +58,33 @@ public sealed class PipelineProcessor : IPipelineProcessor
         var pipeline = await DocumentPipeline.Get(job.PipelineId, ct)
             ?? throw new InvalidOperationException($"Pipeline {job.PipelineId} not found.");
 
+        pipeline.Status = PipelineStatus.Processing;
+        pipeline.ProcessedDocuments = 0;
+        pipeline.UpdatedAt = DateTime.UtcNow;
+        await pipeline.Save(ct);
+
+        if (job.TotalDocuments == 0)
+        {
+            job.TotalDocuments = job.DocumentIds.Count;
+        }
+
+        job.ProcessedDocuments = Math.Min(job.ProcessedDocuments, job.TotalDocuments);
+        job.HeartbeatAt = DateTime.UtcNow;
+        job.LastDocumentId = null;
+        await job.Save(ct);
+
+        var changedDocuments = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var passages = new List<Passage>();
+        var processedCount = 0;
+
+        async Task PersistProgressAsync(string? documentId)
+        {
+            job.ProcessedDocuments = Math.Min(processedCount, job.TotalDocuments);
+            job.LastDocumentId = documentId;
+            job.HeartbeatAt = DateTime.UtcNow;
+            await job.Save(ct).ConfigureAwait(false);
+        }
+
         foreach (var documentId in job.DocumentIds)
         {
             ct.ThrowIfCancellationRequested();
@@ -60,6 +93,8 @@ public sealed class PipelineProcessor : IPipelineProcessor
             if (document is null)
             {
                 _logger.LogWarning("Document {DocumentId} missing for pipeline {PipelineId}.", documentId, job.PipelineId);
+                processedCount++;
+                await PersistProgressAsync(documentId).ConfigureAwait(false);
                 continue;
             }
 
@@ -86,15 +121,16 @@ public sealed class PipelineProcessor : IPipelineProcessor
             {
                 PipelineId = pipeline.Id,
                 Stage = "extract",
+                DocumentId = document.Id,
                 FieldPath = null,
                 StartedAt = extractStarted,
                 FinishedAt = extractFinished,
                 Status = "success",
                 Metadata = new Dictionary<string, string>
                 {
-                    ["documentId"] = document.Id,
                     ["method"] = extraction.Method,
-                    ["confidence"] = extraction.Confidence.ToString("0.00")
+                    ["confidence"] = extraction.Confidence.ToString("0.00"),
+                    ["pageCount"] = extraction.PageCount.ToString(CultureInfo.InvariantCulture)
                 }
             }, ct);
 
@@ -108,17 +144,19 @@ public sealed class PipelineProcessor : IPipelineProcessor
                 {
                     PipelineId = pipeline.Id,
                     Stage = "refresh",
+                    DocumentId = document.Id,
                     FieldPath = null,
                     StartedAt = extractFinished,
                     FinishedAt = extractFinished,
                     Status = "skipped",
                     Metadata = new Dictionary<string, string>
                     {
-                        ["documentId"] = document.Id,
                         ["reason"] = "text-hash-unchanged"
                     }
                 }, ct);
 
+                processedCount++;
+                await PersistProgressAsync(document.Id).ConfigureAwait(false);
                 continue;
             }
 
@@ -153,7 +191,6 @@ public sealed class PipelineProcessor : IPipelineProcessor
 
                 var metadata = new Dictionary<string, string>
                 {
-                    ["documentId"] = document.Id,
                     ["typeId"] = classification.TypeId,
                     ["confidence"] = classification.Confidence.ToString("0.00"),
                     ["method"] = classification.Method.ToString(),
@@ -165,13 +202,18 @@ public sealed class PipelineProcessor : IPipelineProcessor
                 {
                     PipelineId = pipeline.Id,
                     Stage = "classify",
+                    DocumentId = document.Id,
                     FieldPath = null,
                     StartedAt = classifyStarted,
                     FinishedAt = classifyFinished,
                     Status = "excluded",
+                    ModelId = classification.Method.ToString(),
+                    ErrorMessage = exclusionReason,
                     Metadata = metadata
                 }, ct);
 
+                processedCount++;
+                await PersistProgressAsync(document.Id).ConfigureAwait(false);
                 continue;
             }
 
@@ -179,9 +221,10 @@ public sealed class PipelineProcessor : IPipelineProcessor
             document.UpdatedAt = classifyFinished;
             await document.Save(ct);
 
+            changedDocuments.Add(document.Id);
+
             var allowedMetadata = new Dictionary<string, string>
             {
-                ["documentId"] = document.Id,
                 ["typeId"] = classification.TypeId,
                 ["confidence"] = classification.Confidence.ToString("0.00"),
                 ["method"] = classification.Method.ToString(),
@@ -193,10 +236,12 @@ public sealed class PipelineProcessor : IPipelineProcessor
             {
                 PipelineId = pipeline.Id,
                 Stage = "classify",
+                DocumentId = document.Id,
                 FieldPath = null,
                 StartedAt = classifyStarted,
                 FinishedAt = classifyFinished,
                 Status = "success",
+                ModelId = classification.Method.ToString(),
                 Metadata = allowedMetadata
             }, ct);
 
@@ -206,6 +251,9 @@ public sealed class PipelineProcessor : IPipelineProcessor
                 var saved = await chunk.Save(ct);
                 passages.Add(saved);
             }
+
+            processedCount++;
+            await PersistProgressAsync(document.Id).ConfigureAwait(false);
         }
 
         await _indexer.IndexAsync(passages, ct);
@@ -226,14 +274,55 @@ public sealed class PipelineProcessor : IPipelineProcessor
             }
         }
 
+        pipeline.ProcessedDocuments = job.ProcessedDocuments;
+        pipeline.UpdatedAt = DateTime.UtcNow;
+        await pipeline.Save(ct);
+
         var allPassages = await Passage.Query(p => p.PipelineId == pipeline.Id, ct);
-        var extractions = await _fieldExtractor.ExtractAsync(pipeline, allPassages, _options, ct);
+        var existingFields = (await ExtractedField.Query(e => e.PipelineId == pipeline.Id, ct).ConfigureAwait(false)).ToList();
+        var plan = await _refreshPlanner.PlanAsync(pipeline, changedDocuments, existingFields, ct).ConfigureAwait(false);
 
-        var existingFields = await ExtractedField.Query(e => e.PipelineId == pipeline.Id, ct);
+        var planTimestamp = DateTime.UtcNow;
+        var planMetadata = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["mode"] = plan.Mode,
+            ["changedDocuments"] = changedDocuments.Count.ToString(CultureInfo.InvariantCulture),
+            ["fieldsToExtract"] = plan.RequiresFullExtraction ? "all" : plan.FieldsToExtract.Count.ToString(CultureInfo.InvariantCulture),
+            ["fieldsPreserved"] = plan.RequiresFullExtraction ? "0" : plan.FieldsToPreserve.Count.ToString(CultureInfo.InvariantCulture)
+        };
+
+        if (!plan.RequiresFullExtraction && plan.Reasons.Count > 0)
+        {
+            planMetadata["reasonCount"] = plan.Reasons.Count.ToString(CultureInfo.InvariantCulture);
+        }
+
+        await _runLog.AppendAsync(new RunLog
+        {
+            PipelineId = pipeline.Id,
+            Stage = "refresh-plan",
+            DocumentId = null,
+            FieldPath = null,
+            StartedAt = planTimestamp,
+            FinishedAt = DateTime.UtcNow,
+            Status = plan.Mode,
+            Metadata = planMetadata
+        }, ct).ConfigureAwait(false);
+
+        HashSet<string>? fieldFilter = null;
+        if (!plan.RequiresFullExtraction && plan.FieldsToExtract.Count > 0)
+        {
+            fieldFilter = plan.FieldsToExtract.ToHashSet(StringComparer.Ordinal);
+        }
+
+        var freshExtractions = new List<ExtractedField>();
+        if (plan.RequiresFullExtraction || (fieldFilter?.Count ?? 0) > 0)
+        {
+            freshExtractions = await _fieldExtractor.ExtractAsync(pipeline, allPassages, _options, fieldFilter, ct).ConfigureAwait(false);
+        }
+
         var existingByField = existingFields.ToDictionary(e => e.FieldPath, StringComparer.Ordinal);
-
         var savedExtractions = new List<ExtractedField>();
-        foreach (var extraction in extractions)
+        foreach (var extraction in freshExtractions)
         {
             if (existingByField.TryGetValue(extraction.FieldPath, out var prior))
             {
@@ -241,11 +330,68 @@ public sealed class PipelineProcessor : IPipelineProcessor
             }
 
             extraction.UpdatedAt = DateTime.UtcNow;
-            var saved = await extraction.Save(ct);
+            var saved = await extraction.Save(ct).ConfigureAwait(false);
             existingByField[extraction.FieldPath] = saved;
             savedExtractions.Add(saved);
         }
 
-        await _merger.MergeAsync(pipeline, savedExtractions, ct);
+        List<ExtractedField> mergeCandidates;
+        if (plan.RequiresFullExtraction)
+        {
+            mergeCandidates = savedExtractions.Count > 0 ? savedExtractions : existingFields.ToList();
+        }
+        else
+        {
+            var combined = new List<ExtractedField>(savedExtractions);
+            var savedPaths = new HashSet<string>(savedExtractions.Select(f => f.FieldPath), StringComparer.Ordinal);
+
+            foreach (var fieldPath in plan.FieldsToPreserve)
+            {
+                if (savedPaths.Contains(fieldPath))
+                {
+                    continue;
+                }
+
+                if (existingByField.TryGetValue(fieldPath, out var preserved))
+                {
+                    combined.Add(preserved);
+                }
+            }
+
+            if (combined.Count == 0 && existingFields.Count > 0)
+            {
+                combined.AddRange(existingFields);
+            }
+
+            mergeCandidates = combined;
+        }
+
+        if (mergeCandidates.Count == 0)
+        {
+            if (existingFields.Count > 0)
+            {
+                mergeCandidates = existingFields.ToList();
+                await _runLog.AppendAsync(new RunLog
+                {
+                    PipelineId = pipeline.Id,
+                    Stage = "refresh-fallback",
+                    FieldPath = null,
+                    StartedAt = DateTime.UtcNow,
+                    FinishedAt = DateTime.UtcNow,
+                    Status = "preserved",
+                    Metadata = new Dictionary<string, string>
+                    {
+                        ["reason"] = "no-new-extractions",
+                        ["preservedFields"] = existingFields.Count.ToString(CultureInfo.InvariantCulture)
+                    }
+                }, ct).ConfigureAwait(false);
+            }
+            else
+            {
+                throw new InvalidOperationException("Incremental refresh produced no fields to merge.");
+            }
+        }
+
+        await _merger.MergeAsync(pipeline, mergeCandidates, ct);
     }
 }

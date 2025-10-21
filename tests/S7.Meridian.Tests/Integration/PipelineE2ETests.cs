@@ -125,10 +125,10 @@ public sealed class PipelineE2ETests
 
             var deliverables = await Deliverable.Query(d => d.PipelineId == pipeline.Id, ct);
             var deliverable = deliverables.Should().ContainSingle().Subject;
-            deliverable.Markdown.Should().Contain("Revenue: 47.2[^1]");
-            deliverable.Markdown.Should().Contain("Employees: 150");
-            deliverable.Markdown.Should().Contain("[^1]:");
-            deliverable.Markdown.Should().Contain("financials.txt");
+            deliverable.RenderedMarkdown.Should().Contain("Revenue: 47.2[^1]");
+            deliverable.RenderedMarkdown.Should().Contain("Employees: 150");
+            deliverable.RenderedMarkdown.Should().Contain("[^1]:");
+            deliverable.RenderedMarkdown.Should().Contain("financials.txt");
 
             var persistedPipeline = await DocumentPipeline.Get(pipeline.Id, ct);
             persistedPipeline.Should().NotBeNull();
@@ -197,6 +197,7 @@ public sealed class PipelineE2ETests
         services.AddSingleton<IDocumentStorage>(storage);
         services.AddSingleton<IDeliverableStorage>(deliverableStorage);
         services.AddSingleton<IEmbeddingCache>(cache);
+        services.AddSingleton<IPdfRenderer, FakePdfRenderer>();
         services.AddSingleton(sp => sp.GetRequiredService<IOptions<MeridianOptions>>().Value);
 
         return (services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true }), storage, cache);
@@ -245,6 +246,15 @@ public sealed class PipelineE2ETests
             var key = $"deliverables/{Guid.NewGuid():N}/{fileName}";
             _store[key] = ms.ToArray();
             return key;
+        }
+    }
+
+    private sealed class FakePdfRenderer : IPdfRenderer
+    {
+        public Task<byte[]> RenderAsync(string markdown, CancellationToken ct = default)
+        {
+            var bytes = Encoding.UTF8.GetBytes(markdown ?? string.Empty);
+            return Task.FromResult(bytes);
         }
     }
 

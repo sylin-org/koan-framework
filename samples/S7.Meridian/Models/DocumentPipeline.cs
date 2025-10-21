@@ -11,6 +11,17 @@ public sealed class DocumentPipeline : Entity<DocumentPipeline>
     public string? Description { get; set; }
         = "Evidence-backed narrative pipeline";
 
+    /// <summary>Identifier of the deliverable type backing this pipeline.</summary>
+    public string DeliverableTypeId { get; set; } = string.Empty;
+
+    /// <summary>Version of the deliverable type snapshot applied to this pipeline.</summary>
+    public int DeliverableTypeVersion { get; set; }
+        = 1;
+
+    /// <summary>Track source type versions pinned for this pipeline.</summary>
+    public Dictionary<string, int> SourceTypeVersions { get; set; }
+        = new(StringComparer.OrdinalIgnoreCase);
+
     /// <summary>JSON schema describing the target deliverable.</summary>
     public string SchemaJson { get; set; } = "{}";
 
@@ -36,10 +47,23 @@ public sealed class DocumentPipeline : Entity<DocumentPipeline>
     public string? BiasNotes { get; set; }
         = null;
 
-    public PipelineQualityMetrics Quality { get; set; } = new();
+    /// <summary>Current pipeline status for orchestrators and dashboards.</summary>
+    public PipelineStatus Status { get; set; }
+        = PipelineStatus.Pending;
 
+    public int TotalDocuments { get; set; }
+        = 0;
+    public int ProcessedDocuments { get; set; }
+        = 0;
+
+    public string? DeliverableId { get; set; }
+        = null;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? CompletedAt { get; set; }
+        = null;
+
+    public PipelineQualityMetrics Quality { get; set; } = new();
 
     public JSchema? TryParseSchema()
     {
@@ -57,6 +81,16 @@ public sealed class DocumentPipeline : Entity<DocumentPipeline>
             return null;
         }
     }
+}
+
+public enum PipelineStatus
+{
+    Pending,
+    Queued,
+    Processing,
+    ReviewNeeded,
+    Completed,
+    Failed
 }
 
 public sealed class PipelineQualityMetrics

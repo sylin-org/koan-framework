@@ -1,0 +1,9 @@
+version: "3.9"
+services:
+  meridian-tesseract:
+    build: ./containers/tesseract
+    ports:
+      - "6060:8000"
+    environment:
+      - TESSDATA_PREFIX=/usr/share/tesseract-ocr/4.00/tessdata
+    restart: unless-stopped

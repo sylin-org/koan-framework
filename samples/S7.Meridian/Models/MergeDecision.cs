@@ -14,6 +14,9 @@ public sealed class MergeDecision : Entity<MergeDecision>
     public string Explanation { get; set; } = string.Empty;
     public string AcceptedExtractionId { get; set; } = string.Empty;
     public List<string> RejectedExtractionIds { get; set; } = new();
+    public List<string> SupportingExtractionIds { get; set; } = new();
+    public Dictionary<string, List<string>> CollectionProvenance { get; set; }
+        = new(StringComparer.OrdinalIgnoreCase);
     public string RuleConfigJson { get; set; } = string.Empty;
     public string? TransformApplied { get; set; }
         = null;

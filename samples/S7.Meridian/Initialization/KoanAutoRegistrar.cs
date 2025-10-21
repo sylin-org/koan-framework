@@ -1,3 +1,4 @@
+using System;
 using Koan.Core;
 using Koan.Core.Provenance;
 using Koan.Samples.Meridian.Infrastructure;
@@ -31,9 +32,33 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         services.AddSingleton<IDocumentStorage, DocumentStorage>();
         services.AddSingleton(new DeliverableStorageOptions());
         services.AddSingleton<IDeliverableStorage, DeliverableStorage>();
-        services.AddSingleton<IPdfRenderer, PdfRenderer>();
+        services.AddHttpClient<IPdfRenderer, PandocPdfRenderer>((sp, client) =>
+        {
+            var options = sp.GetRequiredService<IOptions<MeridianOptions>>().Value;
+            var pandoc = options.Rendering.Pandoc;
+            if (!string.IsNullOrWhiteSpace(pandoc.BaseUrl))
+            {
+                client.BaseAddress = new Uri(pandoc.BaseUrl, UriKind.Absolute);
+            }
+
+            var timeout = Math.Clamp(pandoc.TimeoutSeconds, 5, 600);
+            client.Timeout = TimeSpan.FromSeconds(timeout);
+        });
         services.AddSingleton<IDocumentIngestionService, DocumentIngestionService>();
         services.AddSingleton<IJobCoordinator, JobCoordinator>();
+        services.AddHttpClient<IOcrClient, TesseractOcrClient>((sp, client) =>
+        {
+            var options = sp.GetRequiredService<IOptions<MeridianOptions>>().Value;
+            var baseUrl = options.Extraction.Ocr.BaseUrl;
+            if (!string.IsNullOrWhiteSpace(baseUrl))
+            {
+                client.BaseAddress = new Uri(baseUrl, UriKind.Absolute);
+            }
+
+            var timeout = Math.Clamp(options.Extraction.Ocr.TimeoutSeconds, 5, 300);
+            client.Timeout = TimeSpan.FromSeconds(timeout);
+        });
+
         services.AddSingleton<ITextExtractor, TextExtractor>();
         services.AddSingleton<IPassageChunker, PassageChunker>();
         services.AddSingleton<IPipelineAlertService, PipelineAlertService>();
@@ -41,8 +66,10 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         services.AddSingleton<ISecureUploadValidator, SecureUploadValidator>();
         services.AddSingleton<IPassageIndexer, PassageIndexer>();
         services.AddSingleton<IFieldExtractor, FieldExtractor>();
+        services.AddSingleton<IIncrementalRefreshPlanner, IncrementalRefreshPlanner>();
         services.AddSingleton<IDocumentClassifier, DocumentClassifier>();
         services.AddSingleton<IRunLogWriter, RunLogWriter>();
+        services.AddSingleton<ITemplateRenderer, TemplateRenderer>();
         services.AddSingleton<IAiAssistAuditor, AiAssistAuditor>();
         services.AddSingleton<ISourceTypeAuthoringService, SourceTypeAuthoringService>();
         services.AddSingleton<IAnalysisTypeAuthoringService, AnalysisTypeAuthoringService>();

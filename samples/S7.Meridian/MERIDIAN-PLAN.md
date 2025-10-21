@@ -7,19 +7,19 @@
 
 ## 📊 CURRENT STATUS SNAPSHOT
 
-**Last Updated**: 2025-10-21
-**Phase**: Phase 2 - Merge Policies & Conflict Resolution
-**Progress**: Phase 2 complete – merge automation validated
-**Current Task**: Phase 3 - Document Classification pipeline
-**Next Checkpoint**: Kickoff classification cascade + policy routing
+**Last Updated**: 2025-10-22
+**Phase**: Phase 4 - Production Features
+**Progress**: Incremental refresh + templated rendering live
+**Current Task**: Stabilize production endpoints & observability
+**Next Checkpoint**: Day 2 UI/alert persistence follow-up
 
 ### Phase Completion Status
 ```
 ✅ Phase 0: Foundation Setup (COMPLETE)
 ✅ Phase 1: Core RAG Extraction (COMPLETE)
 ✅ Phase 2: Merge Policies (COMPLETE)
-⏳ Phase 3: Document Classification (IN PROGRESS)
-⬜ Phase 4: Production Features (PENDING)
+✅ Phase 3: Document Classification (COMPLETE)
+⏳ Phase 4: Production Features (IN PROGRESS)
 ⬜ Phase 5: Production Hardening (PENDING)
 ```
 
@@ -30,17 +30,19 @@
 ✅ Vector indexing with on-disk embedding cache (SHA-256 keys)
 ✅ Hybrid RAG retrieval (BM25 + embeddings) with MMR diversity
 ✅ Token-budgeted LLM extraction w/ schema validation + span mapping
-✅ Durable job orchestration + background worker heartbeat
-✅ Markdown deliverable rendering with evidence metadata
+✅ Durable job orchestration + background worker heartbeats & progress
+✅ Markdown/JSON/PDF deliverable rendering with evidence metadata
+✅ Multi-document upload + job scheduling
+✅ Incremental refresh planner with approval preservation
 ✅ Merge policies (precedence, latest, consensus, collection) with audit trail
 ✅ Manual overrides (confidence 1.0) and citation footnotes in deliverables
 ```
 
 ### What Doesn't Work Yet
 ```bash
-⚠️ Document classification pipeline (Phase 3 scope)
-❌ Field overrides UI + incremental refresh APIs
-❌ Production telemetry & hardening (Phase 4/5)
+⚠️ Evidence drawer + override UI (Day 2 scope)
+⚠️ Alert persistence + advanced telemetry dashboards
+❌ Production hardening (Phase 5)
 ```
 
 
@@ -84,7 +86,7 @@ samples/S7.Meridian/
 │   └── RunLog.cs                    ✅ Audit trail
 ├── Services/
 │   ├── FieldExtractor.cs            ✅ Full RAG pipeline (Phase 1 delivered)
-│   ├── DocumentMerger.cs            ⚠️ SIMPLIFIED - Enhance in Phase 2
+│   ├── DocumentMerger.cs            ✅ Merge engine + incremental refresh preservation
 │   ├── TextExtractor.cs             ✅ PdfPig + DOCX
 │   ├── PassageChunker.cs            ✅ Semantic chunking
 │   ├── PassageIndexer.cs            ✅ Embedding cache integration complete
