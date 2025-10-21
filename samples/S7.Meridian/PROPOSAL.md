@@ -1403,181 +1403,44 @@ public class PassageChunker : IPassageChunker
 ```
 
 **Document Classification Service (Cascade Pattern)**
-```csharp
-public class DocumentClassifier : IDocumentClassifier
-{
-    public async Task<(string typeId, double confidence, ClassificationMethod method)> ClassifyAsync(
-        SourceDocument doc,
-        CancellationToken ct)
-    {
-        // Cascade: Heuristic → Vector → LLM (fastest → slowest)
+- Stage 1: Heuristic rules (filename patterns, keywords, MIME type, page counts) – accept when confidence ≥0.9.
+- Stage 2: Vector similarity (embed preview, compare to cached SourceType vectors) – accept when cosine similarity ≥0.75.
+- Stage 3: LLM fallback (prompt with SourceType catalog, parse {typeId, confidence, reasoning}) – default to confidence 0.3 if parsing fails.
+- Persist ClassifiedTypeId, ClassifiedTypeVersion, ClassificationConfidence, ClassificationMethod, and reasoning.
+### Source & Analysis Type Authoring (Phase 4.5)
 
-        // Stage 1: Heuristic classification (fast, high precision)
-        var heuristicResult = await TryHeuristicClassification(doc, ct);
-        if (heuristicResult.HasValue && heuristicResult.Value.confidence > 0.9)
-        {
-            return heuristicResult.Value;
-        }
+#### SourceType Enhancements
+- **Model** (`SourceType : Entity<SourceType>`)
+  - `Name`, `Description`, `Version`
+  - `Tags[]`, `Descriptors[]`
+  - `FilenamePatterns[]`, `Keywords[]`, `MimeTypes[]`, `ExpectedPageCountMin/Max`
+  - `FieldQueries{ fieldPath -> retrieval hint }`
+  - `Instructions` (additional classifier/extractor guidance)
+  - `OutputTemplate` (expected structured output)
+  - Embedding metadata (existing fields retained)
+- **Controller**: `SourceTypesController : EntityController<SourceType>` (CRUD, query)
+- **AI Assist**: `POST /api/sourcetypes/ai-suggest`
+  - Request: seed document text + optional hints.
+  - Response: draft SourceType payload (client reviews then persists via CRUD).
+  - Validation: sanitize regex/templates, ensure instructions non-empty.
+- **Contract**: Classifier refuses to run if referenced SourceType missing.
 
-        // Stage 2: Vector similarity (medium speed, good recall)
-        var vectorResult = await TryVectorClassification(doc, ct);
-        if (vectorResult.HasValue && vectorResult.Value.confidence > 0.75)
-        {
-            return vectorResult.Value;
-        }
+#### AnalysisType Catalog
+- **Model** (`AnalysisType : Entity<AnalysisType>`)
+  - `Name`, `Description`, `Version`
+  - `Tags[]`, `Descriptors[]`
+  - `Instructions` (synthesis prompt), `OutputTemplate`
+  - `RequiredSourceTypes[]` (optional gating)
+- **Controller**: `AnalysisTypesController : EntityController<AnalysisType>`
+- **AI Assist**: `POST /api/analysistypes/ai-suggest`
+  - Request: analysis brief (goal, audience, inputs).
+  - Response: suggested AnalysisType (instructions/output template/tags).
+- **Constraints**:
+  - Document AI processing must reference an existing SourceType.
+  - Analysis synthesis must reference an existing AnalysisType.
+  - Audit log records AI-assisted suggestion metadata.
 
-        // Stage 3: LLM classification (slow, highest accuracy)
-        return await LLMClassification(doc, ct);
-    }
-
-    private async Task<(string typeId, double confidence, ClassificationMethod method)?>
-        TryHeuristicClassification(SourceDocument doc, CancellationToken ct)
-    {
-        var allTypes = await SourceType.All(ct);
-
-        foreach (var type in allTypes)
-        {
-            var score = 0.0;
-            var maxScore = 0.0;
-
-            // Check filename patterns
-            if (type.FilenamePatterns.Count > 0)
-            {
-                maxScore += 0.3;
-                foreach (var pattern in type.FilenamePatterns)
-                {
-                    if (Regex.IsMatch(doc.OriginalFileName, pattern, RegexOptions.IgnoreCase))
-                    {
-                        score += 0.3;
-                        break;
-                    }
-                }
-            }
-
-            // Check keywords presence
-            if (type.Keywords.Count > 0)
-            {
-                maxScore += 0.3;
-                var matchedKeywords = type.Keywords.Count(kw =>
-                    doc.ExtractedText.Contains(kw, StringComparison.OrdinalIgnoreCase));
-                score += 0.3 * (matchedKeywords / (double)type.Keywords.Count);
-            }
-
-            // Check page count range
-            if (type.ExpectedPageCountMin.HasValue || type.ExpectedPageCountMax.HasValue)
-            {
-                maxScore += 0.2;
-                var inRange = (!type.ExpectedPageCountMin.HasValue || doc.PageCount >= type.ExpectedPageCountMin.Value) &&
-                              (!type.ExpectedPageCountMax.HasValue || doc.PageCount <= type.ExpectedPageCountMax.Value);
-                if (inRange) score += 0.2;
-            }
-
-            // Check MIME type
-            if (type.MimeTypes.Count > 0)
-            {
-                maxScore += 0.2;
-                if (type.MimeTypes.Contains(doc.MimeType))
-                {
-                    score += 0.2;
-                }
-            }
-
-            if (maxScore > 0)
-            {
-                var confidence = score / maxScore;
-                if (confidence > 0.9)
-                {
-                    return (type.Id, confidence, ClassificationMethod.Heuristic);
-                }
-            }
-        }
-
-        return null; // No high-confidence heuristic match
-    }
-
-    private async Task<(string typeId, double confidence, ClassificationMethod method)?>
-        TryVectorClassification(SourceDocument doc, CancellationToken ct)
-    {
-        // Embed first 1000 characters of document
-        var preview = doc.ExtractedText.Length > 1000
-            ? doc.ExtractedText.Substring(0, 1000)
-            : doc.ExtractedText;
-
-        var docEmbedding = await Koan.AI.Ai.Embed(preview, ct);
-
-        // Ensure type embeddings are refreshed for current version
-        var allTypes = await SourceType.All(ct);
-        foreach (var type in allTypes)
-        {
-            await type.EnsureTypeEmbeddingAsync(Koan.AI.Ai.Embed, ct);
-        }
-
-        // Compare to SourceType embeddings
-        var bestMatch = allTypes
-            .Where(t => t.TypeEmbedding != null)
-            .Select(t => (
-                typeId: t.Id,
-                similarity: CosineSimilarity(docEmbedding, t.TypeEmbedding!)
-            ))
-            .OrderByDescending(x => x.similarity)
-            .FirstOrDefault();
-
-        if (bestMatch.similarity > 0.75)
-        {
-            return (bestMatch.typeId, bestMatch.similarity, ClassificationMethod.Vector);
-        }
-
-        return null;
-    }
-
-    private async Task<(string typeId, double confidence, ClassificationMethod method)>
-        LLMClassification(SourceDocument doc, CancellationToken ct)
-    {
-        var allTypes = await SourceType.All(ct);
-
-        var prompt = $@"Classify the following document into one of these types:
-
-{string.Join("\n", allTypes.Select(t => $"- {t.Name}: {t.Description}"))}
-
-Document preview (first 500 chars):
-{doc.ExtractedText.Substring(0, Math.Min(500, doc.ExtractedText.Length))}
-
-Filename: {doc.OriginalFileName}
-Page count: {doc.PageCount}
-
-Respond in JSON:
-{{
-  ""typeId"": ""<type ID>"",
-  ""typeName"": ""<type name>"",
-  ""confidence"": <0.0-1.0>,
-  ""reasoning"": ""<brief explanation>""
-}}";
-
-        var response = await Koan.AI.Ai.Complete(prompt, ct);
-        var result = JObject.Parse(response);
-
-        var typeId = result["typeId"]?.Value<string>() ?? allTypes.First().Id;
-        var confidence = result["confidence"]?.Value<double>() ?? 0.5;
-
-        return (typeId, confidence, ClassificationMethod.LLM);
-    }
-
-    private double CosineSimilarity(float[] a, float[] b)
-    {
-        if (a.Length != b.Length) return 0.0;
-
-        double dot = 0.0, magA = 0.0, magB = 0.0;
-        for (int i = 0; i < a.Length; i++)
-        {
-            dot += a[i] * b[i];
-            magA += a[i] * a[i];
-            magB += b[i] * b[i];
-        }
-
-        return dot / (Math.Sqrt(magA) * Math.Sqrt(magB));
-    }
-}
-```
+Open items: template seeding, UX confirmation flow, prompt hardening, unit/integration tests for AI assist endpoints.
 
 **Security Hygiene & Upload Validation**
 ```csharp
@@ -4880,3 +4743,4 @@ Then run: `sudo update-texmf`
 16. ✅ Comprehensive acceptance criteria with 6 key tests
 
 **Total Lines**: 4400+ (production-locked specification with full implementation details)
+
