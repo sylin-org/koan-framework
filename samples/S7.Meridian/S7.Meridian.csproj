@@ -9,26 +9,37 @@
 
   <ItemGroup>
     <!-- Koan Framework Core -->
-    <ProjectReference Include="..\..\src\Koan\Koan.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Core\Koan.Core.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Data.Core\Koan.Data.Core.csproj" />
     <ProjectReference Include="..\..\src\Koan.Web\Koan.Web.csproj" />
     <ProjectReference Include="..\..\src\Koan.Web.Extensions\Koan.Web.Extensions.csproj" />
-    <ProjectReference Include="..\..\src\Koan.Canon.Domain\Koan.Canon.Domain.csproj" />
-    <ProjectReference Include="..\..\src\Koan.Canon.Web\Koan.Canon.Web.csproj" />
 
     <!-- Data Layer -->
     <ProjectReference Include="..\..\src\Connectors\Data\Mongo\Koan.Data.Connector.Mongo.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Data.Vector\Koan.Data.Vector.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Data.Vector.Abstractions\Koan.Data.Vector.Abstractions.csproj" />
 
     <!-- Storage -->
+    <ProjectReference Include="..\..\src\Koan.Storage\Koan.Storage.csproj" />
     <ProjectReference Include="..\..\src\Connectors\Storage\Local\Koan.Storage.Connector.Local.csproj" />
 
     <!-- Web -->
     <ProjectReference Include="..\..\src\Connectors\Web\Swagger\Koan.Web.Connector.Swagger.csproj" />
 
+    <!-- AI -->
+    <ProjectReference Include="..\..\src\Koan.AI\Koan.AI.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- External Dependencies -->
-    <PackageReference Include="PdfPig" Version="0.1.9" />
+    <PackageReference Include="UglyToad.PdfPig" Version="1.7.0-custom-5" />
     <PackageReference Include="Tesseract" Version="5.2.0" />
     <PackageReference Include="Stubble.Core" Version="1.10.8" />
-    <PackageReference Include="NJsonSchema" Version="11.0.0" />
+    <PackageReference Include="NJsonSchema" Version="11.5.1" />
+    <PackageReference Include="DocumentFormat.OpenXml" Version="3.3.0" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+    <PackageReference Include="Newtonsoft.Json.Schema" Version="4.0.1" />
+  <PackageReference Include="System.IO.Packaging" Version="9.0.0" />
   </ItemGroup>
 
 </Project>

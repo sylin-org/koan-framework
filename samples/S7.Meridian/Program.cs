@@ -1,12 +1,18 @@
-using Koan;
-using Koan.Samples.Meridian;
+using Koan.Core;
+using Koan.Core.Hosting.App;
+using Koan.Web;
+using Koan.Web.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Koan Framework Bootstrap
-builder.Services.AddKoan();
+builder.Services
+    .AddKoan()
+    .AsWebApi();
 
 var app = builder.Build();
+
+AppHost.Current ??= app.Services;
 
 // Koan Environment Info
 if (KoanEnv.IsDevelopment)

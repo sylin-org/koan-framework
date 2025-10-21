@@ -1,5 +1,9 @@
 # S7.Meridian - Document Intelligence System
 
+> **✅ PHASE 1 COMPLETE** (January 20, 2025)
+>
+> Core RAG-based field extraction is now fully implemented with embedding cache, hybrid vector search, and LLM integration. See [PHASE_1_COMPLETE.md](PHASE_1_COMPLETE.md) for implementation details and [TESTING.md](TESTING.md) for testing instructions.
+
 **Navigate documents to truth.**
 
 A local-first document intelligence workbench that transforms mixed source files (PDFs, documents, images) into evidence-backed deliverables with minimal effort. Upload files, define what you want to create, and Meridian distills the evidence into trustworthy, cited documents.
