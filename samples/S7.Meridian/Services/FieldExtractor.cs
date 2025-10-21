@@ -1,9 +1,12 @@
+using System;
 using System.Security.Cryptography;
 using System.Globalization;
 using System.Collections.Generic;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using Koan.AI;
 using Koan.AI.Contracts;
 using Koan.AI.Contracts.Options;
@@ -21,7 +24,7 @@ namespace Koan.Samples.Meridian.Services;
 
 public interface IFieldExtractor
 {
-    Task<List<ExtractedField>> ExtractAsync(DocumentPipeline pipeline, IReadOnlyList<Passage> passages, MeridianOptions options, CancellationToken ct);
+    Task<List<ExtractedField>> ExtractAsync(DocumentPipeline pipeline, IReadOnlyList<Passage> passages, MeridianOptions options, ISet<string>? fieldFilter, CancellationToken ct);
 }
 
 /// <summary>
@@ -46,6 +49,7 @@ public sealed class FieldExtractor : IFieldExtractor
 {
     private readonly ILogger<FieldExtractor> _logger;
     private readonly IEmbeddingCache _cache;
+    private readonly IRunLogWriter _runLog;
     private const string EmbeddingModel = "granite3.3:8b";
     private static readonly char[] KeywordTrimCharacters = { '.', ',', ';', ':', '!', '?', '"', '\'', '(', ')', '[', ']', '{', '}', '-', '_' };
     private static readonly HashSet<string> KeywordStopWords = new(StringComparer.OrdinalIgnoreCase)
@@ -62,16 +66,18 @@ public sealed class FieldExtractor : IFieldExtractor
         "any"
     };
 
-    public FieldExtractor(ILogger<FieldExtractor> logger, IEmbeddingCache cache)
+    public FieldExtractor(ILogger<FieldExtractor> logger, IEmbeddingCache cache, IRunLogWriter runLog)
     {
         _logger = logger;
         _cache = cache;
+        _runLog = runLog;
     }
 
-        public async Task<List<ExtractedField>> ExtractAsync(
+    public async Task<List<ExtractedField>> ExtractAsync(
         DocumentPipeline pipeline,
         IReadOnlyList<Passage> passages,
         MeridianOptions options,
+        ISet<string>? fieldFilter,
         CancellationToken ct)
     {
         var schema = pipeline.TryParseSchema();
@@ -88,11 +94,27 @@ public sealed class FieldExtractor : IFieldExtractor
         var fieldQueryOverrides = BuildFieldQueryOverrides(sourceTypes);
         var keywordHint = BuildKeywordHint(pipeline, sourceTypes);
 
+        HashSet<string>? filter = null;
+        if (fieldFilter is { Count: > 0 })
+        {
+            filter = new HashSet<string>(fieldFilter, StringComparer.Ordinal);
+        }
+
+        if (filter is { Count: 0 })
+        {
+            return results;
+        }
+
         var fieldPaths = EnumerateLeafSchemas(schema).ToList();
         _logger.LogInformation("Extracting {Count} fields for pipeline {PipelineId}", fieldPaths.Count, pipeline.Id);
 
         foreach (var (fieldPath, fieldSchema) in fieldPaths)
         {
+            if (filter is not null && !filter.Contains(fieldPath))
+            {
+                continue;
+            }
+
             ct.ThrowIfCancellationRequested();
 
             try
@@ -125,11 +147,64 @@ public sealed class FieldExtractor : IFieldExtractor
 
                 var budgeted = EnforceTokenBudget(diverse, options.Retrieval.MaxTokensPerField);
 
-                var extraction = await ExtractFromPassages(pipeline, fieldPath, fieldSchema, budgeted, options, instructionBlock, ct);
-                if (extraction != null)
+                var extractionStarted = DateTime.UtcNow;
+                var extractionResult = await ExtractFromPassages(pipeline, fieldPath, fieldSchema, budgeted, options, instructionBlock, ct);
+                var extractionFinished = DateTime.UtcNow;
+
+                if (extractionResult?.Field is { } field)
                 {
-                    results.Add(extraction);
+                    results.Add(field);
                 }
+
+                var logPassageIds = (extractionResult?.PassageIds ?? Array.Empty<string>())
+                    .Where(id => !string.IsNullOrWhiteSpace(id))
+                    .Select(id => id!)
+                    .ToList();
+
+                if (logPassageIds.Count == 0)
+                {
+                    logPassageIds = budgeted
+                        .Select(p => p.Id)
+                        .Where(id => !string.IsNullOrWhiteSpace(id))
+                        .Select(id => id!)
+                        .ToList();
+                }
+
+                var metadata = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["retrievalCandidates"] = retrieval.Candidates.Count.ToString(CultureInfo.InvariantCulture),
+                    ["passageCount"] = budgeted.Count.ToString(CultureInfo.InvariantCulture),
+                    ["schemaValid"] = (extractionResult?.SchemaValid ?? false).ToString().ToLowerInvariant()
+                };
+
+                if (extractionResult?.Confidence is { } confidenceValue && confidenceValue > 0)
+                {
+                    metadata["confidence"] = confidenceValue.ToString("0.00", CultureInfo.InvariantCulture);
+                }
+
+                if (!string.IsNullOrWhiteSpace(extractionResult?.ErrorMessage))
+                {
+                    metadata["error"] = extractionResult!.ErrorMessage!;
+                }
+
+                await _runLog.AppendAsync(new RunLog
+                {
+                    PipelineId = pipeline.Id,
+                    Stage = "extract-field",
+                    DocumentId = extractionResult?.DocumentId ?? budgeted.FirstOrDefault()?.SourceDocumentId,
+                    FieldPath = fieldPath,
+                    StartedAt = extractionStarted,
+                    FinishedAt = extractionFinished,
+                    Status = extractionResult?.Field is not null ? "success" : "failed",
+                    ModelId = extractionResult?.ModelId,
+                    PromptHash = extractionResult?.PromptHash,
+                    TokensUsed = extractionResult?.TokenEstimate,
+                    TopK = options.Retrieval.TopK,
+                    Alpha = options.Retrieval.Alpha,
+                    PassageIds = logPassageIds,
+                    ErrorMessage = extractionResult?.ErrorMessage,
+                    Metadata = metadata
+                }, ct);
             }
             catch (Exception ex)
             {
@@ -405,6 +480,17 @@ public sealed class FieldExtractor : IFieldExtractor
     }
 
     private sealed record RetrievalResult(List<(Passage passage, double score, float[]? vector)> Candidates, float[] QueryEmbedding);
+
+    private sealed record FieldExtractionResult(
+        ExtractedField? Field,
+        string? DocumentId,
+        string PromptHash,
+        IReadOnlyList<string> PassageIds,
+        string ModelId,
+        int TokenEstimate,
+        double Confidence,
+        bool SchemaValid,
+        string? ErrorMessage);
 
     private async Task<float[]?> GetPassageEmbeddingAsync(Passage passage, CancellationToken ct)
     {
@@ -787,7 +873,7 @@ If the field cannot be found, respond with:
     /// <summary>
     /// Extracts a field value from passages using LLM.
     /// </summary>
-    private async Task<ExtractedField?> ExtractFromPassages(
+    private async Task<FieldExtractionResult?> ExtractFromPassages(
         DocumentPipeline pipeline,
         string fieldPath,
         JSchema fieldSchema,
@@ -802,7 +888,6 @@ If the field cannot be found, respond with:
         }
 
         var prompt = BuildExtractionPrompt(passages, fieldPath, fieldSchema, instructionBlock);
-
         var promptHash = ComputePromptHash(prompt);
         _logger.LogDebug("Extraction prompt hash for {FieldPath}: {Hash}", fieldPath, promptHash);
 
@@ -815,13 +900,29 @@ If the field cannot be found, respond with:
         };
 
         _logger.LogDebug("Calling AI for field {FieldPath} with model {Model}", fieldPath, chatOptions.Model);
-        var response = await Koan.AI.Ai.Chat(chatOptions, ct);
+        var response = await Koan.AI.Ai.Chat(chatOptions, ct).ConfigureAwait(false);
+
+        var tokenEstimate = EstimateTokenCount(prompt) + EstimateTokenCount(response);
+        var passageIds = passages
+            .Select(p => p.Id)
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .Select(id => id!)
+            .ToList();
 
         var parsed = ParseExtractionResponse(response);
         if (parsed == null)
         {
             _logger.LogWarning("Failed to parse AI response for field {FieldPath}", fieldPath);
-            return null;
+            return new FieldExtractionResult(
+                null,
+                passages.FirstOrDefault()?.SourceDocumentId,
+                promptHash,
+                passageIds,
+                chatOptions.Model ?? string.Empty,
+                tokenEstimate,
+                0.0,
+                false,
+                "response-parse-failed");
         }
 
         var schemaValid = ValidateAgainstSchema(parsed.Value, fieldSchema, out var normalizedToken, out var validationError);
@@ -843,6 +944,7 @@ If the field cannot be found, respond with:
         {
             normalizedJson = parsed.Value.ToString(Formatting.None);
         }
+
         var stringValue = normalizedToken switch
         {
             JValue jValue when jValue.Type == JTokenType.String => jValue.Value<string>() ?? string.Empty,
@@ -898,7 +1000,16 @@ If the field cannot be found, respond with:
         _logger.LogInformation("Extracted field {FieldPath}: {Value} (confidence: {Confidence:P0})",
             fieldPath, normalizedJson ?? "null", confidence);
 
-        return extraction;
+        return new FieldExtractionResult(
+            extraction,
+            bestPassage.SourceDocumentId,
+            promptHash,
+            passageIds,
+            chatOptions.Model ?? string.Empty,
+            tokenEstimate,
+            confidence,
+            schemaValid,
+            validationError);
     }
 
     /// <summary>

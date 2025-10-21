@@ -1,4 +1,7 @@
-﻿using Koan.Data.Core;
+using System;
+using System.Threading;
+using System.Threading.Tasks;
+using Koan.Data.Core;
 using Koan.Samples.Meridian.Models;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -35,6 +38,7 @@ public sealed class MeridianJobWorker : BackgroundService
                 {
                     await _processor.ProcessAsync(job, stoppingToken);
                     job.Status = JobStatus.Completed;
+                    job.ProcessedDocuments = job.TotalDocuments;
                     job.CompletedAt = DateTime.UtcNow;
                     job.HeartbeatAt = DateTime.UtcNow;
                     await job.Save(stoppingToken);

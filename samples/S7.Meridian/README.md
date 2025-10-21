@@ -36,6 +36,8 @@ A local-first document intelligence workbench that transforms mixed source files
 - **Pipeline orchestration**: Canon phases (Validation → Enrichment)
 - **Error handling**: Retry logic, partial failures, recovery
 - **Observability**: Structured logging, metrics, phase tracking
+- **Versioned deliverables**: Each run snapshots hashed canonical data + evidence maps, rendering templated Markdown/JSON on demand
+- **Incremental refresh**: Targeted field re-extraction with job heartbeats and approval preservation
 
 ---
 
@@ -69,7 +71,7 @@ A local-first document intelligence workbench that transforms mixed source files
 ### Prerequisites
 
 - .NET 10 SDK
-- Docker Desktop (for MongoDB, Weaviate, Ollama)
+- Docker Desktop (for MongoDB, Weaviate, Ollama, and OCR containers)
 - Optional: set `WEAVIATE_ENDPOINT` to reuse an existing Weaviate instance (defaults to the Koan test fixture)
 - 16GB RAM minimum (for local LLMs)
 
@@ -77,6 +79,8 @@ A local-first document intelligence workbench that transforms mixed source files
 
 ```bash
 cd samples/S7.Meridian
+docker compose -f docker-compose.tesseract.yml up -d  # start Tesseract OCR sidecar
+docker compose -f docker-compose.pandoc.yml up -d     # start Pandoc renderer sidecar
 ./start.bat  # Windows
 # or
 ./start.sh   # Linux/Mac
@@ -107,7 +111,7 @@ dotnet test tests/Suites/Data/S7.Meridian/Koan.Data.S7.Meridian.Tests/ -c Releas
 
 1. **Choose deliverable type**: "Vendor Assessment"
 2. **Add context**: "Prioritize Q3 2024 data"
-3. **Upload files**: Drag PDFs (auto-classified)
+3. **Upload files**: Drag one or many PDFs in a single request (auto-classified)
 4. **Process**: Watch pipeline stages
 5. **Review**: Resolve conflicts with evidence drawer
 6. **Finalize**: Download PDF with citations
@@ -545,6 +549,68 @@ All data sourced from:
 ```
 
 ---
+
+#### OCR Fallback Configuration
+
+Set `Meridian:Extraction:Ocr` to point the pipeline at the OCR sidecar. The defaults assume `docker compose -f docker-compose.tesseract.yml up -d` has published the service on `http://localhost:6060/ocr`.
+
+```json
+{
+  "Meridian": {
+    "Extraction": {
+      "Ocr": {
+        "Enabled": true,
+        "BaseUrl": "http://localhost:6060/",
+        "Endpoint": "ocr",
+        "TimeoutSeconds": 90,
+        "ConfidenceFloor": 0.6
+      }
+    }
+  }
+}
+```
+
+#### Pandoc Renderer Configuration
+
+Set `Meridian:Rendering:Pandoc` to the HTTP base address exposed by the Pandoc sidecar (`docker compose -f docker-compose.pandoc.yml up -d`).
+
+```json
+{
+  "Meridian": {
+    "Rendering": {
+      "Pandoc": {
+        "Enabled": true,
+        "BaseUrl": "http://localhost:7070/",
+        "Endpoint": "render",
+        "TimeoutSeconds": 240,
+        "SanitizeLatex": true
+      }
+    }
+  }
+}
+```
+
+### Narrative Rendering API
+
+Deliverables now expose templated outputs directly:
+
+| Method | Route | Description |
+| ------ | ----- | ----------- |
+| `GET` | `/api/pipelines/{pipelineId}/deliverables/latest` | Returns the most recent persisted deliverable entity. |
+| `GET` | `/api/pipelines/{pipelineId}/deliverables/markdown` | Renders the latest deliverable markdown on demand using the current template + formatted payload. |
+| `GET` | `/api/pipelines/{pipelineId}/deliverables/json` | Returns the canonical JSON payload (`fields` section) for the latest deliverable. |
+| `GET` | `/api/pipelines/{pipelineId}/deliverables/pdf` | Streams a PDF rendered through the Pandoc sidecar using the current template. |
+
+### Run Log Telemetry
+
+`RunLog` entries now capture pipeline, document, and AI metadata for every stage. Each entry includes:
+
+- `documentId` when applicable (extraction and classification stages)
+- `promptHash`, `modelId`, and token estimates for field extractions
+- Retrieval context (`topK`, `alpha`, `passageIds`)
+- Detailed metadata (confidence, schema validation status, rejection reason)
+
+Use these records to trace long-running pipelines, compare prompt revisions, and surface diagnostics in dashboards.
 
 ## Key Patterns Demonstrated
 

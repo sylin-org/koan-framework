@@ -107,8 +107,8 @@ public sealed class MergePoliciesTests
             summaryField.MergeStrategy.Should().Be("override");
 
             // Deliverable footnotes present
-            deliverable.Markdown.Should().Contain("[^1]:");
-            deliverable.Markdown.Should().Contain("financial.pdf");
+            deliverable.RenderedMarkdown.Should().Contain("[^1]:");
+            deliverable.RenderedMarkdown.Should().Contain("financial.pdf");
 
             // Merge decisions persisted
             var decisions = await MergeDecision.Query(d => d.PipelineId == pipeline.Id, ct);
@@ -124,7 +124,7 @@ public sealed class MergePoliciesTests
             overrideDecision.Explanation.Should().Contain("override");
 
             // Deliverable storage captured rendered bytes
-            deliverableStorage.StoredPdfKeys.Should().Contain(deliverable.PdfStorageKey);
+            deliverableStorage.StoredPdfKeys.Should().Contain(deliverable.RenderedPdfKey);
         }
         finally
         {

@@ -4611,7 +4611,7 @@ Then run: `sudo update-texmf`
 - [ ] Type versions pinned on `DocumentPipeline` creation
 - [ ] `Deliverable.DataHash` computed from canonical JSON
 - [ ] `Deliverable.TemplateMdHash` computed from template
-- [ ] `RunLog` entries capture prompt hash + passage IDs
+- [x] `RunLog` entries capture prompt hash + passage IDs
 - [ ] Merge decisions stable across identical inputs
 
 ✅ **Determinism**
@@ -4649,7 +4649,7 @@ Then run: `sudo update-texmf`
 - [ ] Classification metadata cached in-memory
 
 ✅ **Observability**
-- [ ] `RunLog` entries for each stage (extraction, merge, render)
+- [x] `RunLog` entries for each stage (extraction, merge, render)
 - [ ] Quality metrics dashboard (coverage, citations, conflicts)
 - [ ] Stale-job recovery tested (chaos test: kill worker mid-run)
 

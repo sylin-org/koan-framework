@@ -1,5 +1,7 @@
-﻿using System.Security.Cryptography;
+using System.Linq;
+using System.Security.Cryptography;
 using System.Text;
+using Koan.Samples.Meridian.Infrastructure;
 using Koan.Samples.Meridian.Models;
 using Microsoft.Extensions.Logging;
 using UglyToad.PdfPig;
@@ -24,19 +26,23 @@ public sealed class TextExtractionResult
 public sealed class TextExtractor : ITextExtractor
 {
     private readonly IDocumentStorage _storage;
+    private readonly IOcrClient _ocrClient;
+    private readonly MeridianOptions _options;
     private readonly ILogger<TextExtractor> _logger;
 
-    public TextExtractor(IDocumentStorage storage, ILogger<TextExtractor> logger)
+    public TextExtractor(IDocumentStorage storage, IOcrClient ocrClient, MeridianOptions options, ILogger<TextExtractor> logger)
     {
         _storage = storage;
+        _ocrClient = ocrClient;
+        _options = options;
         _logger = logger;
     }
 
     public async Task<TextExtractionResult> ExtractAsync(SourceDocument document, CancellationToken ct)
     {
-        await using var stream = await _storage.OpenReadAsync(document.StorageKey, ct);
+        await using var stream = await _storage.OpenReadAsync(document.StorageKey, ct).ConfigureAwait(false);
         await using var buffer = new MemoryStream();
-        await stream.CopyToAsync(buffer, ct);
+        await stream.CopyToAsync(buffer, ct).ConfigureAwait(false);
         buffer.Position = 0;
 
         var mediaType = document.MediaType?.ToLowerInvariant();
@@ -47,7 +53,21 @@ public sealed class TextExtractor : ITextExtractor
 
         if (mediaType is "application/pdf" or "pdf")
         {
-            return ExtractFromPdf(buffer);
+            var pdfResult = ExtractFromPdf(buffer);
+
+            if (ShouldFallbackToOcr(pdfResult))
+            {
+                var ocrResult = await TryOcrAsync(buffer, ct).ConfigureAwait(false);
+                if (ocrResult is not null)
+                {
+                    _logger.LogInformation("OCR fallback succeeded for document {DocumentId}.", document.Id);
+                    return ocrResult;
+                }
+
+                _logger.LogDebug("OCR fallback skipped or failed for document {DocumentId}; using native text.", document.Id);
+            }
+
+            return pdfResult;
         }
 
         if (mediaType is "application/vnd.openxmlformats-officedocument.wordprocessingml.document" or "application/msword")
@@ -57,11 +77,11 @@ public sealed class TextExtractor : ITextExtractor
 
         if (mediaType is "text/plain" or "text/markdown")
         {
-            return await ExtractPlainTextAsync(buffer, ct);
+            return await ExtractPlainTextAsync(buffer, ct).ConfigureAwait(false);
         }
 
         _logger.LogWarning("Unknown media type {MediaType} for document {DocumentId}; falling back to plain text read.", mediaType, document.Id);
-        return await ExtractPlainTextAsync(buffer, ct);
+        return await ExtractPlainTextAsync(buffer, ct).ConfigureAwait(false);
     }
 
     private static TextExtractionResult ExtractFromPdf(Stream pdfStream)
@@ -90,7 +110,7 @@ public sealed class TextExtractor : ITextExtractor
     {
         stream.Position = 0;
         using var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true, leaveOpen: true);
-        var text = await reader.ReadToEndAsync(ct);
+        var text = await reader.ReadToEndAsync(ct).ConfigureAwait(false);
         return new TextExtractionResult
         {
             Text = text,
@@ -130,6 +150,85 @@ public sealed class TextExtractor : ITextExtractor
             PageCount = Math.Max(1, CountLogicalPages(text)),
             Method = "Docx"
         };
+    }
+
+    private bool ShouldFallbackToOcr(TextExtractionResult result)
+    {
+        if (!_options.Extraction.Ocr.Enabled)
+        {
+            return false;
+        }
+
+        if (result.PageCount == 0 || string.IsNullOrWhiteSpace(result.Text))
+        {
+            return true;
+        }
+
+        var normalized = result.Text.Trim();
+        if (normalized.Length < 64)
+        {
+            return true;
+        }
+
+        if (normalized.Count(c => c == '\uFFFD') > 0)
+        {
+            return true;
+        }
+
+        var whitespaceRatio = normalized.Count(char.IsWhiteSpace) / (double)Math.Max(1, normalized.Length);
+        return whitespaceRatio > 0.5;
+    }
+
+    private async Task<TextExtractionResult?> TryOcrAsync(Stream pdfStream, CancellationToken ct)
+    {
+        if (!_options.Extraction.Ocr.Enabled)
+        {
+            return null;
+        }
+
+        if (pdfStream.CanSeek)
+        {
+            pdfStream.Position = 0;
+        }
+
+        try
+        {
+            var result = await _ocrClient.ExtractAsync(pdfStream, ct).ConfigureAwait(false);
+            if (result is null)
+            {
+                return null;
+            }
+
+            if (result.Confidence < _options.Extraction.Ocr.ConfidenceFloor)
+            {
+                _logger.LogDebug("OCR result below confidence floor ({Confidence:0.00}).", result.Confidence);
+                return null;
+            }
+
+            return new TextExtractionResult
+            {
+                Text = result.Text,
+                Confidence = result.Confidence,
+                PageCount = result.PageCount,
+                Method = "Tesseract"
+            };
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "OCR fallback failed; returning native PDF extraction.");
+            return null;
+        }
+        finally
+        {
+            if (pdfStream.CanSeek)
+            {
+                pdfStream.Position = 0;
+            }
+        }
     }
 
     public static string ComputeTextHash(string text)

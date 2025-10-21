@@ -14,6 +14,7 @@ public sealed class MeridianOptions
     public MergeOptions Merge { get; set; } = new();
     public ClassificationOptions Classification { get; set; } = new();
     public ConfidenceOptions Confidence { get; set; } = new();
+    public RenderingOptions Rendering { get; set; } = new();
 }
 
 public sealed class RetrievalOptions
@@ -44,6 +45,27 @@ public sealed class ExtractionOptions
 
     /// <summary>Maximum output tokens for extraction response (default: 500).</summary>
     public int MaxOutputTokens { get; set; } = 500;
+
+    /// <summary>OCR configuration for scanned documents.</summary>
+    public OcrOptions Ocr { get; set; } = new();
+}
+
+public sealed class OcrOptions
+{
+    /// <summary>Enable OCR fallback when native text extraction is low confidence.</summary>
+    public bool Enabled { get; set; } = true;
+
+    /// <summary>Base URL of the Tesseract OCR container.</summary>
+    public string BaseUrl { get; set; } = "http://localhost:6060/";
+
+    /// <summary>Relative endpoint to invoke for OCR extraction.</summary>
+    public string Endpoint { get; set; } = "ocr";
+
+    /// <summary>Request timeout (seconds) when calling the OCR container.</summary>
+    public int TimeoutSeconds { get; set; } = 90;
+
+    /// <summary>Minimum confidence value returned by OCR before accepting the result.</summary>
+    public double ConfidenceFloor { get; set; } = 0.55;
 }
 
 public sealed class MergeOptions
@@ -142,4 +164,27 @@ public sealed class ConfidenceOptions
         if (confidence >= LowThreshold) return "yellow";
         return "red";
     }
+}
+
+public sealed class RenderingOptions
+{
+    public PandocOptions Pandoc { get; set; } = new();
+}
+
+public sealed class PandocOptions
+{
+    /// <summary>Enable Pandoc rendering. Disable to skip PDF generation.</summary>
+    public bool Enabled { get; set; } = true;
+
+    /// <summary>Base URL of the Pandoc rendering container.</summary>
+    public string BaseUrl { get; set; } = "http://localhost:7070/";
+
+    /// <summary>Endpoint path for rendering requests.</summary>
+    public string Endpoint { get; set; } = "render";
+
+    /// <summary>Request timeout (seconds) when calling the Pandoc renderer.</summary>
+    public int TimeoutSeconds { get; set; } = 180;
+
+    /// <summary>Whether to strip dangerous LaTeX commands before rendering.</summary>
+    public bool SanitizeLatex { get; set; } = true;
 }
