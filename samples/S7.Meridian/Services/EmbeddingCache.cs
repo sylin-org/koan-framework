@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Linq;
 using Koan.Samples.Meridian.Models;
 
 namespace Koan.Samples.Meridian.Services;
@@ -106,8 +107,63 @@ public sealed class EmbeddingCache : IEmbeddingCache
 
     public Task<int> FlushAsync(CancellationToken ct = default)
     {
-        // No in-memory cache to flush; all writes are immediate
-        return Task.FromResult(0);
+        if (!Directory.Exists(CacheBasePath))
+        {
+            return Task.FromResult(0);
+        }
+
+        var files = Directory.GetFiles(CacheBasePath, "*.json", SearchOption.AllDirectories);
+        var deleted = 0;
+
+        foreach (var file in files)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            try
+            {
+                File.Delete(file);
+                deleted++;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to delete cached embedding {Path}", file);
+            }
+        }
+
+        var directories = Directory.GetDirectories(CacheBasePath, "*", SearchOption.AllDirectories)
+            .OrderByDescending(d => d.Length)
+            .ToList();
+
+        foreach (var directory in directories)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            try
+            {
+                if (!Directory.EnumerateFileSystemEntries(directory).Any())
+                {
+                    Directory.Delete(directory, false);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "Failed to remove cache directory {Path}", directory);
+            }
+        }
+
+        try
+        {
+            if (!Directory.EnumerateFileSystemEntries(CacheBasePath).Any())
+            {
+                Directory.Delete(CacheBasePath, false);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Failed to remove cache root {Path}", CacheBasePath);
+        }
+
+        return Task.FromResult(deleted);
     }
 
     public async Task<CacheStats> GetStatsAsync(CancellationToken ct = default)

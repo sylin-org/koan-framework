@@ -1,6 +1,9 @@
-﻿using System.Security.Cryptography;
+using System.Security.Cryptography;
+using System.Globalization;
+using System.Collections.Generic;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Linq;
 using Koan.AI;
 using Koan.AI.Contracts;
 using Koan.AI.Contracts.Options;
@@ -10,6 +13,7 @@ using Koan.Data.Vector.Abstractions;
 using Koan.Samples.Meridian.Infrastructure;
 using Koan.Samples.Meridian.Models;
 using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Newtonsoft.Json.Schema;
 
@@ -41,13 +45,30 @@ public interface IFieldExtractor
 public sealed class FieldExtractor : IFieldExtractor
 {
     private readonly ILogger<FieldExtractor> _logger;
+    private readonly IEmbeddingCache _cache;
+    private const string EmbeddingModel = "granite3.3:8b";
+    private static readonly char[] KeywordTrimCharacters = { '.', ',', ';', ':', '!', '?', '"', '\'', '(', ')', '[', ']', '{', '}', '-', '_' };
+    private static readonly HashSet<string> KeywordStopWords = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "find",
+        "information",
+        "about",
+        "please",
+        "show",
+        "me",
+        "the",
+        "a",
+        "an",
+        "any"
+    };
 
-    public FieldExtractor(ILogger<FieldExtractor> logger)
+    public FieldExtractor(ILogger<FieldExtractor> logger, IEmbeddingCache cache)
     {
         _logger = logger;
+        _cache = cache;
     }
 
-    public async Task<List<ExtractedField>> ExtractAsync(
+        public async Task<List<ExtractedField>> ExtractAsync(
         DocumentPipeline pipeline,
         IReadOnlyList<Passage> passages,
         MeridianOptions options,
@@ -71,29 +92,37 @@ public sealed class FieldExtractor : IFieldExtractor
 
             try
             {
-                // 1. Build RAG query
                 var query = BuildRAGQuery(fieldPath, fieldSchema, pipeline);
 
-                // 2. Retrieve relevant passages
-                var retrieved = await RetrievePassages(pipeline.Id, query, options, ct);
-                if (retrieved.Count == 0)
+                var retrieval = await RetrievePassages(pipeline.Id, query, passages, options, ct);
+                if (retrieval.Candidates.Count == 0)
                 {
                     _logger.LogDebug("No passages retrieved for field {FieldPath}, skipping extraction", fieldPath);
                     continue;
                 }
 
-                // 3. Apply MMR diversity (skip for now as we need vectors from VectorWorkflow)
-                // For Phase 1, we'll use retrieved passages directly
-                var diverse = retrieved;
+                var orderedCandidates = retrieval.Candidates
+                    .OrderByDescending(c => c.score)
+                    .ToList();
 
-                // 4. Enforce token budget
+                var diverse = ApplyMMR(
+                    orderedCandidates,
+                    Math.Min(options.Retrieval.TopK, orderedCandidates.Count),
+                    options.Retrieval.MmrLambda);
+
+                if (diverse.Count == 0)
+                {
+                    diverse = orderedCandidates
+                        .Select(c => c.passage)
+                        .Take(options.Retrieval.TopK)
+                        .ToList();
+                }
+
                 var budgeted = EnforceTokenBudget(diverse, options.Retrieval.MaxTokensPerField);
 
-                // 5. Extract from passages
                 var extraction = await ExtractFromPassages(pipeline, fieldPath, fieldSchema, budgeted, options, ct);
                 if (extraction != null)
                 {
-                    await extraction.Save(ct);
                     results.Add(extraction);
                 }
             }
@@ -131,41 +160,142 @@ public sealed class FieldExtractor : IFieldExtractor
     /// <summary>
     /// Retrieves relevant passages using hybrid vector search (BM25 + semantic).
     /// </summary>
-    private async Task<List<Passage>> RetrievePassages(
+    private async Task<RetrievalResult> RetrievePassages(
         string pipelineId,
         string query,
+        IReadOnlyList<Passage> corpus,
         MeridianOptions options,
         CancellationToken ct)
     {
-        // 1. Embed query
         _logger.LogDebug("Embedding query: {Query}", query);
         var queryEmbedding = await Koan.AI.Ai.Embed(query, ct);
 
-        // 2. Hybrid search via VectorWorkflow
-        var results = await VectorWorkflow<Passage>.Query(
-            new VectorQueryOptions(
-                queryEmbedding,
-                TopK: options.Retrieval.TopK,
-                SearchText: query,           // Enables BM25 hybrid search
-                Alpha: options.Retrieval.Alpha),
-            profileName: MeridianConstants.VectorProfile,
-            ct: ct);
+        var candidates = new List<(Passage passage, double score, float[]? vector)>();
 
-        // 3. Load passages and filter by pipeline
-        var passages = new List<Passage>();
-        foreach (var match in results.Matches)
+        if (VectorWorkflow<Passage>.IsAvailable(MeridianConstants.VectorProfile))
         {
-            var passage = await Passage.Get(match.Id, ct);
-            if (passage != null && passage.PipelineId == pipelineId)
+            var results = await VectorWorkflow<Passage>.Query(
+                new VectorQueryOptions(
+                    queryEmbedding,
+                    TopK: options.Retrieval.TopK,
+                    SearchText: query,
+                    Alpha: options.Retrieval.Alpha),
+                profileName: MeridianConstants.VectorProfile,
+                ct: ct);
+
+            foreach (var match in results.Matches)
             {
-                passages.Add(passage);
+                var passage = await Passage.Get(match.Id, ct);
+                if (passage != null && passage.PipelineId == pipelineId)
+                {
+                    var vector = await GetPassageEmbeddingAsync(passage, ct);
+                    candidates.Add((passage, match.Score, vector));
+                }
+            }
+        }
+        else
+        {
+            _logger.LogWarning("Vector profile {Profile} unavailable; falling back to lexical search.", MeridianConstants.VectorProfile);
+
+            foreach (var passage in corpus.Where(p => p.PipelineId == pipelineId))
+            {
+                var score = ComputeKeywordScore(passage.Text, query);
+                if (score <= 0)
+                {
+                    continue;
+                }
+
+                var vector = await GetPassageEmbeddingAsync(passage, ct);
+                candidates.Add((passage, score, vector));
+            }
+
+            candidates = candidates
+                .OrderByDescending(c => c.score)
+                .Take(options.Retrieval.TopK)
+                .ToList();
+        }
+
+        _logger.LogInformation("Retrieved {Count} passages for query: {Query}", candidates.Count, query);
+        return new RetrievalResult(candidates, queryEmbedding);
+    }
+
+    private sealed record RetrievalResult(List<(Passage passage, double score, float[]? vector)> Candidates, float[] QueryEmbedding);
+
+    private async Task<float[]?> GetPassageEmbeddingAsync(Passage passage, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(passage.Text))
+        {
+            return null;
+        }
+
+        var hash = EmbeddingCache.ComputeContentHash(passage.Text);
+        try
+        {
+            var cached = await _cache.GetAsync(hash, EmbeddingModel, nameof(Passage), ct);
+            if (cached?.Embedding is { Length: > 0 })
+            {
+                return cached.Embedding;
+            }
+
+            var embedding = await Koan.AI.Ai.Embed(passage.Text, ct);
+            await _cache.SetAsync(hash, EmbeddingModel, embedding, nameof(Passage), ct);
+            return embedding;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Failed to obtain embedding for passage {PassageId}", passage.Id);
+            return null;
+        }
+    }
+
+    private double ComputeKeywordScore(string text, string query)
+    {
+        if (string.IsNullOrWhiteSpace(text) || string.IsNullOrWhiteSpace(query))
+        {
+            return 0;
+        }
+
+        var terms = query.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (terms.Length == 0)
+        {
+            return 0;
+        }
+
+        var filteredTerms = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var term in terms)
+        {
+            var cleaned = term.Trim(KeywordTrimCharacters);
+            if (string.IsNullOrWhiteSpace(cleaned))
+            {
+                continue;
+            }
+
+            if (KeywordStopWords.Contains(cleaned))
+            {
+                continue;
+            }
+
+            filteredTerms.Add(cleaned.ToLowerInvariant());
+        }
+
+        if (filteredTerms.Count == 0)
+        {
+            return 0;
+        }
+
+        var lowerText = text.ToLowerInvariant();
+        double score = 0;
+
+        foreach (var termLower in filteredTerms)
+        {
+            if (lowerText.Contains(termLower))
+            {
+                score += 1;
             }
         }
 
-        _logger.LogInformation("Retrieved {Count} passages for query: {Query}", passages.Count, query);
-        return passages;
+        return score;
     }
-
     /// <summary>
     /// Computes cosine similarity between two embedding vectors.
     /// </summary>
@@ -191,7 +321,6 @@ public sealed class FieldExtractor : IFieldExtractor
     /// </summary>
     private List<Passage> ApplyMMR(
         List<(Passage passage, double score, float[]? vector)> ranked,
-        float[] queryEmbedding,
         int maxPassages,
         double lambda)
     {
@@ -340,24 +469,21 @@ If the field cannot be found, respond with:
     /// <summary>
     /// Parses the AI extraction response using multiple strategies.
     /// </summary>
-    private (string? Value, double Confidence, int? PassageIndex)? ParseExtractionResponse(string response)
+    private ExtractionResponse? ParseExtractionResponse(string response)
     {
         JObject? json = null;
         var jsonText = response.Trim();
 
-        // Strategy 1: Direct parse
         json = TryParseJson(jsonText);
 
         if (json == null)
         {
-            // Strategy 2: Strip markdown code blocks
-            jsonText = Regex.Replace(response, @"```(?:json)?\s*|\s*```", "");
+            jsonText = Regex.Replace(response, @"`(?:json)?\s*|\s*`", "");
             json = TryParseJson(jsonText);
         }
 
         if (json == null)
         {
-            // Strategy 3: Extract by balanced braces
             jsonText = ExtractJsonByBalancedBraces(response);
             json = TryParseJson(jsonText);
         }
@@ -368,12 +494,14 @@ If the field cannot be found, respond with:
             return null;
         }
 
-        var value = json["value"]?.ToString();
-        var confidence = json["confidence"]?.Value<double>() ?? 0.0;
-        var passageIndex = json["passageIndex"]?.Value<int>();
+        var valueToken = json["value"];
+        var confidence = json["confidence"]?.Value<double?>() ?? 0.0;
+        var passageIndex = json["passageIndex"]?.Value<int?>();
 
-        return (value, confidence, passageIndex);
+        return new ExtractionResponse(valueToken, confidence, passageIndex);
     }
+
+        private sealed record ExtractionResponse(JToken? Value, double Confidence, int? PassageIndex);
 
     private JObject? TryParseJson(string text)
     {
@@ -409,44 +537,59 @@ If the field cannot be found, respond with:
     /// <summary>
     /// Validates the extracted value against the schema and attempts type repair.
     /// </summary>
-    private bool ValidateAgainstSchema(string? value, JSchema schema, out string? validationError)
+    private bool ValidateAgainstSchema(JToken? valueToken, JSchema schema, out JToken? normalizedToken, out string? validationError)
     {
+        normalizedToken = valueToken;
         validationError = null;
 
-        if (value == null)
+        if (valueToken is null || valueToken.Type == JTokenType.Null)
         {
-            return true; // null is valid if field is not required
-        }
-
-        try
-        {
-            // Try to parse value based on schema type
-            if (schema.Type == JSchemaType.Number || schema.Type == JSchemaType.Integer)
-            {
-                if (!double.TryParse(value, out _))
-                {
-                    validationError = $"Value '{value}' is not a valid number";
-                    return false;
-                }
-            }
-            else if (schema.Type == JSchemaType.Boolean)
-            {
-                if (!bool.TryParse(value, out _))
-                {
-                    validationError = $"Value '{value}' is not a valid boolean";
-                    return false;
-                }
-            }
-
             return true;
         }
-        catch (Exception ex)
+
+        var working = valueToken.DeepClone();
+
+        if (schema.Type.HasValue)
         {
-            validationError = ex.Message;
+            var types = schema.Type.Value;
+
+            if ((types.HasFlag(JSchemaType.Number) || types.HasFlag(JSchemaType.Integer)) && working is JValue numericValue)
+            {
+                if (numericValue.Type == JTokenType.String)
+                {
+                    var text = numericValue.Value<string>()?.Trim();
+                    if (double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsedNumber))
+                    {
+                        working = types.HasFlag(JSchemaType.Integer)
+                            ? new JValue(Convert.ToInt64(Math.Round(parsedNumber)))
+                            : new JValue(parsedNumber);
+                    }
+                }
+            }
+            else if (types.HasFlag(JSchemaType.Boolean) && working is JValue boolValue && boolValue.Type == JTokenType.String)
+            {
+                var text = boolValue.Value<string>()?.Trim();
+                if (bool.TryParse(text, out var parsedBool))
+                {
+                    working = new JValue(parsedBool);
+                }
+            }
+            else if (types.HasFlag(JSchemaType.String) && working.Type != JTokenType.String)
+            {
+                working = new JValue(working.ToString(Formatting.None));
+            }
+        }
+
+        if (!working.IsValid(schema, out IList<string> errors))
+        {
+            validationError = string.Join("; ", errors);
+            normalizedToken = valueToken;
             return false;
         }
-    }
 
+        normalizedToken = working;
+        return true;
+    }
     /// <summary>
     /// Extracts a field value from passages using LLM.
     /// </summary>
@@ -458,16 +601,16 @@ If the field cannot be found, respond with:
         MeridianOptions options,
         CancellationToken ct)
     {
-        if (passages.Count == 0) return null;
+        if (passages.Count == 0)
+        {
+            return null;
+        }
 
-        // 1. Build prompt
         var prompt = BuildExtractionPrompt(passages, fieldPath, fieldSchema);
 
-        // 2. Log prompt hash for reproducibility
         var promptHash = ComputePromptHash(prompt);
         _logger.LogDebug("Extraction prompt hash for {FieldPath}: {Hash}", fieldPath, promptHash);
 
-        // 3. Call LLM
         var chatOptions = new AiChatOptions
         {
             Message = prompt,
@@ -479,7 +622,6 @@ If the field cannot be found, respond with:
         _logger.LogDebug("Calling AI for field {FieldPath} with model {Model}", fieldPath, chatOptions.Model);
         var response = await Koan.AI.Ai.Chat(chatOptions, ct);
 
-        // 4. Parse response
         var parsed = ParseExtractionResponse(response);
         if (parsed == null)
         {
@@ -487,26 +629,61 @@ If the field cannot be found, respond with:
             return null;
         }
 
-        // 5. Validate against schema
-        var schemaValid = ValidateAgainstSchema(parsed.Value.Value, fieldSchema, out var validationError);
+        var schemaValid = ValidateAgainstSchema(parsed.Value, fieldSchema, out var normalizedToken, out var validationError);
+        if (!schemaValid && !string.IsNullOrWhiteSpace(validationError))
+        {
+            _logger.LogWarning("Schema validation failed for field {FieldPath}: {Error}", fieldPath, validationError);
+        }
 
-        // 6. Get best passage
-        var passageIndex = parsed.Value.PassageIndex ?? 0;
+        string? normalizedJson = null;
+        if (normalizedToken is JValue normalizedValue && normalizedValue.Type == JTokenType.String)
+        {
+            normalizedJson = JsonConvert.SerializeObject(normalizedValue.Value<string>() ?? string.Empty);
+        }
+        else if (normalizedToken != null)
+        {
+            normalizedJson = normalizedToken.ToString(Formatting.None);
+        }
+        else if (parsed.Value != null)
+        {
+            normalizedJson = parsed.Value.ToString(Formatting.None);
+        }
+        var stringValue = normalizedToken switch
+        {
+            JValue jValue when jValue.Type == JTokenType.String => jValue.Value<string>() ?? string.Empty,
+            JValue jValue => jValue.ToString(Formatting.None),
+            null => parsed.Value?.ToString(Formatting.None) ?? string.Empty,
+            _ => normalizedToken.ToString(Formatting.None)
+        };
+
+        var confidence = Math.Clamp(parsed.Confidence, 0.0, 1.0);
+
+        var passageIndex = parsed.PassageIndex ?? 0;
         if (passageIndex < 0 || passageIndex >= passages.Count)
+        {
             passageIndex = 0;
+        }
 
         var bestPassage = passages[passageIndex];
+        var span = LocateSpanInPassage(bestPassage.Text, stringValue);
 
-        // 7. Locate span
-        var span = LocateSpanInPassage(bestPassage.Text, parsed.Value.Value ?? "");
+        var evidenceMetadata = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["promptHash"] = promptHash,
+            ["schemaValid"] = schemaValid ? "true" : "false"
+        };
 
-        // 8. Create ExtractedField
+        if (!string.IsNullOrWhiteSpace(validationError))
+        {
+            evidenceMetadata["schemaError"] = validationError;
+        }
+
         var extraction = new ExtractedField
         {
             PipelineId = pipeline.Id,
             FieldPath = fieldPath,
-            ValueJson = parsed.Value.Value,
-            Confidence = parsed.Value.Confidence,
+            ValueJson = normalizedJson,
+            Confidence = confidence,
             SourceDocumentId = bestPassage.SourceDocumentId,
             PassageId = bestPassage.Id,
             Evidence = new TextSpanEvidence
@@ -516,14 +693,15 @@ If the field cannot be found, respond with:
                 OriginalText = bestPassage.Text,
                 Page = bestPassage.PageNumber,
                 Section = bestPassage.Section,
-                Span = span
+                Span = span,
+                Metadata = evidenceMetadata
             },
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
 
         _logger.LogInformation("Extracted field {FieldPath}: {Value} (confidence: {Confidence:P0})",
-            fieldPath, parsed.Value.Value ?? "null", parsed.Value.Confidence);
+            fieldPath, normalizedJson ?? "null", confidence);
 
         return extraction;
     }

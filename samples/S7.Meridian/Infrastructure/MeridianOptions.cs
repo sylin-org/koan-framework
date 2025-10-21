@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace Koan.Samples.Meridian.Infrastructure;
 
 /// <summary>
@@ -9,6 +11,7 @@ public sealed class MeridianOptions
     public RetrievalOptions Retrieval { get; set; } = new();
     public ExtractionOptions Extraction { get; set; } = new();
     public MergeOptions Merge { get; set; } = new();
+    public ClassificationOptions Classification { get; set; } = new();
     public ConfidenceOptions Confidence { get; set; } = new();
 }
 
@@ -52,6 +55,64 @@ public sealed class MergeOptions
 
     /// <summary>Enable normalized value comparison for approval preservation (default: true).</summary>
     public bool EnableNormalizedComparison { get; set; } = true;
+
+    /// <summary>Default precedence order for source types (e.g., financials over vendor PDFs).</summary>
+    public List<string> DefaultSourcePrecedence { get; set; } = new();
+
+    /// <summary>Field-specific merge policies keyed by JSON path (e.g., $.revenue).</summary>
+    public Dictionary<string, MergePolicyOptions> Policies { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+}
+
+public sealed class MergePolicyOptions
+{
+    /// <summary>Name of the merge strategy (highestConfidence, sourcePrecedence, latest, consensus, collection).</summary>
+    public string Strategy { get; set; } = "highestConfidence";
+
+    /// <summary>Optional precedence list overriding the default order.</summary>
+    public List<string>? SourcePrecedence { get; set; }
+
+    /// <summary>Path to a companion date field for latest-by strategies.</summary>
+    public string? LatestByFieldPath { get; set; }
+
+    /// <summary>Minimum unique sources required for consensus selection.</summary>
+    public int? ConsensusMinimumSources { get; set; }
+
+    /// <summary>Transform to apply to the accepted value (normalizeToUsd, round2, etc.).</summary>
+    public string? Transform { get; set; }
+
+    /// <summary>Strategy for collection merges (union, intersection, concat).</summary>
+    public string? CollectionStrategy { get; set; }
+}
+
+public sealed class ClassificationOptions
+{
+    /// <summary>Confidence threshold required to accept heuristic classification.</summary>
+    public double HeuristicConfidenceThreshold { get; set; } = 0.9;
+
+    /// <summary>Confidence threshold required to accept vector classification.</summary>
+    public double VectorConfidenceThreshold { get; set; } = 0.75;
+
+    /// <summary>Maximum characters of the document text to embed for classification.</summary>
+    public int VectorPreviewLength { get; set; } = 1000;
+
+    /// <summary>Model identifier to use for LLM classification fallback (null = default AI model).</summary>
+    public string? LlmModel { get; set; }
+
+    /// <summary>Classification types available to the cascade.</summary>
+    public List<SourceTypeOptions> Types { get; set; } = new();
+}
+
+public sealed class SourceTypeOptions
+{
+    public string Id { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+    public string Description { get; set; } = string.Empty;
+    public int Version { get; set; } = 1;
+    public List<string> FilenamePatterns { get; set; } = new();
+    public List<string> Keywords { get; set; } = new();
+    public int? ExpectedPageCountMin { get; set; }
+    public int? ExpectedPageCountMax { get; set; }
+    public List<string> MimeTypes { get; set; } = new();
 }
 
 public sealed class ConfidenceOptions

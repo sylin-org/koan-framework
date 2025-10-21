@@ -1,4 +1,4 @@
-﻿using Koan.Core;
+using Koan.Core;
 using Koan.Core.Provenance;
 using Koan.Samples.Meridian.Infrastructure;
 using Koan.Samples.Meridian.Services;
@@ -27,17 +27,23 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         // Core services
         services.AddSingleton(new DocumentStorageOptions());
         services.AddSingleton<IDocumentStorage, DocumentStorage>();
+        services.AddSingleton(new DeliverableStorageOptions());
+        services.AddSingleton<IDeliverableStorage, DeliverableStorage>();
+        services.AddSingleton<IPdfRenderer, PdfRenderer>();
         services.AddSingleton<IDocumentIngestionService, DocumentIngestionService>();
         services.AddSingleton<IJobCoordinator, JobCoordinator>();
         services.AddSingleton<ITextExtractor, TextExtractor>();
         services.AddSingleton<IPassageChunker, PassageChunker>();
         services.AddSingleton<IPipelineAlertService, PipelineAlertService>();
         services.AddSingleton<IEmbeddingCache, EmbeddingCache>();
+        services.AddSingleton<ISecureUploadValidator, SecureUploadValidator>();
         services.AddSingleton<IPassageIndexer, PassageIndexer>();
         services.AddSingleton<IFieldExtractor, FieldExtractor>();
+        services.AddSingleton<IDocumentClassifier, DocumentClassifier>();
         services.AddSingleton<IRunLogWriter, RunLogWriter>();
         services.AddSingleton<IDocumentMerger, DocumentMerger>();
         services.AddSingleton<IPipelineProcessor, PipelineProcessor>();
+        services.AddHostedService<ClassificationSeedService>();
         services.AddHostedService<MeridianJobWorker>();
     }
 

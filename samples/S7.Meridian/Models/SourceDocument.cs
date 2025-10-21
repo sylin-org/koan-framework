@@ -1,4 +1,5 @@
-﻿using Koan.Data.Core.Model;
+using Koan.Data.Core.Model;
+using Koan.Samples.Meridian.Infrastructure;
 
 namespace Koan.Samples.Meridian.Models;
 
@@ -11,6 +12,32 @@ public sealed class SourceDocument : Entity<SourceDocument>
         = null;
     public long Size { get; set; }
         = 0;
+
+    /// <summary>Classification of the source document (e.g., AuditedFinancial, VendorPrescreen).</summary>
+    public string SourceType { get; set; } = MeridianConstants.SourceTypes.Unclassified;
+
+    /// <summary>Raw text extracted from the document for downstream processing.</summary>
+    public string ExtractedText { get; set; } = string.Empty;
+
+    /// <summary>Identifier of the classified type (mirrors SourceType for compatibility).</summary>
+    public string? ClassifiedTypeId { get; set; }
+        = null;
+
+    /// <summary>Version of the classified type definition used during classification.</summary>
+    public int? ClassifiedTypeVersion { get; set; }
+        = null;
+
+    /// <summary>Confidence score returned by the classifier.</summary>
+    public double ClassificationConfidence { get; set; }
+        = 0.0;
+
+    /// <summary>Method used to classify the document.</summary>
+    public ClassificationMethod ClassificationMethod { get; set; }
+        = ClassificationMethod.Heuristic;
+
+    /// <summary>Classifier-provided explanation or reasoning string.</summary>
+    public string? ClassificationReason { get; set; }
+        = null;
 
     public DocumentProcessingStatus Status { get; set; }
         = DocumentProcessingStatus.Pending;
@@ -33,5 +60,14 @@ public enum DocumentProcessingStatus
     Pending,
     Extracted,
     Indexed,
+    Classified,
     Failed
+}
+
+public enum ClassificationMethod
+{
+    Heuristic,
+    Vector,
+    Llm,
+    Manual
 }
