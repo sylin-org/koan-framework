@@ -66,6 +66,7 @@ A local-first document intelligence workbench that transforms mixed source files
 
 - .NET 10 SDK
 - Docker Desktop (for MongoDB, Weaviate, Ollama)
+- Optional: set `WEAVIATE_ENDPOINT` to reuse an existing Weaviate instance (defaults to the Koan test fixture)
 - 16GB RAM minimum (for local LLMs)
 
 ### Run the Sample
@@ -83,6 +84,20 @@ This will:
 3. Seed sample types (Vendor Assessment, RFP Response)
 4. Run self-test
 5. Open browser to http://localhost:5104
+
+### Validate Vector Workflows
+
+Before wiring new flows, rerun the vector connector spec to ensure the shared profile remains green:
+
+```bash
+dotnet test tests/Suites/Data/Connector.Weaviate/Koan.Data.Connector.Weaviate.Tests/ -c Release --filter "FullyQualifiedName~WeaviateConnectorSpec"
+```
+
+When the Meridian regression spec lands, it will live under `tests/Suites/Data/S7.Meridian/Koan.Data.S7.Meridian.Tests/`. Target it directly to validate the `meridian:evidence` profile:
+
+```bash
+dotnet test tests/Suites/Data/S7.Meridian/Koan.Data.S7.Meridian.Tests/ -c Release --filter MeridianVectorWorkflowSpec
+```
 
 ### First Analysis
 
@@ -661,6 +676,13 @@ return (
 ---
 
 ## Testing Patterns
+
+### Regression Coverage
+
+- `WeaviateConnectorSpec` (`tests/Suites/Data/Connector.Weaviate/Koan.Data.Connector.Weaviate.Tests/Specs/WeaviateConnectorSpec.cs`) exercises vector CRUD, hybrid ranking, and profile binding.
+    Run it with the connector suite command in Quick Start whenever the profile changes.
+- `MeridianVectorWorkflowSpec` (planned for `tests/Suites/Data/S7.Meridian/Koan.Data.S7.Meridian.Tests/`) will compose the connector fixture with Meridian batching.
+    That regression guards the `meridian:evidence` profile end-to-end.
 
 ### Unit Tests
 
