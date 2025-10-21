@@ -6,6 +6,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
+using Koan.Samples.Meridian.Models;
+using Koan.Web.Hooks;
 
 namespace Koan.Samples.Meridian.Initialization;
 
@@ -41,6 +43,10 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         services.AddSingleton<IFieldExtractor, FieldExtractor>();
         services.AddSingleton<IDocumentClassifier, DocumentClassifier>();
         services.AddSingleton<IRunLogWriter, RunLogWriter>();
+        services.AddSingleton<IAiAssistAuditor, AiAssistAuditor>();
+        services.AddSingleton<ISourceTypeAuthoringService, SourceTypeAuthoringService>();
+        services.AddSingleton<IAnalysisTypeAuthoringService, AnalysisTypeAuthoringService>();
+        services.AddSingleton<IModelHook<DocumentPipeline>, DocumentPipelineAnalysisTypeHook>();
         services.AddSingleton<IDocumentMerger, DocumentMerger>();
         services.AddSingleton<IPipelineProcessor, PipelineProcessor>();
         services.AddHostedService<ClassificationSeedService>();

@@ -1,4 +1,5 @@
-﻿using Koan.Data.Core;
+using System.Collections.Generic;
+using Koan.Data.Core;
 using System.Linq;
 using Koan.Samples.Meridian.Infrastructure;
 using Koan.Samples.Meridian.Models;
@@ -131,9 +132,62 @@ public sealed class PipelineProcessor : IPipelineProcessor
             document.ClassificationConfidence = classification.Confidence;
             document.ClassificationMethod = classification.Method;
             document.ClassificationReason = classification.Reason;
+
+            var allowed = pipeline.RequiredSourceTypes is null ||
+                          pipeline.RequiredSourceTypes.Count == 0 ||
+                          pipeline.RequiredSourceTypes.Any(type =>
+                              string.Equals(type, classification.TypeId, StringComparison.OrdinalIgnoreCase));
+
+            if (!allowed)
+            {
+                var requiredList = string.Join(", ", pipeline.RequiredSourceTypes);
+                var exclusionReason = $"Classified as {classification.TypeId}, but analysis '{pipeline.AnalysisTypeId}' requires [{requiredList}].";
+
+                _logger.LogWarning("Document {DocumentId} classified as {TypeId} but pipeline {PipelineId} requires [{Required}]; excluding from run.",
+                    document.Id, classification.TypeId, pipeline.Id, requiredList);
+
+                document.Status = DocumentProcessingStatus.Failed;
+                document.ClassificationReason = exclusionReason;
+                document.UpdatedAt = classifyFinished;
+                await document.Save(ct);
+
+                var metadata = new Dictionary<string, string>
+                {
+                    ["documentId"] = document.Id,
+                    ["typeId"] = classification.TypeId,
+                    ["confidence"] = classification.Confidence.ToString("0.00"),
+                    ["method"] = classification.Method.ToString(),
+                    ["allowed"] = "false",
+                    ["requiredSourceTypes"] = requiredList
+                };
+
+                await _runLog.AppendAsync(new RunLog
+                {
+                    PipelineId = pipeline.Id,
+                    Stage = "classify",
+                    FieldPath = null,
+                    StartedAt = classifyStarted,
+                    FinishedAt = classifyFinished,
+                    Status = "excluded",
+                    Metadata = metadata
+                }, ct);
+
+                continue;
+            }
+
             document.Status = DocumentProcessingStatus.Classified;
             document.UpdatedAt = classifyFinished;
             await document.Save(ct);
+
+            var allowedMetadata = new Dictionary<string, string>
+            {
+                ["documentId"] = document.Id,
+                ["typeId"] = classification.TypeId,
+                ["confidence"] = classification.Confidence.ToString("0.00"),
+                ["method"] = classification.Method.ToString(),
+                ["reason"] = classification.Reason,
+                ["allowed"] = "true"
+            };
 
             await _runLog.AppendAsync(new RunLog
             {
@@ -143,14 +197,7 @@ public sealed class PipelineProcessor : IPipelineProcessor
                 StartedAt = classifyStarted,
                 FinishedAt = classifyFinished,
                 Status = "success",
-                Metadata = new Dictionary<string, string>
-                {
-                    ["documentId"] = document.Id,
-                    ["typeId"] = classification.TypeId,
-                    ["confidence"] = classification.Confidence.ToString("0.00"),
-                    ["method"] = classification.Method.ToString(),
-                    ["reason"] = classification.Reason
-                }
+                Metadata = allowedMetadata
             }, ct);
 
             var chunks = _chunker.Chunk(document, extraction.Text);
@@ -171,9 +218,12 @@ public sealed class PipelineProcessor : IPipelineProcessor
                 continue;
             }
 
-            doc.Status = DocumentProcessingStatus.Indexed;
-            doc.UpdatedAt = DateTime.UtcNow;
-            await doc.Save(ct);
+            if (doc.Status != DocumentProcessingStatus.Failed)
+            {
+                doc.Status = DocumentProcessingStatus.Indexed;
+                doc.UpdatedAt = DateTime.UtcNow;
+                await doc.Save(ct);
+            }
         }
 
         var allPassages = await Passage.Query(p => p.PipelineId == pipeline.Id, ct);

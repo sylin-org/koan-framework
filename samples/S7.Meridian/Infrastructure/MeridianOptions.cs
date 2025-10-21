@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 namespace Koan.Samples.Meridian.Infrastructure;
@@ -108,11 +109,16 @@ public sealed class SourceTypeOptions
     public string Name { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
     public int Version { get; set; } = 1;
+    public List<string> Tags { get; set; } = new();
+    public List<string> Descriptors { get; set; } = new();
     public List<string> FilenamePatterns { get; set; } = new();
     public List<string> Keywords { get; set; } = new();
     public int? ExpectedPageCountMin { get; set; }
     public int? ExpectedPageCountMax { get; set; }
     public List<string> MimeTypes { get; set; } = new();
+    public Dictionary<string, string> FieldQueries { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+    public string Instructions { get; set; } = string.Empty;
+    public string OutputTemplate { get; set; } = string.Empty;
 }
 
 public sealed class ConfidenceOptions

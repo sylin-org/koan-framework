@@ -1,4 +1,5 @@
-﻿using Koan.Data.Core.Model;
+using System.Collections.Generic;
+using Koan.Data.Core.Model;
 using Newtonsoft.Json.Linq;
 using Newtonsoft.Json.Schema;
 
@@ -15,6 +16,21 @@ public sealed class DocumentPipeline : Entity<DocumentPipeline>
 
     /// <summary>Markdown template rendered with the merged field payload.</summary>
     public string TemplateMarkdown { get; set; } = "# Meridian Deliverable\n";
+
+    /// <summary>Identifier of the AnalysisType backing this pipeline.</summary>
+    public string AnalysisTypeId { get; set; } = string.Empty;
+
+    /// <summary>Version of the AnalysisType applied to this pipeline.</summary>
+    public int AnalysisTypeVersion { get; set; } = 1;
+
+    /// <summary>Analysis-level instructions appended to extraction prompts.</summary>
+    public string AnalysisInstructions { get; set; } = string.Empty;
+
+    /// <summary>Tags inherited from the AnalysisType (useful for filtering and telemetry).</summary>
+    public List<string> AnalysisTags { get; set; } = new();
+
+    /// <summary>Source types required for this analysis. Empty list means no restriction.</summary>
+    public List<string> RequiredSourceTypes { get; set; } = new();
 
     /// <summary>Optional operator guidance that biases retrieval, not final values.</summary>
     public string? BiasNotes { get; set; }

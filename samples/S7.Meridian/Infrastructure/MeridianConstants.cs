@@ -31,6 +31,18 @@ public static class MeridianConstants
         public const string Route = "api/pipelines/{pipelineId}/deliverables";
     }
 
+    public static class SourceTypeCatalog
+    {
+        public const string Route = "api/sourcetypes";
+        public const string AiSuggestSegment = "ai-suggest";
+    }
+
+    public static class AnalysisTypeCatalog
+    {
+        public const string Route = "api/analysistypes";
+        public const string AiSuggestSegment = "ai-suggest";
+    }
+
     public static class SourceTypes
     {
         public const string AuditedFinancial = "AuditedFinancial";

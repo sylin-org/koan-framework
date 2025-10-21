@@ -1,7 +1,9 @@
+using Koan.AI.Connector.Ollama;
 using Koan.Core;
 using Koan.Core.Hosting.App;
 using Koan.Web;
 using Koan.Web.Extensions;
+
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -9,6 +11,8 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services
     .AddKoan()
     .AsWebApi();
+
+builder.Services.AddOllamaFromConfig();
 
 var app = builder.Build();
 
@@ -26,3 +30,4 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
+public partial class Program { }

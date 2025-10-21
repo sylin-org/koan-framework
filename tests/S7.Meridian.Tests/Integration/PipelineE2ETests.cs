@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
@@ -50,9 +51,20 @@ public sealed class PipelineE2ETests
             using var aiScope = Ai.With(new FakeAi());
             var ct = CancellationToken.None;
 
+            var analysisType = new AnalysisType
+            {
+                Name = "Test Analysis",
+                Description = "Integration test analysis",
+                Instructions = "Summarize financial metrics with supporting context.",
+                OutputTemplate = "# Test Report\n\nRevenue: {{revenue}}\nEmployees: {{employees}}",
+                RequiredSourceTypes = new List<string> { MeridianConstants.SourceTypes.AuditedFinancial }
+            };
+            await analysisType.Save(ct);
+
             var pipeline = new DocumentPipeline
             {
                 Name = "Test Pipeline",
+                AnalysisTypeId = analysisType.Id,
                 SchemaJson = """
                 {
                     "type": "object",
@@ -62,8 +74,7 @@ public sealed class PipelineE2ETests
                     },
                     "required": [ "revenue", "employees" ]
                 }
-                """,
-                TemplateMarkdown = "# Test Report\n\nRevenue: {{revenue}}\nEmployees: {{employees}}"
+                """
             };
             await pipeline.Save(ct);
 

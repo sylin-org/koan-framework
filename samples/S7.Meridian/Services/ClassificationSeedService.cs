@@ -1,6 +1,8 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using Koan.Samples.Meridian.Infrastructure;
 using Koan.Data.Core;
-using System.Linq;
 using Koan.Samples.Meridian.Models;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -34,11 +36,18 @@ public sealed class ClassificationSeedService : IHostedService
                     Name = typeOption.Name,
                     Description = typeOption.Description,
                     Version = typeOption.Version,
+                    Tags = new List<string>(typeOption.Tags),
+                    Descriptors = new List<string>(typeOption.Descriptors),
                     FilenamePatterns = new List<string>(typeOption.FilenamePatterns),
                     Keywords = new List<string>(typeOption.Keywords),
                     ExpectedPageCountMin = typeOption.ExpectedPageCountMin,
                     ExpectedPageCountMax = typeOption.ExpectedPageCountMax,
                     MimeTypes = new List<string>(typeOption.MimeTypes),
+                    FieldQueries = new Dictionary<string, string>(typeOption.FieldQueries, StringComparer.OrdinalIgnoreCase),
+                    Instructions = typeOption.Instructions ?? string.Empty,
+                    OutputTemplate = typeOption.OutputTemplate ?? string.Empty,
+                    InstructionsUpdatedAt = DateTime.UtcNow,
+                    OutputTemplateUpdatedAt = DateTime.UtcNow,
                     CreatedAt = DateTime.UtcNow,
                     UpdatedAt = DateTime.UtcNow
                 };
@@ -54,6 +63,11 @@ public sealed class ClassificationSeedService : IHostedService
                           existing.ExpectedPageCountMin != typeOption.ExpectedPageCountMin ||
                           existing.ExpectedPageCountMax != typeOption.ExpectedPageCountMax ||
                           !SequenceEqual(existing.MimeTypes, typeOption.MimeTypes) ||
+                          !SequenceEqual(existing.Tags, typeOption.Tags) ||
+                          !SequenceEqual(existing.Descriptors, typeOption.Descriptors) ||
+                          !DictionaryEqual(existing.FieldQueries, typeOption.FieldQueries) ||
+                          !string.Equals(existing.Instructions, typeOption.Instructions, StringComparison.Ordinal) ||
+                          !string.Equals(existing.OutputTemplate, typeOption.OutputTemplate, StringComparison.Ordinal) ||
                           !string.Equals(existing.Name, typeOption.Name, StringComparison.Ordinal) ||
                           !string.Equals(existing.Description, typeOption.Description, StringComparison.Ordinal);
 
@@ -65,11 +79,24 @@ public sealed class ClassificationSeedService : IHostedService
             existing.Name = typeOption.Name;
             existing.Description = typeOption.Description;
             existing.Version = typeOption.Version;
+            existing.Tags = new List<string>(typeOption.Tags);
+            existing.Descriptors = new List<string>(typeOption.Descriptors);
             existing.FilenamePatterns = new List<string>(typeOption.FilenamePatterns);
             existing.Keywords = new List<string>(typeOption.Keywords);
             existing.ExpectedPageCountMin = typeOption.ExpectedPageCountMin;
             existing.ExpectedPageCountMax = typeOption.ExpectedPageCountMax;
             existing.MimeTypes = new List<string>(typeOption.MimeTypes);
+            existing.FieldQueries = new Dictionary<string, string>(typeOption.FieldQueries, StringComparer.OrdinalIgnoreCase);
+            if (!string.Equals(existing.Instructions, typeOption.Instructions, StringComparison.Ordinal))
+            {
+                existing.Instructions = typeOption.Instructions ?? string.Empty;
+                existing.InstructionsUpdatedAt = DateTime.UtcNow;
+            }
+            if (!string.Equals(existing.OutputTemplate, typeOption.OutputTemplate, StringComparison.Ordinal))
+            {
+                existing.OutputTemplate = typeOption.OutputTemplate ?? string.Empty;
+                existing.OutputTemplateUpdatedAt = DateTime.UtcNow;
+            }
             existing.TypeEmbedding = null;
             existing.TypeEmbeddingVersion = 0;
             existing.TypeEmbeddingHash = null;
@@ -92,5 +119,30 @@ public sealed class ClassificationSeedService : IHostedService
 
         return left.OrderBy(s => s, StringComparer.OrdinalIgnoreCase)
             .SequenceEqual(right.OrderBy(s => s, StringComparer.OrdinalIgnoreCase));
+    }
+
+    private static bool DictionaryEqual(
+        IReadOnlyDictionary<string, string> left,
+        IReadOnlyDictionary<string, string> right)
+    {
+        if (left.Count != right.Count)
+        {
+            return false;
+        }
+
+        foreach (var kvp in left)
+        {
+            if (!right.TryGetValue(kvp.Key, out var otherValue))
+            {
+                return false;
+            }
+
+            if (!string.Equals(kvp.Value, otherValue, StringComparison.Ordinal))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 }

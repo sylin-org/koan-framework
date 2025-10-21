@@ -83,6 +83,11 @@ public sealed class FieldExtractor : IFieldExtractor
             return results;
         }
 
+        var sourceTypes = await LoadSourceTypesAsync(pipeline.Id, ct).ConfigureAwait(false);
+        var instructionBlock = BuildInstructionBlock(pipeline, sourceTypes);
+        var fieldQueryOverrides = BuildFieldQueryOverrides(sourceTypes);
+        var keywordHint = BuildKeywordHint(pipeline, sourceTypes);
+
         var fieldPaths = EnumerateLeafSchemas(schema).ToList();
         _logger.LogInformation("Extracting {Count} fields for pipeline {PipelineId}", fieldPaths.Count, pipeline.Id);
 
@@ -92,7 +97,7 @@ public sealed class FieldExtractor : IFieldExtractor
 
             try
             {
-                var query = BuildRAGQuery(fieldPath, fieldSchema, pipeline);
+                var query = BuildRAGQuery(fieldPath, pipeline, fieldQueryOverrides, keywordHint);
 
                 var retrieval = await RetrievePassages(pipeline.Id, query, passages, options, ct);
                 if (retrieval.Candidates.Count == 0)
@@ -120,7 +125,7 @@ public sealed class FieldExtractor : IFieldExtractor
 
                 var budgeted = EnforceTokenBudget(diverse, options.Retrieval.MaxTokensPerField);
 
-                var extraction = await ExtractFromPassages(pipeline, fieldPath, fieldSchema, budgeted, options, ct);
+                var extraction = await ExtractFromPassages(pipeline, fieldPath, fieldSchema, budgeted, options, instructionBlock, ct);
                 if (extraction != null)
                 {
                     results.Add(extraction);
@@ -137,24 +142,204 @@ public sealed class FieldExtractor : IFieldExtractor
         return results;
     }
 
+    private async Task<List<SourceType>> LoadSourceTypesAsync(string pipelineId, CancellationToken ct)
+    {
+        var documents = await SourceDocument.Query(d => d.PipelineId == pipelineId, ct).ConfigureAwait(false);
+        var ids = documents
+            .Select(d => d.ClassifiedTypeId ?? d.SourceType)
+            .Where(id => !string.IsNullOrWhiteSpace(id) && !string.Equals(id, MeridianConstants.SourceTypes.Unclassified, StringComparison.OrdinalIgnoreCase))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (ids.Count == 0)
+        {
+            return new List<SourceType>();
+        }
+
+        var result = new List<SourceType>();
+        foreach (var id in ids)
+        {
+            ct.ThrowIfCancellationRequested();
+            var sourceType = await SourceType.Get(id!, ct).ConfigureAwait(false);
+            if (sourceType is null)
+            {
+                _logger.LogWarning("Source type {SourceTypeId} referenced by pipeline {PipelineId} is missing. Documents may be unclassified.", id, pipelineId);
+                continue;
+            }
+
+            result.Add(sourceType);
+        }
+
+        return result;
+    }
+
+    private static IReadOnlyDictionary<string, string> BuildFieldQueryOverrides(IEnumerable<SourceType> sourceTypes)
+    {
+        var overrides = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var type in sourceTypes)
+        {
+            foreach (var kvp in type.FieldQueries)
+            {
+                if (string.IsNullOrWhiteSpace(kvp.Key) || string.IsNullOrWhiteSpace(kvp.Value))
+                {
+                    continue;
+                }
+
+                var key = NormalizeFieldPath(kvp.Key);
+                var value = kvp.Value.Trim();
+
+                if (overrides.TryGetValue(key, out var existing))
+                {
+                    if (!existing.Contains(value, StringComparison.OrdinalIgnoreCase))
+                    {
+                        overrides[key] = $"{existing} OR {value}";
+                    }
+                }
+                else
+                {
+                    overrides[key] = value;
+                }
+            }
+        }
+
+        return overrides;
+    }
+
+    private static string BuildInstructionBlock(DocumentPipeline pipeline, IEnumerable<SourceType> sourceTypes)
+    {
+        var builder = new StringBuilder();
+
+        if (!string.IsNullOrWhiteSpace(pipeline.AnalysisInstructions))
+        {
+            builder.AppendLine($"[Analysis] {pipeline.AnalysisInstructions.Trim()}");
+        }
+
+        foreach (var type in sourceTypes)
+        {
+            if (string.IsNullOrWhiteSpace(type.Instructions))
+            {
+                continue;
+            }
+
+            builder.AppendLine($"[{type.Name}] {type.Instructions.Trim()}");
+        }
+
+        return builder.ToString().Trim();
+    }
+
+    private static string BuildKeywordHint(DocumentPipeline pipeline, IEnumerable<SourceType> sourceTypes)
+    {
+        var keywords = new List<string>();
+        if (pipeline.AnalysisTags is { Count: > 0 })
+        {
+            keywords.AddRange(pipeline.AnalysisTags);
+        }
+
+        if (pipeline.RequiredSourceTypes is { Count: > 0 })
+        {
+            keywords.AddRange(pipeline.RequiredSourceTypes);
+        }
+
+        keywords.AddRange(sourceTypes.SelectMany(type => type.Keywords ?? new List<string>()));
+        keywords.AddRange(sourceTypes.SelectMany(type => type.Tags ?? new List<string>()));
+        keywords.AddRange(sourceTypes.SelectMany(type => type.Descriptors ?? new List<string>()));
+
+        var normalized = keywords
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => value.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(8)
+            .ToList();
+
+        if (normalized.Count == 0)
+        {
+            return string.Empty;
+        }
+
+        return $"Prioritize passages mentioning: {string.Join(", ", normalized)}.";
+    }
+
+    private static string NormalizeFieldPath(string fieldPath)
+    {
+        if (string.IsNullOrWhiteSpace(fieldPath))
+        {
+            return string.Empty;
+        }
+
+        var trimmed = fieldPath.Trim();
+        if (trimmed.StartsWith("$."))
+        {
+            return trimmed;
+        }
+
+        return trimmed.StartsWith("$", StringComparison.Ordinal)
+            ? trimmed
+            : $"$.{trimmed.TrimStart('.')}";
+    }
+
+    private static bool TryGetQueryOverride(
+        string fieldPath,
+        IReadOnlyDictionary<string, string> overrides,
+        out string? query)
+    {
+        var normalized = NormalizeFieldPath(fieldPath);
+        if (normalized.Length == 0)
+        {
+            query = null;
+            return false;
+        }
+
+        if (overrides.TryGetValue(normalized, out query))
+        {
+            return true;
+        }
+
+        if (normalized.EndsWith("[]", StringComparison.Ordinal))
+        {
+            var singular = normalized[..^2];
+            if (overrides.TryGetValue(singular, out query))
+            {
+                return true;
+            }
+        }
+
+        query = null;
+        return false;
+    }
+
     /// <summary>
     /// Builds a semantic query for RAG retrieval based on the field path and schema.
     /// Converts camelCase field names to natural language queries.
     /// </summary>
-    private string BuildRAGQuery(string fieldPath, JSchema fieldSchema, DocumentPipeline pipeline)
+    private string BuildRAGQuery(
+        string fieldPath,
+        DocumentPipeline pipeline,
+        IReadOnlyDictionary<string, string> fieldQueryOverrides,
+        string keywordHint)
     {
-        // Extract field name: $.annualRevenue → "annualRevenue"
-        var fieldName = fieldPath.TrimStart('$', '.');
+        if (TryGetQueryOverride(fieldPath, fieldQueryOverrides, out var overrideQuery) &&
+            !string.IsNullOrWhiteSpace(overrideQuery))
+        {
+            return overrideQuery!;
+        }
 
-        // Convert camelCase to spaced: annualRevenue → annual revenue
+        var fieldName = fieldPath.TrimStart('$', '.');
         var spaced = Regex.Replace(fieldName, "([a-z])([A-Z])", "$1 $2").ToLower();
 
-        // Apply bias if present
-        var bias = !string.IsNullOrWhiteSpace(pipeline.BiasNotes)
-            ? $" {pipeline.BiasNotes}"
-            : string.Empty;
+        var builder = new StringBuilder();
+        builder.Append("Find information about ").Append(spaced).Append('.');
 
-        return $"Find information about {spaced}.{bias}";
+        if (!string.IsNullOrWhiteSpace(pipeline.BiasNotes))
+        {
+            builder.Append(' ').Append(pipeline.BiasNotes);
+        }
+
+        if (!string.IsNullOrWhiteSpace(keywordHint))
+        {
+            builder.Append(' ').Append(keywordHint);
+        }
+
+        return builder.ToString();
     }
 
     /// <summary>
@@ -421,7 +606,11 @@ public sealed class FieldExtractor : IFieldExtractor
     /// <summary>
     /// Builds a prompt for LLM-based field extraction from passages.
     /// </summary>
-    private string BuildExtractionPrompt(List<Passage> passages, string fieldPath, JSchema fieldSchema)
+    private string BuildExtractionPrompt(
+        List<Passage> passages,
+        string fieldPath,
+        JSchema fieldSchema,
+        string instructionBlock)
     {
         var fieldName = fieldPath.TrimStart('$', '.');
         var fieldType = fieldSchema.Type?.ToString() ?? "string";
@@ -451,6 +640,11 @@ Respond in JSON format:
 
 If the field cannot be found, respond with:
 {{ ""value"": null, ""confidence"": 0.0, ""passageIndex"": null }}";
+
+        if (!string.IsNullOrWhiteSpace(instructionBlock))
+        {
+            prompt += $"\n\nGuidance:\n{instructionBlock}";
+        }
 
         return prompt;
     }
@@ -599,6 +793,7 @@ If the field cannot be found, respond with:
         JSchema fieldSchema,
         List<Passage> passages,
         MeridianOptions options,
+        string instructionBlock,
         CancellationToken ct)
     {
         if (passages.Count == 0)
@@ -606,7 +801,7 @@ If the field cannot be found, respond with:
             return null;
         }
 
-        var prompt = BuildExtractionPrompt(passages, fieldPath, fieldSchema);
+        var prompt = BuildExtractionPrompt(passages, fieldPath, fieldSchema, instructionBlock);
 
         var promptHash = ComputePromptHash(prompt);
         _logger.LogDebug("Extraction prompt hash for {FieldPath}: {Hash}", fieldPath, promptHash);

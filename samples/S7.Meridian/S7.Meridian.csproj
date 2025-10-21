@@ -28,6 +28,7 @@
 
     <!-- AI -->
     <ProjectReference Include="..\..\src\Koan.AI\Koan.AI.csproj" />
+    <ProjectReference Include="..\..\src\Connectors\AI\Ollama\Koan.AI.Connector.Ollama.csproj" />
   </ItemGroup>
 
   <ItemGroup>
