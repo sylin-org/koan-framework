@@ -102,33 +102,55 @@ public sealed class DocumentMerger : IDocumentMerger
             accepted.ValueJson = mergeResult.ValueToken.ToString(Formatting.None);
             accepted.UpdatedAt = now;
             accepted.Evidence.Metadata["mergeStrategy"] = mergeResult.Strategy;
+            if (!string.IsNullOrWhiteSpace(descriptor.Transform))
+            {
+                accepted.Evidence.Metadata["transformApplied"] = descriptor.Transform!;
+            }
 
             if (_options.Merge.EnableNormalizedComparison)
             {
                 PreserveApprovalsIfEquivalent(accepted, candidates, mergeResult.ValueToken);
             }
 
-            await accepted.Save(ct);
-            acceptedFields.Add(accepted);
+            var savedAccepted = await accepted.Save(ct);
+            acceptedFields.Add(savedAccepted);
 
+            var rejectedIds = new List<string>();
             foreach (var rejected in mergeResult.Rejected)
             {
-                if (rejected.Id == accepted.Id)
+                if (rejected.Id == savedAccepted.Id)
                 {
                     continue;
                 }
 
                 rejected.MergeStrategy = mergeResult.Strategy;
                 rejected.UpdatedAt = now;
-                await rejected.Save(ct);
+                var savedRejected = await rejected.Save(ct);
+                if (!string.IsNullOrWhiteSpace(savedRejected.Id))
+                {
+                    rejectedIds.Add(savedRejected.Id);
+                }
             }
+
+            var decision = new MergeDecision
+            {
+                PipelineId = pipeline.Id,
+                FieldPath = group.Key,
+                Strategy = mergeResult.Strategy,
+                Explanation = mergeResult.Explanation ?? string.Empty,
+                AcceptedExtractionId = savedAccepted.Id ?? string.Empty,
+                RejectedExtractionIds = rejectedIds,
+                RuleConfigJson = SerializePolicyDescriptor(descriptor),
+                TransformApplied = descriptor.Transform
+            };
+            await decision.Save(ct);
 
             var templateKey = NormalizeKey(group.Key);
             var formattedValue = FormatValueForTemplate(mergeResult.ValueToken);
 
             if (_options.Merge.EnableCitations)
             {
-                var footnote = await BuildFootnoteAsync(accepted, mergeResult.ValueToken, footnotes.Count + 1, sourceCache, passageCache, ct);
+                var footnote = await BuildFootnoteAsync(savedAccepted, mergeResult.ValueToken, footnotes.Count + 1, sourceCache, passageCache, ct);
                 if (footnote is { } info)
                 {
                     footnotes.Add(info);
@@ -144,7 +166,7 @@ public sealed class DocumentMerger : IDocumentMerger
                 {
                     ["strategy"] = mergeResult.Strategy,
                     ["candidateCount"] = candidates.Count.ToString(CultureInfo.InvariantCulture),
-                    ["acceptedExtractionId"] = accepted.Id
+                    ["acceptedExtractionId"] = savedAccepted.Id ?? string.Empty
                 };
 
                 if (!string.IsNullOrWhiteSpace(mergeResult.Explanation))
@@ -308,12 +330,16 @@ public sealed class DocumentMerger : IDocumentMerger
         {
             var overrideToken = ParseToken(overrideCandidate.OverrideValueJson);
             overrideCandidate.ValueJson = overrideCandidate.OverrideValueJson;
+            overrideCandidate.Confidence = 1.0;
+            overrideCandidate.Evidence.Metadata["overrideApplied"] = overrideCandidate.OverrideReason ?? "manual override";
+            var transformedOverride = MergeTransforms.Apply(descriptor.Transform, overrideToken);
+            overrideCandidate.ValueJson = transformedOverride.ToString(Formatting.None);
             return new FieldMergeResult(
                 overrideCandidate,
                 candidates.Where(c => c.Id != overrideCandidate.Id).ToList(),
                 "override",
                 "User override applied.",
-                ApplyTransform(overrideToken, descriptor.Transform));
+                transformedOverride);
         }
 
         FieldMergeResult result = descriptor.Strategy switch
@@ -325,7 +351,7 @@ public sealed class DocumentMerger : IDocumentMerger
             _ => ApplyHighestConfidence(candidates)
         };
 
-        var transformed = ApplyTransform(result.ValueToken, descriptor.Transform);
+        var transformed = MergeTransforms.Apply(descriptor.Transform, result.ValueToken);
         result.Accepted.ValueJson = transformed.ToString(Formatting.None);
         return result with { ValueToken = transformed };
     }
@@ -338,7 +364,7 @@ public sealed class DocumentMerger : IDocumentMerger
     {
         var precedence = descriptor.SourcePrecedence?.ToList() ?? new List<string>();
 
-        var ranked = new List<(ExtractedField Field, int Priority)>();
+        var ranked = new List<(ExtractedField Field, int Priority, string SourceType)>();
         foreach (var candidate in candidates)
         {
             var doc = await GetSourceDocumentAsync(candidate.SourceDocumentId, sourceCache, ct);
@@ -349,7 +375,8 @@ public sealed class DocumentMerger : IDocumentMerger
                 priority = precedence.Count > 0 ? precedence.Count : int.MaxValue;
             }
 
-            ranked.Add((candidate, priority));
+            ranked.Add((candidate, priority, sourceType));
+            candidate.Evidence.Metadata["sourceType"] = sourceType;
         }
 
         var ordered = ranked
@@ -700,75 +727,6 @@ public sealed class DocumentMerger : IDocumentMerger
         return JToken.DeepEquals(left, right);
     }
 
-    private static JToken ApplyTransform(JToken token, string? transform)
-    {
-        if (string.IsNullOrWhiteSpace(transform))
-        {
-            return token;
-        }
-
-        return transform.ToLowerInvariant() switch
-        {
-            "normalizetousd" => NormalizeToUsd(token),
-            "round2" => RoundNumeric(token, 2),
-            "round0" => RoundNumeric(token, 0),
-            _ => token
-        };
-    }
-
-    private static JToken NormalizeToUsd(JToken token)
-    {
-        var raw = token.Type switch
-        {
-            JTokenType.Float or JTokenType.Integer => token.ToString(),
-            JTokenType.String => token.Value<string>() ?? string.Empty,
-            _ => token.ToString()
-        };
-
-        raw = raw.Trim();
-        if (string.IsNullOrWhiteSpace(raw))
-        {
-            return token;
-        }
-
-        if (decimal.TryParse(raw, NumberStyles.Any, CultureInfo.InvariantCulture, out var numeric))
-        {
-            return new JValue(Math.Round(numeric, 2));
-        }
-
-        var match = Regex.Match(raw, @"\$?\s*(?<value>[\d,]*\.?\d+)\s*(?<suffix>[KMB])?", RegexOptions.IgnoreCase);
-        if (!match.Success)
-        {
-            return token;
-        }
-
-        var numericPart = match.Groups["value"].Value.Replace(",", string.Empty);
-        if (!decimal.TryParse(numericPart, NumberStyles.Any, CultureInfo.InvariantCulture, out var amount))
-        {
-            return token;
-        }
-
-        amount *= match.Groups["suffix"].Value.ToUpperInvariant() switch
-        {
-            "K" => 1_000m,
-            "M" => 1_000_000m,
-            "B" => 1_000_000_000m,
-            _ => 1m
-        };
-
-        return new JValue(Math.Round(amount, 2));
-    }
-
-    private static JToken RoundNumeric(JToken token, int decimals)
-    {
-        if (decimal.TryParse(token.ToString(), NumberStyles.Any, CultureInfo.InvariantCulture, out var number))
-        {
-            return new JValue(Math.Round(number, decimals));
-        }
-
-        return token;
-    }
-
     private static async Task<SourceDocument?> GetSourceDocumentAsync(string? id, Dictionary<string, SourceDocument?> cache, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(id))
@@ -801,5 +759,20 @@ public sealed class DocumentMerger : IDocumentMerger
         var passage = await Passage.Get(id, ct);
         cache[id] = passage;
         return passage;
+    }
+
+    private static string SerializePolicyDescriptor(MergePolicyDescriptor descriptor)
+    {
+        var payload = new
+        {
+            Strategy = descriptor.Strategy.ToString(),
+            descriptor.SourcePrecedence,
+            descriptor.LatestByFieldPath,
+            descriptor.ConsensusMinimumSources,
+            descriptor.Transform,
+            descriptor.CollectionStrategy
+        };
+
+        return JsonConvert.SerializeObject(payload);
     }
 }

@@ -8,17 +8,17 @@
 ## 📊 CURRENT STATUS SNAPSHOT
 
 **Last Updated**: 2025-10-21
-**Phase**: Phase 1 - Core RAG-Based Field Extraction
-**Progress**: 10/10 primary tasks complete (Phase 1 ready for review)
-**Current Task**: Transition to Phase 2 - Merge Policy Enhancements
-**Next Checkpoint**: Sign-off on end-to-end harness + Phase 2 kickoff
+**Phase**: Phase 2 - Merge Policies & Conflict Resolution
+**Progress**: Phase 2 complete – merge automation validated
+**Current Task**: Phase 3 - Document Classification pipeline
+**Next Checkpoint**: Kickoff classification cascade + policy routing
 
 ### Phase Completion Status
 ```
 ✅ Phase 0: Foundation Setup (COMPLETE)
 ✅ Phase 1: Core RAG Extraction (COMPLETE)
-⬜ Phase 2: Merge Policies (PENDING)
-⬜ Phase 3: Document Classification (PENDING)
+✅ Phase 2: Merge Policies (COMPLETE)
+⏳ Phase 3: Document Classification (IN PROGRESS)
 ⬜ Phase 4: Production Features (PENDING)
 ⬜ Phase 5: Production Hardening (PENDING)
 ```
@@ -32,14 +32,15 @@
 ✅ Token-budgeted LLM extraction w/ schema validation + span mapping
 ✅ Durable job orchestration + background worker heartbeat
 ✅ Markdown deliverable rendering with evidence metadata
-✅ Automated end-to-end validation harness (Task 1.E2E)
+✅ Merge policies (precedence, latest, consensus, collection) with audit trail
+✅ Manual overrides (confidence 1.0) and citation footnotes in deliverables
 ```
 
 ### What Doesn't Work Yet
 ```bash
-⚠️ Merge policy enhancements (Phase 2 scope)
-❌ Document classification pipeline
-❌ Field overrides + incremental refresh
+⚠️ Document classification pipeline (Phase 3 scope)
+❌ Field overrides UI + incremental refresh APIs
+❌ Production telemetry & hardening (Phase 4/5)
 ```
 
 
@@ -1164,9 +1165,18 @@ Update this section after each task completion:
 [x] Task 1.E2E: End-to-End Test (1 subtask)
 ```
 
+### Phase 2 Task Completion Log
+```
+[x] Task 2.1: MergePolicy modelling & MergeDecision audit entity
+[x] Task 2.2: MergeTransforms registry (currency/date/percent/fuzzy/enum/rounding)
+[x] Task 2.3: DocumentMerger strategy engine (precedence/latest/consensus/collection)
+[x] Task 2.4: Field override pipeline (confidence=1.0 + logging)
+[x] Task 2.5: Citation footnotes & merge decision persistence
+```
+
 **Last Updated**: 2025-10-21
-**Last Completed Task**: Task 1.E2E - End-to-End Test validated
-**Next Task**: Phase 2 kickoff – Merge policy enhancements
+**Last Completed Task**: Phase 2 - Merge policy engine & audit trail
+**Next Task**: Phase 3 kickoff – Document classification cascade
 
 
 ---
@@ -1178,12 +1188,13 @@ If resuming after interruption, use this section to restore context:
 **Current Implementation State**:
 - FieldExtractor implements full RAG loop (hybrid retrieval, MMR, schema validation, span mapping)
 - Embedding cache + PassageIndexer reuse vectors (SHA-256 hashed directories)
-- PipelineProcessor injects MeridianOptions and defers persistence to processor stage
-- Unit tests cover embedding cache + schema normalization helpers
+- DocumentMerger enforces precedence/latest/consensus/collection strategies with MergeDecision audit records
+- Deliverables include citation footnotes and override handling
+- Unit tests cover embedding cache, schema normalization, merge transforms, and policy integration
 
 **Next Immediate Actions**:
-1. Build end-to-end harness to drive pipeline and assert deliverable output
-2. Capture sample document fixtures for regression
-3. Document manual verification steps in TESTING.md
+1. Stand up document classification pipeline (heuristic + vector + LLM) per Phase 3
+2. Wire classification outputs into SourceDocument + PipelineProcessor and add regression tests
+3. Document operator workflows for overrides & start planning Phase 4 production features
 
 **Known Blockers**: None (awaiting E2E harness)
