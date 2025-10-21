@@ -60,7 +60,7 @@ The Koan Backup system provides attribute-driven backup and restore capabilities
 │  Data<T>, Vector<T>                 │
 │  - AllStream()                       │
 │  - Save()                            │
-│  - SaveWithVector()                  │
+│  - VectorData<TEntity>.SaveWithVector() │
 └──────────────┬──────────────────────┘
                │ delegates to
                ↓
@@ -540,7 +540,7 @@ public async Task<BackupResult> ImportVectors<T, TKey>(string backupPath)
         if (embedding == null) continue;
 
         // Save to current vector provider (may be different!)
-        await Data<T, TKey>.SaveWithVector(entity, embedding, null);
+    await VectorData<T>.SaveWithVector(entity, embedding, null);
         count++;
     }
 

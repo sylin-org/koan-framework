@@ -423,57 +423,6 @@ public static class Data<TEntity, TKey>
         return all.Skip((page - 1) * size).Take(size).ToList();
     }
 
-    // Vector role facade (minimal surface for now)
-    public static class Vector
-    {
-        private static Koan.Data.Vector.Abstractions.IVectorSearchRepository<TEntity, TKey> Repo
-            => Koan.Core.Hosting.App.AppHost.Current?.GetService<IDataService>()?.GetRequiredVectorRepository<TEntity, TKey>()
-               ?? throw new System.InvalidOperationException("No vector repository available for this entity.");
-
-        public static Task UpsertAsync(TKey id, float[] embedding, object? metadata = null, CancellationToken ct = default)
-            => Repo.UpsertAsync(id, embedding, metadata, ct);
-
-        public static Task<int> UpsertManyAsync(IEnumerable<(TKey Id, float[] Embedding, object? Metadata)> items, CancellationToken ct = default)
-            => Repo.UpsertManyAsync(items, ct);
-
-        public static Task<bool> DeleteAsync(TKey id, CancellationToken ct = default)
-            => Repo.DeleteAsync(id, ct);
-
-        public static Task<int> DeleteManyAsync(IEnumerable<TKey> ids, CancellationToken ct = default)
-            => Repo.DeleteManyAsync(ids, ct);
-
-        public static Task<Koan.Data.Vector.Abstractions.VectorQueryResult<TKey>> SearchAsync(Koan.Data.Vector.Abstractions.VectorQueryOptions options, CancellationToken ct = default)
-            => Repo.SearchAsync(options, ct);
-    }
-
-    // Simple DTO for combined saves with vector
-    public readonly record struct VectorEntity(TEntity Entity, ReadOnlyMemory<float> Vector, string? Anchor = null, IReadOnlyDictionary<string, object>? Metadata = null);
-
-    // Orchestration: save document and corresponding vector
-    public static async Task SaveWithVector(TEntity entity, ReadOnlyMemory<float> vector, IReadOnlyDictionary<string, object>? metadata = null, CancellationToken ct = default)
-    {
-        // Persist the source document first
-        await Repo.UpsertAsync(entity, ct).ConfigureAwait(false);
-        // Persist the vector
-        await Vector.UpsertAsync(entity.Id, vector.ToArray(), metadata, ct).ConfigureAwait(false);
-    }
-
-    public static async Task<BatchResult> SaveManyWithVector(IEnumerable<VectorEntity> items, CancellationToken ct = default)
-    {
-        // Materialize once
-        var list = items as IList<VectorEntity> ?? items.ToList();
-        var docs = list.Select(x => x.Entity).ToList();
-        var up = await Repo.UpsertManyAsync(docs, ct).ConfigureAwait(false);
-        int vec = 0;
-        if (list.Count > 0)
-        {
-            var tuples = list.Select(x => (x.Entity.Id, x.Vector.ToArray(), (object?)x.Metadata)).ToList();
-            vec = await Vector.UpsertManyAsync(tuples, ct).ConfigureAwait(false);
-        }
-        // Report using Added=up, Updated=0, Deleted=0 (best-effort summary)
-        return new BatchResult(up, 0, 0);
-    }
-
     // Partition-scoped helpers (ambient via EntityContext)
     public static IDisposable WithPartition(string? partition) =>
         string.IsNullOrEmpty(partition) ? NoOpDisposable.Instance : EntityContext.Partition(partition);

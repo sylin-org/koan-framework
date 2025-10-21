@@ -20,17 +20,17 @@ We want an entity-first facade that:
 Introduce a static facade `Entity<T>` exposing role-focused helpers for common operations:
 
 - `Entity<T>.Doc.Save(entity, ct)` - resolves Source adapter via attributes/defaults and saves the document
-- `Entity<T>.Vector.Save(entity, embedding, ct)` - resolves Vector adapter and saves vector payload for the entity
+- `VectorData<T>.SaveWithVector(entity, embedding, metadata, ct)` - resolves the configured vector adapter and saves embeddings alongside the entity
 - `Entity<T>.Doc.Get(id, ct)`
 - `Entity<T>.Doc.Delete(id, ct)`
 - Batch helpers:
   - `Entity<T>.Doc.SaveMany(IEnumerable<T> items, ct)`
-  - `Entity<T>.Vector.SaveMany(IEnumerable<VectorEntity<T>> items, ct)`
+  - `VectorData<T>.SaveManyWithVector(IEnumerable<VectorData<T>.VectorEntity> items, ct)`
 
 Additionally, expose policy helpers for common orchestration:
 
-- `Entity<T>.SaveWithVector(entity, embedder, vectorizerOptions, ct)`
-- A `VectorEntity<T>` DTO: `{ T Entity; ReadOnlyMemory<float> Vector; string? Anchor; IDictionary<string, object>? Metadata; }`
+- `VectorData<T>.SaveWithVector(entity, embedder(entity), metadata, ct)`
+- A `VectorData<T>.VectorEntity` DTO: `{ T Entity; ReadOnlyMemory<float> Vector; string? Anchor; IDictionary<string, object>? Metadata; }`
 
 These are thin wrappers over `IDataService` and repositories; they do not bypass configuration or options. Overloads may accept an optional adapter alias to override routing per call.
 
@@ -57,11 +57,11 @@ These are thin wrappers over `IDataService` and repositories; they do not bypass
 await Entity<AnimeDoc>.Doc.Save(doc, ct);
 
 // Save vector after embedding
-var ve = new VectorEntity<AnimeDoc>(doc, vector);
-await Entity<AnimeDoc>.Vector.Save(ve, ct);
+var ve = new VectorData<AnimeDoc>.VectorEntity(doc, vector);
+await VectorData<AnimeDoc>.SaveManyWithVector(new[] { ve }, ct);
 
 // Or orchestrated
-await Entity<AnimeDoc>.SaveWithVector(doc, ai.Embed, new() { Model = "mxbai-embed-large" }, ct);
+await VectorData<AnimeDoc>.SaveWithVector(doc, ai.Embed(doc), new() { Model = "mxbai-embed-large" }, ct);
 ```
 
 ## Testability

@@ -243,7 +243,7 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
             };
 
             // Save with vector using framework pattern (S5.Recs line 740)
-            await Data<PhotoAsset, string>.SaveWithVector(photo, embedding, vectorMetadata, ct);
+            await VectorData<PhotoAsset>.SaveWithVector(photo, embedding, vectorMetadata, ct);
 
             photo.ProcessingStatus = ProcessingStatus.Completed;
             _logger.LogInformation("AI metadata generated for photo {PhotoId}", photo.Id);
@@ -992,7 +992,7 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
             ["searchText"] = embeddingText
         };
 
-        await Data<PhotoAsset, string>.SaveWithVector(photo, embedding, vectorMetadata, ct);
+    await VectorData<PhotoAsset>.SaveWithVector(photo, embedding, vectorMetadata, ct);
 
         var lockedItems = new List<string>();
         if (summaryWasLocked) lockedItems.Add("summary");

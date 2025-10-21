@@ -47,4 +47,3 @@ Koan.AI.Connector.LMStudio - Technical reference
 - AI registry ADR: ../../../../docs/decisions/AI-0008-adapters-and-registry.md
 - OpenAI surface ADR: ../../../../docs/decisions/AI-0005-protocol-surfaces.md
 - Secrets ADR: ../../../../docs/decisions/AI-0004-secrets-provider.md
-

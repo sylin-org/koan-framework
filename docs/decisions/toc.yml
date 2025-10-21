@@ -200,6 +200,8 @@
       href: DATA-0077-canonical-patch-operations.md
     - name: DATA-0084 Vector workflows and profiles
       href: DATA-0084-vector-workflows-and-profiles.md
+    - name: DATA-0085 Isolate vector workflows into Koan.Data.Vector
+      href: DATA-0085-vector-module-split.md
 - name: Web (WEB)
   items:
     - name: WEB-0010 Separate AI web surface

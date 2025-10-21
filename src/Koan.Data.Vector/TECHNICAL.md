@@ -9,7 +9,8 @@ source: src/Koan.Data.Vector/
 
 ## Contract
 
-- Provider-agnostic facade to save/search embeddings for entities
+- Provider-agnostic workflows to save/search embeddings for entities
+- Profiles carry stable defaults: topK, alpha, metadata enrichers, telemetry opt-in
 - Stable inputs: entity id, embedding vector, optional metadata; outputs: topK results with scores
 
 ## Embedding contract
@@ -25,9 +26,12 @@ source: src/Koan.Data.Vector/
 
 ## Operations
 
-- Health: provider-specific readiness
-- Metrics: index latency for save/search; vector count; cache hit rates (if used)
+- Workflows: `VectorWorkflow<T>.For(profile)` resolves profile defaults and orchestrates document + vector persistence
+- Profiles: register via `VectorProfiles.Register` or configuration (`Koan:Data:Vector:Profiles`)
+- Health: provider-specific readiness via `IVectorSearchRepository`
+- Metrics: opt-in telemetry (`EmitMetrics()`) captures profile, topK, alpha, match counts
 
 ## References
 
+- Vector workflows ADR: `/docs/decisions/DATA-0084-vector-workflows-and-profiles.md`
 - Data access patterns: `/docs/guides/data/all-query-streaming-and-pager.md`

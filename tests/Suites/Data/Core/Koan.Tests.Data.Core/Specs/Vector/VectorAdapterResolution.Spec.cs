@@ -1,4 +1,5 @@
 ﻿using Koan.Data.Core.Model;
+using Koan.Data.Vector;
 using Koan.Data.Vector.Abstractions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -21,6 +22,7 @@ public sealed class VectorAdapterResolutionSpec
             .UsingServiceProvider(key: "services", configure: static (_, services) =>
             {
                 services.AddKoanDataCore();
+                services.AddKoanDataVector();
                 services.AddSingleton<IDataService, DataService>();
                 services.AddSingleton<IVectorAdapterFactory>(new FakeVectorFactory("foo"));
                 services.AddSingleton<IVectorAdapterFactory>(new FakeVectorFactory("bar"));
@@ -29,8 +31,8 @@ public sealed class VectorAdapterResolutionSpec
             .Assert(ctx =>
             {
                 var provider = ctx.GetRequiredItem<ServiceProviderFixture>("services").Services;
-                var data = provider.GetRequiredService<IDataService>();
-                var repo = data.TryGetVectorRepository<EntityWithVectorAdapter, string>();
+                var vector = provider.GetRequiredService<IVectorService>();
+                var repo = vector.TryGetRepository<EntityWithVectorAdapter, string>();
                 repo.Should().NotBeNull();
                 (repo as FakeVectorRepo<EntityWithVectorAdapter, string>)!.ProviderName.Should().Be("foo");
                 return ValueTask.CompletedTask;
@@ -53,6 +55,7 @@ public sealed class VectorAdapterResolutionSpec
 
                 services.AddSingleton<IConfiguration>(cfg);
                 services.AddKoanDataCore();
+                services.AddKoanDataVector();
                 services.AddSingleton<IDataService, DataService>();
                 services.AddSingleton<IVectorAdapterFactory>(new FakeVectorFactory("foo"));
                 services.AddSingleton<IVectorAdapterFactory>(new FakeVectorFactory("bar"));
@@ -61,8 +64,8 @@ public sealed class VectorAdapterResolutionSpec
             .Assert(ctx =>
             {
                 var provider = ctx.GetRequiredItem<ServiceProviderFixture>("services").Services;
-                var data = provider.GetRequiredService<IDataService>();
-                var repo = data.TryGetVectorRepository<EntityWithSourceOnly, string>();
+                var vector = provider.GetRequiredService<IVectorService>();
+                var repo = vector.TryGetRepository<EntityWithSourceOnly, string>();
                 repo.Should().NotBeNull();
                 (repo as FakeVectorRepo<EntityWithSourceOnly, string>)!.ProviderName.Should().Be("bar");
                 return ValueTask.CompletedTask;
@@ -77,6 +80,7 @@ public sealed class VectorAdapterResolutionSpec
             .UsingServiceProvider(key: "services", configure: static (_, services) =>
             {
                 services.AddKoanDataCore();
+                services.AddKoanDataVector();
                 services.AddSingleton<IDataService, DataService>();
                 services.AddSingleton<IVectorAdapterFactory>(new FakeVectorFactory("foo"));
                 services.AddSingleton<IVectorAdapterFactory>(new FakeVectorFactory("bar"));
@@ -85,8 +89,8 @@ public sealed class VectorAdapterResolutionSpec
             .Assert(ctx =>
             {
                 var provider = ctx.GetRequiredItem<ServiceProviderFixture>("services").Services;
-                var data = provider.GetRequiredService<IDataService>();
-                var repo = data.TryGetVectorRepository<EntityWithSourceOnly, string>();
+                var vector = provider.GetRequiredService<IVectorService>();
+                var repo = vector.TryGetRepository<EntityWithSourceOnly, string>();
                 repo.Should().NotBeNull();
                 (repo as FakeVectorRepo<EntityWithSourceOnly, string>)!.ProviderName.Should().Be("json");
                 return ValueTask.CompletedTask;

@@ -121,9 +121,9 @@ internal sealed class LMStudioDiscoveryAdapter : ServiceDiscoveryAdapterBase
 
     protected override string? ReadExplicitConfiguration()
     {
-     return _configuration.GetConnectionString("LMStudio") ??
-         _configuration[Constants.Configuration.Keys.ConnectionString] ??
-         _configuration[$"{Constants.Section}:BaseUrl"];
+        return _configuration.GetConnectionString("LMStudio") ??
+            _configuration[Constants.Configuration.Keys.ConnectionString] ??
+            _configuration[$"{Constants.Section}:BaseUrl"];
     }
 
     private IEnumerable<DiscoveryCandidate> GetEnvironmentCandidates()

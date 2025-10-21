@@ -5,7 +5,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Koan.Core.Pipelines;
 using Koan.Data.Abstractions;
-using Koan.Data.Vector;
 
 namespace Koan.Data.Core;
 
@@ -56,34 +55,7 @@ public static class PipelineDataExtensions
 
             try
             {
-                // Check if envelope contains embedding data from Tokenize stage
-                if (envelope.Features.TryGetValue(PipelineFeatureKeys.Embedding, out var embeddingObj)
-                    && embeddingObj is float[] embedding)
-                {
-                    // Extract vector metadata if present
-                    var vectorMetadata = envelope.Features.TryGetValue("vector:metadata", out var metadataObj)
-                                       ? metadataObj as IReadOnlyDictionary<string, object>
-                                       : null;
-
-                    try
-                    {
-                        // Try vector-aware save that persists both entity and embedding
-                        await Data<TEntity, string>.SaveWithVector(envelope.Entity, embedding, vectorMetadata, ct).ConfigureAwait(false);
-
-                        // Populate metadata to indicate vector was saved
-                        envelope.Metadata["vector:affected"] = 1;
-                    }
-                    catch (InvalidOperationException)
-                    {
-                        // Vector storage not available, fall back to standard entity save
-                        await envelope.Entity.Save(ct).ConfigureAwait(false);
-                    }
-                }
-                else
-                {
-                    // Standard entity save when no embedding present
-                    await envelope.Entity.Save(ct).ConfigureAwait(false);
-                }
+                await envelope.Entity.Save(ct).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
@@ -106,34 +78,7 @@ public static class PipelineDataExtensions
 
             try
             {
-                // Check if envelope contains embedding data from Tokenize stage
-                if (envelope.Features.TryGetValue(PipelineFeatureKeys.Embedding, out var embeddingObj)
-                    && embeddingObj is float[] embedding)
-                {
-                    // Extract vector metadata if present
-                    var vectorMetadata = envelope.Features.TryGetValue("vector:metadata", out var metadataObj)
-                                       ? metadataObj as IReadOnlyDictionary<string, object>
-                                       : null;
-
-                    try
-                    {
-                        // Try vector-aware save that persists both entity and embedding
-                        await Data<TEntity, string>.SaveWithVector(envelope.Entity, embedding, vectorMetadata, ct).ConfigureAwait(false);
-
-                        // Populate metadata to indicate vector was saved
-                        envelope.Metadata["vector:affected"] = 1;
-                    }
-                    catch (InvalidOperationException)
-                    {
-                        // Vector storage not available, fall back to standard entity save
-                        await envelope.Entity.Save(ct).ConfigureAwait(false);
-                    }
-                }
-                else
-                {
-                    // Standard entity save when no embedding present
-                    await envelope.Entity.Save(ct).ConfigureAwait(false);
-                }
+                await envelope.Entity.Save(ct).ConfigureAwait(false);
             }
             catch (Exception ex)
             {

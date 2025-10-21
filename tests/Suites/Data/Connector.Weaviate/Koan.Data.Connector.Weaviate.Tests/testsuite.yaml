@@ -1,8 +1,5 @@
-﻿# Weaviate Connector Test Suite
-id: connector-weaviate
-name: Weaviate Connector
-category: data-connector
-status: in-progress
-description: |
-  Test suite for Koan.Data.Connector.Weaviate covering vector CRUD, batch, health, and capability probes.
-  Blocked on connector discovery updates and vector fixture readiness.
+﻿suite: Koan.Data.Connector.Weaviate.Tests
+lane: docker
+scope: connector
+module: Data.Vector.Weaviate
+description: Dedicated integration coverage for the Weaviate vector connector: container bootstrap, vector CRUD, hybrid search, and capability probes against a live Weaviate instance.

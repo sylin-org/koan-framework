@@ -11,8 +11,8 @@ Vector features (search repos, defaults, and facades) currently live partly in K
 Introduce a dedicated module/package Koan.Data.Vector and move all vector-facing implementations there. Also introduce a slim contracts-only package Koan.Data.Vector.Abstractions and relocate vector contracts there (providers depend only on abstractions).
 
 - In Koan.Data.Vector.Abstractions (new): IVectorSearchRepository, IVectorAdapterFactory, VectorCapabilities, VectorQueryOptions/Result/Match, VectorEmbeddingAttribute, [VectorAdapter].
-- In Koan.Data.Vector (new): IVectorService (resolution and caching), AddKoanDataVector(IServiceCollection) with options binding, VectorDefaultsOptions, facades VectorData<TEntity,TKey>/VectorData<TEntity> (Upsert/Delete/Search + SaveWithVector/SaveManyWithVector), extensions for IServiceProvider and health.
-  - Developer-facing facade: Vector<TEntity> provides terse ergonomics without touching Core. Methods: Save((id, vector, metadata)), Save(IEnumerable<...>), Search(options). Example: await Vector<MyDoc>.Save(items, ct).
+- In Koan.Data.Vector (new): IVectorService (resolution and caching), AddKoanDataVector(IServiceCollection) with options binding, VectorDefaultsOptions, facades `VectorData<TEntity>` (Upsert/Delete/Search + SaveWithVector/SaveManyWithVector), vector-aware pipeline extensions, and health extensions.
+  - Developer-facing facade: `VectorData<TEntity>` exposes terse ergonomics without touching Core. Methods: `SaveWithVector`, `SaveManyWithVector`, `UpsertManyAsync`, `SearchAsync`. Example: `await VectorData<MyDoc>.SaveWithVector(doc, embedding, metadata, ct);`.
 - In Koan.Data.Core (remove): Data<TEntity,TKey>.Vector nested facade, SaveWithVector helpers in AggregateExtensions, IDataService vector helpers (TryGetVectorRepository/GetRequiredVectorRepository), VectorDefaultsOptions.
 - Resolution precedence: [VectorAdapter] attribute → VectorDefaultsOptions.DefaultProvider → Source provider (from [SourceAdapter]/[DataAdapter]) → first available IVectorAdapterFactory → fail fast.
 

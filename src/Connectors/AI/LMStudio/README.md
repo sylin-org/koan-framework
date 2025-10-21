@@ -94,4 +94,3 @@ POST /ai/chat
 - LM Studio: https://lmstudio.ai
 - Koan AI adapters ADR: ../../../../docs/decisions/AI-0008-adapters-and-registry.md
 - OpenAI compatibility (Koan): ../../../../docs/decisions/AI-0005-protocol-surfaces.md
-

@@ -39,7 +39,7 @@ internal sealed class LMStudioOptionsConfigurator : AdapterOptionsConfigurator<L
 
     protected override void ConfigureProviderSpecific(LMStudioOptions options)
     {
-    KoanLog.ConfigInfo(Logger, LogActions.Config, LocalLogOutcomes.Start);
+        KoanLog.ConfigInfo(Logger, LogActions.Config, LocalLogOutcomes.Start);
 
         var explicitConnection = ReadProviderConfiguration(string.Empty,
             Constants.Configuration.Keys.ConnectionString,
@@ -111,11 +111,11 @@ internal sealed class LMStudioOptionsConfigurator : AdapterOptionsConfigurator<L
             }
         }
 
-    KoanLog.ConfigInfo(Logger, LogActions.Config, LocalLogOutcomes.Complete,
-            ("connection", options.ConnectionString ?? "(null)"),
-            ("defaultModel", options.DefaultModel ?? "(null)"),
-            ("apiKey", string.IsNullOrWhiteSpace(options.ApiKey) ? "(none)" : "(set)"),
-            ("autoDiscovery", options.AutoDiscoveryEnabled));
+        KoanLog.ConfigInfo(Logger, LogActions.Config, LocalLogOutcomes.Complete,
+                ("connection", options.ConnectionString ?? "(null)"),
+                ("defaultModel", options.DefaultModel ?? "(null)"),
+                ("apiKey", string.IsNullOrWhiteSpace(options.ApiKey) ? "(none)" : "(set)"),
+                ("autoDiscovery", options.AutoDiscoveryEnabled));
     }
 
     private string ResolveAutonomousConnection(string? defaultModel, LMStudioOptions options)

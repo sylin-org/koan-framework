@@ -113,7 +113,7 @@ public class MaintenanceController : ControllerBase
                         ["searchText"] = BuildSearchText(photo)
                     };
 
-                    await Data<PhotoAsset, string>.SaveWithVector(photo, photo.Embedding, metadata, ct);
+                    await VectorData<PhotoAsset>.SaveWithVector(photo, photo.Embedding, metadata, ct);
                     reindexed++;
                 }
             }

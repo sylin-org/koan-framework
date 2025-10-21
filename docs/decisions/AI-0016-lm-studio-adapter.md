@@ -30,4 +30,3 @@ Koan already supports local inference through the Ollama adapter and remote prov
 - AI-0005 Protocol surfaces (OpenAI compatibility)
 - AI-0004 Secrets provider
 - AI-0015 Canonical source member architecture
-

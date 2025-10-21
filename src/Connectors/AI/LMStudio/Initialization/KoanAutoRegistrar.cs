@@ -44,31 +44,31 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 
         var defaults = new LMStudioOptions();
 
-    var connection = KoanConfiguration.ReadFirstWithSource(
-            cfg,
-            defaults.ConnectionString,
-            Constants.Configuration.Keys.ConnectionString,
-            Constants.Configuration.Keys.AltConnectionString,
-            "ConnectionStrings:LMStudio",
-            "ConnectionStrings:Default");
+        var connection = KoanConfiguration.ReadFirstWithSource(
+                cfg,
+                defaults.ConnectionString,
+                Constants.Configuration.Keys.ConnectionString,
+                Constants.Configuration.Keys.AltConnectionString,
+                "ConnectionStrings:LMStudio",
+                "ConnectionStrings:Default");
 
-    var baseUrl = KoanConfiguration.ReadFirstWithSource(
-            cfg,
-            defaults.BaseUrl,
-            Constants.Section + ":BaseUrl",
-            "Koan:Ai:LMStudio:BaseUrl");
+        var baseUrl = KoanConfiguration.ReadFirstWithSource(
+                cfg,
+                defaults.BaseUrl,
+                Constants.Section + ":BaseUrl",
+                "Koan:Ai:LMStudio:BaseUrl");
 
-    var defaultModel = KoanConfiguration.ReadFirstWithSource(
-            cfg,
-            defaults.DefaultModel ?? "none",
-            Constants.Section + ":DefaultModel",
-            "Koan:Ai:LMStudio:DefaultModel");
+        var defaultModel = KoanConfiguration.ReadFirstWithSource(
+                cfg,
+                defaults.DefaultModel ?? "none",
+                Constants.Section + ":DefaultModel",
+                "Koan:Ai:LMStudio:DefaultModel");
 
-    var apiKey = KoanConfiguration.ReadFirstWithSource(
-            cfg,
-            defaults.ApiKey ?? string.Empty,
-            Constants.Configuration.Keys.ApiKey,
-            Constants.Discovery.EnvKey);
+        var apiKey = KoanConfiguration.ReadFirstWithSource(
+                cfg,
+                defaults.ApiKey ?? string.Empty,
+                Constants.Configuration.Keys.ApiKey,
+                Constants.Discovery.EnvKey);
 
         Publish(module, LMStudioProvenanceItems.ConnectionString, connection);
         Publish(module, LMStudioProvenanceItems.BaseUrl, baseUrl, displayOverride: ResolveDisplayBase(cfg, connection, baseUrl, defaults));

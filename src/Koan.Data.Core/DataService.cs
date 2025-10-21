@@ -3,7 +3,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Koan.Data.Abstractions;
 using Koan.Data.Core.Configuration;
 using Koan.Data.Core.Schema;
-using Koan.Data.Vector.Abstractions;
 using System.Collections.Concurrent;
 
 namespace Koan.Data.Core;
@@ -15,7 +14,6 @@ namespace Koan.Data.Core;
 public sealed class DataService(IServiceProvider sp) : IDataService
 {
     private readonly ConcurrentDictionary<CacheKey, object> _cache = new();
-    private readonly ConcurrentDictionary<(Type, Type), object> _vecCache = new();
 
     private record CacheKey(
         Type EntityType,
@@ -62,70 +60,6 @@ public sealed class DataService(IServiceProvider sp) : IDataService
             ?? throw new InvalidOperationException("IDirectDataService not registered. AddKoanDataDirect() required.");
         return svc.Direct(source, adapter);
     }
-
-    public IVectorSearchRepository<TEntity, TKey>? TryGetVectorRepository<TEntity, TKey>()
-        where TEntity : class, IEntity<TKey>
-        where TKey : notnull
-    {
-        var key = (typeof(TEntity), typeof(TKey));
-        if (_vecCache.TryGetValue(key, out var existing)) return (IVectorSearchRepository<TEntity, TKey>?)existing;
-
-        // Resolve from adapter factories honoring role attributes and defaults.
-        var vectorFactories = sp.GetServices<IVectorAdapterFactory>().ToList();
-        if (vectorFactories.Count == 0) return null;
-
-        // 1) Role attribute: [VectorAdapter("...")]
-        string? desired = (Attribute.GetCustomAttribute(typeof(TEntity), typeof(VectorAdapterAttribute))
-            as VectorAdapterAttribute)?.Provider;
-
-        // 2) App default: Koan:Data:VectorDefaults:DefaultProvider
-        if (string.IsNullOrWhiteSpace(desired))
-        {
-            // If vector module is referenced, resolve defaults from there. Optional.
-            try
-            {
-                var optType = typeof(Microsoft.Extensions.Options.IOptions<>).MakeGenericType(Type.GetType("Koan.Data.Vector.VectorDefaultsOptions, Koan.Data.Vector")!);
-                var opts = sp.GetService(optType);
-                if (opts is not null)
-                {
-                    var valProp = optType.GetProperty("Value");
-                    var val = valProp?.GetValue(opts);
-                    var prop = val?.GetType().GetProperty("DefaultProvider");
-                    desired = (string?)prop?.GetValue(val);
-                }
-            }
-            catch { /* optional */ }
-
-            // Fallback: read straight from IConfiguration if options aren't bound
-            if (string.IsNullOrWhiteSpace(desired))
-            {
-                var cfg = sp.GetService<IConfiguration>();
-                var viaCfg = cfg?["Koan:Data:VectorDefaults:DefaultProvider"];
-                if (!string.IsNullOrWhiteSpace(viaCfg)) desired = viaCfg;
-            }
-        }
-
-        // 3) Fallback: entity data provider (useful when provider names align, e.g., "weaviate")
-        if (string.IsNullOrWhiteSpace(desired))
-        {
-            desired = AggregateConfigs.Get<TEntity, TKey>(sp).Provider;
-        }
-
-        IVectorSearchRepository<TEntity, TKey>? repo = null;
-        IVectorAdapterFactory? factory = null;
-        if (!string.IsNullOrWhiteSpace(desired))
-        {
-            factory = vectorFactories.FirstOrDefault(f => f.CanHandle(desired!));
-        }
-        factory ??= vectorFactories.FirstOrDefault();
-        if (factory is not null)
-            repo = factory.Create<TEntity, TKey>(sp);
-
-        if (repo is not null)
-            _vecCache[key] = repo;
-        return repo;
-    }
-    // Provider resolution is now handled by TypeConfigs
 
     private static IDataRepository<TEntity, TKey> ApplyDecorators<TEntity, TKey>(
         Type entityType,

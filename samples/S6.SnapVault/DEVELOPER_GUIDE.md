@@ -270,7 +270,7 @@ var vectorMetadata = new Dictionary<string, object>
 };
 
 // Save with vector using framework pattern
-await Data<PhotoAsset, string>.SaveWithVector(photo, embedding, vectorMetadata, ct);
+await VectorData<PhotoAsset>.SaveWithVector(photo, embedding, vectorMetadata, ct);
 ```
 
 **Search Execution**: `PhotoProcessingService.SemanticSearchAsync()` (Services/PhotoProcessingService.cs:249)
@@ -973,7 +973,7 @@ public async Task<ActionResult<PhotoListResponse>> GetPhotosByEvent(
 
 **Pattern**:
 1. Generate embeddings for entities
-2. Store with `SaveWithVector()`
+2. Store with `VectorData<PhotoAsset>.SaveWithVector()`
 3. Let users control alpha (semantic vs keyword)
 4. Provide fallback for when vector search unavailable
 

@@ -95,7 +95,7 @@ await VectorTestPlan.For<Passage>(profile: "meridian:evidence")
 ## Impact
 
 - **Koan.Data.Vector**: Adds workflow facade, profile registry, options binding, and telemetry.
-- **Koan.Data.Core**: `Data<TEntity, TKey>.SaveWithVector` delegates to workflows when available.
+- **Koan.Data.Vector**: `VectorData<TEntity>.SaveWithVector` delegates to workflows when available.
 - **Samples**: S7.Meridian, S5.Recs, S6.SnapVault adopt `VectorWorkflow<T>.Save/Query`.
 - **Docs**: Updated guidance promotes profile-first ergonomics and configuration patterns.
 - **Tests**: New vector test plan covers profile discovery + hybrid semantics.
