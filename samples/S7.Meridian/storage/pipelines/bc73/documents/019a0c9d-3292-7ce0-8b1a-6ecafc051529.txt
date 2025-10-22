@@ -1,5 +1,0 @@
-Arcadia Systems Architecture Steering Committee - 2025-10-20
-Attendees: CIO Dana Wright, Lead Architect Leo Martinez, Vendor Liaison Priya Shah.
-Agenda focused on the Atlas modernization initiative and partner selection timeline.
-Key discussion: Synapse Analytics committed to piloting the integration gateway by 2025-11-15.
-Action: Infrastructure team (owner: Morgan Ellis) to prepare sandbox credentials for Synapse by next Monday.
