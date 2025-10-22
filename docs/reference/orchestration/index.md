@@ -5,7 +5,7 @@ title: "Orchestration Pillar Reference"
 audience: [developers, architects, ai-agents]
 status: current
 last_updated: 2025-09-28
-framework_version: v0.6.2
+framework_version: v0.6.3
 validation:
   date_last_tested: 2025-09-28
   status: verified

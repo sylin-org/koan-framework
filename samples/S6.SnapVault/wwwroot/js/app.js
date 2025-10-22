@@ -1,0 +1,718 @@
+/**
+ * S6.SnapVault Professional Edition
+ * Main Application Entry Point
+ * Version 1.2 - Professional View Presets with Smart Resolution
+ */
+
+import { PhotoGrid } from './components/grid.js';
+import { SearchBar } from './components/search.js';
+import { Lightbox } from './components/lightbox.js';
+import { UploadModal } from './components/upload.js';
+import { ProcessMonitor } from './components/processMonitor.js';
+import { Timeline } from './components/timeline.js';
+import { KeyboardShortcuts } from './components/keyboard.js';
+import { BulkActions } from './components/bulkActions.js';
+import { ContextPanel } from './components/contextPanel.js';
+import { Toast } from './components/toast.js';
+import { CollectionsSidebar } from './components/collectionsSidebar.js';
+import { PhotoSelection } from './components/photoSelection.js';
+import { DragDropManager } from './components/dragDropManager.js';
+import { CollectionView } from './components/collectionView.js';
+import { API } from './api.js';
+import { VIEW_PRESETS, migrateOldDensity } from './viewPresets.js';
+import { escapeHtml } from './utils/html.js';
+import { StateManager } from './utils/StateManager.js';
+import { EventBus } from './utils/EventBus.js';
+import { ActionExecutor } from './system/ActionExecutor.js';
+import { StateRegistry } from './utils/StateRegistry.js';
+
+class SnapVaultApp {
+  constructor() {
+    this.currentWorkspace = 'gallery';
+    this.components = {};
+
+    // Initialize centralized state management
+    this.stateManager = new StateManager();
+    this.eventBus = new EventBus();
+
+    // Initialize StateRegistry for global shared state (NEW)
+    this.registry = new StateRegistry();
+
+    // Migrate old density preference to new view preset
+    this.migrateUserPreferences();
+
+    // Set initial view preset
+    this.stateManager.set('viewPreset', this.loadViewPreset());
+
+    // Backward compatibility: expose state for components that still use it
+    this.state = this.stateManager.state;
+
+    // Setup state subscriptions for auto-updating UI
+    this.setupStateSubscriptions();
+  }
+
+  migrateUserPreferences() {
+    // Check for old density setting and migrate
+    const oldDensity = localStorage.getItem('snapvault-density');
+    if (oldDensity && !localStorage.getItem('snapvault-view-preset')) {
+      const newPreset = migrateOldDensity(parseInt(oldDensity));
+      localStorage.setItem('snapvault-view-preset', newPreset);
+      localStorage.removeItem('snapvault-density');
+      console.log(`[Migration] Migrated density ${oldDensity} to preset "${newPreset}"`);
+    }
+  }
+
+  loadViewPreset() {
+    // Load saved preference or default to 'comfortable'
+    const saved = localStorage.getItem('snapvault-view-preset');
+    return (saved && VIEW_PRESETS[saved]) ? saved : 'comfortable';
+  }
+
+  /**
+   * Setup state subscriptions for automatic UI updates
+   * Event-driven architecture: UI automatically updates when state changes
+   */
+  setupStateSubscriptions() {
+    // Subscribe library badges to count changes
+    this.registry.subscribe('counts', (counts) => {
+      console.log('[StateRegistry] Counts updated:', counts);
+      this.updateLibraryBadges(counts);
+    });
+  }
+
+  /**
+   * Load accurate photo statistics from API
+   * Updates StateRegistry which triggers UI updates automatically
+   */
+  async loadStats() {
+    try {
+      const stats = await this.api.get('/api/photos/stats');
+      console.log('[loadStats] Fetched stats:', stats);
+
+      // Update registry (this will automatically trigger UI updates via subscriptions)
+      this.registry.batchUpdate({
+        'counts.totalPhotos': stats.totalPhotos,
+        'counts.favorites': stats.favorites
+      });
+
+      // Also update old state for backward compatibility
+      this.state.totalPhotosCount = stats.totalPhotos;
+      this.state.favoritesCount = stats.favorites;
+    } catch (error) {
+      console.error('[loadStats] Failed to load stats:', error);
+    }
+  }
+
+  /**
+   * Update library badges (called automatically via state subscription)
+   * @param {object} counts - { totalPhotos, favorites, collections }
+   */
+  updateLibraryBadges(counts) {
+    document.querySelectorAll('.library-section .sidebar-item').forEach(item => {
+      const labelElement = item.querySelector('.item-label');
+      const badgeElement = item.querySelector('.item-badge');
+
+      if (!labelElement || !badgeElement) return;
+
+      const label = labelElement.textContent;
+
+      if (label === 'All Photos') {
+        badgeElement.textContent = counts.totalPhotos || 0;
+      } else if (label === 'Favorites') {
+        badgeElement.textContent = counts.favorites || 0;
+      }
+    });
+  }
+
+  // Expose photos array for components
+  get photos() {
+    return this.state.photos;
+  }
+
+  async init() {
+    console.log('[App] Initializing SnapVault Pro...');
+
+    // Initialize API client
+    this.api = new API();
+
+    // Load accurate stats from API
+    await this.loadStats();
+
+    // Initialize action system (PHASE 2)
+    this.actions = new ActionExecutor(this);
+
+    // Initialize components
+    this.components.toast = new Toast();
+    this.components.grid = new PhotoGrid(this);
+    this.components.search = new SearchBar(this);
+    this.components.lightbox = new Lightbox(this);
+    this.components.upload = new UploadModal(this);
+    this.components.processMonitor = new ProcessMonitor(this);
+    this.components.timeline = new Timeline(this);
+    this.components.keyboard = new KeyboardShortcuts(this);
+    this.components.bulkActions = new BulkActions(this);
+    this.components.contextPanel = new ContextPanel(this);
+
+    // Collection management components
+    this.components.collectionsSidebar = new CollectionsSidebar(this);
+    this.components.photoSelection = new PhotoSelection(this);
+    this.components.dragDrop = new DragDropManager(this);
+    this.components.collectionView = new CollectionView(this);
+
+    // Setup event listeners
+    this.setupWorkspaceNavigation();
+    this.setupViewPresetControls(); // NEW: View preset controls
+    this.setupUploadButtons();
+    this.setupLibraryNavigation();
+    this.setupDragAndDrop();
+
+    // Load initial data
+    await this.loadEvents();
+
+    // Initialize collection management
+    await this.components.collectionsSidebar.init();
+    this.components.photoSelection.init();
+    this.components.dragDrop.init();
+
+    // Load photos via CollectionView (PhotoSet-based)
+    await this.components.collectionView.setView('all-photos');
+
+    // Enable infinite scroll after initial load
+    this.components.grid.enableInfiniteScroll();
+
+    console.log('[App] SnapVault Pro ready');
+  }
+
+  setupWorkspaceNavigation() {
+    const workspaceButtons = document.querySelectorAll('.workspace-btn');
+    workspaceButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const workspace = btn.dataset.workspace;
+        this.switchWorkspace(workspace);
+      });
+    });
+  }
+
+  switchWorkspace(workspace) {
+    // Update active workspace button
+    document.querySelectorAll('.workspace-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.workspace === workspace);
+    });
+
+    // Update active workspace content
+    document.querySelectorAll('.workspace').forEach(ws => {
+      ws.classList.toggle('active', ws.dataset.workspace === workspace);
+    });
+
+    this.currentWorkspace = workspace;
+
+    // Update components
+    if (workspace === 'timeline') {
+      this.components.timeline.render();
+    }
+  }
+
+  setupViewPresetControls() {
+    const presetButtons = document.querySelectorAll('.view-toggle');
+    const currentPreset = this.state.viewPreset;
+
+    presetButtons.forEach(btn => {
+      // Set initial active state based on loaded preference
+      btn.classList.toggle('active', btn.dataset.preset === currentPreset);
+
+      // Add click handler
+      btn.addEventListener('click', () => {
+        const preset = btn.dataset.preset;
+        this.setViewPreset(preset);
+      });
+    });
+  }
+
+  async setViewPreset(presetId) {
+    console.log(`[setViewPreset] START - switching to ${presetId}`);
+
+    if (!VIEW_PRESETS[presetId]) {
+      console.warn(`Unknown view preset: ${presetId}`);
+      return;
+    }
+
+    // Disable infinite scroll during view preset switch
+    this.components.grid.disableInfiniteScroll();
+
+    this.state.viewPreset = presetId;
+
+    // Save preference
+    localStorage.setItem('snapvault-view-preset', presetId);
+
+    // Update active button
+    document.querySelectorAll('.view-toggle').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.preset === presetId);
+    });
+
+    console.log(`[setViewPreset] View preset: ${VIEW_PRESETS[presetId].label}`);
+
+    // Update preset attribute only (instant, no image reload)
+    this.components.grid.updatePreset();
+
+    // Delay re-enabling infinite scroll to prevent immediate trigger
+    // This gives the layout time to settle and user time to scroll
+    setTimeout(() => {
+      this.components.grid.enableInfiniteScroll();
+      console.log(`[setViewPreset] Infinite scroll re-enabled after delay`);
+    }, 500);
+
+    console.log(`[setViewPreset] COMPLETE`);
+  }
+
+  setupUploadButtons() {
+    const uploadButtons = document.querySelectorAll('.btn-upload, .btn-upload-empty');
+    uploadButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        this.components.upload.open();
+      });
+    });
+  }
+
+  setupLibraryNavigation() {
+    const libraryItems = document.querySelectorAll('.library-section .sidebar-item');
+    libraryItems.forEach(item => {
+      item.addEventListener('click', () => {
+        const label = item.querySelector('.item-label').textContent;
+
+        // Update active state
+        libraryItems.forEach(i => i.classList.remove('active'));
+        item.classList.add('active');
+
+        // Clear collection active state
+        document.querySelectorAll('.collection-item').forEach(c => c.classList.remove('active'));
+
+        // Route to collection view for proper state management
+        if (label === 'All Photos') {
+          this.components.collectionView.setView('all-photos');
+        } else if (label === 'Favorites') {
+          this.components.collectionView.setView('favorites');
+        }
+      });
+    });
+  }
+
+  // filterPhotos and loadPhotos removed - CollectionView handles all photo loading via PhotoSet
+
+  async loadMorePhotos() {
+    console.log(`[DEBUG loadMorePhotos] CALLED - hasMorePages: ${this.state.hasMorePages}, loadingMore: ${this.state.loadingMore}`);
+
+    if (!this.state.hasMorePages || this.state.loadingMore) {
+      console.log(`[DEBUG loadMorePhotos] EARLY RETURN - hasMorePages: ${this.state.hasMorePages}, loadingMore: ${this.state.loadingMore}`);
+      return;
+    }
+
+    try {
+      this.state.loadingMore = true;
+      console.log(`[DEBUG loadMorePhotos] Set loadingMore = true`);
+
+      // Get PhotoSet instance from CollectionView
+      const photoSet = this.components.collectionView.getPhotoSet();
+      console.log(`[DEBUG loadMorePhotos] PhotoSet:`, photoSet ? 'EXISTS' : 'NULL');
+
+      if (!photoSet) {
+        console.error('[DEBUG loadMorePhotos] No PhotoSet available - cannot load more');
+        return;
+      }
+
+      console.log(`[DEBUG loadMorePhotos] Current photos.length: ${this.state.photos.length}, PhotoSet.totalCount: ${photoSet.totalCount}`);
+
+      // Calculate next window position
+      const currentLoadedCount = this.state.photos.length;
+      const nextStartIndex = currentLoadedCount;
+      const batchSize = 50; // Load 50 more photos at a time
+
+      console.log(`[DEBUG loadMorePhotos] Calling photoSet.loadWindow(${nextStartIndex}, ${batchSize})`);
+
+      // Load next window using PhotoSet session
+      const response = await photoSet.loadWindow(nextStartIndex, batchSize);
+      console.log(`[DEBUG loadMorePhotos] Response:`, response);
+
+      if (response && response.photos && response.photos.length > 0) {
+        console.log(`[DEBUG loadMorePhotos] Got ${response.photos.length} photos`);
+
+        // Append new photos to state and grid
+        this.state.photos.push(...response.photos);
+
+        // Update favorites count
+        this.state.favoritesCount = this.state.photos.filter(p => p.isFavorite).length;
+
+        this.components.grid.appendPhotos(response.photos);
+        this.updateLibraryCounts();
+        this.updateStatusBar();
+
+        // Check if there are more photos to load
+        const totalLoaded = this.state.photos.length;
+        this.state.hasMorePages = totalLoaded < photoSet.totalCount;
+
+        console.log(`[DEBUG loadMorePhotos] SUCCESS - Loaded ${response.photos.length} photos (total: ${totalLoaded} of ${photoSet.totalCount}), hasMorePages: ${this.state.hasMorePages}`);
+      } else {
+        // No more photos
+        this.state.hasMorePages = false;
+        console.log(`[DEBUG loadMorePhotos] No more pages - reached end of library`);
+      }
+    } catch (error) {
+      console.error('[DEBUG loadMorePhotos] ERROR:', error);
+      this.components.toast.show('Failed to load more photos', { icon: '⚠️', duration: 3000 });
+    } finally {
+      this.state.loadingMore = false;
+      console.log(`[DEBUG loadMorePhotos] FINALLY - Set loadingMore = false`);
+    }
+  }
+
+  /**
+   * Auto-fill viewport with photos on initial load
+   * Particularly important for compact grid modes on large screens (4K)
+   * Keeps loading pages until viewport is filled or collection end is reached
+   */
+  async fillViewport() {
+    const MAX_ITERATIONS = 10; // Safety limit to prevent infinite loops
+    let iterations = 0;
+
+    while (iterations < MAX_ITERATIONS) {
+      // Check if we need more photos
+      if (!this.needsMorePhotosToFillViewport()) {
+        console.log('[Viewport Fill] Grid fills viewport - stopping auto-pagination');
+        break;
+      }
+
+      // Check if more pages are available
+      if (!this.state.hasMorePages) {
+        console.log('[Viewport Fill] No more pages available - collection end reached');
+        break;
+      }
+
+      // Load next page
+      console.log(`[Viewport Fill] Loading page ${this.state.currentPage + 1} to fill viewport...`);
+      await this.loadMorePhotos();
+
+      // Small delay to let DOM update and images load
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      iterations++;
+    }
+
+    if (iterations > 0) {
+      console.log(`[Viewport Fill] Completed after ${iterations} additional page(s)`);
+    }
+  }
+
+  /**
+   * Check if grid needs more photos to fill the viewport
+   * Returns true if grid bottom is above viewport bottom (needs more content)
+   */
+  needsMorePhotosToFillViewport() {
+    const gridContainer = document.querySelector('.photo-grid');
+    if (!gridContainer) return false;
+
+    const gridRect = gridContainer.getBoundingClientRect();
+    const viewportHeight = window.innerHeight;
+
+    // Check if grid bottom is above viewport bottom (with small buffer)
+    const needsMore = gridRect.bottom < (viewportHeight - 100);
+
+    if (needsMore) {
+      console.log('[Viewport Fill] Check: Grid bottom at', Math.round(gridRect.bottom), 'px, viewport height', viewportHeight, 'px - needs more');
+    }
+
+    return needsMore;
+  }
+
+  async loadEvents() {
+    try {
+      const response = await this.api.get('/api/events');
+      this.state.events = response || [];
+      this.renderEvents();
+    } catch (error) {
+      console.error('Failed to load events:', error);
+      this.components.toast.show('Failed to load events', { icon: '⚠️', duration: 3000 });
+    }
+  }
+
+  setLoading(isLoading) {
+    const statusBar = document.querySelector('.status-bar .status-text');
+    if (statusBar) {
+      if (isLoading) {
+        statusBar.textContent = 'Loading...';
+      } else {
+        this.updateStatusBar();
+      }
+    }
+  }
+
+  updateStatusBar() {
+    const statusBar = document.querySelector('.status-bar .status-text');
+    if (!statusBar) return;
+
+    const loadedCount = this.state.photos.length;
+    const totalCount = this.state.totalPhotosCount;
+
+    if (totalCount > 0 && loadedCount < totalCount) {
+      statusBar.textContent = `${loadedCount} out of ${totalCount} photos`;
+    } else if (totalCount > 0) {
+      statusBar.textContent = `${totalCount} photos`;
+    } else {
+      statusBar.textContent = `${loadedCount} photos`;
+    }
+  }
+
+  updateLibraryCounts() {
+    // Use totalPhotosCount from API (accurate even when viewing collections)
+    const allCount = this.state.totalPhotosCount || 0;
+
+    // Only calculate favorites count from loaded photos when in All Photos view
+    // Otherwise it will be inaccurate (shows only favorites in current collection)
+    const { viewState } = this.components.collectionView || {};
+    const favoritesCount = viewState?.type === 'all-photos'
+      ? this.state.photos.filter(p => p.isFavorite).length
+      : this.state.favoritesCount || 0;
+
+    console.log('[updateLibraryCounts]', { allCount, favoritesCount, viewState: viewState?.type });
+
+    // Use more specific selector to avoid conflicts
+    document.querySelectorAll('.library-section .sidebar-item').forEach(item => {
+      const labelElement = item.querySelector('.item-label');
+      const badgeElement = item.querySelector('.item-badge');
+
+      if (!labelElement || !badgeElement) {
+        console.warn('[updateLibraryCounts] Missing label or badge element', item);
+        return;
+      }
+
+      const label = labelElement.textContent;
+
+      if (label === 'All Photos') {
+        badgeElement.textContent = allCount;
+        console.log('[updateLibraryCounts] Set All Photos badge to', allCount);
+      } else if (label === 'Favorites') {
+        badgeElement.textContent = favoritesCount;
+        console.log('[updateLibraryCounts] Set Favorites badge to', favoritesCount);
+      }
+    });
+  }
+
+  renderEvents() {
+    const container = document.querySelector('.events-list');
+    if (!container) return;
+
+    if (this.state.events.length === 0) {
+      container.innerHTML = '<p class="empty-state">No events yet</p>';
+      return;
+    }
+
+    container.innerHTML = this.state.events.map(event => `
+      <button class="library-item" data-event-id="${event.id}">
+        <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+          <line x1="16" y1="2" x2="16" y2="6"></line>
+          <line x1="8" y1="2" x2="8" y2="6"></line>
+          <line x1="3" y1="10" x2="21" y2="10"></line>
+        </svg>
+        <span class="label">${escapeHtml(event.name)}</span>
+        <span class="badge">${event.photoCount || 0}</span>
+      </button>
+    `).join('');
+
+    // Attach click handlers to event items
+    const eventItems = container.querySelectorAll('.library-item[data-event-id]');
+    eventItems.forEach(item => {
+      item.addEventListener('click', async () => {
+        const eventId = item.dataset.eventId;
+
+        // Update active state
+        eventItems.forEach(i => i.classList.remove('active'));
+        item.classList.add('active');
+
+        // Clear library panel active state
+        document.querySelectorAll('.library-panel .library-item').forEach(i => i.classList.remove('active'));
+
+        // Filter photos by event
+        await this.filterPhotosByEvent(eventId);
+      });
+    });
+  }
+
+  async filterPhotosByEvent(eventId) {
+    this.state.currentFilter = `event:${eventId}`;
+
+    try {
+      this.setLoading(true);
+
+      // Use the existing by-event endpoint from PhotosController
+      const response = await this.api.get(`/api/photos/by-event/${eventId}`);
+      this.state.photos = response.photos || [];
+      this.components.grid.render();
+
+      const event = this.state.events.find(e => e.id === eventId);
+      if (event) {
+        this.components.toast.show(`Showing ${response.photos.length} photos from "${event.name}"`, {
+          icon: '📅',
+          duration: 2000
+        });
+      }
+    } catch (error) {
+      console.error('Failed to load event photos:', error);
+      this.components.toast.show('Failed to load event photos', { icon: '⚠️', duration: 3000 });
+    } finally {
+      this.setLoading(false);
+    }
+  }
+
+  async favoritePhoto(photoId) {
+    const photo = this.state.photos.find(p => p.id === photoId);
+    if (!photo) return;
+
+    // Optimistic UI update
+    photo.isFavorite = !photo.isFavorite;
+
+    // Update favorites count
+    this.state.favoritesCount = this.state.photos.filter(p => p.isFavorite).length;
+
+    this.components.grid.updatePhotoCard(photoId, photo);
+    this.updateLibraryCounts();
+
+    try {
+      await this.api.post(`/api/photos/${photoId}/favorite`);
+      this.components.toast.show(photo.isFavorite ? 'Added to favorites' : 'Removed from favorites', {
+        icon: '⭐',
+        duration: 2000
+      });
+    } catch (error) {
+      // Rollback on failure
+      photo.isFavorite = !photo.isFavorite;
+
+      // Rollback favorites count
+      this.state.favoritesCount = this.state.photos.filter(p => p.isFavorite).length;
+
+      this.components.grid.updatePhotoCard(photoId, photo);
+      this.updateLibraryCounts();
+
+      this.components.toast.show('Failed to update favorite', {
+        icon: '⚠️',
+        duration: 5000,
+        actions: [{
+          label: 'Retry',
+          onClick: () => this.favoritePhoto(photoId)
+        }]
+      });
+    }
+  }
+
+  async ratePhoto(photoId, rating) {
+    const photo = this.state.photos.find(p => p.id === photoId);
+    if (!photo) return;
+
+    const oldRating = photo.rating;
+
+    // Optimistic UI update
+    photo.rating = rating;
+    this.components.grid.updatePhotoCard(photoId, photo);
+
+    try {
+      await this.api.post(`/api/photos/${photoId}/rate`, { rating });
+    } catch (error) {
+      // Rollback on failure
+      photo.rating = oldRating;
+      this.components.grid.updatePhotoCard(photoId, photo);
+
+      this.components.toast.show('Failed to update rating', {
+        icon: '⚠️',
+        duration: 5000
+      });
+    }
+  }
+
+  clearSelection() {
+    // Clear all selected photos
+    this.state.selectedPhotos.forEach(photoId => {
+      const card = this.components.grid.photoCards.get(photoId);
+      if (card) {
+        card.classList.remove('selected');
+        card.querySelector('.selection-indicator').style.display = 'none';
+      }
+    });
+
+    this.stateManager.clearSelection();
+    this.components.bulkActions.update(0);
+    this.eventBus.emit('selection:cleared');
+  }
+
+  setupDragAndDrop() {
+    const mainContent = document.querySelector('.main-content');
+    if (!mainContent) return;
+
+    let dragCounter = 0;
+
+    // Prevent default drag behavior on entire page
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+      document.body.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      });
+    });
+
+    // Drag enter - show drop zone
+    mainContent.addEventListener('dragenter', (e) => {
+      dragCounter++;
+      // Only show file upload interface for EXTERNAL file drags
+      // Internal photo drags have 'text/plain' data (photo ID)
+      const isInternalPhotoDrag = e.dataTransfer.types.includes('text/plain');
+      const isExternalFileDrag = e.dataTransfer.types.includes('Files') && !isInternalPhotoDrag;
+
+      if (isExternalFileDrag) {
+        mainContent.classList.add('drag-over');
+      }
+    });
+
+    // Drag over - keep drop zone visible
+    mainContent.addEventListener('dragover', (e) => {
+      // Only show file upload interface for EXTERNAL file drags
+      const isInternalPhotoDrag = e.dataTransfer.types.includes('text/plain');
+      const isExternalFileDrag = e.dataTransfer.types.includes('Files') && !isInternalPhotoDrag;
+
+      if (isExternalFileDrag) {
+        e.dataTransfer.dropEffect = 'copy';
+        mainContent.classList.add('drag-over');
+      }
+    });
+
+    // Drag leave - hide drop zone
+    mainContent.addEventListener('dragleave', () => {
+      dragCounter--;
+      if (dragCounter === 0) {
+        mainContent.classList.remove('drag-over');
+      }
+    });
+
+    // Drop - handle files
+    mainContent.addEventListener('drop', (e) => {
+      dragCounter = 0;
+      mainContent.classList.remove('drag-over');
+
+      // Only handle EXTERNAL file drops (not internal photo drags)
+      const isInternalPhotoDrag = e.dataTransfer.types.includes('text/plain');
+      const files = e.dataTransfer.files;
+
+      if (files.length > 0 && !isInternalPhotoDrag) {
+        // Open upload modal with pre-selected files
+        this.components.upload.open(files);
+      }
+    });
+  }
+
+}
+
+// Initialize app when DOM is ready
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => {
+    window.app = new SnapVaultApp();
+    window.app.init();
+  });
+} else {
+  window.app = new SnapVaultApp();
+  window.app.init();
+}

@@ -12,7 +12,7 @@ namespace Koan.Data.Connector.Redis.Discovery;
 /// Contains ALL Redis-specific knowledge - core orchestration knows nothing about Redis.
 /// Reads own KoanServiceAttribute and handles Redis-specific health checks.
 /// </summary>
-internal sealed class RedisDiscoveryAdapter : ServiceDiscoveryAdapterBase
+public sealed class RedisDiscoveryAdapter : ServiceDiscoveryAdapterBase
 {
     public override string ServiceName => "redis";
     public override string[] Aliases => new[] { "cache" };

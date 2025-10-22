@@ -1,18 +1,24 @@
+using System;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Koan.Core;
+using Koan.Core.Adapters.Reporting;
+using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Modules;
 using Koan.Core.Orchestration;
 using Koan.Core.Orchestration.Abstractions;
-using Microsoft.Extensions.Logging;
+using Koan.Core.Provenance;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Naming;
 using Koan.Data.Vector.Abstractions;
 using Koan.Data.Vector.Connector.Weaviate.Discovery;
 using Koan.Data.Vector.Connector.Weaviate.Orchestration;
+using WeaviateItems = Koan.Data.Vector.Connector.Weaviate.Infrastructure.WeaviateProvenanceItems;
+using ProvenanceModes = Koan.Core.Hosting.Bootstrap.ProvenancePublicationModeExtensions;
 
 namespace Koan.Data.Vector.Connector.Weaviate.Initialization;
 
@@ -23,8 +29,6 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 
     public void Initialize(IServiceCollection services)
     {
-        var logger = services.BuildServiceProvider().GetService<Microsoft.Extensions.Logging.ILoggerFactory>()?.CreateLogger("Koan.Data.Vector.Connector.Weaviate.Initialization.KoanAutoRegistrar");
-        logger?.Log(LogLevel.Debug, "Koan.Data.Vector.Connector.Weaviate KoanAutoRegistrar loaded.");
         services.AddKoanOptions<WeaviateOptions>(Infrastructure.Constants.Configuration.Section);
 
         services.AddSingleton<IConfigureOptions<WeaviateOptions>, WeaviateOptionsConfigurator>();
@@ -43,25 +47,140 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         services.AddHttpClient("weaviate");
     }
 
-    public void Describe(Koan.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)
+    public void Describe(ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
-        report.AddModule(ModuleName, ModuleVersion);
+        module.Describe(ModuleVersion);
+        module.AddNote("Weaviate discovery handled by autonomous WeaviateDiscoveryAdapter");
 
-        // Autonomous discovery adapter handles all connection string resolution
-        // Boot report shows discovery results from WeaviateDiscoveryAdapter
-        report.AddNote("Weaviate discovery handled by autonomous WeaviateDiscoveryAdapter");
-
-        // Configure default options for reporting
+        // Configure default options for reporting with provenance metadata
         var defaultOptions = new WeaviateOptions();
 
-        report.AddSetting("ConnectionString", "auto (resolved by discovery)", isSecret: false);
-        report.AddSetting("Endpoint", "auto (resolved by discovery)", isSecret: false);
-        report.AddSetting("DefaultTopK", defaultOptions.DefaultTopK.ToString());
-        report.AddSetting("MaxTopK", defaultOptions.MaxTopK.ToString());
-        report.AddSetting("Dimension", defaultOptions.Dimension.ToString());
-        report.AddSetting("Metric", defaultOptions.Metric);
-        report.AddSetting("TimeoutSeconds", defaultOptions.DefaultTimeoutSeconds.ToString());
+        var connection = Configuration.ReadFirstWithSource(
+            cfg,
+            defaultOptions.ConnectionString,
+            WeaviateItems.ConnectionStringKeys);
+
+        var endpoint = Configuration.ReadFirstWithSource(
+            cfg,
+            defaultOptions.Endpoint,
+            WeaviateItems.EndpointKeys);
+
+        var defaultTopK = Configuration.ReadWithSource(
+            cfg,
+            WeaviateItems.DefaultTopK.Key,
+            defaultOptions.DefaultTopK);
+
+        var maxTopK = Configuration.ReadWithSource(
+            cfg,
+            WeaviateItems.MaxTopK.Key,
+            defaultOptions.MaxTopK);
+
+        var dimension = Configuration.ReadWithSource(
+            cfg,
+            WeaviateItems.Dimension.Key,
+            defaultOptions.Dimension);
+
+        var metric = Configuration.ReadWithSource(
+            cfg,
+            WeaviateItems.Metric.Key,
+            defaultOptions.Metric);
+
+        var timeoutSeconds = Configuration.ReadWithSource(
+            cfg,
+            WeaviateItems.TimeoutSeconds.Key,
+            defaultOptions.DefaultTimeoutSeconds);
+
+        var connectionIsAuto = string.IsNullOrWhiteSpace(connection.Value) || string.Equals(connection.Value, "auto", StringComparison.OrdinalIgnoreCase);
+        var connectionMode = connectionIsAuto
+            ? ProvenanceModes.FromBootSource(BootSettingSource.Auto, usedDefault: true)
+            : ProvenanceModes.FromConfigurationValue(connection);
+        var connectionSourceKey = connection.ResolvedKey ?? WeaviateItems.ConnectionString.Key;
+
+        var effectiveConnectionString = connection.Value ?? defaultOptions.ConnectionString;
+        if (connectionIsAuto)
+        {
+            var adapter = new WeaviateDiscoveryAdapter(cfg, NullLogger<WeaviateDiscoveryAdapter>.Instance);
+            effectiveConnectionString = AdapterBootReporting.ResolveConnectionString(
+                cfg,
+                adapter,
+                null,
+                () => BuildWeaviateFallback(defaultOptions, endpoint.Value));
+        }
+
+        module.AddSetting(
+            WeaviateItems.ConnectionString,
+            connectionMode,
+            effectiveConnectionString,
+            sourceKey: connectionSourceKey,
+            usedDefault: connectionIsAuto ? true : connection.UsedDefault);
+
+        module.AddSetting(
+            WeaviateItems.Endpoint,
+            ProvenanceModes.FromConfigurationValue(endpoint),
+            endpoint.Value,
+            sourceKey: endpoint.ResolvedKey,
+            usedDefault: endpoint.UsedDefault);
+
+        module.AddSetting(
+            WeaviateItems.DefaultTopK,
+            ProvenanceModes.FromConfigurationValue(defaultTopK),
+            defaultTopK.Value,
+            sourceKey: defaultTopK.ResolvedKey,
+            usedDefault: defaultTopK.UsedDefault);
+
+        module.AddSetting(
+            WeaviateItems.MaxTopK,
+            ProvenanceModes.FromConfigurationValue(maxTopK),
+            maxTopK.Value,
+            sourceKey: maxTopK.ResolvedKey,
+            usedDefault: maxTopK.UsedDefault);
+
+        module.AddSetting(
+            WeaviateItems.Dimension,
+            ProvenanceModes.FromConfigurationValue(dimension),
+            dimension.Value,
+            sourceKey: dimension.ResolvedKey,
+            usedDefault: dimension.UsedDefault);
+
+        module.AddSetting(
+            WeaviateItems.Metric,
+            ProvenanceModes.FromConfigurationValue(metric),
+            metric.Value,
+            sourceKey: metric.ResolvedKey,
+            usedDefault: metric.UsedDefault);
+
+        module.AddSetting(
+            WeaviateItems.TimeoutSeconds,
+            ProvenanceModes.FromConfigurationValue(timeoutSeconds),
+            timeoutSeconds.Value,
+            sourceKey: timeoutSeconds.ResolvedKey,
+            usedDefault: timeoutSeconds.UsedDefault);
+    }
+    private static string BuildWeaviateFallback(WeaviateOptions defaults, string? configuredEndpoint)
+    {
+        var endpoint = !string.IsNullOrWhiteSpace(configuredEndpoint)
+            ? configuredEndpoint
+            : defaults.Endpoint;
+
+        return NormalizeWeaviateEndpoint(endpoint);
     }
 
+    private static string NormalizeWeaviateEndpoint(string endpoint)
+    {
+        if (string.IsNullOrWhiteSpace(endpoint))
+        {
+            return "http://localhost:8085";
+        }
+
+        if (Uri.TryCreate(endpoint, UriKind.Absolute, out var uri))
+        {
+            var scheme = string.IsNullOrWhiteSpace(uri.Scheme) ? "http" : uri.Scheme;
+            var portSegment = uri.IsDefaultPort ? string.Empty : $":{uri.Port}";
+            return $"{scheme}://{uri.Host}{portSegment}";
+        }
+
+        return endpoint;
+    }
 }
+
 

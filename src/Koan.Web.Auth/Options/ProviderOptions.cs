@@ -7,6 +7,7 @@ public sealed class ProviderOptions
     public string? DisplayName { get; init; }
     public string? Icon { get; init; }
     public bool Enabled { get; init; } = true;
+    public int? Priority { get; init; }
 
     // OIDC
     public string? Authority { get; init; }

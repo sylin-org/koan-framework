@@ -110,4 +110,45 @@ public sealed class McpEntityAttribute : Attribute
     /// Optional prefix appended to generated tool names for namespacing.
     /// </summary>
     public string? ToolPrefix { get; set; }
+
+    private McpExposureMode? _exposure;
+
+    /// <summary>
+    /// Determines how this entity is exposed via MCP (Auto, Code, Tools, Full).
+    /// Null = inherit from assembly/configuration defaults.
+    /// Valid string values: "auto", "code", "tools", "full"
+    /// </summary>
+    /// <example>
+    /// <code>
+    /// [McpEntity(Name = "Todo", Exposure = "code")]
+    /// [McpEntity(Name = "AuditLog", Exposure = McpExposureMode.Tools)]
+    /// </code>
+    /// </example>
+    public object? Exposure
+    {
+        get => _exposure;
+        set => _exposure = value switch
+        {
+            null => null,
+            McpExposureMode mode => mode,
+            string s => s.ToLowerInvariant() switch
+            {
+                "auto" => McpExposureMode.Auto,
+                "code" => McpExposureMode.Code,
+                "tools" => McpExposureMode.Tools,
+                "full" => McpExposureMode.Full,
+                _ => throw new ArgumentException(
+                    $"Invalid exposure mode '{s}'. Valid values: auto, code, tools, full",
+                    nameof(value))
+            },
+            _ => throw new ArgumentException(
+                "Exposure must be McpExposureMode enum or string literal (auto, code, tools, full)",
+                nameof(value))
+        };
+    }
+
+    /// <summary>
+    /// Typed accessor for internal use.
+    /// </summary>
+    internal McpExposureMode? ExposureMode => _exposure;
 }

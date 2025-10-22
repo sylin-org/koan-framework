@@ -1,0 +1,8 @@
+﻿# Web Admin Test Suite
+id: web-admin
+name: Web Admin Controllers
+category: web
+status: in-progress
+description: |
+  Test suite for Koan.Web admin controllers, including entities, models, auth/roles, and backup endpoint.
+  Uses TestPipeline HTTP harnesses for regression and integration coverage.

@@ -3,6 +3,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Logging;
+using Koan.Core.Provenance;
 using System.Reflection;
 
 namespace Koan.Core;
@@ -219,6 +220,7 @@ public static class KoanEnv
     public static OrchestrationMode OrchestrationMode => CurrentSnapshot.OrchestrationMode;
     public static string SessionId => CurrentSnapshot.SessionId;
     public static Assembly[] KoanAssemblies => AssemblyCache.Instance.GetKoanAssemblies();
+    public static ProvenanceSnapshot Provenance => ProvenanceRegistry.Instance.CurrentSnapshot;
 
     private sealed record SnapshotData(
         string EnvironmentName,

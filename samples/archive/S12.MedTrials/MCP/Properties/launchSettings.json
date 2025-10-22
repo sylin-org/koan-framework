@@ -1,0 +1,12 @@
+{
+  "profiles": {
+    "S12.MedTrials.McpService": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "applicationUrl": "https://localhost:63325;http://localhost:63326"
+    }
+  }
+}

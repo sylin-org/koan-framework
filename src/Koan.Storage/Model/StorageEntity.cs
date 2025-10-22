@@ -181,7 +181,8 @@ public abstract class StorageEntity<TEntity> : Entity<TEntity>, IStorageObject
         var inst = Activator.CreateInstance<TEntity>();
         if (inst is StorageEntity<TEntity> se)
         {
-            se.Id = obj.Id;
+            // Do NOT copy obj.Id - preserve entity's auto-generated GUID v7
+            // The storage key is in obj.Key, not obj.Id
             se.Key = obj.Key;
             se.Name = obj.Name;
             se.ContentType = obj.ContentType;
@@ -202,7 +203,8 @@ public abstract class StorageEntity<TEntity> : Entity<TEntity>, IStorageObject
         var inst = Activator.CreateInstance<TTarget>();
         if (inst is StorageEntity<TTarget> se)
         {
-            se.Id = obj.Id;
+            // Do NOT copy obj.Id - preserve entity's auto-generated GUID v7
+            // The storage key is in obj.Key, not obj.Id
             se.Key = obj.Key;
             se.Name = obj.Name;
             se.ContentType = obj.ContentType;

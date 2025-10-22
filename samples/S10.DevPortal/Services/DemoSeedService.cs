@@ -42,6 +42,7 @@ public class DemoSeedService : IDemoSeedService
 
     public async Task<List<Article>> GenerateSampleArticles(int count)
     {
+        await Task.CompletedTask;
         var articles = new List<Article>();
         var sampleTitles = new[]
         {
@@ -155,6 +156,7 @@ public class DemoSeedService : IDemoSeedService
 
     public async Task<List<User>> GenerateSampleUsers()
     {
+        await Task.CompletedTask;
         var users = new List<User>
         {
             new User
@@ -192,6 +194,7 @@ public class DemoSeedService : IDemoSeedService
 
     public async Task<List<Comment>> GenerateSampleComments(List<Article> articles, List<User> users)
     {
+        await Task.CompletedTask;
         var comments = new List<Comment>();
 
         foreach (var article in articles.Take(10)) // Add comments to first 10 articles
@@ -230,6 +233,7 @@ public class DemoSeedService : IDemoSeedService
 
     private async Task<List<Article>> GenerateSampleArticlesWithRelationships(List<Technology> technologies, List<User> users, int count)
     {
+        await Task.CompletedTask;
         var articles = new List<Article>();
         var sampleTitles = new[]
         {

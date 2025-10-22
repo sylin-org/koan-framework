@@ -33,7 +33,7 @@ public class EntityEndpointResult
 
 public sealed class EntityCollectionResult<TEntity> : EntityEndpointResult
 {
-    public EntityCollectionResult(EntityRequestContext context, IReadOnlyList<TEntity> items, int totalCount, object? payload, object? shortCircuit = null)
+    public EntityCollectionResult(EntityRequestContext context, IReadOnlyList<TEntity> items, long totalCount, object? payload, object? shortCircuit = null)
         : base(context, payload, shortCircuit)
     {
         Items = items;
@@ -42,7 +42,7 @@ public sealed class EntityCollectionResult<TEntity> : EntityEndpointResult
 
     public IReadOnlyList<TEntity> Items { get; }
 
-    public int TotalCount { get; }
+    public long TotalCount { get; }
 }
 
 public sealed class EntityModelResult<TEntity> : EntityEndpointResult

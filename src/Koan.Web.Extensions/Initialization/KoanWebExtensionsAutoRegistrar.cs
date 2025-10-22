@@ -33,8 +33,9 @@ public sealed class KoanWebExtensionsAutoRegistrar : IKoanAutoRegistrar
         // Expose registration extension methods on IServiceCollection (already provided by GenericControllers class)
     }
 
-    public void Describe(Koan.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)
+    public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
-        report.AddModule(ModuleName, ModuleVersion);
+        module.Describe(ModuleVersion);
     }
 }
+

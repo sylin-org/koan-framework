@@ -6,4 +6,6 @@ public enum QueryCapabilities
     None = 0,
     String = 1 << 0,
     Linq = 1 << 1,
+    FastCount = 1 << 2,
+    OptimizedCount = 1 << 3
 }

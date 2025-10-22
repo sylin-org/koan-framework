@@ -1,0 +1,7 @@
+﻿suite: Koan.Data.Connector.Postgres.Tests
+lane: docker
+scope: connector
+module: Data.Connector.Postgres
+description: Integration coverage for the Postgres data connector validating CRUD, partition routing, batching, instructions, and capability probes.
+legacyProjects:
+  - Koan.Data.Postgres.Tests

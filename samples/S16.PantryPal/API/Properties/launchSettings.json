@@ -1,0 +1,12 @@
+{
+  "profiles": {
+    "S16.PantryPal": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "applicationUrl": "https://localhost:63327;http://localhost:63328"
+    }
+  }
+}

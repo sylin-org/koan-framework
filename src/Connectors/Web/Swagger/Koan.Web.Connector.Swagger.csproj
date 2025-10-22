@@ -11,7 +11,6 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
-    <FrameworkReference Include="Microsoft.AspNetCore.App" />
-  <ProjectReference Include="..\..\..\Koan.Web\Koan.Web.csproj" />
+    <ProjectReference Include="..\..\..\Koan.Web\Koan.Web.csproj" />
   </ItemGroup>
 </Project>

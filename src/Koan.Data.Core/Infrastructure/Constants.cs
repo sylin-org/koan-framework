@@ -14,10 +14,5 @@ public static class Constants
         {
             public const string Section = "Koan:Data:Direct";
         }
-        public static class Runtime
-        {
-            public const string Section = "Koan:Data:Runtime";
-            public const string EnsureSchemaOnStart = "Koan:Data:Runtime:EnsureSchemaOnStart";
-        }
     }
 }

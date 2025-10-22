@@ -13,7 +13,8 @@ const API = {
     },
 
     async runBenchmark(config) {
-        const response = await fetch(`${this.baseUrl}/api/benchmark/run`, {
+        // Use synchronous endpoint that supports real-time SignalR progress
+        const response = await fetch(`${this.baseUrl}/api/benchmark/run-sync`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -23,6 +24,28 @@ const API = {
 
         if (!response.ok) {
             throw new Error(`Benchmark failed: ${response.statusText}`);
+        }
+
+        return await response.json();
+    },
+
+    async getJobStatus(jobId) {
+        const response = await fetch(`${this.baseUrl}/api/benchmark/status/${jobId}`);
+
+        if (!response.ok) {
+            throw new Error(`Failed to get job status: ${response.statusText}`);
+        }
+
+        return await response.json();
+    },
+
+    async cancelJob(jobId) {
+        const response = await fetch(`${this.baseUrl}/api/benchmark/cancel/${jobId}`, {
+            method: 'POST'
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to cancel job: ${response.statusText}`);
         }
 
         return await response.json();

@@ -67,4 +67,7 @@ node_modules/
 # Docker runtime status artifacts (avoid committing transient ps outputs)
 /samples/**/ps.json
 /.sora
-/samples/S5.Recs/.Koan/cache
+/tests.old
+
+# Koan framework cache and metadata
+**/.Koan/

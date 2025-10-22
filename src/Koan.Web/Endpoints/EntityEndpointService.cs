@@ -11,6 +11,7 @@ using Microsoft.Extensions.Logging;
 using Koan.Data.Abstractions;
 using Koan.Data.Core;
 using Koan.Data.Core.Model;
+using Koan.Data.Abstractions.Instructions;
 using Koan.Web.Filtering;
 using Koan.Web.Hooks;
 using Koan.Web.Infrastructure;
@@ -54,7 +55,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         }
 
         RepositoryQueryResult queryResult;
-        int total;
+        long total;
         try
         {
             queryResult = await QueryCollectionAsync(request, context.Options, context.CancellationToken);
@@ -85,12 +86,14 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         }
 
         var list = queryResult.Items.ToList();
+
         if (context.Options.Sort.Count > 0)
         {
             list = ApplySort(list, context.Options.Sort);
         }
 
         var shouldPaginate = request.ApplyPagination;
+
         if (shouldPaginate && !queryResult.RepositoryHandledPagination)
         {
             (list, total) = ApplyPagination(list, context.Options.Page, context.Options.PageSize, total);
@@ -128,6 +131,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         }
 
         object payload = list;
+
         if (!string.IsNullOrWhiteSpace(request.With) && request.With.Contains("all", StringComparison.OrdinalIgnoreCase))
         {
             payload = await EnrichRelationshipsAsync(list, context.CancellationToken);
@@ -165,7 +169,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         }
 
         IReadOnlyList<TEntity> repositoryItems;
-        int total;
+        long total;
         try
         {
             (repositoryItems, total) = await QueryCollectionFromBodyAsync(repo, request, context.Options, context.CancellationToken);
@@ -237,7 +241,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
             return ModelShortCircuit(context, hookContext);
         }
 
-        using var _ = EntityContext.Partition(string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
+        using var _ = EntityContext.With(partition: string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
         var model = await Data<TEntity, TKey>.GetAsync(request.Id!, context.CancellationToken);
         await _hookPipeline.AfterModelFetchAsync(hookContext, model);
         if (model is null)
@@ -274,7 +278,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         TEntity saved;
         if (!string.IsNullOrWhiteSpace(request.Set))
         {
-            using var _ = EntityContext.Partition(request.Set);
+            using var _ = EntityContext.With(partition: request.Set);
             saved = await request.Model.Upsert<TEntity, TKey>(context.CancellationToken);
         }
         else
@@ -314,7 +318,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
             await _hookPipeline.BeforeSaveAsync(hookContext, model);
         }
 
-        using var _ = EntityContext.Partition(string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
+        using var _ = EntityContext.With(partition: string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
         var upserted = await Data<TEntity, TKey>.UpsertManyAsync(list, context.CancellationToken);
 
         foreach (var model in list)
@@ -336,7 +340,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
 
         var hookContext = _hookPipeline.CreateContext(context);
 
-        using var _ = EntityContext.Partition(string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
+        using var _ = EntityContext.With(partition: string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
         var model = await Data<TEntity, TKey>.GetAsync(request.Id, context.CancellationToken);
         if (model is null)
         {
@@ -364,7 +368,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         var repo = _dataService.GetRepository<TEntity, TKey>();
         var writes = WriteCaps(repo);
         context.Headers["Koan-Write-Capabilities"] = writes.Writes.ToString();
-        using var _ = EntityContext.Partition(string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
+        using var _ = EntityContext.With(partition: string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
         var deleted = await Data<TEntity, TKey>.DeleteManyAsync(request.Ids ?? Array.Empty<TKey>(), context.CancellationToken);
         return new EntityEndpointResult(context, new { deleted });
     }
@@ -376,14 +380,14 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
             return new EntityEndpointResult(request.Context, null, new BadRequestResult());
         }
 
-        using var _ = EntityContext.Partition(string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
+        using var _ = EntityContext.With(partition: string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
         var removed = await Entity<TEntity, TKey>.Remove(request.Query!, request.Context.CancellationToken);
         return new EntityEndpointResult(request.Context, new { deleted = removed });
     }
 
     public async Task<EntityEndpointResult> DeleteAllAsync(EntityDeleteAllRequest request)
     {
-        using var _ = EntityContext.Partition(string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
+        using var _ = EntityContext.With(partition: string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
         var deleted = await Entity<TEntity, TKey>.RemoveAll(request.Context.CancellationToken);
         return new EntityEndpointResult(request.Context, new { deleted });
     }
@@ -396,9 +400,9 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
 
         var hookContext = _hookPipeline.CreateContext(context);
 
-        await _hookPipeline.BeforePatchAsync(hookContext, request.Id?.ToString() ?? string.Empty, request.Patch);
+        await _hookPipeline.BeforePatchAsync(hookContext, request.Id?.ToString() ?? string.Empty, request.Patch!);
 
-        using var _ = EntityContext.Partition(string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
+        using var _ = EntityContext.With(partition: string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
         var original = await Data<TEntity, TKey>.GetAsync(request.Id!, context.CancellationToken);
         if (original is null)
         {
@@ -406,7 +410,30 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         }
 
         var working = await Data<TEntity, TKey>.GetAsync(request.Id!, context.CancellationToken);
-        request.Patch.ApplyTo(working!);
+        if (working is null)
+        {
+            return new EntityModelResult<TEntity>(context, null, null, new NotFoundResult());
+        }
+
+        // Apply generalized patch
+        if (request.Patch is Microsoft.AspNetCore.JsonPatch.JsonPatchDocument<TEntity> jp)
+        {
+            jp.ApplyTo(working);
+        }
+        else if (request.Patch is Newtonsoft.Json.Linq.JToken jt)
+        {
+            var opts = context.HttpContext?.RequestServices.GetService(typeof(Microsoft.Extensions.Options.IOptions<Koan.Web.Options.KoanWebOptions>)) as Microsoft.Extensions.Options.IOptions<Koan.Web.Options.KoanWebOptions>;
+            var mergePolicy = opts?.Value.MergePatchNullsForNonNullable ?? MergePatchNullPolicy.SetDefault;
+            var partialPolicy = opts?.Value.PartialJsonNulls ?? PartialJsonNullPolicy.SetNull;
+            Koan.Data.Abstractions.Instructions.IPatchApplicator<TEntity> applicator = request.Kind == PatchKind.MergePatch7386
+                ? new Koan.Data.Core.Patch.MergePatchApplicator<TEntity>(jt, mergePolicy)
+                : new Koan.Data.Core.Patch.PartialJsonApplicator<TEntity>(jt, partialPolicy);
+            applicator.Apply(working);
+        }
+        else
+        {
+            return new EntityModelResult<TEntity>(context, null, null, new BadRequestObjectResult(new { error = "Unsupported patch payload" }));
+        }
         var idProp = typeof(TEntity).GetProperty("Id");
         if (idProp is not null)
         {
@@ -442,7 +469,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         }
     }
 
-    private static (List<TEntity> Items, int Total) ApplyPagination(List<TEntity> source, int page, int pageSize, int total)
+    private static (List<TEntity> Items, long Total) ApplyPagination(List<TEntity> source, int page, int pageSize, long total)
     {
         if (pageSize <= 0)
         {
@@ -523,7 +550,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
 
     private sealed class RepositoryQueryResult
     {
-        public RepositoryQueryResult(IReadOnlyList<TEntity> items, int total, bool handled, bool exceededLimit)
+        public RepositoryQueryResult(IReadOnlyList<TEntity> items, long total, bool handled, bool exceededLimit)
         {
             Items = items;
             Total = total;
@@ -532,7 +559,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         }
 
         public IReadOnlyList<TEntity> Items { get; }
-        public int Total { get; }
+        public long Total { get; }
         public bool RepositoryHandledPagination { get; }
         public bool ExceededSafetyLimit { get; }
     }
@@ -542,7 +569,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         QueryOptions options,
         CancellationToken cancellationToken)
     {
-        using var _ = EntityContext.Partition(string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
+        using var _ = EntityContext.With(partition: string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
 
         object? queryPayload = null;
         if (!string.IsNullOrWhiteSpace(request.FilterJson))
@@ -601,13 +628,13 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
 
     }
 
-    private async Task<(IReadOnlyList<TEntity> Items, int Total)> QueryCollectionFromBodyAsync(
+    private async Task<(IReadOnlyList<TEntity> Items, long Total)> QueryCollectionFromBodyAsync(
         IDataRepository<TEntity, TKey> repo,
         EntityQueryRequest request,
         QueryOptions options,
         CancellationToken cancellationToken)
     {
-        using var _ = EntityContext.Partition(string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
+        using var _ = EntityContext.With(partition: string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
         if (!string.IsNullOrWhiteSpace(request.FilterJson) && repo is ILinqQueryRepository<TEntity, TKey> lrepo)
         {
             if (!JsonFilterBuilder.TryBuild<TEntity>(request.FilterJson!, out var predicate, out var error, new JsonFilterBuilder.BuildOptions { IgnoreCase = request.IgnoreCase }))
@@ -615,22 +642,40 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
                 throw new InvalidOperationException(error ?? "Invalid filter");
             }
             var items = await lrepo.QueryAsync(predicate!, cancellationToken);
-            int total;
-            try { total = await lrepo.CountAsync(predicate!, cancellationToken); } catch { total = items.Count; }
+            long total;
+            try
+            {
+                var countRequest = new CountRequest<TEntity> { Predicate = predicate };
+                var countResult = await repo.CountAsync(countRequest, cancellationToken);
+                total = countResult.Value;
+            }
+            catch { total = items.Count; }
             return (items.ToList(), total);
         }
 
         if (!string.IsNullOrWhiteSpace(options.Q) && repo is IStringQueryRepository<TEntity, TKey> srepo)
         {
             var items = await srepo.QueryAsync(options.Q!, cancellationToken);
-            int total;
-            try { total = await srepo.CountAsync(options.Q!, cancellationToken); } catch { total = items.Count; }
+            long total;
+            try
+            {
+                var countRequest = new CountRequest<TEntity> { RawQuery = options.Q };
+                var countResult = await repo.CountAsync(countRequest, cancellationToken);
+                total = countResult.Value;
+            }
+            catch { total = items.Count; }
             return (items.ToList(), total);
         }
 
         var all = await repo.QueryAsync(null, cancellationToken);
-        int allTotal;
-        try { allTotal = await repo.CountAsync(null, cancellationToken); } catch { allTotal = all.Count; }
+        long allTotal;
+        try
+        {
+            var countRequest = new CountRequest<TEntity>();
+            var countResult = await repo.CountAsync(countRequest, cancellationToken);
+            allTotal = countResult.Value;
+        }
+        catch { allTotal = all.Count; }
         return (all.ToList(), allTotal);
     }
 

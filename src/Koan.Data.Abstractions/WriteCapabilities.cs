@@ -7,4 +7,5 @@ public enum WriteCapabilities
     BulkUpsert = 1 << 0,
     BulkDelete = 1 << 1,
     AtomicBatch = 1 << 2,
+    FastRemove = 1 << 3,
 }

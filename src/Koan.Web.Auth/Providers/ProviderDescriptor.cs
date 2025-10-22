@@ -13,4 +13,5 @@ public sealed class ProviderDescriptor
     [JsonProperty("challengeUrl")] public string? ChallengeUrl { get; init; }
     [JsonProperty("metadataUrl")] public string? MetadataUrl { get; init; }
     [JsonProperty("scopes")] public string[]? Scopes { get; init; }
+    [JsonProperty("priority")] public int Priority { get; init; }
 }

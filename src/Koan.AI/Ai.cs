@@ -162,9 +162,51 @@ public static class Ai
     /// <param name="options">Vision options including image, prompt, model overrides, etc.</param>
     /// <param name="ct">Cancellation token</param>
     /// <returns>AI response text</returns>
-    public static Task<string> Understand(AiVisionOptions options, CancellationToken ct = default)
+    public static async Task<string> Understand(AiVisionOptions options, CancellationToken ct = default)
     {
-        return Understand(options.ImageBytes, options.Prompt, ct);
+        var parts = new List<AiMessagePart>
+        {
+            new AiMessagePart { Type = "text", Text = options.Prompt },
+            new AiMessagePart { Type = "image", Data = options.ImageBytes, MimeType = options.ImageFormat ?? "image/jpeg" }
+        };
+
+        var messages = new List<AiMessage>
+        {
+            new AiMessage("user", options.Prompt)
+            {
+                Parts = parts
+            }
+        };
+
+        // Add system prompt if provided
+        if (!string.IsNullOrWhiteSpace(options.SystemPrompt))
+        {
+            messages.Insert(0, new AiMessage("system", options.SystemPrompt));
+        }
+
+        var promptOpts = new AiPromptOptions
+        {
+            Temperature = options.Temperature,
+            MaxOutputTokens = options.MaxTokens
+        };
+
+        // Merge context overrides
+        var (source, provider, model) = AiContextScope.ResolveMerged(
+            options.Source,
+            options.Provider,
+            options.Model);
+
+        var response = await Resolve().PromptAsync(new AiChatRequest
+        {
+            Messages = messages,
+            Model = model,
+            Options = promptOpts,
+            Route = source != null || provider != null
+                ? new AiRouteHints { AdapterId = source ?? provider }
+                : null
+        }, ct);
+
+        return response.Text;
     }
 
     /// <summary>
@@ -182,18 +224,6 @@ public static class Ai
     {
         return new AiContextScope(source, provider, model);
     }
-
-    // ============================================================================
-    // Legacy API (BACKWARD COMPATIBILITY)
-    // ============================================================================
-
-    [Obsolete("Use Chat() for capability-based routing. Prompt() will be removed in v1.0")]
-    public static Task<AiChatResponse> Prompt(string message, string? model = null, AiPromptOptions? opts = null, CancellationToken ct = default)
-        => Resolve().PromptAsync(BuildChat(message, model, opts), ct);
-
-    [Obsolete("Use Stream() with AiChatOptions for capability-based routing. This overload will be removed in v1.0")]
-    public static IAsyncEnumerable<AiChatChunk> Stream(string message, string? model = null, AiPromptOptions? opts = null, CancellationToken ct = default)
-        => Resolve().StreamAsync(BuildChat(message, model, opts), ct);
 
     public static Task<AiEmbeddingsResponse> Embed(AiEmbeddingsRequest req, CancellationToken ct = default)
         => Resolve().EmbedAsync(req, ct);
@@ -245,14 +275,6 @@ public static class Ai
         _resolver ??= CreateResolver(sp);
         return _resolver(sp);
     }
-
-    private static AiChatRequest BuildChat(string message, string? model, AiPromptOptions? opts)
-        => new()
-        {
-            Messages = new() { new AiMessage("user", message) },
-            Model = model,
-            Options = opts
-        };
 
     private static AiChatRequest BuildChatRequest(AiChatOptions options)
     {

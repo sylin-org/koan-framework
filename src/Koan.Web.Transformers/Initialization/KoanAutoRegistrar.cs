@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Koan.Core;
 using Koan.Core.Extensions;
+using Koan.Core.Hosting.Bootstrap;
 
 namespace Koan.Web.Transformers.Initialization;
 
@@ -17,10 +18,18 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         // which AppBootstrapper will discover and run. We avoid duplicate registration here.
     }
 
-    public void Describe(Koan.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)
+    public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
-        report.AddModule(ModuleName, ModuleVersion);
-        var enabled = cfg.Read(Infrastructure.Constants.Configuration.Transformers.AutoDiscover, true);
-        report.AddSetting("AutoDiscover", enabled.ToString());
+        module.Describe(ModuleVersion);
+        var enabled = Koan.Core.Configuration.ReadWithSource(
+            cfg,
+            Infrastructure.Constants.Configuration.Transformers.AutoDiscover,
+            true);
+        module.AddSetting(
+            "AutoDiscover",
+            enabled.Value.ToString(),
+            source: enabled.Source,
+            consumers: new[] { "Koan.Web.Transformers.Registry" });
     }
 }
+

@@ -3,17 +3,20 @@ type: GUIDE
 domain: web
 title: "Expose MCP over HTTP + SSE"
 audience: [developers, ai-agents]
-last_updated: 2025-01-17
-framework_version: "v0.2.18+"
+last_updated: 2025-10-09
+framework_version: v0.6.3
 status: current
-validation: 2025-01-17
+validation:
+  date_last_tested: 2025-10-09
+  status: drafted
+  scope: docs/guides/mcp-http-sse-howto.md
 ---
 
 # Expose MCP over HTTP + SSE
 
-**Document Type**: GUIDE  \
-**Target Audience**: Developers, AI Agents  \
-**Last Updated**: 2025-01-17  \
+**Document Type**: GUIDE \
+**Target Audience**: Developers, AI Agents \
+**Last Updated**: 2025-01-17 \
 **Framework Version**: v0.2.18+
 
 ---
@@ -88,8 +91,7 @@ using Koan.Web.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddKoan()
-    .AsWebApi();
+builder.Services.AddKoan();
 
 builder.Services.AddKoanMcp(builder.Configuration);
 
@@ -201,11 +203,11 @@ For staging and production environments:
 
 ## 12. Next Steps
 
-- Read the [HTTP + SSE transport proposal](../proposals/koan-mcp-http-sse-transport.md) for architectural details and roadmap.
-- Explore [Koan MCP Integration](../proposals/koan-mcp-integration.md) to understand how STDIO and upcoming transports align.
-- Connect a real IDE or agent using the [TypeScript reference client](../proposals/koan-mcp-http-sse-transport.md#client-side-consumption).
+- Read the [HTTP + SSE transport proposal](../archive/proposals/koan-mcp-http-sse-transport.md) for architectural details and roadmap.
+- Explore [Koan MCP Integration](../archive/proposals/koan-mcp-integration.md) to understand how STDIO and upcoming transports align.
+- Connect a real IDE or agent using the [TypeScript reference client](../archive/proposals/koan-mcp-http-sse-transport.md#client-side-consumption).
 
 ---
 
-**Last Validation**: 2025-01-17 by Framework Specialist  \
+**Last Validation**: 2025-01-17 by Framework Specialist \
 **Framework Version Tested**: v0.2.18+

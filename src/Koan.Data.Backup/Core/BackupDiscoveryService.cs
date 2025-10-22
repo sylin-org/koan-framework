@@ -113,7 +113,7 @@ public class BackupDiscoveryService : IBackupDiscoveryService
             // List backup files from storage using the new listing capability
             try
             {
-                await foreach (var file in _storageService.ListObjectsAsync(storageProfile, "backups", "backups/", ct))
+                await foreach (var file in _storageService.ListObjectsAsync(storageProfile, "backups", null, ct))
                 {
                     try
                     {
@@ -412,6 +412,8 @@ public class BackupDiscoveryService : IBackupDiscoveryService
                 EntityTypes = manifest?.Entities.Select(e => e.EntityType).Distinct().ToArray(),
                 Providers = manifest?.Entities.Select(e => e.Provider).Distinct().ToArray(),
                 HealthStatus = BackupHealthStatus.Unknown, // Will be determined during validation
+                ArchiveStorageKey = !string.IsNullOrWhiteSpace(manifest?.ArchiveStorageKey) ? manifest.ArchiveStorageKey : file.Key,
+                ArchiveFileName = fileName,
                 Metadata = manifest?.Metadata ?? new Dictionary<string, string>()
             };
 
@@ -461,3 +463,6 @@ public class BackupDiscoveryService : IBackupDiscoveryService
     }
 
 }
+
+
+

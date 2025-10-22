@@ -16,6 +16,12 @@ const Results = {
         Charts.createPerformanceChart('singleWriteChart', results, 'Single Writes');
         Charts.createPerformanceChart('batchWriteChart', results, 'Batch Writes');
         Charts.createPerformanceChart('readByIdChart', results, 'Read By ID');
+        Charts.createPerformanceChart('updateChart', results, 'Update Operations');
+        Charts.createPerformanceChart('querySimpleChart', results, 'Query (Simple Filter)');
+        Charts.createPerformanceChart('queryRangeChart', results, 'Query (Range Filter)');
+        Charts.createPerformanceChart('queryComplexChart', results, 'Query (Complex Filter)');
+        Charts.createPerformanceChart('paginationChart', results, 'Pagination');
+        Charts.createMigrationChart(results);
 
         // Generate recommendations
         this.generateRecommendations(results);
@@ -32,6 +38,42 @@ const Results = {
 
         const totalTests = results.providerResults.reduce((sum, p) => sum + p.tests.length, 0);
         document.getElementById('testsCompleted').textContent = totalTests;
+
+        // Generate performance leaderboard
+        this.generateLeaderboard(results);
+    },
+
+    generateLeaderboard(results) {
+        const container = document.getElementById('leaderboard');
+        if (!container) return;
+
+        container.innerHTML = '';
+
+        // Sort providers by total duration (ascending - lower is better)
+        const sorted = [...results.providerResults].sort((a, b) => a.totalDuration - b.totalDuration);
+
+        sorted.forEach((provider, index) => {
+            const rank = index + 1;
+            const card = document.createElement('div');
+            card.className = `leaderboard-card${rank <= 3 ? ` rank-${rank}` : ''}`;
+
+            // Calculate average ops/sec across all tests
+            const avgOpsPerSec = provider.tests.reduce((sum, t) => sum + t.operationsPerSecond, 0) / provider.tests.length;
+
+            card.innerHTML = `
+                <div class="leaderboard-rank">${rank}</div>
+                <div class="leaderboard-provider">
+                    <div class="leaderboard-provider-name">${provider.providerName.toUpperCase()}</div>
+                    <span class="leaderboard-provider-badge">${provider.isContainerized ? 'Containerized' : 'In-Process'}</span>
+                </div>
+                <div class="leaderboard-stats">
+                    <div class="leaderboard-duration">${(provider.totalDuration / 1000000000).toFixed(2)}s</div>
+                    <div class="leaderboard-speed">Avg: ${Math.round(avgOpsPerSec).toLocaleString()} ops/sec</div>
+                </div>
+            `;
+
+            container.appendChild(card);
+        });
     },
 
     generateRecommendations(results) {
@@ -126,7 +168,7 @@ const Results = {
             let html = `
                 <h3>${provider.providerName.toUpperCase()}</h3>
                 <p>
-                    ${provider.isContainerized ? '🐳 Containerized' : '💾 In-Process'} |
+                    ${provider.isContainerized ? 'Containerized' : 'In-Process'} |
                     Total Duration: ${(provider.totalDuration / 1000000000).toFixed(2)}s
                 </p>
                 <table class="results-table">
@@ -161,6 +203,86 @@ const Results = {
 
             section.innerHTML = html;
             container.appendChild(section);
+        });
+    },
+
+    exportJson() {
+        if (!this.currentResults) {
+            alert('No results to export');
+            return;
+        }
+
+        const json = JSON.stringify(this.currentResults, null, 2);
+        const blob = new Blob([json], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `koan-benchmark-${new Date().toISOString().slice(0,19).replace(/:/g,'-')}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    },
+
+    exportCsv() {
+        if (!this.currentResults) {
+            alert('No results to export');
+            return;
+        }
+
+        // Build CSV
+        const lines = ['Provider,Test,Entity Tier,Duration (s),Ops/Sec,Execution'];
+
+        this.currentResults.providerResults.forEach(provider => {
+            provider.tests.forEach(test => {
+                lines.push([
+                    provider.providerName,
+                    test.testName,
+                    test.entityTier,
+                    (test.duration / 1000000000).toFixed(2),
+                    Math.round(test.operationsPerSecond),
+                    test.usedNativeExecution ? 'Native' : 'Fallback'
+                ].join(','));
+            });
+        });
+
+        const csv = lines.join('\n');
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `koan-benchmark-${new Date().toISOString().slice(0,19).replace(/:/g,'-')}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    },
+
+    shareResults() {
+        if (!this.currentResults) {
+            alert('No results to share');
+            return;
+        }
+
+        // Create shareable summary
+        const duration = ((this.currentResults.completedAt - this.currentResults.startedAt) / 1000).toFixed(2);
+        const providers = this.currentResults.providerResults.length;
+        const tests = this.currentResults.providerResults.reduce((sum, p) => sum + p.tests.length, 0);
+
+        const summary = `Koan Adapter Benchmark Results\n` +
+            `Duration: ${duration}s | Providers: ${providers} | Tests: ${tests}\n` +
+            `Entities: ${this.currentResults.entityCount.toLocaleString()}\n\n` +
+            this.currentResults.providerResults.map(p =>
+                `${p.providerName.toUpperCase()}: ${(p.totalDuration / 1000000000).toFixed(2)}s`
+            ).join('\n');
+
+        // Copy to clipboard
+        navigator.clipboard.writeText(summary).then(() => {
+            alert('Results summary copied to clipboard!');
+        }).catch(err => {
+            console.error('Failed to copy:', err);
+            // Fallback: Show in alert
+            alert(summary);
         });
     }
 };

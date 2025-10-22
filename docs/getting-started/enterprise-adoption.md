@@ -4,7 +4,7 @@ domain: core
 title: "Enterprise Adoption Guide"
 audience: [architects, developers, ai-agents]
 last_updated: 2025-02-14
-framework_version: v0.2.18
+framework_version: v0.6.3
 status: current
 validation:
   date_last_tested: 2025-02-14

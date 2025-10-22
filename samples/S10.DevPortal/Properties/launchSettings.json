@@ -1,0 +1,12 @@
+{
+  "profiles": {
+    "S10.DevPortal": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "applicationUrl": "https://localhost:58252;http://localhost:58253"
+    }
+  }
+}

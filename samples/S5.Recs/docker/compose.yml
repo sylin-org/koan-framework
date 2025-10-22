@@ -34,8 +34,6 @@ services:
     depends_on:
       mongo:
         condition: service_healthy
-      elasticsearch:
-        condition: service_healthy
       ollama:
         condition: service_started
   mongo:

@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Koan.AI.Contracts;
 using Koan.AI.Contracts.Models;
+using Koan.AI.Contracts.Options;
 
 namespace Koan.AI;
 
@@ -14,11 +15,17 @@ public static class Engine
     public static Task<AiEmbeddingsResponse> Embed(AiEmbeddingsRequest req, CancellationToken ct = default)
         => Ai.Embed(req, ct);
 
-    public static Task<AiChatResponse> Prompt(string message, string? model = null, AiPromptOptions? opts = null, CancellationToken ct = default)
-        => Ai.Prompt(message, model, opts, ct);
+    public static Task<string> Chat(string message, CancellationToken ct = default)
+        => Ai.Chat(message, ct);
 
-    public static IAsyncEnumerable<AiChatChunk> Stream(string message, string? model = null, AiPromptOptions? opts = null, CancellationToken ct = default)
-        => Ai.Stream(message, model, opts, ct);
+    public static Task<string> Chat(AiChatOptions options, CancellationToken ct = default)
+        => Ai.Chat(options, ct);
+
+    public static IAsyncEnumerable<string> Stream(string message, CancellationToken ct = default)
+        => Ai.Stream(message, ct);
+
+    public static IAsyncEnumerable<string> Stream(AiChatOptions options, CancellationToken ct = default)
+        => Ai.Stream(options, ct);
 
     // Targeted selection (provider and/or model)
     public static EngineSelector For(string? provider = null, string? model = null) => new(provider, model);

@@ -1,6 +1,4 @@
 using Koan.Data.Abstractions;
-using Koan.Data.Vector.Abstractions;
-
 namespace Koan.Data.Core;
 
 /// <summary>
@@ -24,8 +22,4 @@ public interface IDataService
     /// </summary>
     Direct.IDirectSession Direct(string? source = null, string? adapter = null);
 
-    // Vector repository accessor (optional adapter). Returns null if no vector adapter is configured for the entity.
-    IVectorSearchRepository<TEntity, TKey>? TryGetVectorRepository<TEntity, TKey>()
-        where TEntity : class, IEntity<TKey>
-        where TKey : notnull;
 }

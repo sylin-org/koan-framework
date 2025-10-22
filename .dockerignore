@@ -1,6 +1,10 @@
 # Build outputs
 **/bin/
 **/obj/
+**/packages/
+**/.nuget/
+**/TestResults/
+**/BenchmarkDotNet.Artifacts/
 
 # Git
 .git/
@@ -33,12 +37,17 @@
 **/.dockerignore
 **/docker-compose*.yml
 
-# Docker volume data only (not source code under src/Connectors/Data/)
-**/.Koan/Data/
+# All .Koan directories (volume data, cache, etc.)
+**/.Koan/
 
 # Logs
 **/logs/
 **/*.log
+
+# Database files
+**/*.db
+**/*.db-shm
+**/*.db-wal
 
 # OS
 **/.DS_Store

@@ -1,4 +1,4 @@
-﻿{
+{
   "profiles": {
     "S8.Canon.Api": {
       "commandName": "Project",
@@ -6,7 +6,7 @@
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"
       },
-      "applicationUrl": "https://localhost:50091;http://localhost:50092"
+      "applicationUrl": "https://localhost:63323;http://localhost:63324"
     }
   }
 }

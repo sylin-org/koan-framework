@@ -12,6 +12,9 @@ using Koan.Web.Auth.Services.Discovery;
 using Koan.Web.Auth.Services.Http;
 using Koan.Web.Auth.Services.Options;
 using Koan.Web.Auth.Connector.Test.Options;
+using Koan.Web.Auth.Services.Infrastructure;
+using ProvenanceModes = Koan.Core.Hosting.Bootstrap.ProvenancePublicationModeExtensions;
+using BootSettingSource = Koan.Core.Hosting.Bootstrap.BootSettingSource;
 
 namespace Koan.Web.Auth.Services.Initialization;
 
@@ -151,27 +154,66 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             .AddHttpMessageHandler<ServiceAuthenticationHandler>();
     }
 
-    public void Describe(BootReport report, IConfiguration cfg, IHostEnvironment env)
+    public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
-        report.AddModule(ModuleName, ModuleVersion);
+        module.Describe(ModuleVersion);
 
-        var options = new ServiceAuthOptions();
-        cfg.GetSection(ServiceAuthOptions.SectionPath).Bind(options);
+        var modeValue = env.IsDevelopment() ? "Development" : "Production";
+        module.AddSetting(
+            WebAuthServicesProvenanceItems.Mode,
+            ProvenanceModes.FromBootSource(BootSettingSource.Environment, usedDefault: false),
+            modeValue,
+            usedDefault: false);
 
-        report.AddSetting("Mode", env.IsDevelopment() ? "Development" : "Production");
-        report.AddSetting("Auto Discovery", options.EnableAutoDiscovery.ToString());
-        report.AddSetting("Token Caching", options.EnableTokenCaching.ToString());
+        var autoDiscovery = Koan.Core.Configuration.ReadWithSource(
+            cfg,
+            $"{ServiceAuthOptions.SectionPath}:{nameof(ServiceAuthOptions.EnableAutoDiscovery)}",
+            true);
+        var tokenCaching = Koan.Core.Configuration.ReadWithSource(
+            cfg,
+            $"{ServiceAuthOptions.SectionPath}:{nameof(ServiceAuthOptions.EnableTokenCaching)}",
+            true);
+
+        module.AddSetting(
+            WebAuthServicesProvenanceItems.AutoDiscovery,
+            ProvenanceModes.FromConfigurationValue(autoDiscovery),
+            autoDiscovery.Value,
+            sourceKey: autoDiscovery.ResolvedKey,
+            usedDefault: autoDiscovery.UsedDefault);
+
+        module.AddSetting(
+            WebAuthServicesProvenanceItems.TokenCaching,
+            ProvenanceModes.FromConfigurationValue(tokenCaching),
+            tokenCaching.Value,
+            sourceKey: tokenCaching.ResolvedKey,
+            usedDefault: tokenCaching.UsedDefault);
 
         var discoveredServices = DiscoverServices();
         if (discoveredServices.Length > 0)
         {
-            report.AddSetting("Services Discovered", discoveredServices.Length.ToString());
+            module.AddSetting(
+                WebAuthServicesProvenanceItems.ServicesDiscovered,
+                ProvenancePublicationMode.Discovery,
+                discoveredServices.Length,
+                usedDefault: true);
+
             foreach (var service in discoveredServices)
             {
-                report.AddSetting($"  └─ {service.ServiceId}",
-                    $"Scopes: {string.Join(", ", service.ProvidedScopes)} | " +
-                    $"Dependencies: {service.Dependencies.Length}");
+                module.AddSetting(
+                    WebAuthServicesProvenanceItems.ServiceDetail(service.ServiceId),
+                    ProvenancePublicationMode.Discovery,
+                    $"Scopes: {string.Join(", ", service.ProvidedScopes)} | Dependencies: {service.Dependencies.Length}",
+                    usedDefault: true);
             }
+        }
+        else
+        {
+            module.AddSetting(
+                WebAuthServicesProvenanceItems.ServicesDiscovered,
+                ProvenancePublicationMode.Discovery,
+                0,
+                usedDefault: true);
         }
     }
 }
+

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Koan.Mcp.Options;
+using Newtonsoft.Json.Linq;
 using Koan.Mcp.Schema;
 using Koan.Web.Endpoints;
 using Microsoft.Extensions.Logging;
@@ -65,11 +66,13 @@ public sealed class DescriptorMapper
             var jsonSchema = _schemaBuilder.BuildParametersSchema(entityType, keyType, descriptor, operation, attribute, entityOverride);
             var description = BuildDescription(attribute.Description, operation.Kind, displayName);
 
+            // Convert System.Text.Json.Nodes.JsonObject -> Newtonsoft JObject for unified JSON layer
+            var jSchema = JObject.Parse(jsonSchema.ToJsonString());
             tools.Add(new McpToolDefinition(
                 toolName,
                 displayName,
                 operation.Kind,
-                jsonSchema,
+                jSchema,
                 operation.ReturnsCollection,
                 isMutation,
                 description,

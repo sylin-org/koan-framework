@@ -1,0 +1,7 @@
+﻿suite: Koan.Cache.Adapter.Redis.Tests
+lane: docker
+scope: integration
+module: Cache.Adapter.Redis
+description: Integration coverage for the Redis cache adapter using containerized Redis fixtures.
+legacyProjects:
+  - Koan.Cache.Redis.Tests

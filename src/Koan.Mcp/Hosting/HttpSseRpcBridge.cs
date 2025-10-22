@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text.Json;
-using System.Text.Json.Nodes;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
@@ -15,9 +15,9 @@ namespace Koan.Mcp.Hosting;
 
 public sealed class HttpSseRpcBridge : IAsyncDisposable
 {
-    private static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web)
+    private static readonly JsonSerializerSettings SerializerSettings = new()
     {
-        PropertyNameCaseInsensitive = true
+        NullValueHandling = NullValueHandling.Ignore
     };
 
     private static readonly string[] ScopeClaimTypes =
@@ -115,7 +115,7 @@ public sealed class HttpSseRpcBridge : IAsyncDisposable
                     await HandleToolsCallAsync(envelope, cancellationToken).ConfigureAwait(false);
                     break;
                 case "ping":
-                    var pong = new JsonObject { ["jsonrpc"] = "2.0", ["id"] = CloneId(envelope.Id), ["result"] = "pong" };
+                    var pong = new JObject { ["jsonrpc"] = "2.0", ["id"] = CloneId(envelope.Id), ["result"] = "pong" };
                     _session.Enqueue(ServerSentEvent.FromJsonRpc(pong));
                     break;
                 default:
@@ -150,14 +150,14 @@ public sealed class HttpSseRpcBridge : IAsyncDisposable
             };
         }
 
-        var node = JsonSerializer.SerializeToNode(response, SerializerOptions) as JsonObject;
+        var node = JToken.FromObject(response, JsonSerializer.Create(SerializerSettings)) as JObject;
         if (node is null)
         {
             _session.Enqueue(ServerSentEvent.FromJsonRpc(CreateError(envelope.Id, -32603, "Failed to serialise response.")));
             return;
         }
 
-        var result = new JsonObject
+        var result = new JObject
         {
             ["jsonrpc"] = "2.0",
             ["id"] = CloneId(envelope.Id),
@@ -168,13 +168,13 @@ public sealed class HttpSseRpcBridge : IAsyncDisposable
 
     private async Task HandleToolsCallAsync(JsonRpcEnvelope envelope, CancellationToken cancellationToken)
     {
-        if (envelope.Params is not JsonObject parameters)
+        if (envelope.Params is not JObject parameters)
         {
             _session.Enqueue(ServerSentEvent.FromJsonRpc(CreateError(envelope.Id, -32602, "Expected params object.")));
             return;
         }
 
-        if (!parameters.TryGetPropertyValue("name", out var nameNode) || nameNode?.GetValue<string>() is not { Length: > 0 } toolName)
+        if (!parameters.TryGetValue("name", StringComparison.OrdinalIgnoreCase, out var nameNode) || nameNode?.Value<string>() is not { Length: > 0 } toolName)
         {
             _session.Enqueue(ServerSentEvent.FromJsonRpc(CreateError(envelope.Id, -32602, "Missing tool name.")));
             return;
@@ -192,8 +192,8 @@ public sealed class HttpSseRpcBridge : IAsyncDisposable
             return;
         }
 
-        JsonObject? arguments = null;
-        if (parameters.TryGetPropertyValue("arguments", out var argsNode) && argsNode is JsonObject obj)
+        JObject? arguments = null;
+        if (parameters.TryGetValue("arguments", StringComparison.OrdinalIgnoreCase, out var argsNode) && argsNode is JObject obj)
         {
             arguments = obj;
         }
@@ -205,14 +205,14 @@ public sealed class HttpSseRpcBridge : IAsyncDisposable
         };
 
         var result = await _handler.CallToolAsync(callParams, cancellationToken).ConfigureAwait(false);
-        var node = JsonSerializer.SerializeToNode(result, SerializerOptions);
+        var node = JToken.FromObject(result, JsonSerializer.Create(SerializerSettings));
         if (node is null)
         {
             _session.Enqueue(ServerSentEvent.FromJsonRpc(CreateError(envelope.Id, -32603, "Failed to serialise response.")));
             return;
         }
 
-        var response = new JsonObject
+        var response = new JObject
         {
             ["jsonrpc"] = "2.0",
             ["id"] = CloneId(envelope.Id),
@@ -286,9 +286,9 @@ public sealed class HttpSseRpcBridge : IAsyncDisposable
         return requiredScopes.All(scope => scopes.Contains(scope));
     }
 
-    private static JsonObject CreateError(JsonNode? id, int code, string message, JsonNode? data = null)
+    private static JObject CreateError(JToken? id, int code, string message, JToken? data = null)
     {
-        var error = new JsonObject
+        var error = new JObject
         {
             ["code"] = code,
             ["message"] = message
@@ -299,7 +299,7 @@ public sealed class HttpSseRpcBridge : IAsyncDisposable
             error["data"] = data;
         }
 
-        return new JsonObject
+        return new JObject
         {
             ["jsonrpc"] = "2.0",
             ["id"] = CloneId(id),
@@ -307,8 +307,8 @@ public sealed class HttpSseRpcBridge : IAsyncDisposable
         };
     }
 
-    private static JsonNode? CloneId(JsonNode? id)
-        => id is null ? null : id.DeepClone();
+    private static JToken? CloneId(JToken? id)
+        => id?.DeepClone();
 
     public async ValueTask DisposeAsync()
     {
@@ -334,4 +334,4 @@ public sealed class HttpSseRpcBridge : IAsyncDisposable
     }
 }
 
-public sealed record JsonRpcEnvelope(string Jsonrpc, string Method, JsonNode? Params, JsonNode? Id);
+public sealed record JsonRpcEnvelope(string Jsonrpc, string Method, JToken? Params, JToken? Id);

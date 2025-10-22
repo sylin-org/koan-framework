@@ -447,8 +447,7 @@ public sealed class ServiceClientAutoRegistrar : IKoanAutoRegistrar
 var builder = WebApplication.CreateBuilder(args);
 
 // Just adding the package reference auto-enables service authentication
-builder.Services.AddKoan()
-    .AsWebApi();
+builder.Services.AddKoan();
 
 var app = builder.Build();
 app.Run();

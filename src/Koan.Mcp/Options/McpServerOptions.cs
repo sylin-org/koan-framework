@@ -62,6 +62,20 @@ public sealed class McpServerOptions
     public bool PublishCapabilityEndpoint { get; set; } = true;
 
     /// <summary>
+    /// Determines how MCP capabilities are exposed to clients (Auto, Code, Tools, Full).
+    /// Auto: Detect client capabilities and adapt (default).
+    /// Code: Expose code execution only (token optimized).
+    /// Tools: Expose entity tools only (legacy compatibility).
+    /// Full: Expose both code and tools (maximum compatibility).
+    /// </summary>
+    public McpExposureMode? Exposure { get; set; }
+
+    /// <summary>
+    /// Code mode execution configuration.
+    /// </summary>
+    public CodeModeOptions? CodeMode { get; set; }
+
+    /// <summary>
     /// When supplied only entities listed here are exposed (matched against full name or simple name).
     /// </summary>
     public ISet<string> AllowedEntities { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);

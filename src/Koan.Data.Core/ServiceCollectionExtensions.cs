@@ -1,3 +1,7 @@
+using System;
+using System.Diagnostics.CodeAnalysis;
+using System.Linq;
+using System.Reflection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -11,37 +15,25 @@ namespace Koan.Data.Core;
 
 public static class ServiceCollectionExtensions
 {
-    // High-level bootstrap: AddKoan()
-    public static IServiceCollection AddKoan(this IServiceCollection services)
-    {
-        services.AddKoanCore();
-        var svc = services.AddKoanDataCore();
-        // Apply active recipes if Koan.Recipe.Abstractions is referenced
-        try
-        {
-            var ext = Type.GetType("Koan.Recipe.KoanRecipeServiceCollectionExtensions, Koan.Recipe.Abstractions");
-            var mi = ext?.GetMethod("ApplyActiveRecipes", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
-            mi?.Invoke(null, new object?[] { services });
-        }
-        catch { /* optional */ }
-        // If Koan.Data.Direct is referenced, auto-register it (no hard reference from Core)
-        try
-        {
-            // Use cached assemblies instead of bespoke AppDomain scanning
-            var directReg = AssemblyCache.Instance.GetAllAssemblies()
-                .SelectMany(a => { try { return a.GetTypes(); } catch { return Array.Empty<Type>(); } })
-                .FirstOrDefault(t => t.IsSealed && t.IsAbstract == false && t.Name == "DirectRegistration" && t.Namespace == "Koan.Data.Direct");
-            var mi = directReg?.GetMethod("AddKoanDataDirect", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
-            mi?.Invoke(null, new object?[] { services });
-        }
-        catch { /* optional */ }
-        return svc;
-    }
-
     public static IServiceCollection AddKoanDataCore(this IServiceCollection services)
     {
+        ArgumentNullException.ThrowIfNull(services);
+
         // Initialize modules (adapters, etc.) that opt-in via IKoanInitializer
-        Koan.Core.Hosting.Bootstrap.AppBootstrapper.InitializeModules(services);
+        AppBootstrapper.InitializeModules(services);
+        RegisterKoanDataCoreServices(services);
+        return services;
+    }
+
+    internal static void RegisterKoanDataCoreServices(IServiceCollection services)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+
+        if (services.Any(d => d.ServiceType == typeof(IDataService)))
+        {
+            return;
+        }
+
         services.TryAddSingleton<Configuration.IDataConnectionResolver, Configuration.DefaultDataConnectionResolver>();
         // Provide a default storage name resolver so naming works even without adapter-specific registration (e.g., JSON adapter)
         services.TryAddSingleton<Koan.Data.Abstractions.Naming.IStorageNameResolver, Koan.Data.Abstractions.Naming.DefaultStorageNameResolver>();
@@ -69,7 +61,6 @@ public static class ServiceCollectionExtensions
         // Relationship metadata scanning (ParentAttribute, etc.)
         services.TryAddSingleton<Koan.Data.Core.Relationships.IRelationshipMetadata, Koan.Data.Core.Relationships.RelationshipMetadataService>();
         Koan.Data.Core.Model.EntityMetadataProvider.RelationshipMetadataAccessor = sp => sp.GetRequiredService<Koan.Data.Core.Relationships.IRelationshipMetadata>();
-        return services;
     }
 
     // One-liner startup: builds provider, runs discovery, starts runtime (greenfield)
@@ -86,17 +77,7 @@ public static class ServiceCollectionExtensions
                 .AddJsonFile("appsettings.json", optional: true, reloadOnChange: false)
                 .AddEnvironmentVariables();
             // If Koan.Secrets.Core is referenced, auto-add the secrets configuration wrapper
-            try
-            {
-                var asm = AppDomain.CurrentDomain.GetAssemblies().FirstOrDefault(a => a.GetName().Name == "Koan.Secrets.Core");
-                var ext = asm?.GetType("Koan.Secrets.Core.Configuration.SecretResolvingConfigurationExtensions");
-                var mi = ext?.GetMethod("AddSecretsReferenceConfiguration", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
-                if (mi is not null)
-                {
-                    _ = mi.Invoke(null, new object?[] { cb, null });
-                }
-            }
-            catch { /* optional */ }
+            TryInvokeSecretsBootstrap("AddSecretsReferenceConfiguration", cb, null);
 
             var cfg = cb.Build();
             services.AddSingleton<IConfiguration>(cfg);
@@ -104,18 +85,23 @@ public static class ServiceCollectionExtensions
         var sp = services.BuildServiceProvider();
         Koan.Core.Hosting.App.AppHost.Current = sp;
         // If secrets configuration is present, upgrade from bootstrap to DI-backed resolver and emit reload
-        try
-        {
-            var asm = AppDomain.CurrentDomain.GetAssemblies().FirstOrDefault(a => a.GetName().Name == "Koan.Secrets.Core");
-            var ext = asm?.GetType("Koan.Secrets.Core.Configuration.SecretResolvingConfigurationExtensions");
-            var mi = ext?.GetMethod("UpgradeSecretsConfiguration", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
-            mi?.Invoke(null, new object?[] { sp });
-        }
-        catch { /* optional */ }
+        TryInvokeSecretsBootstrap("UpgradeSecretsConfiguration", sp);
         try { KoanEnv.TryInitialize(sp); } catch { }
         var rt = sp.GetService<Koan.Core.Hosting.Runtime.IAppRuntime>();
         rt?.Discover();
         rt?.Start();
         return sp;
+    }
+
+    [DynamicDependency(DynamicallyAccessedMemberTypes.PublicMethods, "Koan.Secrets.Core.Configuration.SecretResolvingConfigurationExtensions", "Koan.Secrets.Core")]
+    private static void TryInvokeSecretsBootstrap(string methodName, params object?[]? args)
+    {
+        try
+        {
+            var secretsType = Type.GetType("Koan.Secrets.Core.Configuration.SecretResolvingConfigurationExtensions, Koan.Secrets.Core", throwOnError: false, ignoreCase: false);
+            var method = secretsType?.GetMethod(methodName, BindingFlags.Public | BindingFlags.Static);
+            method?.Invoke(null, args ?? Array.Empty<object?>());
+        }
+        catch { /* optional */ }
     }
 }

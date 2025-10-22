@@ -1,0 +1,7 @@
+version: "3.9"
+services:
+  meridian-tesseract:
+    image: ghcr.io/hertzg/tesseract-server:latest
+    ports:
+      - "6060:8884"
+    restart: unless-stopped

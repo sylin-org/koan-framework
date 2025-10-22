@@ -1,0 +1,10 @@
+﻿global using FluentAssertions;
+global using Koan.Cache.Abstractions;
+global using Koan.Cache.Abstractions.Primitives;
+global using Koan.Cache.Abstractions.Stores;
+global using Koan.Testing.Extensions;
+global using Koan.Testing.Pipeline;
+global using Microsoft.Extensions.Configuration;
+global using Microsoft.Extensions.DependencyInjection;
+global using Microsoft.Extensions.Hosting;
+global using Xunit;

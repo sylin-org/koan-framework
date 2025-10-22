@@ -1,0 +1,71 @@
+name: koan-s6-snapvault
+services:
+  api:
+    build:
+      context: ../../..
+      dockerfile: samples/S6.SnapVault/Dockerfile
+    image: koan-s6-snapvault:dev
+    ports:
+      - "5086:5086"
+    environment:
+      ASPNETCORE_ENVIRONMENT: "Development"
+      ASPNETCORE_URLS: "http://+:5086"
+
+      # Override container-specific endpoints (not auto-discoverable from inside container)
+      Koan__Ai__Services__Ollama__0__BaseUrl: "http://ollama:11434"
+      Koan__Data__Vector__Endpoint: "http://weaviate:8080"
+    volumes:
+      - ../.Koan/Data:/app/data
+      - ../.Koan/cache:/app/cache
+      - ../.Koan/storage:/app/storage
+    depends_on:
+      mongo:
+        condition: service_healthy
+      weaviate:
+        condition: service_healthy
+      ollama:
+        condition: service_started
+
+  mongo:
+    image: mongo:latest
+    container_name: mongo-s6
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - ../.Koan/Data/mongo:/data/db
+    ports:
+      - "4906:27017"
+
+  weaviate:
+    image: semitechnologies/weaviate:latest
+    container_name: weaviate-s6
+    environment:
+      QUERY_DEFAULTS_LIMIT: "25"
+      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: "true"
+      PERSISTENCE_DATA_PATH: "/var/lib/weaviate"
+      DEFAULT_VECTORIZER_MODULE: "none"
+      # Stable single-node clustering to avoid RAFT bootstrap loops
+      CLUSTER_HOSTNAME: "node1"
+      RAFT_BOOTSTRAP_EXPECT: "1"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/v1/meta"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - ../.Koan/Data/weaviate:/var/lib/weaviate
+    ports:
+      - "5087:8080"
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama-s6
+    volumes:
+      - ../.Koan/Data/ollama-models:/root/.ollama
+    ports:
+      - "5089:11434"
+
+volumes: {}

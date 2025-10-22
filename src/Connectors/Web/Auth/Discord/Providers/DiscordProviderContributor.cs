@@ -19,7 +19,8 @@ internal sealed class DiscordProviderContributor : IAuthProviderContributor
                 TokenEndpoint = "https://discord.com/api/oauth2/token",
                 UserInfoEndpoint = "https://discord.com/api/users/@me",
                 Scopes = new[] { "identify", "email" },
-                Enabled = true
+                Enabled = true,
+                Priority = 150
             }
         };
     }

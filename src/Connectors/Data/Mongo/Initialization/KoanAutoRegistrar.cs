@@ -1,9 +1,12 @@
+using System;
+using System.Collections.Generic;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Logging.Abstractions;
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization;
 using MongoDB.Bson.Serialization.Conventions;
@@ -17,35 +20,34 @@ using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Naming;
 using Koan.Data.Connector.Mongo.Discovery;
 using Koan.Data.Connector.Mongo.Orchestration;
+using MongoItems = Koan.Data.Connector.Mongo.Infrastructure.MongoProvenanceItems;
+using ProvenanceModes = Koan.Core.Hosting.Bootstrap.ProvenancePublicationModeExtensions;
 
 namespace Koan.Data.Connector.Mongo.Initialization;
 
 public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 {
+    private static bool _staticSetupComplete;
+
     public string ModuleName => "Koan.Data.Connector.Mongo";
     public string? ModuleVersion => typeof(KoanAutoRegistrar).Assembly.GetName().Version?.ToString();
 
     public void Initialize(IServiceCollection services)
     {
-        // Configure MongoDB conventions globally at startup - disables _t discriminators
-        var pack = new ConventionPack
+        // CORE-0003: AppDomain-scoped guard for static MongoDB state
+        if (!_staticSetupComplete)
         {
-            new IgnoreExtraElementsConvention(true),
-            new NullBsonValueConvention()
-        };
-        ConventionRegistry.Register("KoanGlobalConventions", pack, _ => true);
+            lock (typeof(KoanAutoRegistrar))
+            {
+                if (!_staticSetupComplete)
+                {
+                    ConfigureMongoStaticState();
+                    _staticSetupComplete = true;
+                }
+            }
+        }
 
-        // Disable discriminators by registering custom null discriminator convention
-        // This prevents _t/_v fields from being added to documents
-        BsonSerializer.RegisterDiscriminatorConvention(
-            typeof(object),
-            new NoDiscriminatorConvention());
-
-        BsonSerializer.RegisterSerializationProvider(new JObjectSerializationProvider());
-
-        // Note: Optimized serialization will be registered lazily when repositories are created
-        // Note: Conventions handle null values, no custom serializer needed
-
+        // ServiceCollection-scoped services (run every time - naturally idempotent via TryAdd)
         services.AddKoanOptions<MongoOptions>();
         services.AddSingleton<IConfigureOptions<MongoOptions>, MongoOptionsConfigurator>();
         services.AddSingleton<MongoClientProvider>();
@@ -62,45 +64,228 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         // NEW: Register MongoDB discovery adapter (maintains "Reference = Intent")
         // Adding Koan.Data.Connector.Mongo automatically enables MongoDB discovery capabilities
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IServiceDiscoveryAdapter, MongoDiscoveryAdapter>());
+    }
+
+    private static void ConfigureMongoStaticState()
+    {
+        // Configure MongoDB conventions globally at startup - disables _t discriminators
+        var pack = new ConventionPack
+        {
+            new IgnoreExtraElementsConvention(true),
+            new NullBsonValueConvention()
+        };
+
+        try
+        {
+            ConventionRegistry.Register("KoanGlobalConventions", pack, _ => true);
+        }
+        catch (ArgumentException)
+        {
+            // Already registered - safe to ignore
+        }
+
+        // Disable discriminators by registering custom null discriminator convention
+        // This prevents _t/_v fields from being added to documents
+        try
+        {
+            BsonSerializer.RegisterDiscriminatorConvention(
+                typeof(object),
+                new NoDiscriminatorConvention());
+        }
+        catch (BsonSerializationException)
+        {
+            // Already registered - safe to ignore
+        }
+
+        try
+        {
+            BsonSerializer.RegisterSerializationProvider(new JObjectSerializationProvider());
+        }
+        catch (BsonSerializationException)
+        {
+            // Already registered - safe to ignore
+        }
 
         // Apply MongoDB GUID optimization directly for v3.5.0 compatibility
         Console.WriteLine("[MONGO-KOAN-AUTO-REGISTRAR] Applying MongoDB GUID optimization directly...");
         var optimizer = new MongoOptimizationAutoRegistrar();
-        optimizer.Initialize(services);
+        optimizer.Initialize(null!); // Optimizer doesn't use services parameter
     }
 
-    public void Describe(Koan.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)
+    public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
-        report.AddModule(ModuleName, ModuleVersion);
-
+        module.Describe(ModuleVersion);
         // Autonomous discovery adapter handles all connection string resolution
         // Boot report shows discovery results from MongoDiscoveryAdapter
 
         var availableProviders = DiscoverAvailableDataProviders();
-        report.AddNote($"Available providers: {string.Join(", ", availableProviders)}");
-        report.AddNote("MongoDB discovery handled by autonomous MongoDiscoveryAdapter");
+        module.AddNote($"Available providers: {string.Join(", ", availableProviders)}");
+        module.AddNote("MongoDB discovery handled by autonomous MongoDiscoveryAdapter");
 
-        // Configure default options for reporting
+        // Configure default options for reporting with provenance metadata
         var defaultOptions = new MongoOptions();
-        var databaseName = Configuration.ReadFirst(cfg, defaultOptions.Database,
-            Infrastructure.Constants.Configuration.Keys.Database,
-            Infrastructure.Constants.Configuration.Keys.AltDatabase);
 
-        report.AddSetting("Database", databaseName);
-        report.AddSetting("ConnectionString", "auto (resolved by discovery)", isSecret: false);
+        var connection = Configuration.ReadFirstWithSource(
+            cfg,
+            defaultOptions.ConnectionString,
+            MongoItems.ConnectionStringKeys);
 
-        // Announce schema capability per acceptance criteria
-        report.AddSetting(Infrastructure.Constants.Bootstrap.EnsureCreatedSupported, true.ToString());
+        var database = Configuration.ReadFirstWithSource(
+            cfg,
+            defaultOptions.Database,
+            MongoItems.DatabaseKeys);
 
-        // Announce paging guardrails (decision 0044)
-        var defSize = Configuration.ReadFirst(cfg, defaultOptions.DefaultPageSize,
-            Infrastructure.Constants.Configuration.Keys.DefaultPageSize,
-            Infrastructure.Constants.Configuration.Keys.AltDefaultPageSize);
-        var maxSize = Configuration.ReadFirst(cfg, defaultOptions.MaxPageSize,
-            Infrastructure.Constants.Configuration.Keys.MaxPageSize,
-            Infrastructure.Constants.Configuration.Keys.AltMaxPageSize);
-        report.AddSetting(Infrastructure.Constants.Bootstrap.DefaultPageSize, defSize.ToString());
-        report.AddSetting(Infrastructure.Constants.Bootstrap.MaxPageSize, maxSize.ToString());
+        var defaultPageSize = Configuration.ReadFirstWithSource(
+            cfg,
+            defaultOptions.DefaultPageSize,
+            MongoItems.DefaultPageSizeKeys);
+
+        var maxPageSize = Configuration.ReadFirstWithSource(
+            cfg,
+            defaultOptions.MaxPageSize,
+            MongoItems.MaxPageSizeKeys);
+
+        var username = Configuration.ReadFirstWithSource(
+            cfg,
+            string.Empty,
+            "Koan:Data:Mongo:Username",
+            "Koan:Data:Username");
+
+        var password = Configuration.ReadFirstWithSource(
+            cfg,
+            string.Empty,
+            "Koan:Data:Mongo:Password",
+            "Koan:Data:Password");
+
+        var effectiveConnectionString = ResolveConnectionStringForReporting(
+            cfg,
+            defaultOptions,
+            connection,
+            database.Value ?? defaultOptions.Database,
+            username.Value,
+            password.Value);
+
+        var connectionIsAuto = string.IsNullOrWhiteSpace(connection.Value) || string.Equals(connection.Value, "auto", StringComparison.OrdinalIgnoreCase);
+        var connectionSourceKey = connection.ResolvedKey ?? MongoItems.ConnectionString.Key;
+        var connectionMode = connectionIsAuto
+            ? ProvenanceModes.FromBootSource(BootSettingSource.Auto, usedDefault: true)
+            : ProvenanceModes.FromConfigurationValue(connection);
+
+        Publish(
+            module,
+            MongoItems.ConnectionString,
+            connection,
+            displayOverride: effectiveConnectionString,
+            modeOverride: connectionMode,
+            usedDefaultOverride: connectionIsAuto ? true : connection.UsedDefault,
+            sourceKeyOverride: connectionSourceKey);
+
+        Publish(module, MongoItems.Database, database, database.Value ?? defaultOptions.Database);
+
+        module.AddSetting(
+            MongoItems.EnsureCreatedSupported,
+            ProvenanceModes.FromBootSource(BootSettingSource.Auto, usedDefault: true),
+            true,
+            usedDefault: true,
+            sanitizeOverride: false);
+
+        Publish(module, MongoItems.DefaultPageSize, defaultPageSize);
+
+        Publish(module, MongoItems.MaxPageSize, maxPageSize);
+    }
+
+    private static void Publish<T>(Koan.Core.Provenance.ProvenanceModuleWriter module, ProvenanceItem item, Koan.Core.ConfigurationValue<T> value, object? displayOverride = null, ProvenancePublicationMode? modeOverride = null, bool? usedDefaultOverride = null, string? sourceKeyOverride = null, bool? sanitizeOverride = null)
+    {
+        module.AddSetting(
+            item,
+            modeOverride ?? ProvenanceModes.FromConfigurationValue(value),
+            displayOverride ?? value.Value,
+            sourceKey: sourceKeyOverride ?? value.ResolvedKey,
+            usedDefault: usedDefaultOverride ?? value.UsedDefault,
+            sanitizeOverride: sanitizeOverride);
+    }
+
+    private static string ResolveConnectionStringForReporting(
+        IConfiguration? configuration,
+        MongoOptions defaults,
+    Koan.Core.ConfigurationValue<string> configuredConnection,
+        string? database,
+        string? username,
+        string? password)
+    {
+        if (!string.IsNullOrWhiteSpace(configuredConnection.Value) &&
+            !string.Equals(configuredConnection.Value, "auto", StringComparison.OrdinalIgnoreCase))
+        {
+            return configuredConnection.Value!;
+        }
+
+        var resolvedDatabase = string.IsNullOrWhiteSpace(database) ? defaults.Database : database!;
+        var safeConfiguration = configuration ?? new ConfigurationBuilder().AddInMemoryCollection().Build();
+
+        try
+        {
+            var adapter = new MongoDiscoveryAdapter(safeConfiguration, NullLogger<MongoDiscoveryAdapter>.Instance);
+
+            var parameters = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+            if (!string.IsNullOrWhiteSpace(resolvedDatabase))
+            {
+                parameters["database"] = resolvedDatabase;
+            }
+
+            if (!string.IsNullOrWhiteSpace(username))
+            {
+                parameters["username"] = username!;
+            }
+
+            if (!string.IsNullOrWhiteSpace(password))
+            {
+                parameters["password"] = password!;
+            }
+
+            var context = new DiscoveryContext
+            {
+                OrchestrationMode = KoanEnv.OrchestrationMode,
+                Configuration = safeConfiguration,
+                HealthCheckTimeout = TimeSpan.FromMilliseconds(500),
+                Parameters = parameters.Count > 0 ? parameters : null
+            };
+
+            var result = adapter.DiscoverAsync(context).GetAwaiter().GetResult();
+            if (result.IsSuccessful && !string.IsNullOrWhiteSpace(result.ServiceUrl))
+            {
+                return result.ServiceUrl!;
+            }
+        }
+        catch
+        {
+            // Discovery failures fall back to defaults below.
+        }
+
+        return BuildFallbackConnectionString(defaults, resolvedDatabase, username, password);
+    }
+
+    private static string BuildFallbackConnectionString(
+        MongoOptions defaults,
+        string? database,
+        string? username,
+        string? password)
+    {
+        var fallback = defaults.ConnectionString;
+        if (!string.IsNullOrWhiteSpace(fallback) &&
+            !string.Equals(fallback, "auto", StringComparison.OrdinalIgnoreCase))
+        {
+            return fallback;
+        }
+
+        var auth = string.IsNullOrWhiteSpace(username)
+            ? string.Empty
+            : $"{username}:{password ?? string.Empty}@";
+
+        var databaseSegment = string.IsNullOrWhiteSpace(database)
+            ? defaults.Database
+            : database!;
+
+        return $"mongodb://{auth}localhost:27017/{databaseSegment}";
     }
 
     private static string[] DiscoverAvailableDataProviders()
@@ -149,6 +334,7 @@ public class NullBsonValueConvention : IMemberMapConvention
         }
     }
 }
+
 
 
 

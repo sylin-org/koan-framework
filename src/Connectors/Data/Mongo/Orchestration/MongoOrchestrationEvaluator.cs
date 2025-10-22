@@ -5,6 +5,7 @@ using MongoDB.Driver;
 using Koan.Core;
 using Koan.Core.Orchestration;
 using Koan.Data.Connector.Mongo.Infrastructure;
+using MongoItems = Koan.Data.Connector.Mongo.Infrastructure.MongoProvenanceItems;
 
 namespace Koan.Data.Connector.Mongo.Orchestration;
 
@@ -25,11 +26,8 @@ public class MongoOrchestrationEvaluator : BaseOrchestrationEvaluator
     protected override bool IsServiceEnabled(IConfiguration configuration)
     {
         // MongoDB is enabled if connection string is configured (including "auto")
-        var connectionString = Configuration.ReadFirst(configuration, "",
-            Constants.Configuration.Keys.ConnectionString,
-            Constants.Configuration.Keys.AltConnectionString,
-            Constants.Configuration.Keys.ConnectionStringsMongo,
-            Constants.Configuration.Keys.ConnectionStringsDefault);
+        var connectionString = Configuration.ReadFirst(configuration, string.Empty,
+            MongoItems.ConnectionStringKeys);
 
         return !string.IsNullOrWhiteSpace(connectionString);
     }
@@ -37,11 +35,8 @@ public class MongoOrchestrationEvaluator : BaseOrchestrationEvaluator
     protected override bool HasExplicitConfiguration(IConfiguration configuration)
     {
         // Check for explicit connection strings (not "auto")
-        var connectionString = Configuration.ReadFirst(configuration, "",
-            Constants.Configuration.Keys.ConnectionString,
-            Constants.Configuration.Keys.AltConnectionString,
-            Constants.Configuration.Keys.ConnectionStringsMongo,
-            Constants.Configuration.Keys.ConnectionStringsDefault);
+        var connectionString = Configuration.ReadFirst(configuration, string.Empty,
+            MongoItems.ConnectionStringKeys);
 
         return !string.IsNullOrWhiteSpace(connectionString) &&
                !string.Equals(connectionString.Trim(), "auto", StringComparison.OrdinalIgnoreCase);

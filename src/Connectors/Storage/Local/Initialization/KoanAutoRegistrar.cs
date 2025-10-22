@@ -7,6 +7,7 @@ using Koan.Storage;
 using Koan.Storage.Abstractions;
 using Koan.Storage.Connector.Local;
 using Koan.Storage.Connector.Local.Infrastructure;
+using Koan.Core.Hosting.Bootstrap;
 
 namespace Koan.Storage.Connector.Local.Initialization;
 
@@ -22,12 +23,13 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         services.AddSingleton<IStorageProvider, LocalStorageProvider>();
     }
 
-    public void Describe(Koan.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)
+    public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
-        report.AddModule(ModuleName, ModuleVersion);
+        module.Describe(ModuleVersion);
         var basePath = Core.Configuration.Read(cfg, $"{LocalStorageConstants.Configuration.Section}:{LocalStorageConstants.Configuration.Keys.BasePath}", string.Empty) ?? string.Empty;
-        report.AddSetting("BasePath", string.IsNullOrWhiteSpace(basePath) ? "(not set)" : basePath);
-        report.AddSetting("Capabilities", "seek=true, range=true, presign=false, copy=true");
+        module.AddSetting("BasePath", string.IsNullOrWhiteSpace(basePath) ? "(not set)" : basePath);
+        module.AddSetting("Capabilities", "seek=true, range=true, presign=false, copy=true");
     }
 }
+
 

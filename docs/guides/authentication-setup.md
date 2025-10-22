@@ -233,7 +233,7 @@ public class AdminController : ControllerBase
     [Authorize(Policy = "AdminOnly")]
     public async Task<IActionResult> AssignRole(string id, [FromBody] string role)
     {
-        var user = await User.ById(id);
+    var user = await User.Get(id);
         if (user == null) return NotFound();
 
         user.Roles = user.Roles.Append(role).Distinct().ToArray();

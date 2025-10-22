@@ -1,0 +1,7 @@
+﻿suite: Koan.Data.Connector.Mongo.Tests
+lane: docker
+scope: connector
+module: Data.Connector.Mongo
+description: Integration coverage for the Mongo data connector validating CRUD, partition routing, batching, instructions, and capability probes.
+legacyProjects:
+  - Koan.Data.Mongo.Tests

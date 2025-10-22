@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
@@ -7,8 +7,10 @@
     <RootNamespace>S5.Recs</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\src\Koan.Admin\Koan.Admin.csproj" />
     <ProjectReference Include="..\..\src\Koan.Core\Koan.Core.csproj" />
     <ProjectReference Include="..\..\src\Koan.Core.Adapters\Koan.Core.Adapters.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Web.Admin\Koan.Web.Admin.csproj" />
     <ProjectReference Include="..\..\src\Koan.Web\Koan.Web.csproj" />
     <ProjectReference Include="..\..\src\Connectors\Web\Swagger\Koan.Web.Connector.Swagger.csproj" />
     <ProjectReference Include="..\..\src\Koan.Data.Core\Koan.Data.Core.csproj" />
@@ -29,9 +31,6 @@
     <!-- Backup and Restore Web API -->
     <ProjectReference Include="..\..\src\Koan.Web.Backup\Koan.Web.Backup.csproj" />
     <ProjectReference Include="..\..\src\Koan.Web.Extensions\Koan.Web.Extensions.csproj" />
-  </ItemGroup>
-  <ItemGroup>
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
   </ItemGroup>
 </Project>
 

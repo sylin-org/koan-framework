@@ -105,7 +105,35 @@ public class OptimizedRestoreService : IRestoreService
         // Load backup manifest to get entity list
         var manifest = await LoadBackupManifest(backupName, options.StorageProfile, ct);
 
+        // Check manifest integrity
+        if (manifest.Status == BackupStatus.Failed && !options.AllowPartialRestore)
+        {
+            var error = "Backup manifest indicates failed backup. Set AllowPartialRestore = true to attempt partial restore of successful entities.";
+            _logger.LogError(error);
+            throw new InvalidOperationException(error);
+        }
+
+        if (manifest.Status == BackupStatus.Failed)
+        {
+            _logger.LogWarning("Backup manifest indicates failed backup. Attempting partial restore of successful entities.");
+        }
+
+        // Filter entities: exclude failed ones, apply user filters
+        var failedEntities = manifest.Entities
+            .Where(e => !string.IsNullOrEmpty(e.ErrorMessage))
+            .ToList();
+
+        if (failedEntities.Any())
+        {
+            _logger.LogWarning("Skipping {FailedCount} failed entities during restore:", failedEntities.Count);
+            foreach (var failed in failedEntities)
+            {
+                _logger.LogWarning("  - {EntityType}: {ErrorMessage}", failed.EntityType, failed.ErrorMessage);
+            }
+        }
+
         var entitiesToRestore = manifest.Entities
+            .Where(e => string.IsNullOrEmpty(e.ErrorMessage)) // Only restore successful entities
             .Where(e => ShouldIncludeEntity(e, options))
             .ToList();
 
@@ -444,7 +472,9 @@ public class OptimizedRestoreService : IRestoreService
         if (backup != null)
         {
             // Generate the expected backup path based on the backup metadata
-            return $"backups/{backup.Name}-{backup.CreatedAt:yyyyMMdd-HHmmss}.zip";
+            return !string.IsNullOrWhiteSpace(backup.ArchiveStorageKey)
+                ? backup.ArchiveStorageKey
+                : BackupArchiveNaming.Create(backup.Name, backup.CreatedAt).StorageKey;
         }
 
         // If not found by name, try to discover backups in the specified storage profile
@@ -455,7 +485,9 @@ public class OptimizedRestoreService : IRestoreService
 
         if (backup != null)
         {
-            return $"backups/{backup.Name}-{backup.CreatedAt:yyyyMMdd-HHmmss}.zip";
+            return !string.IsNullOrWhiteSpace(backup.ArchiveStorageKey)
+                ? backup.ArchiveStorageKey
+                : BackupArchiveNaming.Create(backup.Name, backup.CreatedAt).StorageKey;
         }
 
         throw new InvalidOperationException($"Backup '{backupName}' not found in storage profile '{storageProfile}'");

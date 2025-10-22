@@ -311,7 +311,6 @@ var backupOrders = await Order.All();
 |--------|---------|------------|--------------|
 | **S1.Web** | Basic CRUD demo | Simple | Todo management, basic relationships |
 | **S5.Recs** | AI + Vector search | Advanced | Recommendation engine, Weaviate, AI integration |
-| **S7.TechDocs** | Content platform | Medium | Authentication, moderation, Swagger |
 | **S10.DevPortal** | **Framework showcase** | **Demo-focused** | **Multi-provider, capability detection, live switching** |
 
 S10.DevPortal is unique in providing **live demonstration** of framework capabilities rather than domain-specific functionality.

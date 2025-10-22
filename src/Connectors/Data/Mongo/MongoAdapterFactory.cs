@@ -33,24 +33,28 @@ public sealed class MongoAdapterFactory : IDataAdapterFactory
     {
         var config = sp.GetRequiredService<IConfiguration>();
         var sourceRegistry = sp.GetRequiredService<DataSourceRegistry>();
-        var baseOptions = sp.GetRequiredService<IOptionsMonitor<MongoOptions>>().CurrentValue;
         var resolver = sp.GetRequiredService<IStorageNameResolver>();
+        var globalOptions = sp.GetRequiredService<IOptionsMonitor<MongoOptions>>();
+
+        if (string.IsNullOrWhiteSpace(source) || string.Equals(source, "Default", StringComparison.OrdinalIgnoreCase))
+        {
+            // Reuse the DI-managed provider so readiness monitoring and discovery outputs stay in sync.
+            var sharedProvider = sp.GetRequiredService<MongoClientProvider>();
+            return new MongoRepository<TEntity, TKey>(sharedProvider, globalOptions, resolver, sp);
+        }
+
+        var baseOptions = globalOptions.CurrentValue;
 
         // Resolve source-specific connection string
-        // If base options already have a connection (from discovery) and no specific source requested, use it
-        string connectionString;
-        if ((string.IsNullOrWhiteSpace(source) || string.Equals(source, "Default", StringComparison.OrdinalIgnoreCase))
-            && !string.IsNullOrWhiteSpace(baseOptions.ConnectionString))
+        var connectionString = AdapterConnectionResolver.ResolveConnectionString(
+            config,
+            sourceRegistry,
+            "Mongo",
+            source);
+
+        if (string.IsNullOrWhiteSpace(connectionString))
         {
             connectionString = baseOptions.ConnectionString;
-        }
-        else
-        {
-            connectionString = AdapterConnectionResolver.ResolveConnectionString(
-                config,
-                sourceRegistry,
-                "Mongo",
-                source);
         }
 
         // Create source-specific options

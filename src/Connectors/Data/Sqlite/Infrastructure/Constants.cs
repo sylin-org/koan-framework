@@ -20,6 +20,13 @@ public static class Constants
             public const string MaxPageSize = Section + ":MaxPageSize";
             public const string AltMaxPageSize = AltSection + ":MaxPageSize";
 
+            // Naming and connection metadata
+            public const string NamingStyle = Section + ":NamingStyle";
+            public const string AltNamingStyle = AltSection + ":NamingStyle";
+            public const string Separator = Section + ":Separator";
+            public const string AltSeparator = AltSection + ":Separator";
+            public const string EnsureCreatedSupported = Section + ":EnsureCreatedSupported";
+
             // Schema governance
             public const string DdlPolicy = Section + ":DdlPolicy"; // AutoCreate | Validate | NoDdl
             public const string AltDdlPolicy = AltSection + ":DdlPolicy";

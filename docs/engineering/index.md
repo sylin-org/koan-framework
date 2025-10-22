@@ -26,6 +26,8 @@ validation:
 
 - [Packaging policy](packaging.md)
 - [Logging visual standardization](logging-visual-standardization.md)
+- [Test authoring guidance](test-authoring.md)
+- [Configuration provenance descriptors](provenance-configuration-descriptors.md)
 - [Architecture principles](../architecture/principles.md)
 - [Documentation posture (ARCH-0041)](../decisions/ARCH-0041-docs-posture-instructions-over-tutorials.md)
 - [Script-owned versioning (BUILD-0072)](../decisions/BUILD-0072-script-owned-versioning.md)

@@ -20,6 +20,7 @@ public interface IRecsService
         double? ratingMax,
         int? yearMin,
         int? yearMax,
+        double? alpha,
         CancellationToken ct);
     Task RateAsync(string userId, string mediaId, int rating, CancellationToken ct);
 }

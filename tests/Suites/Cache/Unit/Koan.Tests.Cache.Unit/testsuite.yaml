@@ -1,0 +1,7 @@
+﻿suite: Koan.Tests.Cache.Unit
+lane: fast
+scope: unit
+module: Koan.Cache
+description: Unit specifications for cache client, options, instrumentation, and helpers.
+legacyProjects:
+  - Koan.Cache.Tests

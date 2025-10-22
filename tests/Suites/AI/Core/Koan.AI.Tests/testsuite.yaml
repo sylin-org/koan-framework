@@ -1,0 +1,5 @@
+﻿suite: Koan.AI.Tests
+lane: fast
+scope: unit
+module: Koan.AI
+description: Unit specifications covering AI conversation builder and router behaviors.

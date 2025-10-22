@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using System.Globalization;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -15,6 +17,7 @@ using Koan.Data.Abstractions;
 using Koan.Data.Connector.Couchbase.Discovery;
 using Koan.Data.Connector.Couchbase.Infrastructure;
 using Koan.Data.Connector.Couchbase.Orchestration;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Koan.Data.Connector.Couchbase.Initialization;
 
@@ -38,13 +41,12 @@ public sealed class CouchbaseAutoRegistrar : IKoanAutoRegistrar
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IServiceDiscoveryAdapter, CouchbaseDiscoveryAdapter>());
     }
 
-    public void Describe(BootReport report, IConfiguration cfg, IHostEnvironment env)
+    public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
-        report.AddModule(ModuleName, ModuleVersion);
-
+        module.Describe(ModuleVersion);
         // Autonomous discovery adapter handles all connection string resolution
         // Boot report shows discovery results from CouchbaseDiscoveryAdapter
-        report.AddNote("Couchbase discovery handled by autonomous CouchbaseDiscoveryAdapter");
+        module.AddNote("Couchbase discovery handled by autonomous CouchbaseDiscoveryAdapter");
 
         // Use centralized boot reporting with adapter-specific callback
         var options = AdapterBootReporting.ConfigureForBootReportWithConfigurator<CouchbaseOptions, CouchbaseOptionsConfigurator>(
@@ -52,14 +54,40 @@ public sealed class CouchbaseAutoRegistrar : IKoanAutoRegistrar
             (config, readiness) => new CouchbaseOptionsConfigurator(config),
             () => new CouchbaseOptions());
 
-        report.ReportAdapterConfiguration(ModuleName, ModuleVersion, options,
-            (r, o) => {
+        module.ReportAdapterConfiguration(ModuleName, ModuleVersion, options,
+            (m, o) => {
                 // Couchbase-specific settings
-                r.ReportConnectionString(ModuleName, "auto (resolved by discovery)");
-                r.ReportStorageTargets(ModuleName, o.Bucket, o.Collection, o.Scope);
-                r.ReportPerformanceSettings(ModuleName, queryTimeout: o.QueryTimeout);
-                r.AddSetting($"{ModuleName}:DurabilityLevel", o.DurabilityLevel ?? "<default>");
-                r.AddSetting(Constants.Bootstrap.EnsureCreatedSupported, true.ToString());
+                var connectionParameters = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+                if (!string.IsNullOrWhiteSpace(o.Bucket)) connectionParameters["bucket"] = o.Bucket!;
+                if (!string.IsNullOrWhiteSpace(o.Username)) connectionParameters["username"] = o.Username!;
+                if (!string.IsNullOrWhiteSpace(o.Password)) connectionParameters["password"] = o.Password!;
+
+                var connectionString = ResolveCouchbaseConnectionString(cfg, o.ConnectionString, connectionParameters);
+                m.ReportConnectionString(ModuleName, connectionString);
+                m.ReportStorageTargets(ModuleName, o.Bucket, o.Collection, o.Scope);
+                m.ReportPerformanceSettings(ModuleName, queryTimeout: o.QueryTimeout);
+                m.AddSetting($"{ModuleName}:DurabilityLevel", o.DurabilityLevel ?? "<default>");
+                m.AddSetting(Constants.Bootstrap.EnsureCreatedSupported, true.ToString());
             });
     }
+
+    private static string ResolveCouchbaseConnectionString(
+        IConfiguration configuration,
+        string? configuredConnection,
+        IDictionary<string, object> parameters)
+    {
+        if (!string.IsNullOrWhiteSpace(configuredConnection) &&
+            !string.Equals(configuredConnection, "auto", StringComparison.OrdinalIgnoreCase))
+        {
+            return configuredConnection!;
+        }
+
+        var adapter = new CouchbaseDiscoveryAdapter(configuration, NullLogger<CouchbaseDiscoveryAdapter>.Instance);
+        return AdapterBootReporting.ResolveConnectionString(
+            configuration,
+            adapter,
+            parameters,
+            () => "couchbase://localhost");
+    }
 }
+

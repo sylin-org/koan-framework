@@ -66,8 +66,14 @@ public class StreamingBackupService : IBackupService
             _activeBackups[manifest.Id] = progress;
 
             // Create backup archive
-            var (archiveStream, backupPath) = await _storageService.CreateBackupArchiveAsync(
-                backupName, options.StorageProfile, ct);
+            var (archiveStream, descriptor) = await _storageService.CreateBackupArchiveAsync(
+                backupName,
+                manifest.CreatedAt,
+                ct);
+
+            manifest.StorageProfile = options.StorageProfile;
+            manifest.ArchiveStorageKey = descriptor.StorageKey;
+            manifest.ArchiveFileName = descriptor.FileName;
 
             using var archive = new ZipArchive(archiveStream, ZipArchiveMode.Create);
 
@@ -108,11 +114,14 @@ public class StreamingBackupService : IBackupService
 
             // Upload to storage
             archive.Dispose(); // Close the archive
-            var contentHash = await _storageService.UploadBackupArchiveAsync(
-                archiveStream, backupPath, options.StorageProfile, ct);
+            var storageObject = await _storageService.UploadBackupArchiveAsync(
+                archiveStream,
+                descriptor,
+                options.StorageProfile,
+                ct);
 
-            manifest.Verification.OverallChecksum = contentHash;
-
+            manifest.Verification.ArchiveContentHash = storageObject.ContentHash ?? string.Empty;
+            manifest.Verification.ArchiveSizeBytes = storageObject.Size;
             // Update final progress
             progress.Status = BackupStatus.Completed;
             progress.ElapsedTime = stopwatch.Elapsed;
@@ -156,9 +165,23 @@ public class StreamingBackupService : IBackupService
         // Ensure all entities are discovered and warmed up
         await _discoveryService.WarmupAllEntitiesAsync(ct);
 
+        // Build backup inventory to get policies
+        var inventory = await _discoveryService.BuildInventoryAsync(ct);
+
+        // Filter to only included entities (respecting backup policy)
         var allEntities = _discoveryService.GetDiscoveredEntities()
             .Where(e => ShouldIncludeEntity(e, options))
+            .Where(e => inventory.IncludedEntities.Any(p => p.EntityType == e.EntityType))
             .ToList();
+
+        // Log warnings about uncovered entities
+        if (inventory.HasWarnings)
+        {
+            foreach (var warning in inventory.Warnings)
+            {
+                _logger.LogWarning(warning);
+            }
+        }
 
         var manifest = new BackupManifest
         {
@@ -192,8 +215,14 @@ public class StreamingBackupService : IBackupService
             _activeBackups[manifest.Id] = progress;
 
             // Create backup archive
-            var (archiveStream, backupPath) = await _storageService.CreateBackupArchiveAsync(
-                backupName, options.StorageProfile, ct);
+            var (archiveStream, descriptor) = await _storageService.CreateBackupArchiveAsync(
+                backupName,
+                manifest.CreatedAt,
+                ct);
+
+            manifest.StorageProfile = options.StorageProfile;
+            manifest.ArchiveStorageKey = descriptor.StorageKey;
+            manifest.ArchiveFileName = descriptor.FileName;
 
             using var archive = new ZipArchive(archiveStream, ZipArchiveMode.Create);
 
@@ -203,7 +232,10 @@ public class StreamingBackupService : IBackupService
             {
                 ct.ThrowIfCancellationRequested();
 
-                var result = await BackupEntityByReflection(archive, entityInfo, options, ct);
+                // Get policy for this entity
+                var policy = inventory.IncludedEntities.FirstOrDefault(p => p.EntityType == entityInfo.EntityType);
+
+                var result = await BackupEntityByReflection(archive, entityInfo, policy, options, ct);
                 results.Add(result);
 
                 // Update progress
@@ -216,25 +248,43 @@ public class StreamingBackupService : IBackupService
             }
             manifest.Entities = results.Where(r => r != null).ToList()!;
 
+            // Check if any entities failed
+            var failedEntities = manifest.Entities.Where(e => !string.IsNullOrEmpty(e.ErrorMessage)).ToList();
+            if (failedEntities.Any())
+            {
+                _logger.LogWarning("Backup completed with {FailedCount} failed entities", failedEntities.Count);
+                manifest.Status = BackupStatus.Failed;
+                manifest.Verification.ValidationErrors.AddRange(
+                    failedEntities.Select(e => $"Entity {e.EntityType} failed: {e.ErrorMessage}"));
+            }
+
             // Calculate totals
             manifest.Verification.TotalItemCount = manifest.Entities.Sum(e => e.ItemCount);
             manifest.Verification.TotalSizeBytes = manifest.Entities.Sum(e => e.SizeBytes);
             manifest.Verification.OverallChecksum = _storageService.ComputeOverallChecksum(manifest.Entities);
 
-            // Finalize manifest
+            // Finalize manifest (Status may already be Failed if entities failed)
             manifest.CompletedAt = DateTimeOffset.UtcNow;
             manifest.Duration = stopwatch.Elapsed;
-            manifest.Status = BackupStatus.Completed;
+            if (manifest.Status != BackupStatus.Failed)
+            {
+                manifest.Status = BackupStatus.Completed;
+            }
 
             // Store manifest and verification
             await _storageService.StoreManifestAsync(archive, manifest, ct);
             await _storageService.StoreVerificationAsync(archive, manifest, ct);
 
             // Upload to storage
-            archive.Dispose();
-            var contentHash = await _storageService.UploadBackupArchiveAsync(
-                archiveStream, backupPath, options.StorageProfile, ct);
+            archive.Dispose(); // Close the archive
+            var storageObject = await _storageService.UploadBackupArchiveAsync(
+                archiveStream,
+                descriptor,
+                options.StorageProfile,
+                ct);
 
+            manifest.Verification.ArchiveContentHash = storageObject.ContentHash ?? string.Empty;
+            manifest.Verification.ArchiveSizeBytes = storageObject.Size;
             // Update final progress
             progress.Status = BackupStatus.Completed;
             progress.BytesProcessed = manifest.Verification.TotalSizeBytes;
@@ -309,6 +359,7 @@ public class StreamingBackupService : IBackupService
     private async Task<EntityBackupInfo?> BackupEntityByReflection(
         ZipArchive archive,
         EntityTypeInfo entityInfo,
+        EntityBackupPolicy? policy,
         GlobalBackupOptions options,
         CancellationToken ct)
     {
@@ -331,6 +382,31 @@ public class StreamingBackupService : IBackupService
                 ct);
 
             backupInfo.BackupDuration = stopwatch.Elapsed;
+
+            // Apply backup policy metadata
+            if (policy != null)
+            {
+                backupInfo.Encrypt = policy.Encrypt;
+                backupInfo.IncludeSchema = policy.IncludeSchema;
+
+                _logger.LogDebug("Applied backup policy to {EntityType}: Encrypt={Encrypt}, IncludeSchema={IncludeSchema}",
+                    entityInfo.EntityType.Name, policy.Encrypt, policy.IncludeSchema);
+            }
+
+            // Validate backup integrity
+            if (backupInfo.ItemCount == 0 && string.IsNullOrWhiteSpace(backupInfo.ErrorMessage))
+            {
+                _logger.LogWarning("Entity {EntityType} backup completed with 0 items - may indicate empty dataset or misconfiguration",
+                    entityInfo.EntityType.Name);
+            }
+
+            if (string.IsNullOrWhiteSpace(backupInfo.StorageFile))
+            {
+                var error = $"Backup completed but StorageFile is empty for entity {entityInfo.EntityType.Name}";
+                _logger.LogError(error);
+                backupInfo.ErrorMessage = error;
+            }
+
             return backupInfo;
         }
         catch (Exception ex)
@@ -341,7 +417,9 @@ public class StreamingBackupService : IBackupService
                 EntityType = entityInfo.EntityType.Name,
                 KeyType = entityInfo.KeyType.Name,
                 Provider = entityInfo.Provider,
-                ErrorMessage = ex.Message
+                ErrorMessage = ex.Message,
+                Encrypt = policy?.Encrypt ?? false,
+                IncludeSchema = policy?.IncludeSchema ?? true
             };
         }
     }

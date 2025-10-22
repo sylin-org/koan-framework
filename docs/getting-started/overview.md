@@ -127,21 +127,24 @@ You now have REST CRUD, health checks, telemetry, and SQLite storage without con
   ```powershell
   dotnet add package Koan.AI.Ollama
   ```
-- Inject `IAiService` for chat + semantic search:
+- Inject `IAi` for chat + semantic search:
 
   ```csharp
   public class TodosController : EntityController<Todo>
   {
-      private readonly IAiService _ai;
-      public TodosController(IAiService ai) => _ai = ai;
+    private readonly IAi _ai;
+    public TodosController(IAi ai) => _ai = ai;
 
       [HttpPost("{id}/suggestions")]
       public async Task<ActionResult<string>> GetSuggestions(string id)
       {
           var todo = await Todo.Get(id);
           if (todo is null) return NotFound();
-          var suggestion = await _ai.Chat($"What should I do after completing: {todo.Title}?
-          return Ok(suggestion);
+      var suggestion = await _ai.ChatAsync(new AiChatRequest
+      {
+        Messages = [ new() { Role = AiMessageRole.User, Content = $"What should I do after completing: {todo.Title}?" } ]
+      });
+      return Ok(suggestion.Choices?.FirstOrDefault()?.Message?.Content);
       }
 
     [HttpGet("semantic-search")]

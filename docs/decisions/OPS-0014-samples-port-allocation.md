@@ -17,11 +17,22 @@ Reserve contiguous blocks of 10 ports per sample starting at 5034 (visual hint t
 
 - Range start: 5034
 - Block size: 10 per sample
-- Assignments (initial):
+- Assignments:
+  - S0: 5034 (block 5034–5039). Console app, no HTTP.
   - S1: 5044 (block 5040–5049). HTTP binds to 5044.
-  - S2: 5054 (block 5050–5059). HTTP binds to 5054. Mongo is addressed by service name in compose (no host port mapping).
-  - S5: 5084 (block 5080–5089). HTTP binds to 5084.
-  - Future samples: increment the block (S3 → 5060–5069, S4 → 5070–5079, ...).
+  - S2: 5054 (block 5050–5059). ~~ARCHIVED~~ - freed for future use.
+  - S3: 5064 (block 5060–5069). Reserved for S3.NotifyHub.
+  - S4: 5074 (block 5070–5079). ~~ARCHIVED (S4.Web)~~ - Reserved for S4.DevHub.
+  - S5: 5084 (block 5080–5089). HTTP binds to 5084 (S5.Recs).
+  - S6: 5094 (block 5090–5099). ~~ARCHIVED (S6.Auth, S6.SocialCreator)~~ - Reserved for S6.MediaHub.
+  - S7: 5104 (block 5100–5109). Reserved for future sample.
+  - S8: 5114 (block 5110–5119). HTTP binds to 5114 (S8.Canon).
+  - S9: 5124 (block 5120–5129). Reserved for S9.OrderFlow.
+  - S10: 5134 (block 5130–5139). HTTP binds to 5134 (S10.DevPortal).
+  - S12: 5154 (block 5150–5159). ~~ARCHIVED~~
+  - S14: 5174 (block 5170–5179). HTTP binds to 5174 (S14.AdapterBench).
+  - S15: 5184 (block 5180–5189). ~~ARCHIVED~~
+  - S16: 5194 (block 5190–5199). HTTP binds to 5194 (S16.PantryPal).
 
 ## Consequences
 - Lower chance of conflicts with common dev ports.

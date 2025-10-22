@@ -148,6 +148,69 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
             }
         }, ct);
 
+    public Task<IReadOnlyList<TEntity?>> GetManyAsync(IEnumerable<TKey> ids, CancellationToken ct = default)
+        => ExecuteWithReadinessAsync(async () =>
+        {
+            ct.ThrowIfCancellationRequested();
+            using var act = CouchbaseTelemetry.Activity.StartActivity("couchbase.get.many");
+            act?.SetTag("entity", typeof(TEntity).FullName);
+
+            var idList = ids as IReadOnlyList<TKey> ?? ids.ToList();
+            if (idList.Count == 0)
+            {
+                return (IReadOnlyList<TEntity?>)Array.Empty<TEntity?>();
+            }
+
+            var ctx = await ResolveCollectionAsync(ct).ConfigureAwait(false);
+
+            // Build list of keys for batch get
+            var keys = idList.Select(id => GetKey(id)).ToList();
+
+            try
+            {
+                // Couchbase supports batch get via GetAsync for multiple keys
+                var tasks = keys.Select(key => ctx.Collection.GetAsync(key, new GetOptions().CancellationToken(ct)));
+                var allResults = await Task.WhenAll(tasks).ConfigureAwait(false);
+
+                // Build dictionary for O(1) lookup
+                var entityMap = new Dictionary<TKey, TEntity>();
+                for (var i = 0; i < allResults.Length; i++)
+                {
+                    if (allResults[i] != null)
+                    {
+                        entityMap[idList[i]] = allResults[i].ContentAs<TEntity>();
+                    }
+                }
+
+                // Preserve order and include nulls
+                var results = new TEntity?[idList.Count];
+                for (var i = 0; i < idList.Count; i++)
+                {
+                    results[i] = entityMap.TryGetValue(idList[i], out var entity) ? entity : null;
+                }
+
+                return (IReadOnlyList<TEntity?>)results;
+            }
+            catch (DocumentNotFoundException)
+            {
+                // Some documents don't exist - return nulls for missing
+                var results = new TEntity?[idList.Count];
+                for (var i = 0; i < idList.Count; i++)
+                {
+                    try
+                    {
+                        var result = await ctx.Collection.GetAsync(keys[i], new GetOptions().CancellationToken(ct)).ConfigureAwait(false);
+                        results[i] = result.ContentAs<TEntity>();
+                    }
+                    catch (DocumentNotFoundException)
+                    {
+                        results[i] = null;
+                    }
+                }
+                return (IReadOnlyList<TEntity?>)results;
+            }
+        }, ct);
+
     public Task<IReadOnlyList<TEntity>> QueryAsync(object? query, CancellationToken ct = default)
         => ExecuteWithReadinessAsync(() => QueryInternalAsync(query, null, ct), ct);
 
@@ -195,54 +258,49 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
         return await ExecuteQueryAsync(ctx, statement, definition, options, ct).ConfigureAwait(false);
     }
 
-    public Task<int> CountAsync(object? query, CancellationToken ct = default)
+    public Task<CountResult> CountAsync(CountRequest<TEntity> request, CancellationToken ct = default)
         => ExecuteWithReadinessAsync(async () =>
         {
             ct.ThrowIfCancellationRequested();
+            using var act = CouchbaseTelemetry.Activity.StartActivity("couchbase.count");
+            act?.SetTag("entity", typeof(TEntity).FullName);
             var ctx = await ResolveCollectionAsync(ct).ConfigureAwait(false);
+
+            CouchbaseQueryDefinition? definition = null;
             string statement;
-            CouchbaseQueryDefinition? def = null;
-            if (query is CouchbaseQueryDefinition definition)
+
+            if (request.Predicate is not null)
             {
-                statement = $"SELECT RAW COUNT(*) FROM ({definition.Statement}) AS sub";
-                def = new CouchbaseQueryDefinition(statement)
+                if (!CouchbaseLinqQueryTranslator.TryTranslate<TEntity, TKey>(request.Predicate, _optimizationInfo, out var translation))
                 {
-                    Parameters = definition.Parameters
+                    throw new NotSupportedException($"Unable to translate expression '{request.Predicate}' to N1QL for Couchbase.");
+                }
+
+                statement = $"SELECT RAW COUNT(*) FROM .. AS doc WHERE {translation.WhereClause}";
+                definition = new CouchbaseQueryDefinition(statement)
+                {
+                    Parameters = translation.Parameters.ToDictionary(static kvp => kvp.Key, static kvp => kvp.Value)
                 };
             }
-            else if (query is string str && !string.IsNullOrWhiteSpace(str))
+            else if (request.ProviderQuery is CouchbaseQueryDefinition providerDef)
             {
-                statement = $"SELECT RAW COUNT(*) FROM ({str}) AS sub";
+                statement = $"SELECT RAW COUNT(*) FROM ({providerDef.Statement}) AS sub";
+                definition = new CouchbaseQueryDefinition(statement)
+                {
+                    Parameters = providerDef.Parameters
+                };
+            }
+            else if (!string.IsNullOrWhiteSpace(request.RawQuery))
+            {
+                statement = $"SELECT RAW COUNT(*) FROM ({request.RawQuery}) AS sub";
             }
             else
             {
-                statement = $"SELECT RAW COUNT(*) FROM `{ctx.BucketName}`.`{ctx.ScopeName}`.`{ctx.CollectionName}`";
+                statement = $"SELECT RAW COUNT(*) FROM ..";
             }
-
-            var result = await ExecuteScalarQueryAsync<long>(ctx, statement, def, ct).ConfigureAwait(false);
-            return (int)result;
-        }, ct);
-
-    public Task<int> CountAsync(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
-        => ExecuteWithReadinessAsync(async () =>
-        {
-            ct.ThrowIfCancellationRequested();
-            using var act = CouchbaseTelemetry.Activity.StartActivity("couchbase.count.linq");
-            act?.SetTag("entity", typeof(TEntity).FullName);
-            var ctx = await ResolveCollectionAsync(ct).ConfigureAwait(false);
-            if (!CouchbaseLinqQueryTranslator.TryTranslate<TEntity, TKey>(predicate, _optimizationInfo, out var translation))
-            {
-                throw new NotSupportedException($"Unable to translate expression '{predicate}' to N1QL for Couchbase.");
-            }
-
-            var statement = $"SELECT RAW COUNT(*) FROM `{ctx.BucketName}`.`{ctx.ScopeName}`.`{ctx.CollectionName}` AS doc WHERE {translation.WhereClause}";
-            var definition = new CouchbaseQueryDefinition(statement)
-            {
-                Parameters = translation.Parameters.ToDictionary(static kvp => kvp.Key, static kvp => kvp.Value)
-            };
 
             var result = await ExecuteScalarQueryAsync<long>(ctx, statement, definition, ct).ConfigureAwait(false);
-            return (int)result;
+            return CountResult.Exact(result);
         }, ct);
 
     public Task<TEntity> UpsertAsync(TEntity model, CancellationToken ct = default)
@@ -356,6 +414,22 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
             {
                 count++;
             }
+            return count;
+        }, ct);
+
+    public Task<long> RemoveAllAsync(RemoveStrategy strategy, CancellationToken ct = default)
+        => ExecuteWithReadinessAsync(async () =>
+        {
+            ct.ThrowIfCancellationRequested();
+            var ctx = await ResolveCollectionAsync(ct).ConfigureAwait(false);
+            var statement = $"DELETE FROM `{ctx.BucketName}`.`{ctx.ScopeName}`.`{ctx.CollectionName}` RETURNING META().id";
+            var count = 0L;
+            await foreach (var _ in ExecuteQueryAsync<dynamic>(ctx, statement, null, null, ct).ConfigureAwait(false))
+            {
+                count++;
+            }
+            // No fast path available - bucket flush requires admin permissions
+            // Optimized and Fast both use same implementation (Safe)
             return count;
         }, ct);
 

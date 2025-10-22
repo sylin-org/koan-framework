@@ -1,7 +1,5 @@
 using System;
 using System.IO;
-using System.Text.Json;
-using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
 using Koan.Core;
@@ -9,6 +7,8 @@ using Koan.Mcp.Options;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace Koan.Mcp.Hosting;
 
@@ -149,12 +149,14 @@ public sealed class HttpSseTransport
             return Results.NotFound(new { error = "session_not_found" });
         }
 
-        JsonNode? payload;
+        JToken? payload;
         try
         {
-            payload = await JsonNode.ParseAsync(context.Request.Body, cancellationToken: context.RequestAborted).ConfigureAwait(false);
+            using var reader = new StreamReader(context.Request.Body);
+            using var jsonReader = new JsonTextReader(reader);
+            payload = await JToken.ReadFromAsync(jsonReader, context.RequestAborted).ConfigureAwait(false);
         }
-        catch (JsonException ex)
+        catch (JsonReaderException ex)
         {
             _logger.LogWarning(ex, "Invalid JSON payload submitted to MCP HTTP+SSE RPC endpoint.");
             return Results.BadRequest(new { error = "invalid_json" });
@@ -200,27 +202,31 @@ public sealed class HttpSseTransport
         return null;
     }
 
-    private static bool TryCreateEnvelope(JsonNode node, out JsonRpcEnvelope envelope, out string? error)
+    private static bool TryCreateEnvelope(JToken node, out JsonRpcEnvelope envelope, out string? error)
     {
         envelope = default!;
         error = null;
 
-        if (node is not JsonObject obj)
+        if (node is not JObject obj)
         {
             error = "Payload must be a JSON object.";
             return false;
         }
 
         var methodNode = obj["method"];
-        if (methodNode?.GetValue<string>() is not { Length: > 0 } method)
+        if (methodNode?.Type == JTokenType.String && methodNode.Value<string>() is { Length: > 0 } method)
+        {
+            // ok
+        }
+        else
         {
             error = "Missing method.";
             return false;
         }
 
-        var jsonRpc = obj["jsonrpc"]?.GetValue<string>() ?? "2.0";
-        var parameters = obj.TryGetPropertyValue("params", out var paramsNode) ? paramsNode : null;
-        var id = obj.TryGetPropertyValue("id", out var idNode) ? idNode : null;
+        var jsonRpc = obj["jsonrpc"]?.Value<string>() ?? "2.0";
+        var parameters = obj.TryGetValue("params", out var paramsNode) ? paramsNode : null;
+        var id = obj.TryGetValue("id", out var idNode) ? idNode : null;
 
         envelope = new JsonRpcEnvelope(jsonRpc, method, parameters, id);
         return true;

@@ -1,20 +1,21 @@
 @echo off
 setlocal
-REM Simple start for S1.Web: optional URL, run in foreground (shows logs), open browser after short delay.
 
-set "URL=%~1"
-if "%URL%"=="" set "URL=http://localhost:5044"
+set "SCRIPT_DIR=%~dp0"
+pushd "%SCRIPT_DIR%" >nul
 
-pushd "%~dp0"
+set "DOTNET_ENVIRONMENT=Development"
+set "ASPNETCORE_ENVIRONMENT=Development"
+if not defined ASPNETCORE_URLS set "ASPNETCORE_URLS=http://localhost:4998"
 
-REM Best-effort: stop any previous published EXE (safe to ignore failures)
-taskkill /F /IM "S1.Web.exe" /T >nul 2>nul
+set "DOTNET_CMD=dotnet run --project ""S1.Web.csproj"" --no-launch-profile"
 
-REM Open the browser after a short delay; avoid complex health checks for simplicity
-start "" cmd /c "timeout /t 2 >nul & start "" "%URL%""
+if not "%~1"=="" (
+    set "DOTNET_CMD=%DOTNET_CMD% -- %*"
+)
 
-echo Running S1.Web at %URL% (press Ctrl+C to stop). Logs will appear below.
-dotnet run -p:UseAppHost=false --urls "%URL%"
+start "" cmd /c "%DOTNET_CMD%"
 
 popd
 endlocal
+exit /b 0

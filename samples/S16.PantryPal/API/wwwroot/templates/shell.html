@@ -1,0 +1,37 @@
+﻿<header class="hidden md:block sticky top-0 z-30 bg-white/80 backdrop-blur-sm ring-1 ring-gray-200" ng-controller="ShellCtrl">
+  <div class="max-w-7xl mx-auto px-4 h-16 flex items-center gap-6">
+    <div class="shrink-0 font-semibold text-gray-900">PantryPal</div>
+    <div class="flex-1 max-w-xl">
+      <input type="search" placeholder="Search pantry (q=)" class="w-full rounded-xl bg-white ring-1 ring-gray-200 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary-400" ng-model="qTop" ng-keydown="$event.key==='Enter' && (location.href='#/pantry?q='+encodeURIComponent(qTop||''))">
+    </div>
+    <nav class="flex items-center gap-4 text-sm text-gray-700">
+      <a href="#/dashboard" ng-class="{'text-primary-600':isActive('/dashboard')}">Dashboard</a>
+      <a href="#/pantry" ng-class="{'text-primary-600':isActive('/pantry')}">Pantry</a>
+      <a href="#/capture" ng-class="{'text-primary-600':isActive('/capture')}">Capture</a>
+      <a href="#/meals" ng-class="{'text-primary-600':isActive('/meals')}">Meals</a>
+      <a href="#/insights" ng-class="{'text-primary-600':isActive('/insights')}">Insights</a>
+      <a href="#/shopping-list" ng-class="{'text-primary-600':isActive('/shopping-list')}">Shopping</a>
+      <a href="#/behind-the-scenes" class="text-gray-500">Behind</a>
+    </nav>
+  </div>
+  <div class="border-t border-gray-100"></div>
+</header>
+
+<main class="max-w-7xl mx-auto px-2 md:px-4 py-6 md:py-8">
+  <div ng-view></div>
+  
+</main>
+
+<!-- Bottom nav mobile -->
+<nav class="md:hidden fixed bottom-0 inset-x-0 bg-white/90 backdrop-blur border-t shadow-sm">
+  <div class="grid grid-cols-6 text-xs text-center text-gray-500">
+    <a href="#/dashboard" class="py-2" ng-class="{'text-primary-600':isActive('/dashboard')}">Home</a>
+    <a href="#/pantry" class="py-2" ng-class="{'text-primary-600':isActive('/pantry')}">Pantry</a>
+    <a href="#/capture" class="py-2" ng-class="{'text-primary-600':isActive('/capture')}">Capture</a>
+    <a href="#/meals" class="py-2" ng-class="{'text-primary-600':isActive('/meals')}">Meals</a>
+    <a href="#/insights" class="py-2" ng-class="{'text-primary-600':isActive('/insights')}">Insights</a>
+    <a href="#/shopping-list" class="py-2" ng-class="{'text-primary-600':isActive('/shopping-list')}">Shop</a>
+  </div>
+</nav>
+
+<toast-container></toast-container>

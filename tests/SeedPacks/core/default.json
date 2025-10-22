@@ -1,0 +1,11 @@
+﻿{
+  "jsonSamples": {
+    "canonicalCandidate": "{\"b\":2,\"a\":1,\"c\":{\"y\":2,\"x\":1},\"arr\":[{\"k\":2,\"a\":1},{\"k\":1}] }",
+    "mergeStrong": "{\"arr\":[1,2],\"name\":\"a\",\"obj\":{\"x\":1}}",
+    "mergeWeak": "{\"arr\":[9,8,7],\"name\":\"b\",\"obj\":{\"x\":2,\"y\":3}}",
+    "replaceWeak": "{\"a\":[9]}",
+    "concatWeak": "{\"a\":[9]}",
+    "arrayByKeyStrong": "{\"items\":[{\"id\":\"a\",\"v\":1},{\"id\":\"b\",\"v\":2}]}",
+    "arrayByKeyWeak": "{\"items\":[{\"id\":\"b\",\"v\":9,\"extra\":1},{\"id\":\"c\",\"v\":3}]}"
+  }
+}

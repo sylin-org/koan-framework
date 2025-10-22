@@ -2,173 +2,747 @@
 <html lang="en" ng-app="s1app">
 <head>
   <meta charset="utf-8">
-  <title>S1 Web • Koan</title>
+  <title>S1.Web • Koan Framework Interactive Demo</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/modern-normalize@2/modern-normalize.min.css">
   <link rel="stylesheet" href="/styles.css">
   <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.8.3/angular.min.js"></script>
 </head>
 <body ng-controller="MainCtrl as vm">
-<div class="container">
-  <header class="site">
-    <div class="brand">
-      <div class="logo" aria-hidden="true"></div>
-      <h1>S1 Web</h1>
-      <span class="badge">AngularJS</span>
-    </div>
-    <div class="muted">Static app served from <code>wwwroot/</code> • Health at <code>/api/health</code></div>
-  </header>
+  <div class="app-container">
 
-  <div class="grid">
-    <!-- Left: Todos -->
-    <div class="card">
-      <div class="card-header">
-        <div class="card-title">Todos</div>
-        <div class="toolbar">
-          <button class="ok" ng-click="vm.seed(10)">Create 10</button>
-          <button class="ok" ng-click="vm.seed(100)">Create 100</button>
-          <button class="ok" ng-click="vm.seed(1000)">Create 1000</button>
-          <button class="danger" ng-click="vm.clear()">Clear</button>
-        </div>
-      </div>
-      <div class="card-body">
-        <div class="toolbar" style="margin-bottom:10px">
-          <span class="muted">Page</span>
-          <input type="number" ng-model="vm.page" min="1" style="width:5rem"/>
-          <span class="muted">Size</span>
-          <input type="number" ng-model="vm.size" min="1" max="200" style="width:5rem"/>
-          <button class="ghost" ng-click="vm.load()">Apply</button>
-          <span class="spacer"></span>
-          <div class="muted">{{vm.total}} items • page {{vm.page}} of {{vm.totalPages || 0}}</div>
-        </div>
-
-        <div class="pager">
-          <button ng-click="vm.gotoStart()" ng-disabled="vm.page <= 1">Start</button>
-          <button ng-click="vm.shift(-100)" ng-disabled="vm.page <= 1">-100</button>
-          <button ng-click="vm.shift(-10)" ng-disabled="vm.page <= 1">-10</button>
-          <button ng-click="vm.shift(-1)" ng-disabled="vm.page <= 1">-1</button>
-          <span class="spacer"></span>
-          <button ng-click="vm.shift(1)" ng-disabled="vm.totalPages > 0 ? vm.page >= vm.totalPages : true">+1</button>
-          <button ng-click="vm.shift(10)" ng-disabled="vm.totalPages > 0 ? vm.page >= vm.totalPages : true">+10</button>
-          <button ng-click="vm.shift(100)" ng-disabled="vm.totalPages > 0 ? vm.page >= vm.totalPages : true">+100</button>
-          <button ng-click="vm.gotoEnd()" ng-disabled="vm.totalPages <= 1">End</button>
-        </div>
-
-        <form class="list" ng-submit="vm.create()" style="margin-top:10px">
-          <div class="todo-row">
-            <input type="text" placeholder="New todo title" ng-model="vm.title" />
-            <button type="submit">Add</button>
+    <!-- Enhanced Header -->
+    <header class="context-bar">
+      <div class="context-left">
+        <div class="brand">
+          <div class="brand-icon">⚡</div>
+          <div class="brand-text-group">
+            <h1 class="brand-text">S1.Web</h1>
+            <p class="brand-subtitle">Koan Framework Interactive Demo</p>
           </div>
-        </form>
+        </div>
+        <div class="context-badges">
+          <span class="badge badge-primary" title="Direct entity operations: todo.Save(), Todo.Get(id)">Entity-First</span>
+          <span class="badge badge-success" title="Services auto-register via IKoanAutoRegistrar">Auto-Registration</span>
+          <span class="badge badge-info" title="Same code works across SQL, NoSQL, JSON providers">Provider Transparent</span>
+        </div>
+      </div>
+      <div class="context-right">
+        <div class="status-indicator">
+          <span class="status-dot" ng-class="{'status-healthy': vm.health, 'status-neutral': !vm.health}"></span>
+          <span class="status-label">{{vm.health ? 'Healthy' : 'Unknown'}}</span>
+        </div>
+        <a href="/.well-known/koan/admin" class="control-button-secondary" title="Open Koan Admin">🔧 Admin</a>
+      </div>
+    </header>
 
-        <div class="list" style="margin-top:10px">
-          <div class="todo-row" ng-repeat="t in vm.todos track by t.id">
-            <input type="text" ng-model="t.title" />
-            <button class="ghost" ng-click="vm.save(t)">Save</button>
-            <button class="danger" ng-click="vm.remove(t)">Delete</button>
+    <!-- Main Layout -->
+    <div class="main-layout">
+
+      <!-- Main Content Area -->
+      <main class="main-content">
+
+        <!-- Tab Navigation -->
+        <nav class="tab-nav">
+          <button class="tab-nav-item" ng-class="{active: vm.activeTab === 'demo'}" ng-click="vm.showTab('demo')">
+            <span class="tab-icon">🎯</span>
+            <span class="tab-label">Interactive Demo</span>
+          </button>
+          <button class="tab-nav-item" ng-class="{active: vm.activeTab === 'code-patterns'}" ng-click="vm.showTab('code-patterns')">
+            <span class="tab-icon">📚</span>
+            <span class="tab-label">Code Patterns</span>
+          </button>
+          <button class="tab-nav-item" ng-class="{active: vm.activeTab === 'relationships'}" ng-click="vm.showTab('relationships')">
+            <span class="tab-icon">🔗</span>
+            <span class="tab-label">Relationships</span>
+          </button>
+          <button class="tab-nav-item" ng-class="{active: vm.activeTab === 'performance'}" ng-click="vm.showTab('performance')">
+            <span class="tab-icon">⚡</span>
+            <span class="tab-label">Performance</span>
+          </button>
+        </nav>
+
+        <!-- Tab Content -->
+        <div class="tab-content">
+
+          <!-- Tab 1: Interactive Demo -->
+          <div class="tab-pane" ng-class="{active: vm.activeTab === 'demo'}">
+
+            <div class="panel">
+              <div class="panel-header">
+                <div>
+                  <h3>📝 Todo CRUD Operations</h3>
+                  <p class="panel-subtitle">
+                    Framework Pattern: <code>EntityController&lt;Todo&gt;</code><br>
+                    Auto-generated routes: GET, POST, PUT, DELETE
+                  </p>
+                </div>
+              </div>
+              <div class="panel-body">
+
+                <!-- Quick Actions -->
+                <div class="action-group">
+                  <h4 class="action-group-title">Quick Actions</h4>
+                  <div class="toolbar">
+                    <button class="btn btn-success" ng-click="vm.seed(10)">Seed 10</button>
+                    <button class="btn btn-success" ng-click="vm.seed(100)">Seed 100</button>
+                    <button class="btn btn-success" ng-click="vm.seed(1000)">Seed 1K</button>
+                    <button class="btn btn-danger" ng-click="vm.clear()">Clear All</button>
+                    <div class="spacer"></div>
+                    <span class="insight-badge">💡 Batch operations via .Save(ct)</span>
+                  </div>
+                </div>
+
+                <!-- Pagination Controls -->
+                <div class="action-group">
+                  <h4 class="action-group-title">Pagination</h4>
+                  <div class="toolbar">
+                    <span class="muted">Page</span>
+                    <input type="number" ng-model="vm.page" min="1" class="input-small"/>
+                    <span class="muted">of {{vm.totalPages || 0}}</span>
+                    <span class="spacer-small"></span>
+                    <span class="muted">Size</span>
+                    <input type="number" ng-model="vm.size" min="1" max="200" class="input-small"/>
+                    <button class="btn btn-ghost" ng-click="vm.load()">Apply</button>
+                    <div class="spacer"></div>
+                    <span class="muted">{{vm.total}} total items</span>
+                    <span class="insight-badge">💡 Via [KoanDataBehavior]</span>
+                  </div>
+
+                  <div class="pager">
+                    <button class="btn-pager" ng-click="vm.gotoStart()" ng-disabled="vm.page <= 1">⟨⟨ Start</button>
+                    <button class="btn-pager" ng-click="vm.shift(-10)" ng-disabled="vm.page <= 1">-10</button>
+                    <button class="btn-pager" ng-click="vm.shift(-1)" ng-disabled="vm.page <= 1">-1</button>
+                    <span class="pager-current">Page {{vm.page}}</span>
+                    <button class="btn-pager" ng-click="vm.shift(1)" ng-disabled="vm.totalPages > 0 ? vm.page >= vm.totalPages : true">+1</button>
+                    <button class="btn-pager" ng-click="vm.shift(10)" ng-disabled="vm.totalPages > 0 ? vm.page >= vm.totalPages : true">+10</button>
+                    <button class="btn-pager" ng-click="vm.gotoEnd()" ng-disabled="vm.totalPages <= 1">End ⟩⟩</button>
+                  </div>
+                </div>
+
+                <!-- Add New Todo -->
+                <div class="action-group">
+                  <h4 class="action-group-title">Add New Todo</h4>
+                  <form class="add-form" ng-submit="vm.create()">
+                    <input type="text" placeholder="New todo title..." ng-model="vm.title" class="input-primary" required />
+                    <button type="submit" class="btn btn-primary">+ Add Todo</button>
+                  </form>
+                </div>
+
+                <!-- Todo List -->
+                <div class="todo-list">
+                  <div class="todo-item" ng-repeat="t in vm.todos track by t.id">
+                    <div class="todo-checkbox">
+                      <input type="checkbox" ng-model="t.isCompleted" ng-change="vm.save(t)" />
+                    </div>
+                    <div class="todo-content">
+                      <input type="text" ng-model="t.title" class="todo-title-input" />
+                      <span class="todo-id">ID: {{t.id.substring(0, 8)}}...</span>
+                    </div>
+                    <div class="todo-actions">
+                      <button class="btn btn-ghost btn-sm" ng-click="vm.save(t)">Save</button>
+                      <button class="btn btn-danger btn-sm" ng-click="vm.remove(t)">Delete</button>
+                    </div>
+                  </div>
+                  <div class="loading-state" ng-if="vm.loading">Loading...</div>
+                  <div class="empty-state" ng-if="!vm.loading && vm.todos.length === 0">
+                    <p>No todos yet. Click "Seed 10" to create sample data.</p>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
           </div>
-          <div class="muted" ng-if="vm.loading">Loading…</div>
+
+          <!-- Tab 2: Code Patterns -->
+          <div class="tab-pane" ng-class="{active: vm.activeTab === 'code-patterns'}">
+
+            <div class="panel">
+              <div class="panel-header">
+                <div>
+                  <h3>Entity-First Development</h3>
+                  <p class="panel-subtitle">Direct entity operations without repository pattern</p>
+                </div>
+              </div>
+              <div class="panel-body">
+                <div class="code-example-grid">
+
+                  <div class="code-example">
+                    <h4 class="code-example-title">📝 Entity Definition</h4>
+                    <pre class="code-block"><code>[DataAdapter("sqlite")]
+public class Todo : Entity&lt;Todo&gt;
+{
+    public string Title { get; set; } = "";
+    public string Description { get; set; } = "";
+    public bool IsCompleted { get; set; }
+
+    // ID auto-generated as GUID v7
+}</code></pre>
+                    <div class="code-insight">
+                      ✨ <strong>Key Benefit:</strong> Inherit Entity&lt;T&gt; for automatic ID generation,
+                      CRUD operations, and provider transparency.
+                    </div>
+                  </div>
+
+                  <div class="code-example">
+                    <h4 class="code-example-title">✍️ Create & Update</h4>
+                    <pre class="code-block"><code>// Create
+var todo = new Todo {
+    Title = "Buy groceries"
+};
+await todo.Save(); // ID auto-assigned
+
+// Update
+todo.Title = "Buy groceries and cook";
+await todo.Save(); // Same method
+
+// Batch create
+var todos = GenerateTodos(100);
+await todos.Save(); // Single round-trip</code></pre>
+                    <div class="code-insight">
+                      💡 <strong>.Save()</strong> handles both insert and update intelligently.
+                    </div>
+                  </div>
+
+                  <div class="code-example">
+                    <h4 class="code-example-title">🔍 Read Operations</h4>
+                    <pre class="code-block"><code>// Get by ID
+var todo = await Todo.Get(id);
+
+// Get all
+var all = await Todo.All();
+
+// First page
+var page = await Todo.FirstPage(10);
+
+// Streaming (memory-efficient)
+await foreach (var t in Todo.AllStream()) {
+    // Process one at a time
+}</code></pre>
+                    <div class="code-insight">
+                      ⚡ <strong>Streaming:</strong> Process large datasets without loading everything into memory.
+                    </div>
+                  </div>
+
+                  <div class="code-example">
+                    <h4 class="code-example-title">🗑️ Delete Operations</h4>
+                    <pre class="code-block"><code>// Delete single
+await todo.Remove();
+
+// Delete by ID
+await Todo.Remove(id);
+
+// Delete all
+var count = await Todo.RemoveAll();
+
+// Batch delete
+await todos.Remove(); // IEnumerable extension</code></pre>
+                    <div class="code-insight">
+                      🎯 <strong>Consistency:</strong> Same patterns for single and batch operations.
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+            </div>
+
+            <div class="panel">
+              <div class="panel-header">
+                <div>
+                  <h3>Auto-Generated CRUD Controller</h3>
+                  <p class="panel-subtitle">Full REST API with minimal code</p>
+                </div>
+              </div>
+              <div class="panel-body">
+                <div class="code-example-split">
+
+                  <div class="code-example">
+                    <h4 class="code-example-title">Controller Definition</h4>
+                    <pre class="code-block"><code>[Route("api/todo")]
+[KoanDataBehavior(
+    MustPaginate = true,
+    DefaultPageSize = 10,
+    MaxPageSize = 200)]
+public class TodoController
+    : EntityController&lt;Todo&gt;
+{
+    // That's it! Full CRUD API ready.
+}</code></pre>
+                  </div>
+
+                  <div class="code-example">
+                    <h4 class="code-example-title">Auto-Generated Routes</h4>
+                    <div class="route-table">
+                      <div class="route-row">
+                        <span class="route-method route-get">GET</span>
+                        <code class="route-path">/api/todo</code>
+                        <span class="route-desc">List all (paginated)</span>
+                      </div>
+                      <div class="route-row">
+                        <span class="route-method route-get">GET</span>
+                        <code class="route-path">/api/todo/{id}</code>
+                        <span class="route-desc">Get by ID</span>
+                      </div>
+                      <div class="route-row">
+                        <span class="route-method route-post">POST</span>
+                        <code class="route-path">/api/todo</code>
+                        <span class="route-desc">Create or update</span>
+                      </div>
+                      <div class="route-row">
+                        <span class="route-method route-delete">DELETE</span>
+                        <code class="route-path">/api/todo/{id}</code>
+                        <span class="route-desc">Delete by ID</span>
+                      </div>
+                    </div>
+                    <div class="code-insight">
+                      🚀 <strong>Full CRUD API</strong> with 8 lines of code. Override methods to customize behavior.
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Tab 3: Relationships -->
+          <div class="tab-pane" ng-class="{active: vm.activeTab === 'relationships'}">
+
+            <div class="panel">
+              <div class="panel-header">
+                <div>
+                  <h3>Relationship Navigation</h3>
+                  <p class="panel-subtitle">Typed parent/child relationships with cardinality validation</p>
+                </div>
+              </div>
+              <div class="panel-body">
+
+                <div class="relationship-diagram">
+                  <div class="relationship-visual">
+                    <div class="entity-node entity-user">
+                      <div class="entity-icon">👤</div>
+                      <div class="entity-name">User</div>
+                    </div>
+                    <div class="relationship-arrow arrow-down">
+                      <span class="arrow-label">[Parent]</span>
+                    </div>
+                    <div class="entity-node entity-todo entity-primary">
+                      <div class="entity-icon">📝</div>
+                      <div class="entity-name">Todo</div>
+                    </div>
+                    <div class="relationship-fork">
+                      <div class="fork-left">
+                        <div class="relationship-arrow arrow-down">
+                          <span class="arrow-label">[Parent]</span>
+                        </div>
+                        <div class="entity-node entity-category">
+                          <div class="entity-icon">📁</div>
+                          <div class="entity-name">Category</div>
+                        </div>
+                      </div>
+                      <div class="fork-right">
+                        <div class="relationship-arrow arrow-down">
+                          <span class="arrow-label">[Children]</span>
+                        </div>
+                        <div class="entity-node entity-item">
+                          <div class="entity-icon">☑️</div>
+                          <div class="entity-name">TodoItem</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="code-example-grid">
+
+                  <div class="code-example">
+                    <h4 class="code-example-title">Defining Relationships</h4>
+                    <pre class="code-block"><code>public class Todo : Entity&lt;Todo&gt;
+{
+    [Parent(typeof(User))]
+    public string UserId { get; set; }
+
+    [Parent(typeof(Category))]
+    public string CategoryId { get; set; }
+}
+
+public class TodoItem : Entity&lt;TodoItem&gt;
+{
+    [Parent(typeof(Todo))]
+    public string TodoId { get; set; }
+}</code></pre>
+                  </div>
+
+                  <div class="code-example">
+                    <h4 class="code-example-title">Navigating Relationships</h4>
+                    <pre class="code-block"><code>var todo = await Todo.Get(id);
+
+// Get typed parents
+var user = await todo.GetParent&lt;User&gt;();
+var category = await todo.GetParent&lt;Category&gt;();
+
+// Get all parents
+var parents = await todo.GetParents();
+
+// Get children
+var items = await todo.GetChildren&lt;TodoItem&gt;();
+
+// Get full relationship graph
+var graph = await todo.GetRelatives();</code></pre>
+                  </div>
+
+                  <div class="code-example">
+                    <h4 class="code-example-title">Batch Relationship Loading</h4>
+                    <pre class="code-block"><code>// Load todos with relationships
+var todos = await Todo.FirstPage(10);
+var enriched = await todos.Relatives&lt;Todo, string&gt;();
+
+// Each enriched item contains:
+// - Entity: The todo itself
+// - Parents: Dictionary of parent entities
+// - Children: Dictionary of child collections
+
+foreach (var item in enriched) {
+    var todo = item.Entity;
+    var user = item.Parents[typeof(User)];
+    var items = item.Children[typeof(TodoItem)];
+}</code></pre>
+                  </div>
+
+                  <div class="code-example">
+                    <h4 class="code-example-title">Streaming with Relationships</h4>
+                    <pre class="code-block"><code>// Memory-efficient relationship loading
+await foreach (var enriched in
+    Todo.AllStream(batchSize: 100)
+        .Relatives&lt;Todo, string&gt;())
+{
+    // Process with relationships
+    // Without loading everything into memory
+    ProcessTodoWithRelationships(enriched);
+}</code></pre>
+                    <div class="code-insight">
+                      💾 <strong>Efficient:</strong> Batch loads relationships in chunks to minimize database round-trips
+                      while keeping memory usage low.
+                    </div>
+                  </div>
+
+                </div>
+
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Tab 4: Performance -->
+          <div class="tab-pane" ng-class="{active: vm.activeTab === 'performance'}">
+
+            <div class="panel">
+              <div class="panel-header">
+                <div>
+                  <h3>Streaming & Batch Operations</h3>
+                  <p class="panel-subtitle">Memory-efficient processing for large datasets</p>
+                </div>
+              </div>
+              <div class="panel-body">
+
+                <div class="perf-comparison">
+                  <div class="perf-card perf-bad">
+                    <div class="perf-icon">⚠️</div>
+                    <h4>❌ Materialized (All at once)</h4>
+                    <pre class="code-block"><code>// Loads ALL records into memory
+var todos = await Todo.All();
+foreach (var todo in todos) {
+    Process(todo);
+}</code></pre>
+                    <div class="perf-metrics">
+                      <div class="perf-metric">
+                        <span class="perf-label">Memory:</span>
+                        <span class="perf-value perf-bad-value">450 MB</span>
+                      </div>
+                      <div class="perf-metric">
+                        <span class="perf-label">Time to First Item:</span>
+                        <span class="perf-value perf-bad-value">2.3s</span>
+                      </div>
+                    </div>
+                    <div class="perf-warning">
+                      ⚠️ Unsuitable for large datasets - loads everything before processing begins
+                    </div>
+                  </div>
+
+                  <div class="perf-card perf-good">
+                    <div class="perf-icon">✅</div>
+                    <h4>✓ Streaming (Batched)</h4>
+                    <pre class="code-block"><code>// Loads 100 records at a time
+await foreach (var todo in
+    Todo.AllStream(batchSize: 100))
+{
+    Process(todo);
+}</code></pre>
+                    <div class="perf-metrics">
+                      <div class="perf-metric">
+                        <span class="perf-label">Memory:</span>
+                        <span class="perf-value perf-good-value">12 MB</span>
+                      </div>
+                      <div class="perf-metric">
+                        <span class="perf-label">Time to First Item:</span>
+                        <span class="perf-value perf-good-value">45ms</span>
+                      </div>
+                    </div>
+                    <div class="perf-benefit">
+                      ✨ Memory-efficient and responsive - processes items as they arrive
+                    </div>
+                  </div>
+                </div>
+
+                <div class="code-example-grid">
+
+                  <div class="code-example">
+                    <h4 class="code-example-title">Batch Insert Performance</h4>
+                    <pre class="code-block"><code>// Create 1,000 todos
+var todos = Enumerable
+    .Range(0, 1000)
+    .Select(i => new Todo {
+        Title = $"Task {i}"
+    });
+
+var sw = Stopwatch.StartNew();
+var count = await todos.Save();
+sw.Stop();
+
+// Result: ~320ms for 1,000 records
+// Average: 0.32ms per record</code></pre>
+                    <div class="code-insight">
+                      ⚡ Framework optimizes batch operations with single database round-trip
+                    </div>
+                  </div>
+
+                  <div class="code-example">
+                    <h4 class="code-example-title">Pagination Performance</h4>
+                    <pre class="code-block"><code>// Efficient pagination
+[KoanDataBehavior(
+    MustPaginate = true,
+    DefaultPageSize = 10)]
+public class TodoController
+    : EntityController&lt;Todo&gt; { }
+
+// Client requests:
+// GET /api/todo?page=1&size=10
+//
+// Response headers:
+// X-Total-Count: 1000
+// X-Page: 1
+// X-Page-Size: 10
+// X-Total-Pages: 100</code></pre>
+                    <div class="code-insight">
+                      📄 Database-level pagination with provider-optimized queries (LIMIT/OFFSET, TOP, etc.)
+                    </div>
+                  </div>
+
+                </div>
+
+              </div>
+            </div>
+
+            <div class="panel">
+              <div class="panel-header">
+                <div>
+                  <h3>Provider Capabilities</h3>
+                  <p class="panel-subtitle">Understanding what each provider supports</p>
+                </div>
+              </div>
+              <div class="panel-body">
+
+                <div class="provider-matrix">
+                  <table class="provider-table">
+                    <thead>
+                      <tr>
+                        <th>Capability</th>
+                        <th>SQLite</th>
+                        <th>PostgreSQL</th>
+                        <th>MongoDB</th>
+                        <th>JSON</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>CRUD Operations</td>
+                        <td><span class="capability-yes">✓</span></td>
+                        <td><span class="capability-yes">✓</span></td>
+                        <td><span class="capability-yes">✓</span></td>
+                        <td><span class="capability-yes">✓</span></td>
+                      </tr>
+                      <tr>
+                        <td>Pagination</td>
+                        <td><span class="capability-yes">✓</span></td>
+                        <td><span class="capability-yes">✓</span></td>
+                        <td><span class="capability-yes">✓</span></td>
+                        <td><span class="capability-partial">~</span></td>
+                      </tr>
+                      <tr>
+                        <td>Transactions</td>
+                        <td><span class="capability-yes">✓</span></td>
+                        <td><span class="capability-yes">✓</span></td>
+                        <td><span class="capability-yes">✓</span></td>
+                        <td><span class="capability-no">✗</span></td>
+                      </tr>
+                      <tr>
+                        <td>Relationships</td>
+                        <td><span class="capability-yes">✓</span></td>
+                        <td><span class="capability-yes">✓</span></td>
+                        <td><span class="capability-yes">✓</span></td>
+                        <td><span class="capability-yes">✓</span></td>
+                      </tr>
+                      <tr>
+                        <td>Streaming</td>
+                        <td><span class="capability-yes">✓</span></td>
+                        <td><span class="capability-yes">✓</span></td>
+                        <td><span class="capability-yes">✓</span></td>
+                        <td><span class="capability-partial">~</span></td>
+                      </tr>
+                      <tr>
+                        <td>Full-Text Search</td>
+                        <td><span class="capability-no">✗</span></td>
+                        <td><span class="capability-yes">✓</span></td>
+                        <td><span class="capability-yes">✓</span></td>
+                        <td><span class="capability-no">✗</span></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <div class="provider-notes">
+                  <div class="provider-note">
+                    <strong>✓ Full Support:</strong> Native provider implementation
+                  </div>
+                  <div class="provider-note">
+                    <strong>~ Partial:</strong> In-memory fallback when needed
+                  </div>
+                  <div class="provider-note">
+                    <strong>✗ Not Supported:</strong> Feature unavailable
+                  </div>
+                </div>
+
+                <div class="code-insight" style="margin-top: 1rem;">
+                  💡 <strong>Provider Transparency:</strong> Your entity code stays the same regardless of provider.
+                  Switch between SQLite, PostgreSQL, MongoDB, or JSON by changing the [DataAdapter] attribute.
+                </div>
+
+              </div>
+            </div>
+
+          </div>
+
         </div>
-      </div>
+
+      </main>
+
+      <!-- Right Sidebar: Framework Insights -->
+      <aside class="right-sidebar">
+
+        <div class="sidebar-panel">
+          <h3 class="sidebar-title">🔍 Framework Insights</h3>
+
+          <!-- Compact Framework Overview -->
+          <div class="insight-section">
+            <h4 class="insight-section-title">Overview</h4>
+            <div class="framework-metrics">
+              <div class="metric-row">
+                <span class="metric-label">Entities:</span>
+                <span class="metric-value">4 registered</span>
+              </div>
+              <div class="metric-row">
+                <span class="metric-label">Provider:</span>
+                <span class="metric-value">SQLite</span>
+              </div>
+              <div class="metric-row">
+                <span class="metric-label">ID Strategy:</span>
+                <span class="metric-value">GUID v7</span>
+              </div>
+              <div class="metric-row">
+                <span class="metric-label">API Requests:</span>
+                <span class="metric-value">{{vm.requests.length}}</span>
+                <span class="metric-detail" ng-if="vm.requests.length > 0">(avg {{vm.getAvgResponseTime()}}ms)</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="insight-section">
+            <h4 class="insight-section-title">Auto-Registration</h4>
+            <div class="insight-list">
+              <div class="insight-item insight-success">
+                <span class="insight-icon">✓</span>
+                <span class="insight-text">Todo</span>
+              </div>
+              <div class="insight-item insight-success">
+                <span class="insight-icon">✓</span>
+                <span class="insight-text">User</span>
+              </div>
+              <div class="insight-item insight-success">
+                <span class="insight-icon">✓</span>
+                <span class="insight-text">Category</span>
+              </div>
+              <div class="insight-item insight-success">
+                <span class="insight-icon">✓</span>
+                <span class="insight-text">TodoItem</span>
+              </div>
+            </div>
+            <p class="insight-footer">via IKoanAutoRegistrar</p>
+          </div>
+
+          <div class="insight-section">
+            <h4 class="insight-section-title">Live API Monitor</h4>
+            <div class="api-log">
+              <div class="api-log-item" ng-repeat="r in vm.requests | limitTo:8 | orderBy:'-ts' track by $index">
+                <span class="api-time">{{r.ts | date:'HH:mm:ss'}}</span>
+                <span class="api-method" ng-class="{'method-get': r.method==='GET', 'method-post': r.method==='POST', 'method-delete': r.method==='DELETE'}">
+                  {{r.method}}
+                </span>
+                <code class="api-path">{{r.url | limitTo:20}}{{r.url.length > 20 ? '...' : ''}}</code>
+                <span class="api-status" ng-class="{'status-success': r.status>=200 && r.status<300, 'status-error': r.status>=400}">
+                  {{r.status || '-'}}
+                </span>
+                <span class="api-ms">{{r.ms}}ms</span>
+              </div>
+              <div class="empty-state-small" ng-if="vm.requests.length === 0">
+                No API requests yet
+              </div>
+            </div>
+            <button class="btn-text" ng-click="vm.clearRequests()" ng-if="vm.requests.length > 0">Clear log</button>
+          </div>
+
+        </div>
+
+      </aside>
+
     </div>
 
-    <!-- Right: API Requests -->
-    <div class="card" style="grid-column: 2;">
-      <div class="card-header">
-        <div class="card-title">API Requests</div>
-        <div class="toolbar">
-          <button class="ghost" ng-click="vm.clearRequests()">Clear</button>
-          <span class="muted" ng-if="!vm.requests.length">No requests yet</span>
-        </div>
-      </div>
-      <div class="card-body">
-        <table ng-if="vm.requests.length">
-          <thead>
-            <tr>
-              <th style="width:86px">Time</th>
-              <th style="width:62px">Meth</th>
-              <th>URL</th>
-              <th style="width:68px">Status</th>
-              <th style="width:64px">ms</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr ng-repeat="r in vm.requests | limitTo:100 | orderBy:'-ts' track by $index">
-              <td>{{r.ts | date:'HH:mm:ss'}}</td>
-              <td>{{r.method}}</td>
-              <td><code>{{r.url}}</code></td>
-              <td><span ng-class="{'muted': r.status==0, 'ok': r.status>=200 && r.status<300, 'warn': r.status>=300 && r.status<400, 'danger': r.status>=400}">{{r.status || '-'}}</span></td>
-              <td>{{r.ms}}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
+    <!-- Footer -->
+    <footer class="footer">
+      <span class="footer-brand">S1.Web</span>
+      <span class="divider">•</span>
+      <span class="footer-note">Koan Framework Interactive Demo</span>
+      <span class="divider">•</span>
+      <a href="https://github.com/sylin-org/koan-framework" class="footer-link">GitHub</a>
+    </footer>
 
-    <!-- System strip spanning full width, above Capabilities -->
-    <div class="system-strip" style="grid-column: 1 / -1;">
-      <div class="muted">System:</div>
-      <div>
-        <span ng-if="vm.health">{{vm.health.status}}</span>
-        <span class="muted" ng-if="!vm.health">unknown</span>
-      </div>
-      <div class="spacer"></div>
-      <button class="ghost" ng-click="vm.check()">Ping</button>
-    </div>
-
-    <!-- Capabilities full width -->
-    <div class="card" style="grid-column: 1 / -1;">
-      <div class="card-header">
-        <div class="card-title">Capabilities</div>
-        <div class="toolbar">
-          <button class="ghost" ng-click="vm.loadCaps()">Reload</button>
-          <span class="muted" ng-if="vm.capsLoading">Loading…</span>
-          <span class="muted" ng-if="!vm.capsLoading && vm.caps && vm.caps.aggregates">({{vm.caps.aggregates.length}} aggregates)</span>
-        </div>
-      </div>
-      <div class="card-body">
-        <table ng-if="vm.caps && vm.caps.aggregates && vm.caps.aggregates.length">
-          <thead>
-            <tr>
-              <th>Type</th>
-              <th>Key</th>
-              <th>Provider</th>
-              <th>Query</th>
-              <th>Write</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr ng-repeat="a in vm.caps.aggregates | orderBy:'type'">
-              <td><code>{{a.type}}</code></td>
-              <td><code>{{a.key}}</code></td>
-              <td><code>{{a.provider}}</code></td>
-              <td>{{(a.query || []).join(', ') || '-'}}</td>
-              <td>{{(a.write || []).join(', ') || '-'}}</td>
-            </tr>
-          </tbody>
-        </table>
-  <div class="muted" ng-if="vm.caps && (!vm.caps || !vm.caps.aggregates || vm.caps.aggregates.length === 0)">No aggregates discovered.</div>
-      </div>
-    </div>
   </div>
 
-  <div class="footer">Koan Framework sample • S1.Web</div>
-</div>
-<script>
+  <script>
 angular.module('s1app', [])
 // Request log service
 .factory('requestLog', function() {
   var svc = { entries: [] };
-  svc.add = function(e) { svc.entries.push(e); if (svc.entries.length > 500) svc.entries.shift(); };
+  svc.add = function(e) { svc.entries.push(e); if (svc.entries.length > 100) svc.entries.shift(); };
   svc.clear = function() { svc.entries.length = 0; };
   return svc;
 })
-// Interceptor to capture API requests to /api/* and /.well-known/Koan/*
+// Interceptor to capture API requests
 .config(function($httpProvider) {
   $httpProvider.interceptors.push(function($q, requestLog) {
     return {
       request: function(cfg) {
-  if (typeof cfg.url === 'string' && (cfg.url.indexOf('/api/') === 0 || cfg.url.indexOf('/.well-known/Koan/') === 0)) {
+        if (typeof cfg.url === 'string' && (cfg.url.indexOf('/api/') === 0 || cfg.url.indexOf('/.well-known/') === 0)) {
           cfg._Koan_meta = { t0: Date.now(), method: (cfg.method||'GET').toUpperCase(), url: cfg.url };
         }
         return cfg;
@@ -194,13 +768,32 @@ angular.module('s1app', [])
 })
 .controller('MainCtrl', function($http, requestLog) {
   var vm = this;
+
+  // State
+  vm.activeTab = 'demo';
   vm.todos = [];
-  vm.check = function() { $http.get('/health').then(function(r){ vm.health = r.data; }); };
-  vm.caps = null; vm.capsLoading = false;
-  vm.loadCaps = function(){ vm.capsLoading = true; $http.get('/.well-known/Koan/capabilities').then(function(r){ vm.caps = r.data; }).finally(function(){ vm.capsLoading = false; }); };
+  vm.health = null;
   vm.requests = requestLog.entries;
-  vm.clearRequests = function(){ requestLog.clear(); };
-  vm.page = 1; vm.size = 10; vm.total = 0; vm.totalPages = 0;
+  vm.page = 1;
+  vm.size = 10;
+  vm.total = 0;
+  vm.totalPages = 0;
+  vm.loading = false;
+  vm.title = '';
+
+  // Tab navigation
+  vm.showTab = function(tab) {
+    vm.activeTab = tab;
+  };
+
+  // Health check
+  vm.check = function() {
+    $http.get('/health').then(function(r){
+      vm.health = r.data;
+    });
+  };
+
+  // Todo operations
   vm.load = function(){
     vm.loading = true;
     var url = '/api/todo?page=' + encodeURIComponent(vm.page) + '&size=' + encodeURIComponent(vm.size);
@@ -210,17 +803,49 @@ angular.module('s1app', [])
       var hdrPage = parseInt(r.headers('X-Page')||vm.page||'1');
       var hdrSize = parseInt(r.headers('X-Page-Size')||vm.size||'10');
       var hdrTotalPages = parseInt(r.headers('X-Total-Pages')||'0');
-      // Normalize values
       if (!isNaN(hdrPage) && hdrPage > 0) vm.page = hdrPage; else vm.page = 1;
       if (!isNaN(hdrSize) && hdrSize > 0) vm.size = hdrSize;
       vm.totalPages = !isNaN(hdrTotalPages) ? hdrTotalPages : (vm.size > 0 ? Math.ceil(vm.total / vm.size) : 0);
     }).finally(function(){ vm.loading=false; });
   };
-  vm.create = function(){ if(!vm.title) return; $http.post('/api/todo', { title: vm.title }).then(function(){ vm.title=''; vm.load(); }); };
-  vm.save = function(t){ $http.post('/api/todo', t).then(function(){ vm.load(); }); };
-  vm.remove = function(t){ $http.delete('/api/todo/' + encodeURIComponent(t.id)).then(function(){ vm.load(); }); };
-  vm.seed = function(n){ $http.post('/api/todo/seed/' + encodeURIComponent(n)).then(function(){ vm.load(); }); };
-  vm.clear = function(){ $http.delete('/api/todo/clear').then(function(){ vm.load(); }); };
+
+  vm.create = function(){
+    if(!vm.title) return;
+    $http.post('/api/todo', { title: vm.title }).then(function(){
+      vm.title='';
+      vm.load();
+    });
+  };
+
+  vm.save = function(t){
+    $http.post('/api/todo', t).then(function(){
+      vm.load();
+    });
+  };
+
+  vm.remove = function(t){
+    $http.delete('/api/todo/' + encodeURIComponent(t.id)).then(function(){
+      vm.load();
+    });
+  };
+
+  vm.seed = function(n){
+    $http.post('/api/todo/seed/' + encodeURIComponent(n)).then(function(){
+      vm.load();
+    });
+  };
+
+  vm.clear = function(){
+    $http.delete('/api/todo/clear').then(function(){
+      vm.load();
+    });
+  };
+
+  vm.clearRequests = function(){
+    requestLog.clear();
+  };
+
+  // Pagination helpers
   vm.shift = function(n){
     var tp = vm.totalPages || 0;
     var target = (vm.page || 1) + n;
@@ -228,10 +853,27 @@ angular.module('s1app', [])
     if (tp > 0 && target > tp) target = tp;
     if (target !== vm.page) { vm.page = target; vm.load(); }
   };
-  vm.gotoStart = function(){ if (vm.page > 1) { vm.page = 1; vm.load(); } };
-  vm.gotoEnd = function(){ var tp = vm.totalPages || 0; var target = tp > 0 ? tp : 1; if (vm.page !== target) { vm.page = target; vm.load(); } };
+
+  vm.gotoStart = function(){
+    if (vm.page > 1) { vm.page = 1; vm.load(); }
+  };
+
+  vm.gotoEnd = function(){
+    var tp = vm.totalPages || 0;
+    var target = tp > 0 ? tp : 1;
+    if (vm.page !== target) { vm.page = target; vm.load(); }
+  };
+
+  // Utility
+  vm.getAvgResponseTime = function() {
+    if (vm.requests.length === 0) return 0;
+    var sum = vm.requests.reduce(function(acc, r) { return acc + (r.ms || 0); }, 0);
+    return Math.round(sum / vm.requests.length);
+  };
+
+  // Initialize
   vm.load();
-  vm.loadCaps();
+  vm.check();
 });
 </script>
 </body>

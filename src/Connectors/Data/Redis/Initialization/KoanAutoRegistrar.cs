@@ -1,3 +1,4 @@
+using System;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -5,6 +6,8 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Koan.Core;
+using Koan.Core.Adapters.Reporting;
+using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Modules;
 using Koan.Core.Orchestration;
 using Koan.Core.Orchestration.Abstractions;
@@ -14,6 +17,11 @@ using Koan.Data.Connector.Redis.Orchestration;
 using StackExchange.Redis;
 using Koan.Orchestration.Aspire;
 using Aspire.Hosting;
+using Microsoft.Extensions.Logging.Abstractions;
+using Koan.Data.Connector.Redis.Discovery;
+using Koan.Core.Provenance;
+using RedisItems = Koan.Data.Connector.Redis.Infrastructure.RedisProvenanceItems;
+using ProvenanceModes = Koan.Core.Hosting.Bootstrap.ProvenancePublicationModeExtensions;
 
 namespace Koan.Data.Connector.Redis.Initialization;
 
@@ -24,9 +32,6 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar, IKoanAspireRegistrar
 
     public void Initialize(IServiceCollection services)
     {
-        var logger = services.BuildServiceProvider().GetService<Microsoft.Extensions.Logging.ILoggerFactory>()?.CreateLogger("Koan.Data.Connector.Redis.Initialization.KoanAutoRegistrar");
-        logger?.Log(LogLevel.Debug, "Koan.Data.Connector.Redis KoanAutoRegistrar loaded.");
-
         services.AddKoanOptions<RedisOptions>();
         services.AddSingleton<IConfigureOptions<RedisOptions>, RedisOptionsConfigurator>();
         services.TryAddSingleton<IStorageNameResolver, DefaultStorageNameResolver>();
@@ -42,10 +47,10 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar, IKoanAspireRegistrar
         services.AddSingleton<IDataAdapterFactory, RedisAdapterFactory>();
 
         // Only register connection multiplexer if Redis is available or in Aspire context
-        RegisterConnectionMultiplexer(services, logger);
+        RegisterConnectionMultiplexer(services);
     }
 
-    private void RegisterConnectionMultiplexer(IServiceCollection services, ILogger? logger)
+    private void RegisterConnectionMultiplexer(IServiceCollection services)
     {
         services.AddSingleton<IConnectionMultiplexer>(sp =>
         {
@@ -56,6 +61,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar, IKoanAspireRegistrar
                 cs = KoanEnv.InContainer ? Infrastructure.Constants.Discovery.DefaultCompose : Infrastructure.Constants.Discovery.DefaultLocal;
             }
 
+            var logger = sp.GetService<ILogger<KoanAutoRegistrar>>();
             logger?.LogDebug("Attempting Redis connection to: {ConnectionString}", cs);
             try
             {
@@ -63,30 +69,111 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar, IKoanAspireRegistrar
             }
             catch (RedisConnectionException ex)
             {
-                logger?.LogError("Redis connection failed: {Message}", ex.Message);
+                logger?.LogError(ex, "Redis connection failed: {Message}", ex.Message);
                 throw new InvalidOperationException($"Redis is not available. Connection string: {cs}. " +
                     "Ensure Redis is running or use the Aspire AppHost for managed Redis.", ex);
             }
         });
     }
 
-    public void Describe(Koan.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)
+    public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
-        report.AddModule(ModuleName, ModuleVersion);
-
+        module.Describe(ModuleVersion);
         // Autonomous discovery adapter handles all connection string resolution
         // Boot report shows discovery results from RedisDiscoveryAdapter
-        report.AddNote("Redis discovery handled by autonomous RedisDiscoveryAdapter");
+        module.AddNote("Redis discovery handled by autonomous RedisDiscoveryAdapter");
 
-        // Configure default options for reporting
+        // Configure default options for reporting (with provenance)
         var defaultOptions = new RedisOptions();
-        var database = Koan.Core.Configuration.Read(cfg, "Koan:Data:Redis:Database", defaultOptions.Database);
 
-        report.AddSetting("ConnectionString", "auto (resolved by discovery)", isSecret: false);
-        report.AddSetting("Database", database.ToString());
-        report.AddSetting(Infrastructure.Constants.Bootstrap.EnsureCreatedSupported, true.ToString());
-        report.AddSetting(Infrastructure.Constants.Bootstrap.DefaultPageSize, defaultOptions.DefaultPageSize.ToString());
-        report.AddSetting(Infrastructure.Constants.Bootstrap.MaxPageSize, defaultOptions.MaxPageSize.ToString());
+        var connection = Configuration.ReadFirstWithSource(
+            cfg,
+            defaultOptions.ConnectionString,
+            $"{Infrastructure.Constants.Configuration.Section_Data}:{Infrastructure.Constants.Configuration.Keys.ConnectionString}",
+            $"{Infrastructure.Constants.Configuration.Section_Sources_Default}:{Infrastructure.Constants.Configuration.Keys.ConnectionString}",
+            "ConnectionStrings:Redis",
+            "ConnectionStrings:Default");
+
+        var database = Configuration.ReadFirstWithSource(
+            cfg,
+            defaultOptions.Database,
+            $"{Infrastructure.Constants.Configuration.Section_Data}:{Infrastructure.Constants.Configuration.Keys.Database}",
+            $"{Infrastructure.Constants.Configuration.Section_Sources_Default}:{Infrastructure.Constants.Configuration.Keys.Database}");
+
+        var defaultPageSize = Configuration.ReadFirstWithSource(
+            cfg,
+            defaultOptions.DefaultPageSize,
+            $"{Infrastructure.Constants.Configuration.Section_Data}:{Infrastructure.Constants.Configuration.Keys.DefaultPageSize}",
+            $"{Infrastructure.Constants.Configuration.Section_Sources_Default}:{Infrastructure.Constants.Configuration.Keys.DefaultPageSize}");
+
+        var maxPageSize = Configuration.ReadFirstWithSource(
+            cfg,
+            defaultOptions.MaxPageSize,
+            $"{Infrastructure.Constants.Configuration.Section_Data}:{Infrastructure.Constants.Configuration.Keys.MaxPageSize}",
+            $"{Infrastructure.Constants.Configuration.Section_Sources_Default}:{Infrastructure.Constants.Configuration.Keys.MaxPageSize}");
+
+        var ensureCreated = Configuration.ReadFirstWithSource(
+            cfg,
+            true,
+            $"{Infrastructure.Constants.Configuration.Section_Data}:{Infrastructure.Constants.Configuration.Keys.EnsureCreatedSupported}",
+            $"{Infrastructure.Constants.Configuration.Section_Sources_Default}:{Infrastructure.Constants.Configuration.Keys.EnsureCreatedSupported}");
+
+        var connectionIsAuto = string.IsNullOrWhiteSpace(connection.Value) || string.Equals(connection.Value, "auto", StringComparison.OrdinalIgnoreCase);
+        var connectionSourceKey = connection.ResolvedKey ??
+            $"{Infrastructure.Constants.Configuration.Section_Data}:{Infrastructure.Constants.Configuration.Keys.ConnectionString}";
+
+        var effectiveConnectionString = connection.Value ?? defaultOptions.ConnectionString;
+        if (connectionIsAuto)
+        {
+            var adapter = new RedisDiscoveryAdapter(cfg, NullLogger<RedisDiscoveryAdapter>.Instance);
+            effectiveConnectionString = AdapterBootReporting.ResolveConnectionString(
+                cfg,
+                adapter,
+                null,
+                () => BuildRedisFallback(defaultOptions));
+        }
+
+        var connectionMode = connectionIsAuto
+            ? ProvenanceModes.FromBootSource(BootSettingSource.Auto, usedDefault: true)
+            : ProvenanceModes.FromConfigurationValue(connection);
+
+        Publish(
+            module,
+            RedisItems.ConnectionString,
+            connection,
+            displayOverride: effectiveConnectionString,
+            modeOverride: connectionMode,
+            usedDefaultOverride: connectionIsAuto ? true : connection.UsedDefault,
+            sourceKeyOverride: connectionSourceKey);
+
+        Publish(module, RedisItems.Database, database);
+        Publish(module, RedisItems.EnsureCreatedSupported, ensureCreated);
+        Publish(module, RedisItems.DefaultPageSize, defaultPageSize);
+        Publish(module, RedisItems.MaxPageSize, maxPageSize);
+    }
+
+    private static void Publish<T>(ProvenanceModuleWriter module, ProvenanceItem item, ConfigurationValue<T> value, object? displayOverride = null, ProvenancePublicationMode? modeOverride = null, bool? usedDefaultOverride = null, string? sourceKeyOverride = null, bool? sanitizeOverride = null)
+    {
+        module.AddSetting(
+            item,
+            modeOverride ?? ProvenanceModes.FromConfigurationValue(value),
+            displayOverride ?? value.Value,
+            sourceKey: sourceKeyOverride ?? value.ResolvedKey,
+            usedDefault: usedDefaultOverride ?? value.UsedDefault,
+            sanitizeOverride: sanitizeOverride);
+    }
+
+    private static string BuildRedisFallback(RedisOptions defaults)
+    {
+        if (!string.IsNullOrWhiteSpace(defaults.ConnectionString) &&
+            !string.Equals(defaults.ConnectionString, "auto", StringComparison.OrdinalIgnoreCase))
+        {
+            return defaults.ConnectionString;
+        }
+
+        return KoanEnv.InContainer
+            ? Infrastructure.Constants.Discovery.DefaultCompose
+            : Infrastructure.Constants.Discovery.DefaultLocal;
     }
 
     // IKoanAspireRegistrar implementation
@@ -200,4 +287,5 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar, IKoanAspireRegistrar
         return (port, password);
     }
 }
+
 

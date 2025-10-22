@@ -1,5 +1,5 @@
 using System.Collections.Generic;
-using System.Text.Json.Nodes;
+using Newtonsoft.Json.Linq;
 using Koan.Web.Endpoints;
 
 namespace Koan.Mcp;
@@ -8,7 +8,7 @@ public sealed record McpToolDefinition(
     string Name,
     string EntityName,
     EntityEndpointOperationKind Operation,
-    JsonObject InputSchema,
+    JObject InputSchema,
     bool ReturnsCollection,
     bool IsMutation,
     string? Description,

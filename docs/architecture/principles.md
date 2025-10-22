@@ -2,11 +2,14 @@
 type: ARCHITECTURE
 domain: framework
 title: "Koan Framework Architecture Principles"
-audience: [architects, senior-developers, ai-agents]
+audience: [architects, developers, ai-agents]
 last_updated: 2025-01-17
-framework_version: "v0.2.18+"
+framework_version: v0.2.18+
 status: current
-validation: 2025-01-17
+validation:
+    date_last_tested: 2025-01-17
+    status: verified
+    scope: docs/architecture/principles.md
 ---
 
 # Koan Framework Architecture Principles
@@ -47,7 +50,7 @@ Storage backend becomes a deployment concern, not development concern.
 
 ```csharp
 // Static methods are first-class
-var todo = await Todo.ById(id);
+var todo = await Todo.Get(id);
 var todos = await Todo.Where(t => !t.IsCompleted);
 
 // Instance methods work consistently
@@ -280,7 +283,7 @@ public class EntityNotFoundException : KoanException
 [HttpGet("{id}")]
 public async Task<IActionResult> Get(string id)
 {
-    var entity = await Todo.ById(id);
+    var entity = await Todo.Get(id);
     return entity == null ? NotFound() : Ok(entity);
 }
 ```

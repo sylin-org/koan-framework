@@ -9,126 +9,268 @@
 <body>
     <div class="container">
         <header>
-            <h1>🚀 Koan Adapter Benchmark</h1>
-            <p class="subtitle">Compare performance across SQLite, PostgreSQL, MongoDB, and Redis</p>
+            <h1>Koan Adapter Benchmark</h1>
+            <p class="subtitle">Multi-Provider Performance Testing Suite</p>
+            <div class="hero-stats">
+                <div class="hero-stat">
+                    <div class="hero-stat-value">4</div>
+                    <div class="hero-stat-label">Providers</div>
+                </div>
+                <div class="hero-stat">
+                    <div class="hero-stat-value">11</div>
+                    <div class="hero-stat-label">Test Types</div>
+                </div>
+                <div class="hero-stat">
+                    <div class="hero-stat-value">3</div>
+                    <div class="hero-stat-label">Entity Tiers</div>
+                </div>
+            </div>
         </header>
 
         <div class="config-panel">
-            <h2>Benchmark Configuration</h2>
+            <div class="config-header">
+                <h2>Benchmark Configuration</h2>
+                <div class="config-actions">
+                    <button id="resetConfigBtn" class="btn-link" title="Reset to defaults">
+                        <span>↻</span> Reset
+                    </button>
+                </div>
+            </div>
 
             <div class="config-row">
                 <div class="config-group">
-                    <label>Mode</label>
+                    <label>
+                        Mode
+                        <span class="tooltip-icon" title="Sequential tests providers one at a time. Parallel tests all providers simultaneously.">ⓘ</span>
+                    </label>
                     <div class="mode-toggle">
-                        <button id="sequentialBtn" class="mode-btn active">Sequential</button>
-                        <button id="parallelBtn" class="mode-btn">Parallel</button>
+                        <button id="sequentialBtn" class="mode-btn active">
+                            <span class="mode-icon">▶</span> Sequential
+                        </button>
+                        <button id="parallelBtn" class="mode-btn">
+                            <span class="mode-icon">⎈</span> Parallel
+                        </button>
                     </div>
                     <small class="help-text">
-                        Sequential: Test providers one at a time<br>
-                        Parallel: Test all providers simultaneously
+                        <strong>Sequential:</strong> Test providers one at a time for direct comparison<br>
+                        <strong>Parallel:</strong> Test all providers simultaneously for real-world scenarios
                     </small>
                 </div>
 
                 <div class="config-group">
-                    <label>Scale</label>
+                    <label>
+                        Scale
+                        <span class="tooltip-icon" title="Controls the number of entities created and tested. More entities = longer test time but more accurate results.">ⓘ</span>
+                    </label>
                     <select id="scaleSelect" class="form-control">
-                        <option value="Quick">Quick (1,000 entities)</option>
-                        <option value="Standard" selected>Standard (5,000 entities)</option>
-                        <option value="Full">Full (10,000 entities)</option>
+                        <option value="Quick">Quick (1,000 entities ~ 30 sec)</option>
+                        <option value="Standard" selected>Standard (5,000 entities ~ 2 min)</option>
+                        <option value="Full">Full (10,000 entities ~ 5 min)</option>
                     </select>
-                    <small class="help-text">Number of entities to create and test</small>
+                    <small class="help-text">Estimated duration varies by hardware and selected providers</small>
                 </div>
             </div>
 
             <div class="config-row">
                 <div class="config-group">
-                    <label>Providers</label>
+                    <label>
+                        Providers
+                        <span class="tooltip-icon" title="Select which storage providers to benchmark. Container-based providers require Docker.">ⓘ</span>
+                    </label>
                     <div id="providerCheckboxes" class="checkbox-group">
                         <!-- Populated by JS -->
                     </div>
+                    <small class="help-text">
+                        <span class="badge badge-inline">In-Process</span> runs in-app,
+                        <span class="badge badge-inline">Container</span> requires Docker
+                    </small>
                 </div>
 
                 <div class="config-group">
-                    <label>Entity Tiers</label>
+                    <label>
+                        Entity Tiers
+                        <span class="tooltip-icon" title="Entity complexity levels: Minimal (basic CRUD), Indexed (with search fields), Complex (full relations).">ⓘ</span>
+                    </label>
                     <div id="tierCheckboxes" class="checkbox-group">
                         <!-- Populated by JS -->
                     </div>
+                    <small class="help-text">More tiers = more comprehensive testing</small>
                 </div>
             </div>
 
-            <div class="config-row">
-                <button id="runBenchmarkBtn" class="btn-primary">Run Benchmark</button>
-                <button id="stopBenchmarkBtn" class="btn-secondary" style="display:none;">Stop</button>
+            <div class="config-row config-actions-row">
+                <div class="config-summary">
+                    <span id="testCountSummary" class="summary-text">Ready to run benchmark</span>
+                </div>
+                <div class="config-buttons">
+                    <button id="runBenchmarkBtn" class="btn-primary">
+                        <span class="btn-icon">▶</span> Run Benchmark
+                    </button>
+                    <button id="stopBenchmarkBtn" class="btn-secondary" style="display:none;">
+                        <span class="btn-icon">■</span> Stop
+                    </button>
+                </div>
             </div>
         </div>
 
         <div id="progressPanel" class="progress-panel" style="display:none;">
-            <h2>Running Tests...</h2>
+            <div class="progress-header-section">
+                <h2>Running Benchmark</h2>
+                <div class="progress-mode-badge" id="progressModeBadge">Sequential</div>
+            </div>
 
-            <div class="progress-header">
-                <div>
-                    <strong>Mode:</strong> <span id="currentMode">Sequential</span> |
-                    <strong>Provider:</strong> <span id="currentProvider">-</span>
+            <!-- Hero Progress Section -->
+            <div class="progress-hero">
+                <div class="circular-progress-wrapper">
+                    <svg class="circular-progress" width="180" height="180" viewBox="0 0 180 180">
+                        <defs>
+                            <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" style="stop-color:#3b82f6;stop-opacity:1" />
+                                <stop offset="100%" style="stop-color:#8b5cf6;stop-opacity:1" />
+                            </linearGradient>
+                        </defs>
+                        <circle class="circular-progress-bg" cx="90" cy="90" r="80" fill="none" stroke-width="12"></circle>
+                        <circle id="circularProgressBar" class="circular-progress-fill" cx="90" cy="90" r="80" fill="none" stroke-width="12"
+                                stroke-dasharray="502.4" stroke-dashoffset="502.4" transform="rotate(-90 90 90)"></circle>
+                    </svg>
+                    <div class="circular-progress-text">
+                        <div class="circular-progress-percent" id="circularProgressPercent">0%</div>
+                        <div class="circular-progress-label">Complete</div>
+                    </div>
                 </div>
-                <div>
-                    <strong>Progress:</strong> <span id="progressPercent">0</span>%
+
+                <div class="progress-live-stats">
+                    <div class="live-stat-card">
+                        <div class="live-stat-content">
+                            <div class="live-stat-value" id="liveCurrentTest">Initializing...</div>
+                            <div class="live-stat-label">Current Test</div>
+                        </div>
+                    </div>
+                    <div class="live-stat-card">
+                        <div class="live-stat-content">
+                            <div class="live-stat-value" id="liveCurrentProvider">-</div>
+                            <div class="live-stat-label">Active Provider</div>
+                        </div>
+                    </div>
+                    <div class="live-stat-card highlight">
+                        <div class="live-stat-content">
+                            <div class="live-stat-value" id="liveSpeed">0</div>
+                            <div class="live-stat-label">ops/sec</div>
+                        </div>
+                    </div>
+                    <div class="live-stat-card">
+                        <div class="live-stat-content">
+                            <div class="live-stat-value"><span id="liveCurrentOps">0</span> / <span id="liveTotalOps">0</span></div>
+                            <div class="live-stat-label">Operations</div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <div class="progress-bar-container">
-                <div id="progressBar" class="progress-bar"></div>
+            <!-- Provider Progress Cards -->
+            <div id="providerProgressContainer" class="provider-progress-container" style="display:none;">
+                <h3>Provider Status</h3>
+                <div id="providerProgressBars" class="provider-progress-grid"></div>
             </div>
 
-            <div class="current-test">
-                <div><strong>Current Test:</strong> <span id="currentTest">-</span></div>
-                <div><strong>Operations:</strong> <span id="currentOps">0</span> / <span id="totalOps">0</span></div>
-                <div><strong>Speed:</strong> <span id="currentSpeed">0</span> ops/sec</div>
-            </div>
-
-            <div class="test-log">
-                <div id="testLog"></div>
+            <!-- Test Activity Stream -->
+            <div class="test-activity-section">
+                <div class="activity-header">
+                    <h3>Test Activity</h3>
+                    <button id="clearLogBtn" class="btn-link-small">Clear</button>
+                </div>
+                <div class="test-log" id="testLog"></div>
             </div>
         </div>
 
         <div id="resultsPanel" class="results-panel" style="display:none;">
-            <h2>Benchmark Results</h2>
+            <div class="results-header">
+                <h2>Benchmark Results</h2>
+                <div class="results-actions">
+                    <button id="exportJsonBtn" class="btn-link" title="Export results as JSON">
+                        <span>⬇</span> Export JSON
+                    </button>
+                    <button id="exportCsvBtn" class="btn-link" title="Export results as CSV">
+                        <span>⬇</span> Export CSV
+                    </button>
+                    <button id="shareResultsBtn" class="btn-link" title="Copy shareable link to clipboard">
+                        Share
+                    </button>
+                </div>
+            </div>
 
             <div class="tabs">
-                <button class="tab-btn active" data-tab="overview">Overview</button>
-                <button class="tab-btn" data-tab="writes">Write Performance</button>
-                <button class="tab-btn" data-tab="reads">Read Performance</button>
-                <button class="tab-btn" data-tab="details">Detailed Results</button>
+                <button class="tab-btn active" data-tab="overview">
+                    Overview
+                </button>
+                <button class="tab-btn" data-tab="writes">
+                    Writes
+                </button>
+                <button class="tab-btn" data-tab="reads">
+                    Reads
+                </button>
+                <button class="tab-btn" data-tab="queries">
+                    Queries
+                </button>
+                <button class="tab-btn" data-tab="migration">
+                    Migration
+                </button>
+                <button class="tab-btn" data-tab="details">
+                    Details
+                </button>
             </div>
 
             <div class="tab-content">
                 <div id="overviewTab" class="tab-pane active">
-                    <div class="overview-grid">
-                        <div class="stat-card">
-                            <h3>Total Duration</h3>
-                            <div id="totalDuration" class="stat-value">-</div>
-                        </div>
-                        <div class="stat-card">
-                            <h3>Entities Tested</h3>
-                            <div id="entitiesTested" class="stat-value">-</div>
-                        </div>
-                        <div class="stat-card">
-                            <h3>Providers</h3>
-                            <div id="providersCount" class="stat-value">-</div>
-                        </div>
-                        <div class="stat-card">
-                            <h3>Tests Completed</h3>
-                            <div id="testsCompleted" class="stat-value">-</div>
+                    <!-- Executive Summary -->
+                    <div class="executive-summary">
+                        <div class="summary-stats-grid">
+                            <div class="summary-stat-card">
+                                <div class="summary-stat-content">
+                                    <div class="summary-stat-value" id="totalDuration">-</div>
+                                    <div class="summary-stat-label">Total Duration</div>
+                                </div>
+                            </div>
+                            <div class="summary-stat-card">
+                                <div class="summary-stat-content">
+                                    <div class="summary-stat-value" id="entitiesTested">-</div>
+                                    <div class="summary-stat-label">Entities Tested</div>
+                                </div>
+                            </div>
+                            <div class="summary-stat-card">
+                                <div class="summary-stat-content">
+                                    <div class="summary-stat-value" id="providersCount">-</div>
+                                    <div class="summary-stat-label">Providers</div>
+                                </div>
+                            </div>
+                            <div class="summary-stat-card">
+                                <div class="summary-stat-content">
+                                    <div class="summary-stat-value" id="testsCompleted">-</div>
+                                    <div class="summary-stat-label">Tests Completed</div>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
-                    <div class="chart-container">
-                        <h3>Overall Performance Comparison</h3>
+                    <!-- Performance Leaderboard -->
+                    <div class="leaderboard-section">
+                        <h3>Performance Leaderboard</h3>
+                        <div id="leaderboard" class="leaderboard-grid"></div>
+                    </div>
+
+                    <!-- Performance Comparison Chart -->
+                    <div class="chart-container-premium">
+                        <div class="chart-header">
+                            <h3>Overall Performance Comparison</h3>
+                            <p class="chart-description">Lower duration is better - shows total time to complete all tests</p>
+                        </div>
                         <canvas id="overviewChart"></canvas>
                     </div>
 
-                    <div class="recommendations">
-                        <h3>📊 Use Case Recommendations</h3>
-                        <div id="recommendations"></div>
+                    <!-- Use Case Recommendations -->
+                    <div class="recommendations-premium">
+                        <h3>Smart Recommendations</h3>
+                        <div id="recommendations" class="recommendations-grid"></div>
                     </div>
                 </div>
 
@@ -147,6 +289,37 @@
                     <div class="chart-container">
                         <h3>Read By ID Performance</h3>
                         <canvas id="readByIdChart"></canvas>
+                    </div>
+                    <div class="chart-container">
+                        <h3>Update Operations Performance</h3>
+                        <canvas id="updateChart"></canvas>
+                    </div>
+                    <div class="chart-container">
+                        <h3>Pagination Performance</h3>
+                        <canvas id="paginationChart"></canvas>
+                    </div>
+                </div>
+
+                <div id="queriesTab" class="tab-pane">
+                    <div class="chart-container">
+                        <h3>Simple Filter Query Performance</h3>
+                        <canvas id="querySimpleChart"></canvas>
+                    </div>
+                    <div class="chart-container">
+                        <h3>Range Filter Query Performance</h3>
+                        <canvas id="queryRangeChart"></canvas>
+                    </div>
+                    <div class="chart-container">
+                        <h3>Complex Filter Query Performance</h3>
+                        <canvas id="queryComplexChart"></canvas>
+                    </div>
+                </div>
+
+                <div id="migrationTab" class="tab-pane">
+                    <div class="chart-container">
+                        <h3>Cross-Provider Migration Performance</h3>
+                        <p>Shows the performance of migrating data from one provider to another.</p>
+                        <canvas id="migrationChart"></canvas>
                     </div>
                 </div>
 

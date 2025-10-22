@@ -11,6 +11,7 @@ using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Logging;
 using Koan.Core.Observability;
 using Koan.Core;
+using Koan.Core.Provenance;
 
 namespace Koan.Core.Hosting.Runtime;
 
@@ -32,27 +33,30 @@ internal sealed class AppRuntime : IAppRuntime
         KoanStartupTimeline.Mark(KoanStartupStage.BootstrapStart);
         try
         {
-            var report = new BootReport();
+            IProvenanceRegistry registry = ProvenanceRegistry.Instance;
             var cfg = _sp.GetService<IConfiguration>();
 
             // Collect module information from all KoanAutoRegistrars
-            CollectBootReport(report, cfg);
+            CollectProvenance(registry, cfg);
 
-            var modules = report.GetModules();
-            var modulePairs = modules
-                .Select(m => (m.Name, m.Version ?? "unknown"))
+            var provenance = registry.CurrentSnapshot;
+            var modulePairs = provenance.Pillars
+                .SelectMany(p => p.Modules)
+                .GroupBy(m => m.Name, StringComparer.OrdinalIgnoreCase)
+                .Select(g => (g.Key, string.IsNullOrWhiteSpace(g.First().Version) ? "unknown" : g.First().Version!))
+                .OrderBy(pair => pair.Key, StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
             var snapshot = KoanEnv.CurrentSnapshot;
             var runtimeVersion = ResolveRuntimeVersion(modulePairs);
 
+            var hostDescription = DescribeHost();
+            var headerBlock = KoanConsoleBlocks.BuildBootstrapHeaderBlock(snapshot, hostDescription, modulePairs, runtimeVersion);
+            var inventoryBlock = KoanConsoleBlocks.BuildInventoryBlock(snapshot, modulePairs);
+
             if (_logger is not null)
             {
-                var hostDescription = DescribeHost();
-                var headerBlock = KoanConsoleBlocks.BuildBootstrapHeaderBlock(snapshot, hostDescription, modulePairs, runtimeVersion);
                 _logger.LogInformation("{Block}", headerBlock);
-
-                var inventoryBlock = KoanConsoleBlocks.BuildInventoryBlock(snapshot, modulePairs);
                 _logger.LogInformation("{Block}", inventoryBlock);
             }
 
@@ -63,16 +67,23 @@ internal sealed class AppRuntime : IAppRuntime
             if (!show)
                 show = obs?.Value?.Enabled == true && obs.Value?.Traces?.Enabled == true;
 
-            if (show && cfg != null && _logger is null)
+            if (show && _logger is null)
             {
-                var options = GetBootReportOptions(cfg);
-                try { Console.Write(report.ToString(options)); } catch { }
+                try
+                {
+                    Console.Write(headerBlock);
+                    Console.Write(inventoryBlock);
+                }
+                catch
+                {
+                    // best-effort only
+                }
             }
         }
         catch { /* best-effort */ }
     }
 
-    private void CollectBootReport(BootReport report, IConfiguration? cfg)
+    private void CollectProvenance(IProvenanceRegistry registry, IConfiguration? cfg)
     {
         if (cfg == null) return;
 
@@ -95,7 +106,9 @@ internal sealed class AppRuntime : IAppRuntime
                     if (Activator.CreateInstance(t) is IKoanAutoRegistrar registrar)
                     {
                         var hostEnv = env ?? new DefaultHostEnvironment();
-                        registrar.Describe(report, cfg, hostEnv);
+                        var module = registry.GetOrCreateModule(string.Empty, registrar.ModuleName);
+                        module.Describe(registrar.ModuleVersion);
+                        registrar.Describe(module, cfg, hostEnv);
                     }
                 }
                 catch { /* best-effort */ }
@@ -126,18 +139,6 @@ internal sealed class AppRuntime : IAppRuntime
         }
 
         return $"Generic Host ({applicationName})";
-    }
-
-    private static BootReportOptions GetBootReportOptions(IConfiguration cfg)
-    {
-        var section = cfg.GetSection("Koan:Bootstrap");
-        return new BootReportOptions
-        {
-            ShowDecisions = section.GetValue("ShowDecisions", !KoanEnv.IsProduction),
-            ShowConnectionAttempts = section.GetValue("ShowConnectionAttempts", !KoanEnv.IsProduction),
-            ShowDiscovery = section.GetValue("ShowDiscovery", !KoanEnv.IsProduction),
-            CompactMode = section.GetValue("CompactMode", KoanEnv.IsProduction)
-        };
     }
 
     public void Start()

@@ -3,6 +3,10 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Koan.Core;
 using Koan.Core.Extensions;
+using Koan.Data.Core.Pillars;
+using Koan.Core.Hosting.Bootstrap;
+using DataCoreItems = Koan.Data.Core.Infrastructure.DataCoreProvenanceItems;
+using ProvenanceModes = Koan.Core.Hosting.Bootstrap.ProvenancePublicationModeExtensions;
 
 namespace Koan.Data.Core.Initialization;
 
@@ -13,14 +17,24 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 
     public void Initialize(IServiceCollection services)
     {
-        // Core wiring is triggered by AddKoan()/AddKoanDataCore via host code; nothing to do here.
-        // We intentionally avoid double-registering since AddKoan() is the canonical entry point.
+        DataPillarManifest.EnsureRegistered();
+        // Registration handled by KoanDataCoreInitializer; explicit AddKoanDataCore() keeps compatibility for manual layering.
     }
 
-    public void Describe(Koan.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)
+    public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
-        report.AddModule(ModuleName, ModuleVersion);
-        var ensure = cfg.Read(Infrastructure.Constants.Configuration.Runtime.EnsureSchemaOnStart, true);
-        report.AddSetting("EnsureSchemaOnStart", ensure.ToString());
+        module.Describe(ModuleVersion);
+        var ensureSetting = Koan.Core.Configuration.ReadWithSource(
+            cfg,
+            DataCoreItems.EnsureSchemaOnStart.Key,
+            true);
+
+        module.AddSetting(
+            DataCoreItems.EnsureSchemaOnStart,
+            ProvenanceModes.FromConfigurationValue(ensureSetting),
+            ensureSetting.Value,
+            sourceKey: ensureSetting.ResolvedKey,
+            usedDefault: ensureSetting.UsedDefault);
     }
 }
+

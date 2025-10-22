@@ -17,7 +17,7 @@ namespace Koan.Data.Core.Model
 {
 
     // Domain-centric CRTP base with static conveniences, independent of data namespace
-    public abstract class Entity<TEntity, TKey> : IEntity<TKey>
+    public abstract partial class Entity<TEntity, TKey> : IEntity<TKey>
         where TEntity : class, Koan.Data.Abstractions.IEntity<TKey>
         where TKey : notnull
     {
@@ -65,9 +65,13 @@ namespace Koan.Data.Core.Model
         // Static conveniences forward to the data facade without exposing its namespace in domain types
         public static Task<TEntity?> Get(TKey id, CancellationToken ct = default)
             => EntityEventExecutor<TEntity, TKey>.ExecuteLoadAsync(token => Data<TEntity, TKey>.GetAsync(id, token), ct);
+        public static Task<IReadOnlyList<TEntity?>> Get(IEnumerable<TKey> ids, CancellationToken ct = default)
+            => EntityEventExecutor<TEntity, TKey>.ExecuteLoadManyAsync(token => Data<TEntity, TKey>.GetManyAsync(ids, token), ct);
         // Partition-aware variants
         public static Task<TEntity?> Get(TKey id, string partition, CancellationToken ct = default)
             => EntityEventExecutor<TEntity, TKey>.ExecuteLoadAsync(token => Data<TEntity, TKey>.GetAsync(id, partition, token), ct);
+        public static Task<IReadOnlyList<TEntity?>> Get(IEnumerable<TKey> ids, string partition, CancellationToken ct = default)
+            => EntityEventExecutor<TEntity, TKey>.ExecuteLoadManyAsync(token => Data<TEntity, TKey>.GetManyAsync(ids, partition, token), ct);
 
         public static Task<IReadOnlyList<TEntity>> All(CancellationToken ct = default)
             => Data<TEntity, TKey>.All(ct);
@@ -112,15 +116,45 @@ namespace Koan.Data.Core.Model
             => Data<TEntity, TKey>.Page(page, size, ct);
 
         // Counts
-        public static Task<int> Count(CancellationToken ct = default)
-            => Data<TEntity, TKey>.CountAllAsync(ct);
-        public static Task<int> Count(string query, CancellationToken ct = default)
-            => Data<TEntity, TKey>.CountAsync(query, ct);
-        public static Task<int> CountAll(string partition, CancellationToken ct = default)
-            => Data<TEntity, TKey>.CountAllAsync(partition, ct);
-        public static Task<int> Count(string query, string partition, CancellationToken ct = default)
-            => Data<TEntity, TKey>.CountAsync(query, partition, ct);
+        // Simple: await Entity.Count → defaults to optimized
+        // Explicit: await Entity.Count.Exact(ct), await Entity.Count.Fast(ct)
+        public static EntityCountAccessor Count { get; } = new();
 
+        /// <summary>
+        /// Awaitable count accessor with fluent API.
+        /// Simple: await Todo.Count (defaults to optimized)
+        /// Explicit: await Todo.Count.Exact(ct), await Todo.Count.Fast(ct)
+        /// </summary>
+        public sealed class EntityCountAccessor
+        {
+            // Default: await Entity.Count → Optimized strategy
+            public System.Runtime.CompilerServices.TaskAwaiter<long> GetAwaiter()
+                => Data<TEntity, TKey>.CountAsync((object?)null, CountStrategy.Optimized, default).GetAwaiter();
+
+            public Task<long> Exact(CancellationToken ct = default)
+                => Data<TEntity, TKey>.CountAsync(ct);
+
+            public Task<long> Fast(CancellationToken ct = default)
+                => Data<TEntity, TKey>.CountAsync((object?)null, CountStrategy.Fast, ct);
+
+            public Task<long> Optimized(CancellationToken ct = default)
+                => Data<TEntity, TKey>.CountAsync((object?)null, CountStrategy.Optimized, ct);
+
+            public Task<long> Where(Expression<Func<TEntity, bool>> predicate, CountStrategy strategy = CountStrategy.Optimized, CancellationToken ct = default)
+                => Data<TEntity, TKey>.CountAsync(predicate, strategy, ct);
+
+            public Task<long> Where(Expression<Func<TEntity, bool>> predicate, DataQueryOptions options, CancellationToken ct = default)
+                => Data<TEntity, TKey>.CountAsync(predicate, options, ct);
+
+            public Task<long> Query(string query, CountStrategy strategy = CountStrategy.Optimized, CancellationToken ct = default)
+                => Data<TEntity, TKey>.CountAsync(query, strategy, ct);
+
+            public Task<long> Query(string query, DataQueryOptions options, CancellationToken ct = default)
+                => Data<TEntity, TKey>.CountAsync(query, options, ct);
+
+            public Task<long> Partition(string partition, CountStrategy strategy = CountStrategy.Exact, CancellationToken ct = default)
+                => Data<TEntity, TKey>.CountAsync(partition, strategy, ct);
+        }
         public static IBatchSet<TEntity, TKey> Batch() => Data<TEntity, TKey>.Batch();
 
         public static CopyTransferBuilder<TEntity, TKey> Copy()
@@ -368,11 +402,127 @@ namespace Koan.Data.Core.Model
                 .ConfigureAwait(false);
         }
 
-        public static Task<int> RemoveAll(CancellationToken ct = default)
-            => Data<TEntity, TKey>.DeleteAllAsync(ct);
+        /// <summary>
+        /// Removes all entities using Optimized strategy (framework chooses based on provider capabilities).
+        /// Uses current EntityContext or default partition.
+        /// Provider with FastRemove: Uses Fast (TRUNCATE/DROP). Provider without: Uses Safe (DELETE with hooks).
+        /// </summary>
+        /// <param name="ct">Cancellation token</param>
+        /// <returns>Number of entities removed, or -1 if unknown</returns>
+        public static Task<long> RemoveAll(CancellationToken ct = default)
+            => RemoveAll(RemoveStrategy.Optimized, ct);
 
-        public static Task<int> RemoveAll(DataQueryOptions? options, CancellationToken ct = default)
-            => Data<TEntity, TKey>.DeleteAllAsync(options, ct);
+        /// <summary>
+        /// Removes all entities using the specified strategy.
+        /// Uses current EntityContext or default partition.
+        /// </summary>
+        /// <param name="strategy">Removal strategy (Safe fires hooks, Fast bypasses for performance)</param>
+        /// <param name="ct">Cancellation token</param>
+        /// <returns>Number of entities removed, or -1 if unknown (TRUNCATE doesn't report count)</returns>
+        public static Task<long> RemoveAll(RemoveStrategy strategy, CancellationToken ct = default)
+            => Data<TEntity, TKey>.RemoveAllAsync(strategy, ct);
+
+        /// <summary>
+        /// Removes all entities in the specified partition using the given strategy.
+        /// </summary>
+        /// <param name="strategy">Removal strategy (Safe fires hooks, Fast bypasses for performance)</param>
+        /// <param name="partition">Partition name to target</param>
+        /// <param name="ct">Cancellation token</param>
+        /// <returns>Number of entities removed, or -1 if unknown</returns>
+        public static Task<long> RemoveAll(RemoveStrategy strategy, string partition, CancellationToken ct = default)
+            => Data<TEntity, TKey>.RemoveAllAsync(strategy, partition, ct);
+
+        // --- Patch convenience statics (DX sugar, normalize to canonical PatchOps) ---
+        // Null → null semantics (application/json partial JSON)
+        public static Task<TEntity?> Patch(TKey id, object partial, Koan.Data.Abstractions.Instructions.PartialJsonNullPolicy? nulls = null, CancellationToken ct = default)
+        {
+            if (partial is null) throw new ArgumentNullException(nameof(partial));
+            var ops = new List<Koan.Data.Abstractions.Instructions.PatchOp>();
+            // Use Newtonsoft for consistent token walking used elsewhere
+            var jt = Newtonsoft.Json.Linq.JToken.FromObject(partial);
+            void Walk(Newtonsoft.Json.Linq.JToken token, string basePath)
+            {
+                if (token is Newtonsoft.Json.Linq.JObject obj)
+                {
+                    foreach (var p in obj.Properties())
+                    {
+                        var path = basePath + "/" + p.Name;
+                        if (p.Value.Type == Newtonsoft.Json.Linq.JTokenType.Object)
+                        {
+                            Walk(p.Value, path);
+                        }
+                        else if (p.Value.Type == Newtonsoft.Json.Linq.JTokenType.Null)
+                        {
+                            ops.Add(new Koan.Data.Abstractions.Instructions.PatchOp("replace", path, null, Newtonsoft.Json.Linq.JValue.CreateNull()));
+                        }
+                        else
+                        {
+                            ops.Add(new Koan.Data.Abstractions.Instructions.PatchOp("replace", path, null, p.Value.DeepClone()));
+                        }
+                    }
+                }
+                else
+                {
+                    ops.Add(new Koan.Data.Abstractions.Instructions.PatchOp("replace", basePath, null, token.DeepClone()));
+                }
+            }
+            Walk(jt, "");
+            ops = ops.Select(o => o with { Path = o.Path.StartsWith('/') ? o.Path : "/" + o.Path.TrimStart('/') }).ToList();
+            var options = new Koan.Data.Abstractions.Instructions.PatchOptions(
+                Koan.Data.Abstractions.Instructions.MergePatchNullPolicy.SetDefault,
+                nulls ?? Koan.Data.Abstractions.Instructions.PartialJsonNullPolicy.SetNull,
+                Koan.Data.Abstractions.Instructions.ArrayBehavior.Replace);
+            var payload = new Koan.Data.Abstractions.Instructions.PatchPayload<TKey>(id, null, null, "partial-json", ops, options);
+            return Data<TEntity, TKey>.PatchAsync(payload, ct);
+        }
+
+        // Null → default semantics (application/merge-patch+json)
+        public static Task<TEntity?> PatchMerge(TKey id, object delta, Koan.Data.Abstractions.Instructions.MergePatchNullPolicy? nulls = null, CancellationToken ct = default)
+        {
+            if (delta is null) throw new ArgumentNullException(nameof(delta));
+            var jt = Newtonsoft.Json.Linq.JToken.FromObject(delta);
+            var ops = new List<Koan.Data.Abstractions.Instructions.PatchOp>();
+            void Walk(Newtonsoft.Json.Linq.JToken token, string basePath)
+            {
+                if (token is Newtonsoft.Json.Linq.JObject obj)
+                {
+                    foreach (var p in obj.Properties())
+                    {
+                        var path = basePath + "/" + p.Name;
+                        if (p.Value.Type == Newtonsoft.Json.Linq.JTokenType.Object)
+                        {
+                            Walk(p.Value, path);
+                        }
+                        else if (p.Value.Type == Newtonsoft.Json.Linq.JTokenType.Null)
+                        {
+                            ops.Add(new Koan.Data.Abstractions.Instructions.PatchOp("remove", path, null, null));
+                        }
+                        else
+                        {
+                            ops.Add(new Koan.Data.Abstractions.Instructions.PatchOp("replace", path, null, p.Value.DeepClone()));
+                        }
+                    }
+                }
+                else
+                {
+                    ops.Add(new Koan.Data.Abstractions.Instructions.PatchOp("replace", basePath, null, token.DeepClone()));
+                }
+            }
+            Walk(jt, "");
+            ops = ops.Select(o => o with { Path = o.Path.StartsWith('/') ? o.Path : "/" + o.Path.TrimStart('/') }).ToList();
+            var options = new Koan.Data.Abstractions.Instructions.PatchOptions(
+                nulls ?? Koan.Data.Abstractions.Instructions.MergePatchNullPolicy.SetDefault,
+                Koan.Data.Abstractions.Instructions.PartialJsonNullPolicy.SetNull,
+                Koan.Data.Abstractions.Instructions.ArrayBehavior.Replace);
+            var payload = new Koan.Data.Abstractions.Instructions.PatchPayload<TKey>(id, null, null, "merge-patch", ops, options);
+            return Data<TEntity, TKey>.PatchAsync(payload, ct);
+        }
+
+        /// <summary>
+        /// Indicates whether the current provider supports fast removal (TRUNCATE/DROP).
+        /// </summary>
+        public static bool SupportsFastRemove
+            => Data<TEntity, TKey>.WriteCaps.Writes.HasFlag(WriteCapabilities.FastRemove);
 
         // Instance self-remove
         public Task<bool> Remove(CancellationToken ct = default)
@@ -755,5 +905,4 @@ public static class EntityMetadataProvider
 {
     public static Func<IServiceProvider, IRelationshipMetadata>? RelationshipMetadataAccessor;
 }
-
 

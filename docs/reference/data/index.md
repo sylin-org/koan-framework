@@ -5,9 +5,9 @@ title: "Data Pillar Reference"
 audience: [developers, architects, ai-agents]
 status: current
 last_updated: 2025-09-28
-framework_version: v0.6.2
+framework_version: v0.6.3
 validation:
-  date_last_tested: 2025-09-28
+  date_last_tested: 2025-10-07
   status: verified
   scope: docs/reference/data/index.md
 ---
@@ -31,11 +31,19 @@ validation:
 
 ---
 
+
 ## Pillar Overview
+
+**Test Coverage:**
+
+- All Data pillar connectors and adapters (Sqlite, Postgres, SqlServer, Mongo, Redis, Json, Couchbase, OpenSearch, Vector) are covered by automated test suites as of 2025-10-07.
+- See `tests/Suites/` for per-connector and per-pillar test implementations.
 
 Koan’s Data pillar unifies persistence across SQL, NoSQL, JSON, and vector databases. Every entity is a rich domain object with first-class static helpers (`All`, `Query`, `AllStream`, `FirstPage`, etc.) and lifecycle hooks. Capabilities are discovered automatically from installed adapters.
 
 **Core packages**: `Koan.Data.Core`, adapter-specific packages (for example `Koan.Data.Connector.Postgres`, `Koan.Data.Connector.MongoDB`, `Koan.Data.Connector.Redis`, `Koan.Data.Vector.Redis`).
+
+➤ **Caching**: See the [Koan Cache Reference](./cache.md) for fluent builders, tag invalidation, and policy-driven caching that integrates with `Entity<TEntity>`.
 
 ---
 
@@ -55,7 +63,7 @@ var product = await new Product { Name = "Widget", Price = 10.00m }.Save();
 
 // Read
 var all = await Product.All();
-var widget = await Product.ById(product.Id);
+var widget = await Product.Get(product.Id);
 
 // Update
 widget.Price = 15.00m;
@@ -100,7 +108,7 @@ public class Order : Entity<Order>
   public string UserId { get; set; } = "";
   public decimal Total { get; set; }
 
-  public Task<User?> GetUser() => User.ById(UserId);
+  public Task<User?> GetUser() => User.Get(UserId);
 
   public static Task<Order[]> ForUser(string userId) =>
     Query().Where(o => o.UserId == userId);
@@ -158,7 +166,7 @@ public class Order : Entity<Order>
 {
   public async Task AddItem(string productId, int quantity)
   {
-    var product = await Product.ById(productId)
+  var product = await Product.Get(productId)
       ?? throw new InvalidOperationException("Product not found");
 
     await new OrderItem
@@ -292,8 +300,8 @@ All direct commands respect configured connections, logging, and retry policies.
 
 ## Provider Matrix
 
-| Provider   | Package               | Primary Use Case                        |
-| ---------- | --------------------- | --------------------------------------- |
+| Provider   | Package                         | Primary Use Case                        |
+| ---------- | ------------------------------- | --------------------------------------- |
 | SQLite     | `Koan.Data.Connector.Sqlite`    | Local development, embedded deployments |
 | Postgres   | `Koan.Data.Connector.Postgres`  | Production relational workloads         |
 | SQL Server | `Koan.Data.Connector.SqlServer` | Legacy and enterprise relational        |
@@ -337,4 +345,3 @@ export Koan__Data__Postgres__ConnectionString="Host=prod;Database=app"
 - [Entity Lifecycle Events](./entity-lifecycle-events.md)
 - [Flow Pillar Reference](../flow/index.md) for ingestion pipelines and semantic augmentation
 - [AI Pillar Reference](../ai/index.md) for embedding generation and retrieval-augmented generation
-

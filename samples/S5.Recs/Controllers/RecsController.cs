@@ -36,6 +36,7 @@ public class RecsController(IRecsService recs) : ControllerBase
             req.Filters?.RatingMax,
             req.Filters?.YearMin,
             req.Filters?.YearMax,
+            req.Alpha,
             ct).GetAwaiter().GetResult();
         return Ok(new { items, degraded });
     }

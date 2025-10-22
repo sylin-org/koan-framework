@@ -67,15 +67,28 @@ public class MongoOptimizationAutoRegistrar : IKoanInitializer
             new IgnoreExtraElementsConvention(true)
         };
 
-        ConventionRegistry.Register(
-            "KoanFrameworkGlobalConventions",
-            conventionPack,
-            t => true); // Apply to all types
+        try
+        {
+            ConventionRegistry.Register(
+                "KoanFrameworkGlobalConventions",
+                conventionPack,
+                t => true); // Apply to all types
+        }
+        catch (ArgumentException)
+        {
+            // Already registered - safe to ignore
+        }
 
         // Configure global GUID representation for v3.5.0 compatibility
-        BsonSerializer.RegisterSerializer(typeof(Guid), new GuidSerializer(GuidRepresentation.Standard));
-        BsonSerializer.RegisterSerializer(typeof(Guid?), new NullableSerializer<Guid>(new GuidSerializer(GuidRepresentation.Standard)));
-
+        try
+        {
+            BsonSerializer.RegisterSerializer(typeof(Guid), new GuidSerializer(GuidRepresentation.Standard));
+            BsonSerializer.RegisterSerializer(typeof(Guid?), new NullableSerializer<Guid>(new GuidSerializer(GuidRepresentation.Standard)));
+        }
+        catch (BsonSerializationException)
+        {
+            // Already registered - safe to ignore
+        }
     }
 
     /// <summary>

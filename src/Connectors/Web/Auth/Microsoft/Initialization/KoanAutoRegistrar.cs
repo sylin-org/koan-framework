@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Koan.Core;
+using Koan.Core.Hosting.Bootstrap;
 using Koan.Web.Auth.Connector.Microsoft.Providers;
 using Koan.Web.Auth.Providers;
 
@@ -18,10 +19,20 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IAuthProviderContributor, MicrosoftProviderContributor>());
     }
 
-    public void Describe(Koan.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)
+    public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
-        report.AddModule(ModuleName, ModuleVersion);
-        report.AddSetting("Provides", "microsoft (OIDC)");
+        module.Describe(ModuleVersion);
+        module.AddSetting(
+            "Provider",
+            "microsoft (OIDC)",
+            source: BootSettingSource.Auto,
+            consumers: new[] { "Koan.Web.Auth.ProviderRegistry" });
+        module.AddSetting(
+            "Defaults.Enabled",
+            "true",
+            source: BootSettingSource.Auto,
+            consumers: new[] { "Koan.Web.Auth.ProviderRegistry" });
     }
 }
+
 

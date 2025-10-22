@@ -1,0 +1,16 @@
+﻿ 
+services:
+  pantry:
+    build:
+      context: ../..
+      dockerfile: samples/S16.PantryPal/API/Dockerfile
+    image: s16.pantrypal:latest
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      S16__Ingestion__MaxUploadBytes: 5242880
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./.Koan/Data/photos:/app/photos
+    restart: unless-stopped
+volumes: {}

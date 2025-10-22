@@ -9,7 +9,6 @@ using S5.Recs.Services;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddKoan()
-    .AsWebApi()
     .AsProxiedApi()
     .WithRateLimit();
 

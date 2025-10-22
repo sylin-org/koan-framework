@@ -13,9 +13,6 @@
     <FileVersion>0.6.3</FileVersion>
   </PropertyGroup>
   <ItemGroup>
-    <FrameworkReference Include="Microsoft.AspNetCore.App" />
-  </ItemGroup>
-  <ItemGroup>
     <ProjectReference Include="..\Koan.Core\Koan.Core.csproj" />
     <ProjectReference Include="..\Koan.Data.Core\Koan.Data.Core.csproj" />
     <ProjectReference Include="..\Koan.Web.Extensions\Koan.Web.Extensions.csproj" />

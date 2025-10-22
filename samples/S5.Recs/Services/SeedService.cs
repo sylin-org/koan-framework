@@ -314,10 +314,11 @@ internal sealed class SeedService : ISeedService
 
         try
         {
-            using (EntityContext.Partition(null))
+            using (EntityContext.Partition(null!))
             {
                 var repo = dataSvc.GetRepository<Media, string>();
-                mediaCount = await repo.CountAsync(query: null, ct);
+                var result = await repo.CountAsync(new CountRequest<Media>(), ct);
+                mediaCount = (int)result.Value;
             }
         }
         catch (Exception ex)
@@ -327,7 +328,7 @@ internal sealed class SeedService : ISeedService
 
         try
         {
-            using (EntityContext.Partition(null))
+            using (EntityContext.Partition(null!))
             {
                 if (Vector<Media>.IsAvailable)
                 {
@@ -719,7 +720,7 @@ internal sealed class SeedService : ISeedService
             }
         }
 
-        _logger?.LogInformation("Embedding cache: {Hits} hits, {Misses} misses ({HitRate:P1} hit rate)",
+        _logger?.LogInformation("Embedding cache: {CacheHits} hits, {CacheMisses} misses ({HitRate:P1} hit rate)",
             cachedItems.Count, uncachedItems.Count,
             itemsList.Count > 0 ? (double)cachedItems.Count / itemsList.Count : 0);
 
@@ -732,10 +733,11 @@ internal sealed class SeedService : ISeedService
                 {
                     ["title"] = media.Title,
                     ["genres"] = media.Genres,
-                    ["popularity"] = media.Popularity
+                    ["popularity"] = media.Popularity,
+                    ["searchText"] = BuildSearchText(media)  // Required for hybrid search
                 };
 
-                await Data<Media, string>.SaveWithVector(media, embedding, vectorMetadata, ct).ConfigureAwait(false);
+                await VectorData<Media>.SaveWithVector(media, embedding, vectorMetadata, ct).ConfigureAwait(false);
                 Interlocked.Increment(ref stored);
             }
             catch (Exception ex)
@@ -755,7 +757,13 @@ internal sealed class SeedService : ISeedService
                     .OnSuccess(success => success
                         .Mutate(envelope =>
                         {
-                            envelope.Features["vector:metadata"] = new { title = envelope.Entity.Title, genres = envelope.Entity.Genres, popularity = envelope.Entity.Popularity };
+                            envelope.Features["vector:metadata"] = new
+                            {
+                                title = envelope.Entity.Title,
+                                genres = envelope.Entity.Genres,
+                                popularity = envelope.Entity.Popularity,
+                                searchText = BuildSearchText(envelope.Entity)  // Required for hybrid search
+                            };
                         })
                         .Do(async (envelope, ct) =>
                         {
@@ -768,7 +776,7 @@ internal sealed class SeedService : ISeedService
 
                                 try
                                 {
-                                    await Data<Media, string>.SaveWithVector(envelope.Entity, embedding, vectorMetadata, ct).ConfigureAwait(false);
+                                    await VectorData<Media>.SaveWithVector(envelope.Entity, embedding, vectorMetadata, ct).ConfigureAwait(false);
                                     envelope.Metadata["vector:affected"] = 1;
                                     Interlocked.Add(ref stored, 1);
 
@@ -777,12 +785,12 @@ internal sealed class SeedService : ISeedService
                                     var contentHash = EmbeddingCache.ComputeContentHash(embeddingText);
                                     await _embeddingCache.SetAsync(contentHash, modelId, embedding, typeof(Media).FullName!, ct);
                                 }
-                                catch (InvalidOperationException ex)
+                                catch (InvalidOperationException)
                                 {
                                     envelope.Metadata["vector:affected"] = 0;
                                     Interlocked.Increment(ref failures);
                                 }
-                                catch (Exception ex)
+                                catch (Exception)
                                 {
                                     envelope.Metadata["vector:affected"] = 0;
                                     Interlocked.Increment(ref failures);
@@ -831,5 +839,20 @@ internal sealed class SeedService : ISeedService
         var trimmedText = text.Trim();
         //_logger?.LogDebug("BuildEmbeddingText for media {Id}: {Length} chars, text preview: {Preview}", m.Id, trimmedText.Length, trimmedText.Length > 100 ? trimmedText.Substring(0, 100) + "..." : trimmedText);
         return trimmedText;
+    }
+
+    /// <summary>
+    /// Builds search text for BM25 hybrid search - just title variants for keyword matching.
+    /// </summary>
+    public string BuildSearchText(Media m)
+    {
+        var titles = new List<string>();
+        if (!string.IsNullOrWhiteSpace(m.Title)) titles.Add(m.Title);
+        if (!string.IsNullOrWhiteSpace(m.TitleEnglish) && m.TitleEnglish != m.Title) titles.Add(m.TitleEnglish!);
+        if (!string.IsNullOrWhiteSpace(m.TitleRomaji) && m.TitleRomaji != m.Title) titles.Add(m.TitleRomaji!);
+        if (!string.IsNullOrWhiteSpace(m.TitleNative) && m.TitleNative != m.Title) titles.Add(m.TitleNative!);
+        if (m.Synonyms is { Length: > 0 }) titles.AddRange(m.Synonyms);
+
+        return string.Join(" ", titles.Distinct());
     }
 }

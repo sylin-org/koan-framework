@@ -1,3 +1,5 @@
+using Koan.Data.Abstractions.Instructions;
+
 namespace Koan.Web.Options;
 
 /// <summary>
@@ -35,4 +37,12 @@ public sealed class KoanWebOptions
     // Controls exposure of the observability snapshot endpoint.
     // Default: false; can be enabled via config. In Development, controller may allow it regardless.
     public bool ExposeObservabilitySnapshot { get; set; } = false;
+
+    // Controls how RFC 7386 (merge-patch) treats nulls on non-nullable value types.
+    // Default: map to default(T). Alternative: reject with 422.
+    public MergePatchNullPolicy MergePatchNullsForNonNullable { get; set; } = MergePatchNullPolicy.SetDefault;
+
+    // Controls how application/json (partial JSON) treats nulls on reference types.
+    // Default: SetNull (null sets property to null). Alternative: Ignore or Disallow.
+    public PartialJsonNullPolicy PartialJsonNulls { get; set; } = PartialJsonNullPolicy.SetNull;
 }

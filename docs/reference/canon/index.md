@@ -1,11 +1,11 @@
 ---
 type: REF
-domain: canon
+domain: framework
 title: "Canon Pillar Reference"
 audience: [developers, architects, ai-agents]
 status: current
 last_updated: 2025-09-28
-framework_version: v0.6.2
+framework_version: v0.6.3
 validation:
   date_last_tested: 2025-09-28
   status: verified
@@ -40,6 +40,12 @@ Canon (formerly the Flow pillar) orchestrates inbound data, enrichment, and publ
 - `Koan.Canon` – runtime, entities, stages, interceptors, controllers.
 - `Koan.Canon.Semantic` – semantic streaming pipeline operators.
 - Adapter packages (`Koan.Data.Connector.Postgres`, `Koan.Data.Vector.Redis`, `Koan.Data.Connector.Mongo`, etc.) wired through Koan’s auto-registration.
+
+### Identity Graph & Source-of-Truth Requirements
+
+- **Peer identity graph**: Canon treats every `[AggregationKey]` as an optional peer node. Do **not** model “primary vs secondary” identifiers; payloads may arrive with any subset (email, username, employee IDs, etc.). Canon unions clusters when later payloads bridge previously separate identifiers.
+- **Authority-aware policies**: Regulated properties must designate an authoritative system using the upcoming `AggregationPolicyKind.SourceOfTruth` (e.g., Workday for HR attributes). Provide a fallback policy such as `Latest` until the authority emits data, and log attempted overrides for audit.
+- **Operational posture**: Capture identity merge posture (`auto-union`, `manual-review`) in `CanonizationOptions.Identity`, and surface authoritative mappings in module docs so API consumers know which integration governs each field.
 
 ---
 
@@ -460,5 +466,4 @@ public async Task DevicePipeline_ShouldPersistProjection()
 - [AI Pillar Reference](../ai/index.md)
 - [Messaging Reference](../messaging/index.md)
 - [Semantic Pipelines Playbook](../../guides/semantic-pipelines.md)
-- [DX-0041 Consolidation ADR](../../decisions/DX-0041-docs-consolidation.md)
-
+- [DX-0041 Consolidation ADR](../../decisions/DX-0041-docs-pillar-consolidation.md)

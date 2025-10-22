@@ -94,7 +94,7 @@
       <td><strong>Vector / semantic search</strong></td>
       <td>🟥 External add-ons</td>
       <td>🟥 Rare</td>
-      <td>🟩 Built-in vector module; <code>SemanticSearch</code>, <code>SaveWithVector</code></td>
+  <td>🟩 Built-in vector module; <code>SemanticSearch</code>, <code>VectorData&lt;T&gt;.SaveWithVector</code></td>
     </tr>
     <tr><th colspan="4" style="text-align:left;">5) Operations, Deployment &amp; Tooling</th></tr>
     <tr>

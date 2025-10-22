@@ -1,18 +1,26 @@
+using System;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Logging.Abstractions;
 using Koan.Core;
+using Koan.Core.Adapters.Reporting;
+using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Modules;
 using Koan.Core.Orchestration;
 using Koan.Core.Orchestration.Abstractions;
+using Koan.Core.Provenance;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Naming;
 using Koan.Data.Connector.Postgres.Discovery;
 using Koan.Data.Connector.Postgres.Orchestration;
+using Koan.Data.Relational.Orchestration;
 using Koan.Orchestration.Aspire;
 using Aspire.Hosting;
+using PostgresItems = Koan.Data.Connector.Postgres.Infrastructure.PostgresProvenanceItems;
+using ProvenanceModes = Koan.Core.Hosting.Bootstrap.ProvenancePublicationModeExtensions;
 
 namespace Koan.Data.Connector.Postgres.Initialization;
 
@@ -28,6 +36,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar, IKoanAspireRegistrar
         services.TryAddSingleton<IStorageNameResolver, DefaultStorageNameResolver>();
         services.TryAddEnumerable(new ServiceDescriptor(typeof(INamingDefaultsProvider), typeof(PostgresNamingDefaultsProvider), ServiceLifetime.Singleton));
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, PostgresHealthContributor>());
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IConfigureOptions<RelationalMaterializationOptions>, PostgresRelationalMaterializationOptionsConfigurator>());
 
         // Register orchestration evaluator for dependency management
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IKoanOrchestrationEvaluator, PostgresOrchestrationEvaluator>());
@@ -39,33 +48,113 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar, IKoanAspireRegistrar
         services.AddSingleton<IDataAdapterFactory, PostgresAdapterFactory>();
     }
 
-    public void Describe(Koan.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)
+    public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
-        report.AddModule(ModuleName, ModuleVersion);
-
+        module.Describe(ModuleVersion);
         // Autonomous discovery adapter handles all connection string resolution
         // Boot report shows discovery results from PostgresDiscoveryAdapter
-        report.AddNote("PostgreSQL discovery handled by autonomous PostgresDiscoveryAdapter");
+        module.AddNote("PostgreSQL discovery handled by autonomous PostgresDiscoveryAdapter");
 
-        // Configure default options for reporting
+        // Configure default options for reporting (with provenance)
         var defaultOptions = new PostgresOptions();
-        var searchPath = Configuration.ReadFirst(cfg, defaultOptions.SearchPath ?? "public",
+
+        var connection = Configuration.ReadFirstWithSource(
+            cfg,
+            defaultOptions.ConnectionString,
+            Infrastructure.Constants.Configuration.Keys.ConnectionString,
+            Infrastructure.Constants.Configuration.Keys.AltConnectionString,
+            Infrastructure.Constants.Configuration.Keys.ConnectionStringsPostgres,
+            Infrastructure.Constants.Configuration.Keys.ConnectionStringsDefault);
+
+        var searchPath = Configuration.ReadFirstWithSource(
+            cfg,
+            defaultOptions.SearchPath ?? "public",
             Infrastructure.Constants.Configuration.Keys.SearchPath);
 
-        report.AddSetting("ConnectionString", "auto (resolved by discovery)", isSecret: false);
-        report.AddSetting("NamingStyle", defaultOptions.NamingStyle.ToString());
-        report.AddSetting("Separator", defaultOptions.Separator);
-        report.AddSetting("SearchPath", searchPath);
-        report.AddSetting("EnsureCreatedSupported", true.ToString());
-
-        var defSize = Configuration.ReadFirst(cfg, defaultOptions.DefaultPageSize,
+        var defaultPageSize = Configuration.ReadFirstWithSource(
+            cfg,
+            defaultOptions.DefaultPageSize,
             Infrastructure.Constants.Configuration.Keys.DefaultPageSize,
             Infrastructure.Constants.Configuration.Keys.AltDefaultPageSize);
-        var maxSize = Configuration.ReadFirst(cfg, defaultOptions.MaxPageSize,
+
+        var maxPageSize = Configuration.ReadFirstWithSource(
+            cfg,
+            defaultOptions.MaxPageSize,
             Infrastructure.Constants.Configuration.Keys.MaxPageSize,
             Infrastructure.Constants.Configuration.Keys.AltMaxPageSize);
-        report.AddSetting("DefaultPageSize", defSize.ToString());
-        report.AddSetting("MaxPageSize", maxSize.ToString());
+
+        var namingStyle = Configuration.ReadFirstWithSource(
+            cfg,
+            defaultOptions.NamingStyle,
+            Infrastructure.Constants.Configuration.Keys.NamingStyle,
+            Infrastructure.Constants.Configuration.Keys.AltNamingStyle);
+
+        var separator = Configuration.ReadFirstWithSource(
+            cfg,
+            defaultOptions.Separator,
+            Infrastructure.Constants.Configuration.Keys.Separator,
+            Infrastructure.Constants.Configuration.Keys.AltSeparator);
+
+        var ensureCreated = Configuration.ReadWithSource(
+            cfg,
+            Infrastructure.Constants.Configuration.Keys.EnsureCreatedSupported,
+            true);
+
+        var connectionIsAuto = string.IsNullOrWhiteSpace(connection.Value) || string.Equals(connection.Value, "auto", StringComparison.OrdinalIgnoreCase);
+        var connectionSourceKey = connection.ResolvedKey ?? Infrastructure.Constants.Configuration.Keys.ConnectionString;
+        var effectiveConnectionString = connection.Value ?? defaultOptions.ConnectionString;
+
+        if (connectionIsAuto)
+        {
+            var adapter = new PostgresDiscoveryAdapter(cfg, NullLogger<PostgresDiscoveryAdapter>.Instance);
+            effectiveConnectionString = AdapterBootReporting.ResolveConnectionString(
+                cfg,
+                adapter,
+                null,
+                () => BuildPostgresFallback(defaultOptions));
+        }
+
+        var connectionMode = connectionIsAuto
+            ? ProvenanceModes.FromBootSource(BootSettingSource.Auto, usedDefault: true)
+            : ProvenanceModes.FromConfigurationValue(connection);
+
+        Publish(
+            module,
+            PostgresItems.ConnectionString,
+            connection,
+            displayOverride: effectiveConnectionString,
+            modeOverride: connectionMode,
+            usedDefaultOverride: connectionIsAuto ? true : connection.UsedDefault,
+            sourceKeyOverride: connectionSourceKey);
+
+        Publish(
+            module,
+            PostgresItems.SearchPath,
+            searchPath,
+            displayOverride: searchPath.Value ?? defaultOptions.SearchPath ?? "public");
+
+        Publish(module, PostgresItems.NamingStyle, namingStyle);
+        Publish(module, PostgresItems.Separator, separator);
+        Publish(module, PostgresItems.EnsureCreatedSupported, ensureCreated);
+        Publish(module, PostgresItems.DefaultPageSize, defaultPageSize);
+        Publish(module, PostgresItems.MaxPageSize, maxPageSize);
+    }
+
+    private static void Publish<T>(ProvenanceModuleWriter module, ProvenanceItem item, ConfigurationValue<T> value, object? displayOverride = null, ProvenancePublicationMode? modeOverride = null, bool? usedDefaultOverride = null, string? sourceKeyOverride = null, bool? sanitizeOverride = null)
+    {
+        module.AddSetting(
+            item,
+            modeOverride ?? ProvenanceModes.FromConfigurationValue(value),
+            displayOverride ?? value.Value,
+            sourceKey: sourceKeyOverride ?? value.ResolvedKey,
+            usedDefault: usedDefaultOverride ?? value.UsedDefault,
+            sanitizeOverride: sanitizeOverride);
+    }
+
+    private static string BuildPostgresFallback(PostgresOptions defaults)
+    {
+        var database = defaults.SearchPath ?? "Koan";
+        return $"Host=localhost;Port=5432;Database={database};Username=postgres;Password=postgres";
     }
 
     // IKoanAspireRegistrar implementation
@@ -153,4 +242,5 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar, IKoanAspireRegistrar
         return (database, username, password, port);
     }
 }
+
 

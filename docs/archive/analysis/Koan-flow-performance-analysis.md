@@ -73,7 +73,7 @@ foreach (var c in candidates)
 
 **Optimization Recommendation**:
 
-- Replace individual `GetAsync` calls with `GetManyAsync` batch operations
+- Replace individual `GetAsync` calls with batch operations (`Entity.Get(ids)` at Entity layer, `GetManyAsync` at Data layer)
 - Group candidate keys for single database round trip
 - Implement parallel processing for independent operations
 
@@ -125,7 +125,7 @@ foreach (var c in candidates)
 
 - Extensive use of reflection-based database calls
 - Individual `GetAsync`/`UpsertAsync` operations in loops
-- No utilization of batch operations (`GetManyAsync`, `UpsertManyAsync`)
+- No utilization of batch operations (`Entity.Get(ids)` / `Entity.Save()` at Entity layer, or `GetManyAsync` / `UpsertManyAsync` at Data layer)
 - Type construction overhead with `MakeGenericType()` calls
 
 **Optimization Strategy**:
@@ -172,6 +172,7 @@ foreach (var c in candidates)
 
 ```csharp
 // Replace individual operations with batch equivalents
+// Note: At Entity<T> layer, prefer: await Entity.Get(ids, ct)
 await Data<KeyIndex<T>, string>.GetManyAsync(candidateKeys, ct);
 await Data<StageRecord<T>, string>.UpsertManyAsync(records, setName, ct);
 await Data<T, string>.DeleteManyAsync(recordIds, setName, ct);
@@ -392,7 +393,7 @@ public static void ConfigureForPerformance(FlowOptions options)
 
 ### Immediate Actions (Next Sprint)
 
-1. **Implement Batch Database Operations** - Replace individual calls with `GetManyAsync`/`UpsertManyAsync`
+1. **Implement Batch Database Operations** - Replace individual calls with batch operations (`Entity.Get(ids)` / `Entity.Save()` at Entity layer, or `GetManyAsync` / `UpsertManyAsync` at Data layer)
 2. **Create Compiled Delegate Cache** - Eliminate reflection overhead in critical paths
 3. **Add Performance Monitoring** - Implement metrics to measure optimization impact
 

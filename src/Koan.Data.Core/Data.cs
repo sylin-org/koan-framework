@@ -15,6 +15,8 @@ public static class Data<TEntity, TKey>
     where TEntity : class, IEntity<TKey>
     where TKey : notnull
 {
+    private readonly record struct CountOutcome(long Count, bool IsEstimate);
+
     private static IDataRepository<TEntity, TKey> Repo
     => Koan.Core.Hosting.App.AppHost.Current?.GetService<IDataService>()?.GetRepository<TEntity, TKey>()
            ?? throw new System.InvalidOperationException("AppHost.Current is not set. Ensure services.AddKoan() and greenfield boot (AppHost.Current + IAppRuntime).");
@@ -25,7 +27,57 @@ public static class Data<TEntity, TKey>
     public static IWriteCapabilities WriteCaps
         => Repo as IWriteCapabilities ?? new WriteCapsImpl(WriteCapabilities.None);
 
+    private static async Task<CountOutcome> CountInternalAsync(object? query, CountStrategy strategy, DataQueryOptions? options, CancellationToken ct)
+    {
+        var repo = Repo;
+        var request = BuildCountRequest(query, strategy, options);
+
+        try
+        {
+            var result = await repo.CountAsync(request, ct).ConfigureAwait(false);
+            return new CountOutcome(result.Value, result.IsEstimate);
+        }
+        catch (NotSupportedException)
+        {
+            var fallbackItems = await LoadItemsForFallbackAsync(repo, request, ct).ConfigureAwait(false);
+            return new CountOutcome(fallbackItems.Count, false);
+        }
+    }
+
+    private static CountRequest<TEntity> BuildCountRequest(object? query, CountStrategy strategy, DataQueryOptions? options)
+        => new()
+        {
+            Strategy = strategy,
+            Options = options,
+            Predicate = query as Expression<Func<TEntity, bool>>,
+            RawQuery = query as string,
+            ProviderQuery = query is string || query is Expression<Func<TEntity, bool>> ? null : query
+        };
+
+    private static async Task<IReadOnlyList<TEntity>> LoadItemsForFallbackAsync(IDataRepository<TEntity, TKey> repo, CountRequest<TEntity> request, CancellationToken ct)
+    {
+        var payload = request.ProviderQuery ?? (object?)request.RawQuery ?? request.Predicate;
+        var options = request.Options;
+
+        if (repo is IDataRepositoryWithOptions<TEntity, TKey> repoWithOptions && options is not null)
+        {
+            return await repoWithOptions.QueryAsync(payload, options, ct).ConfigureAwait(false);
+        }
+
+        if (request.Predicate is not null && repo is ILinqQueryRepository<TEntity, TKey> linq)
+        {
+            return await linq.QueryAsync(request.Predicate, ct).ConfigureAwait(false);
+        }
+
+        if (request.RawQuery is not null && repo is IStringQueryRepository<TEntity, TKey> str)
+        {
+            return await str.QueryAsync(request.RawQuery, ct).ConfigureAwait(false);
+        }
+
+        return await repo.QueryAsync(payload, ct).ConfigureAwait(false);
+    }
     public static Task<TEntity?> GetAsync(TKey id, CancellationToken ct = default) => Repo.GetAsync(id, ct);
+    public static Task<IReadOnlyList<TEntity?>> GetManyAsync(IEnumerable<TKey> ids, CancellationToken ct = default) => Repo.GetManyAsync(ids, ct);
 
     // Full scan - no pagination applied unless explicitly requested by user
     public static Task<IReadOnlyList<TEntity>> All(CancellationToken ct = default)
@@ -33,17 +85,21 @@ public static class Data<TEntity, TKey>
 
     public static async Task<IReadOnlyList<TEntity>> All(DataQueryOptions? options, CancellationToken ct = default)
     {
-        var result = await QueryWithCount((Expression<Func<TEntity, bool>>?)null, options, ct).ConfigureAwait(false);
+        Expression<Func<TEntity, bool>>? predicate = null;
+        var result = await QueryWithCount(predicate, options, ct).ConfigureAwait(false);
         return result.Items;
     }
 
     public static Task<QueryResult<TEntity>> AllWithCount(DataQueryOptions? options = null, CancellationToken ct = default)
-        => QueryWithCount((Expression<Func<TEntity, bool>>?)null, options, ct);
+    {
+        Expression<Func<TEntity, bool>>? predicate = null;
+        return QueryWithCount(predicate, options, ct);
+    }
 
     public static Task<QueryResult<TEntity>> QueryWithCount(DataQueryOptions? options, CancellationToken ct = default, int? absoluteMaxRecords = null)
         => QueryWithCount((object?)null, options, ct, absoluteMaxRecords);
 
-    public static Task<QueryResult<TEntity>> QueryWithCount(Expression<Func<TEntity, bool>> predicate, DataQueryOptions? options = null, CancellationToken ct = default, int? absoluteMaxRecords = null)
+    public static Task<QueryResult<TEntity>> QueryWithCount(Expression<Func<TEntity, bool>>? predicate, DataQueryOptions? options = null, CancellationToken ct = default, int? absoluteMaxRecords = null)
         => QueryWithCount((object?)predicate, options, ct, absoluteMaxRecords);
 
     public static Task<QueryResult<TEntity>> QueryWithCount(string query, DataQueryOptions? options = null, CancellationToken ct = default, int? absoluteMaxRecords = null)
@@ -55,8 +111,11 @@ public static class Data<TEntity, TKey>
         CancellationToken ct = default,
         int? absoluteMaxRecords = null)
     {
-        var repo = Repo;
         var providedOptions = options ?? new DataQueryOptions();
+        var countStrategy = providedOptions.CountStrategy ?? CountStrategy.Optimized;
+        providedOptions = providedOptions.WithCountStrategy(countStrategy);
+
+        var repo = Repo;
         var hasPagination = providedOptions.HasPagination;
         var page = hasPagination ? providedOptions.EffectivePage(1) : 1;
         var pageSize = hasPagination ? providedOptions.EffectivePageSize(Koan.Data.Core.Infrastructure.Constants.Defaults.UnboundedLoopPageSize) : int.MaxValue;
@@ -64,35 +123,28 @@ public static class Data<TEntity, TKey>
         var normalizedOptions = hasPagination
             ? providedOptions.WithPagination(page, pageSize)
             : providedOptions.WithoutPagination();
+        normalizedOptions = normalizedOptions.WithCountStrategy(countStrategy);
 
-        async Task<int?> TryCountAsync()
-        {
-            try
-            {
-                return await repo.CountAsync(query, ct).ConfigureAwait(false);
-            }
-            catch
-            {
-                return null;
-            }
-        }
+        CountOutcome? precomputedCount = null;
 
-        int? preflightCount = null;
         if (!hasPagination && absoluteMaxRecords.HasValue)
         {
-            preflightCount = await TryCountAsync().ConfigureAwait(false);
-            if (preflightCount.HasValue && preflightCount.Value > absoluteMaxRecords.Value)
+            var outcome = await CountInternalAsync(query, countStrategy, providedOptions, ct).ConfigureAwait(false);
+            if (outcome.Count > absoluteMaxRecords.Value)
             {
                 return new QueryResult<TEntity>
                 {
                     Items = Array.Empty<TEntity>(),
-                    TotalCount = preflightCount.Value,
+                    TotalCount = outcome.Count,
                     Page = 1,
                     PageSize = 0,
                     RepositoryHandledPagination = false,
-                    ExceededSafetyLimit = true
+                    ExceededSafetyLimit = true,
+                    IsEstimate = outcome.IsEstimate
                 };
             }
+
+            precomputedCount = outcome;
         }
 
         if (hasPagination && repo is IPagedRepository<TEntity, TKey> pagedRepo)
@@ -105,7 +157,8 @@ public static class Data<TEntity, TKey>
                 Page = repoResult.Page,
                 PageSize = repoResult.PageSize,
                 RepositoryHandledPagination = true,
-                ExceededSafetyLimit = false
+                ExceededSafetyLimit = false,
+                IsEstimate = repoResult.IsEstimate
             };
         }
 
@@ -122,40 +175,40 @@ public static class Data<TEntity, TKey>
             items = await repo.QueryAsync(query, ct).ConfigureAwait(false);
         }
 
-        int? totalCount = preflightCount;
-        if (!totalCount.HasValue && (hasPagination || absoluteMaxRecords.HasValue))
+        CountOutcome? countOutcome = precomputedCount;
+        if (!countOutcome.HasValue && (hasPagination || absoluteMaxRecords.HasValue))
         {
-            totalCount = await TryCountAsync().ConfigureAwait(false);
+            countOutcome = await CountInternalAsync(query, countStrategy, providedOptions, ct).ConfigureAwait(false);
         }
 
-        if (!totalCount.HasValue)
-        {
-            totalCount = items.Count;
-        }
+        var totalCount = countOutcome?.Count ?? items.Count;
+        var isEstimate = countOutcome?.IsEstimate ?? false;
 
         if (!hasPagination)
         {
-            if (absoluteMaxRecords.HasValue && totalCount.Value > absoluteMaxRecords.Value)
+            if (absoluteMaxRecords.HasValue && totalCount > absoluteMaxRecords.Value)
             {
                 return new QueryResult<TEntity>
                 {
                     Items = Array.Empty<TEntity>(),
-                    TotalCount = totalCount.Value,
+                    TotalCount = totalCount,
                     Page = 1,
                     PageSize = 0,
                     RepositoryHandledPagination = repositoryHandledPagination,
-                    ExceededSafetyLimit = true
+                    ExceededSafetyLimit = true,
+                    IsEstimate = isEstimate
                 };
             }
 
             return new QueryResult<TEntity>
             {
                 Items = items,
-                TotalCount = totalCount.Value,
+                TotalCount = totalCount,
                 Page = 1,
                 PageSize = items.Count,
                 RepositoryHandledPagination = repositoryHandledPagination,
-                ExceededSafetyLimit = false
+                ExceededSafetyLimit = false,
+                IsEstimate = isEstimate
             };
         }
 
@@ -169,14 +222,14 @@ public static class Data<TEntity, TKey>
         return new QueryResult<TEntity>
         {
             Items = window,
-            TotalCount = totalCount.Value,
+            TotalCount = totalCount,
             Page = page,
             PageSize = hasPagination ? pageSize : window.Count,
             RepositoryHandledPagination = repositoryHandledPagination,
-            ExceededSafetyLimit = false
+            ExceededSafetyLimit = false,
+            IsEstimate = isEstimate
         };
     }
-
     public static Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
         => Query(predicate, (DataQueryOptions?)null, ct);
 
@@ -196,14 +249,45 @@ public static class Data<TEntity, TKey>
         var result = await QueryWithCount(query, options, ct).ConfigureAwait(false);
         return result.Items;
     }
-    public static Task<int> CountAllAsync(CancellationToken ct = default)
-        => Repo.CountAsync(null, ct);
-    public static Task<int> CountAsync(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
-        => (Repo as ILinqQueryRepository<TEntity, TKey>)?.CountAsync(predicate, ct)
-           ?? throw new System.NotSupportedException("LINQ queries are not supported by this repository.");
-    public static Task<int> CountAsync(string query, CancellationToken ct = default)
-        => (Repo as IStringQueryRepository<TEntity, TKey>)?.CountAsync(query, ct)
-           ?? throw new System.NotSupportedException("String queries are not supported by this repository.");
+    public static Task<long> CountAsync(CancellationToken ct = default)
+        => CountAsync((object?)null, CountStrategy.Exact, null, ct);
+
+    public static Task<long> CountAsync(object? query, CountStrategy strategy = CountStrategy.Exact, CancellationToken ct = default)
+        => CountAsync(query, strategy, null, ct);
+
+    public static Task<long> CountAsync(Expression<Func<TEntity, bool>> predicate, CountStrategy strategy = CountStrategy.Optimized, CancellationToken ct = default)
+        => CountAsync((object?)predicate ?? throw new ArgumentNullException(nameof(predicate)), strategy, null, ct);
+
+    public static Task<long> CountAsync(string query, CountStrategy strategy = CountStrategy.Optimized, CancellationToken ct = default)
+        => CountAsync((object?)query ?? throw new ArgumentNullException(nameof(query)), strategy, null, ct);
+
+    public static Task<long> CountAsync(DataQueryOptions options, CancellationToken ct = default)
+        => CountAsync((object?)null, options?.CountStrategy ?? CountStrategy.Exact, options, ct);
+
+    public static Task<long> CountAsync(Expression<Func<TEntity, bool>> predicate, DataQueryOptions options, CancellationToken ct = default)
+        => CountAsync((object?)predicate ?? throw new ArgumentNullException(nameof(predicate)), options?.CountStrategy ?? CountStrategy.Optimized, options, ct);
+
+    public static Task<long> CountAsync(string query, DataQueryOptions options, CancellationToken ct = default)
+        => CountAsync((object?)query ?? throw new ArgumentNullException(nameof(query)), options?.CountStrategy ?? CountStrategy.Optimized, options, ct);
+
+    public static async Task<long> CountAsync(object? query, CountStrategy strategy, DataQueryOptions? options, CancellationToken ct)
+    {
+        var outcome = await CountInternalAsync(query, strategy, options, ct).ConfigureAwait(false);
+        return outcome.Count;
+    }
+
+    public static Task<long> CountAsync(Expression<Func<TEntity, bool>> predicate, string partition, CountStrategy strategy = CountStrategy.Optimized, CancellationToken ct = default)
+    {
+        using var _ = WithPartition(partition);
+        return CountAsync((object?)predicate ?? throw new ArgumentNullException(nameof(predicate)), strategy, null, ct);
+    }
+
+    public static Task<long> CountAsync(string query, string partition, CountStrategy strategy = CountStrategy.Optimized, CancellationToken ct = default)
+    {
+        using var _ = WithPartition(partition);
+        return CountAsync((object?)query ?? throw new ArgumentNullException(nameof(query)), strategy, null, ct);
+    }
+
     public static Task<bool> DeleteAsync(TKey id, CancellationToken ct = default) => Repo.DeleteAsync(id, ct);
     public static Task<int> DeleteManyAsync(IEnumerable<TKey> ids, CancellationToken ct = default) => Repo.DeleteManyAsync(ids, ct);
     public static Task<int> DeleteAllAsync(CancellationToken ct = default) => Repo.DeleteAllAsync(ct);
@@ -215,6 +299,68 @@ public static class Data<TEntity, TKey>
 
     public static Task<int> DeleteAllAsync(DataQueryOptions? options, CancellationToken ct = default)
         => string.IsNullOrWhiteSpace(options?.Partition) ? Repo.DeleteAllAsync(ct) : DeleteAllAsync(options!.Partition!, ct);
+
+    public static Task<long> RemoveAllAsync(RemoveStrategy strategy, CancellationToken ct = default)
+        => Repo.RemoveAllAsync(strategy, ct);
+
+    public static Task<long> RemoveAllAsync(RemoveStrategy strategy, string partition, CancellationToken ct = default)
+    { using var _ = WithPartition(partition); return Repo.RemoveAllAsync(strategy, ct); }
+
+    /// <summary>
+    /// Applies a patch to an entity by id using a transport-agnostic PatchRequest.
+    /// Tries adapter instruction execution (data.patch), else performs read-modify-upsert locally.
+    /// </summary>
+    public static async Task<TEntity?> PatchAsync(
+        Koan.Data.Abstractions.Instructions.PatchRequest<TKey, TEntity> request,
+        MergePatchNullPolicy? mergeNulls = null,
+        PartialJsonNullPolicy? partialNulls = null,
+        CancellationToken ct = default)
+    {
+        var repo = Repo;
+        if (repo is Koan.Data.Abstractions.Instructions.IInstructionExecutor<TEntity> exec)
+        {
+            try
+            {
+                var result = await exec.ExecuteAsync<TEntity?>(new Koan.Data.Abstractions.Instructions.Instruction(Koan.Data.Abstractions.Instructions.DataInstructions.Patch, request), ct).ConfigureAwait(false);
+                return result;
+            }
+            catch (NotSupportedException) { /* fall back */ }
+        }
+
+        var current = await repo.GetAsync(request.Id, ct).ConfigureAwait(false);
+        if (current is null) return null;
+        var m = mergeNulls ?? MergePatchNullPolicy.SetDefault;
+        var p = partialNulls ?? PartialJsonNullPolicy.SetNull;
+        var applicator = Koan.Data.Core.Patch.PatchApplicators.Create<TEntity, TKey>(request.Kind, request.Payload!, m, p);
+        applicator.Apply(current);
+        return await repo.UpsertAsync(current, ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Applies canonical patch operations to an entity by id.
+    /// Attempts adapter execution (data.patch) with the payload; otherwise read-modify-upsert.
+    /// </summary>
+    public static async Task<TEntity?> PatchAsync(
+        Koan.Data.Abstractions.Instructions.PatchPayload<TKey> payload,
+        CancellationToken ct = default)
+    {
+        var repo = Repo;
+        if (repo is Koan.Data.Abstractions.Instructions.IInstructionExecutor<TEntity> exec)
+        {
+            try
+            {
+                var result = await exec.ExecuteAsync<TEntity?>(new Koan.Data.Abstractions.Instructions.Instruction(Koan.Data.Abstractions.Instructions.DataInstructions.Patch, payload), ct).ConfigureAwait(false);
+                if (result is not null) return result;
+            }
+            catch (NotSupportedException) { /* fallback */ }
+        }
+
+        var current = await repo.GetAsync(payload.Id, ct).ConfigureAwait(false);
+        if (current is null) return null;
+        Koan.Data.Core.Patch.PatchOpsExecutor.Apply<TEntity, TKey>(current, payload);
+        return await repo.UpsertAsync(current, ct).ConfigureAwait(false);
+    }
+
     public static Task<TEntity> UpsertAsync(TEntity model, CancellationToken ct = default) => Repo.UpsertAsync(model, ct);
     public static Task<int> UpsertManyAsync(IEnumerable<TEntity> models, CancellationToken ct = default) => Repo.UpsertManyAsync(models, ct);
     public static IBatchSet<TEntity, TKey> Batch() => Repo.CreateBatch();
@@ -277,87 +423,27 @@ public static class Data<TEntity, TKey>
         return all.Skip((page - 1) * size).Take(size).ToList();
     }
 
-    // Vector role facade (minimal surface for now)
-    public static class Vector
-    {
-        private static Koan.Data.Vector.Abstractions.IVectorSearchRepository<TEntity, TKey> Repo
-            => Koan.Core.Hosting.App.AppHost.Current?.GetService<IDataService>()?.GetRequiredVectorRepository<TEntity, TKey>()
-               ?? throw new System.InvalidOperationException("No vector repository available for this entity.");
-
-        public static Task UpsertAsync(TKey id, float[] embedding, object? metadata = null, CancellationToken ct = default)
-            => Repo.UpsertAsync(id, embedding, metadata, ct);
-
-        public static Task<int> UpsertManyAsync(IEnumerable<(TKey Id, float[] Embedding, object? Metadata)> items, CancellationToken ct = default)
-            => Repo.UpsertManyAsync(items, ct);
-
-        public static Task<bool> DeleteAsync(TKey id, CancellationToken ct = default)
-            => Repo.DeleteAsync(id, ct);
-
-        public static Task<int> DeleteManyAsync(IEnumerable<TKey> ids, CancellationToken ct = default)
-            => Repo.DeleteManyAsync(ids, ct);
-
-        public static Task<Koan.Data.Vector.Abstractions.VectorQueryResult<TKey>> SearchAsync(Koan.Data.Vector.Abstractions.VectorQueryOptions options, CancellationToken ct = default)
-            => Repo.SearchAsync(options, ct);
-    }
-
-    // Simple DTO for combined saves with vector
-    public readonly record struct VectorEntity(TEntity Entity, ReadOnlyMemory<float> Vector, string? Anchor = null, IReadOnlyDictionary<string, object>? Metadata = null);
-
-    // Orchestration: save document and corresponding vector
-    public static async Task SaveWithVector(TEntity entity, ReadOnlyMemory<float> vector, IReadOnlyDictionary<string, object>? metadata = null, CancellationToken ct = default)
-    {
-        // Persist the source document first
-        await Repo.UpsertAsync(entity, ct).ConfigureAwait(false);
-        // Persist the vector
-        await Vector.UpsertAsync(entity.Id, vector.ToArray(), metadata, ct).ConfigureAwait(false);
-    }
-
-    public static async Task<BatchResult> SaveManyWithVector(IEnumerable<VectorEntity> items, CancellationToken ct = default)
-    {
-        // Materialize once
-        var list = items as IList<VectorEntity> ?? items.ToList();
-        var docs = list.Select(x => x.Entity).ToList();
-        var up = await Repo.UpsertManyAsync(docs, ct).ConfigureAwait(false);
-        int vec = 0;
-        if (list.Count > 0)
-        {
-            var tuples = list.Select(x => (x.Entity.Id, x.Vector.ToArray(), (object?)x.Metadata)).ToList();
-            vec = await Vector.UpsertManyAsync(tuples, ct).ConfigureAwait(false);
-        }
-        // Report using Added=up, Updated=0, Deleted=0 (best-effort summary)
-        return new BatchResult(up, 0, 0);
-    }
-
     // Partition-scoped helpers (ambient via EntityContext)
-    public static IDisposable WithPartition(string? partition) => EntityContext.Partition(partition);
+    public static IDisposable WithPartition(string? partition) =>
+        string.IsNullOrEmpty(partition) ? NoOpDisposable.Instance : EntityContext.Partition(partition);
 
     public static Task<TEntity?> GetAsync(TKey id, string partition, CancellationToken ct = default)
     { using var _ = WithPartition(partition); return Repo.GetAsync(id, ct); }
 
+    public static Task<IReadOnlyList<TEntity?>> GetManyAsync(IEnumerable<TKey> ids, string partition, CancellationToken ct = default)
+    { using var _ = WithPartition(partition); return Repo.GetManyAsync(ids, ct); }
+
     public static Task<IReadOnlyList<TEntity>> All(string partition, CancellationToken ct = default)
     { using var _ = WithPartition(partition); return Repo.QueryAsync(null, ct); }
-    public static Task<int> CountAllAsync(string partition, CancellationToken ct = default)
-    { using var _ = WithPartition(partition); return Repo.CountAsync(null, ct); }
-
     public static Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, string partition, CancellationToken ct = default)
     {
         using var _ = WithPartition(partition); return (Repo as ILinqQueryRepository<TEntity, TKey>)?.QueryAsync(predicate, ct)
-                                           ?? throw new System.NotSupportedException("LINQ queries are not supported by this repository.");
-    }
-    public static Task<int> CountAsync(Expression<Func<TEntity, bool>> predicate, string partition, CancellationToken ct = default)
-    {
-        using var _ = WithPartition(partition); return (Repo as ILinqQueryRepository<TEntity, TKey>)?.CountAsync(predicate, ct)
                                            ?? throw new System.NotSupportedException("LINQ queries are not supported by this repository.");
     }
 
     public static Task<IReadOnlyList<TEntity>> Query(string query, string partition, CancellationToken ct = default)
     {
         using var _ = WithPartition(partition); return (Repo as IStringQueryRepository<TEntity, TKey>)?.QueryAsync(query, ct)
-                                           ?? throw new System.NotSupportedException("String queries are not supported by this repository.");
-    }
-    public static Task<int> CountAsync(string query, string partition, CancellationToken ct = default)
-    {
-        using var _ = WithPartition(partition); return (Repo as IStringQueryRepository<TEntity, TKey>)?.CountAsync(query, ct)
                                            ?? throw new System.NotSupportedException("String queries are not supported by this repository.");
     }
 
@@ -517,4 +603,11 @@ public static class Data<TEntity, TKey>
 
     // Fluent builder: Data<TEntity,TKey>.MoveFrom("backup").Where(...).Map(...).Copy().BatchSize(1000).To("root");
     public static PartitionMoveBuilder<TEntity, TKey> MoveFrom(string fromPartition) => new(fromPartition);
+
+    private sealed class NoOpDisposable : IDisposable
+    {
+        public static readonly NoOpDisposable Instance = new();
+        private NoOpDisposable() { }
+        public void Dispose() { }
+    }
 }

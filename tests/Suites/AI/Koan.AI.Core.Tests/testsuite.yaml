@@ -1,0 +1,8 @@
+﻿# AI Core Test Suite
+id: ai-core
+name: AI Core
+category: ai
+status: in-progress
+description: |
+  Test suite for Koan.AI.Core covering streaming, adapter fallback, failure modes, and unhealthy source routing.
+  Uses TestPipeline for integration and regression coverage.

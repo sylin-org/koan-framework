@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
@@ -6,8 +6,8 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <AssemblyName>Koan.Canon.Web</AssemblyName>
     <RootNamespace>Koan.Canon.Web</RootNamespace>
-    <Description>ASP.NET Core surfaces for Koan Canon: controller endpoints, projection management APIs, and health/readiness wiring.</Description>
-    <PackageTags>$(CommonPackageTags);canon;web;controllers;projections</PackageTags>
+    <Description>ASP.NET Core surfaces for Koan Canon built on the new domain runtime.</Description>
+    <PackageTags>$(CommonPackageTags);canon;web;controllers;runtime</PackageTags>
     <Version>0.6.3</Version>
     <AssemblyVersion>0.6.3</AssemblyVersion>
     <FileVersion>0.6.3</FileVersion>
@@ -16,8 +16,8 @@
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\Koan.Canon.Domain\Koan.Canon.Domain.csproj" />
     <ProjectReference Include="..\Koan.Core\Koan.Core.csproj" />
-    <ProjectReference Include="..\Koan.Canon.Core\Koan.Canon.Core.csproj" />
     <ProjectReference Include="..\Koan.Web\Koan.Web.csproj" />
     <ProjectReference Include="..\Koan.Web.Extensions\Koan.Web.Extensions.csproj" />
   </ItemGroup>

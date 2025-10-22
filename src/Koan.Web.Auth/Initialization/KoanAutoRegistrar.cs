@@ -1,10 +1,19 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Koan.Core;
 using Koan.Web.Auth.Extensions;
+using Koan.Web.Auth.Infrastructure;
 using Koan.Web.Extensions;
+using Koan.Web.Auth.Pillars;
+using Koan.Core.Hosting.Bootstrap;
+using ProvenanceModes = Koan.Core.Hosting.Bootstrap.ProvenancePublicationModeExtensions;
+using BootSettingSource = Koan.Core.Hosting.Bootstrap.BootSettingSource;
 
 namespace Koan.Web.Auth.Initialization;
 
@@ -15,6 +24,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 
     public void Initialize(IServiceCollection services)
     {
+        SecurityPillarManifest.EnsureRegistered();
         // Ensure auth services are registered once
         services.AddKoanWebAuth();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<Microsoft.AspNetCore.Hosting.IStartupFilter, Hosting.KoanWebAuthStartupFilter>());
@@ -23,73 +33,270 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         services.AddKoanControllersFrom<Controllers.DiscoveryController>();
     }
 
-    public void Describe(Koan.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)
+    public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
-        report.AddModule(ModuleName, ModuleVersion);
+        module.Describe(ModuleVersion);
+        cfg ??= new ConfigurationBuilder().Build();
 
         // Best-effort discovery summary without binding or DI: list provider display names and protocol
         // Strategy: if configured providers exist, list those; otherwise fall back to well-known defaults.
         var section = cfg.GetSection(Options.AuthOptions.SectionPath);
         var providers = section.GetSection("Providers");
 
-        static string PrettyProtocol(string? type)
-            => string.IsNullOrWhiteSpace(type) ? "OIDC"
-               : type!.ToLowerInvariant() switch
-               {
-                   "oidc" => "OIDC",
-                   "oauth2" => "OAuth",
-                   "oauth" => "OAuth",
-                   "saml" => "SAML",
-                   "ldap" => "LDAP",
-                   _ => type
-               };
+        var configured = LoadConfiguredProviders(providers);
+        var defaults = DiscoverContributorProviders(cfg, env);
+        var effective = ComposeEffectiveProviders(configured, defaults);
 
-        static string Titleize(string id)
-        {
-            if (string.IsNullOrWhiteSpace(id)) return id;
-            var parts = id.Replace('-', ' ').Replace('_', ' ').Split(' ', StringSplitOptions.RemoveEmptyEntries);
-            for (var i = 0; i < parts.Length; i++)
-            {
-                var p = parts[i];
-                parts[i] = char.ToUpperInvariant(p[0]) + (p.Length > 1 ? p.Substring(1) : string.Empty);
-            }
-            return string.Join(' ', parts);
-        }
+        var detected = effective.Select(pair => FormatProvider(pair.Key, pair.Value)).ToList();
 
-        var configured = providers.Exists() ? providers.GetChildren().ToList() : new List<IConfigurationSection>();
-        var detected = new List<string>();
+        var providerSectionKey = $"{Options.AuthOptions.SectionPath}:{nameof(Options.AuthOptions.Providers)}";
+        var providerSource = configured.Count > 0
+            ? Koan.Core.Hosting.Bootstrap.BootSettingSource.AppSettings
+            : defaults.Count > 0
+                ? Koan.Core.Hosting.Bootstrap.BootSettingSource.Auto
+                : Koan.Core.Hosting.Bootstrap.BootSettingSource.Auto;
 
-        if (configured.Count > 0)
-        {
-            foreach (var child in configured)
-            {
-                var id = child.Key;
-                var display = child.GetValue<string>(nameof(Options.ProviderOptions.DisplayName));
-                if (string.IsNullOrWhiteSpace(display)) display = Titleize(id);
-                var type = child.GetValue<string>(nameof(Options.ProviderOptions.Type));
-                // Keep type as-is if configured; otherwise leave null and PrettyProtocol will titleize raw value later.
-                detected.Add($"{display} ({PrettyProtocol(type)})");
-            }
-        }
-        else
-        {
-            // No explicit config: nothing to list unless contributors add providers at runtime
-        }
+        var providerMode = ProvenanceModes.FromBootSource(providerSource, configured.Count == 0);
+        var providerSourceKey = configured.Count > 0 ? providerSectionKey : null;
+        var providerUsedDefault = configured.Count == 0;
 
-        report.AddSetting("Providers", detected.Count.ToString());
-        report.AddSetting("DetectedProviders", string.Join(", ", detected));
+        module.AddSetting(
+            WebAuthProvenanceItems.ProviderRegistryCount,
+            providerMode,
+            effective.Count,
+            sourceKey: providerSourceKey,
+            usedDefault: providerUsedDefault);
+
+        module.AddSetting(
+            WebAuthProvenanceItems.ProviderRegistryDetails,
+            providerMode,
+            detected.Count == 0 ? "(none)" : string.Join(", ", detected),
+            sourceKey: providerSourceKey,
+            usedDefault: providerUsedDefault);
 
         // Production gating for dynamic providers (adapter/contributor defaults without explicit config)
-        var allowDynamic = Koan.Core.Configuration.Read(cfg, Infrastructure.AuthConstants.Configuration.AllowDynamicProvidersInProduction, false)
+        var allowDynamicOption = Koan.Core.Configuration.ReadWithSource(
+            cfg,
+            Infrastructure.AuthConstants.Configuration.AllowDynamicProvidersInProduction,
+            false);
+        var allowMagicOption = Koan.Core.Configuration.ReadWithSource(
+            cfg,
+            Koan.Core.Infrastructure.Constants.Configuration.Koan.AllowMagicInProduction,
+            false);
+
+        var allowDynamic = allowDynamicOption.Value
                            || Koan.Core.KoanEnv.AllowMagicInProduction
-                           || Koan.Core.Configuration.Read(cfg, Koan.Core.Infrastructure.Constants.Configuration.Koan.AllowMagicInProduction, false);
-        if (Koan.Core.KoanEnv.IsProduction && !allowDynamic)
+                           || allowMagicOption.Value;
+
+        var dynamicMode = !allowDynamicOption.UsedDefault
+            ? ProvenanceModes.FromConfigurationValue(allowDynamicOption)
+            : !allowMagicOption.UsedDefault
+                ? ProvenanceModes.FromConfigurationValue(allowMagicOption)
+                : Koan.Core.KoanEnv.AllowMagicInProduction
+                    ? ProvenanceModes.FromBootSource(BootSettingSource.Environment)
+                    : ProvenancePublicationMode.Auto;
+        var dynamicSourceKey = !allowDynamicOption.UsedDefault
+            ? allowDynamicOption.ResolvedKey
+            : !allowMagicOption.UsedDefault
+                ? allowMagicOption.ResolvedKey
+                : Koan.Core.Infrastructure.Constants.Configuration.Koan.AllowMagicInProduction;
+        var dynamicUsedDefault = allowDynamicOption.UsedDefault && allowMagicOption.UsedDefault && !Koan.Core.KoanEnv.AllowMagicInProduction;
+        var dynamicValue = Koan.Core.KoanEnv.IsProduction && !allowDynamic
+            ? "disabled (set Koan:Web:Auth:AllowDynamicProvidersInProduction=true or Koan:AllowMagicInProduction=true)"
+            : "enabled";
+
+        module.AddSetting(
+            WebAuthProvenanceItems.DynamicProvidersInProduction,
+            dynamicMode,
+            dynamicValue,
+            sourceKey: dynamicSourceKey,
+            usedDefault: dynamicUsedDefault);
+
+        module.AddTool(
+            "Auth Provider Discovery",
+            Infrastructure.AuthConstants.Routes.Discovery,
+            "Lists configured authentication providers",
+            capability: "auth.discovery");
+    }
+
+    private static Dictionary<string, Options.ProviderOptions> LoadConfiguredProviders(IConfigurationSection providers)
+    {
+        var result = new Dictionary<string, Options.ProviderOptions>(StringComparer.OrdinalIgnoreCase);
+        if (providers is null || !providers.Exists()) return result;
+
+        foreach (var child in providers.GetChildren())
         {
-            report.AddSetting("DynamicProvidersInProduction", "disabled (set Koan:Web:Auth:AllowDynamicProvidersInProduction=true or Koan:AllowMagicInProduction=true)");
+            var options = new Options.ProviderOptions();
+            child.Bind(options);
+            result[child.Key] = options;
         }
-        else
+
+        return result;
+    }
+
+    private static Dictionary<string, Options.ProviderOptions> DiscoverContributorProviders(IConfiguration cfg, IHostEnvironment env)
+    {
+        var result = new Dictionary<string, Options.ProviderOptions>(StringComparer.OrdinalIgnoreCase);
+        var contract = typeof(Providers.IAuthProviderContributor);
+        var assemblies = AppDomain.CurrentDomain.GetAssemblies();
+
+        foreach (var assembly in assemblies)
         {
-            report.AddSetting("DynamicProvidersInProduction", "enabled");
+            foreach (var type in SafeGetTypes(assembly))
+            {
+                if (!contract.IsAssignableFrom(type) || type.IsInterface || type.IsAbstract) continue;
+                var contributor = CreateContributor(type, cfg, env);
+                if (contributor is null) continue;
+
+                try
+                {
+                    var defaults = contributor.GetDefaults();
+                    if (defaults is null) continue;
+                    foreach (var kv in defaults)
+                    {
+                        result[kv.Key] = kv.Value;
+                    }
+                }
+                catch
+                {
+                    // ignore contributor failures during boot reporting
+                }
+            }
+        }
+
+        return result;
+    }
+
+    private static Providers.IAuthProviderContributor? CreateContributor(Type type, IConfiguration cfg, IHostEnvironment env)
+    {
+        try
+        {
+            var ctor = type.GetConstructor(Type.EmptyTypes);
+            if (ctor is not null)
+            {
+                return (Providers.IAuthProviderContributor?)Activator.CreateInstance(type);
+            }
+
+            ctor = type.GetConstructor(new[] { typeof(IConfiguration), typeof(IHostEnvironment) });
+            if (ctor is not null)
+            {
+                return (Providers.IAuthProviderContributor?)ctor.Invoke(new object?[] { cfg, env });
+            }
+
+            ctor = type.GetConstructor(new[] { typeof(IConfiguration) });
+            if (ctor is not null)
+            {
+                return (Providers.IAuthProviderContributor?)ctor.Invoke(new object?[] { cfg });
+            }
+
+            ctor = type.GetConstructor(new[] { typeof(IHostEnvironment) });
+            if (ctor is not null)
+            {
+                return (Providers.IAuthProviderContributor?)ctor.Invoke(new object?[] { env });
+            }
+        }
+        catch
+        {
+            // ignore creation failure
+        }
+
+        return null;
+    }
+
+    private static IEnumerable<Type> SafeGetTypes(Assembly assembly)
+    {
+        try
+        {
+            return assembly.GetTypes();
+        }
+        catch (ReflectionTypeLoadException ex)
+        {
+            return ex.Types.Where(t => t is not null).Select(t => t!);
+        }
+        catch
+        {
+            return Array.Empty<Type>();
         }
     }
+
+    private static Dictionary<string, Options.ProviderOptions> ComposeEffectiveProviders(
+        IDictionary<string, Options.ProviderOptions> configured,
+        IDictionary<string, Options.ProviderOptions> defaults)
+    {
+        var result = new Dictionary<string, Options.ProviderOptions>(defaults, StringComparer.OrdinalIgnoreCase);
+
+        foreach (var pair in configured)
+        {
+            if (result.TryGetValue(pair.Key, out var existing))
+            {
+                result[pair.Key] = MergeProviders(existing, pair.Value);
+            }
+            else
+            {
+                result[pair.Key] = pair.Value;
+            }
+        }
+
+        return result;
+    }
+
+    private static Options.ProviderOptions MergeProviders(Options.ProviderOptions baseline, Options.ProviderOptions overlay)
+    {
+        return new Options.ProviderOptions
+        {
+            Type = overlay.Type ?? baseline.Type,
+            DisplayName = overlay.DisplayName ?? baseline.DisplayName,
+            Icon = overlay.Icon ?? baseline.Icon,
+            Enabled = overlay.Enabled && baseline.Enabled,
+            Priority = overlay.Priority ?? baseline.Priority,
+            Authority = overlay.Authority ?? baseline.Authority,
+            ClientId = overlay.ClientId ?? baseline.ClientId,
+            ClientSecret = overlay.ClientSecret ?? baseline.ClientSecret,
+            SecretRef = overlay.SecretRef ?? baseline.SecretRef,
+            Scopes = overlay.Scopes ?? baseline.Scopes,
+            CallbackPath = overlay.CallbackPath ?? baseline.CallbackPath,
+            AuthorizationEndpoint = overlay.AuthorizationEndpoint ?? baseline.AuthorizationEndpoint,
+            TokenEndpoint = overlay.TokenEndpoint ?? baseline.TokenEndpoint,
+            UserInfoEndpoint = overlay.UserInfoEndpoint ?? baseline.UserInfoEndpoint,
+            EntityId = overlay.EntityId ?? baseline.EntityId,
+            IdpMetadataUrl = overlay.IdpMetadataUrl ?? baseline.IdpMetadataUrl,
+            IdpMetadataXml = overlay.IdpMetadataXml ?? baseline.IdpMetadataXml,
+            SigningCertRef = overlay.SigningCertRef ?? baseline.SigningCertRef,
+            DecryptionCertRef = overlay.DecryptionCertRef ?? baseline.DecryptionCertRef,
+            AllowIdpInitiated = overlay.AllowIdpInitiated || baseline.AllowIdpInitiated,
+            ClockSkewSeconds = overlay.ClockSkewSeconds != 120 ? overlay.ClockSkewSeconds : baseline.ClockSkewSeconds
+        };
+    }
+
+    private static string FormatProvider(string id, Options.ProviderOptions options)
+    {
+        var name = string.IsNullOrWhiteSpace(options.DisplayName) ? Titleize(id) : options.DisplayName!;
+        var protocol = PrettyProtocol(options.Type);
+        return options.Enabled ? $"{name} ({protocol})" : $"{name} ({protocol}, disabled)";
+    }
+
+    private static string PrettyProtocol(string? type)
+        => string.IsNullOrWhiteSpace(type) ? "OIDC"
+           : type!.ToLowerInvariant() switch
+           {
+               "oidc" => "OIDC",
+               "oauth2" => "OAuth",
+               "oauth" => "OAuth",
+               "saml" => "SAML",
+               "ldap" => "LDAP",
+               _ => type
+           };
+
+    private static string Titleize(string id)
+    {
+        if (string.IsNullOrWhiteSpace(id)) return id;
+        var parts = id.Replace('-', ' ').Replace('_', ' ').Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        for (var i = 0; i < parts.Length; i++)
+        {
+            var p = parts[i];
+            parts[i] = char.ToUpperInvariant(p[0]) + (p.Length > 1 ? p.Substring(1) : string.Empty);
+        }
+        return string.Join(' ', parts);
+    }
 }
+

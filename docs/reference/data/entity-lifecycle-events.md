@@ -4,9 +4,12 @@ domain: data
 title: "Entity Lifecycle Events"
 audience: [developers, architects, ai-agents]
 last_updated: 2025-02-19
-framework_version: "v0.2.18+"
+framework_version: v0.6.3
 status: current
-validation: 2025-02-19
+validation:
+    date_last_tested: 2025-02-19
+    status: verified
+    scope: docs/reference/data/entity-lifecycle-events.md
 ---
 
 # Entity Lifecycle Events

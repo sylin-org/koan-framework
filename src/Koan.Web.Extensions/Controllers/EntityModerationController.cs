@@ -202,7 +202,7 @@ public abstract class EntityModerationController<TEntity, TKey, TFlow> : Control
         var items = await Data<TEntity, TKey>.Page(page <= 0 ? 1 : page, size <= 0 ? KoanWebConstants.Defaults.DefaultPageSize : Math.Min(size, KoanWebConstants.Defaults.MaxPageSize), ct);
         try
         {
-            var total = await Data<TEntity, TKey>.CountAllAsync(ct);
+            var total = await Data<TEntity, TKey>.CountAsync(ct);
             var totalPages = size > 0 ? (int)Math.Ceiling((double)total / size) : 0;
             Response.Headers["X-Total-Count"] = total.ToString();
             Response.Headers["X-Page"] = (page <= 0 ? 1 : page).ToString();

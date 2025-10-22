@@ -1,98 +1,142 @@
- - name: Home
-   href: index.md
- - name: Getting Started
-   href: getting-started/overview.md
-   items:
-     - name: Getting Started Hub
-       href: getting-started/overview.md
-     - name: Enterprise Adoption
-       href: getting-started/enterprise-adoption.md
- - name: Developer Guides
-   href: guides/README.md
-   items:
-     - name: Building APIs
-       href: guides/building-apis.md
+- name: Home
+  href: index.md
+- name: Getting Started
+  href: getting-started/overview.md
+  items:
+    - name: Getting Started Hub
+      href: getting-started/overview.md
+    - name: Enterprise Adoption
+      href: getting-started/enterprise-adoption.md
+- name: Developer Guides
+  href: guides/README.md
+  items:
+    - name: Building APIs
+      href: guides/building-apis.md
     - name: Data Modeling
       href: guides/data-modeling.md
+    - name: Canon Capabilities
+      href: guides/canon-capabilities-howto.md
+    - name: Patch Capabilities
+      href: guides/patch-capabilities-howto.md
     - name: Garden Cooperative Journal
       href: guides/garden-cooperative-journal.md
-     - name: AI Integration
-       href: guides/ai-integration.md
-     - name: Authentication Setup
-       href: guides/authentication-setup.md
-     - name: Performance Optimization
-       href: guides/performance.md
-     - name: Semantic Pipelines
-       href: guides/semantic-pipelines.md
-     - name: MCP over HTTP + SSE
-       href: guides/mcp-http-sse-howto.md
-     - name: Auto-Provisioning System
-       href: guides/deep-dive/auto-provisioning-system.md
-     - name: Bootstrap Lifecycle
-       href: guides/deep-dive/bootstrap-lifecycle.md
+    - name: AI Integration
+      href: guides/ai-integration.md
+    - name: Authentication Setup
+      href: guides/authentication-setup.md
+    - name: Performance Optimization
+      href: guides/performance.md
+    - name: Semantic Pipelines
+      href: guides/semantic-pipelines.md
+    - name: Entity access and streaming
+      href: guides/data/entity-access-and-streaming.md
+    - name: MCP over HTTP + SSE
+      href: guides/mcp-http-sse-howto.md
+    - name: Docs build and lint
+      href: engineering/docs-build-and-lint.md
+    - name: Aspire Integration
+      href: guides/aspire-integration.md
+    - name: Auto-Provisioning System
+      href: guides/deep-dive/auto-provisioning-system.md
+    - name: Bootstrap Lifecycle
+      href: guides/deep-dive/bootstrap-lifecycle.md
     - name: Engineering
       href: engineering/index.md
       items:
+        - name: Samples Organization
+          href: engineering/samples-organization.md
         - name: Packaging Policy
           href: engineering/packaging.md
         - name: Auth Controller Discovery Regression
           href: engineering/auth-controller-discovery.md
- - name: Case Studies
-   href: case-studies/s13-docmind/index.md
-   items:
-     - name: S13.DocMind Overview
-       href: case-studies/s13-docmind/index.md
-     - name: Data and Domain Model
-       href: case-studies/s13-docmind/data-modeling.md
-     - name: AI Pipeline
-       href: case-studies/s13-docmind/ai-pipeline.md
-     - name: Operations & Diagnostics
-       href: case-studies/s13-docmind/operations-and-diagnostics.md
- - name: API Reference
-   href: api/index.md
-   items:
-     - name: Core
-       href: reference/core/index.md
-     - name: Data
-       href: reference/data/index.md
-       items:
-         - name: Entity Lifecycle Events
-           href: reference/data/entity-lifecycle-events.md
-     - name: Web
-       href: reference/web/index.md
-       items:
-         - name: Pagination Attribute Reference
-           href: reference/web/pagination-attribute.md
-     - name: AI
-       href: reference/ai/index.md
-     - name: Messaging
-       href: reference/messaging/index.md
-     - name: Storage
-       href: reference/storage/index.md
+        - name: Descriptor-Driven Configuration Provenance
+          href: engineering/provenance-configuration-descriptors.md
+        - name: Test Authoring Guidance
+          href: engineering/test-authoring.md
+- name: Case Studies
+  href: case-studies/s13-docmind/index.md
+  items:
+    - name: S13.DocMind Overview
+      href: case-studies/s13-docmind/index.md
+    - name: Data and Domain Model
+      href: case-studies/s13-docmind/data-modeling.md
+    - name: AI Pipeline
+      href: case-studies/s13-docmind/ai-pipeline.md
+    - name: Operations & Diagnostics
+      href: case-studies/s13-docmind/operations-and-diagnostics.md
+- name: Reference
+  href: reference/index.md
+  items:
+    - name: Core
+      href: reference/core/index.md
+    - name: Data
+      href: reference/data/index.md
+      items:
+        - name: Entity Lifecycle Events
+          href: reference/data/entity-lifecycle-events.md
+        - name: Cache
+          href: reference/data/cache.md
+    - name: Web
+      href: reference/web/index.md
+      items:
+        - name: Pagination Attribute Reference
+          href: reference/web/pagination-attribute.md
+    - name: Web HTTP API
+      href: reference/web/http-api.md
+    - name: OpenAPI generation
+      href: reference/web/openapi-generation.md
+    - name: PATCH formats and normalization
+      href: api/patch-normalization.md
+    - name: AI
+      href: reference/ai/index.md
+    - name: Messaging
+      href: reference/messaging/index.md
+    - name: Flow
+      href: reference/flow/index.md
+    - name: Storage
+      href: reference/storage/index.md
     - name: Canon
       href: reference/canon/index.md
-     - name: Orchestration
-       href: reference/orchestration/index.md
- - name: Architecture
-   href: architecture/principles.md
-   items:
-     - name: Framework Principles
-       href: architecture/principles.md
-     - name: Pagination Refactor Plan
-       href: architecture/pagination-refactor-plan.md
-     - name: Comparison with Zen
-       href: architecture/comparison.md
-     - name: Capability Map
-       href: architecture/capability-map.md
-     - name: Module Ledger
-       href: architecture/module-ledger.md
- - name: Architecture Decisions
-   href: decisions/index.md
- - name: Support
-   href: support/troubleshooting.md
- - name: Templates
-   href: templates/document-template.md
- - name: Archive
-   href: archive/README.md
- - name: Contributing
-   href: ../CONTRIBUTING.md
+    - name: Orchestration
+      href: reference/orchestration/index.md
+- name: Architecture
+  href: architecture/principles.md
+  items:
+    - name: Framework Principles
+      href: architecture/principles.md
+    - name: Pagination Refactor Plan
+      href: architecture/pagination-refactor-plan.md
+    - name: Comparison with Zen
+      href: architecture/comparison.md
+    - name: Capability Map
+      href: architecture/capability-map.md
+    - name: Module Ledger
+      href: architecture/module-ledger.md
+    - name: Koan Elasticity Strategy
+      href: architecture/koan-elasticity-strategy.md
+    - name: Koan Platform Comparative Analysis
+      href: architecture/koan-platform-comparative-analysis.md
+    - name: Koan Cache Module
+      href: architecture/koan-cache-module.md
+    - name: Adapter and Orchestration Registration
+      href: architecture/adapter-and-orchestration-registration.md
+    - name: Canon Runtime Migration Plan
+      href: architecture/canon-runtime-migration.md
+- name: Architecture Decisions
+  href: decisions/index.md
+- name: Support
+  href: support/troubleshooting.md
+- name: Proposals
+  items:
+    - name: Canonization Overhaul (2025)
+      href: proposals/PROP-canon-overhaul-2.md
+    - name: Canon Aggregation Contract & Policies
+      href: proposals/PROP-canon-aggregation-contract.md
+    - name: Koan Admin Dashboard Refresh
+      href: proposals/PROP-koan-admin-dashboard.md
+- name: Templates
+  href: templates/document-template.md
+- name: Archive
+  href: archive/README.md
+- name: Contributing
+  href: ../CONTRIBUTING.md

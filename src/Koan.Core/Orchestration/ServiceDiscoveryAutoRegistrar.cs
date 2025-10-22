@@ -39,16 +39,16 @@ public class ServiceDiscoveryAutoRegistrar : IKoanAutoRegistrar
         }
     }
 
-    public void Describe(BootReport report, IConfiguration cfg, IHostEnvironment env)
+    public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
         var adapters = DiscoverServiceDiscoveryAdapters();
 
-        report.AddModule(ModuleName, ModuleVersion);
-        report.AddNote($"ServiceDiscoveryAdapters: {adapters.Count()}");
+        module.Describe(ModuleVersion);
+        module.AddNote($"ServiceDiscoveryAdapters: {adapters.Count()}");
 
         foreach (var adapterType in adapters)
         {
-            report.AddNote($"  • {adapterType.Name}");
+            module.AddNote($"  • {adapterType.Name}");
         }
     }
 

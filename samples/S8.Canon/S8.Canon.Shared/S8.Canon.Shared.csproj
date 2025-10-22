@@ -5,7 +5,6 @@
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\..\src\Koan.Canon.Core\Koan.Canon.Core.csproj" />
     <ProjectReference Include="..\..\..\src\Koan.Messaging.Core\Koan.Messaging.Core.csproj" />
     <ProjectReference Include="..\..\..\src\Koan.Data.Core\Koan.Data.Core.csproj" />
   </ItemGroup>

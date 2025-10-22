@@ -28,7 +28,8 @@ internal sealed class ProviderRegistry : IProviderRegistry
             var protocol = cfg.Type ?? InferTypeFromId(id);
             var scopes = cfg.Scopes;
             var state = EvaluateHealth(protocol, cfg);
-            yield return ProviderDescriptorFactory.Create(id, name, protocol, cfg.Enabled, state, cfg.Icon, scopes);
+            var priority = cfg.Priority ?? 0;
+            yield return ProviderDescriptorFactory.Create(id, name, protocol, cfg.Enabled, state, cfg.Icon, scopes, priority);
         }
     }
 
@@ -84,6 +85,7 @@ internal sealed class ProviderRegistry : IProviderRegistry
                         DisplayName = p.DisplayName,
                         Icon = p.Icon,
                         Enabled = false,
+                        Priority = p.Priority,
                         Authority = p.Authority,
                         ClientId = p.ClientId,
                         ClientSecret = p.ClientSecret,
@@ -117,6 +119,7 @@ internal sealed class ProviderRegistry : IProviderRegistry
             DisplayName = b.DisplayName ?? a.DisplayName,
             Icon = b.Icon ?? a.Icon,
             Enabled = b.Enabled && a.Enabled,
+            Priority = b.Priority ?? a.Priority,
 
             // OIDC
             Authority = b.Authority ?? a.Authority,

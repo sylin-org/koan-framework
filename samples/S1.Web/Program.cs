@@ -1,16 +1,20 @@
-using Koan.Data.Core;
+using Koan.Core;
+using Koan.Core.Hosting.App;
 using Koan.Web.Extensions;
+using S1.Web.Hosting;
 using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
+LoggingConfiguration.Configure(builder);
+
 // Framework bootstrap
 builder.Services.AddKoan()
-    // Sensible defaults: controllers, static files, secure headers, ProblemDetails
-    .AsWebApi()
     // Toggle middleware
     .WithExceptionHandler()
     .WithRateLimit();
+
+builder.Services.AddProblemDetails();
 
 // Transformers disabled in S1: keep API simple here.
 
@@ -46,6 +50,8 @@ builder.Services.AddRateLimiter(options =>
 // Koan.Web wires routing, controllers, static files, secure headers, and /api/health.
 var app = builder.Build();
 
+AppHost.Current ??= app.Services;
+
 // Platform auto-ensures schema at startup when supported
 if (app.Environment.IsDevelopment())
 {
@@ -54,7 +60,9 @@ if (app.Environment.IsDevelopment())
     try { Directory.CreateDirectory(dataPath); } catch { /* best effort */ }
 }
 
-app.Run();
+ApplicationLifecycle.Configure(app);
+
+await app.RunAsync();
 
 // Make Program public and partial to help WebApplicationFactory discovery in tests
 namespace S1.Web

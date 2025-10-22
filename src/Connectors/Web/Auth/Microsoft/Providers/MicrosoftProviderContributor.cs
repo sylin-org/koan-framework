@@ -18,7 +18,8 @@ internal sealed class MicrosoftProviderContributor : IAuthProviderContributor
                 Icon = "/icons/microsoft.svg",
                 Authority = "https://login.microsoftonline.com/common/v2.0",
                 Scopes = new[] { "openid", "email", "profile" },
-                Enabled = true
+                Enabled = true,
+                Priority = 200
             }
         };
     }

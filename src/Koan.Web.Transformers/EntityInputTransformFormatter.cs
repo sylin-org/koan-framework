@@ -1,3 +1,7 @@
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Formatters;
 using Microsoft.Net.Http.Headers;
 
@@ -26,8 +30,25 @@ internal sealed class EntityInputTransformFormatter : InputFormatter
         return ImplementsIEntity(type);
     }
 
-    private static bool ImplementsIEntity(Type t)
-        => t.GetInterfaces().Any(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(Data.Abstractions.IEntity<>));
+    private static bool ImplementsIEntity(Type type)
+    {
+        var current = type;
+        while (current is not null && current != typeof(object))
+        {
+            if (current.IsGenericType)
+            {
+                var definition = current.GetGenericTypeDefinition();
+                if (definition == typeof(Koan.Data.Core.Model.Entity<>) || definition == typeof(Koan.Data.Core.Model.Entity<,>))
+                {
+                    return true;
+                }
+            }
+
+            current = current.BaseType;
+        }
+
+        return false;
+    }
 
     public override async Task<InputFormatterResult> ReadRequestBodyAsync(InputFormatterContext context)
     {
@@ -41,24 +62,22 @@ internal sealed class EntityInputTransformFormatter : InputFormatter
         else entityType = modelType;
 
         var contentType = http.Request.ContentType ?? string.Empty;
-        var resolver = typeof(ITransformerRegistry).GetMethod(nameof(ITransformerRegistry.ResolveForInput))!.MakeGenericMethod(entityType);
-        var match = resolver.Invoke(_registry, new object?[] { contentType });
-        // If no matching transformer, let the next formatter handle (likely JSON)
-        if (match is null) return await InputFormatterResult.NoValueAsync();
-        var transformer = match.GetType().GetProperty("Transformer")!.GetValue(match)!;
+        var selection = _registry.ResolveForInput(entityType, contentType);
+        if (selection is null)
+        {
+            return await InputFormatterResult.NoValueAsync();
+        }
 
         // Don't dispose the request body; the framework owns it
         var body = http.Request.Body;
         if (isMany)
         {
-            var mi = transformer.GetType().GetMethod("ParseManyAsync")!;
-            var entities = await (Task<IReadOnlyList<object>>)mi.Invoke(transformer, new object?[] { body, contentType, http })!;
+            var entities = await selection.Invoker.ParseManyAsync(body, contentType, http).ConfigureAwait(false);
             return await InputFormatterResult.SuccessAsync(entities);
         }
         else
         {
-            var mi = transformer.GetType().GetMethod("ParseAsync")!;
-            var entity = await (Task<object>)mi.Invoke(transformer, new object?[] { body, contentType, http })!;
+            var entity = await selection.Invoker.ParseAsync(body, contentType, http).ConfigureAwait(false);
             return await InputFormatterResult.SuccessAsync(entity);
         }
     }

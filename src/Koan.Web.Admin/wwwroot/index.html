@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Koan Admin • Framework Inspector</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="api/status/styles/module-visuals.css" />
+</head>
+<body>
+  <div class="app-container">
+    <!-- Context Bar -->
+    <header class="context-bar">
+      <div class="context-left">
+        <div class="brand">
+          <span class="brand-icon">⚡</span>
+          <span class="brand-text">Koan Admin</span>
+        </div>
+        <div class="context-meta" id="context-meta">
+          <span class="env-badge" id="env-badge">Development</span>
+          <span class="divider">•</span>
+          <span id="session-id">Session: ...</span>
+          <span class="divider">•</span>
+          <span id="uptime">Uptime: ...</span>
+        </div>
+      </div>
+      <div class="context-right">
+        <div class="status-indicator" id="status-indicator">
+          <span class="status-dot status-neutral"></span>
+          <span class="status-label">Loading...</span>
+        </div>
+        <label class="control-toggle">
+          <input type="checkbox" id="auto-refresh" checked />
+          <span>Auto-refresh</span>
+        </label>
+        <button id="refresh-btn" type="button" class="control-button">
+          <span>🔄</span>
+        </button>
+        <button id="settings-btn" type="button" class="control-button-secondary">
+          <span>⚙</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Layout: 2 columns -->
+    <div class="main-layout">
+      <!-- Left: Navigation + Pillar Accordion -->
+      <aside class="left-sidebar" id="left-sidebar">
+        <!-- Navigation Menu -->
+        <nav class="nav-menu" id="nav-menu">
+          <a href="#/" class="nav-item active" data-nav="dashboard">
+            <span class="nav-icon">🏠</span>
+            <span class="nav-label">Dashboard</span>
+          </a>
+          <a href="#/ops" class="nav-item" data-nav="ops">
+            <span class="nav-icon">📊</span>
+            <span class="nav-label">Ops</span>
+          </a>
+          <a href="#/framework" class="nav-item" data-nav="framework">
+            <span class="nav-icon">🔧</span>
+            <span class="nav-label">Framework</span>
+          </a>
+          <a href="#/configuration" class="nav-item" data-nav="configuration">
+            <span class="nav-icon">⚙️</span>
+            <span class="nav-label">Configuration</span>
+          </a>
+        </nav>
+
+        <!-- Pillar Accordion -->
+        <div class="pillar-accordion-section">
+          <div class="sidebar-header">
+            <h2>Pillars</h2>
+            <button class="collapse-all-btn" id="collapse-all-btn" title="Collapse all">
+              <span>⊟</span>
+            </button>
+          </div>
+          <div class="pillars-container" id="pillars-container">
+            <div class="loading-state">Loading pillars...</div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Center: Main Content -->
+      <main class="main-content" id="main-content">
+        <!-- Hero Section: Framework Pulse -->
+        <section class="framework-pulse" id="framework-pulse">
+          <h2 class="pulse-title">Framework Pulse</h2>
+          <div class="pulse-grid" id="pulse-grid">
+            <a href="#/framework" class="pulse-card">
+              <div class="pulse-label">Modules Registered</div>
+              <div class="pulse-value" id="pulse-modules">—</div>
+              <div class="pulse-detail">Auto-registration complete</div>
+            </a>
+            <a href="#/framework" class="pulse-card">
+              <div class="pulse-label">Providers Elected</div>
+              <div class="pulse-value" id="pulse-providers">—</div>
+              <div class="pulse-detail">Multi-provider routing</div>
+            </a>
+            <a href="#/ops" class="pulse-card">
+              <div class="pulse-label">Health Status</div>
+              <div class="pulse-value" id="pulse-health">—</div>
+              <div class="pulse-detail">Critical components</div>
+            </a>
+            <a href="#/configuration" class="pulse-card">
+              <div class="pulse-label">Settings</div>
+              <div class="pulse-value" id="pulse-settings">—</div>
+              <div class="pulse-detail">Configuration values</div>
+            </a>
+          </div>
+        </section>
+
+        <!-- Dynamic View Container -->
+        <div class="view-container" id="view-container">
+          <!-- Dashboard View (default) -->
+          <div class="view dashboard-view active" id="dashboard-view">
+            <section class="panel">
+              <header class="panel-header">
+                <div>
+                  <h3>Framework Overview</h3>
+                  <p class="panel-subtitle">Quick access to key areas</p>
+                </div>
+              </header>
+              <div class="panel-body">
+                <div class="dashboard-quick-links">
+                  <a href="#/ops" class="quick-link-card">
+                    <span class="quick-link-icon">📊</span>
+                    <span class="quick-link-title">Ops Mode</span>
+                    <span class="quick-link-subtitle">Runtime telemetry & health</span>
+                  </a>
+                  <a href="#/framework" class="quick-link-card">
+                    <span class="quick-link-icon">🔧</span>
+                    <span class="quick-link-title">Framework Mode</span>
+                    <span class="quick-link-subtitle">Auto-registration & capabilities</span>
+                  </a>
+                  <a href="#/configuration" class="quick-link-card">
+                    <span class="quick-link-icon">⚙️</span>
+                    <span class="quick-link-title">Configuration</span>
+                    <span class="quick-link-subtitle">All settings & sources</span>
+                  </a>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <!-- Ops View -->
+          <div class="view ops-view" id="ops-view">
+            <div class="view-header">
+              <div class="view-title-group">
+                <h2 class="view-title">Ops Mode</h2>
+                <p class="view-subtitle">Runtime telemetry, health checks, and performance metrics</p>
+              </div>
+            </div>
+
+            <section class="panel runtime-panel">
+              <header class="panel-header">
+                <div>
+                  <h3>System Telemetry</h3>
+                  <p class="panel-subtitle">Runtime performance metrics</p>
+                </div>
+              </header>
+              <div class="panel-body">
+                <div class="telemetry-grid" id="telemetry-grid">
+                  <!-- Dynamically populated -->
+                </div>
+              </div>
+            </section>
+
+            <div class="two-column">
+              <section class="panel health-panel">
+                <header class="panel-header">
+                  <div>
+                    <h3>Health Status</h3>
+                    <p class="panel-subtitle">All components sorted by criticality</p>
+                  </div>
+                </header>
+                <div class="panel-body" id="health-body">
+                  <!-- Dynamically populated -->
+                </div>
+              </section>
+
+              <section class="panel environment-panel">
+                <header class="panel-header">
+                  <div>
+                    <h3>Environment</h3>
+                    <p class="panel-subtitle">Runtime environment details</p>
+                  </div>
+                </header>
+                <div class="panel-body" id="environment-body">
+                  <!-- Dynamically populated -->
+                </div>
+              </section>
+            </div>
+
+            <section class="panel notes-panel">
+              <header class="panel-header">
+                <div>
+                  <h3>Startup Notes</h3>
+                  <p class="panel-subtitle">Boot sequence callouts</p>
+                </div>
+              </header>
+              <div class="panel-body" id="startup-notes-body">
+                <!-- Dynamically populated -->
+              </div>
+            </section>
+          </div>
+
+          <!-- Framework View -->
+          <div class="view framework-view" id="framework-view">
+            <div class="view-header">
+              <div class="view-title-group">
+                <h2 class="view-title">Framework Mode</h2>
+                <p class="view-subtitle">Auto-registration, provider election, and capability analysis</p>
+              </div>
+            </div>
+
+            <section class="panel registration-panel">
+              <header class="panel-header">
+                <div>
+                  <h3>Auto-Registration Report</h3>
+                  <p class="panel-subtitle">IKoanAutoRegistrar discovery results</p>
+                </div>
+              </header>
+              <div class="panel-body">
+                <div class="registration-summary" id="registration-summary">
+                  <!-- Dynamically populated -->
+                </div>
+                <div class="registration-table-wrapper">
+                  <table class="data-table" id="registration-table">
+                    <thead>
+                      <tr>
+                        <th>Pillar</th>
+                        <th>Modules</th>
+                        <th>Settings</th>
+                        <th>Notes</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <!-- Dynamically populated -->
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </section>
+
+            <section class="panel provider-election-panel">
+              <header class="panel-header">
+                <div>
+                  <h3>Provider Election Decisions</h3>
+                  <p class="panel-subtitle">Multi-provider routing outcomes</p>
+                </div>
+              </header>
+              <div class="panel-body" id="provider-election-body">
+                <!-- Dynamically populated -->
+              </div>
+            </section>
+
+            <section class="panel capability-panel">
+              <header class="panel-header">
+                <div>
+                  <h3>Provider Capability Matrix</h3>
+                  <p class="panel-subtitle">QueryCaps and WriteCaps per provider</p>
+                </div>
+              </header>
+              <div class="panel-body">
+                <div class="capability-matrix" id="capability-matrix">
+                  <!-- Dynamically populated -->
+                </div>
+              </div>
+            </section>
+
+            <section class="panel provenance-panel">
+              <header class="panel-header">
+                <div>
+                  <h3>Setting Provenance Analysis</h3>
+                  <p class="panel-subtitle">Configuration source breakdown</p>
+                </div>
+              </header>
+              <div class="panel-body">
+                <div class="provenance-summary" id="provenance-summary">
+                  <!-- Dynamically populated -->
+                </div>
+                <div class="provenance-details" id="provenance-details">
+                  <!-- Dynamically populated -->
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <!-- Configuration View (NEW) -->
+          <div class="view configuration-view" id="configuration-view">
+            <div class="view-header">
+              <div class="view-title-group">
+                <h2 class="view-title">Configuration Overview</h2>
+                <p class="view-subtitle">All settings across framework modules</p>
+              </div>
+              <div class="view-actions">
+                <div class="view-mode-switcher" id="config-view-mode">
+                  <button class="view-mode-btn active" data-mode="canonical">Canonical</button>
+                  <button class="view-mode-btn" data-mode="appsettings">AppSettings</button>
+                  <button class="view-mode-btn" data-mode="env">.ENV</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Canonical View -->
+            <div class="config-mode-content active" id="config-canonical">
+              <section class="panel">
+                <div class="panel-body">
+                  <div class="config-controls">
+                    <div class="config-search">
+                      <input type="text" id="config-search-input" placeholder="🔍 Search settings..." class="config-search-input" />
+                    </div>
+                    <div class="config-controls-right">
+                      <div class="config-display">
+                        <label class="config-display-label">Display:</label>
+                        <div class="config-display-buttons" id="config-display-buttons">
+                          <button class="config-display-btn" data-display="label">Label</button>
+                          <button class="config-display-btn active" data-display="canonical">Canonical</button>
+                        </div>
+                      </div>
+                      <div class="config-sort">
+                        <label class="config-sort-label">Sort by:</label>
+                        <div class="config-sort-buttons" id="config-sort-buttons">
+                          <button class="config-sort-btn active" data-sort="key">Key</button>
+                          <button class="config-sort-btn" data-sort="source">Source</button>
+                          <button class="config-sort-btn" data-sort="value">Value</button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="config-list" id="config-list">
+                    <!-- Dynamically populated -->
+                  </div>
+                </div>
+              </section>
+            </div>
+
+            <!-- AppSettings View -->
+            <div class="config-mode-content" id="config-appsettings">
+              <section class="panel">
+                <div class="panel-body">
+                  <pre class="config-json" id="config-json-output"><!-- Dynamically populated --></pre>
+                </div>
+              </section>
+            </div>
+
+            <!-- .ENV View -->
+            <div class="config-mode-content" id="config-env">
+              <section class="panel">
+                <div class="panel-body">
+                  <pre class="config-env" id="config-env-output"><!-- Dynamically populated --></pre>
+                </div>
+              </section>
+            </div>
+          </div>
+
+          <!-- Pillar View -->
+          <div class="view pillar-view" id="pillar-view">
+            <div class="view-header">
+              <button class="back-btn" id="back-to-dashboard">← Dashboard</button>
+              <div class="view-title-group">
+                <h2 class="view-title" id="pillar-view-title">Pillar Details</h2>
+                <p class="view-subtitle" id="pillar-view-subtitle"></p>
+              </div>
+            </div>
+            <div class="pillar-modules-grid" id="pillar-modules-grid">
+              <!-- Dynamically populated -->
+            </div>
+          </div>
+
+          <!-- Module View -->
+          <div class="view module-view" id="module-view">
+            <div class="view-header">
+              <button class="back-btn" id="back-to-pillar">← Back</button>
+              <div class="view-title-group">
+                <h2 class="view-title" id="module-view-title">Module Details</h2>
+                <p class="view-subtitle" id="module-view-subtitle"></p>
+              </div>
+            </div>
+            <div class="module-detail-content" id="module-detail-content">
+              <!-- Dynamically populated -->
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <span class="footer-brand">Koan Admin</span>
+      <span class="divider">•</span>
+      <span class="footer-note">Framework Inspector</span>
+      <span class="divider">•</span>
+      <span class="timestamp" id="generated-at"></span>
+    </footer>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

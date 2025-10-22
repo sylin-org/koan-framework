@@ -1,0 +1,5 @@
+﻿suite: Koan.Data.Connector.SqlServer.Tests
+lane: docker
+scope: integration
+module: Data.Connector.SqlServer
+description: Integration coverage for the SQL Server data connector exercising CRUD, schema governance, and relational fixtures.

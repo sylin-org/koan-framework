@@ -20,8 +20,8 @@ services:
       - mongo
       - postgres
     volumes:
-      # Persist SQLite data
-      - sqlite-data:/app/data
+      # Persist SQLite data into sample-local .Koan folder
+      - ../.Koan/Data/sqlite:/app/data
     networks:
       - devportal-network
 
@@ -34,7 +34,7 @@ services:
     environment:
       MONGO_INITDB_DATABASE: DevPortal
     volumes:
-      - mongo-data:/data/db
+      - ../.Koan/Data/mongo:/data/db
     networks:
       - devportal-network
     healthcheck:
@@ -55,7 +55,7 @@ services:
       POSTGRES_PASSWORD: dev
       POSTGRES_INITDB_ARGS: "--encoding=UTF-8"
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      - ../.Koan/Data/postgres:/var/lib/postgresql/data
     networks:
       - devportal-network
     healthcheck:
@@ -71,7 +71,7 @@ services:
     ports:
       - "5093:6379"
     volumes:
-      - redis-data:/data
+      - ../.Koan/Data/redis:/data
     networks:
       - devportal-network
     healthcheck:
@@ -80,16 +80,7 @@ services:
       timeout: 5s
       retries: 3
 
-# Named volumes for data persistence
-volumes:
-  mongo-data:
-    driver: local
-  postgres-data:
-    driver: local
-  sqlite-data:
-    driver: local
-  redis-data:
-    driver: local
+# Bind-mounted data lives under ../.Koan/Data; no named volumes required
 
 # Dedicated network for service communication
 networks:

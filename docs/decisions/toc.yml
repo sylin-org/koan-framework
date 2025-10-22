@@ -4,6 +4,44 @@
   items:
     - name: AAAA-0000 ADR authoring template
       href: AAAA-0000-template.md
+- name: AI (AI)
+  items:
+    - name: AI-0001 AI baseline
+      href: AI-0001-ai-baseline.md
+    - name: AI-0002 API contracts and SSE
+      href: AI-0002-api-contracts-and-sse.md
+    - name: AI-0003 Tokenization and cost
+      href: AI-0003-tokenization-and-cost.md
+    - name: AI-0004 Secrets provider
+      href: AI-0004-secrets-provider.md
+    - name: AI-0005 Protocol surfaces
+      href: AI-0005-protocol-surfaces.md
+    - name: AI-0006 Data formats and grounding
+      href: AI-0006-data-formats-and-grounding.md
+    - name: AI-0007 Inference servers interop
+      href: AI-0007-inference-servers-interop.md
+    - name: AI-0008 AI adapters and registry
+      href: AI-0008-adapters-and-registry.md
+    - name: AI-0009 Multi-service routing and policies
+      href: AI-0009-multi-service-routing-and-policies.md
+    - name: AI-0010 Entrypoint and augmentations
+      href: AI-0010-entrypoint-and-augmentations.md
+    - name: AI-0011 AI engine facade and selection
+      href: AI-0011-ai-engine-facade-and-selection.md
+    - name: AI-0012 MCP JSON-RPC runtime
+      href: AI-0012-mcp-jsonrpc-runtime.md
+    - name: AI-0013 MCP HTTP SSE deployment
+      href: AI-0013-mcp-http-sse-deployment.md
+    - name: AI-0013 S12 MedTrials sample
+      href: AI-0013-s12-medtrials-sample.md
+    - name: AI-0014 AI modernization sources and fallbacks
+      href: AI-0014-ai-modernization-sources-capabilities-fallback.md
+    - name: AI-0014 MCP code mode
+      href: AI-0014-mcp-code-mode.md
+    - name: AI-0015 Canonical source member architecture
+      href: AI-0015-canonical-source-member-architecture.md
+    - name: AI-0016 LM Studio adapter for Koan AI
+      href: AI-0016-lm-studio-adapter.md
 - name: Architecture (ARCH)
   items:
     - name: ARCH-0001 Rename generic parameter to TEntity
@@ -50,12 +88,26 @@
       href: ARCH-0052-core-ids-and-json-merge-policy.md
     - name: ARCH-0053 Flow pillar – entity-first and auto-registrar
       href: ARCH-0053-Koan-flow-pillar-entity-first-and-auto-registrar.md
+    - name: S16-0001 PantryPal entity-first refactor
+      href: S16-0001-pantrypal-entity-first-refactor.md
     - name: ARCH-0054 Framework positioning – container native
       href: ARCH-0054-framework-positioning-container-native.md
     - name: ARCH-0055 Koan Aspire integration approval
       href: ARCH-0055-koan-aspire-integration-approval.md
     - name: ARCH-0056 Koan.Canon pillar renaming
       href: ARCH-0056-koan-canon-pillar-renaming.md
+    - name: ARCH-0059 Koan Cache module and adapters
+      href: ARCH-0059-koan-cache-module.md
+    - name: ARCH-0060 Cache control surface helpers
+      href: ARCH-0060-cache-control-surface.md
+    - name: ARCH-0061 JSON layer unification on Newtonsoft
+      href: ARCH-0061-json-layer-unification-newtonsoft-over-stj.md
+    - name: ARCH-0062 S8 legacy snapshot removal and sample streamline
+      href: ARCH-0062-s8-legacy-snapshot-removal-and-sample-streamline.md
+    - name: ARCH-0063 Docs IA realignment and retrieval improvements
+      href: ARCH-0063-docs-ia-realignment-and-retrieval-improvements.md
+    - name: ARCH-0065 AddKoan bootstrap lives in Koan.Core
+      href: ARCH-0065-addkoan-bootstrap-rehome.md
 - name: Data (DATA)
   items:
     - name: DATA-0002 Query capabilities flag
@@ -144,6 +196,12 @@
       href: DATA-0075-entity-schema-guard-and-provisioning-reset.md
     - name: DATA-0076 Mongo `_id` index governance
       href: DATA-0076-mongo-id-index-governance.md
+    - name: DATA-0077 Canonical patch operations
+      href: DATA-0077-canonical-patch-operations.md
+    - name: DATA-0084 Vector workflows and profiles
+      href: DATA-0084-vector-workflows-and-profiles.md
+    - name: DATA-0085 Isolate vector workflows into Koan.Data.Vector
+      href: DATA-0085-vector-module-split.md
 - name: Web (WEB)
   items:
     - name: WEB-0010 Separate AI web surface
@@ -172,8 +230,16 @@
       href: WEB-0049-role-attribution-layer-and-claims-transformation.md
     - name: WEB-0050 S8 Flow IoT sample and SSE monitor
       href: WEB-0050-s8-flow-iot-sample-and-sse-monitor.md
+    - name: WEB-0051 Auth provider discovery and election
+      href: WEB-0051-auth-provider-discovery-and-election.md
     - name: WEB-0060 Flow messaging refactor
       href: WEB-0060-flow-messaging-refactor.md
+    - name: WEB-0061 Koan Admin surface refresh
+      href: WEB-0061-koan-admin-surface-refresh.md
+    - name: WEB-0062 Koan Admin pillar visualization
+      href: WEB-0062-koan-admin-pillar-visualization.md
+    - name: WEB-0063 Koan Admin Dashboard roadmap
+      href: WEB-0063-admin-dashboard-roadmap.md
 - name: Flow (FLOW)
   items:
     - name: FLOW-0070 Flow commands bus
@@ -262,6 +328,12 @@
       href: OPS-0050-scheduling-and-bootstrap-unification.md
     - name: OPS-0051 Container smart defaults and discovery
       href: OPS-0051-container-smart-defaults-and-discovery.md
+- name: Testing (TEST)
+  items:
+    - name: TEST-0001 Koan testing platform realignment
+      href: TEST-0001-koan-testing-platform.md
+    - name: TEST-0002 Test parity migration roadmap
+      href: TEST-0002-test-parity-migration-roadmap.md
 - name: Developer Experience (DX)
   items:
     - name: DX-0028 Service project naming and conventions

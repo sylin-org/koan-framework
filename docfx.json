@@ -80,6 +80,15 @@
     ],
     "postProcessors": [],
     "keepFileLink": false,
+    "redirections": [
+      { "source_path": "docs/api/web-http-api.md", "redirect_url": "/reference/web/http-api.html" },
+      { "source_path": "docs/api/openapi-generation.md", "redirect_url": "/reference/web/openapi-generation.html" },
+      { "source_path": "docs/guides/data/all-query-streaming-and-pager.md", "redirect_url": "/guides/data/entity-access-and-streaming.html" },
+      { "source_path": "docs/guides/mcp-code-mode-preflight.md", "redirect_url": "/engineering/mcp-code-mode-preflight.html" },
+      { "source_path": "docs/guides/deep-dive/auto-provisioning-system.md", "redirect_url": "/architecture/deep-dive/auto-provisioning-system.html" },
+      { "source_path": "docs/guides/deep-dive/bootstrap-lifecycle.md", "redirect_url": "/architecture/deep-dive/bootstrap-lifecycle.html" },
+      { "source_path": "docs/guides/BACKUP-MIGRATION-GUIDE.md", "redirect_url": "/guides/data/backup-migration.html" }
+    ],
     "disableGitFeatures": false,
     "globalMetadata": {
       "_appTitle": "Koan Framework Documentation",

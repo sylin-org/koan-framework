@@ -1,0 +1,8 @@
+﻿# Sqlite Connector Test Suite
+id: connector-sqlite
+name: Sqlite Connector
+category: data-connector
+status: in-progress
+description: |
+  Test suite for Koan.Data.Connector.Sqlite covering CRUD, batch, health, and capability probes.
+  Mirrors patterns from InMemory, Postgres, and Redis connector suites.

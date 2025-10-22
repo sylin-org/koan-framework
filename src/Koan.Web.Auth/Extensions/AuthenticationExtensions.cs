@@ -22,6 +22,9 @@ public static class AuthenticationExtensions
         var builder = services.AddAuthentication(options =>
             {
                 options.DefaultScheme = CookieScheme;
+                options.DefaultAuthenticateScheme = CookieScheme;
+                options.DefaultChallengeScheme = CookieScheme;
+                options.DefaultSignInScheme = CookieScheme;
             })
             .AddCookie(CookieScheme, o =>
             {

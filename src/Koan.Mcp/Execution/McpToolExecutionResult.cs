@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.Text.Json.Nodes;
+using Newtonsoft.Json.Linq;
 
 namespace Koan.Mcp.Execution;
 
@@ -8,11 +8,11 @@ public sealed class McpToolExecutionResult
 {
     private McpToolExecutionResult(
         bool success,
-        JsonNode? payload,
-        JsonNode? shortCircuit,
+        JToken? payload,
+        JToken? shortCircuit,
         IReadOnlyDictionary<string, string> headers,
         IReadOnlyList<string> warnings,
-        JsonObject diagnostics,
+        JObject diagnostics,
         string? errorCode,
         string? errorMessage)
     {
@@ -28,26 +28,26 @@ public sealed class McpToolExecutionResult
 
     public bool Success { get; }
 
-    public JsonNode? Payload { get; }
+    public JToken? Payload { get; }
 
-    public JsonNode? ShortCircuit { get; }
+    public JToken? ShortCircuit { get; }
 
     public IReadOnlyDictionary<string, string> Headers { get; }
 
     public IReadOnlyList<string> Warnings { get; }
 
-    public JsonObject Diagnostics { get; }
+    public JObject Diagnostics { get; }
 
     public string? ErrorCode { get; }
 
     public string? ErrorMessage { get; }
 
     public static McpToolExecutionResult SuccessResult(
-        JsonNode? payload,
-        JsonNode? shortCircuit,
+        JToken? payload,
+        JToken? shortCircuit,
         IReadOnlyDictionary<string, string> headers,
         IReadOnlyList<string> warnings,
-        JsonObject diagnostics)
+        JObject diagnostics)
     {
         return new McpToolExecutionResult(
             true,
@@ -63,7 +63,7 @@ public sealed class McpToolExecutionResult
     public static McpToolExecutionResult Failure(
         string errorCode,
         string errorMessage,
-        JsonObject? diagnostics = null)
+        JObject? diagnostics = null)
     {
         return new McpToolExecutionResult(
             false,
@@ -71,7 +71,7 @@ public sealed class McpToolExecutionResult
             null,
             new Dictionary<string, string>(),
             Array.Empty<string>(),
-            diagnostics ?? new JsonObject(),
+            diagnostics ?? new JObject(),
             errorCode,
             errorMessage);
     }

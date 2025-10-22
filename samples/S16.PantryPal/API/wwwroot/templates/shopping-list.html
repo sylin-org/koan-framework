@@ -1,0 +1,16 @@
+﻿<section class="space-y-6 md:space-y-8" aria-label="Shopping List">
+  <div class="bg-white rounded-2xl shadow-sm p-4">
+    <p class="text-sm text-gray-600">Grouped by aisle/category. Check items as you go.</p>
+  </div>
+  <div ng-repeat="g in vm.groups" class="bg-white rounded-2xl shadow-sm p-4">
+    <div class="font-medium mb-2 text-gray-900">{{g.name}}</div>
+    <div class="divide-y divide-gray-100">
+      <label class="flex items-center gap-3 py-2 hover:bg-gray-50" ng-repeat="it in g.items">
+        <input type="checkbox" class="accent-primary-600" ng-model="it.checked">
+        <span class="flex-1">{{it.name}} — {{it.quantity}} {{it.unit}}</span>
+        <span class="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 ring-1 ring-gray-200">{{it.source||'from plan'}}</span>
+      </label>
+    </div>
+  </div>
+  <div class="text-center text-sm text-gray-500" ng-if="vm.groups.length===0">Nothing missing — great job!</div>
+</section>

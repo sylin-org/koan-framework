@@ -1,0 +1,18 @@
+﻿<section class="space-y-6 md:space-y-8" aria-label="Meals">
+  <div class="bg-white rounded-2xl shadow-sm p-4 md:p-6">
+    <div class="flex items-center gap-3">
+      <select multiple class="rounded-xl bg-white ring-1 ring-gray-200 px-3 py-2 text-sm" ng-model="vm.filters.dietaryRestrictions"><option>vegetarian</option><option>vegan</option><option>gluten-free</option></select>
+      <div class="flex items-center gap-2 text-sm text-gray-700">Max minutes <input class="accent-primary-600" type="range" min="10" max="120" ng-model="vm.filters.maxCookingMinutes"></div>
+      <button class="inline-flex items-center gap-2 rounded-xl px-4 py-2 bg-primary-600 text-white hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-400" ng-click="vm.suggest()">Suggest meals</button>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
+    <div class="bg-white rounded-2xl shadow-sm p-4 transition-shadow hover:shadow translate-y-0 hover:translate-y-[1px]" ng-repeat="r in vm.results">
+      <div class="font-medium truncate text-gray-900">{{ (r.recipe && r.recipe.name) || r.name }}</div>
+      <div class="h-1.5 bg-gray-100 rounded mt-2"><div class="h-1.5 bg-primary-600 rounded" ng-style="{ width: ((r.availabilityScore||0.8)*100) + '%' }"></div></div>
+      <div class="mt-2 flex flex-wrap gap-1 -mx-0.5"><span class="mx-0.5 text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 ring-1 ring-gray-200" ng-repeat="m in (r.missingIngredients||[])">{{m}}</span></div>
+      <button class="mt-3 inline-flex items-center gap-2 rounded-xl px-4 py-2 bg-white text-gray-900 ring-1 ring-gray-200 hover:bg-gray-50" ng-click="vm.addToPlan(r, 'Mon', 'Dinner')">Add to Plan</button>
+    </div>
+  </div>
+</section>

@@ -14,12 +14,16 @@ using Koan.Data.Core.Optimization;
 using Koan.Data.Core.Schema;
 using Koan.Data.Relational.Linq;
 using Koan.Data.Relational.Orchestration;
+using System.Diagnostics.CodeAnalysis;
+using System.Linq;
 using System.Linq.Expressions;
 using Newtonsoft.Json;
 
 namespace Koan.Data.Connector.Postgres;
 
-internal sealed class PostgresRepository<TEntity, TKey> :
+internal sealed class PostgresRepository<
+    [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.PublicParameterlessConstructor | DynamicallyAccessedMemberTypes.PublicProperties)] TEntity,
+    TKey> :
     IDataRepository<TEntity, TKey>,
     IOptimizedDataRepository<TEntity, TKey>,
     ILinqQueryRepository<TEntity, TKey>,
@@ -36,7 +40,7 @@ internal sealed class PostgresRepository<TEntity, TKey> :
     where TKey : notnull
 {
     public QueryCapabilities Capabilities => QueryCapabilities.Linq | QueryCapabilities.String;
-    public WriteCapabilities Writes => WriteCapabilities.AtomicBatch | WriteCapabilities.BulkDelete; // BulkUpsert later via COPY staging
+    public WriteCapabilities Writes => WriteCapabilities.AtomicBatch | WriteCapabilities.BulkDelete | WriteCapabilities.FastRemove;
 
     // Storage optimization support
     private readonly StorageOptimizationInfo _optimizationInfo;
@@ -338,6 +342,57 @@ internal sealed class PostgresRepository<TEntity, TKey> :
         return row == default ? null : FromRow(row);
     }
 
+    public async Task<IReadOnlyList<TEntity?>> GetManyAsync(IEnumerable<TKey> ids, CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        using var act = PgTelemetry.Activity.StartActivity("pg.get.many");
+        act?.SetTag("entity", typeof(TEntity).FullName);
+
+        var idList = ids as IReadOnlyList<TKey> ?? ids.ToList();
+        if (idList.Count == 0)
+        {
+            return Array.Empty<TEntity?>();
+        }
+
+        await using var conn = Open();
+
+        // Optimize IDs for query
+        var optimizedIds = new List<string>(idList.Count);
+        foreach (var id in idList)
+        {
+            string optimizedId;
+            if (_optimizationInfo.IsOptimized && typeof(TKey) == typeof(string) && id is string stringId)
+            {
+                if (_optimizationInfo.OptimizationType == StorageOptimizationType.Guid && Guid.TryParse(stringId, out var guid))
+                    optimizedId = guid.ToString("D");
+                else
+                    optimizedId = stringId;
+            }
+            else
+            {
+                optimizedId = id!.ToString()!;
+            }
+            optimizedIds.Add(optimizedId);
+        }
+
+        // Use IN clause for bulk query
+        var rows = await conn.QueryAsync<(string Id, string Json)>(
+            $"SELECT \"Id\"::text, \"Json\"::text FROM {QualifiedTable} WHERE \"Id\" = ANY(@Ids)",
+            new { Ids = optimizedIds.ToArray() });
+
+        // Build dictionary for O(1) lookup
+        var entityMap = rows.Select(FromRow).ToDictionary(e => e.Id);
+
+        // Preserve order and include nulls
+        var results = new TEntity?[idList.Count];
+        for (var i = 0; i < idList.Count; i++)
+        {
+            results[i] = entityMap.TryGetValue(idList[i], out var entity) ? entity : null;
+        }
+
+        return results;
+    }
+
     public async Task<IReadOnlyList<TEntity>> QueryAsync(object? query, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
@@ -345,7 +400,7 @@ internal sealed class PostgresRepository<TEntity, TKey> :
         act?.SetTag("entity", typeof(TEntity).FullName);
         await using var conn = Open();
         // DATA-0061: no-options should return full set
-        var rows = await conn.QueryAsync<(string Id, string Json)>($"SELECT \"Id\", \"Json\"::text FROM {QualifiedTable} ORDER BY \"Id\"");
+    var rows = await conn.QueryAsync<(string Id, string Json)>($"SELECT \"Id\", \"Json\"::text FROM {QualifiedTable} ORDER BY ctid");
         return rows.Select(FromRow).ToList();
     }
 
@@ -356,18 +411,80 @@ internal sealed class PostgresRepository<TEntity, TKey> :
         act?.SetTag("entity", typeof(TEntity).FullName);
         var (offset, limit) = ComputeSkipTake(options);
         await using var conn = Open();
-        var sql = $"SELECT \"Id\", \"Json\"::text FROM {QualifiedTable} ORDER BY \"Id\" LIMIT {limit} OFFSET {offset}";
+    var sql = $"SELECT \"Id\", \"Json\"::text FROM {QualifiedTable} ORDER BY ctid LIMIT {limit} OFFSET {offset}";
         var rows = await conn.QueryAsync<(string Id, string Json)>(sql);
         return rows.Select(FromRow).ToList();
     }
 
-    public async Task<int> CountAsync(object? query, CancellationToken ct = default)
+    public async Task<CountResult> CountAsync(CountRequest<TEntity> request, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        using var act = PgTelemetry.Activity.StartActivity("pg.count:all");
+        using var act = PgTelemetry.Activity.StartActivity("pg.count");
         act?.SetTag("entity", typeof(TEntity).FullName);
         await using var conn = Open();
-        return await conn.ExecuteScalarAsync<int>($"SELECT COUNT(1) FROM {QualifiedTable}");
+
+        // Fast count via pg_stat when no predicate and strategy allows it
+        if (request.Predicate is null && request.RawQuery is null && request.ProviderQuery is null)
+        {
+            var strategy = request.Options?.CountStrategy ?? CountStrategy.Optimized;
+            if (strategy == CountStrategy.Fast || strategy == CountStrategy.Optimized)
+            {
+                try
+                {
+                    var (schema, table) = ResolveSchemaAndTable();
+                    var estimate = await conn.ExecuteScalarAsync<long>(
+                        @"SELECT n_live_tup FROM pg_stat_user_tables
+                          WHERE schemaname = @schema AND relname = @table",
+                        new { schema, table });
+                    if (estimate >= 0)
+                        return CountResult.Estimate(estimate);
+                }
+                catch
+                {
+                    // Fall back to exact count
+                }
+            }
+        }
+
+        // Exact count based on request type
+        if (request.Predicate is not null)
+        {
+            var translator = new LinqWhereTranslator<TEntity>(_dialect);
+            try
+            {
+                var (whereSql, parameters) = translator.Translate(request.Predicate);
+                whereSql = RewriteWhereForProjection(whereSql);
+                return await CountWhereAsync(whereSql, parameters);
+            }
+            catch (NotSupportedException)
+            {
+                var compiled = request.Predicate.Compile();
+                var all = await QueryAsync((object?)null, ct);
+                var count = (long)all.Count(compiled);
+                return CountResult.Exact(count);
+            }
+        }
+
+        if (request.RawQuery is not null)
+        {
+            var whereSql = RewriteWhereForProjection(request.RawQuery);
+            var count = await conn.ExecuteScalarAsync<long>($"SELECT COUNT(1) FROM {QualifiedTable} WHERE " + whereSql);
+            return CountResult.Exact(count);
+        }
+
+        // No predicate - full table count
+        var totalCount = await conn.ExecuteScalarAsync<long>($"SELECT COUNT(1) FROM {QualifiedTable}");
+        return CountResult.Exact(totalCount);
+    }
+
+    private async Task<CountResult> CountWhereAsync(string whereSql, IReadOnlyList<object?> parameters)
+    {
+        await using var conn = Open();
+        var sql = $"SELECT COUNT(1) FROM {QualifiedTable} WHERE {whereSql}";
+        var dyn = new DynamicParameters();
+        for (int i = 0; i < parameters.Count; i++) dyn.Add($"p{i}", parameters[i]);
+        var count = await conn.ExecuteScalarAsync<long>(sql, dyn);
+        return CountResult.Exact(count);
     }
 
     public async Task<IReadOnlyList<TEntity>> QueryAsync(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
@@ -381,8 +498,7 @@ internal sealed class PostgresRepository<TEntity, TKey> :
             var (whereSql, parameters) = translator.Translate(predicate);
             whereSql = RewriteWhereForProjection(whereSql);
             await using var conn = Open();
-            // DATA-0061: no-options should return full set for predicate
-            var sql = $"SELECT \"Id\", \"Json\"::text FROM {QualifiedTable} WHERE {whereSql} ORDER BY \"Id\"";
+            var sql = $"SELECT \"Id\", \"Json\"::text FROM {QualifiedTable} WHERE {whereSql} ORDER BY ctid";
             var dyn = new DynamicParameters();
             for (int i = 0; i < parameters.Count; i++) dyn.Add($"p{i}", parameters[i]);
             var rows = await conn.QueryAsync<(string Id, string Json)>(sql, dyn);
@@ -390,8 +506,9 @@ internal sealed class PostgresRepository<TEntity, TKey> :
         }
         catch (NotSupportedException)
         {
+            var compiled = predicate.Compile();
             var all = await QueryAsync((object?)null, ct);
-            return all.AsQueryable().Where(predicate).ToList();
+            return all.Where(compiled).ToList();
         }
     }
 
@@ -407,7 +524,7 @@ internal sealed class PostgresRepository<TEntity, TKey> :
             whereSql = RewriteWhereForProjection(whereSql);
             var (offset, limit) = ComputeSkipTake(options);
             await using var conn = Open();
-            var sql = $"SELECT \"Id\", \"Json\"::text FROM {QualifiedTable} WHERE {whereSql} ORDER BY \"Id\" LIMIT {limit} OFFSET {offset}";
+            var sql = $"SELECT \"Id\", \"Json\"::text FROM {QualifiedTable} WHERE {whereSql} ORDER BY ctid LIMIT {limit} OFFSET {offset}";
             var dyn = new DynamicParameters();
             for (int i = 0; i < parameters.Count; i++) dyn.Add($"p{i}", parameters[i]);
             var rows = await conn.QueryAsync<(string Id, string Json)>(sql, dyn);
@@ -415,36 +532,10 @@ internal sealed class PostgresRepository<TEntity, TKey> :
         }
         catch (NotSupportedException)
         {
+            var compiled = predicate.Compile();
             var all = await QueryAsync((object?)null, options, ct);
-            return all.AsQueryable().Where(predicate).ToList();
+            return all.Where(compiled).ToList();
         }
-    }
-
-    public Task<int> CountAsync(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        using var act = PgTelemetry.Activity.StartActivity("pg.count:linq");
-        act?.SetTag("entity", typeof(TEntity).FullName);
-        var translator = new LinqWhereTranslator<TEntity>(_dialect);
-        try
-        {
-            var (whereSql, parameters) = translator.Translate(predicate);
-            whereSql = RewriteWhereForProjection(whereSql);
-            return CountWhereAsync(whereSql, parameters);
-        }
-        catch (NotSupportedException)
-        {
-            return Task.FromResult(QueryAsync(predicate, ct).Result.Count);
-        }
-    }
-
-    private async Task<int> CountWhereAsync(string whereSql, IReadOnlyList<object?> parameters)
-    {
-        await using var conn = Open();
-        var sql = $"SELECT COUNT(1) FROM {QualifiedTable} WHERE {whereSql}";
-        var dyn = new DynamicParameters();
-        for (int i = 0; i < parameters.Count; i++) dyn.Add($"p{i}", parameters[i]);
-        return await conn.ExecuteScalarAsync<int>(sql, dyn);
     }
 
     public async Task<IReadOnlyList<TEntity>> QueryAsync(string sql, CancellationToken ct = default)
@@ -462,7 +553,7 @@ internal sealed class PostgresRepository<TEntity, TKey> :
         else
         {
             var whereSql = RewriteWhereForProjection(sql);
-            var rows = await conn.QueryAsync<(string Id, string Json)>($"SELECT \"Id\", \"Json\"::text FROM {QualifiedTable} WHERE " + whereSql + $" ORDER BY \"Id\" LIMIT {_defaultPageSize} OFFSET 0");
+            var rows = await conn.QueryAsync<(string Id, string Json)>($"SELECT \"Id\", \"Json\"::text FROM {QualifiedTable} WHERE " + whereSql + $" ORDER BY ctid LIMIT {_defaultPageSize} OFFSET 0");
             return rows.Select(FromRow).ToList();
         }
     }
@@ -482,7 +573,7 @@ internal sealed class PostgresRepository<TEntity, TKey> :
         else
         {
             var whereSql = RewriteWhereForProjection(sql);
-            var rows = await conn.QueryAsync<(string Id, string Json)>($"SELECT \"Id\", \"Json\"::text FROM {QualifiedTable} WHERE " + whereSql + $" ORDER BY \"Id\" LIMIT {_defaultPageSize} OFFSET 0", parameters);
+            var rows = await conn.QueryAsync<(string Id, string Json)>($"SELECT \"Id\", \"Json\"::text FROM {QualifiedTable} WHERE " + whereSql + $" ORDER BY ctid LIMIT {_defaultPageSize} OFFSET 0", parameters);
             return rows.Select(FromRow).ToList();
         }
     }
@@ -503,7 +594,7 @@ internal sealed class PostgresRepository<TEntity, TKey> :
         {
             var (offset, limit) = ComputeSkipTake(options);
             var whereSql = RewriteWhereForProjection(sql);
-            var rows = await conn.QueryAsync<(string Id, string Json)>($"SELECT \"Id\", \"Json\"::text FROM {QualifiedTable} WHERE " + whereSql + $" ORDER BY \"Id\" LIMIT {limit} OFFSET {offset}");
+            var rows = await conn.QueryAsync<(string Id, string Json)>($"SELECT \"Id\", \"Json\"::text FROM {QualifiedTable} WHERE " + whereSql + $" ORDER BY ctid LIMIT {limit} OFFSET {offset}");
             return rows.Select(FromRow).ToList();
         }
     }
@@ -524,30 +615,11 @@ internal sealed class PostgresRepository<TEntity, TKey> :
         {
             var (offset, limit) = ComputeSkipTake(options);
             var whereSql = RewriteWhereForProjection(sql);
-            var rows = await conn.QueryAsync<(string Id, string Json)>($"SELECT \"Id\", \"Json\"::text FROM {QualifiedTable} WHERE " + whereSql + $" ORDER BY \"Id\" LIMIT {limit} OFFSET {offset}", parameters);
+            var rows = await conn.QueryAsync<(string Id, string Json)>($"SELECT \"Id\", \"Json\"::text FROM {QualifiedTable} WHERE " + whereSql + $" ORDER BY ctid LIMIT {limit} OFFSET {offset}", parameters);
             return rows.Select(FromRow).ToList();
         }
     }
 
-    public async Task<int> CountAsync(string sql, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        using var act = PgTelemetry.Activity.StartActivity("pg.count:string");
-        act?.SetTag("entity", typeof(TEntity).FullName);
-        await using var conn = Open();
-        var whereSql = RewriteWhereForProjection(sql);
-        return await conn.ExecuteScalarAsync<int>($"SELECT COUNT(1) FROM {QualifiedTable} WHERE " + whereSql);
-    }
-
-    public async Task<int> CountAsync(string sql, object? parameters, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        using var act = PgTelemetry.Activity.StartActivity("pg.count:string:param");
-        act?.SetTag("entity", typeof(TEntity).FullName);
-        await using var conn = Open();
-        var whereSql = RewriteWhereForProjection(sql);
-        return await conn.ExecuteScalarAsync<int>($"SELECT COUNT(1) FROM {QualifiedTable} WHERE " + whereSql, parameters);
-    }
 
     public async Task<TEntity> UpsertAsync(TEntity model, CancellationToken ct = default)
     { await UpsertManyAsync(new[] { model }, ct); return model; }
@@ -593,6 +665,37 @@ internal sealed class PostgresRepository<TEntity, TKey> :
     {
         await using var conn = Open();
         return await conn.ExecuteAsync($"DELETE FROM {QualifiedTable}");
+    }
+
+    public async Task<long> RemoveAllAsync(RemoveStrategy strategy, CancellationToken ct = default)
+    {
+        await using var conn = Open();
+
+        // Resolve Optimized strategy based on provider capabilities
+        var effectiveStrategy = strategy == RemoveStrategy.Optimized
+            ? (Writes.HasFlag(WriteCapabilities.FastRemove) ? RemoveStrategy.Fast : RemoveStrategy.Safe)
+            : strategy;
+
+        if (effectiveStrategy == RemoveStrategy.Fast)
+        {
+            // Fast path: TRUNCATE (bypasses hooks, resets sequence)
+            try
+            {
+                await conn.ExecuteAsync($"TRUNCATE TABLE {QualifiedTable} RESTART IDENTITY", ct);
+                return -1; // TRUNCATE doesn't report count
+            }
+            catch (Npgsql.PostgresException ex) when (ex.SqlState == "0A000") // Feature not supported
+            {
+                // Foreign key constraint - fall back to DELETE
+                // Silently fall through to safe path
+            }
+        }
+
+        // Safe path: DELETE (fires hooks if registered)
+        var countRequest = new CountRequest<TEntity>();
+        var countResult = await CountAsync(countRequest, ct);
+        await conn.ExecuteAsync($"DELETE FROM {QualifiedTable}", ct);
+        return countResult.Value;
     }
 
     public IBatchSet<TEntity, TKey> CreateBatch() => new PgBatch(this);
@@ -894,67 +997,77 @@ internal sealed class PostgresRepository<TEntity, TKey> :
 
     private string RewriteWhereForProjection(string whereSql)
     {
-        var projections = ProjectionResolver.Get(typeof(TEntity));
-        bool hasQuotes = whereSql.IndexOf('"') >= 0;
-        if (hasQuotes)
+        if (string.IsNullOrWhiteSpace(whereSql))
         {
-            // Assume already quoted; best-effort replace property names inside quotes
-            foreach (var p in projections)
-            {
-                whereSql = whereSql.Replace("\"" + p.Property.Name + "\"", "\"" + p.ColumnName + "\"");
-            }
             return whereSql;
         }
 
-        // Replace bare identifiers with jsonb extraction or projected columns (if any)
-        var map = projections.ToDictionary(p => p.Property.Name, p => "\"" + p.ColumnName + "\"", StringComparer.Ordinal);
-        whereSql = System.Text.RegularExpressions.Regex.Replace(whereSql, "\n|\r", " ");
-        foreach (var kv in map)
+        var projections = ProjectionResolver.Get(typeof(TEntity));
+        if (projections.Count == 0)
         {
-            var ident = kv.Key;
-            var col = kv.Value;
-            whereSql = System.Text.RegularExpressions.Regex.Replace(
-                whereSql,
-                $"\\b{System.Text.RegularExpressions.Regex.Escape(ident)}\\b",
-                col);
+            return whereSql;
         }
-        // Fallback: JSONB extraction for unknown tokens
-        whereSql = System.Text.RegularExpressions.Regex.Replace(
-            whereSql,
-            "(?<![@:])\\b([A-Za-z_][A-Za-z0-9_]*)\\b",
-            m =>
+
+        foreach (var projection in projections)
+        {
+            var token = "\"" + projection.Property.Name + "\"";
+            if (!whereSql.Contains(token, StringComparison.Ordinal))
             {
-                var token = m.Groups[1].Value;
-                switch (token.ToUpperInvariant())
-                {
-                    case "AND":
-                    case "OR":
-                    case "NOT":
-                    case "NULL":
-                    case "LIKE":
-                    case "IN":
-                    case "IS":
-                    case "BETWEEN":
-                    case "EXISTS":
-                    case "SELECT":
-                    case "FROM":
-                    case "WHERE":
-                    case "GROUP":
-                    case "BY":
-                    case "ORDER":
-                    case "OFFSET":
-                    case "FETCH":
-                    case "ASC":
-                    case "DESC":
-                    case "LIMIT":
-                        return token;
-                }
-                if (map.ContainsKey(token)) return map[token];
-                return $"(\"Json\" #>> '{{{token}}}')"; // text extraction
-            });
+                continue;
+            }
+
+            var expression = BuildProjectionExpression(projection);
+            if (string.IsNullOrEmpty(expression))
+            {
+                continue;
+            }
+
+            whereSql = whereSql.Replace(token, expression, StringComparison.Ordinal);
+        }
+
         return whereSql;
     }
 
+    private static string BuildProjectionExpression(ProjectedProperty projection)
+    {
+        var propertyName = projection.Property.Name;
+        var jsonAccessor = "(\"Json\" #>> '{" + propertyName + "}')";
+        var propertyType = projection.Property.PropertyType;
+        var isNullable = Nullable.GetUnderlyingType(propertyType) is not null;
+        var underlying = Nullable.GetUnderlyingType(propertyType) ?? propertyType;
+
+        if (projection.IsEnum)
+        {
+            underlying = Enum.GetUnderlyingType(underlying);
+        }
+
+        static string WrapCast(string valueExpression, string pgType)
+            => "((" + valueExpression + ")::" + pgType + ")";
+
+        string ValueOrNull()
+        {
+            var trimmed = "TRIM(" + jsonAccessor + ")";
+            return isNullable ? "NULLIF(" + trimmed + ", '')" : trimmed;
+        }
+
+        return underlying switch
+        {
+            Type t when t == typeof(int) || t == typeof(short) || t == typeof(byte) => WrapCast(ValueOrNull(), "integer"),
+            Type t when t == typeof(long) => WrapCast(ValueOrNull(), "bigint"),
+            Type t when t == typeof(uint) || t == typeof(ushort) || t == typeof(char) => WrapCast(ValueOrNull(), "integer"),
+            Type t when t == typeof(ulong) => WrapCast(ValueOrNull(), "numeric"),
+            Type t when t == typeof(float) => WrapCast(ValueOrNull(), "real"),
+            Type t when t == typeof(double) => WrapCast(ValueOrNull(), "double precision"),
+            Type t when t == typeof(decimal) => WrapCast(ValueOrNull(), "numeric"),
+            Type t when t == typeof(bool) => WrapCast(ValueOrNull(), "boolean"),
+            Type t when t == typeof(DateTime) || t == typeof(DateTimeOffset) => WrapCast(ValueOrNull(), "timestamptz"),
+            Type t when t == typeof(Guid) => WrapCast(ValueOrNull(), "uuid"),
+            _ => jsonAccessor
+        };
+    }
+
+    [RequiresUnreferencedCode("Uses reflection-based Json deserialization fallbacks for dynamic rows.")]
+    [RequiresDynamicCode("Uses reflection to instantiate entities when JSON payloads are invalid.")]
     private static List<TEntity> MapRowsToEntities(IEnumerable<dynamic> rows)
     {
         var list = new List<TEntity>();
@@ -978,8 +1091,11 @@ internal sealed class PostgresRepository<TEntity, TKey> :
                     }
                 }
             }
-            var ent2 = Activator.CreateInstance<TEntity>();
-            list.Add(ent2);
+            var entObj = Activator.CreateInstance(typeof(TEntity));
+            if (entObj is TEntity ent2)
+            {
+                list.Add(ent2);
+            }
         }
         return list;
     }
@@ -992,6 +1108,8 @@ internal sealed class PostgresRepository<TEntity, TKey> :
         try { return (TResult)Convert.ChangeType(value, t); } catch { return default!; }
     }
 
+    [RequiresUnreferencedCode("Reflects over dynamic row types to produce dictionaries.")]
+    [RequiresDynamicCode("Reflects over dynamic row types to produce dictionaries.")]
     private static IReadOnlyList<Dictionary<string, object?>> MapDynamicRows(IEnumerable<dynamic> rows)
     {
         var list = new List<Dictionary<string, object?>>();

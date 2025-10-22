@@ -28,6 +28,12 @@ public static class Constants
             public const string JsonCaseInsensitive = Section + ":JsonCaseInsensitive";
             public const string JsonWriteIndented = Section + ":JsonWriteIndented";
             public const string JsonIgnoreNullValues = Section + ":JsonIgnoreNullValues";
+
+            public const string NamingStyle = Section + ":NamingStyle";
+            public const string AltNamingStyle = AltSection + ":NamingStyle";
+            public const string Separator = Section + ":Separator";
+            public const string AltSeparator = AltSection + ":Separator";
+            public const string EnsureCreatedSupported = Section + ":EnsureCreatedSupported";
         }
     }
 }

@@ -1,150 +1,192 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
+using Koan.Canon.Domain.Model;
+using Koan.Canon.Domain.Runtime;
+using Koan.Canon.Web.Catalog;
+using Koan.Canon.Web.Controllers;
+using Koan.Canon.Web.Infrastructure;
+using Koan.Core;
+using Koan.Canon.Domain.Pillars;
+using Koan.Web.Extensions;
+using Koan.Web.Controllers;
+using Koan.Web.Extensions.GenericControllers;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
-using Koan.Core;
-using Koan.Canon.Infrastructure;
-using Koan.Canon;
-using Koan.Canon.Materialization;
-using Koan.Web.Extensions;
-using System.Reflection;
+using Koan.Core.Hosting.Bootstrap;
 
 namespace Koan.Canon.Web.Initialization;
 
 public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 {
+    private static readonly MethodInfo AddGenericControllerMethod = typeof(GenericControllers).GetMethod(nameof(GenericControllers.AddGenericController))!;
+
     public string ModuleName => "Koan.Canon.Web";
+
     public string? ModuleVersion => typeof(KoanAutoRegistrar).Assembly.GetName().Version?.ToString();
 
     public void Initialize(IServiceCollection services)
     {
-        // Ensure MVC sees controllers from this assembly
+        FlowPillarManifest.EnsureRegistered();
         services.AddKoanControllersFrom<KoanAutoRegistrar>();
+        services.AddCanonRuntime();
 
-        // Discover Canon models and register CanonEntityController<TModel> under /api/Canon/{model}
-        foreach (var modelType in DiscoverModels())
+        var modelDescriptors = DiscoverDescriptors(includeValueObjects: true).ToList();
+        services.AddSingleton<ICanonModelCatalog>(_ => new CanonModelCatalog(modelDescriptors));
+
+        foreach (var descriptor in modelDescriptors.Where(d => !d.IsValueObject))
         {
-            var modelName = CanonRegistry.GetModelName(modelType);
-            var route = $"{Koan.Canon.Web.Infrastructure.WebConstants.Routes.DefaultPrefix}/{modelName}";
-            // Register CanonEntityController<TModel> bound to this model type via GenericControllers helper (by reflection)
-            var gcType = Type.GetType("Koan.Web.Extensions.GenericControllers.GenericControllers, Koan.Web.Extensions");
-            if (gcType is not null)
+            RegisterGenericController(services, descriptor.ModelType, typeof(CanonEntitiesController<>), descriptor.Route);
+        }
+
+        foreach (var descriptor in modelDescriptors.Where(d => d.IsValueObject))
+        {
+            RegisterGenericController(services, descriptor.ModelType, typeof(EntityController<>), descriptor.Route);
+        }
+    }
+
+    public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
+    {
+        module.Describe(ModuleVersion);
+        module.AddSetting(
+            "routes.models",
+            WebConstants.Routes.Models,
+            source: Koan.Core.Hosting.Bootstrap.BootSettingSource.Custom,
+            consumers: new[] { "Koan.Canon.Web.Catalog" });
+        module.AddSetting(
+            "routes.admin",
+            WebConstants.Routes.Admin,
+            source: Koan.Core.Hosting.Bootstrap.BootSettingSource.Custom,
+            consumers: new[] { "Koan.Canon.Web.AdminSurface" });
+        module.AddSetting(
+            "routes.canon",
+            WebConstants.Routes.CanonPrefix + "/{model}",
+            source: Koan.Core.Hosting.Bootstrap.BootSettingSource.Custom,
+            consumers: new[] { "Koan.Canon.Web.EntitiesController" });
+        module.AddSetting(
+            "routes.valueObjects",
+            WebConstants.Routes.ValueObjectPrefix + "/{type}",
+            source: Koan.Core.Hosting.Bootstrap.BootSettingSource.Custom,
+            consumers: new[] { "Koan.Canon.Web.ValueObjectController" });
+
+        module.AddTool(
+            "Canon Admin",
+            WebConstants.Routes.Admin,
+            "Auto-generated admin surface for Canon models",
+            capability: "canon.admin");
+    }
+
+    private static void RegisterGenericController(IServiceCollection services, Type modelType, Type controllerDefinition, string route)
+    {
+        var method = AddGenericControllerMethod.MakeGenericMethod(modelType);
+        _ = method.Invoke(null, new object?[] { services, controllerDefinition, route });
+    }
+
+    private static IEnumerable<CanonModelDescriptor> DiscoverDescriptors(bool includeValueObjects)
+    {
+        var descriptors = new List<CanonModelDescriptor>();
+        foreach (var modelType in DiscoverTypes(typeof(CanonEntity<>)))
+        {
+            var slug = ToSlug(modelType.Name);
+            var route = $"{WebConstants.Routes.CanonPrefix}/{slug}";
+            descriptors.Add(new CanonModelDescriptor(modelType, slug, modelType.Name, route, isValueObject: false));
+        }
+
+        if (includeValueObjects)
+        {
+            foreach (var valueObjectType in DiscoverTypes(typeof(CanonValueObject<>)))
             {
-                var addGeneric = gcType.GetMethod("AddGenericController", BindingFlags.Public | BindingFlags.Static);
-                if (addGeneric is not null)
-                {
-                    var g = addGeneric.MakeGenericMethod(modelType);
-                    _ = g.Invoke(null, new object?[] { services, typeof(Koan.Canon.Web.Controllers.CanonEntityController<>), route });
-                }
+                var slug = ToSlug(valueObjectType.Name);
+                var route = $"{WebConstants.Routes.ValueObjectPrefix}/{slug}";
+                descriptors.Add(new CanonModelDescriptor(valueObjectType, slug, valueObjectType.Name, route, isValueObject: true));
             }
         }
-        // Discover Canon value-objects and register standard EntityController<TVo> under /api/vo/{type}
-        foreach (var voType in DiscoverValueObjects())
-        {
-            var voName = CanonRegistry.GetModelName(voType);
-            var route = $"/api/vo/{voName}";
-            var gcType = Type.GetType("Koan.Web.Extensions.GenericControllers.GenericControllers, Koan.Web.Extensions");
-            if (gcType is not null)
-            {
-                var addGeneric = gcType.GetMethod("AddGenericController", BindingFlags.Public | BindingFlags.Static);
-                if (addGeneric is not null)
-                {
-                    var g = addGeneric.MakeGenericMethod(voType);
-                    _ = g.Invoke(null, new object?[] { services, typeof(Koan.Web.Controllers.EntityController<>), route });
-                }
-            }
-        }
-        // Health/metrics are assumed to be added by host; controllers expose endpoints only.
 
-        // Opt-out turnkey: auto-add Canon runtime in web hosts unless disabled via config.
-        // Gate: Koan:Canon:AutoRegister (default: true). Idempotent: skips if already added.
-        try
+        return descriptors
+            .GroupBy(descriptor => descriptor.ModelType)
+            .Select(group => group.First());
+    }
+
+    private static IEnumerable<Type> DiscoverTypes(Type openGenericBase)
+    {
+        foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
         {
-            IConfiguration? cfg = null;
+            Type?[] types;
             try
             {
-                var existing = services.FirstOrDefault(d => d.ServiceType == typeof(IConfiguration));
-                cfg = existing?.ImplementationInstance as IConfiguration;
+                types = assembly.GetTypes();
             }
-            catch { }
-
-            var enabled = true; // default ON
-            if (cfg is not null)
+            catch (ReflectionTypeLoadException ex)
             {
-                // Prefer explicit boolean; treat missing as true
-                var val = cfg.GetValue<bool?>("Koan:Canon:AutoRegister");
-                if (val.HasValue) enabled = val.Value;
+                types = ex.Types;
+            }
+            catch
+            {
+                continue;
             }
 
-            // Skip if Canon already wired (presence of ICanonMaterializer indicates AddKoanCanon ran)
-            var already = services.Any(d => d.ServiceType == typeof(ICanonMaterializer));
-            if (enabled && !already)
+            foreach (var type in types)
             {
-                services.AddKoanCanon();
+                if (type is null || type.IsAbstract || !type.IsClass)
+                {
+                    continue;
+                }
+
+                var baseType = type.BaseType;
+                if (baseType is null || !baseType.IsGenericType)
+                {
+                    continue;
+                }
+
+                if (baseType.GetGenericTypeDefinition() != openGenericBase)
+                {
+                    continue;
+                }
+
+                yield return type;
             }
         }
-        catch { }
     }
 
-    public void Describe(Koan.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)
+    private static string ToSlug(string value)
     {
-    report.AddModule(ModuleName, ModuleVersion);
-    report.AddSetting("routes[0]", "/admin/replay");
-    report.AddSetting("routes[1]", "/admin/reproject");
-    report.AddSetting("routes[2]", "/models/{model}/views/{view}/{referenceUlid}");
-    report.AddSetting("routes[3]", "/models/{model}/views/{view}");
-    report.AddSetting("routes[4]", "/policies");
-    report.AddSetting("routes[5]", $"{Koan.Canon.Web.Infrastructure.WebConstants.Routes.DefaultPrefix}/{{model}}");
-    report.AddSetting("routes[6]", "/api/vo/{type}");
-    var autoReg = cfg.GetValue<bool?>("Koan:Canon:AutoRegister") ?? true;
-    report.AddSetting("turnkey.autoRegister", autoReg.ToString().ToLowerInvariant());
-    }
-
-    private static IEnumerable<Type> DiscoverModels()
-    {
-        var result = new List<Type>();
-        var assemblies = AppDomain.CurrentDomain.GetAssemblies();
-        foreach (var asm in assemblies)
+        if (string.IsNullOrWhiteSpace(value))
         {
-            Type?[] types;
-            try { types = asm.GetTypes(); }
-            catch (ReflectionTypeLoadException rtle) { types = rtle.Types; }
-            catch { continue; }
-            foreach (var t in types)
-            {
-                if (t is null || !t.IsClass || t.IsAbstract) continue;
-                var bt = t.BaseType;
-                if (bt is null || !bt.IsGenericType) continue;
-                if (bt.GetGenericTypeDefinition() != typeof(Koan.Canon.Model.CanonEntity<>)) continue;
-                result.Add(t);
-            }
+            return value;
         }
-        return result;
-    }
 
-    private static IEnumerable<Type> DiscoverValueObjects()
-    {
-        var result = new List<Type>();
-        var assemblies = AppDomain.CurrentDomain.GetAssemblies();
-        foreach (var asm in assemblies)
+        Span<char> buffer = stackalloc char[value.Length * 2];
+        var bufferIndex = 0;
+        var wasSeparator = true;
+        foreach (var ch in value)
         {
-            Type?[] types;
-            try { types = asm.GetTypes(); }
-            catch (ReflectionTypeLoadException rtle) { types = rtle.Types; }
-            catch { continue; }
-            foreach (var t in types)
+            if (char.IsUpper(ch))
             {
-                if (t is null || !t.IsClass || t.IsAbstract) continue;
-                var bt = t.BaseType;
-                if (bt is null || !bt.IsGenericType) continue;
-                if (bt.GetGenericTypeDefinition() != typeof(Koan.Canon.Model.CanonValueObject<>)) continue;
-                result.Add(t);
+                if (!wasSeparator && bufferIndex > 0)
+                {
+                    buffer[bufferIndex++] = '-';
+                }
+                buffer[bufferIndex++] = char.ToLowerInvariant(ch);
+                wasSeparator = false;
+            }
+            else if (char.IsLetterOrDigit(ch))
+            {
+                buffer[bufferIndex++] = char.ToLowerInvariant(ch);
+                wasSeparator = false;
+            }
+            else
+            {
+                if (!wasSeparator && bufferIndex > 0)
+                {
+                    buffer[bufferIndex++] = '-';
+                }
+                wasSeparator = true;
             }
         }
-        return result;
+
+        return new string(buffer[..bufferIndex]);
     }
 }
-
-
-
 

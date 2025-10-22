@@ -6,6 +6,7 @@ using Koan.Core;
 using Koan.Core.Orchestration;
 using Koan.Messaging;
 using Koan.Messaging.Connector.RabbitMq.Orchestration;
+using Koan.Core.Hosting.Bootstrap;
 
 namespace Koan.Messaging.Connector.RabbitMq;
 
@@ -30,10 +31,9 @@ public class KoanAutoRegistrar : IKoanAutoRegistrar
         services.AddKoanMessaging();
     }
     
-    public void Describe(Koan.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)
+    public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
-        report.AddModule(ModuleName, ModuleVersion);
-
+        module.Describe(ModuleVersion);
         // Use centralized orchestration-aware service discovery
         var serviceDiscovery = new OrchestrationAwareServiceDiscovery(cfg);
 
@@ -56,24 +56,34 @@ public class KoanAutoRegistrar : IKoanAutoRegistrar
             var discoveryTask = serviceDiscovery.DiscoverServiceAsync("rabbitmq", discoveryOptions);
             var result = discoveryTask.GetAwaiter().GetResult();
 
-            report.AddDiscovery($"orchestration-{result.DiscoveryMethod}", result.ServiceUrl);
-            report.AddConnectionAttempt("Messaging.RabbitMq", result.ServiceUrl, result.IsHealthy);
+            var method = $"orchestration-{result.DiscoveryMethod}";
+            var endpoint = Koan.Core.Redaction.DeIdentify(result.ServiceUrl ?? string.Empty);
+            module.AddSetting("Discovery.Method", method);
+            module.AddSetting("Discovery.Endpoint", endpoint);
+            module.AddSetting("Discovery.Healthy", result.IsHealthy.ToString());
+
+            var status = result.IsHealthy ? "reachable" : "unreachable";
+            module.AddNote($"RabbitMQ endpoint {status}: {endpoint}");
 
             // Log provider election decision
             var availableProviders = DiscoverAvailableMessagingProviders();
-            report.AddProviderElection("Messaging", "RabbitMQ", availableProviders,
-                "highest priority provider with orchestration-aware discovery");
+            module.AddSetting("Provider.Selected", "RabbitMQ");
+            module.AddSetting("Provider.Candidates", string.Join(", ", availableProviders));
+            module.AddSetting("Provider.Rationale", "highest priority provider with orchestration-aware discovery");
         }
         catch (Exception ex)
         {
-            report.AddDiscovery("orchestration-fallback", "amqp://guest:guest@localhost:5672");
-            report.AddConnectionAttempt("Messaging.RabbitMq", "amqp://guest:guest@localhost:5672", false);
-            report.AddSetting("Discovery.Error", ex.Message);
+            var fallbackEndpoint = Koan.Core.Redaction.DeIdentify("amqp://guest:guest@localhost:5672");
+            module.AddSetting("Discovery.Method", "orchestration-fallback");
+            module.AddSetting("Discovery.Endpoint", fallbackEndpoint);
+            module.AddSetting("Discovery.Healthy", bool.FalseString);
+            module.AddNote($"RabbitMQ endpoint unreachable: {fallbackEndpoint}");
+            module.AddSetting("Discovery.Error", ex.Message);
         }
 
-        report.AddSetting("Priority", "100 (High - preferred provider)");
-        report.AddSetting("OrchestrationMode", KoanEnv.OrchestrationMode.ToString());
-        report.AddSetting("Configuration", "Orchestration-aware service discovery enabled");
+        module.AddSetting("Priority", "100 (High - preferred provider)");
+        module.AddSetting("OrchestrationMode", KoanEnv.OrchestrationMode.ToString());
+        module.AddSetting("Configuration", "Orchestration-aware service discovery enabled");
     }
     
     private static string[] GetLegacyEnvironmentCandidates()
@@ -119,3 +129,4 @@ public class KoanAutoRegistrar : IKoanAutoRegistrar
         return providers.ToArray();
     }
 }
+

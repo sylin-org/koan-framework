@@ -1,0 +1,1161 @@
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
+using Koan.Data.Abstractions;
+using Koan.Data.Core;
+using Koan.Web.Attributes;
+using Koan.Web.Controllers;
+using S6.SnapVault.Models;
+using S6.SnapVault.Services;
+using S6.SnapVault.Services.AI;
+using S6.SnapVault.Hubs;
+
+namespace S6.SnapVault.Controllers;
+
+/// <summary>
+/// Photo management API - demonstrates batch operations, semantic search, and storage tiers
+/// </summary>
+[Route("api/[controller]")]
+[Pagination(Mode = PaginationMode.On, DefaultSize = 30, MaxSize = 200, DefaultSort = "-id")]
+public class PhotosController : EntityController<PhotoAsset>
+{
+    private readonly ILogger<PhotosController> _logger;
+    private readonly IPhotoProcessingService _processingService;
+    private readonly IPhotoProcessingQueue _queue;
+    private readonly IHubContext<PhotoProcessingHub> _hubContext;
+
+    public PhotosController(
+        ILogger<PhotosController> logger,
+        IPhotoProcessingService processingService,
+        IPhotoProcessingQueue queue,
+        IHubContext<PhotoProcessingHub> hubContext)
+    {
+        _logger = logger;
+        _processingService = processingService;
+        _queue = queue;
+        _hubContext = hubContext;
+    }
+
+    /// <summary>
+    /// Get library statistics (total photos, favorites count, etc.)
+    /// Used for accurate UI counts regardless of pagination
+    /// </summary>
+    [HttpGet("stats")]
+    public async Task<ActionResult<PhotoStats>> GetStats(CancellationToken ct = default)
+    {
+        var allPhotos = await PhotoAsset.All(ct);
+
+        return Ok(new PhotoStats
+        {
+            TotalPhotos = allPhotos.Count,
+            Favorites = allPhotos.Count(p => p.IsFavorite)
+        });
+    }
+
+    /// <summary>
+    /// Get photo's index in a sorted/filtered context
+    /// Used by PhotoSet to determine navigation boundaries
+    /// </summary>
+    [HttpGet("{id}/index")]
+    public async Task<ActionResult<PhotoIndexResponse>> GetPhotoIndex(
+        string id,
+        [FromQuery] string context = "all-photos",
+        [FromQuery] string? collectionId = null,
+        [FromQuery] string? searchQuery = null,
+        [FromQuery] double searchAlpha = 0.5,
+        [FromQuery] string sortBy = "id",
+        [FromQuery] string sortOrder = "desc",
+        CancellationToken ct = default)
+    {
+        // Build query based on context
+        var photos = await BuildPhotoQuery(context, collectionId, searchQuery, searchAlpha, sortBy, sortOrder, ct);
+
+        // Find index of requested photo
+        var index = photos.FindIndex(p => p.Id == id);
+
+        if (index == -1)
+        {
+            return NotFound(new { Error = "Photo not found in current context" });
+        }
+
+        return Ok(new PhotoIndexResponse
+        {
+            Index = index,
+            TotalCount = photos.Count,
+            HasNext = index < photos.Count - 1,
+            HasPrevious = index > 0
+        });
+    }
+
+    /// <summary>
+    /// Get a range of photos with lightweight metadata
+    /// Used by PhotoSet's sliding window cache
+    /// </summary>
+    [HttpGet("range")]
+    public async Task<ActionResult<PhotoRangeResponse>> GetPhotoRange(
+        [FromQuery] string context = "all-photos",
+        [FromQuery] string? collectionId = null,
+        [FromQuery] string? searchQuery = null,
+        [FromQuery] double searchAlpha = 0.5,
+        [FromQuery] int startIndex = 0,
+        [FromQuery] int count = 100,
+        [FromQuery] string sortBy = "id",
+        [FromQuery] string sortOrder = "desc",
+        CancellationToken ct = default)
+    {
+        // Limit max batch size
+        if (count > 200)
+        {
+            count = 200;
+        }
+
+        // Build query based on context
+        var photos = await BuildPhotoQuery(context, collectionId, searchQuery, searchAlpha, sortBy, sortOrder, ct);
+
+        // Extract requested range
+        var rangePhotos = photos
+            .Skip(startIndex)
+            .Take(count)
+            .Select(p => new PhotoMetadata
+            {
+                Id = p.Id,
+                FileName = p.OriginalFileName,
+                CapturedAt = p.CapturedAt,
+                CreatedAt = p.CreatedAt.UtcDateTime,
+                ThumbnailUrl = $"/api/media/photos/{p.Id}/thumbnail",
+                Rating = p.Rating,
+                IsFavorite = p.IsFavorite,
+                Width = p.Width,
+                Height = p.Height
+            })
+            .ToList();
+
+        return Ok(new PhotoRangeResponse
+        {
+            Photos = rangePhotos,
+            StartIndex = startIndex,
+            Count = rangePhotos.Count,
+            TotalCount = photos.Count
+        });
+    }
+
+    /// <summary>
+    /// Get adjacent photo (next/previous) in current context
+    /// Optimized single-query endpoint for navigation
+    /// </summary>
+    [HttpGet("{id}/adjacent")]
+    public async Task<ActionResult<PhotoAsset>> GetAdjacentPhoto(
+        string id,
+        [FromQuery] string direction = "next",
+        [FromQuery] string context = "all-photos",
+        [FromQuery] string? collectionId = null,
+        [FromQuery] string? searchQuery = null,
+        [FromQuery] double searchAlpha = 0.5,
+        [FromQuery] string sortBy = "capturedAt",
+        [FromQuery] string sortOrder = "desc",
+        [FromQuery] int distance = 1,
+        CancellationToken ct = default)
+    {
+        // Build query based on context
+        var photos = await BuildPhotoQuery(context, collectionId, searchQuery, searchAlpha, sortBy, sortOrder, ct);
+
+        // Find current photo's index
+        var currentIndex = photos.FindIndex(p => p.Id == id);
+
+        if (currentIndex == -1)
+        {
+            return NotFound(new { Error = "Photo not found in current context" });
+        }
+
+        // Calculate target index
+        var targetIndex = direction == "next"
+            ? currentIndex + distance
+            : currentIndex - distance;
+
+        // Check bounds
+        if (targetIndex < 0 || targetIndex >= photos.Count)
+        {
+            return NotFound(new { Error = "No adjacent photo found", Reason = "at_end_of_set" });
+        }
+
+        return Ok(photos[targetIndex]);
+    }
+
+    /// <summary>
+    /// Build a photo query based on context (all-photos, collection, favorites, search)
+    /// Uses DataQueryOptions for provider-level sort pushdown (avoids in-memory sorting)
+    /// </summary>
+    private async Task<List<PhotoAsset>> BuildPhotoQuery(
+        string context,
+        string? collectionId,
+        string? searchQuery,
+        double searchAlpha,
+        string sortBy,
+        string sortOrder,
+        CancellationToken ct)
+    {
+        // Build sort expression for provider pushdown (e.g., "-id" for descending, "id" for ascending)
+        var sortExpression = BuildSortExpression(sortBy, sortOrder);
+
+        // Filter by context
+        switch (context)
+        {
+            case "favorites":
+                // Use Query with DataQueryOptions for pushdown
+                var queryOptions = new DataQueryOptions { Sort = sortExpression };
+                var favorites = await PhotoAsset.Query(p => p.IsFavorite, queryOptions, ct);
+                return favorites.ToList();
+
+            case "search":
+                if (string.IsNullOrEmpty(searchQuery))
+                {
+                    throw new ArgumentException("searchQuery required for search context");
+                }
+
+                // Use semantic search service (returns List<PhotoAsset>)
+                var searchResults = await _processingService.SemanticSearchAsync(
+                    query: searchQuery,
+                    eventId: null,
+                    alpha: searchAlpha,
+                    topK: int.MaxValue  // Get all results for consistent navigation
+                );
+
+                // Search results already have relevance sorting, skip additional sorting
+                return searchResults;
+
+            case "collection":
+                if (string.IsNullOrEmpty(collectionId))
+                {
+                    throw new ArgumentException("collectionId required for collection context");
+                }
+
+                var collection = await Collection.Get(collectionId, ct);
+                if (collection == null)
+                {
+                    throw new ArgumentException("Collection not found");
+                }
+
+                // Get photos in collection order using batch retrieval
+                var collectionPhotos = await PhotoAsset.Get(collection.PhotoIds, ct);
+
+                // Collections always preserve manual PhotoIds order (curated ordering)
+                // Sort parameters are ignored - collections are meant to have explicit order
+                var orderedPhotos = new List<PhotoAsset>();
+                foreach (var photoId in collection.PhotoIds)
+                {
+                    var photo = collectionPhotos.FirstOrDefault(p => p.Id == photoId);
+                    if (photo != null)
+                    {
+                        orderedPhotos.Add(photo);
+                    }
+                }
+                return orderedPhotos;
+
+            case "all-photos":
+            default:
+                // Use DataQueryOptions for provider-level sort pushdown
+                var allOptions = new DataQueryOptions { Sort = sortExpression };
+                var allPhotos = await PhotoAsset.All(allOptions, ct);
+                return allPhotos.ToList();
+        }
+    }
+
+    /// <summary>
+    /// Build sort expression string for DataQueryOptions pushdown
+    /// Format: "-field" for descending, "field" for ascending
+    /// </summary>
+    private string BuildSortExpression(string sortBy, string sortOrder)
+    {
+        var normalizedSort = sortBy.ToLower();
+        var prefix = sortOrder.ToLower() == "desc" ? "-" : "";
+
+        // Map to actual entity property names
+        var fieldName = normalizedSort switch
+        {
+            "id" => "Id",
+            "uploadedat" => "UploadedAt",
+            "capturedat" => "CapturedAt",  // Note: CapturedAt can be null
+            "createdat" => "CreatedAt",
+            "rating" => "Rating",
+            "filename" => "OriginalFileName",
+            _ => "Id"  // Default to Id (GUID v7 time-ordered)
+        };
+
+        return $"{prefix}{fieldName}";
+    }
+
+    /// <summary>
+    /// Upload photos to an event (or auto-create daily album if eventId not provided)
+    /// Demonstrates: File upload, batch processing, background jobs, auto-organization
+    /// </summary>
+    [HttpPost("upload")]
+    [RequestSizeLimit(104857600)] // 100MB limit
+    public async Task<ActionResult<UploadResponse>> UploadPhotos(
+        [FromForm] string? eventId,
+        [FromForm] List<IFormFile> files,
+        CancellationToken ct = default)
+    {
+        if (files == null || files.Count == 0)
+        {
+            return BadRequest(new { Error = "No files provided" });
+        }
+
+        // If eventId provided, validate it exists
+        Event? evt = null;
+        if (!string.IsNullOrEmpty(eventId))
+        {
+            evt = await Event.Get(eventId, ct);
+            if (evt == null)
+            {
+                return NotFound(new { Error = "Event not found" });
+            }
+        }
+
+        // Validate files
+        var validFiles = files.Where(f => IsValidImageFile(f)).ToList();
+        if (validFiles.Count == 0)
+        {
+            return BadRequest(new { Error = "No valid image files found" });
+        }
+
+        // Create processing job
+        var job = new ProcessingJob
+        {
+            EventId = eventId ?? "auto",
+            TotalPhotos = validFiles.Count,
+            Status = ProcessingStatus.InProgress
+        };
+        await job.Save(ct);
+
+        _logger.LogInformation(
+            "Created upload job {JobId} with {Count} file(s) for event {EventId}",
+            job.Id, validFiles.Count, eventId ?? "auto");
+
+        // Queue files for background processing
+        var queuedCount = 0;
+        foreach (var file in validFiles)
+        {
+            try
+            {
+                // Read file into memory for queuing
+                using var ms = new MemoryStream();
+                await file.CopyToAsync(ms, ct);
+                var fileData = ms.ToArray();
+
+                // Queue for background processing
+                var queuedUpload = new QueuedPhotoUpload
+                {
+                    JobId = job.Id,
+                    EventId = eventId,
+                    FileName = file.FileName,
+                    ContentType = file.ContentType,
+                    FileData = fileData
+                };
+
+                _queue.Enqueue(queuedUpload);
+                queuedCount++;
+
+                // Notify clients that file is queued
+                await _hubContext.Clients.Group($"job:{job.Id}").SendAsync("PhotoQueued", new PhotoProgressEvent
+                {
+                    JobId = job.Id,
+                    PhotoId = "", // Not yet created
+                    FileName = file.FileName,
+                    Status = "queued",
+                    Stage = "queued"
+                }, ct);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to queue file {FileName}", file.FileName);
+                job.Errors.Add($"{file.FileName}: {ex.Message}");
+            }
+        }
+
+        // Update job with queue status
+        job.ProcessedPhotos = 0; // Will be updated by background worker
+        await job.Save(ct);
+
+        _logger.LogInformation(
+            "Queued {QueuedCount} of {TotalCount} file(s) for background processing (Job: {JobId})",
+            queuedCount, validFiles.Count, job.Id);
+
+        // Return immediately - processing happens in background
+        return Ok(new UploadResponse
+        {
+            JobId = job.Id,
+            TotalQueued = queuedCount,
+            TotalFailed = job.Errors.Count,
+            Message = $"Queued {queuedCount} photo(s) for processing. Connect to SignalR hub to receive real-time updates."
+        });
+    }
+
+    /// <summary>
+    /// Semantic search - demonstrates Koan.Data.Vector integration
+    /// </summary>
+    [HttpPost("search")]
+    public async Task<ActionResult<SearchResponse>> SearchPhotos([FromBody] SearchRequest request)
+    {
+        if (string.IsNullOrEmpty(request.Query))
+        {
+            return BadRequest(new { Error = "Query is required" });
+        }
+
+        // Use service for semantic search with user-controlled alpha (with built-in fallback)
+        var photos = await _processingService.SemanticSearchAsync(
+            query: request.Query,
+            eventId: request.EventId,
+            alpha: request.Alpha,
+            topK: request.Limit
+        );
+
+        return Ok(new SearchResponse
+        {
+            Photos = photos,
+            Query = request.Query,
+            ResultCount = photos.Count
+        });
+    }
+
+    /// <summary>
+    /// Get photos for an event with pagination
+    /// </summary>
+    [HttpGet("by-event/{eventId}")]
+    public async Task<ActionResult<PaginatedResponse>> GetByEvent(
+        string eventId,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 50,
+        CancellationToken ct = default)
+    {
+        var allPhotos = await PhotoAsset.Query(p => p.EventId == eventId, ct);
+        var totalCount = allPhotos.Count;
+
+        var photos = allPhotos
+            .OrderByDescending(p => p.CapturedAt ?? p.UploadedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToList();
+
+        return Ok(new PaginatedResponse
+        {
+            Photos = photos,
+            Page = page,
+            PageSize = pageSize,
+            TotalCount = totalCount,
+            TotalPages = (int)Math.Ceiling(totalCount / (double)pageSize)
+        });
+    }
+
+    /// <summary>
+    /// Toggle favorite status
+    /// </summary>
+    [HttpPost("{id}/favorite")]
+    public async Task<ActionResult> ToggleFavorite(string id, CancellationToken ct = default)
+    {
+        var photo = await PhotoAsset.Get(id, ct);
+        if (photo == null)
+        {
+            return NotFound();
+        }
+
+        photo.IsFavorite = !photo.IsFavorite;
+        await photo.Save(ct);
+
+        return Ok(new { IsFavorite = photo.IsFavorite });
+    }
+
+    /// <summary>
+    /// Set photo rating (0-5 stars)
+    /// </summary>
+    [HttpPost("{id}/rate")]
+    public async Task<ActionResult> RatePhoto(string id, [FromBody] RateRequest request, CancellationToken ct = default)
+    {
+        if (request.Rating < 0 || request.Rating > 5)
+        {
+            return BadRequest(new { Error = "Rating must be between 0 and 5" });
+        }
+
+        var photo = await PhotoAsset.Get(id, ct);
+        if (photo == null)
+        {
+            return NotFound();
+        }
+
+        photo.Rating = request.Rating;
+        await photo.Save(ct);
+
+        return Ok(new { Rating = photo.Rating });
+    }
+
+    /// <summary>
+    /// Regenerate AI description and embedding for a photo
+    /// DEPRECATED: Use /regenerate-ai-analysis instead for better lock support
+    /// </summary>
+    [HttpPost("{id}/regenerate-ai")]
+    public async Task<ActionResult> RegenerateAI(string id, CancellationToken ct = default)
+    {
+        var photo = await PhotoAsset.Get(id, ct);
+        if (photo == null)
+        {
+            return NotFound();
+        }
+
+        _logger.LogInformation("Regenerating AI metadata for photo {PhotoId}", id);
+
+        // Clear existing AI data
+        photo.DetailedDescription = "";
+        photo.Embedding = null;
+        photo.AutoTags = new List<string>();
+        photo.DetectedObjects = new List<string>();
+        photo.MoodDescription = "";
+        await photo.Save(ct);
+
+        // Regenerate AI metadata in background
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await _processingService.GenerateAIMetadataAsync(photo, CancellationToken.None);
+                _logger.LogInformation("Successfully regenerated AI metadata for photo {PhotoId}", id);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to regenerate AI metadata for photo {PhotoId}", id);
+            }
+        }, CancellationToken.None);
+
+        return Ok(new { Message = "AI regeneration started in background", PhotoId = id });
+    }
+
+    /// <summary>
+    /// Regenerate AI analysis for a photo while preserving locked facts
+    /// "Reroll with holds" - locked facts are preserved during regeneration
+    /// Optionally specify an analysis style ID (smart, portrait, product, landscape, etc.)
+    /// </summary>
+    [HttpPost("{id}/regenerate-ai-analysis")]
+    public async Task<ActionResult<PhotoAsset>> RegenerateAIAnalysis(
+        string id,
+        [FromBody] RegenerateAIAnalysisRequest? request = null,
+        CancellationToken ct = default)
+    {
+        try
+        {
+            var photo = await _processingService.RegenerateAIAnalysisAsync(id, request?.AnalysisStyleId, ct);
+            return Ok(photo);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return NotFound(new { Error = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to regenerate AI analysis for photo {PhotoId}", id);
+            return StatusCode(500, new { Error = "Failed to regenerate AI analysis", Details = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Toggle lock state of a specific fact in the AI analysis
+    /// Returns the updated list of locked facts to support multi-tab scenarios
+    /// </summary>
+    [HttpPost("{id}/facts/{factKey}/toggle-lock")]
+    public async Task<ActionResult> ToggleLockFact(string id, string factKey, CancellationToken ct = default)
+    {
+        var photo = await PhotoAsset.Get(id, ct);
+        if (photo == null)
+        {
+            return NotFound();
+        }
+
+        if (photo.AiAnalysis == null)
+        {
+            return BadRequest(new { Error = "Photo has no AI analysis" });
+        }
+
+        // Normalize to lowercase (all fact keys are stored lowercase)
+        var normalizedKey = factKey.ToLowerInvariant();
+
+        // Verify fact exists
+        if (!photo.AiAnalysis.Facts.ContainsKey(normalizedKey))
+        {
+            return BadRequest(new { Error = $"Fact key '{normalizedKey}' not found in analysis" });
+        }
+
+        // Toggle lock state
+        bool isNowLocked;
+        if (photo.AiAnalysis.LockedFactKeys.Contains(normalizedKey))
+        {
+            photo.AiAnalysis.LockedFactKeys.Remove(normalizedKey);
+            isNowLocked = false;
+            _logger.LogInformation("Unlocked fact {FactKey} for photo {PhotoId}", normalizedKey, id);
+        }
+        else
+        {
+            photo.AiAnalysis.LockedFactKeys.Add(normalizedKey);
+            isNowLocked = true;
+            _logger.LogInformation("Locked fact {FactKey} for photo {PhotoId}", normalizedKey, id);
+        }
+
+        await photo.Save(ct);
+
+        return Ok(new
+        {
+            FactKey = normalizedKey,
+            IsLocked = isNowLocked,
+            LockedFactKeys = photo.AiAnalysis.LockedFactKeys.ToList()
+        });
+    }
+
+    /// <summary>
+    /// Toggle lock state of the AI summary
+    /// Locked summaries are preserved during regeneration
+    /// </summary>
+    [HttpPost("{id}/summary/toggle-lock")]
+    public async Task<ActionResult> ToggleLockSummary(string id, CancellationToken ct = default)
+    {
+        var photo = await PhotoAsset.Get(id, ct);
+        if (photo == null)
+        {
+            return NotFound();
+        }
+
+        if (photo.AiAnalysis == null)
+        {
+            return BadRequest(new { Error = "Photo has no AI analysis" });
+        }
+
+        // Toggle lock state
+        photo.AiAnalysis.SummaryLocked = !photo.AiAnalysis.SummaryLocked;
+        await photo.Save(ct);
+
+        _logger.LogInformation("{Action} summary for photo {PhotoId}",
+            photo.AiAnalysis.SummaryLocked ? "Locked" : "Unlocked", id);
+
+        return Ok(new
+        {
+            SummaryLocked = photo.AiAnalysis.SummaryLocked
+        });
+    }
+
+    /// <summary>
+    /// Lock all content in the AI analysis (summary and facts)
+    /// </summary>
+    [HttpPost("{id}/facts/lock-all")]
+    public async Task<ActionResult> LockAllFacts(string id, CancellationToken ct = default)
+    {
+        var photo = await PhotoAsset.Get(id, ct);
+        if (photo == null)
+        {
+            return NotFound();
+        }
+
+        if (photo.AiAnalysis == null)
+        {
+            return BadRequest(new { Error = "Photo has no AI analysis" });
+        }
+
+        // Lock summary
+        photo.AiAnalysis.SummaryLocked = true;
+
+        // Lock all existing fact keys (all keys are already lowercase)
+        photo.AiAnalysis.LockedFactKeys = new HashSet<string>(photo.AiAnalysis.Facts.Keys);
+        await photo.Save(ct);
+
+        _logger.LogInformation("Locked summary and all {Count} facts for photo {PhotoId}", photo.AiAnalysis.LockedFactKeys.Count, id);
+
+        return Ok(new
+        {
+            SummaryLocked = photo.AiAnalysis.SummaryLocked,
+            LockedCount = photo.AiAnalysis.LockedFactKeys.Count,
+            LockedFactKeys = photo.AiAnalysis.LockedFactKeys
+        });
+    }
+
+    /// <summary>
+    /// Unlock all content in the AI analysis (summary and facts)
+    /// </summary>
+    [HttpPost("{id}/facts/unlock-all")]
+    public async Task<ActionResult> UnlockAllFacts(string id, CancellationToken ct = default)
+    {
+        var photo = await PhotoAsset.Get(id, ct);
+        if (photo == null)
+        {
+            return NotFound();
+        }
+
+        if (photo.AiAnalysis == null)
+        {
+            return BadRequest(new { Error = "Photo has no AI analysis" });
+        }
+
+        var previousCount = photo.AiAnalysis.LockedFactKeys.Count;
+
+        // Unlock summary
+        photo.AiAnalysis.SummaryLocked = false;
+
+        // Unlock facts
+        photo.AiAnalysis.LockedFactKeys.Clear();
+        await photo.Save(ct);
+
+        _logger.LogInformation("Unlocked summary and all {Count} facts for photo {PhotoId}", previousCount, id);
+
+        return Ok(new
+        {
+            SummaryLocked = photo.AiAnalysis.SummaryLocked,
+            UnlockedCount = previousCount,
+            LockedFactKeys = photo.AiAnalysis.LockedFactKeys
+        });
+    }
+
+    /// <summary>
+    /// Download full-resolution photo
+    /// </summary>
+    [HttpGet("{id}/download")]
+    public ActionResult DownloadPhoto(string id)
+    {
+        var photo = PhotoAsset.Get(id);
+        if (photo == null)
+        {
+            return NotFound();
+        }
+
+        // Redirect to the storage URL for the full-resolution photo
+        return Redirect($"/storage/{photo.Key}");
+    }
+
+    /// <summary>
+    /// Bulk delete photos
+    /// </summary>
+    [HttpPost("bulk/delete")]
+    public async Task<ActionResult> BulkDelete([FromBody] BulkRequest request, CancellationToken ct = default)
+    {
+        if (request.PhotoIds == null || request.PhotoIds.Count == 0)
+        {
+            return BadRequest(new { Error = "PhotoIds is required" });
+        }
+
+        var deleted = 0;
+        var errors = new List<string>();
+
+        foreach (var id in request.PhotoIds)
+        {
+            try
+            {
+                var photo = await PhotoAsset.Get(id, ct);
+                if (photo != null)
+                {
+                    await photo.Remove(ct);
+                    deleted++;
+                }
+                else
+                {
+                    errors.Add($"Photo {id} not found");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to delete photo {PhotoId}", id);
+                errors.Add($"Photo {id}: {ex.Message}");
+            }
+        }
+
+        return Ok(new
+        {
+            Deleted = deleted,
+            Failed = errors.Count,
+            Errors = errors
+        });
+    }
+
+    /// <summary>
+    /// Get filter metadata (distinct values for filtering)
+    /// </summary>
+    [HttpGet("filter-metadata")]
+    public async Task<ActionResult<FilterMetadata>> GetFilterMetadata(CancellationToken ct = default)
+    {
+        var allPhotos = await PhotoAsset.All(ct);
+
+        var metadata = new FilterMetadata
+        {
+            CameraModels = allPhotos
+                .Where(p => !string.IsNullOrEmpty(p.CameraModel))
+                .Select(p => p.CameraModel!)
+                .Distinct()
+                .OrderBy(c => c)
+                .ToList(),
+
+            Years = allPhotos
+                .Where(p => p.CapturedAt.HasValue)
+                .Select(p => p.CapturedAt!.Value.Year)
+                .Distinct()
+                .OrderByDescending(y => y)
+                .ToList(),
+
+            Tags = allPhotos
+                .SelectMany(p => p.AutoTags)
+                .GroupBy(t => t)
+                .OrderByDescending(g => g.Count())
+                .Take(50) // Top 50 tags
+                .Select(g => new TagInfo { Tag = g.Key, Count = g.Count() })
+                .ToList()
+        };
+
+        return Ok(metadata);
+    }
+
+    /// <summary>
+    /// Get Smart Collections for Discovery Panel
+    /// Returns intelligent photo groupings with counts and preview thumbnails
+    /// </summary>
+    [HttpGet("smart-collections")]
+    public async Task<ActionResult<SmartCollectionsResponse>> GetSmartCollections(CancellationToken ct = default)
+    {
+        var allPhotos = await PhotoAsset.All(ct);
+        var now = DateTime.UtcNow;
+        var sevenDaysAgo = now.AddDays(-7);
+        var thirtyDaysAgo = now.AddDays(-30);
+
+        var collections = new List<SmartCollection>();
+
+        // 1. Recent Uploads
+        var recentUploads = allPhotos
+            .Where(p => p.UploadedAt >= sevenDaysAgo)
+            .OrderByDescending(p => p.UploadedAt)
+            .ToList();
+
+        if (recentUploads.Any())
+        {
+            collections.Add(new SmartCollection
+            {
+                Id = "recent-uploads",
+                Name = "Recent Uploads",
+                Type = "system",
+                PhotoCount = recentUploads.Count,
+                Thumbnails = recentUploads.Take(4).Select(p => $"/storage/{p.MasonryThumbnailMediaId}").ToList(),
+                LastUpdated = recentUploads.First().UploadedAt,
+                Icon = "camera"
+            });
+        }
+
+        // 2. Needs Attention (unrated or untagged photos older than 30 days)
+        var needsAttention = allPhotos
+            .Where(p => p.UploadedAt < thirtyDaysAgo && (p.Rating == 0 || p.AutoTags.Count == 0))
+            .OrderByDescending(p => p.UploadedAt)
+            .ToList();
+
+        if (needsAttention.Any())
+        {
+            collections.Add(new SmartCollection
+            {
+                Id = "needs-attention",
+                Name = "Needs Attention",
+                Type = "system",
+                PhotoCount = needsAttention.Count,
+                Thumbnails = needsAttention.Take(4).Select(p => $"/storage/{p.MasonryThumbnailMediaId}").ToList(),
+                LastUpdated = needsAttention.First().UploadedAt,
+                Icon = "alert-circle",
+                Description = "Unrated or untagged"
+            });
+        }
+
+        // 3. This Week's Best (4-5 star photos from last 7 days)
+        var thisWeeksBest = allPhotos
+            .Where(p => p.Rating >= 4 && p.UploadedAt >= sevenDaysAgo)
+            .OrderByDescending(p => p.Rating)
+            .ThenByDescending(p => p.UploadedAt)
+            .ToList();
+
+        if (thisWeeksBest.Any())
+        {
+            collections.Add(new SmartCollection
+            {
+                Id = "this-weeks-best",
+                Name = "This Week's Best",
+                Type = "system",
+                PhotoCount = thisWeeksBest.Count,
+                Thumbnails = thisWeeksBest.Take(4).Select(p => $"/storage/{p.MasonryThumbnailMediaId}").ToList(),
+                LastUpdated = thisWeeksBest.First().UploadedAt,
+                Icon = "star",
+                Description = "4-5 star ratings"
+            });
+        }
+        else
+        {
+            // Fallback: Last Month's Best
+            var lastMonthsBest = allPhotos
+                .Where(p => p.Rating >= 4 && p.UploadedAt >= thirtyDaysAgo)
+                .OrderByDescending(p => p.Rating)
+                .ThenByDescending(p => p.UploadedAt)
+                .ToList();
+
+            if (lastMonthsBest.Any())
+            {
+                collections.Add(new SmartCollection
+                {
+                    Id = "last-months-best",
+                    Name = "Last Month's Best",
+                    Type = "system",
+                    PhotoCount = lastMonthsBest.Count,
+                    Thumbnails = lastMonthsBest.Take(4).Select(p => $"/storage/{p.MasonryThumbnailMediaId}").ToList(),
+                    LastUpdated = lastMonthsBest.First().UploadedAt,
+                    Icon = "star",
+                    Description = "4-5 star ratings"
+                });
+            }
+        }
+
+        // 4. Camera Profiles (grouped by camera model)
+        var cameraGroups = allPhotos
+            .Where(p => !string.IsNullOrEmpty(p.CameraModel))
+            .GroupBy(p => p.CameraModel)
+            .OrderByDescending(g => g.Count())
+            .Take(5) // Top 5 cameras
+            .ToList();
+
+        foreach (var group in cameraGroups)
+        {
+            var cameraPhotos = group.OrderByDescending(p => p.UploadedAt).ToList();
+            collections.Add(new SmartCollection
+            {
+                Id = $"camera-{group.Key?.Replace(" ", "-").ToLower()}",
+                Name = group.Key ?? "Unknown Camera",
+                Type = "camera",
+                PhotoCount = group.Count(),
+                Thumbnails = cameraPhotos.Take(4).Select(p => $"/storage/{p.MasonryThumbnailMediaId}").ToList(),
+                LastUpdated = cameraPhotos.First().UploadedAt,
+                Icon = "camera-slr"
+            });
+        }
+
+        // 5. Favorites
+        var favorites = allPhotos
+            .Where(p => p.IsFavorite)
+            .OrderByDescending(p => p.UploadedAt)
+            .ToList();
+
+        if (favorites.Any())
+        {
+            collections.Add(new SmartCollection
+            {
+                Id = "favorites",
+                Name = "Favorites",
+                Type = "system",
+                PhotoCount = favorites.Count,
+                Thumbnails = favorites.Take(4).Select(p => $"/storage/{p.MasonryThumbnailMediaId}").ToList(),
+                LastUpdated = favorites.First().UploadedAt,
+                Icon = "heart"
+            });
+        }
+
+        return Ok(new SmartCollectionsResponse
+        {
+            Collections = collections,
+            TotalPhotos = allPhotos.Count
+        });
+    }
+
+    /// <summary>
+    /// Toggle favorite status for a single photo
+    /// PUT /api/photos/{id}/favorite
+    /// Body: { isFavorite: boolean }
+    /// </summary>
+    [HttpPut("{id}/favorite")]
+    public async Task<ActionResult> SetFavorite(
+        string id,
+        [FromBody] SetFavoriteRequest request,
+        CancellationToken ct = default)
+    {
+        try
+        {
+            var photo = await PhotoAsset.Get(id, ct);
+            if (photo == null)
+                return NotFound(new { Error = $"Photo '{id}' not found" });
+
+            photo.IsFavorite = request.IsFavorite;
+            await photo.Save(ct);
+
+            _logger.LogInformation("Set favorite status for photo {PhotoId} to {Status}",
+                id, request.IsFavorite);
+
+            return Ok(new
+            {
+                PhotoId = photo.Id,
+                IsFavorite = photo.IsFavorite
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to set favorite status for photo {PhotoId}", id);
+            return StatusCode(500, new { Error = "Failed to update favorite status" });
+        }
+    }
+
+    /// <summary>
+    /// Get all favorited photos
+    /// GET /api/photos/favorites
+    /// </summary>
+    [HttpGet("favorites")]
+    public async Task<ActionResult> GetFavorites(CancellationToken ct = default)
+    {
+        try
+        {
+            var favorites = await PhotoAsset.Query(p => p.IsFavorite == true, ct);
+
+            return Ok(new
+            {
+                Count = favorites.Count,
+                Photos = favorites
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to retrieve favorite photos");
+            return StatusCode(500, new { Error = "Failed to retrieve favorites" });
+        }
+    }
+
+    /// <summary>
+    /// Bulk favorite/unfavorite photos
+    /// </summary>
+    [HttpPost("bulk/favorite")]
+    public async Task<ActionResult> BulkFavorite([FromBody] BulkRequest request, CancellationToken ct = default)
+    {
+        if (request.PhotoIds == null || request.PhotoIds.Count == 0)
+        {
+            return BadRequest(new { Error = "PhotoIds is required" });
+        }
+
+        var updated = 0;
+        var errors = new List<string>();
+
+        foreach (var id in request.PhotoIds)
+        {
+            try
+            {
+                var photo = await PhotoAsset.Get(id, ct);
+                if (photo != null)
+                {
+                    photo.IsFavorite = request.IsFavorite;
+                    await photo.Save(ct);
+                    updated++;
+                }
+                else
+                {
+                    errors.Add($"Photo {id} not found");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to update favorite for photo {PhotoId}", id);
+                errors.Add($"Photo {id}: {ex.Message}");
+            }
+        }
+
+        return Ok(new
+        {
+            Updated = updated,
+            Failed = errors.Count,
+            Errors = errors,
+            IsFavorite = request.IsFavorite
+        });
+    }
+
+    private bool IsValidImageFile(IFormFile file)
+    {
+        var validExtensions = new[] { ".jpg", ".jpeg", ".png", ".heic" };
+        var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+
+        return validExtensions.Contains(extension) && file.Length > 0 && file.Length <= 25 * 1024 * 1024; // 25MB max
+    }
+}
+
+public class UploadResponse
+{
+    public string JobId { get; set; } = "";
+    public int TotalQueued { get; set; }
+    public int TotalFailed { get; set; }
+    public string Message { get; set; } = "";
+}
+
+public class SearchRequest
+{
+    public string Query { get; set; } = "";
+    public string? EventId { get; set; }
+    public double Alpha { get; set; } = 0.5; // 0.0 = exact, 1.0 = semantic
+    public int Limit { get; set; } = 20;
+}
+
+public class RateRequest
+{
+    public int Rating { get; set; }
+}
+
+public class SetFavoriteRequest
+{
+    public bool IsFavorite { get; set; }
+}
+
+public class SearchResponse
+{
+    public List<PhotoAsset> Photos { get; set; } = new();
+    public string Query { get; set; } = "";
+    public int ResultCount { get; set; }
+    public bool UsedFallback { get; set; }
+}
+
+public class PaginatedResponse
+{
+    public List<PhotoAsset> Photos { get; set; } = new();
+    public int Page { get; set; }
+    public int PageSize { get; set; }
+    public int TotalCount { get; set; }
+    public int TotalPages { get; set; }
+}
+
+public class BulkRequest
+{
+    public List<string> PhotoIds { get; set; } = new();
+    public bool IsFavorite { get; set; }
+}
+
+public class FilterMetadata
+{
+    public List<string> CameraModels { get; set; } = new();
+    public List<int> Years { get; set; } = new();
+    public List<TagInfo> Tags { get; set; } = new();
+}
+
+public class TagInfo
+{
+    public string Tag { get; set; } = "";
+    public int Count { get; set; }
+}
+
+public class SmartCollectionsResponse
+{
+    public List<SmartCollection> Collections { get; set; } = new();
+    public int TotalPhotos { get; set; }
+}
+
+public class SmartCollection
+{
+    public string Id { get; set; } = "";
+    public string Name { get; set; } = "";
+    public string Type { get; set; } = ""; // "system", "camera", "ai", "custom"
+    public int PhotoCount { get; set; }
+    public List<string> Thumbnails { get; set; } = new(); // Up to 4 thumbnail URLs
+    public DateTime LastUpdated { get; set; }
+    public string Icon { get; set; } = ""; // Icon name for frontend
+    public string? Description { get; set; } // Optional subtitle
+}
+
+/// <summary>
+/// Request model for regenerating AI analysis with optional style selection
+/// </summary>
+public class RegenerateAIAnalysisRequest
+{
+    /// <summary>
+    /// Optional analysis style ID (smart, portrait, product, landscape, architecture, action, macro)
+    /// If null, uses last-used style or defaults to base prompt
+    /// </summary>
+    public string? AnalysisStyleId { get; set; }
+}

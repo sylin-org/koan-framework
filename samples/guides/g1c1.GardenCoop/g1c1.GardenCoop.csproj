@@ -9,9 +9,13 @@
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\..\src\Connectors\Web\Auth\Test\Koan.Web.Auth.Connector.Test.csproj" />
+    <ProjectReference Include="..\..\..\src\Koan.Web.Admin\Koan.Web.Admin.csproj" />
+    <ProjectReference Include="..\..\..\src\Koan.Web.Auth.Services\Koan.Web.Auth.Services.csproj" />
+    <ProjectReference Include="..\..\..\src\Koan.Web.Auth\Koan.Web.Auth.csproj" />
     <ProjectReference Include="..\..\..\src\Koan.Web\Koan.Web.csproj" />
     <ProjectReference Include="..\..\..\src\Koan.Web.Extensions\Koan.Web.Extensions.csproj" />
-    <ProjectReference Include="..\..\..\src\\Connectors\\Data\\Sqlite\Koan.Data.Connector.Sqlite.csproj" />
+    <ProjectReference Include="..\..\..\src\Connectors\Data\Sqlite\Koan.Data.Connector.Sqlite.csproj" />
     <ProjectReference Include="..\..\..\src\Koan.Data.Core\Koan.Data.Core.csproj" />
   </ItemGroup>
 </Project>

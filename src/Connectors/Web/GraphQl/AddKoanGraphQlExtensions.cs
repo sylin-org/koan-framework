@@ -464,7 +464,7 @@ public static class AddKoanGraphQlExtensions
         where TEntity : class
     {
         public IReadOnlyList<TEntity> Items { get; init; } = Array.Empty<TEntity>();
-        public int TotalCount { get; init; }
+        public long TotalCount { get; init; }
     }
 
     private sealed class Resolvers<TEntity>
@@ -513,26 +513,44 @@ public static class AddKoanGraphQlExtensions
                 }
 
                 IReadOnlyList<TEntity> items;
-                int total = 0;
+                long total = 0;
 
-                using (var _set = EntityContext.Partition(null))
+                using (var _set = EntityContext.Partition(null!))
                 {
                     if (!string.IsNullOrWhiteSpace(filterJson) && repo is ILinqQueryRepository<TEntity, string> lrepo)
                     {
                         if (!JsonFilterBuilder.TryBuild<TEntity>(filterJson!, out var pr, out var error, new JsonFilterBuilder.BuildOptions { IgnoreCase = ignoreCase }))
                             throw new GraphQLException(ErrorBuilder.New().SetMessage(error ?? "Invalid filter").SetCode("BAD_FILTER").Build());
                         items = await lrepo.QueryAsync(pr!, ctx.RequestAborted);
-                        try { total = await lrepo.CountAsync(pr!, ctx.RequestAborted); } catch { total = items.Count; }
+                        try
+                        {
+                            var countRequest = new CountRequest<TEntity> { Predicate = pr };
+                            var countResult = await repo.CountAsync(countRequest, ctx.RequestAborted);
+                            total = countResult.Value;
+                        }
+                        catch { total = items.Count; }
                     }
                     else if (!string.IsNullOrWhiteSpace(opts.Q) && repo is IStringQueryRepository<TEntity, string> srepo)
                     {
                         items = await srepo.QueryAsync(opts.Q!, ctx.RequestAborted);
-                        try { total = await srepo.CountAsync(opts.Q!, ctx.RequestAborted); } catch { total = items.Count; }
+                        try
+                        {
+                            var countRequest = new CountRequest<TEntity> { RawQuery = opts.Q };
+                            var countResult = await repo.CountAsync(countRequest, ctx.RequestAborted);
+                            total = countResult.Value;
+                        }
+                        catch { total = items.Count; }
                     }
                     else
                     {
                         items = await repo.QueryAsync(null, ctx.RequestAborted);
-                        try { total = await repo.CountAsync(null, ctx.RequestAborted); } catch { total = items.Count; }
+                        try
+                        {
+                            var countRequest = new CountRequest<TEntity>();
+                            var countResult = await repo.CountAsync(countRequest, ctx.RequestAborted);
+                            total = countResult.Value;
+                        }
+                        catch { total = items.Count; }
                     }
                 }
 

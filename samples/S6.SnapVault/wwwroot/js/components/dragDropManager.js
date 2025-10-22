@@ -1,0 +1,245 @@
+/**
+ * DragDropManager Component
+ * Manages drop zones for collections and "New Collection" button
+ * Handles photo drag-and-drop to organize into collections
+ */
+
+import { PhotoSetManager } from '../services/PhotoSetManager.js';
+
+export class DragDropManager {
+  constructor(app) {
+    this.app = app;
+    this.dragOverTarget = null;
+  }
+
+  init() {
+    this.attachDropZoneHandlers();
+    console.log('[DragDropManager] Initialized drop zone handlers');
+  }
+
+  attachDropZoneHandlers() {
+    const sidebar = document.querySelector('.sidebar-left');
+    if (!sidebar) {
+      console.warn('[DragDropManager] Sidebar not found');
+      return;
+    }
+
+    console.log('[DragDropManager] Attaching drop zone handlers to sidebar');
+
+    // Dragover on sidebar - show drop zones and highlight targets
+    sidebar.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'copy';
+
+      // Find the target (collection item or new collection button)
+      const collectionItem = e.target.closest('.collection-item[data-droppable="true"]');
+      const newCollectionBtn = e.target.closest('.btn-new-collection');
+
+      // Clear previous highlights
+      if (this.dragOverTarget && this.dragOverTarget !== collectionItem && this.dragOverTarget !== newCollectionBtn) {
+        this.clearDropTargetHighlight();
+      }
+
+      // Highlight current target
+      if (collectionItem) {
+        this.dragOverTarget = collectionItem;
+        collectionItem.classList.add('drop-target');
+      } else if (newCollectionBtn) {
+        this.dragOverTarget = newCollectionBtn;
+        newCollectionBtn.classList.add('drop-target');
+      } else {
+        this.dragOverTarget = null;
+      }
+    });
+
+    // Dragleave - clear highlights when leaving sidebar
+    sidebar.addEventListener('dragleave', (e) => {
+      // Only clear if leaving the sidebar entirely
+      if (!sidebar.contains(e.relatedTarget)) {
+        this.clearDropTargetHighlight();
+        this.dragOverTarget = null;
+      }
+    });
+
+    // Drop handler - add photos to collection or create new collection
+    sidebar.addEventListener('drop', async (e) => {
+      e.preventDefault();
+
+      // Clear visual feedback
+      this.clearDropTargetHighlight();
+
+      // Get selected photo IDs
+      const photoIds = this.app.components.photoSelection.getSelectedPhotoIds();
+
+      console.log('[DragDropManager] Drop detected, selected photo IDs:', photoIds);
+
+      if (photoIds.length === 0) {
+        console.warn('[DragDropManager] No photos selected');
+        return;
+      }
+
+      // Determine drop target
+      const collectionItem = e.target.closest('.collection-item[data-droppable="true"]');
+      const newCollectionBtn = e.target.closest('.btn-new-collection');
+
+      if (newCollectionBtn) {
+        // Create new collection with these photos
+        await this.createCollectionWithPhotos(photoIds);
+      } else if (collectionItem) {
+        // Add to existing collection
+        const collectionId = collectionItem.dataset.collectionId;
+        await this.addPhotosToCollection(collectionId, photoIds);
+      }
+
+      this.dragOverTarget = null;
+    });
+  }
+
+  /**
+   * Generate timestamp-based collection name
+   * Format: "Collection YYYY-MM-DD HH:mm"
+   */
+  generateTimestampName() {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const hour = String(now.getHours()).padStart(2, '0');
+    const minute = String(now.getMinutes()).padStart(2, '0');
+
+    return `Collection ${year}-${month}-${day} ${hour}:${minute}`;
+  }
+
+  /**
+   * Create new collection and add photos to it
+   * INSTANT creation with auto-rename - no prompts
+   */
+  async createCollectionWithPhotos(photoIds) {
+    console.log('[DragDropManager] Creating collection with photos:', photoIds);
+
+    // Generate auto-name (no prompt!)
+    const autoName = this.generateTimestampName();
+
+    try {
+      // Create collection
+      const collection = await this.app.api.post('/api/collections', {
+        name: autoName
+      });
+
+      // Add photos to collection
+      const addResult = await this.app.api.post(`/api/collections/${collection.id}/photos`, {
+        photoIds: photoIds
+      });
+
+      // Invalidate collection cache
+      PhotoSetManager.invalidateCache('collection');
+
+      // Brief toast - don't interrupt flow
+      this.app.components.toast.show(
+        `Created collection with ${addResult.added} photo${addResult.added !== 1 ? 's' : ''}`,
+        { icon: '📁', duration: 2000 }
+      );
+
+      // Clear text selection
+      this.app.components.photoSelection.clearSelection();
+
+      // Reload sidebar and navigate to new collection (non-blocking)
+      if (this.app.components.collectionsSidebar) {
+        this.app.components.collectionsSidebar.loadCollections().then(() => {
+          // Render updated sidebar
+          this.app.components.collectionsSidebar.render();
+
+          // Navigate to the new collection
+          // Collection title is editable in main header (not sidebar)
+          this.app.components.collectionsSidebar.selectView(collection.id);
+        });
+      }
+
+      console.log(`[DragDropManager] Created collection "${autoName}" (ID: ${collection.id})`);
+    } catch (error) {
+      console.error('[DragDropManager] Failed to create collection:', error);
+
+      // Check for capacity limit error
+      if (error.message && error.message.includes('limit')) {
+        this.app.components.toast.show(
+          'Collection limit reached (2,048 photos maximum)',
+          { icon: '⚠️', duration: 5000 }
+        );
+      } else {
+        this.app.components.toast.show(
+          'Failed to create collection',
+          { icon: '⚠️', duration: 3000 }
+        );
+      }
+    }
+  }
+
+  /**
+   * Add photos to existing collection
+   */
+  async addPhotosToCollection(collectionId, photoIds) {
+    console.log('[DragDropManager] Adding photos to collection:', collectionId, photoIds);
+    try {
+      // Get collection name for toast message
+      const collections = this.app.components.collectionsSidebar?.collections || [];
+      const collection = collections.find(c => c.id === collectionId);
+      const collectionName = collection?.name || 'collection';
+
+      // Add photos
+      const result = await this.app.api.post(`/api/collections/${collectionId}/photos`, {
+        photoIds: photoIds
+      });
+
+      // Invalidate collection cache
+      PhotoSetManager.invalidateCache('collection');
+
+      // Reload collections sidebar to update counts
+      if (this.app.components.collectionsSidebar) {
+        await this.app.components.collectionsSidebar.loadCollections();
+        this.app.components.collectionsSidebar.render();
+      }
+
+      this.app.components.toast.show(
+        `Added ${result.added} photo${result.added !== 1 ? 's' : ''} to "${collectionName}"`,
+        { icon: '✓', duration: 2000 }
+      );
+
+      // Clear text selection after successful drop
+      this.app.components.photoSelection.clearSelection();
+
+      console.log(`[DragDropManager] Added ${result.added} photos to collection ${collectionId}`);
+    } catch (error) {
+      console.error('[DragDropManager] Failed to add photos to collection:', error);
+
+      // Check for capacity limit error
+      if (error.message && error.message.includes('limit')) {
+        this.app.components.toast.show(
+          'Collection limit reached (2,048 photos maximum)',
+          { icon: '⚠️', duration: 5000 }
+        );
+      } else {
+        this.app.components.toast.show(
+          'Failed to add photos to collection',
+          { icon: '⚠️', duration: 3000 }
+        );
+      }
+    }
+  }
+
+  /**
+   * Clear drop target visual feedback
+   */
+  clearDropTargetHighlight() {
+    document.querySelectorAll('.drop-target').forEach(el => {
+      el.classList.remove('drop-target');
+    });
+  }
+
+  /**
+   * Reinitialize handlers after sidebar re-render
+   * Called by CollectionsSidebar component
+   */
+  reinit() {
+    this.attachDropZoneHandlers();
+  }
+}

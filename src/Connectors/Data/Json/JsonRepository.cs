@@ -52,6 +52,21 @@ internal sealed class JsonRepository<TEntity, TKey> :
         return Task.FromResult(store.TryGetValue(id, out var value) ? value : null);
     }
 
+    public Task<IReadOnlyList<TEntity?>> GetManyAsync(IEnumerable<TKey> ids, CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        var store = ResolveStore();
+        var idList = ids as IReadOnlyList<TKey> ?? ids.ToList();
+        var results = new TEntity?[idList.Count];
+
+        for (var i = 0; i < idList.Count; i++)
+        {
+            results[i] = store.TryGetValue(idList[i], out var entity) ? entity : null;
+        }
+
+        return Task.FromResult((IReadOnlyList<TEntity?>)results);
+    }
+
     public Task<IReadOnlyList<TEntity>> QueryAsync(object? query, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
@@ -73,13 +88,6 @@ internal sealed class JsonRepository<TEntity, TKey> :
         var skip = (page - 1) * size;
         var list = items.Skip(skip).Take(size).ToList();
         return Task.FromResult((IReadOnlyList<TEntity>)list);
-    }
-
-    public Task<int> CountAsync(object? query, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        var store = ResolveStore();
-        return Task.FromResult(store.Count);
     }
 
     public Task<IReadOnlyList<TEntity>> QueryAsync(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
@@ -104,11 +112,23 @@ internal sealed class JsonRepository<TEntity, TKey> :
         return Task.FromResult((IReadOnlyList<TEntity>)list);
     }
 
-    public Task<int> CountAsync(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
+    public Task<CountResult> CountAsync(CountRequest<TEntity> request, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         var store = ResolveStore();
-        return Task.FromResult(store.Values.AsQueryable().Count(predicate));
+        IQueryable<TEntity> items = store.Values.AsQueryable();
+
+        if (request.Predicate is not null)
+        {
+            items = items.Where(request.Predicate);
+        }
+        else if (request.RawQuery is not null || request.ProviderQuery is not null)
+        {
+            throw new NotSupportedException("JSON adapter only supports LINQ-based count queries.");
+        }
+
+        var total = items.Count();
+        return Task.FromResult(new CountResult(total, false));
     }
 
     public Task<TEntity> UpsertAsync(TEntity model, CancellationToken ct = default)
@@ -165,6 +185,18 @@ internal sealed class JsonRepository<TEntity, TKey> :
         store.Clear();
         Persist(name, store);
         return Task.FromResult(deleted);
+    }
+
+    public Task<long> RemoveAllAsync(RemoveStrategy strategy, CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        var (name, store) = ResolveNameAndStore();
+        var deleted = store.Count;
+        store.Clear();
+        Persist(name, store);
+        // No fast path available - dictionary clear is already instant
+        // Optimized, Fast, and Safe all use same implementation
+        return Task.FromResult((long)deleted);
     }
 
     public IBatchSet<TEntity, TKey> CreateBatch() => new JsonBatch(this);
@@ -302,4 +334,3 @@ internal sealed class JsonRepository<TEntity, TKey> :
 
     // No identifier generation here; RepositoryFacade ensures IDs cross-cutting.
 }
-

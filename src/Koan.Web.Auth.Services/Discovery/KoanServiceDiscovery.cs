@@ -66,6 +66,7 @@ public sealed class KoanServiceDiscovery : IServiceDiscovery
     {
         // For now, return empty array - this would be implemented for service registry scenarios
         _logger.LogDebug("Service discovery not yet implemented");
+        await Task.CompletedTask;
         return Array.Empty<ServiceEndpoint>();
     }
 

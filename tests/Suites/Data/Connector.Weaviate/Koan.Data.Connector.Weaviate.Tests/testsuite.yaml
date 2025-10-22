@@ -1,0 +1,5 @@
+﻿suite: Koan.Data.Connector.Weaviate.Tests
+lane: docker
+scope: connector
+module: Data.Vector.Weaviate
+description: Dedicated integration coverage for the Weaviate vector connector: container bootstrap, vector CRUD, hybrid search, and capability probes against a live Weaviate instance.

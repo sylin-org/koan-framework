@@ -6,6 +6,8 @@ namespace Koan.Orchestration.Connector.Podman;
 
 public sealed class PodmanProvider : IHostingProvider
 {
+    private const string PodmanCli = "podman";
+
     public string Id => "podman";
     public int Priority => 50; // Lower than Docker on Windows-first systems
 
@@ -13,7 +15,7 @@ public sealed class PodmanProvider : IHostingProvider
     {
         try
         {
-            var (code, _, err) = await Run("podman", "version --format json", ct);
+            var (code, _, err) = await Run(PodmanCli, "version --format json", ct);
             if (code == 0) return (true, null);
             return (false, string.IsNullOrWhiteSpace(err) ? "podman not available" : err.Trim());
         }
@@ -26,7 +28,7 @@ public sealed class PodmanProvider : IHostingProvider
     public async Task Up(string composePath, Profile profile, RunOptions options, CancellationToken ct = default)
     {
         var detach = options.Detach ? "-d" : string.Empty;
-        var (_, _, err) = await Run("podman", $"compose -f \"{composePath}\" up {detach}", ct);
+        var (_, _, err) = await Run(PodmanCli, $"compose -f \"{composePath}\" up {detach}", ct);
         if (!string.IsNullOrWhiteSpace(err))
         {
             // podman may write to stderr even on success
@@ -69,7 +71,7 @@ public sealed class PodmanProvider : IHostingProvider
     {
         try
         {
-            var (code, stdout, _) = await Run("podman", $"compose -f \"{composePath}\" ps --format json", ct);
+            var (code, stdout, _) = await Run(PodmanCli, $"compose -f \"{composePath}\" ps --format json", ct);
             if (code != 0 || string.IsNullOrWhiteSpace(stdout)) return new();
             return ParseComposePsJson(stdout);
         }
@@ -79,7 +81,7 @@ public sealed class PodmanProvider : IHostingProvider
     public async Task Down(string composePath, StopOptions options, CancellationToken ct = default)
     {
         var vols = options.RemoveVolumes ? "-v" : string.Empty;
-        await Run("podman", $"compose -f \"{composePath}\" down {vols}", ct);
+        await Run(PodmanCli, $"compose -f \"{composePath}\" down {vols}", ct);
     }
 
     public async IAsyncEnumerable<string> Logs(LogsOptions options, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
@@ -88,7 +90,7 @@ public sealed class PodmanProvider : IHostingProvider
         var follow = options.Follow ? "-f" : string.Empty;
         var tail = options.Tail is { } t ? $"--tail {t}" : string.Empty;
         var since = string.IsNullOrWhiteSpace(options.Since) ? string.Empty : $"--since \"{options.Since}\"";
-        await foreach (var line in Stream("podman", $"compose logs {follow} {tail} {since} {svc}", ct))
+        await foreach (var line in Stream(PodmanCli, $"compose logs {follow} {tail} {since} {svc}", ct))
         {
             yield return line;
         }
@@ -100,7 +102,7 @@ public sealed class PodmanProvider : IHostingProvider
         string stdout = string.Empty;
         try
         {
-            var res = await Run("podman", "compose ps --format json", ct);
+            var res = await Run(PodmanCli, "compose ps --format json", ct);
             code = res.ExitCode;
             stdout = res.StdOut;
         }
@@ -117,7 +119,7 @@ public sealed class PodmanProvider : IHostingProvider
     {
         try
         {
-            var (code, outText, _) = await Run("podman", "compose ps --format json", ct);
+            var (code, outText, _) = await Run(PodmanCli, "compose ps --format json", ct);
             if (code != 0 || string.IsNullOrWhiteSpace(outText)) return Array.Empty<PortBinding>();
             return ParseComposePsPorts(outText);
         }
@@ -131,7 +133,7 @@ public sealed class PodmanProvider : IHostingProvider
     {
         try
         {
-            var (code, outText, _) = Run("podman", "version --format json", CancellationToken.None).GetAwaiter().GetResult();
+            var (code, outText, _) = Run(PodmanCli, "version --format json", CancellationToken.None).GetAwaiter().GetResult();
             if (code != 0 || string.IsNullOrWhiteSpace(outText)) return string.Empty;
             var root = JToken.Parse(outText);
             var ver = root["Version"]?.Value<string>();
@@ -145,7 +147,7 @@ public sealed class PodmanProvider : IHostingProvider
 
     static string GetEndpointSafe()
     {
-        try { return Run("podman", "system connection default", CancellationToken.None).GetAwaiter().GetResult().StdOut.Trim(); }
+        try { return Run(PodmanCli, "system connection default", CancellationToken.None).GetAwaiter().GetResult().StdOut.Trim(); }
         catch { return string.Empty; }
     }
 

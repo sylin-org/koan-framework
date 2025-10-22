@@ -1,0 +1,189 @@
+/**
+ * Context Panel Styles
+ * EXACT replication of Photo Information lightbox panel design
+ * Uses same structure: panel-content → panel-section → content
+ */
+
+/* ==================== Filters Panel Container ==================== */
+.sidebar-right .filters-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border:0;
+}
+
+/* ==================== Panel Content (Scrollable) ==================== */
+.panel-content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* Custom scrollbar */
+.panel-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.panel-content::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.panel-content::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+}
+
+.panel-content::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* ==================== Panel Sections ==================== */
+.panel-section {
+  padding: 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.panel-section:last-child {
+  border-bottom: none;
+}
+
+.panel-section h3 {
+  font-size: 14px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: rgba(255, 255, 255, 0.5);
+  margin: 0 0 12px 0;
+}
+
+/* ==================== Metadata Grid ==================== */
+.metadata-grid {
+  display: grid;
+  gap: 0;
+}
+
+.metadata-item {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  align-items: baseline;
+}
+
+.metadata-item:last-child {
+  border-bottom: none;
+}
+
+.metadata-item .label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: rgba(255, 255, 255, 0.45);
+  flex-shrink: 0;
+}
+
+.metadata-item .value {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.85);
+  word-break: break-word;
+}
+
+/* ==================== Actions Grid ==================== */
+.actions-grid {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.actions-grid:last-child {
+  margin-bottom: 0;
+}
+
+.btn-action {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 14px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 150ms, border-color 150ms, transform 100ms;
+}
+
+.btn-action:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.btn-action:active {
+  transform: scale(0.98);
+}
+
+.btn-action:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.btn-action svg {
+  flex-shrink: 0;
+}
+
+.action-label {
+  flex: 1;
+}
+
+/* Destructive action styling */
+.btn-action.btn-destructive {
+  color: rgba(239, 68, 68, 0.9);
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.btn-action.btn-destructive:hover {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.5);
+}
+
+/* ==================== Empty State ==================== */
+.context-panel-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  padding: 20px;
+  color: rgba(255, 255, 255, 0.3);
+  font-size: 13px;
+  text-align: center;
+}
+
+/* ==================== Accessibility ==================== */
+@media (prefers-reduced-motion: reduce) {
+  .btn-action {
+    transition: none;
+  }
+}
+
+@media (prefers-contrast: high) {
+  .panel-section {
+    border-bottom-width: 2px;
+  }
+
+  .btn-action {
+    border-width: 2px;
+  }
+}
+
+.btn-action:focus-visible {
+  outline: 2px solid rgba(59, 130, 246, 0.8);
+  outline-offset: 2px;
+}

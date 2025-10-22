@@ -1,19 +1,33 @@
+using System;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Console;
+using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Logging;
 using Koan.Core.Modules;
 using Koan.Core.Observability.Health;
+using Koan.Core.Modules.Pillars;
 
 namespace Koan.Core;
 
 // Core DI bootstrap
 public static class ServiceCollectionExtensions
 {
+    public static IServiceCollection AddKoan(this IServiceCollection services)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+
+        services.AddKoanCore();
+        AppBootstrapper.InitializeModules(services);
+        return services;
+    }
+
     public static IServiceCollection AddKoanCore(this IServiceCollection services)
     {
+        CorePillarManifest.EnsureRegistered();
+
         // Default logging: simple console with concise output and sane category levels.
         services.AddLogging(logging =>
         {

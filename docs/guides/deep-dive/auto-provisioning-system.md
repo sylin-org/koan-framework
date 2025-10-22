@@ -1,9 +1,19 @@
+---
+type: ARCHITECTURE
+domain: framework
+title: "Auto-Provisioning System - Deep Dive"
+audience: [developers, architects]
+status: current
+last_updated: 2025-01-27
+framework_version: v0.6.3
+validation:
+    status: not-yet-tested
+    scope: docs/guides/deep-dive/auto-provisioning-system.md
+---
+
 # Auto-Provisioning System - Deep Dive
 
-**Document Type**: ARCHITECTURE
-**Target Audience**: Framework Contributors, Advanced Developers
-**Last Updated**: 2025-01-27
-**Framework Version**: v0.2.18+
+<!-- Previous inline metadata kept above has been normalized into front-matter. -->
 
 ---
 
@@ -498,8 +508,9 @@ public async Task Should_Handle_Concurrent_Provisioning()
 
 - [Bootstrap Lifecycle](bootstrap-lifecycle.md) - Understanding startup coordination
 - [Adapter & Data Connectivity](../../support/troubleshooting.md#adapter--data-connectivity) - Troubleshooting provisioning failures
-- [Entity Storage Patterns](entity-storage-patterns.md) - How Entity<> leverages auto-provisioning
-- [Performance Optimization](../../advanced/performance-optimization/query-optimization.md) - Optimizing provisioned structures
+- Related reading:
+    - [Entity access and streaming](../data/entity-access-and-streaming.md) — How Entity<> patterns work at scale
+    - [Docs build and lint](../../engineering/docs-build-and-lint.md) — Our docs gates and link hygiene
 
 ---
 

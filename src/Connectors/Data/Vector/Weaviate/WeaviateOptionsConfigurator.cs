@@ -11,6 +11,7 @@ using Koan.Core.Infrastructure;
 using Koan.Core.Logging;
 using Koan.Core.Orchestration;
 using Koan.Core.Orchestration.Abstractions;
+using WeaviateItems = Koan.Data.Vector.Connector.Weaviate.Infrastructure.WeaviateProvenanceItems;
 
 namespace Koan.Data.Vector.Connector.Weaviate;
 
@@ -53,19 +54,11 @@ internal sealed class WeaviateOptionsConfigurator : AdapterOptionsConfigurator<W
             ("endpoint", options.Endpoint ?? "(null)"));
 
         // Read Weaviate-specific configuration
-        var endpoint = ReadProviderConfiguration(options.Endpoint,
-            "Koan:Data:Weaviate:Endpoint",
-            "Koan:Data:Weaviate:BaseUrl");
+        var endpoint = ReadProviderConfiguration(options.Endpoint, WeaviateItems.EndpointKeys);
 
-        var apiKey = ReadProviderConfiguration(options.ApiKey ?? "",
-            "Koan:Data:Weaviate:ApiKey",
-            "Koan:Data:Weaviate:Key");
+        var apiKey = ReadProviderConfiguration(options.ApiKey ?? string.Empty, WeaviateItems.ApiKeyKeys);
 
-        var explicitConnectionString = ReadProviderConfiguration("",
-            Infrastructure.Constants.Configuration.Keys.ConnectionString,
-            Infrastructure.Constants.Configuration.Keys.AltConnectionString,
-            "ConnectionStrings:Weaviate",
-            "ConnectionStrings:weaviate");
+        var explicitConnectionString = ReadProviderConfiguration(string.Empty, WeaviateItems.ConnectionStringKeys);
 
         if (!string.IsNullOrWhiteSpace(explicitConnectionString))
         {
@@ -93,21 +86,11 @@ internal sealed class WeaviateOptionsConfigurator : AdapterOptionsConfigurator<W
         }
 
         // Configure Weaviate-specific options
-        options.DefaultTopK = ReadProviderConfiguration(
-            options.DefaultTopK,
-            "Koan:Data:Weaviate:DefaultTopK");
-        options.MaxTopK = ReadProviderConfiguration(
-            options.MaxTopK,
-            "Koan:Data:Weaviate:MaxTopK");
-        options.Dimension = ReadProviderConfiguration(
-            options.Dimension,
-            "Koan:Data:Weaviate:Dimension");
-        options.Metric = ReadProviderConfiguration(
-            options.Metric,
-            "Koan:Data:Weaviate:Metric");
-        options.DefaultTimeoutSeconds = ReadProviderConfiguration(
-            options.DefaultTimeoutSeconds,
-            "Koan:Data:Weaviate:TimeoutSeconds");
+        options.DefaultTopK = ReadProviderConfiguration(options.DefaultTopK, WeaviateItems.DefaultTopKKeys);
+        options.MaxTopK = ReadProviderConfiguration(options.MaxTopK, WeaviateItems.MaxTopKKeys);
+        options.Dimension = ReadProviderConfiguration(options.Dimension, WeaviateItems.DimensionKeys);
+        options.Metric = ReadProviderConfiguration(options.Metric, WeaviateItems.MetricKeys);
+        options.DefaultTimeoutSeconds = ReadProviderConfiguration(options.DefaultTimeoutSeconds, WeaviateItems.TimeoutKeys);
 
         KoanLog.ConfigInfo(Logger, LogActions.Config, LogOutcomeValues.Final,
             ("connection", options.ConnectionString ?? "(null)"),
@@ -176,7 +159,7 @@ internal sealed class WeaviateOptionsConfigurator : AdapterOptionsConfigurator<W
 
     private bool IsAutoDetectionDisabled()
     {
-        return Koan.Core.Configuration.Read(Configuration, "Koan:Data:Weaviate:DisableAutoDetection", false);
+        return Koan.Core.Configuration.Read(Configuration, Infrastructure.Constants.Configuration.Flags.DisableAutoDetection, false);
     }
 
     private static class LogActions

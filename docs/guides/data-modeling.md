@@ -71,7 +71,7 @@ public class Todo : Entity<Todo>
 public class Order : Entity<Order>
 {
     public string UserId { get; set; } = "";
-    public Task<User?> GetUser(CancellationToken ct = default) => User.ById(UserId, ct);
+    public Task<User?> GetUser(CancellationToken ct = default) => User.Get(UserId, ct);
 }
 
 public class User : Entity<User>

@@ -1,0 +1,7 @@
+﻿suite: Koan.Data.Connector.Redis.Tests
+lane: docker
+scope: connector
+module: Data.Connector.Redis
+description: Integration coverage for the Redis data connector validating CRUD, partition routing, batching, instructions, and capability probes.
+legacyProjects:
+  - Koan.Data.Redis.Tests

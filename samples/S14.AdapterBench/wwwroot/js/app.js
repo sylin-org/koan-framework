@@ -3,6 +3,8 @@ const App = {
     selectedProviders: [],
     selectedTiers: [],
     currentMode: 'Sequential',
+    currentJobId: null,
+    pollInterval: null,
 
     async init() {
         await this.loadProviders();
@@ -10,6 +12,7 @@ const App = {
         this.setupEventListeners();
         await Progress.connect();
         Progress.onProgressUpdate = (progress) => Progress.updateUI(progress);
+        this.updateTestCountSummary(); // Initial test count
     },
 
     async loadProviders() {
@@ -35,10 +38,11 @@ const App = {
                 } else {
                     this.selectedProviders = this.selectedProviders.filter(p => p !== provider.name);
                 }
+                this.updateTestCountSummary();
             });
 
             const text = document.createTextNode(
-                ` ${provider.displayName} ${provider.isContainerized ? '(🐳 Container)' : '(💾 In-Process)'}`
+                ` ${provider.displayName} ${provider.isContainerized ? '(Container)' : '(In-Process)'}`
             );
 
             label.appendChild(checkbox);
@@ -70,6 +74,7 @@ const App = {
                 } else {
                     this.selectedTiers = this.selectedTiers.filter(t => t !== tier.name);
                 }
+                this.updateTestCountSummary();
             });
 
             const text = document.createTextNode(` ${tier.name} - ${tier.description}`);
@@ -90,16 +95,47 @@ const App = {
             this.setMode('Parallel');
         });
 
+        // Reset config
+        document.getElementById('resetConfigBtn').addEventListener('click', () => {
+            this.resetConfig();
+        });
+
         // Run benchmark
         document.getElementById('runBenchmarkBtn').addEventListener('click', async () => {
             await this.runBenchmark();
         });
 
+        // Stop benchmark
+        document.getElementById('stopBenchmarkBtn').addEventListener('click', async () => {
+            await this.stopBenchmark();
+        });
+
         // Tab switching
         document.querySelectorAll('.tab-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
-                this.switchTab(e.target.dataset.tab);
+                const target = e.target.closest('.tab-btn');
+                if (target) {
+                    this.switchTab(target.dataset.tab);
+                }
             });
+        });
+
+        // Export buttons
+        document.getElementById('exportJsonBtn').addEventListener('click', () => {
+            Results.exportJson();
+        });
+
+        document.getElementById('exportCsvBtn').addEventListener('click', () => {
+            Results.exportCsv();
+        });
+
+        document.getElementById('shareResultsBtn').addEventListener('click', () => {
+            Results.shareResults();
+        });
+
+        // Clear log button
+        document.getElementById('clearLogBtn').addEventListener('click', () => {
+            document.getElementById('testLog').innerHTML = '';
         });
     },
 
@@ -138,8 +174,34 @@ const App = {
 
         // Clear previous progress
         document.getElementById('testLog').innerHTML = '';
-        document.getElementById('progressBar').style.width = '0%';
-        document.getElementById('currentMode').textContent = this.currentMode;
+
+        // Reset circular progress
+        const circularBar = document.getElementById('circularProgressBar');
+        if (circularBar) {
+            circularBar.style.strokeDashoffset = '502.4';
+        }
+        const circularPercent = document.getElementById('circularProgressPercent');
+        if (circularPercent) {
+            circularPercent.textContent = '0%';
+        }
+
+        // Update mode badge
+        const modeBadge = document.getElementById('progressModeBadge');
+        if (modeBadge) {
+            modeBadge.textContent = this.currentMode;
+        }
+
+        // Reset legacy elements if they exist
+        const progressBar = document.getElementById('progressBar');
+        if (progressBar) {
+            progressBar.style.width = '0%';
+        }
+        const currentMode = document.getElementById('currentMode');
+        if (currentMode) {
+            currentMode.textContent = this.currentMode;
+        }
+
+        Progress.clearProviderProgress();
 
         // Build request
         const request = {
@@ -150,34 +212,127 @@ const App = {
         };
 
         try {
-            const results = await API.runBenchmark(request);
+            // Run benchmark synchronously with real-time SignalR progress
+            const result = await API.runBenchmark(request);
 
-            // Hide progress, show results
-            document.getElementById('progressPanel').style.display = 'none';
-            document.getElementById('runBenchmarkBtn').style.display = 'inline-block';
-            document.getElementById('stopBenchmarkBtn').style.display = 'none';
-
-            // Convert TimeSpan strings to milliseconds for display
-            results.providerResults.forEach(p => {
-                p.totalDuration = this.parseTimeSpan(p.totalDuration);
-                p.tests.forEach(t => {
-                    t.duration = this.parseTimeSpan(t.duration);
+            // Display results immediately
+            if (result) {
+                // Convert TimeSpan strings to nanoseconds for display
+                result.providerResults.forEach(p => {
+                    p.totalDuration = this.parseTimeSpan(p.totalDuration);
+                    p.tests.forEach(t => {
+                        t.duration = this.parseTimeSpan(t.duration);
+                    });
                 });
-            });
 
-            results.startedAt = new Date(results.startedAt);
-            results.completedAt = new Date(results.completedAt);
+                result.startedAt = new Date(result.startedAt);
+                result.completedAt = new Date(result.completedAt);
 
-            Results.display(results);
+                Results.display(result);
+            }
 
+            this.resetUI();
         } catch (error) {
             console.error('Benchmark failed:', error);
             alert(`Benchmark failed: ${error.message}`);
 
-            document.getElementById('progressPanel').style.display = 'none';
-            document.getElementById('runBenchmarkBtn').style.display = 'inline-block';
-            document.getElementById('stopBenchmarkBtn').style.display = 'none';
+            this.resetUI();
         }
+    },
+
+    async pollJobStatus() {
+        if (!this.currentJobId) return;
+
+        this.pollInterval = setInterval(async () => {
+            try {
+                const status = await API.getJobStatus(this.currentJobId);
+
+                // Update progress UI
+                this.updateProgress(status);
+
+                // Check if job is complete
+                if (status.status === 'Completed') {
+                    clearInterval(this.pollInterval);
+                    this.pollInterval = null;
+
+                    // Display results
+                    if (status.result) {
+                        // Convert TimeSpan strings to nanoseconds for display
+                        status.result.providerResults.forEach(p => {
+                            p.totalDuration = this.parseTimeSpan(p.totalDuration);
+                            p.tests.forEach(t => {
+                                t.duration = this.parseTimeSpan(t.duration);
+                            });
+                        });
+
+                        status.result.startedAt = new Date(status.result.startedAt);
+                        status.result.completedAt = new Date(status.result.completedAt);
+
+                        Results.display(status.result);
+                    }
+
+                    this.resetUI();
+                } else if (status.status === 'Failed' || status.status === 'Cancelled') {
+                    clearInterval(this.pollInterval);
+                    this.pollInterval = null;
+
+                    alert(`Benchmark ${status.status.toLowerCase()}: ${status.error || 'Unknown error'}`);
+                    this.resetUI();
+                }
+
+            } catch (error) {
+                console.error('Failed to poll job status:', error);
+                clearInterval(this.pollInterval);
+                this.pollInterval = null;
+                alert(`Failed to get job status: ${error.message}`);
+                this.resetUI();
+            }
+        }, 1000); // Poll every second
+    },
+
+    updateProgress(status) {
+        // Update progress bar
+        const progressBar = document.getElementById('progressBar');
+        progressBar.style.width = `${status.progress * 100}%`;
+
+        // Update progress message
+        if (status.progressMessage) {
+            const testLog = document.getElementById('testLog');
+            const logEntry = document.createElement('div');
+            logEntry.className = 'log-entry';
+            logEntry.textContent = `[${new Date().toLocaleTimeString()}] ${status.progressMessage}`;
+            testLog.appendChild(logEntry);
+            testLog.scrollTop = testLog.scrollHeight;
+        }
+    },
+
+    async stopBenchmark() {
+        if (!this.currentJobId) return;
+
+        try {
+            await API.cancelJob(this.currentJobId);
+
+            // Stop polling
+            if (this.pollInterval) {
+                clearInterval(this.pollInterval);
+                this.pollInterval = null;
+            }
+
+            alert('Benchmark cancelled');
+            this.resetUI();
+
+        } catch (error) {
+            console.error('Failed to cancel benchmark:', error);
+            alert(`Failed to cancel benchmark: ${error.message}`);
+        }
+    },
+
+    resetUI() {
+        document.getElementById('progressPanel').style.display = 'none';
+        document.getElementById('runBenchmarkBtn').style.display = 'inline-block';
+        document.getElementById('stopBenchmarkBtn').style.display = 'none';
+        Progress.clearProviderProgress();
+        this.currentJobId = null;
     },
 
     parseTimeSpan(timeSpan) {
@@ -192,6 +347,53 @@ const App = {
             return (hours * 3600 + minutes * 60 + seconds) * 1000000000; // nanoseconds
         }
         return timeSpan;
+    },
+
+    updateTestCountSummary() {
+        const providers = this.selectedProviders.length;
+        const tiers = this.selectedTiers.length;
+
+        if (providers === 0 || tiers === 0) {
+            document.getElementById('testCountSummary').textContent = 'Please select providers and tiers';
+            return;
+        }
+
+        const testsPerProviderPerTier = 11;
+        const regularTests = providers * tiers * testsPerProviderPerTier;
+        const migrationTests = providers * (providers - 1) * tiers;
+        const totalTests = regularTests + migrationTests;
+
+        document.getElementById('testCountSummary').textContent =
+            `Ready to run ${totalTests.toLocaleString()} tests (${providers} provider${providers > 1 ? 's' : ''} × ${tiers} tier${tiers > 1 ? 's' : ''})`;
+    },
+
+    resetConfig() {
+        // Reset to default selections
+        document.querySelectorAll('#providerCheckboxes input[type="checkbox"]').forEach(cb => {
+            const provider = cb.value;
+            // Check if this was a default provider (you can enhance this)
+            cb.checked = true;
+            if (cb.checked && !this.selectedProviders.includes(provider)) {
+                this.selectedProviders.push(provider);
+            }
+        });
+
+        document.querySelectorAll('#tierCheckboxes input[type="checkbox"]').forEach(cb => {
+            const tier = cb.value;
+            cb.checked = true;
+            if (cb.checked && !this.selectedTiers.includes(tier)) {
+                this.selectedTiers.push(tier);
+            }
+        });
+
+        // Reset scale
+        document.getElementById('scaleSelect').selectedIndex = 1; // Standard
+
+        // Reset mode
+        this.setMode('Sequential');
+
+        // Update summary
+        this.updateTestCountSummary();
     },
 
     switchTab(tabName) {

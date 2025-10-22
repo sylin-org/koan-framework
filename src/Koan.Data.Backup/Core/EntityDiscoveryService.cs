@@ -1,5 +1,6 @@
 using Koan.Data.Abstractions;
 using Koan.Data.Backup.Abstractions;
+using Koan.Data.Backup.Attributes;
 using Koan.Data.Backup.Models;
 using Microsoft.Extensions.Logging;
 using System.Reflection;
@@ -236,6 +237,145 @@ public class EntityDiscoveryService : IEntityDiscoveryService
             .OrderBy(x => x));
 
         return Convert.ToHexString(System.Text.Encoding.UTF8.GetBytes(combined)).ToLowerInvariant();
+    }
+
+    public Task<BackupInventory> BuildInventoryAsync(CancellationToken ct = default)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        _logger.LogInformation("Building backup inventory...");
+
+        var inventory = new BackupInventory
+        {
+            GeneratedAt = DateTimeOffset.UtcNow
+        };
+
+        try
+        {
+            // Get all discovered or registered entities
+            var entityTypes = GetDiscoveredEntities().ToList();
+
+            _logger.LogDebug("Processing {Count} entity types for backup inventory", entityTypes.Count);
+
+            // Group entities by assembly for efficient scope resolution
+            var entitiesByAssembly = entityTypes
+                .GroupBy(e => e.EntityType.Assembly)
+                .ToList();
+
+            foreach (var assemblyGroup in entitiesByAssembly)
+            {
+                ct.ThrowIfCancellationRequested();
+
+                var assembly = assemblyGroup.Key;
+                var assemblyScope = GetAssemblyBackupScope(assembly);
+
+                foreach (var entityTypeInfo in assemblyGroup)
+                {
+                    ct.ThrowIfCancellationRequested();
+
+                    var entityType = entityTypeInfo.EntityType;
+                    var entityAttr = entityType.GetCustomAttribute<EntityBackupAttribute>();
+
+                    var policy = ResolveBackupPolicy(entityType, assemblyScope, entityAttr);
+
+                    if (policy.IsIncluded)
+                    {
+                        inventory.IncludedEntities.Add(policy);
+                        _logger.LogDebug("Entity {EntityName} included in backup: encrypt={Encrypt}, schema={IncludeSchema} (via {Source})",
+                            policy.EntityName, policy.Encrypt, policy.IncludeSchema, policy.Source);
+                    }
+                    else if (policy.IsExcluded)
+                    {
+                        inventory.ExcludedEntities.Add(policy);
+                        if (!string.IsNullOrWhiteSpace(policy.Reason))
+                        {
+                            _logger.LogDebug("Entity {EntityName} excluded from backup: {Reason}",
+                                policy.EntityName, policy.Reason);
+                        }
+                        else
+                        {
+                            inventory.Warnings.Add($"Entity {policy.EntityName} excluded without documented reason");
+                        }
+                    }
+                    else
+                    {
+                        // Entity has no coverage - generate warning
+                        var scopeMode = assemblyScope?.Mode.ToString() ?? "None";
+                        var warning = $"Entity {policy.EntityName} has no backup coverage (assembly scope: {scopeMode})";
+                        inventory.Warnings.Add(warning);
+                        _logger.LogWarning(warning);
+                    }
+                }
+            }
+
+            _logger.LogInformation(
+                "Backup inventory built in {Duration}ms: {Included} included, {Excluded} excluded, {Warnings} warnings",
+                stopwatch.ElapsedMilliseconds,
+                inventory.TotalIncludedEntities,
+                inventory.TotalExcludedEntities,
+                inventory.TotalWarnings);
+
+            return Task.FromResult(inventory);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to build backup inventory");
+            inventory.Warnings.Add($"Inventory build failed: {ex.Message}");
+            return Task.FromResult(inventory);
+        }
+    }
+
+    private static EntityBackupScopeAttribute? GetAssemblyBackupScope(Assembly assembly)
+    {
+        return assembly.GetCustomAttribute<EntityBackupScopeAttribute>();
+    }
+
+    private static EntityBackupPolicy ResolveBackupPolicy(
+        Type entityType,
+        EntityBackupScopeAttribute? assemblyScope,
+        EntityBackupAttribute? entityAttr)
+    {
+        var policy = new EntityBackupPolicy
+        {
+            EntityType = entityType
+        };
+
+        // Explicit opt-out takes precedence
+        if (entityAttr?.Enabled == false)
+        {
+            policy.IsIncluded = false;
+            policy.Reason = entityAttr.Reason;
+            policy.Source = "Attribute";
+            return policy;
+        }
+
+        // Determine inclusion based on scope and attribute
+        var isIncludedByScope = assemblyScope?.Mode == BackupScope.All;
+        var hasEntityAttribute = entityAttr != null;
+
+        if (hasEntityAttribute)
+        {
+            // Entity explicitly opts in
+            policy.IsIncluded = true;
+            policy.Source = "Attribute";
+            policy.Encrypt = entityAttr!.Encrypt;
+            policy.IncludeSchema = entityAttr.IncludeSchema;
+        }
+        else if (isIncludedByScope)
+        {
+            // Entity included via assembly scope
+            policy.IsIncluded = true;
+            policy.Source = "Assembly";
+            policy.Encrypt = assemblyScope!.EncryptByDefault;
+            policy.IncludeSchema = true; // Default
+        }
+        else
+        {
+            // No coverage
+            policy.IsIncluded = false;
+            policy.Source = "Default";
+        }
+
+        return policy;
     }
 }
 

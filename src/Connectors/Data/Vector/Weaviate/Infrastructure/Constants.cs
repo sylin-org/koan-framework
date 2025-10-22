@@ -6,10 +6,9 @@ public static class Constants
     {
         public const string Section = "Koan:Data:Weaviate";
 
-        public static class Keys
+        public static class Flags
         {
-            public const string ConnectionString = "Koan:Data:Weaviate:ConnectionString";
-            public const string AltConnectionString = "Koan:Data:ConnectionString";
+            public const string DisableAutoDetection = "Koan:Data:Weaviate:DisableAutoDetection";
         }
     }
 

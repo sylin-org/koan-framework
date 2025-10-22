@@ -17,6 +17,7 @@ using Koan.Data.Relational.Linq;
 using Koan.Data.Relational.Orchestration;
 using System.Linq.Expressions;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Serialization;
 
 namespace Koan.Data.Connector.SqlServer;
 
@@ -38,7 +39,7 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
     where TKey : notnull
 {
     public QueryCapabilities Capabilities => QueryCapabilities.Linq | QueryCapabilities.String;
-    public WriteCapabilities Writes => WriteCapabilities.BulkUpsert | WriteCapabilities.BulkDelete | WriteCapabilities.AtomicBatch;
+    public WriteCapabilities Writes => WriteCapabilities.BulkUpsert | WriteCapabilities.BulkDelete | WriteCapabilities.AtomicBatch | WriteCapabilities.FastRemove;
 
     // Storage optimization support
     private readonly StorageOptimizationInfo _optimizationInfo;
@@ -53,6 +54,7 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
     private readonly int _maxPageSize;
     private readonly ILogger _logger;
     private readonly JsonSerializerSettings _json;
+    private static readonly CamelCaseNamingStrategy CamelCase = new();
     private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, bool> _healthyCache = new(StringComparer.Ordinal);
 
     public SqlServerRepository(IServiceProvider sp, SqlServerOptions options, IStorageNameResolver resolver)
@@ -324,6 +326,39 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
         return row == default ? null : FromRow(row);
     }
 
+    public async Task<IReadOnlyList<TEntity?>> GetManyAsync(IEnumerable<TKey> ids, CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        using var act = SqlServerTelemetry.Activity.StartActivity("mssql.get.many");
+        act?.SetTag("entity", typeof(TEntity).FullName);
+
+        var idList = ids as IReadOnlyList<TKey> ?? ids.ToList();
+        if (idList.Count == 0)
+        {
+            return Array.Empty<TEntity?>();
+        }
+
+        await using var conn = Open();
+        var stringIds = idList.Select(id => id!.ToString()!).ToArray();
+
+        // Use IN clause for bulk query
+        var rows = await conn.QueryAsync<(string Id, string Json)>(
+            $"SELECT [Id], [Json] FROM [dbo].[{TableName}] WHERE [Id] IN @Ids",
+            new { Ids = stringIds });
+
+        // Build dictionary for O(1) lookup
+        var entityMap = rows.Select(FromRow).ToDictionary(e => e.Id);
+
+        // Preserve order and include nulls
+        var results = new TEntity?[idList.Count];
+        for (var i = 0; i < idList.Count; i++)
+        {
+            results[i] = entityMap.TryGetValue(idList[i], out var entity) ? entity : null;
+        }
+
+        return results;
+    }
+
     public async Task<IReadOnlyList<TEntity>> QueryAsync(object? query, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
@@ -347,13 +382,66 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
         return rows.Select(FromRow).ToList();
     }
 
-    public async Task<int> CountAsync(object? query, CancellationToken ct = default)
+    public async Task<CountResult> CountAsync(CountRequest<TEntity> request, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        using var act = SqlServerTelemetry.Activity.StartActivity("mssql.count:all");
+        using var act = SqlServerTelemetry.Activity.StartActivity("mssql.count");
         act?.SetTag("entity", typeof(TEntity).FullName);
         await using var conn = Open();
-        return await conn.ExecuteScalarAsync<int>($"SELECT COUNT(1) FROM [dbo].[{TableName}]");
+
+        // Fast count via sys.dm_db_partition_stats when no predicate and strategy allows it
+        if (request.Predicate is null && request.RawQuery is null && request.ProviderQuery is null)
+        {
+            var strategy = request.Options?.CountStrategy ?? CountStrategy.Optimized;
+            if (strategy == CountStrategy.Fast || strategy == CountStrategy.Optimized)
+            {
+                try
+                {
+                    var estimate = await conn.ExecuteScalarAsync<long>(
+                        @"SELECT SUM(p.rows)
+                          FROM sys.partitions p
+                          INNER JOIN sys.tables t ON p.object_id = t.object_id
+                          INNER JOIN sys.schemas s ON t.schema_id = s.schema_id
+                          WHERE s.name = 'dbo' AND t.name = @TableName AND p.index_id IN (0,1)",
+                        new { TableName });
+                    if (estimate >= 0)
+                        return CountResult.Estimate(estimate);
+                }
+                catch
+                {
+                    // Fall back to exact count
+                }
+            }
+        }
+
+        // Exact count based on request type
+        if (request.Predicate is not null)
+        {
+            var translator = new LinqWhereTranslator<TEntity>(_dialect);
+            try
+            {
+                var (whereSql, parameters) = translator.Translate(request.Predicate);
+                whereSql = RewriteWhereForProjection(whereSql);
+                return await CountWhereAsync(whereSql, parameters);
+            }
+            catch (NotSupportedException)
+            {
+                var all = await QueryAsync((object?)null, ct);
+                var count = (long)all.AsQueryable().Count(request.Predicate);
+                return CountResult.Exact(count);
+            }
+        }
+
+        if (request.RawQuery is not null)
+        {
+            var whereSql = RewriteWhereForProjection(request.RawQuery);
+            var count = await conn.ExecuteScalarAsync<long>($"SELECT COUNT(1) FROM [dbo].[{TableName}] WHERE " + whereSql);
+            return CountResult.Exact(count);
+        }
+
+        // No predicate - full table count
+        var totalCount = await conn.ExecuteScalarAsync<long>($"SELECT COUNT(1) FROM [dbo].[{TableName}]");
+        return CountResult.Exact(totalCount);
     }
 
     public async Task<IReadOnlyList<TEntity>> QueryAsync(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
@@ -405,31 +493,14 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
         }
     }
 
-    public Task<int> CountAsync(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        using var act = SqlServerTelemetry.Activity.StartActivity("mssql.count:linq");
-        act?.SetTag("entity", typeof(TEntity).FullName);
-        var translator = new LinqWhereTranslator<TEntity>(_dialect);
-        try
-        {
-            var (whereSql, parameters) = translator.Translate(predicate);
-            whereSql = RewriteWhereForProjection(whereSql);
-            return CountWhereAsync(whereSql, parameters);
-        }
-        catch (NotSupportedException)
-        {
-            return Task.FromResult(QueryAsync(predicate, ct).Result.Count);
-        }
-    }
-
-    private async Task<int> CountWhereAsync(string whereSql, IReadOnlyList<object?> parameters)
+    private async Task<CountResult> CountWhereAsync(string whereSql, IReadOnlyList<object?> parameters)
     {
         await using var conn = Open();
         var sql = $"SELECT COUNT(1) FROM [dbo].[{TableName}] WHERE {whereSql}";
         var dyn = new DynamicParameters();
         for (int i = 0; i < parameters.Count; i++) dyn.Add($"p{i}", parameters[i]);
-        return await conn.ExecuteScalarAsync<int>(sql, dyn);
+        var count = await conn.ExecuteScalarAsync<long>(sql, dyn);
+        return CountResult.Exact(count);
     }
 
     public async Task<IReadOnlyList<TEntity>> QueryAsync(string sql, CancellationToken ct = default)
@@ -514,25 +585,6 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
         }
     }
 
-    public async Task<int> CountAsync(string sql, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        using var act = SqlServerTelemetry.Activity.StartActivity("mssql.count:string");
-        act?.SetTag("entity", typeof(TEntity).FullName);
-        await using var conn = Open();
-        var whereSql = RewriteWhereForProjection(sql);
-        return await conn.ExecuteScalarAsync<int>($"SELECT COUNT(1) FROM [dbo].[{TableName}] WHERE " + whereSql);
-    }
-
-    public async Task<int> CountAsync(string sql, object? parameters, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        using var act = SqlServerTelemetry.Activity.StartActivity("mssql.count:string:param");
-        act?.SetTag("entity", typeof(TEntity).FullName);
-        await using var conn = Open();
-        var whereSql = RewriteWhereForProjection(sql);
-        return await conn.ExecuteScalarAsync<int>($"SELECT COUNT(1) FROM [dbo].[{TableName}] WHERE " + whereSql, parameters);
-    }
 
     public async Task<TEntity> UpsertAsync(TEntity model, CancellationToken ct = default)
     { await UpsertManyAsync(new[] { model }, ct); return model; }
@@ -571,6 +623,37 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
     {
         await using var conn = Open();
         return await conn.ExecuteAsync($"DELETE FROM [dbo].[{TableName}]");
+    }
+
+    public async Task<long> RemoveAllAsync(RemoveStrategy strategy, CancellationToken ct = default)
+    {
+        await using var conn = Open();
+
+        // Resolve Optimized strategy based on provider capabilities
+        var effectiveStrategy = strategy == RemoveStrategy.Optimized
+            ? (Writes.HasFlag(WriteCapabilities.FastRemove) ? RemoveStrategy.Fast : RemoveStrategy.Safe)
+            : strategy;
+
+        if (effectiveStrategy == RemoveStrategy.Fast)
+        {
+            // Fast path: TRUNCATE (bypasses hooks, resets identity)
+            try
+            {
+                await conn.ExecuteAsync($"TRUNCATE TABLE [dbo].[{TableName}]", ct);
+                return -1; // TRUNCATE doesn't report count
+            }
+            catch (Microsoft.Data.SqlClient.SqlException ex) when (ex.Number == 4712) // Cannot truncate table referenced by FK
+            {
+                // Foreign key constraint - fall back to DELETE
+                // Silently fall through to safe path
+            }
+        }
+
+        // Safe path: DELETE (fires hooks if registered)
+        var countRequest = new CountRequest<TEntity>();
+        var countResult = await CountAsync(countRequest, ct);
+        await conn.ExecuteAsync($"DELETE FROM [dbo].[{TableName}]", ct);
+        return countResult.Value;
     }
 
     public IBatchSet<TEntity, TKey> CreateBatch() => new MsSqlBatch(this);
@@ -807,6 +890,43 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
     private string RewriteWhereForProjection(string whereSql)
     {
         var projections = ProjectionResolver.Get(typeof(TEntity));
+        var columnMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Id"] = "[Id]",
+            ["Json"] = "[Json]"
+        };
+
+        foreach (var projection in projections)
+        {
+            var column = $"[{projection.ColumnName}]";
+            columnMap[projection.Property.Name] = column;
+            var camel = CamelCase.GetPropertyName(projection.Property.Name, hasSpecifiedName: false);
+            columnMap[camel] = column;
+        }
+
+        string BuildJsonAccessor(string token)
+        {
+            var camel = CamelCase.GetPropertyName(token, hasSpecifiedName: false);
+            return $"JSON_VALUE([Json], '$.{camel}')";
+        }
+
+        string BuildColumnOrJson(string token)
+        {
+            if (columnMap.TryGetValue(token, out var column))
+            {
+                if (string.Equals(token, "Id", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(token, "Json", StringComparison.OrdinalIgnoreCase))
+                {
+                    return column;
+                }
+
+                var json = BuildJsonAccessor(token);
+                return $"COALESCE({column}, {json})";
+            }
+
+            return BuildJsonAccessor(token);
+        }
+
         bool hasBrackets = whereSql.IndexOf('[', StringComparison.Ordinal) >= 0;
         if (hasBrackets)
         {
@@ -816,23 +936,11 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
                 m =>
                 {
                     var prop = m.Groups["prop"].Value;
-                    var proj = projections.FirstOrDefault(p => string.Equals(p.ColumnName, prop, StringComparison.Ordinal) || string.Equals(p.Property.Name, prop, StringComparison.Ordinal));
-                    if (proj is not null) return $"[{proj.ColumnName}]";
-                    return $"JSON_VALUE([Json], '$.{prop}')";
+                    return BuildColumnOrJson(prop);
                 });
         }
 
-        var map = projections.ToDictionary(p => p.Property.Name, p => $"[{p.ColumnName}]", StringComparer.Ordinal);
         whereSql = System.Text.RegularExpressions.Regex.Replace(whereSql, "\n|\r", " ");
-        foreach (var kv in map)
-        {
-            var ident = kv.Key;
-            var col = kv.Value;
-            whereSql = System.Text.RegularExpressions.Regex.Replace(
-                whereSql,
-                $"\\b{System.Text.RegularExpressions.Regex.Escape(ident)}\\b",
-                col);
-        }
         whereSql = System.Text.RegularExpressions.Regex.Replace(
             whereSql,
             "(?<![@:])\\b([A-Za-z_][A-Za-z0-9_]*)\\b",
@@ -862,9 +970,10 @@ WHERE t.name = @t AND s.name = 'dbo' AND c.name = @c";
                     case "DESC":
                         return token;
                 }
-                if (map.ContainsKey(token)) return map[token];
-                return $"JSON_VALUE([Json], '$.{token}')";
+
+                return BuildColumnOrJson(token);
             });
+
         return whereSql;
     }
 

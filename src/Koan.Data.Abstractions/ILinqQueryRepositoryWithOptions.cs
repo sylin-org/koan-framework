@@ -1,4 +1,8 @@
+using System;
+using System.Collections.Generic;
 using System.Linq.Expressions;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Koan.Data.Abstractions;
 
@@ -6,5 +10,5 @@ public interface ILinqQueryRepositoryWithOptions<TEntity, TKey> : ILinqQueryRepo
     where TEntity : IEntity<TKey>
     where TKey : notnull
 {
-    Task<IReadOnlyList<TEntity>> QueryAsync(Expression<Func<TEntity, bool>> predicate, DataQueryOptions? options, CancellationToken ct = default);
+    new Task<IReadOnlyList<TEntity>> QueryAsync(Expression<Func<TEntity, bool>> predicate, DataQueryOptions? options, CancellationToken ct = default);
 }

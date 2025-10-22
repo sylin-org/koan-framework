@@ -24,6 +24,7 @@ namespace Koan.Data.Connector.Mongo;
 
 internal sealed class MongoRepository<TEntity, TKey> :
     IDataRepository<TEntity, TKey>,
+    IDataRepositoryWithOptions<TEntity, TKey>,
     ILinqQueryRepository<TEntity, TKey>,
     IQueryCapabilities,
     IWriteCapabilities,
@@ -64,7 +65,7 @@ internal sealed class MongoRepository<TEntity, TKey> :
     }
 
     public QueryCapabilities Capabilities => QueryCapabilities.Linq;
-    public WriteCapabilities Writes => WriteCapabilities.BulkUpsert | WriteCapabilities.BulkDelete | WriteCapabilities.AtomicBatch;
+    public WriteCapabilities Writes => WriteCapabilities.BulkUpsert | WriteCapabilities.BulkDelete | WriteCapabilities.AtomicBatch | WriteCapabilities.FastRemove;
     public StorageOptimizationInfo OptimizationInfo => _optimizationInfo;
 
     public AdapterReadinessState ReadinessState => _provider.ReadinessState;
@@ -312,6 +313,37 @@ internal sealed class MongoRepository<TEntity, TKey> :
             return result;
         }, ct);
 
+    public Task<IReadOnlyList<TEntity?>> GetManyAsync(IEnumerable<TKey> ids, CancellationToken ct = default)
+        => ExecuteWithReadinessAsync(async () =>
+        {
+            ct.ThrowIfCancellationRequested();
+            using var activity = MongoTelemetry.Activity.StartActivity("mongo.get.many");
+            activity?.SetTag("entity", typeof(TEntity).FullName);
+
+            // Materialize IDs to preserve order and count
+            var idList = ids as IReadOnlyList<TKey> ?? ids.ToList();
+            if (idList.Count == 0)
+            {
+                return (IReadOnlyList<TEntity?>)Array.Empty<TEntity?>();
+            }
+
+            var collection = await GetCollectionAsync(ct).ConfigureAwait(false);
+            var filter = Builders<TEntity>.Filter.In(x => x.Id, idList);
+            var found = await collection.Find(filter).ToListAsync(ct).ConfigureAwait(false);
+
+            // Build dictionary for O(1) lookup
+            var entityMap = found.ToDictionary(e => e.Id);
+
+            // Preserve order and include nulls for missing entities
+            var results = new TEntity?[idList.Count];
+            for (var i = 0; i < idList.Count; i++)
+            {
+                results[i] = entityMap.TryGetValue(idList[i], out var entity) ? entity : null;
+            }
+
+            return (IReadOnlyList<TEntity?>)results;
+        }, ct);
+
     public Task<IReadOnlyList<TEntity>> QueryAsync(object? query, CancellationToken ct = default)
         => ExecuteWithReadinessAsync(async () =>
         {
@@ -360,26 +392,39 @@ internal sealed class MongoRepository<TEntity, TKey> :
             return (IReadOnlyList<TEntity>)results;
         }, ct);
 
-    public Task<int> CountAsync(object? query, CancellationToken ct = default)
+    public Task<CountResult> CountAsync(CountRequest<TEntity> request, CancellationToken ct = default)
         => ExecuteWithReadinessAsync(async () =>
         {
             ct.ThrowIfCancellationRequested();
             using var activity = MongoTelemetry.Activity.StartActivity("mongo.count");
             activity?.SetTag("entity", typeof(TEntity).FullName);
             var collection = await GetCollectionAsync(ct).ConfigureAwait(false);
-            var count = await collection.CountDocumentsAsync(Builders<TEntity>.Filter.Empty, cancellationToken: ct).ConfigureAwait(false);
-            return (int)count;
-        }, ct);
 
-    public Task<int> CountAsync(Expression<Func<TEntity, bool>> predicate, CancellationToken ct = default)
-        => ExecuteWithReadinessAsync(async () =>
-        {
-            ct.ThrowIfCancellationRequested();
-            using var activity = MongoTelemetry.Activity.StartActivity("mongo.count.linq");
-            activity?.SetTag("entity", typeof(TEntity).FullName);
-            var collection = await GetCollectionAsync(ct).ConfigureAwait(false);
-            var count = await collection.CountDocumentsAsync(predicate, cancellationToken: ct).ConfigureAwait(false);
-            return (int)count;
+            if (request.Strategy == CountStrategy.Fast && request.Predicate is null && request.RawQuery is null && request.ProviderQuery is null)
+            {
+                var estimate = await collection.EstimatedDocumentCountAsync(cancellationToken: ct).ConfigureAwait(false);
+                return CountResult.Estimate((long)estimate);
+            }
+
+            if (request.Predicate is not null)
+            {
+                var count = await collection.CountDocumentsAsync(request.Predicate, cancellationToken: ct).ConfigureAwait(false);
+                return CountResult.Exact((long)count);
+            }
+
+            if (request.ProviderQuery is FilterDefinition<TEntity> filter)
+            {
+                var count = await collection.CountDocumentsAsync(filter, cancellationToken: ct).ConfigureAwait(false);
+                return CountResult.Exact((long)count);
+            }
+
+            if (request.RawQuery is not null)
+            {
+                throw new NotSupportedException("Mongo adapter does not support string-based count queries. Use LINQ or provider filters.");
+            }
+
+            var total = await collection.CountDocumentsAsync(Builders<TEntity>.Filter.Empty, cancellationToken: ct).ConfigureAwait(false);
+            return CountResult.Exact((long)total);
         }, ct);
 
     public Task<TEntity> UpsertAsync(TEntity model, CancellationToken ct = default)
@@ -461,6 +506,38 @@ internal sealed class MongoRepository<TEntity, TKey> :
             var collection = await GetCollectionAsync(ct).ConfigureAwait(false);
             var result = await collection.DeleteManyAsync(Builders<TEntity>.Filter.Empty, ct).ConfigureAwait(false);
             return (int)result.DeletedCount;
+        }, ct);
+
+    public Task<long> RemoveAllAsync(RemoveStrategy strategy, CancellationToken ct = default)
+        => ExecuteWithReadinessAsync(async () =>
+        {
+            ct.ThrowIfCancellationRequested();
+            var collection = await GetCollectionAsync(ct).ConfigureAwait(false);
+
+            // Resolve Optimized strategy based on provider capabilities
+            var effectiveStrategy = strategy == RemoveStrategy.Optimized
+                ? (Writes.HasFlag(WriteCapabilities.FastRemove) ? RemoveStrategy.Fast : RemoveStrategy.Safe)
+                : strategy;
+
+            if (effectiveStrategy == RemoveStrategy.Fast)
+            {
+                // Fast path: drop collection and recreate (loses indexes briefly)
+                var database = GetDatabase(collection);
+                var estimatedCount = await collection.EstimatedDocumentCountAsync(cancellationToken: ct).ConfigureAwait(false);
+
+                await database.DropCollectionAsync(_collectionName, ct).ConfigureAwait(false);
+                await database.CreateCollectionAsync(_collectionName, cancellationToken: ct).ConfigureAwait(false);
+
+                // Recreate collection reference and indexes
+                _collection = database.GetCollection<TEntity>(_collectionName);
+                await EnsureIndexesAsync(_collection, ct).ConfigureAwait(false);
+
+                return estimatedCount;
+            }
+
+            // Safe path: deleteMany (fires hooks if registered)
+            var result = await collection.DeleteManyAsync(Builders<TEntity>.Filter.Empty, ct).ConfigureAwait(false);
+            return result.DeletedCount;
         }, ct);
 
     public Task<TResult> ExecuteAsync<TResult>(Instruction instruction, CancellationToken ct = default)

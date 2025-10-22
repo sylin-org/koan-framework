@@ -6,6 +6,11 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Koan.Web.Extensions;
+using Koan.Core.Hosting.Bootstrap;
+using Koan.Core.Provenance;
+using WebBackupItems = Koan.Web.Backup.Infrastructure.WebBackupProvenanceItems;
+using PublicationMode = Koan.Core.Hosting.Bootstrap.ProvenancePublicationMode;
+using ProvenanceWriter = Koan.Core.Provenance.ProvenanceModuleWriter;
 
 namespace Koan.Web.Backup.Initialization;
 
@@ -35,26 +40,83 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         Log.BootDebug(LogActions.Init, "services-registered", ("module", ModuleName));
     }
 
-    public void Describe(Koan.Core.Hosting.Bootstrap.BootReport report, IConfiguration cfg, IHostEnvironment env)
+    public void Describe(ProvenanceWriter module, IConfiguration cfg, IHostEnvironment env)
     {
-        report.AddModule(ModuleName, ModuleVersion);
-
+        module.Describe(ModuleVersion);
         // Add web backup capabilities
-        report.AddSetting("Capability:BackupWebAPI", "true");
-        report.AddSetting("Capability:RestoreWebAPI", "true");
-        report.AddSetting("Capability:PollingProgressTracking", "true");
-        report.AddSetting("Capability:OperationManagement", "true");
-        report.AddSetting("Capability:BackupCatalogAPI", "true");
-        report.AddSetting("Capability:BackupVerificationAPI", "true");
-        report.AddSetting("Capability:SystemStatusAPI", "true");
-        report.AddSetting("Capability:CORSSupport", "true");
-        report.AddSetting("Capability:APIVersioning", "true");
-        report.AddSetting("Capability:BackgroundCleanup", "true");
+        module.AddSetting(
+            WebBackupItems.BackupWebApi,
+            PublicationMode.Auto,
+            true,
+            usedDefault: true);
+        module.AddSetting(
+            WebBackupItems.RestoreWebApi,
+            PublicationMode.Auto,
+            true,
+            usedDefault: true);
+        module.AddSetting(
+            WebBackupItems.PollingProgressTracking,
+            PublicationMode.Auto,
+            true,
+            usedDefault: true);
+        module.AddSetting(
+            WebBackupItems.OperationManagement,
+            PublicationMode.Auto,
+            true,
+            usedDefault: true);
+        module.AddSetting(
+            WebBackupItems.BackupCatalogApi,
+            PublicationMode.Auto,
+            true,
+            usedDefault: true);
+        module.AddSetting(
+            WebBackupItems.BackupVerificationApi,
+            PublicationMode.Auto,
+            true,
+            usedDefault: true);
+        module.AddSetting(
+            WebBackupItems.SystemStatusApi,
+            PublicationMode.Auto,
+            true,
+            usedDefault: true);
+        module.AddSetting(
+            WebBackupItems.CorsSupport,
+            PublicationMode.Auto,
+            true,
+            usedDefault: true);
+        module.AddSetting(
+            WebBackupItems.ApiVersioning,
+            PublicationMode.Auto,
+            true,
+            usedDefault: true);
+        module.AddSetting(
+            WebBackupItems.BackgroundCleanup,
+            PublicationMode.Auto,
+            true,
+            usedDefault: true);
 
         // Add architecture info
-        report.AddSetting("ProgressTracking", "Polling-based (REST endpoints)");
-        report.AddSetting("SignalRSupport", "false");
-        report.AddSetting("PollingInterval", "Client-controlled");
+        module.AddSetting(
+            WebBackupItems.ProgressTracking,
+            PublicationMode.Auto,
+            "Polling-based (REST endpoints)",
+            usedDefault: true);
+        module.AddSetting(
+            WebBackupItems.SignalRSupport,
+            PublicationMode.Auto,
+            false,
+            usedDefault: true);
+        module.AddSetting(
+            WebBackupItems.PollingInterval,
+            PublicationMode.Auto,
+            "Client-controlled",
+            usedDefault: true);
+
+        module.AddTool(
+            "Backup Operations API",
+            "/api/backup",
+            "Manage backup and restore operations",
+            capability: "backup.operations");
     }
 
     private static class LogActions
