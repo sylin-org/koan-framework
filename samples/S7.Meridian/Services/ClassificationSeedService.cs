@@ -37,9 +37,9 @@ public sealed class ClassificationSeedService : IHostedService
                     Description = typeOption.Description,
                     Version = typeOption.Version,
                     Tags = new List<string>(typeOption.Tags),
-                    Descriptors = new List<string>(typeOption.Descriptors),
-                    FilenamePatterns = new List<string>(typeOption.FilenamePatterns),
-                    Keywords = new List<string>(typeOption.Keywords),
+                    DescriptorHints = new List<string>(typeOption.DescriptorHints),
+                    SignalPhrases = new List<string>(typeOption.SignalPhrases),
+                    SupportsManualSelection = typeOption.SupportsManualSelection,
                     ExpectedPageCountMin = typeOption.ExpectedPageCountMin,
                     ExpectedPageCountMax = typeOption.ExpectedPageCountMax,
                     MimeTypes = new List<string>(typeOption.MimeTypes),
@@ -58,13 +58,13 @@ public sealed class ClassificationSeedService : IHostedService
             }
 
             var changed = existing.Version != typeOption.Version ||
-                          !SequenceEqual(existing.FilenamePatterns, typeOption.FilenamePatterns) ||
-                          !SequenceEqual(existing.Keywords, typeOption.Keywords) ||
+                          existing.SupportsManualSelection != typeOption.SupportsManualSelection ||
                           existing.ExpectedPageCountMin != typeOption.ExpectedPageCountMin ||
                           existing.ExpectedPageCountMax != typeOption.ExpectedPageCountMax ||
                           !SequenceEqual(existing.MimeTypes, typeOption.MimeTypes) ||
                           !SequenceEqual(existing.Tags, typeOption.Tags) ||
-                          !SequenceEqual(existing.Descriptors, typeOption.Descriptors) ||
+                          !SequenceEqual(existing.DescriptorHints, typeOption.DescriptorHints) ||
+                          !SequenceEqual(existing.SignalPhrases, typeOption.SignalPhrases) ||
                           !DictionaryEqual(existing.FieldQueries, typeOption.FieldQueries) ||
                           !string.Equals(existing.Instructions, typeOption.Instructions, StringComparison.Ordinal) ||
                           !string.Equals(existing.OutputTemplate, typeOption.OutputTemplate, StringComparison.Ordinal) ||
@@ -80,9 +80,9 @@ public sealed class ClassificationSeedService : IHostedService
             existing.Description = typeOption.Description;
             existing.Version = typeOption.Version;
             existing.Tags = new List<string>(typeOption.Tags);
-            existing.Descriptors = new List<string>(typeOption.Descriptors);
-            existing.FilenamePatterns = new List<string>(typeOption.FilenamePatterns);
-            existing.Keywords = new List<string>(typeOption.Keywords);
+            existing.DescriptorHints = new List<string>(typeOption.DescriptorHints);
+            existing.SignalPhrases = new List<string>(typeOption.SignalPhrases);
+            existing.SupportsManualSelection = typeOption.SupportsManualSelection;
             existing.ExpectedPageCountMin = typeOption.ExpectedPageCountMin;
             existing.ExpectedPageCountMax = typeOption.ExpectedPageCountMax;
             existing.MimeTypes = new List<string>(typeOption.MimeTypes);

@@ -60,9 +60,7 @@ public sealed class PipelineProcessor : IPipelineProcessor
 
         job.TotalDocuments = job.DocumentIds.Count;
         job.ProcessedDocuments = 0;
-        job.Status = JobStatus.Processing;
-        job.HeartbeatAt = DateTime.UtcNow;
-        await job.Save(ct).ConfigureAwait(false);
+        // Status already set to Processing by TryClaimAnyAsync, no need to save again
 
         pipeline.TotalDocuments = job.TotalDocuments;
         pipeline.ProcessedDocuments = 0;
@@ -70,32 +68,9 @@ public sealed class PipelineProcessor : IPipelineProcessor
         pipeline.UpdatedAt = DateTime.UtcNow;
         await pipeline.Save(ct).ConfigureAwait(false);
 
-        pipeline.Status = PipelineStatus.Processing;
-        pipeline.ProcessedDocuments = 0;
-        pipeline.UpdatedAt = DateTime.UtcNow;
-        await pipeline.Save(ct);
-
-        if (job.TotalDocuments == 0)
-        {
-            job.TotalDocuments = job.DocumentIds.Count;
-        }
-
-        job.ProcessedDocuments = Math.Min(job.ProcessedDocuments, job.TotalDocuments);
-        job.HeartbeatAt = DateTime.UtcNow;
-        job.LastDocumentId = null;
-        await job.Save(ct);
-
         var changedDocuments = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var passages = new List<Passage>();
         var processedCount = 0;
-
-        async Task PersistProgressAsync(string? documentId)
-        {
-            job.ProcessedDocuments = Math.Min(processedCount, job.TotalDocuments);
-            job.LastDocumentId = documentId;
-            job.HeartbeatAt = DateTime.UtcNow;
-            await job.Save(ct).ConfigureAwait(false);
-        }
 
         foreach (var documentId in job.DocumentIds)
         {
@@ -106,7 +81,6 @@ public sealed class PipelineProcessor : IPipelineProcessor
             {
                 _logger.LogWarning("Document {DocumentId} missing for pipeline {PipelineId}.", documentId, job.PipelineId);
                 processedCount++;
-                await PersistProgressAsync(documentId).ConfigureAwait(false);
                 continue;
             }
 
@@ -168,7 +142,6 @@ public sealed class PipelineProcessor : IPipelineProcessor
                 }, ct);
 
                 processedCount++;
-                await PersistProgressAsync(document.Id).ConfigureAwait(false);
                 continue;
             }
 
@@ -227,7 +200,6 @@ public sealed class PipelineProcessor : IPipelineProcessor
                 }, ct);
 
                 processedCount++;
-                await PersistProgressAsync(document.Id).ConfigureAwait(false);
                 continue;
             }
 
@@ -267,7 +239,6 @@ public sealed class PipelineProcessor : IPipelineProcessor
             }
 
             processedCount++;
-            await PersistProgressAsync(document.Id).ConfigureAwait(false);
         }
 
         await _indexer.IndexAsync(passages, ct);
@@ -402,7 +373,9 @@ public sealed class PipelineProcessor : IPipelineProcessor
             }
             else
             {
-                throw new InvalidOperationException("Incremental refresh produced no fields to merge.");
+                // Empty result is valid - log warning and complete successfully
+                _logger.LogWarning("Pipeline {PipelineId} has no fields to merge (no extractions, no existing fields). Completing as empty.", pipeline.Id);
+                mergeCandidates = new List<ExtractedField>();
             }
         }
 
@@ -415,10 +388,17 @@ public sealed class PipelineProcessor : IPipelineProcessor
         pipeline.UpdatedAt = completedAt;
         await pipeline.Save(ct).ConfigureAwait(false);
 
+        // Move completed job to archive partition to preserve history and prevent reprocessing
         job.Status = JobStatus.Completed;
         job.CompletedAt = completedAt;
         job.HeartbeatAt = completedAt;
         job.ProcessedDocuments = job.TotalDocuments;
-        await job.Save(ct).ConfigureAwait(false);
+        
+        _logger.LogInformation("Archiving completed job {JobId} to completed-jobs partition", job.Id);
+        await job.Save("completed-jobs", ct).ConfigureAwait(false);
+        
+        // Remove from active jobs collection to prevent TryClaimAnyAsync from finding it
+        await job.Delete(ct).ConfigureAwait(false);
+        _logger.LogInformation("Job {JobId} archived and removed from active queue", job.Id);
     }
 }

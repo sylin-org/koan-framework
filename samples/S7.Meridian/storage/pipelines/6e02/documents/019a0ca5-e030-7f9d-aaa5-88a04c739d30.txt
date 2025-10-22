@@ -1,0 +1,7 @@
+Cybersecurity Risk Assessment - Synapse Analytics
+Conducted by Arcadia Security Office lead Priya Shah on 2025-10-18.
+Observations:
+- Zero trust network segmentation implemented; SOC 2 Type II in place.
+- Minor finding: log retention policy currently 10 months (Arcadia standard requires 12); remediation planned by 2025-12-31.
+- No evidence of critical vulnerabilities across portal or API endpoints.
+Conclusion: Approved for controlled production rollout with quarterly security reviews.

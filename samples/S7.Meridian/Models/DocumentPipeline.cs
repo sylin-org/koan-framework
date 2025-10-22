@@ -23,7 +23,7 @@ public sealed class DocumentPipeline : Entity<DocumentPipeline>
         = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>JSON schema describing the target deliverable.</summary>
-    public string SchemaJson { get; set; } = "{}";
+    public string SchemaJson { get; set; } = string.Empty;
 
     /// <summary>Markdown template rendered with the merged field payload.</summary>
     public string TemplateMarkdown { get; set; } = "# Meridian Deliverable\n";

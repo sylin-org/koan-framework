@@ -14,7 +14,7 @@ A local-first document intelligence workbench that transforms mixed source files
 
 ### 1. **Evidence-First Document Intelligence**
 - **Automated extraction**: Parse PDFs, extract structured data, cite every value
-- **Source classification**: Auto-detect document types (questionnaires, financial statements, etc.)
+- **Hint-driven classification**: AI descriptors recommend source types with optional user selection
 - **Multi-source aggregation**: Merge data from multiple files with conflict resolution
 - **Citation tracking**: Every extracted value links back to source page and text span
 
@@ -138,7 +138,7 @@ dotnet test tests/Suites/Data/S7.Meridian/Koan.Data.S7.Meridian.Tests/ -c Releas
 
 1. **Choose deliverable type**: "Vendor Assessment"
 2. **Add context**: "Prioritize Q3 2024 data"
-3. **Upload files**: Drag one or many PDFs in a single request (auto-classified)
+3. **Upload files**: Drag one or many PDFs in a single request (pick a type or let hints decide)
 4. **Process**: Watch pipeline stages
 5. **Review**: Resolve conflicts with evidence drawer
 6. **Finalize**: Download PDF with citations
@@ -213,6 +213,8 @@ public class DeliverableField : Entity<DeliverableField>
     public FieldStatus Status { get; set; }
 }
 ```
+
+**Descriptor hints** live on each `SourceType` (`Discriminators.DescriptorHints` and `SignalPhrases`). They are short AI-authored summaries and canonical phrases that characterize the document. Authors tune them when curating source types; analysts can still pick a type manually when hints do not apply, and the pipeline leaves items untyped when no confident match is available.
 
 **Key Insight**: Rich value objects (not primitive obsession). `Citation`, `ClassificationResult`, `MergeRules` are strongly typed.
 
@@ -666,23 +668,39 @@ public async Task<string> SaveFileAsync(IFormFile file)
 
 ---
 
-### 2. **Cascade Classification** (Heuristic → Vector → LLM)
+### 2. **Hint Cascade Classification** (Descriptor → Vector → LLM)
 
 ```csharp
 public async Task<ClassificationResult> ClassifyAsync(SourceFile file)
 {
     var text = await ExtractTextPreview(file); // First 2 pages
 
-    // Try 1: Exact heuristics (fast, cheap)
+    // Try 0: Honor explicit user selection when supplied
+    if (!string.IsNullOrWhiteSpace(file.SourceTypeId))
+    {
+        return new ClassificationResult {
+            SourceTypeId = file.SourceTypeId,
+            Confidence = 1.0,
+            Method = ClassificationMethod.Manual,
+            Rationale = "User selected type"
+        };
+    }
+
+    // Try 1: Descriptor hint overlap (fast, cheap)
     foreach (var sourceType in await SourceType.All())
     {
-        if (sourceType.Discriminators.RegexPatterns.Any(p => Regex.IsMatch(text, p)))
+        var score = _hintMatcher.Score(
+            text,
+            sourceType.Discriminators.DescriptorHints,
+            sourceType.Discriminators.SignalPhrases);
+
+        if (score >= 0.82)
         {
             return new ClassificationResult {
                 SourceTypeId = sourceType.Id,
-                Confidence = 0.95,
-                Method = ClassificationMethod.Heuristic,
-                Rationale = "Matched regex pattern"
+                Confidence = score,
+                Method = ClassificationMethod.Descriptor,
+                Rationale = "Matched descriptor hints"
             };
         }
     }
@@ -714,9 +732,11 @@ public async Task<ClassificationResult> ClassifyAsync(SourceFile file)
 ```
 
 **Design Rationale**:
-- Most files match heuristics (90%+) → fast
-- Vector similarity catches variations (5-8%) → medium cost
-- LLM only for ambiguous cases (2-5%) → expensive but accurate
+- Explicit user choice always wins when analysts know the type
+- Descriptor hints cover the majority of uploads (≈80%) → fast
+- Vector similarity catches variations (≈15%) → medium cost
+- LLM handles untyped or ambiguous cases (remainder) → expensive but accurate
+- Requests with no confident match remain untyped and surface for review
 
 ---
 

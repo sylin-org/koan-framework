@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using System.Text.RegularExpressions;
 using Koan.AI;
 using Koan.AI.Contracts.Options;
 using Koan.Samples.Meridian.Contracts;
@@ -107,10 +106,10 @@ public sealed class SourceTypeAuthoringService : ISourceTypeAuthoringService
         builder.AppendLine("{");
         builder.AppendLine("  \"name\": \"string\",");
         builder.AppendLine("  \"description\": \"string\",");
-        builder.AppendLine("  \"tags\": [\"string\"],");
-        builder.AppendLine("  \"descriptors\": [\"string\"],");
-        builder.AppendLine("  \"filenamePatterns\": [\"regex\"],");
-        builder.AppendLine("  \"keywords\": [\"string\"],");
+    builder.AppendLine("  \"tags\": [\"string\"],");
+    builder.AppendLine("  \"descriptorHints\": [\"short phrase\"],");
+    builder.AppendLine("  \"signalPhrases\": [\"string\"],");
+    builder.AppendLine("  \"supportsManualSelection\": true,");
         builder.AppendLine("  \"mimeTypes\": [\"string\"],");
         builder.AppendLine("  \"expectedPageCount\": { \"min\": number|null, \"max\": number|null },");
         builder.AppendLine("  \"fieldQueries\": { \"$.jsonPath\": \"search query\" },");
@@ -167,9 +166,9 @@ public sealed class SourceTypeAuthoringService : ISourceTypeAuthoringService
             };
 
             draft.Tags = ExtractStringArray(json["tags"]);
-            draft.Descriptors = ExtractStringArray(json["descriptors"]);
-            draft.FilenamePatterns = ExtractStringArray(json["filenamePatterns"]);
-            draft.Keywords = ExtractStringArray(json["keywords"]);
+            draft.DescriptorHints = ExtractStringArray(json["descriptorHints"]);
+            draft.SignalPhrases = ExtractStringArray(json["signalPhrases"]);
+            draft.SupportsManualSelection = json["supportsManualSelection"]?.Value<bool?>() ?? true;
             draft.MimeTypes = ExtractStringArray(json["mimeTypes"]);
 
             var expected = json["expectedPageCount"];
@@ -245,10 +244,9 @@ public sealed class SourceTypeAuthoringService : ISourceTypeAuthoringService
             warnings.Add("AI response did not include an output template; default template applied.");
         }
 
-        draft.Tags = NormalizeList(draft.Tags, warnings, "tags");
-        draft.Descriptors = NormalizeList(draft.Descriptors, warnings, "descriptors");
-        draft.FilenamePatterns = ValidatePatterns(draft.FilenamePatterns, warnings);
-        draft.Keywords = NormalizeList(draft.Keywords, warnings, "keywords");
+    draft.Tags = NormalizeList(draft.Tags, warnings, "tags");
+    draft.DescriptorHints = NormalizeList(draft.DescriptorHints, warnings, "descriptor hints");
+    draft.SignalPhrases = NormalizeList(draft.SignalPhrases, warnings, "signal phrases");
         draft.MimeTypes = NormalizeList(draft.MimeTypes, warnings, "mime types");
 
         var normalizedQueries = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -310,32 +308,6 @@ public sealed class SourceTypeAuthoringService : ISourceTypeAuthoringService
         return normalized;
     }
 
-    private static List<string> ValidatePatterns(List<string> patterns, List<string> warnings)
-    {
-        var valid = new List<string>();
-        foreach (var pattern in patterns)
-        {
-            if (string.IsNullOrWhiteSpace(pattern))
-            {
-                continue;
-            }
-
-            try
-            {
-                _ = new Regex(pattern, RegexOptions.IgnoreCase | RegexOptions.Compiled);
-                valid.Add(pattern);
-            }
-            catch (Exception ex)
-            {
-                warnings.Add($"Filename pattern '{pattern}' was removed: {ex.Message}");
-            }
-        }
-
-        return valid.Distinct(StringComparer.OrdinalIgnoreCase)
-            .Take(MaxListItems)
-            .ToList();
-    }
-
     private static string BuildRequestSummary(SourceTypeAiSuggestRequest request)
     {
         var name = string.IsNullOrWhiteSpace(request.DocumentName) ? "unknown" : request.DocumentName.Trim();
@@ -344,7 +316,7 @@ public sealed class SourceTypeAuthoringService : ISourceTypeAuthoringService
 
     private static string BuildResponseSummary(SourceTypeDraft draft)
     {
-        return $"name={draft.Name};tags={draft.Tags.Count};keywords={draft.Keywords.Count};queries={draft.FieldQueries.Count}";
+        return $"name={draft.Name};tags={draft.Tags.Count};descriptorHints={draft.DescriptorHints.Count};signalPhrases={draft.SignalPhrases.Count};queries={draft.FieldQueries.Count}";
     }
 }
 

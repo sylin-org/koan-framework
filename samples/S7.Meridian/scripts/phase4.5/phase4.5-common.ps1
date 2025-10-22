@@ -29,7 +29,47 @@ function Invoke-MeridianRequest {
         return Invoke-RestMethod @invokeParams
     }
     catch {
-        throw "Request to $uri failed: $($_.Exception.Message)"
+        $exception = $_.Exception
+        $statusDescription = $exception.Message
+        $responseBody = $null
+
+        $response = $null
+        if ($exception.PSObject.Properties.Name -contains 'Response') {
+            $response = $exception.Response
+        }
+        elseif ($exception.InnerException -and $exception.InnerException.PSObject.Properties.Name -contains 'Response') {
+            $response = $exception.InnerException.Response
+        }
+
+        if ($response -is [System.Net.Http.HttpResponseMessage]) {
+            $statusDescription = "{0} ({1})" -f [int]$response.StatusCode, $response.ReasonPhrase
+            try {
+                $responseBody = $response.Content.ReadAsStringAsync().GetAwaiter().GetResult()
+            }
+            catch { }
+        }
+        elseif ($response -is [System.Net.WebResponse]) {
+            try {
+                $statusDescription = "{0} ({1})" -f [int]$response.StatusCode, $response.StatusDescription
+            }
+            catch { }
+
+            try {
+                $stream = $response.GetResponseStream()
+                if ($stream) {
+                    $reader = New-Object System.IO.StreamReader($stream)
+                    $responseBody = $reader.ReadToEnd()
+                }
+            }
+            catch { }
+        }
+
+        if (-not [string]::IsNullOrWhiteSpace($responseBody)) {
+            Write-Warning "Request to $uri failed with response: $responseBody"
+            throw "Request to $uri failed: $statusDescription. Response body: $responseBody"
+        }
+
+        throw "Request to $uri failed: $statusDescription"
     }
 }
 
@@ -115,6 +155,25 @@ function ConvertTo-TitleCaseSafe {
     return $title
 }
 
+function Get-MeridianContentType {
+    param(
+        [string]$FilePath
+    )
+
+    if ([string]::IsNullOrWhiteSpace($FilePath)) {
+        return 'text/plain'
+    }
+
+    $extension = [System.IO.Path]::GetExtension($FilePath)
+    switch ($extension.ToLowerInvariant()) {
+        '.txt' { return 'text/plain' }
+        '.md' { return 'text/markdown' }
+        '.pdf' { return 'application/pdf' }
+        '.docx' { return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' }
+        default { return 'text/plain' }
+    }
+}
+
 function Normalize-List {
     param(
         [Parameter()] $Value,
@@ -156,6 +215,9 @@ function Ensure-MeridianSourceTypeAi {
         [string]$Prompt,
         [string[]]$TargetFields = @(),
         [string[]]$DesiredTags = @(),
+        [string[]]$FallbackDescriptorHints = @(),
+        [string[]]$FallbackSignalPhrases = @(),
+        [Nullable[bool]]$SupportsManualSelection = $null,
         [switch]$SkipCertificateCheck
     )
 
@@ -176,14 +238,24 @@ function Ensure-MeridianSourceTypeAi {
     }
 
     $tags = Normalize-List $draft.Tags
+    if ($null -eq $tags) { $tags = @() }
     if ($tags.Count -eq 0 -and $DesiredTags.Count -gt 0) {
         $tags = @($DesiredTags | ForEach-Object { $_.Trim() } | Where-Object { $_ })
     }
 
-    $descriptors = Normalize-List $draft.Descriptors
-    $filenamePatterns = Normalize-List -Value $draft.FilenamePatterns -AllowSplit
-    $keywords = Normalize-List $draft.Keywords
+    $descriptorHints = Normalize-List $draft.DescriptorHints
+    if ($null -eq $descriptorHints) { $descriptorHints = @() }
+    if ($descriptorHints.Count -eq 0 -and $FallbackDescriptorHints.Count -gt 0) {
+        $descriptorHints = @($FallbackDescriptorHints | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+    }
+
+    $signalPhrases = Normalize-List $draft.SignalPhrases
+    if ($null -eq $signalPhrases) { $signalPhrases = @() }
+    if ($signalPhrases.Count -eq 0 -and $FallbackSignalPhrases.Count -gt 0) {
+        $signalPhrases = @($FallbackSignalPhrases | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+    }
     $mimeTypes = Normalize-List $draft.MimeTypes
+    if ($null -eq $mimeTypes) { $mimeTypes = @() }
     if ($mimeTypes.Count -eq 0) {
         $mimeTypes = @('text/plain')
     }
@@ -205,28 +277,34 @@ function Ensure-MeridianSourceTypeAi {
         Name            = $draft.Name
         Description     = if ($draft.Description) { $draft.Description } else { $Prompt }
         Version         = 1
-        Tags            = $tags
-        Descriptors     = $descriptors
-        FilenamePatterns= $filenamePatterns
-        Keywords        = $keywords
-        MimeTypes       = $mimeTypes
+        Tags            = @($tags)
+        DescriptorHints = @($descriptorHints)
+        SignalPhrases   = @($signalPhrases)
+        MimeTypes       = @($mimeTypes)
         FieldQueries    = $fieldQueries
         Instructions    = if ($draft.Instructions) { $draft.Instructions } else { "Summarize this document." }
         OutputTemplate  = if ($draft.OutputTemplate) { $draft.OutputTemplate } else { "{{SUMMARY}}" }
+    }
+
+    if ($SupportsManualSelection -ne $null) {
+        $payload.SupportsManualSelection = [bool]$SupportsManualSelection
+    }
+    elseif ($draft.PSObject.Properties.Name -contains 'SupportsManualSelection') {
+        $payload.SupportsManualSelection = [bool]$draft.SupportsManualSelection
+    }
+    else {
+        $payload.SupportsManualSelection = $true
     }
 
     if ([string]::IsNullOrWhiteSpace($payload.Name)) {
         $payload.Name = ConvertTo-TitleCaseSafe -Value $Prompt -EmptyFallback "Generated Source Type"
     }
 
-    if ($payload.FilenamePatterns.Count -eq 0) {
-        $payload.FilenamePatterns = @((ConvertTo-Slug $payload.Name).Replace('-', ''))
-    }
-
     if ($payload.Tags.Count -eq 0 -and $DesiredTags.Count -gt 0) {
         $payload.Tags = @($DesiredTags | ForEach-Object { $_.Trim() } | Where-Object { $_ })
     }
 
+    Write-Host "Payload:" ($payload | ConvertTo-Json -Depth 10)
     return Invoke-MeridianRequest -BaseUrl $BaseUrl -Path '/api/sourcetypes' -Method 'POST' -Body $payload -SkipCertificateCheck:$SkipCertificateCheck
 }
 
@@ -258,14 +336,18 @@ function Ensure-MeridianAnalysisTypeAi {
     }
 
     $tags = Normalize-List $draft.Tags
+    if ($null -eq $tags) { $tags = @() }
     $descriptors = Normalize-List $draft.Descriptors
+    if ($null -eq $descriptors) { $descriptors = @() }
     $requiredSources = if ($draft.RequiredSourceTypes) { Normalize-List $draft.RequiredSourceTypes } else { @($IncludedSourceTypes | Where-Object { $_ }) }
+    if ($null -eq $requiredSources) { $requiredSources = @() }
 
     $payload = [ordered]@{
         Name                = $draft.Name
         Description         = if ($draft.Description) { $draft.Description } else { $Goal }
         Instructions        = if ($draft.Instructions) { $draft.Instructions } else { $Goal }
         OutputTemplate      = if ($draft.OutputTemplate) { $draft.OutputTemplate } else { "# Analysis`n{{SUMMARY}}" }
+        JsonSchema          = if ($draft.OutputSchemaJson) { $draft.OutputSchemaJson } else { "{}" }
         Tags                = $tags
         Descriptors         = $descriptors
         RequiredSourceTypes = $requiredSources
@@ -324,16 +406,60 @@ function Upload-MeridianDocument {
         [string]$BaseUrl,
         [string]$PipelineId,
         [string]$FilePath,
+        [string]$ContentType = "",
         [switch]$SkipCertificateCheck
     )
 
-    $form = @{ files = Get-Item -Path $FilePath }
-    $uri = "$BaseUrl/api/pipelines/$PipelineId/documents"
-    $invokeParams = @{ Uri = $uri; Method = 'POST'; Form = $form }
-    if ($SkipCertificateCheck) { $invokeParams.SkipCertificateCheck = $true }
+    if (-not (Test-Path -Path $FilePath -PathType Leaf)) {
+        throw "File '$FilePath' was not found."
+    }
 
-    $response = Invoke-WebRequest @invokeParams
-    return $response.Content | ConvertFrom-Json
+    $uri = "$BaseUrl/api/pipelines/$PipelineId/documents"
+    $resolvedContentType = if ([string]::IsNullOrWhiteSpace($ContentType)) { Get-MeridianContentType -FilePath $FilePath } else { $ContentType }
+
+    $handler = New-Object System.Net.Http.HttpClientHandler
+    if ($SkipCertificateCheck) {
+        $handler.ServerCertificateCustomValidationCallback = { $true }
+    }
+
+    $client = [System.Net.Http.HttpClient]::new($handler)
+    $client.Timeout = [System.TimeSpan]::FromMinutes(5)
+
+    try {
+        $stream = [System.IO.File]::OpenRead($FilePath)
+        try {
+            $fileContent = New-Object System.Net.Http.StreamContent($stream)
+            $fileContent.Headers.ContentType = [System.Net.Http.Headers.MediaTypeHeaderValue]::Parse($resolvedContentType)
+
+            $form = New-Object System.Net.Http.MultipartFormDataContent
+            $form.Add($fileContent, 'files', [System.IO.Path]::GetFileName($FilePath))
+
+            $response = $client.PostAsync($uri, $form).GetAwaiter().GetResult()
+            $body = $response.Content.ReadAsStringAsync().GetAwaiter().GetResult()
+
+            if (-not $response.IsSuccessStatusCode) {
+                $status = "{0} ({1})" -f [int]$response.StatusCode, $response.ReasonPhrase
+                if (-not [string]::IsNullOrWhiteSpace($body)) {
+                    throw "Upload to $uri failed: $status. Response body: $body"
+                }
+
+                throw "Upload to $uri failed: $status"
+            }
+
+            if ([string]::IsNullOrWhiteSpace($body)) {
+                return $null
+            }
+
+            return $body | ConvertFrom-Json
+        }
+        finally {
+            $stream.Dispose()
+        }
+    }
+    finally {
+        $client.Dispose()
+        $handler.Dispose()
+    }
 }
 
 function Upload-MeridianDocumentContent {
@@ -342,11 +468,12 @@ function Upload-MeridianDocumentContent {
         [string]$PipelineId,
         [string]$FileName,
         [string]$Content,
+        [string]$ContentType = "",
         [switch]$SkipCertificateCheck
     )
 
     $file = New-MeridianDocumentFile -Content $Content -FileName $FileName
-    return Upload-MeridianDocument -BaseUrl $BaseUrl -PipelineId $PipelineId -FilePath $file -SkipCertificateCheck:$SkipCertificateCheck
+    return Upload-MeridianDocument -BaseUrl $BaseUrl -PipelineId $PipelineId -FilePath $file -ContentType $ContentType -SkipCertificateCheck:$SkipCertificateCheck
 }
 
 function Wait-MeridianJob {
@@ -359,6 +486,8 @@ function Wait-MeridianJob {
     )
 
     $start = Get-Date
+    $previousStatus = $null
+    $lastTransition = $start
     do {
         Start-Sleep -Seconds 2
         try {
@@ -368,13 +497,68 @@ function Wait-MeridianJob {
             continue
         }
 
-        if ($job.Status -in @('Completed','Failed')) {
+        if ($job.Status -in @('Completed','Failed','Cancelled')) {
             return $job
+        }
+
+        if ($job.Status -ne $previousStatus) {
+            $previousStatus = $job.Status
+            $lastTransition = Get-Date
+        }
+
+        $heartbeat = $null
+        if ($job.PSObject.Properties.Name -contains 'HeartbeatAt' -and $job.HeartbeatAt) {
+            try {
+                $heartbeat = [datetime]::Parse($job.HeartbeatAt)
+            } catch {
+                $heartbeat = $null
+            }
+        }
+
+        $staleHeartbeat = $false
+        if ($heartbeat) {
+            $staleHeartbeat = (Get-Date) - $heartbeat -gt [TimeSpan]::FromMinutes(3)
+        }
+
+        $agedState = (Get-Date) - $lastTransition -gt [TimeSpan]::FromSeconds($TimeoutSeconds / 3)
+
+        if ($job.Status -eq 'Pending' -and ($staleHeartbeat -or $agedState)) {
+            $cancelled = Stop-MeridianJob -BaseUrl $BaseUrl -PipelineId $PipelineId -JobId $JobId -Reason "stale" -SkipCertificateCheck:$SkipCertificateCheck
+            if ($cancelled) {
+                return $cancelled
+            }
         }
     }
     while ((Get-Date) - $start -lt [TimeSpan]::FromSeconds($TimeoutSeconds))
 
+    $cancelled = Stop-MeridianJob -BaseUrl $BaseUrl -PipelineId $PipelineId -JobId $JobId -Reason "timeout" -SkipCertificateCheck:$SkipCertificateCheck
+    if ($cancelled) {
+        return $cancelled
+    }
+
     throw "Job $JobId did not finish within $TimeoutSeconds seconds."
+}
+
+function Stop-MeridianJob {
+    param(
+        [string]$BaseUrl,
+        [string]$PipelineId,
+        [string]$JobId,
+        [string]$Reason = "cancelled",
+        [switch]$SkipCertificateCheck
+    )
+
+    try {
+        $response = Invoke-MeridianRequest -BaseUrl $BaseUrl -Path "/api/pipelines/$PipelineId/jobs/$JobId/cancel" -Method 'POST' -Body @{ reason = $Reason } -SkipCertificateCheck:$SkipCertificateCheck
+        if ($response) {
+            return $response
+        }
+    }
+    catch {
+        Write-Warning "Failed to cancel job ${JobId}: $_"
+    }
+
+    return $null
 }
 
 function Get-MeridianDeliverable {

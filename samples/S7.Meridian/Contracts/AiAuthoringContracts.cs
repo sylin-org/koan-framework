@@ -27,10 +27,10 @@ public sealed class SourceTypeDraft
     public string Name { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
     public List<string> Tags { get; set; } = new();
-    public List<string> Descriptors { get; set; } = new();
-    public List<string> FilenamePatterns { get; set; } = new();
-    public List<string> Keywords { get; set; } = new();
+    public List<string> DescriptorHints { get; set; } = new();
+    public List<string> SignalPhrases { get; set; } = new();
     public List<string> MimeTypes { get; set; } = new();
+    public bool SupportsManualSelection { get; set; } = true;
     public int? ExpectedPageCountMin { get; set; }
         = null;
     public int? ExpectedPageCountMax { get; set; }
@@ -66,5 +66,6 @@ public sealed class AnalysisTypeDraft
     public List<string> Descriptors { get; set; } = new();
     public string Instructions { get; set; } = string.Empty;
     public string OutputTemplate { get; set; } = string.Empty;
+    public string OutputSchemaJson { get; set; } = string.Empty;
     public List<string> RequiredSourceTypes { get; set; } = new();
 }

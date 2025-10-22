@@ -544,11 +544,13 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
 
     [HttpPatch("{id}")]
     [Consumes(Infrastructure.KoanWebConstants.ContentTypes.ApplicationMergePatch)]
+    [ApiExplorerSettings(IgnoreApi = true)]
     public virtual async Task<IActionResult> PatchMerge([FromRoute] TKey id, [FromBody] Newtonsoft.Json.Linq.JToken body, CancellationToken ct)
         => await PatchNormalized(id, NormalizeFromMergePatch(id, body), ct);
 
     [HttpPatch("{id}")]
     [Consumes(Infrastructure.KoanWebConstants.ContentTypes.ApplicationJson)]
+    [ApiExplorerSettings(IgnoreApi = true)]
     public virtual async Task<IActionResult> PatchPartial([FromRoute] TKey id, [FromBody] Newtonsoft.Json.Linq.JToken body, CancellationToken ct)
         => await PatchNormalized(id, NormalizeFromPartialJson(id, body), ct);
 

@@ -90,9 +90,13 @@ public sealed class DocumentPipelineAnalysisTypeHook : IModelHook<DocumentPipeli
                 model.SchemaJson = deliverableType.JsonSchema;
             }
         }
-        else if (analysisChanged && string.IsNullOrWhiteSpace(model.SchemaJson) && !string.IsNullOrWhiteSpace(analysisType.OutputTemplate))
+        else if (analysisChanged && string.IsNullOrWhiteSpace(model.SchemaJson))
         {
-            // Fallback schema placeholder remains "{}" unless provided elsewhere.
+            // Use schema from AnalysisType if available
+            if (!string.IsNullOrWhiteSpace(analysisType.JsonSchema))
+            {
+                model.SchemaJson = analysisType.JsonSchema;
+            }
         }
 
         if (deliverableType is not null && (deliverableChanged || string.IsNullOrWhiteSpace(model.TemplateMarkdown)))

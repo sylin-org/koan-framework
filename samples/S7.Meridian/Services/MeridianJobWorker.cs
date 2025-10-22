@@ -34,32 +34,58 @@ public sealed class MeridianJobWorker : BackgroundService
                     continue;
                 }
 
+                _logger.LogInformation("Claimed job {JobId} (status: {Status}, retryCount: {RetryCount}) for pipeline {PipelineId}", 
+                    job.Id, job.Status, job.RetryCount, job.PipelineId);
+
                 try
                 {
                     await _processor.ProcessAsync(job, stoppingToken);
-                    job.Status = JobStatus.Completed;
-                    job.ProcessedDocuments = job.TotalDocuments;
-                    job.CompletedAt = DateTime.UtcNow;
-                    job.HeartbeatAt = DateTime.UtcNow;
-                    await job.Save(stoppingToken);
                     _logger.LogInformation("Completed job {JobId} for pipeline {PipelineId}.", job.Id, job.PipelineId);
                 }
                 catch (Exception ex) when (!stoppingToken.IsCancellationRequested)
                 {
-                    _logger.LogError(ex, "Processing job {JobId} failed.", job.Id);
+                    _logger.LogError(ex, "Processing job {JobId} failed (attempt {RetryCount}).", job.Id, job.RetryCount + 1);
+                    var now = DateTime.UtcNow;
                     job.RetryCount++;
                     job.LastError = ex.Message;
-                    job.CompletedAt = DateTime.UtcNow;
-                    job.HeartbeatAt = DateTime.UtcNow;
+                    job.CompletedAt = now;
+                    job.HeartbeatAt = now;
                     if (job.RetryCount > 3)
                     {
                         job.Status = JobStatus.Failed;
+                        _logger.LogError("Job {JobId} marked as Failed after {RetryCount} attempts.", job.Id, job.RetryCount);
                     }
                     else
                     {
                         job.Status = JobStatus.Pending;
+                        _logger.LogInformation("Job {JobId} will retry (attempt {RetryCount} of 4).", job.Id, job.RetryCount + 1);
                     }
-                    await job.Save(stoppingToken);
+                    await job.Save(stoppingToken).ConfigureAwait(false);
+
+                    try
+                    {
+                        var pipeline = await DocumentPipeline.Get(job.PipelineId, stoppingToken).ConfigureAwait(false);
+                        if (pipeline is not null)
+                        {
+                            pipeline.ProcessedDocuments = job.ProcessedDocuments;
+                            pipeline.UpdatedAt = now;
+                            if (job.Status == JobStatus.Failed)
+                            {
+                                pipeline.Status = PipelineStatus.Failed;
+                                pipeline.CompletedAt = now;
+                            }
+                            else
+                            {
+                                pipeline.Status = PipelineStatus.Queued;
+                            }
+
+                            await pipeline.Save(stoppingToken).ConfigureAwait(false);
+                        }
+                    }
+                    catch (Exception pipelineEx) when (!stoppingToken.IsCancellationRequested)
+                    {
+                        _logger.LogWarning(pipelineEx, "Failed to update pipeline status after job {JobId} error.", job.Id);
+                    }
                 }
             }
             catch (OperationCanceledException)

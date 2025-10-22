@@ -9,6 +9,8 @@ namespace Koan.Samples.Meridian.Models;
 
 public sealed class ProcessingJob : Entity<ProcessingJob>
 {
+    private static readonly TimeSpan HeartbeatGracePeriod = TimeSpan.FromMinutes(5);
+
     public string PipelineId { get; set; } = string.Empty;
     public JobStatus Status { get; set; } = JobStatus.Pending;
     public int RetryCount { get; set; } = 0;
@@ -28,10 +30,52 @@ public sealed class ProcessingJob : Entity<ProcessingJob>
     public int ProcessedDocuments { get; set; } = 0;
     public string? LastDocumentId { get; set; } = null;
 
+    public static async Task<ProcessingJob?> FindPendingAsync(string pipelineId, CancellationToken ct)
+    {
+        var pending = await Query(j =>
+            j.PipelineId == pipelineId &&
+            j.Status == JobStatus.Pending, ct).ConfigureAwait(false);
+
+        return pending
+            .OrderByDescending(j => j.CreatedAt)
+            .FirstOrDefault();
+    }
+
+    public static async Task<(ProcessingJob? Job, bool Cancelled)> TryCancelPendingAsync(string jobId, CancellationToken ct)
+    {
+        var job = await Get(jobId, ct).ConfigureAwait(false);
+        if (job is null)
+        {
+            return (null, false);
+        }
+
+        var now = DateTime.UtcNow;
+        if (job.Status != JobStatus.Pending)
+        {
+            var staleCutoff = now - HeartbeatGracePeriod;
+            var isStaleProcessing = job.Status == JobStatus.Processing &&
+                                    (job.HeartbeatAt is null || job.HeartbeatAt <= staleCutoff);
+
+            if (!isStaleProcessing)
+            {
+                return (job, false);
+            }
+        }
+
+        job.Status = JobStatus.Cancelled;
+        job.CompletedAt = now;
+        job.HeartbeatAt = now;
+        job.WorkerId = null;
+        job.LastError ??= "Cancelled";
+        await job.Save(ct).ConfigureAwait(false);
+
+        return (job, true);
+    }
+
     public static async Task<ProcessingJob?> TryClaimAsync(string pipelineId, string workerId, CancellationToken ct)
     {
         var now = DateTime.UtcNow;
-        var staleCutoff = now.AddMinutes(-5);
+        var staleCutoff = now - HeartbeatGracePeriod;
 
         var pending = await Query(j =>
             j.PipelineId == pipelineId &&
@@ -54,14 +98,14 @@ public sealed class ProcessingJob : Entity<ProcessingJob>
         job.ProcessedDocuments = 0;
         job.LastDocumentId = null;
         job.LastError = null;
-        await job.Save(ct);
+        await job.Save(ct).ConfigureAwait(false);
         return job;
     }
 
     public static async Task<ProcessingJob?> TryClaimAnyAsync(string workerId, CancellationToken ct)
     {
         var now = DateTime.UtcNow;
-        var staleCutoff = now.AddMinutes(-5);
+        var staleCutoff = now - HeartbeatGracePeriod;
 
         var pending = await Query(j =>
             j.Status == JobStatus.Pending ||
@@ -96,7 +140,36 @@ public sealed class ProcessingJob : Entity<ProcessingJob>
         }
 
         job.HeartbeatAt = DateTime.UtcNow;
-        await job.Save(ct);
+        await job.Save(ct).ConfigureAwait(false);
+    }
+
+    public bool MergeDocuments(IEnumerable<string> documentIds)
+    {
+        ArgumentNullException.ThrowIfNull(documentIds);
+
+        var existing = new HashSet<string>(DocumentIds, StringComparer.Ordinal);
+        var added = false;
+
+        foreach (var id in documentIds)
+        {
+            if (string.IsNullOrWhiteSpace(id))
+            {
+                continue;
+            }
+
+            if (existing.Add(id))
+            {
+                DocumentIds.Add(id);
+                added = true;
+            }
+        }
+
+        if (added)
+        {
+            TotalDocuments = DocumentIds.Count;
+        }
+
+        return added;
     }
 }
 
@@ -105,5 +178,6 @@ public enum JobStatus
     Pending,
     Processing,
     Completed,
-    Failed
+    Failed,
+    Cancelled
 }

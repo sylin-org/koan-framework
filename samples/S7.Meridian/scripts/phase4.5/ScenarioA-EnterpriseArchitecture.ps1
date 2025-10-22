@@ -17,15 +17,71 @@ Write-Host "Scenario A - Enterprise Architecture Review" -ForegroundColor Cyan
 Write-Host "Base URL: $BaseUrl" -ForegroundColor DarkGray
 
 $sourcePrompts = @(
-    @{ Prompt = "Meeting notes focusing on enterprise architecture discussions, decisions, and action items."; Tags = @("meeting","architecture","notes"); TargetFields = @("$.notes") },
-    @{ Prompt = "Customer technical bulletin summarizing product updates and integration highlights for clients."; Tags = @("customer","bulletin","update"); TargetFields = @() },
-    @{ Prompt = "Vendor prescreen questionnaire responses describing revenue figures, staffing levels, certifications, and capabilities."; Tags = @("vendor","questionnaire","finance"); TargetFields = @("$.revenue","$.employees") },
-    @{ Prompt = "Cybersecurity risk assessment summarizing current controls, findings, and remediation guidance."; Tags = @("security","assessment","risk"); TargetFields = @("$.security") }
+    @{
+        Prompt = "Meeting notes focusing on enterprise architecture discussions, decisions, and action items.";
+        Tags = @("meeting","architecture","notes");
+        DescriptorHints = @(
+            "enterprise architecture steering committee notes",
+            "action items for modernization initiatives",
+            "architecture decisions and follow-ups"
+        );
+        SignalPhrases = @(
+            "architecture steering committee",
+            "action item",
+            "integration gateway",
+            "sandbox credentials"
+        )
+    },
+    @{
+        Prompt = "Customer technical bulletin summarizing product updates and integration highlights for clients.";
+        Tags = @("customer","bulletin","update");
+        DescriptorHints = @(
+            "customer technical bulletin",
+            "product update summary",
+            "integration highlights"
+        );
+        SignalPhrases = @(
+            "technical bulletin",
+            "early access program",
+            "integration playbook",
+            "webinar series"
+        )
+    },
+    @{
+        Prompt = "Vendor prescreen questionnaire responses describing revenue figures, staffing levels, certifications, and capabilities.";
+        Tags = @("vendor","questionnaire","finance");
+        DescriptorHints = @(
+            "vendor prescreen questionnaire",
+            "capability assessment questionnaire",
+            "vendor revenue disclosures"
+        );
+        SignalPhrases = @(
+            "FY2024 revenue",
+            "staffing count",
+            "differentiators",
+            "certification"
+        )
+    },
+    @{
+        Prompt = "Cybersecurity risk assessment summarizing current controls, findings, and remediation guidance.";
+        Tags = @("security","assessment","risk");
+        DescriptorHints = @(
+            "cybersecurity risk assessment",
+            "security posture assessment",
+            "remediation guidance summary"
+        );
+        SignalPhrases = @(
+            "zero trust",
+            "log retention",
+            "quarterly security review",
+            "risk assessment"
+        )
+    }
 )
 
 $sourceTypes = @()
 foreach ($entry in $sourcePrompts) {
-    $created = Ensure-MeridianSourceTypeAi -BaseUrl $BaseUrl -Prompt $entry.Prompt -TargetFields $entry.TargetFields -DesiredTags $entry.Tags -SkipCertificateCheck:$SkipCertificateCheck
+    $created = Ensure-MeridianSourceTypeAi -BaseUrl $BaseUrl -Prompt $entry.Prompt -TargetFields $entry.TargetFields -DesiredTags $entry.Tags -FallbackDescriptorHints $entry.DescriptorHints -FallbackSignalPhrases $entry.SignalPhrases -SkipCertificateCheck:$SkipCertificateCheck
     $sourceTypes += $created
     $sourceName = Get-Property -Object $created -Names 'Name','name'
     $sourceId = Get-Property -Object $created -Names 'Id','id'
@@ -37,27 +93,13 @@ $sourceTypeIds = $sourceTypes | ForEach-Object { Get-Property -Object $_ -Names 
 $analysis = Ensure-MeridianAnalysisTypeAi -BaseUrl $BaseUrl -Goal "Produce an enterprise architecture readiness review synthesizing meeting notes, customer bulletins, vendor questionnaires, and cybersecurity assessments." -Audience "CIO steering committee" -IncludedSourceTypes $sourceTypeIds -AdditionalContext "Emphasize key findings, financial health, staffing, and security posture. Use concise markdown sections." -SkipCertificateCheck:$SkipCertificateCheck
 $analysisId = Get-Property -Object $analysis -Names 'Id','id'
 $analysisName = Get-Property -Object $analysis -Names 'Name','name'
-$analysisTemplate = Get-Property -Object $analysis -Names 'OutputTemplate','outputTemplate','TemplateMarkdown','templateMarkdown'
 Write-Host "Analysis type ready: $analysisName ($analysisId)" -ForegroundColor DarkGray
 
-$schemaJson = @"
-{
-  "type": "object",
-  "properties": {
-    "revenue": { "type": "number" },
-    "employees": { "type": "number" },
-    "notes": { "type": "string" },
-    "security": { "type": "string" }
-  }
-}
-"@
-
+# Pipeline definition - schema and template come from AnalysisType automatically via hook
 $pipelineDefinition = [ordered]@{
     Name             = "Enterprise Architecture Review " + (Get-Date -Format 'yyyyMMdd-HHmmss')
     Description      = "Pipeline generated by Scenario A script"
     AnalysisTypeId   = $analysisId
-    SchemaJson       = $schemaJson
-    TemplateMarkdown = if ($analysisTemplate) { $analysisTemplate } else { "# Enterprise Architecture Review`nRevenue: {{revenue}}`nEmployees: {{employees}}`nNotes: {{notes}}" }
 }
 
 $pipeline = New-MeridianPipeline -BaseUrl $BaseUrl -Definition $pipelineDefinition -SkipCertificateCheck:$SkipCertificateCheck
@@ -111,8 +153,13 @@ foreach ($doc in $documents) {
 $deliverable = Get-MeridianDeliverable -BaseUrl $BaseUrl -PipelineId $pipelineId -SkipCertificateCheck:$SkipCertificateCheck
 if ($deliverable) {
     $outputPath = Join-Path $OutputDirectory ("scenario-a-deliverable-" + (Get-Date -Format 'yyyyMMdd-HHmmss') + ".md")
-    [System.IO.File]::WriteAllText($outputPath, $deliverable.Markdown)
-    Write-Host "Deliverable saved to $outputPath" -ForegroundColor Green
+    $markdown = Get-Property -Object $deliverable -Names 'RenderedMarkdown','renderedMarkdown','Markdown','markdown'
+    if ($markdown) {
+        [System.IO.File]::WriteAllText($outputPath, $markdown)
+        Write-Host "Deliverable saved to $outputPath" -ForegroundColor Green
+    } else {
+        Write-Warning "Deliverable has no markdown content."
+    }
 } else {
     Write-Warning "No deliverable was generated."
 }

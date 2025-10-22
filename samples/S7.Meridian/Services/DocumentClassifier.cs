@@ -3,7 +3,6 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using System.Text.RegularExpressions;
 using Koan.AI;
 using Koan.AI.Contracts.Options;
 using Koan.Data.Core;
@@ -32,9 +31,10 @@ public sealed class DocumentClassifier : IDocumentClassifier
     private sealed record SourceTypeSnapshot(
         int Version,
         DateTime UpdatedAt,
-        Regex[] FilenamePatterns,
-        string[] KeywordsLower,
+        string[] DescriptorHints,
+        string[] SignalPhrases,
         string[] MimeTypesLower,
+        bool SupportsManualSelection,
         int? ExpectedPageCountMin,
         int? ExpectedPageCountMax);
 
@@ -55,6 +55,21 @@ public sealed class DocumentClassifier : IDocumentClassifier
         if (types.Count == 0)
         {
             return new ClassificationResult(MeridianConstants.SourceTypes.Unclassified, 0.0, ClassificationMethod.Manual, 1, "No source types configured.");
+        }
+
+        if (document.ClassificationMethod == ClassificationMethod.Manual &&
+            !string.IsNullOrWhiteSpace(document.ClassifiedTypeId))
+        {
+            var manualTypeId = document.ClassifiedTypeId!;
+            var matched = types.FirstOrDefault(t => string.Equals(t.Id, manualTypeId, StringComparison.OrdinalIgnoreCase));
+            var version = document.ClassifiedTypeVersion ?? matched?.Version ?? 1;
+            var confidence = document.ClassificationConfidence > 0 ? document.ClassificationConfidence : 1.0;
+            var reason = string.IsNullOrWhiteSpace(document.ClassificationReason)
+                ? "User selected type"
+                : document.ClassificationReason!;
+
+            _logger.LogDebug("Document {DocumentId} honoring manual selection {TypeId}.", document.Id, manualTypeId);
+            return new ClassificationResult(manualTypeId, confidence, ClassificationMethod.Manual, version, reason);
         }
 
         var text = document.ExtractedText ?? string.Empty;
@@ -92,8 +107,14 @@ public sealed class DocumentClassifier : IDocumentClassifier
 
     private ClassificationResult? EvaluateHeuristics(SourceDocument document, string text, IReadOnlyList<SourceType> types)
     {
+        const double DescriptorWeight = 0.55;
+        const double SignalWeight = 0.25;
+        const double PageWeight = 0.15;
+        const double MimeWeight = 0.05;
+
         var best = default(ClassificationResult?);
-        var textLower = text.ToLowerInvariant();
+        var textLower = NormalizeContent(text);
+        var fileNameLower = NormalizeFileName(document.OriginalFileName);
         var mediaLower = document.MediaType?.ToLowerInvariant();
 
         foreach (var type in types)
@@ -103,47 +124,50 @@ public sealed class DocumentClassifier : IDocumentClassifier
             double maxScore = 0;
             var reasons = new List<string>();
 
-            if (snapshot.FilenamePatterns.Length > 0)
+            if (snapshot.DescriptorHints.Length > 0)
             {
-                maxScore += 0.3;
-                if (snapshot.FilenamePatterns.Any(pattern => pattern.IsMatch(document.OriginalFileName)))
+                maxScore += DescriptorWeight;
+                var descriptorHits = CountPhraseHits(snapshot.DescriptorHints, textLower, fileNameLower);
+                if (descriptorHits > 0)
                 {
-                    score += 0.3;
-                    reasons.Add("Filename pattern match");
+                    var ratio = descriptorHits / Math.Max(1.0, snapshot.DescriptorHints.Length);
+                    score += DescriptorWeight * Math.Min(1.0, ratio);
+                    reasons.Add($"Descriptor hints matched {descriptorHits}/{snapshot.DescriptorHints.Length}");
                 }
             }
 
-            if (snapshot.KeywordsLower.Length > 0 && textLower.Length > 0)
+            if (snapshot.SignalPhrases.Length > 0)
             {
-                maxScore += 0.3;
-                var matches = snapshot.KeywordsLower.Count(keyword => textLower.Contains(keyword));
-                if (matches > 0)
+                maxScore += SignalWeight;
+                var signalHits = CountPhraseHits(snapshot.SignalPhrases, textLower, fileNameLower);
+                if (signalHits > 0)
                 {
-                    score += 0.3 * (matches / Math.Max(1.0, snapshot.KeywordsLower.Length));
-                    reasons.Add($"Matched {matches} keyword(s)");
+                    var ratio = signalHits / Math.Max(1.0, snapshot.SignalPhrases.Length);
+                    score += SignalWeight * Math.Min(1.0, ratio);
+                    reasons.Add($"Signal phrases matched {signalHits}");
                 }
             }
 
             if (snapshot.ExpectedPageCountMin.HasValue || snapshot.ExpectedPageCountMax.HasValue)
             {
-                maxScore += 0.2;
+                maxScore += PageWeight;
                 var inRange =
                     (!snapshot.ExpectedPageCountMin.HasValue || document.PageCount >= snapshot.ExpectedPageCountMin.Value) &&
                     (!snapshot.ExpectedPageCountMax.HasValue || document.PageCount <= snapshot.ExpectedPageCountMax.Value);
                 if (inRange)
                 {
-                    score += 0.2;
+                    score += PageWeight;
                     reasons.Add("Page count within expected range");
                 }
             }
 
             if (snapshot.MimeTypesLower.Length > 0 && !string.IsNullOrWhiteSpace(mediaLower))
             {
-                maxScore += 0.2;
+                maxScore += MimeWeight;
                 if (snapshot.MimeTypesLower.Any(m => string.Equals(m, mediaLower, StringComparison.OrdinalIgnoreCase)))
                 {
-                    score += 0.2;
-                    reasons.Add("Mime type match");
+                    score += MimeWeight;
+                    reasons.Add("MIME type match");
                 }
             }
 
@@ -279,6 +303,70 @@ public sealed class DocumentClassifier : IDocumentClassifier
         }
     }
 
+    private static string NormalizeContent(string content)
+    {
+        if (string.IsNullOrWhiteSpace(content))
+        {
+            return string.Empty;
+        }
+
+        return content.ToLowerInvariant();
+    }
+
+    private static string NormalizeFileName(string? fileName)
+    {
+        if (string.IsNullOrWhiteSpace(fileName))
+        {
+            return string.Empty;
+        }
+
+        var lowered = fileName.ToLowerInvariant();
+        return lowered
+            .Replace("_", " ", StringComparison.Ordinal)
+            .Replace("-", " ", StringComparison.Ordinal)
+            .Replace(".", " ", StringComparison.Ordinal);
+    }
+
+    private static string NormalizePhrase(string phrase)
+    {
+        if (string.IsNullOrWhiteSpace(phrase))
+        {
+            return string.Empty;
+        }
+
+        var tokens = phrase
+            .ToLowerInvariant()
+            .Split(new[] { ' ', '\t', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+
+        return string.Join(' ', tokens);
+    }
+
+    private static int CountPhraseHits(string[] phrases, string textLower, string fileNameLower)
+    {
+        if (phrases.Length == 0)
+        {
+            return 0;
+        }
+
+        var hits = 0;
+
+        foreach (var phrase in phrases)
+        {
+            if (phrase.Length == 0)
+            {
+                continue;
+            }
+
+            if ((textLower.Length > 0 && textLower.Contains(phrase, StringComparison.Ordinal)) ||
+                (fileNameLower.Length > 0 && fileNameLower.Contains(phrase, StringComparison.Ordinal)))
+            {
+                hits++;
+            }
+        }
+
+        return hits;
+    }
+
     private SourceTypeSnapshot GetSnapshot(SourceType type)
     {
         return _snapshots.AddOrUpdate(
@@ -291,24 +379,30 @@ public sealed class DocumentClassifier : IDocumentClassifier
 
     private static SourceTypeSnapshot CreateSnapshot(SourceType type)
     {
-        var patterns = type.FilenamePatterns
-            .Select(pattern => new Regex(pattern, RegexOptions.IgnoreCase | RegexOptions.Compiled))
+        var descriptors = type.DescriptorHints
+            .Select(NormalizePhrase)
+            .Where(value => value.Length > 0)
+            .Distinct(StringComparer.Ordinal)
             .ToArray();
 
-        var keywords = type.Keywords
-            .Select(keyword => keyword.ToLowerInvariant())
+        var signals = type.SignalPhrases
+            .Select(NormalizePhrase)
+            .Where(value => value.Length > 0)
+            .Distinct(StringComparer.Ordinal)
             .ToArray();
 
         var mimeTypes = type.MimeTypes
             .Select(m => m.ToLowerInvariant())
+            .Distinct(StringComparer.Ordinal)
             .ToArray();
 
         return new SourceTypeSnapshot(
             type.Version,
             type.UpdatedAt,
-            patterns,
-            keywords,
+            descriptors,
+            signals,
             mimeTypes,
+            type.SupportsManualSelection,
             type.ExpectedPageCountMin,
             type.ExpectedPageCountMax);
     }
@@ -330,9 +424,9 @@ public sealed class DocumentClassifier : IDocumentClassifier
         {
             var builder = new StringBuilder();
             builder.Append(type.Name).Append(". ").Append(type.Description);
-            if (type.Keywords.Count > 0)
+            if (type.SignalPhrases.Count > 0)
             {
-                builder.Append(" Keywords: ").Append(string.Join(", ", type.Keywords));
+                builder.Append(" Signal phrases: ").Append(string.Join(", ", type.SignalPhrases));
             }
 
             var newEmbedding = await Ai.Embed(builder.ToString(), ct).ConfigureAwait(false);

@@ -9,9 +9,9 @@ public sealed class SourceType : Entity<SourceType>
     public int Version { get; set; } = 1;
 
     public List<string> Tags { get; set; } = new();
-    public List<string> Descriptors { get; set; } = new();
-    public List<string> FilenamePatterns { get; set; } = new();
-    public List<string> Keywords { get; set; } = new();
+    public List<string> DescriptorHints { get; set; } = new();
+    public List<string> SignalPhrases { get; set; } = new();
+    public bool SupportsManualSelection { get; set; } = true;
     public int? ExpectedPageCountMin { get; set; }
         = null;
     public int? ExpectedPageCountMax { get; set; }

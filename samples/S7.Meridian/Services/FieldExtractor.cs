@@ -315,9 +315,9 @@ public sealed class FieldExtractor : IFieldExtractor
             keywords.AddRange(pipeline.RequiredSourceTypes);
         }
 
-        keywords.AddRange(sourceTypes.SelectMany(type => type.Keywords ?? new List<string>()));
+    keywords.AddRange(sourceTypes.SelectMany(type => type.SignalPhrases ?? new List<string>()));
         keywords.AddRange(sourceTypes.SelectMany(type => type.Tags ?? new List<string>()));
-        keywords.AddRange(sourceTypes.SelectMany(type => type.Descriptors ?? new List<string>()));
+    keywords.AddRange(sourceTypes.SelectMany(type => type.DescriptorHints ?? new List<string>()));
 
         var normalized = keywords
             .Where(value => !string.IsNullOrWhiteSpace(value))

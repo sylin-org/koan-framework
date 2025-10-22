@@ -1,0 +1,6 @@
+Customer Technical Bulletin - October 2025
+Arcadia Systems announces Atlas 4.2 with expanded telemetry sharing and a guided onboarding assistant.
+Highlights:
+- Early access program opens 2025-11-01 for retail clients.
+- Dedicated success engineer Camila Torres assigned to top-tier customers.
+- Webinar series scheduled with regional partner NovaBridge to demonstrate integration playbooks.

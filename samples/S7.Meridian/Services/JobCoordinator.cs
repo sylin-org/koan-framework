@@ -31,6 +31,26 @@ public sealed class JobCoordinator : IJobCoordinator
             .Distinct(StringComparer.Ordinal)
             .ToList();
 
+        var existing = await ProcessingJob.FindPendingAsync(pipelineId, ct).ConfigureAwait(false);
+        if (existing is not null)
+        {
+            var beforeCount = existing.DocumentIds.Count;
+            var merged = existing.MergeDocuments(ids);
+            if (merged)
+            {
+                var added = existing.DocumentIds.Count - beforeCount;
+                existing.HeartbeatAt = DateTime.UtcNow;
+                await existing.Save(ct).ConfigureAwait(false);
+                _logger.LogInformation("Appended {Added} documents to existing job {JobId} for pipeline {PipelineId}.", added, existing.Id, pipelineId);
+            }
+            else
+            {
+                _logger.LogDebug("Reusing existing job {JobId} for pipeline {PipelineId}; no new documents detected.", existing.Id, pipelineId);
+            }
+
+            return existing;
+        }
+
         var job = new ProcessingJob
         {
             PipelineId = pipelineId,
@@ -47,7 +67,7 @@ public sealed class JobCoordinator : IJobCoordinator
             throw new InvalidOperationException("Cannot schedule a job without documents.");
         }
 
-        await job.Save(ct);
+        await job.Save(ct).ConfigureAwait(false);
         _logger.LogInformation("Scheduled job {JobId} for pipeline {PipelineId} with {DocumentCount} documents.", job.Id, pipelineId, job.DocumentIds.Count);
         return job;
     }

@@ -8,6 +8,7 @@ using Koan.Samples.Meridian.Contracts;
 using Koan.Samples.Meridian.Infrastructure;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 namespace Koan.Samples.Meridian.Services;
@@ -107,9 +108,14 @@ public sealed class AnalysisTypeAuthoringService : IAnalysisTypeAuthoringService
         builder.AppendLine("  \"tags\": [\"string\"],");
         builder.AppendLine("  \"descriptors\": [\"string\"],");
         builder.AppendLine("  \"instructions\": \"string\",");
+        builder.AppendLine("  \"outputFields\": [\"fieldName1\", \"fieldName2\", \"fieldName3\"],");
         builder.AppendLine("  \"outputTemplate\": \"string\",");
         builder.AppendLine("  \"requiredSourceTypes\": [\"string\"]");
         builder.AppendLine("}");
+        builder.AppendLine();
+        builder.AppendLine("CRITICAL: Define 3-7 output field names in outputFields that capture the analysis goal.");
+        builder.AppendLine("Use Mustache syntax {{fieldName}} in outputTemplate matching the field names exactly.");
+        builder.AppendLine("Field names should be camelCase without special characters.");
         builder.AppendLine();
         builder.Append("Analysis goal: ").AppendLine(request.Goal.Trim());
 
@@ -132,6 +138,7 @@ public sealed class AnalysisTypeAuthoringService : IAnalysisTypeAuthoringService
             builder.Append("Additional context: ").AppendLine(request.AdditionalContext.Trim());
         }
 
+        builder.AppendLine();
         builder.AppendLine("Provide concise instructions suitable for prompt injection into an LLM.");
         return builder.ToString();
     }
@@ -141,12 +148,18 @@ public sealed class AnalysisTypeAuthoringService : IAnalysisTypeAuthoringService
         try
         {
             var json = JObject.Parse(rawResponse);
+            
+            // Parse output fields and build simple schema
+            var outputFields = ExtractArray(json["outputFields"]);
+            var schemaJson = BuildSchemaFromFields(outputFields);
+            
             var draft = new AnalysisTypeDraft
             {
                 Name = json["name"]?.Value<string>()?.Trim() ?? string.Empty,
                 Description = json["description"]?.Value<string>()?.Trim() ?? string.Empty,
                 Instructions = json["instructions"]?.Value<string>()?.Trim() ?? string.Empty,
                 OutputTemplate = json["outputTemplate"]?.Value<string>()?.Trim() ?? string.Empty,
+                OutputSchemaJson = schemaJson,
                 Tags = ExtractArray(json["tags"]),
                 Descriptors = ExtractArray(json["descriptors"]),
                 RequiredSourceTypes = ExtractArray(json["requiredSourceTypes"])
@@ -177,12 +190,35 @@ public sealed class AnalysisTypeAuthoringService : IAnalysisTypeAuthoringService
             .ToList();
     }
 
+    private static string BuildSchemaFromFields(List<string> fields)
+    {
+        if (fields.Count == 0)
+        {
+            return "{\"type\":\"object\",\"properties\":{}}";
+        }
+
+        var schema = new JObject
+        {
+            ["type"] = "object",
+            ["properties"] = new JObject()
+        };
+
+        var properties = (JObject)schema["properties"]!;
+        foreach (var field in fields)
+        {
+            properties[field] = new JObject { ["type"] = "string" };
+        }
+
+        return schema.ToString(Formatting.None);
+    }
+
     private static void SanitizeDraft(AnalysisTypeDraft draft, List<string> warnings)
     {
         draft.Name = draft.Name.Truncate(128);
         draft.Description = draft.Description.Truncate(512);
         draft.Instructions = draft.Instructions.Truncate(2000);
         draft.OutputTemplate = draft.OutputTemplate.Truncate(4000);
+        draft.OutputSchemaJson = draft.OutputSchemaJson?.Truncate(8000) ?? string.Empty;
 
         draft.Tags = draft.Tags
             .Where(value => !string.IsNullOrWhiteSpace(value))
@@ -215,6 +251,12 @@ public sealed class AnalysisTypeAuthoringService : IAnalysisTypeAuthoringService
         {
             warnings.Add("AI response did not include an output template; default template applied.");
             draft.OutputTemplate = "# Executive Summary\n\n## Findings\n- {{finding}}\n";
+        }
+        
+        if (string.IsNullOrWhiteSpace(draft.OutputSchemaJson))
+        {
+            warnings.Add("AI response did not include output fields; default schema applied.");
+            draft.OutputSchemaJson = "{\"type\":\"object\",\"properties\":{\"summary\":{\"type\":\"string\"}}}";
         }
     }
 

@@ -18,7 +18,7 @@ public sealed class FieldExtractorSchemaTests
 
     public FieldExtractorSchemaTests()
     {
-        _extractor = new FieldExtractor(NullLogger<FieldExtractor>.Instance, new InMemoryEmbeddingCache());
+        _extractor = new FieldExtractor(NullLogger<FieldExtractor>.Instance, new InMemoryEmbeddingCache(), new NoOpRunLogWriter());
     }
 
     [Theory]
@@ -110,5 +110,11 @@ public sealed class FieldExtractorSchemaTests
 
         private static string Key(string hash, string model, string entity)
             => $"{entity}:{model}:{hash}";
+    }
+
+    private sealed class NoOpRunLogWriter : IRunLogWriter
+    {
+        public Task AppendAsync(RunLog log, CancellationToken ct)
+            => Task.CompletedTask;
     }
 }
