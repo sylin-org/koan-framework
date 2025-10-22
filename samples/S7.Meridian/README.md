@@ -36,6 +36,8 @@ A local-first document intelligence workbench that transforms mixed source files
 - **Pipeline orchestration**: Canon phases (Validation → Enrichment)
 - **Error handling**: Retry logic, partial failures, recovery
 - **Observability**: Structured logging, metrics, phase tracking
+- **Versioned deliverables**: Each run snapshots hashed canonical data + evidence maps, rendering templated Markdown/JSON on demand
+- **Incremental refresh**: Targeted field re-extraction with job heartbeats and approval preservation
 
 ---
 
@@ -69,25 +71,54 @@ A local-first document intelligence workbench that transforms mixed source files
 ### Prerequisites
 
 - .NET 10 SDK
-- Docker Desktop (for MongoDB, Weaviate, Ollama)
+- Docker Desktop (for MongoDB, Weaviate, Ollama, and OCR containers)
 - Optional: set `WEAVIATE_ENDPOINT` to reuse an existing Weaviate instance (defaults to the Koan test fixture)
 - 16GB RAM minimum (for local LLMs)
 
 ### Run the Sample
 
-```bash
+**Windows**
+
+```powershell
 cd samples/S7.Meridian
-./start.bat  # Windows
-# or
-./start.sh   # Linux/Mac
+.\start.bat
 ```
 
-This will:
-1. Start containers (MongoDB, Weaviate, Ollama via Compose)
-2. Pull recommended Ollama models
-3. Seed sample types (Vendor Assessment, RFP Response)
-4. Run self-test
-5. Open browser to http://localhost:5104
+**macOS / Linux**
+
+```bash
+cd samples/S7.Meridian
+mkdir -p storage
+docker compose -p koan-s7-meridian -f docker/compose.yml up -d --build
+```
+
+The Windows script and the `docker compose` command both:
+- Build and start the full Meridian stack (MongoDB, Pandoc renderer, Tesseract OCR, ASP.NET API)
+- Expose the API at `http://localhost:5080`
+- Make Swagger UI available at `http://localhost:5080/swagger/index.html`
+
+To stop everything:
+
+```bash
+docker compose -p koan-s7-meridian -f docker/compose.yml down
+```
+
+### Phase 4.5 Scenario Automation
+
+With the API running, Phase 4.5 includes scripted journeys that exercise the AI-assisted authoring and override flows end-to-end.
+
+```powershell
+cd samples/S7.Meridian/scripts/phase4.5
+pwsh ./ScenarioA-EnterpriseArchitecture.ps1 [-BaseUrl http://localhost:5080] [-SkipCertificateCheck]
+```
+
+- **Scenario A - Enterprise Architecture Review**: generates four SourceTypes and one AnalysisType via AI assists, uploads Arcadia Systems sample documents, and runs a full pipeline.
+- **Scenario B - Manual Override**: demonstrates applying and clearing a single-field override.
+- **Scenario C - Targeted Refresh**: uploads an incremental document and triggers the refresh planner.
+- **Scenario D - Override Persistence**: shows override values surviving refresh operations.
+- **Scenario E - Override Reversion**: removes an override and validates the AI value is restored.
+
+Each script writes resulting Markdown deliverables to `scripts/phase4.5/output`. Adjust `-BaseUrl` if you expose the API elsewhere or run behind HTTPS with an untrusted certificate.
 
 ### Validate Vector Workflows
 
@@ -107,7 +138,7 @@ dotnet test tests/Suites/Data/S7.Meridian/Koan.Data.S7.Meridian.Tests/ -c Releas
 
 1. **Choose deliverable type**: "Vendor Assessment"
 2. **Add context**: "Prioritize Q3 2024 data"
-3. **Upload files**: Drag PDFs (auto-classified)
+3. **Upload files**: Drag one or many PDFs in a single request (auto-classified)
 4. **Process**: Watch pipeline stages
 5. **Review**: Resolve conflicts with evidence drawer
 6. **Finalize**: Download PDF with citations
@@ -546,6 +577,68 @@ All data sourced from:
 
 ---
 
+#### OCR Fallback Configuration
+
+Set `Meridian:Extraction:Ocr` to point the pipeline at the OCR sidecar. The compose stack exposes the service internally at `http://meridian-tesseract:8884/tesseract` (and maps it to `http://localhost:6060/tesseract` on the host).
+
+```json
+{
+  "Meridian": {
+    "Extraction": {
+      "Ocr": {
+        "Enabled": true,
+        "BaseUrl": "http://meridian-tesseract:8884/",
+        "Endpoint": "tesseract",
+        "TimeoutSeconds": 90,
+        "ConfidenceFloor": 0.6
+      }
+    }
+  }
+}
+```
+
+#### Pandoc Renderer Configuration
+
+Set `Meridian:Rendering:Pandoc` to the HTTP base address exposed by the Pandoc sidecar (`docker compose -f docker-compose.pandoc.yml up -d`).
+
+```json
+{
+  "Meridian": {
+    "Rendering": {
+      "Pandoc": {
+        "Enabled": true,
+        "BaseUrl": "http://localhost:7070/",
+        "Endpoint": "render",
+        "TimeoutSeconds": 240,
+        "SanitizeLatex": true
+      }
+    }
+  }
+}
+```
+
+### Narrative Rendering API
+
+Deliverables now expose templated outputs directly:
+
+| Method | Route | Description |
+| ------ | ----- | ----------- |
+| `GET` | `/api/pipelines/{pipelineId}/deliverables/latest` | Returns the most recent persisted deliverable entity. |
+| `GET` | `/api/pipelines/{pipelineId}/deliverables/markdown` | Renders the latest deliverable markdown on demand using the current template + formatted payload. |
+| `GET` | `/api/pipelines/{pipelineId}/deliverables/json` | Returns the canonical JSON payload (`fields` section) for the latest deliverable. |
+| `GET` | `/api/pipelines/{pipelineId}/deliverables/pdf` | Streams a PDF rendered through the Pandoc sidecar using the current template. |
+
+### Run Log Telemetry
+
+`RunLog` entries now capture pipeline, document, and AI metadata for every stage. Each entry includes:
+
+- `documentId` when applicable (extraction and classification stages)
+- `promptHash`, `modelId`, and token estimates for field extractions
+- Retrieval context (`topK`, `alpha`, `passageIds`)
+- Detailed metadata (confidence, schema validation status, rejection reason)
+
+Use these records to trace long-running pipelines, compare prompt revisions, and surface diagnostics in dashboards.
+
 ## Key Patterns Demonstrated
 
 ### 1. **Content-Addressed Storage** (S6.SnapVault Pattern)
@@ -982,3 +1075,4 @@ See main repository CONTRIBUTING.md for details.
 **Status**: Proposed (Week 1-6 implementation plan)
 **Complexity**: ⭐⭐ Intermediate
 **Key Capabilities**: AI integration, Canon pipelines, document intelligence, evidence tracking
+

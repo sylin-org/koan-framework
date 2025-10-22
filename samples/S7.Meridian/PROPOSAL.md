@@ -1403,181 +1403,110 @@ public class PassageChunker : IPassageChunker
 ```
 
 **Document Classification Service (Cascade Pattern)**
-```csharp
-public class DocumentClassifier : IDocumentClassifier
-{
-    public async Task<(string typeId, double confidence, ClassificationMethod method)> ClassifyAsync(
-        SourceDocument doc,
-        CancellationToken ct)
-    {
-        // Cascade: Heuristic → Vector → LLM (fastest → slowest)
+- Stage 1: Heuristic rules (filename patterns, keywords, MIME type, page counts) - accept when confidence ≥0.9.
+- Stage 2: Vector similarity (embed preview, compare to cached SourceType vectors) - accept when cosine similarity ≥0.75.
+- Stage 3: LLM fallback (prompt with SourceType catalog, parse {typeId, confidence, reasoning}) - default to confidence 0.3 if parsing fails.
+- Persist ClassifiedTypeId, ClassifiedTypeVersion, ClassificationConfidence, ClassificationMethod, and reasoning.
+## Usage Scenario Story Scripts
 
-        // Stage 1: Heuristic classification (fast, high precision)
-        var heuristicResult = await TryHeuristicClassification(doc, ct);
-        if (heuristicResult.HasValue && heuristicResult.Value.confidence > 0.9)
-        {
-            return heuristicResult.Value;
-        }
+### Scenario A - Enterprise Architecture Review (Script: scripts/phase4.5/ScenarioA-EnterpriseArchitecture.ps1)
+**Story**: Arcadia Systems is preparing an enterprise architecture review for Synapse Analytics. The operator asks the AI assistants to design SourceTypes for meeting notes, customer bulletins, vendor questionnaires, and cybersecurity assessments, then composes an Enterprise Architecture Review AnalysisType. Four textual documents capture CIO Dana Wright's steering committee notes, a customer bulletin, a vendor prescreen questionnaire, and a cybersecurity risk assessment. The pipeline must weave these narratives into a single deliverable that surfaces the fictional company names, dates, and action items.
 
-        // Stage 2: Vector similarity (medium speed, good recall)
-        var vectorResult = await TryVectorClassification(doc, ct);
-        if (vectorResult.HasValue && vectorResult.Value.confidence > 0.75)
-        {
-            return vectorResult.Value;
-        }
+**Flow**:
+1. Use `/api/sourcetypes/ai-suggest` to generate SourceTypes for each document class, persisting the drafts via `POST /api/sourcetypes`.
+2. Call `/api/analysistypes/ai-suggest` to create the "Enterprise Architecture Review" AnalysisType with Markdown template and required source tags.
+3. Create a pipeline referencing the AnalysisType, supplying JSON schema fragments for revenue, staffing, notes, and security findings.
+4. Upload the four narrative `.txt` files and wait for ingestion jobs to complete.
+5. Retrieve the deliverable Markdown and confirm the output references Arcadia, Synapse Analytics, the steering committee decisions, and security remediation timelines.
 
-        // Stage 3: LLM classification (slow, highest accuracy)
-        return await LLMClassification(doc, ct);
-    }
+**Desirability**:
+- Proves the AI-assisted authoring experience yields high-signal templates without manual scaffolding.
+- Exercises a full cross-source narrative, validating that story details propagate into the rendered deliverable.
 
-    private async Task<(string typeId, double confidence, ClassificationMethod method)?>
-        TryHeuristicClassification(SourceDocument doc, CancellationToken ct)
-    {
-        var allTypes = await SourceType.All(ct);
+**Feasibility**:
+- Backed by `SourceTypeAuthoringService` and `AnalysisTypeAuthoringService` hitting the local Ollama instance.
+- Scenario script orchestrates only public REST APIs (`EntityController<T>` CRUD + `ai-suggest`) and requires no privileged operations.
 
-        foreach (var type in allTypes)
-        {
-            var score = 0.0;
-            var maxScore = 0.0;
+### Scenario B - Single-Field Manual Override (Script: scripts/phase4.5/ScenarioB-ManualOverride.ps1)
+**Flow**:
+1. Generate SourceTypes and an AnalysisType via AI assists, then create a lightweight pipeline.
+2. Upload two documents to produce a baseline deliverable.
+3. Apply a revenue override through `POST /api/pipelines/{id}/fields/{fieldPath}/override` with reviewer metadata.
+4. Fetch the deliverable to confirm the override value surfaces and audit metadata is present.
+5. Remove the override (`DELETE .../override`) and ensure the deliverable reverts to the AI-derived value.
 
-            // Check filename patterns
-            if (type.FilenamePatterns.Count > 0)
-            {
-                maxScore += 0.3;
-                foreach (var pattern in type.FilenamePatterns)
-                {
-                    if (Regex.IsMatch(doc.OriginalFileName, pattern, RegexOptions.IgnoreCase))
-                    {
-                        score += 0.3;
-                        break;
-                    }
-                }
-            }
+**Desirability**: Demonstrates reviewers can correct isolated fields without rerunning extraction, covering a core governance story.
 
-            // Check keywords presence
-            if (type.Keywords.Count > 0)
-            {
-                maxScore += 0.3;
-                var matchedKeywords = type.Keywords.Count(kw =>
-                    doc.ExtractedText.Contains(kw, StringComparison.OrdinalIgnoreCase));
-                score += 0.3 * (matchedKeywords / (double)type.Keywords.Count);
-            }
+**Feasibility**: Uses the new `PipelineOverridesController`; data model already supports override metadata, so no additional infrastructure is needed.
 
-            // Check page count range
-            if (type.ExpectedPageCountMin.HasValue || type.ExpectedPageCountMax.HasValue)
-            {
-                maxScore += 0.2;
-                var inRange = (!type.ExpectedPageCountMin.HasValue || doc.PageCount >= type.ExpectedPageCountMin.Value) &&
-                              (!type.ExpectedPageCountMax.HasValue || doc.PageCount <= type.ExpectedPageCountMax.Value);
-                if (inRange) score += 0.2;
-            }
+### Scenario C - Targeted Incremental Refresh (Script: scripts/phase4.5/ScenarioC-TargetedRefresh.ps1)
+**Flow**:
+1. Baseline the pipeline with two documents, recording the initial deliverable.
+2. Upload an addendum document that changes revenue and staffing projections.
+3. Trigger the refresh planner (`POST /api/pipelines/{id}/refresh`).
+4. Wait for the refresh job, then verify only impacted fields were reprocessed and logs reference incremental work.
+5. Persist the new deliverable and compare to baseline to confirm targeted updates.
 
-            // Check MIME type
-            if (type.MimeTypes.Count > 0)
-            {
-                maxScore += 0.2;
-                if (type.MimeTypes.Contains(doc.MimeType))
-                {
-                    score += 0.2;
-                }
-            }
+**Desirability**: Validates that Phase 4 refresh logic can respond to incremental evidence without rebuilding the entire pipeline.
 
-            if (maxScore > 0)
-            {
-                var confidence = score / maxScore;
-                if (confidence > 0.9)
-                {
-                    return (type.Id, confidence, ClassificationMethod.Heuristic);
-                }
-            }
-        }
+**Feasibility**: Leverages `PipelineRefreshController`; planner hooks are already wired in `PipelineProcessor`.
 
-        return null; // No high-confidence heuristic match
-    }
+### Scenario D - Override Persistence Through Refresh (Script: scripts/phase4.5/ScenarioD-OverridePersistence.ps1)
+**Flow**:
+1. Create the baseline pipeline and apply a revenue override.
+2. Upload a new vendor update document introducing conflicting revenue.
+3. Invoke the refresh API and wait for completion.
+4. Retrieve the deliverable to confirm the override value persists and audit metadata records the refresh.
 
-    private async Task<(string typeId, double confidence, ClassificationMethod method)?>
-        TryVectorClassification(SourceDocument doc, CancellationToken ct)
-    {
-        // Embed first 1000 characters of document
-        var preview = doc.ExtractedText.Length > 1000
-            ? doc.ExtractedText.Substring(0, 1000)
-            : doc.ExtractedText;
+**Desirability**: Ensures analysts can lock critical values without losing them during reprocessing cycles.
 
-        var docEmbedding = await Koan.AI.Ai.Embed(preview, ct);
+**Feasibility**: Built on the override model plus refresh workflow, no extra dependencies required.
 
-        // Ensure type embeddings are refreshed for current version
-        var allTypes = await SourceType.All(ct);
-        foreach (var type in allTypes)
-        {
-            await type.EnsureTypeEmbeddingAsync(Koan.AI.Ai.Embed, ct);
-        }
+### Scenario E - Override Reversion (Script: scripts/phase4.5/ScenarioE-OverrideReversion.ps1)
+**Flow**:
+1. Apply a staffing override after baseline processing.
+2. Remove the override using the DELETE endpoint.
+3. Run the refresh planner to recompute the field using AI evidence.
+4. Verify the final deliverable reflects the AI value and override audit trail shows add/remove lifecycle.
 
-        // Compare to SourceType embeddings
-        var bestMatch = allTypes
-            .Where(t => t.TypeEmbedding != null)
-            .Select(t => (
-                typeId: t.Id,
-                similarity: CosineSimilarity(docEmbedding, t.TypeEmbedding!)
-            ))
-            .OrderByDescending(x => x.similarity)
-            .FirstOrDefault();
+**Desirability**: Shows governance teams can unwind overrides confidently, with documentation.
 
-        if (bestMatch.similarity > 0.75)
-        {
-            return (bestMatch.typeId, bestMatch.similarity, ClassificationMethod.Vector);
-        }
+**Feasibility**: Uses the same override and refresh endpoints already implemented for Scenarios B-D.
 
-        return null;
-    }
+### Source & Analysis Type Authoring (Phase 4.5)
 
-    private async Task<(string typeId, double confidence, ClassificationMethod method)>
-        LLMClassification(SourceDocument doc, CancellationToken ct)
-    {
-        var allTypes = await SourceType.All(ct);
+#### SourceType Enhancements
+- **Model** (`SourceType : Entity<SourceType>`)
+  - `Name`, `Description`, `Version`
+  - `Tags[]`, `Descriptors[]`
+  - `FilenamePatterns[]`, `Keywords[]`, `MimeTypes[]`, `ExpectedPageCountMin/Max`
+  - `FieldQueries{ fieldPath -> retrieval hint }`
+  - `Instructions` (additional classifier/extractor guidance)
+  - `OutputTemplate` (expected structured output)
+  - Embedding metadata (existing fields retained)
+- **Controller**: `SourceTypesController : EntityController<SourceType>` (CRUD, query)
+- **AI Assist**: `POST /api/sourcetypes/ai-suggest`
+  - Request: seed document text + optional hints.
+  - Response: draft SourceType payload (client reviews then persists via CRUD).
+  - Validation: sanitize regex/templates, ensure instructions non-empty.
+- **Contract**: Classifier refuses to run if referenced SourceType missing.
 
-        var prompt = $@"Classify the following document into one of these types:
+#### AnalysisType Catalog
+- **Model** (`AnalysisType : Entity<AnalysisType>`)
+  - `Name`, `Description`, `Version`
+  - `Tags[]`, `Descriptors[]`
+  - `Instructions` (synthesis prompt), `OutputTemplate`
+  - `RequiredSourceTypes[]` (optional gating)
+- **Controller**: `AnalysisTypesController : EntityController<AnalysisType>`
+- **AI Assist**: `POST /api/analysistypes/ai-suggest`
+  - Request: analysis brief (goal, audience, inputs).
+  - Response: suggested AnalysisType (instructions/output template/tags).
+- **Constraints**:
+  - Document AI processing must reference an existing SourceType.
+  - Analysis synthesis must reference an existing AnalysisType.
+  - Audit log records AI-assisted suggestion metadata.
 
-{string.Join("\n", allTypes.Select(t => $"- {t.Name}: {t.Description}"))}
-
-Document preview (first 500 chars):
-{doc.ExtractedText.Substring(0, Math.Min(500, doc.ExtractedText.Length))}
-
-Filename: {doc.OriginalFileName}
-Page count: {doc.PageCount}
-
-Respond in JSON:
-{{
-  ""typeId"": ""<type ID>"",
-  ""typeName"": ""<type name>"",
-  ""confidence"": <0.0-1.0>,
-  ""reasoning"": ""<brief explanation>""
-}}";
-
-        var response = await Koan.AI.Ai.Complete(prompt, ct);
-        var result = JObject.Parse(response);
-
-        var typeId = result["typeId"]?.Value<string>() ?? allTypes.First().Id;
-        var confidence = result["confidence"]?.Value<double>() ?? 0.5;
-
-        return (typeId, confidence, ClassificationMethod.LLM);
-    }
-
-    private double CosineSimilarity(float[] a, float[] b)
-    {
-        if (a.Length != b.Length) return 0.0;
-
-        double dot = 0.0, magA = 0.0, magB = 0.0;
-        for (int i = 0; i < a.Length; i++)
-        {
-            dot += a[i] * b[i];
-            magA += a[i] * a[i];
-            magB += b[i] * b[i];
-        }
-
-        return dot / (Math.Sqrt(magA) * Math.Sqrt(magB));
-    }
-}
-```
+Open items: template seeding, UX confirmation flow, prompt hardening, unit/integration tests for AI assist endpoints.
 
 **Security Hygiene & Upload Validation**
 ```csharp
@@ -4718,7 +4647,7 @@ Then run: `sudo update-texmf`
 - [ ] Type versions pinned on `DocumentPipeline` creation
 - [ ] `Deliverable.DataHash` computed from canonical JSON
 - [ ] `Deliverable.TemplateMdHash` computed from template
-- [ ] `RunLog` entries capture prompt hash + passage IDs
+- [x] `RunLog` entries capture prompt hash + passage IDs
 - [ ] Merge decisions stable across identical inputs
 
 ✅ **Determinism**
@@ -4756,7 +4685,7 @@ Then run: `sudo update-texmf`
 - [ ] Classification metadata cached in-memory
 
 ✅ **Observability**
-- [ ] `RunLog` entries for each stage (extraction, merge, render)
+- [x] `RunLog` entries for each stage (extraction, merge, render)
 - [ ] Quality metrics dashboard (coverage, citations, conflicts)
 - [ ] Stale-job recovery tested (chaos test: kill worker mid-run)
 
@@ -4880,3 +4809,5 @@ Then run: `sudo update-texmf`
 16. ✅ Comprehensive acceptance criteria with 6 key tests
 
 **Total Lines**: 4400+ (production-locked specification with full implementation details)
+
+

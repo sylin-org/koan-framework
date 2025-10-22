@@ -1,0 +1,9 @@
+version: "3.9"
+services:
+  pandoc:
+    build: ./containers/pandoc
+    ports:
+      - "7070:7070"
+    environment:
+      - UVICORN_WORKERS=1
+    restart: unless-stopped
