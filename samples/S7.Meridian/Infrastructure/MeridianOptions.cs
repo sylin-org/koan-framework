@@ -56,10 +56,10 @@ public sealed class OcrOptions
     public bool Enabled { get; set; } = true;
 
     /// <summary>Base URL of the Tesseract OCR container.</summary>
-    public string BaseUrl { get; set; } = "http://localhost:6060/";
+    public string BaseUrl { get; set; } = "http://meridian-tesseract:8884/";
 
     /// <summary>Relative endpoint to invoke for OCR extraction.</summary>
-    public string Endpoint { get; set; } = "ocr";
+    public string Endpoint { get; set; } = "tesseract";
 
     /// <summary>Request timeout (seconds) when calling the OCR container.</summary>
     public int TimeoutSeconds { get; set; } = 90;
@@ -177,7 +177,7 @@ public sealed class PandocOptions
     public bool Enabled { get; set; } = true;
 
     /// <summary>Base URL of the Pandoc rendering container.</summary>
-    public string BaseUrl { get; set; } = "http://localhost:7070/";
+    public string BaseUrl { get; set; } = "http://meridian-pandoc:7070/";
 
     /// <summary>Endpoint path for rendering requests.</summary>
     public string Endpoint { get; set; } = "render";

@@ -58,6 +58,18 @@ public sealed class PipelineProcessor : IPipelineProcessor
         var pipeline = await DocumentPipeline.Get(job.PipelineId, ct)
             ?? throw new InvalidOperationException($"Pipeline {job.PipelineId} not found.");
 
+        job.TotalDocuments = job.DocumentIds.Count;
+        job.ProcessedDocuments = 0;
+        job.Status = JobStatus.Processing;
+        job.HeartbeatAt = DateTime.UtcNow;
+        await job.Save(ct).ConfigureAwait(false);
+
+        pipeline.TotalDocuments = job.TotalDocuments;
+        pipeline.ProcessedDocuments = 0;
+        pipeline.Status = PipelineStatus.Processing;
+        pipeline.UpdatedAt = DateTime.UtcNow;
+        await pipeline.Save(ct).ConfigureAwait(false);
+
         pipeline.Status = PipelineStatus.Processing;
         pipeline.ProcessedDocuments = 0;
         pipeline.UpdatedAt = DateTime.UtcNow;
@@ -178,7 +190,9 @@ public sealed class PipelineProcessor : IPipelineProcessor
 
             if (!allowed)
             {
-                var requiredList = string.Join(", ", pipeline.RequiredSourceTypes);
+                var requiredList = pipeline.RequiredSourceTypes is { Count: > 0 }
+                    ? string.Join(", ", pipeline.RequiredSourceTypes)
+                    : "(unspecified)";
                 var exclusionReason = $"Classified as {classification.TypeId}, but analysis '{pipeline.AnalysisTypeId}' requires [{requiredList}].";
 
                 _logger.LogWarning("Document {DocumentId} classified as {TypeId} but pipeline {PipelineId} requires [{Required}]; excluding from run.",
@@ -393,5 +407,18 @@ public sealed class PipelineProcessor : IPipelineProcessor
         }
 
         await _merger.MergeAsync(pipeline, mergeCandidates, ct);
+
+        var completedAt = DateTime.UtcNow;
+        pipeline.Status = PipelineStatus.Completed;
+        pipeline.ProcessedDocuments = pipeline.TotalDocuments;
+        pipeline.CompletedAt = completedAt;
+        pipeline.UpdatedAt = completedAt;
+        await pipeline.Save(ct).ConfigureAwait(false);
+
+        job.Status = JobStatus.Completed;
+        job.CompletedAt = completedAt;
+        job.HeartbeatAt = completedAt;
+        job.ProcessedDocuments = job.TotalDocuments;
+        await job.Save(ct).ConfigureAwait(false);
     }
 }

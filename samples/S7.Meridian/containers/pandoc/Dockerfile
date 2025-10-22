@@ -1,11 +1,12 @@
 FROM python:3.11-slim
 
-# Install pinned Pandoc + XeTeX dependencies for deterministic rendering
-RUN apt-get update && apt-get install -y \
-    pandoc=3.1.11-1 \
-    texlive-xetex=2024.20240313-1 \
-    texlive-fonts-recommended=2024.20240313-1 \
-    fonts-dejavu=2.37-6 \
+# Install Pandoc + XeTeX dependencies (use distro-provided versions)
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    pandoc \
+    texlive-xetex \
+    texlive-fonts-recommended \
+    fonts-dejavu \
     && rm -rf /var/lib/apt/lists/*
 
 # Disable LaTeX shell escape

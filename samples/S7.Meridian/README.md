@@ -77,21 +77,48 @@ A local-first document intelligence workbench that transforms mixed source files
 
 ### Run the Sample
 
-```bash
+**Windows**
+
+```powershell
 cd samples/S7.Meridian
-docker compose -f docker-compose.tesseract.yml up -d  # start Tesseract OCR sidecar
-docker compose -f docker-compose.pandoc.yml up -d     # start Pandoc renderer sidecar
-./start.bat  # Windows
-# or
-./start.sh   # Linux/Mac
+.\start.bat
 ```
 
-This will:
-1. Start containers (MongoDB, Weaviate, Ollama via Compose)
-2. Pull recommended Ollama models
-3. Seed sample types (Vendor Assessment, RFP Response)
-4. Run self-test
-5. Open browser to http://localhost:5104
+**macOS / Linux**
+
+```bash
+cd samples/S7.Meridian
+mkdir -p storage
+docker compose -p koan-s7-meridian -f docker/compose.yml up -d --build
+```
+
+The Windows script and the `docker compose` command both:
+- Build and start the full Meridian stack (MongoDB, Pandoc renderer, Tesseract OCR, ASP.NET API)
+- Expose the API at `http://localhost:5080`
+- Make Swagger UI available at `http://localhost:5080/swagger/index.html`
+
+To stop everything:
+
+```bash
+docker compose -p koan-s7-meridian -f docker/compose.yml down
+```
+
+### Phase 4.5 Scenario Automation
+
+With the API running, Phase 4.5 includes scripted journeys that exercise the AI-assisted authoring and override flows end-to-end.
+
+```powershell
+cd samples/S7.Meridian/scripts/phase4.5
+pwsh ./ScenarioA-EnterpriseArchitecture.ps1 [-BaseUrl http://localhost:5080] [-SkipCertificateCheck]
+```
+
+- **Scenario A - Enterprise Architecture Review**: generates four SourceTypes and one AnalysisType via AI assists, uploads Arcadia Systems sample documents, and runs a full pipeline.
+- **Scenario B - Manual Override**: demonstrates applying and clearing a single-field override.
+- **Scenario C - Targeted Refresh**: uploads an incremental document and triggers the refresh planner.
+- **Scenario D - Override Persistence**: shows override values surviving refresh operations.
+- **Scenario E - Override Reversion**: removes an override and validates the AI value is restored.
+
+Each script writes resulting Markdown deliverables to `scripts/phase4.5/output`. Adjust `-BaseUrl` if you expose the API elsewhere or run behind HTTPS with an untrusted certificate.
 
 ### Validate Vector Workflows
 
@@ -552,7 +579,7 @@ All data sourced from:
 
 #### OCR Fallback Configuration
 
-Set `Meridian:Extraction:Ocr` to point the pipeline at the OCR sidecar. The defaults assume `docker compose -f docker-compose.tesseract.yml up -d` has published the service on `http://localhost:6060/ocr`.
+Set `Meridian:Extraction:Ocr` to point the pipeline at the OCR sidecar. The compose stack exposes the service internally at `http://meridian-tesseract:8884/tesseract` (and maps it to `http://localhost:6060/tesseract` on the host).
 
 ```json
 {
@@ -560,8 +587,8 @@ Set `Meridian:Extraction:Ocr` to point the pipeline at the OCR sidecar. The defa
     "Extraction": {
       "Ocr": {
         "Enabled": true,
-        "BaseUrl": "http://localhost:6060/",
-        "Endpoint": "ocr",
+        "BaseUrl": "http://meridian-tesseract:8884/",
+        "Endpoint": "tesseract",
         "TimeoutSeconds": 90,
         "ConfidenceFloor": 0.6
       }
@@ -1048,3 +1075,4 @@ See main repository CONTRIBUTING.md for details.
 **Status**: Proposed (Week 1-6 implementation plan)
 **Complexity**: ⭐⭐ Intermediate
 **Key Capabilities**: AI integration, Canon pipelines, document intelligence, evidence tracking
+

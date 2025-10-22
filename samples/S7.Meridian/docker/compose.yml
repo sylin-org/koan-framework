@@ -1,0 +1,41 @@
+version: "3.9"
+services:
+  meridian-mongo:
+    image: mongo:7
+    container_name: meridian-mongo
+    ports:
+      - "27017:27017"
+    restart: unless-stopped
+
+  meridian-pandoc:
+    build: ../containers/pandoc
+    container_name: meridian-pandoc
+    ports:
+      - "7070:7070"
+    environment:
+      - UVICORN_WORKERS=1
+    restart: unless-stopped
+
+  meridian-tesseract:
+    image: ghcr.io/hertzg/tesseract-server:latest
+    container_name: meridian-tesseract
+    ports:
+      - "6060:8884"
+    restart: unless-stopped
+
+  meridian-api:
+    build:
+      context: ../../..
+      dockerfile: samples/S7.Meridian/Dockerfile
+    container_name: meridian-api
+    depends_on:
+      - meridian-mongo
+      - meridian-pandoc
+      - meridian-tesseract
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+    ports:
+      - "5080:8080"
+    volumes:
+      - ../storage:/app/storage

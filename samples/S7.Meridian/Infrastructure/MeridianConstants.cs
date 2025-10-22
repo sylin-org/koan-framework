@@ -31,6 +31,26 @@ public static class MeridianConstants
         public const string Route = "api/pipelines/{pipelineId}/deliverables";
     }
 
+    public static class DeliverableTypes
+    {
+        public const string Route = "api/deliverabletypes";
+    }
+
+    public static class PipelineOverrides
+    {
+        public const string Route = "api/pipelines/{pipelineId}/fields";
+    }
+
+    public static class PipelineRefresh
+    {
+        public const string Route = "api/pipelines/{pipelineId}/refresh";
+    }
+
+    public static class PipelineQuality
+    {
+        public const string Route = "api/pipelines/{pipelineId}/quality";
+    }
+
     public static class SourceTypeCatalog
     {
         public const string Route = "api/sourcetypes";

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Koan.Samples.Meridian.Models;
 using Koan.Web.Hooks;
 using Microsoft.Extensions.Logging;
@@ -26,22 +27,23 @@ public sealed class DocumentPipelineAnalysisTypeHook : IModelHook<DocumentPipeli
 
     public async Task OnBeforeSaveAsync(HookContext<DocumentPipeline> ctx, DocumentPipeline model)
     {
+        var ct = ctx.Ct;
+        var previous = !string.IsNullOrWhiteSpace(model.Id)
+            ? await DocumentPipeline.Get(model.Id, ct)
+            : null;
+
+        // AnalysisType enforcement
         if (string.IsNullOrWhiteSpace(model.AnalysisTypeId))
         {
             ctx.Warn("AnalysisTypeId is required for Meridian pipelines.");
             throw new InvalidOperationException("AnalysisTypeId is required for Meridian pipelines.");
         }
 
-        var ct = ctx.Ct;
         var analysisType = await AnalysisType.Get(model.AnalysisTypeId, ct);
         if (analysisType is null)
         {
             throw new InvalidOperationException($"AnalysisType '{model.AnalysisTypeId}' was not found.");
         }
-
-        var previous = !string.IsNullOrWhiteSpace(model.Id)
-            ? await DocumentPipeline.Get(model.Id, ct)
-            : null;
 
         var analysisChanged = previous is null ||
                               !string.Equals(previous.AnalysisTypeId, model.AnalysisTypeId, StringComparison.OrdinalIgnoreCase) ||
@@ -56,7 +58,51 @@ public sealed class DocumentPipelineAnalysisTypeHook : IModelHook<DocumentPipeli
             ? new List<string>(analysisType.RequiredSourceTypes)
             : new List<string>();
 
-        if (analysisChanged || string.IsNullOrWhiteSpace(model.TemplateMarkdown))
+        // DeliverableType (optional but preferred)
+        DeliverableType? deliverableType = null;
+        var deliverableChanged = false;
+
+        if (!string.IsNullOrWhiteSpace(model.DeliverableTypeId))
+        {
+            deliverableType = await DeliverableType.Get(model.DeliverableTypeId, ct);
+            if (deliverableType is null)
+            {
+                throw new InvalidOperationException($"DeliverableType '{model.DeliverableTypeId}' was not found.");
+            }
+
+            deliverableChanged = previous is null ||
+                                 !string.Equals(previous.DeliverableTypeId, model.DeliverableTypeId, StringComparison.OrdinalIgnoreCase) ||
+                                 previous.DeliverableTypeVersion != deliverableType.Version;
+
+            model.DeliverableTypeVersion = deliverableType.Version;
+        }
+        else
+        {
+            // Default to analysis template if no deliverable type provided
+            model.DeliverableTypeId = model.AnalysisTypeId;
+            model.DeliverableTypeVersion = model.AnalysisTypeVersion;
+        }
+
+        if (deliverableType is not null && (deliverableChanged || string.IsNullOrWhiteSpace(model.SchemaJson)))
+        {
+            if (!string.IsNullOrWhiteSpace(deliverableType.JsonSchema))
+            {
+                model.SchemaJson = deliverableType.JsonSchema;
+            }
+        }
+        else if (analysisChanged && string.IsNullOrWhiteSpace(model.SchemaJson) && !string.IsNullOrWhiteSpace(analysisType.OutputTemplate))
+        {
+            // Fallback schema placeholder remains "{}" unless provided elsewhere.
+        }
+
+        if (deliverableType is not null && (deliverableChanged || string.IsNullOrWhiteSpace(model.TemplateMarkdown)))
+        {
+            if (!string.IsNullOrWhiteSpace(deliverableType.TemplateMd))
+            {
+                model.TemplateMarkdown = deliverableType.TemplateMd;
+            }
+        }
+        else if (analysisChanged || string.IsNullOrWhiteSpace(model.TemplateMarkdown))
         {
             var template = analysisType.OutputTemplate;
             if (string.IsNullOrWhiteSpace(template))

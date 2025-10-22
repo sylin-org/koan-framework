@@ -1403,40 +1403,76 @@ public class PassageChunker : IPassageChunker
 ```
 
 **Document Classification Service (Cascade Pattern)**
-- Stage 1: Heuristic rules (filename patterns, keywords, MIME type, page counts) – accept when confidence ≥0.9.
-- Stage 2: Vector similarity (embed preview, compare to cached SourceType vectors) – accept when cosine similarity ≥0.75.
-- Stage 3: LLM fallback (prompt with SourceType catalog, parse {typeId, confidence, reasoning}) – default to confidence 0.3 if parsing fails.
+- Stage 1: Heuristic rules (filename patterns, keywords, MIME type, page counts) - accept when confidence ≥0.9.
+- Stage 2: Vector similarity (embed preview, compare to cached SourceType vectors) - accept when cosine similarity ≥0.75.
+- Stage 3: LLM fallback (prompt with SourceType catalog, parse {typeId, confidence, reasoning}) - default to confidence 0.3 if parsing fails.
 - Persist ClassifiedTypeId, ClassifiedTypeVersion, ClassificationConfidence, ClassificationMethod, and reasoning.
 ## Usage Scenario Story Scripts
 
-### Scenario A – Enterprise Architecture Review (Cross-Type Cascade)
-1. Define SourceTypes (AI-assisted or manual) for meeting notes, customer technical bulletin, vendor prescreen questionnaire, and cybersecurity risk assessment.
-2. Upload one .txt document per SourceType.
-3. Create an AnalysisType named "Enterprise Architecture Review" with instructions and output template.
-4. Create an analysis referencing the AnalysisType and attach all uploaded documents.
-5. Run pipeline; verify classification, extraction, merge, and deliverable reflect the defined types.
+### Scenario A - Enterprise Architecture Review (Script: scripts/phase4.5/ScenarioA-EnterpriseArchitecture.ps1)
+**Story**: Arcadia Systems is preparing an enterprise architecture review for Synapse Analytics. The operator asks the AI assistants to design SourceTypes for meeting notes, customer bulletins, vendor questionnaires, and cybersecurity assessments, then composes an Enterprise Architecture Review AnalysisType. Four textual documents capture CIO Dana Wright's steering committee notes, a customer bulletin, a vendor prescreen questionnaire, and a cybersecurity risk assessment. The pipeline must weave these narratives into a single deliverable that surfaces the fictional company names, dates, and action items.
 
-### Scenario B – Single-Field Manual Override
-1. Run pipeline, fetch deliverable.
-2. POST /api/pipelines/{id}/fields/$.revenue/override with reviewer value + reason.
-3. Fetch deliverable – revenue reflects override; merge decision logs override.
-4. DELETE override; rerun to confirm AI value restored.
+**Flow**:
+1. Use `/api/sourcetypes/ai-suggest` to generate SourceTypes for each document class, persisting the drafts via `POST /api/sourcetypes`.
+2. Call `/api/analysistypes/ai-suggest` to create the "Enterprise Architecture Review" AnalysisType with Markdown template and required source tags.
+3. Create a pipeline referencing the AnalysisType, supplying JSON schema fragments for revenue, staffing, notes, and security findings.
+4. Upload the four narrative `.txt` files and wait for ingestion jobs to complete.
+5. Retrieve the deliverable Markdown and confirm the output references Arcadia, Synapse Analytics, the steering committee decisions, and security remediation timelines.
 
-### Scenario C – Targeted Incremental Refresh
-1. Baseline pipeline with two docs; capture deliverable + timestamps.
-2. Upload third doc; POST /api/pipelines/{id}/refresh.
-3. On completion, verify only impacted fields reprocessed and refresh logged.
+**Desirability**:
+- Proves the AI-assisted authoring experience yields high-signal templates without manual scaffolding.
+- Exercises a full cross-source narrative, validating that story details propagate into the rendered deliverable.
 
-### Scenario D – Override Persistence Through Refresh
-1. Override compliance status via API.
-2. Upload new doc; run refresh – override still applied (confidence 1.0).
-3. DELETE override; refresh – AI value returns.
-4. Review merge decisions/run logs for override lifecycle.
+**Feasibility**:
+- Backed by `SourceTypeAuthoringService` and `AnalysisTypeAuthoringService` hitting the local Ollama instance.
+- Scenario script orchestrates only public REST APIs (`EntityController<T>` CRUD + `ai-suggest`) and requires no privileged operations.
 
-### Scenario E – Override Escalation & Reversion
-1. Override employees count; realize mistake; DELETE override.
-2. Run refresh to ensure AI value reinstated.
-3. Confirm merge decisions capture override + revert, final deliverable matches AI output.
+### Scenario B - Single-Field Manual Override (Script: scripts/phase4.5/ScenarioB-ManualOverride.ps1)
+**Flow**:
+1. Generate SourceTypes and an AnalysisType via AI assists, then create a lightweight pipeline.
+2. Upload two documents to produce a baseline deliverable.
+3. Apply a revenue override through `POST /api/pipelines/{id}/fields/{fieldPath}/override` with reviewer metadata.
+4. Fetch the deliverable to confirm the override value surfaces and audit metadata is present.
+5. Remove the override (`DELETE .../override`) and ensure the deliverable reverts to the AI-derived value.
+
+**Desirability**: Demonstrates reviewers can correct isolated fields without rerunning extraction, covering a core governance story.
+
+**Feasibility**: Uses the new `PipelineOverridesController`; data model already supports override metadata, so no additional infrastructure is needed.
+
+### Scenario C - Targeted Incremental Refresh (Script: scripts/phase4.5/ScenarioC-TargetedRefresh.ps1)
+**Flow**:
+1. Baseline the pipeline with two documents, recording the initial deliverable.
+2. Upload an addendum document that changes revenue and staffing projections.
+3. Trigger the refresh planner (`POST /api/pipelines/{id}/refresh`).
+4. Wait for the refresh job, then verify only impacted fields were reprocessed and logs reference incremental work.
+5. Persist the new deliverable and compare to baseline to confirm targeted updates.
+
+**Desirability**: Validates that Phase 4 refresh logic can respond to incremental evidence without rebuilding the entire pipeline.
+
+**Feasibility**: Leverages `PipelineRefreshController`; planner hooks are already wired in `PipelineProcessor`.
+
+### Scenario D - Override Persistence Through Refresh (Script: scripts/phase4.5/ScenarioD-OverridePersistence.ps1)
+**Flow**:
+1. Create the baseline pipeline and apply a revenue override.
+2. Upload a new vendor update document introducing conflicting revenue.
+3. Invoke the refresh API and wait for completion.
+4. Retrieve the deliverable to confirm the override value persists and audit metadata records the refresh.
+
+**Desirability**: Ensures analysts can lock critical values without losing them during reprocessing cycles.
+
+**Feasibility**: Built on the override model plus refresh workflow, no extra dependencies required.
+
+### Scenario E - Override Reversion (Script: scripts/phase4.5/ScenarioE-OverrideReversion.ps1)
+**Flow**:
+1. Apply a staffing override after baseline processing.
+2. Remove the override using the DELETE endpoint.
+3. Run the refresh planner to recompute the field using AI evidence.
+4. Verify the final deliverable reflects the AI value and override audit trail shows add/remove lifecycle.
+
+**Desirability**: Shows governance teams can unwind overrides confidently, with documentation.
+
+**Feasibility**: Uses the same override and refresh endpoints already implemented for Scenarios B-D.
+
 ### Source & Analysis Type Authoring (Phase 4.5)
 
 #### SourceType Enhancements

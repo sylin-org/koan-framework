@@ -2,13 +2,8 @@
 
 ## Prerequisites
 
-### 1. MongoDB
-```bash
-# Using Docker:
-docker run -d -p 27017:27017 --name meridian-mongo mongo:latest
-
-# Or use existing MongoDB instance and update appsettings.json
-```
+### 1. Docker Desktop
+- Required for the Meridian stack. `docker compose` will launch MongoDB, Pandoc, the OCR sidecar, and the ASP.NET API.
 
 ### 2. Ollama with granite3.3:8b
 ```bash
@@ -24,12 +19,26 @@ ollama run granite3.3:8b "What is 2+2?"
 
 ## Running the Application
 
-```bash
+**Windows**
+
+```powershell
 cd samples/S7.Meridian
-dotnet run
+.\start.bat
 ```
 
-The API will be available at `http://localhost:5000` (or as configured).
+**macOS / Linux**
+
+```bash
+cd samples/S7.Meridian
+mkdir -p storage
+docker compose -p koan-s7-meridian -f docker/compose.yml up -d --build
+```
+
+The API becomes available at `http://localhost:5080` once the `meridian-api` container is healthy. View live logs with:
+
+```bash
+docker compose -p koan-s7-meridian -f docker/compose.yml logs -f meridian-api
+```
 
 ## Manual End-to-End Test
 
@@ -277,6 +286,28 @@ docker ps | grep mongo
 - Review bias notes in pipeline configuration
 - Check if text quality is good (OCR artifacts can reduce confidence)
 - Verify field names match document terminology
+
+## Phase 4.5 Scenario Scripts
+
+Phase 4.5 adds scripted journeys under `samples/S7.Meridian/scripts/phase4.5`. These rely on the AI-assisted authoring endpoints, so ensure `granite3.3:8b` is available in your local Ollama instance.
+
+1. Start dependencies + API  
+   - Windows: `.\start.bat` (opens API console at `http://localhost:5080`)  
+   - macOS/Linux: `docker compose -f docker/compose.yml up -d` then `ASPNETCORE_URLS="http://localhost:5080;https://localhost:5081" ASPNETCORE_HTTPS_PORT=5081 dotnet run --project S7.Meridian.csproj`
+2. Execute scenarios from PowerShell (pwsh or Windows PowerShell):
+
+```powershell
+cd samples/S7.Meridian/scripts/phase4.5
+pwsh ./ScenarioA-EnterpriseArchitecture.ps1 [-BaseUrl http://localhost:5080] [-SkipCertificateCheck]
+```
+
+- **ScenarioA-EnterpriseArchitecture.ps1** - builds four SourceTypes (meeting notes, customer bulletin, vendor questionnaire, cybersecurity assessment) and an Enterprise Architecture analysis via AI assists, uploads Arcadia Systems sample documents, and runs the pipeline end-to-end.
+- **ScenarioB-ManualOverride.ps1** - applies and clears a revenue override to demonstrate manual corrections.
+- **ScenarioC-TargetedRefresh.ps1** - uploads an incremental document and triggers the refresh planner to reprocess only impacted fields.
+- **ScenarioD-OverridePersistence.ps1** - shows overrides persisting through refresh operations.
+- **ScenarioE-OverrideReversion.ps1** - removes an override and verifies that AI-derived values are reinstated.
+
+Each script emits Markdown deliverables in `scripts/phase4.5/output`. Pass `-SkipCertificateCheck` when running against self-signed HTTPS endpoints.
 
 ## Next Steps (Phase 2)
 
