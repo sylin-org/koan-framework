@@ -1,0 +1,687 @@
+/**
+ * Micro-Interactions and Smooth Transitions
+ *
+ * Design Pattern: Subtle animations that provide feedback and delight
+ * Features: Hover effects, click feedback, loading states, page transitions
+ * Philosophy: Enhance UX without overwhelming or slowing down the interface
+ */
+
+/* ==================== Button Interactions ==================== */
+.btn-ripple {
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-ripple::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.5);
+  transform: translate(-50%, -50%);
+  transition: width 0.6s, height 0.6s;
+}
+
+.btn-ripple:active::after {
+  width: 300px;
+  height: 300px;
+}
+
+/* Enhanced button press feedback */
+.btn-press {
+  transition: transform var(--transition-fast);
+}
+
+.btn-press:active {
+  transform: scale(0.96);
+}
+
+/* Button shine effect */
+.btn-shine {
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-shine::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.3),
+    transparent
+  );
+  transition: left 0.5s;
+}
+
+.btn-shine:hover::before {
+  left: 100%;
+}
+
+/* ==================== Card Interactions ==================== */
+.card-lift {
+  transition: transform var(--transition-base), box-shadow var(--transition-base);
+}
+
+.card-lift:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-lg);
+}
+
+.card-lift:active {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+/* Card tilt effect (3D) */
+.card-tilt {
+  transition: transform var(--transition-base);
+  transform-style: preserve-3d;
+}
+
+.card-tilt:hover {
+  transform: perspective(1000px) rotateX(2deg) rotateY(-2deg);
+}
+
+/* Card border glow */
+.card-glow {
+  position: relative;
+  transition: all var(--transition-base);
+}
+
+.card-glow::before {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  right: -2px;
+  bottom: -2px;
+  background: linear-gradient(
+    135deg,
+    var(--color-primary-400),
+    var(--color-purple-400),
+    var(--color-blue-400)
+  );
+  border-radius: inherit;
+  opacity: 0;
+  z-index: -1;
+  transition: opacity var(--transition-base);
+  filter: blur(8px);
+}
+
+.card-glow:hover::before {
+  opacity: 0.3;
+}
+
+/* ==================== Input Focus Effects ==================== */
+.input-glow:focus {
+  box-shadow: 0 0 0 3px var(--color-primary-100),
+              0 0 20px rgba(37, 99, 235, 0.1);
+}
+
+.input-pulse:focus {
+  animation: inputPulse 2s ease-in-out infinite;
+}
+
+@keyframes inputPulse {
+  0%, 100% {
+    box-shadow: 0 0 0 3px var(--color-primary-100);
+  }
+  50% {
+    box-shadow: 0 0 0 5px var(--color-primary-50);
+  }
+}
+
+/* ==================== Loading Animations ==================== */
+.loading-dots::after {
+  content: '...';
+  display: inline-block;
+  animation: loadingDots 1.5s steps(3, end) infinite;
+}
+
+@keyframes loadingDots {
+  0% { content: '.'; }
+  33% { content: '..'; }
+  66% { content: '...'; }
+}
+
+/* Loading spinner with gradient */
+.loading-spinner-gradient {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 0deg,
+    var(--color-primary-600),
+    var(--color-purple-600),
+    var(--color-primary-600)
+  );
+  mask: radial-gradient(circle, transparent 60%, black 61%);
+  animation: spinGradient 1s linear infinite;
+}
+
+@keyframes spinGradient {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Progress bar shimmer */
+.progress-shimmer {
+  position: relative;
+  overflow: hidden;
+  background-color: var(--color-bg-secondary);
+}
+
+.progress-shimmer::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.5),
+    transparent
+  );
+  animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+  to {
+    left: 100%;
+  }
+}
+
+/* ==================== Page Transitions ==================== */
+.page-fade-in {
+  animation: pageFadeIn 0.3s ease-out;
+}
+
+@keyframes pageFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.page-slide-up {
+  animation: pageSlideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes pageSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.page-zoom-in {
+  animation: pageZoomIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes pageZoomIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* ==================== Tooltip Animations ==================== */
+.tooltip-fade {
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity var(--transition-fast), transform var(--transition-fast);
+  pointer-events: none;
+}
+
+.tooltip-fade.visible {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+/* ==================== Dropdown Animations ==================== */
+.dropdown-scale {
+  opacity: 0;
+  transform: scale(0.95);
+  transform-origin: top;
+  transition: opacity var(--transition-fast), transform var(--transition-fast);
+}
+
+.dropdown-scale.open {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.dropdown-slide {
+  opacity: 0;
+  transform: translateY(-8px);
+  transition: opacity var(--transition-fast), transform var(--transition-fast);
+}
+
+.dropdown-slide.open {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ==================== Modal Animations ==================== */
+.modal-backdrop-fade {
+  opacity: 0;
+  transition: opacity var(--transition-base);
+}
+
+.modal-backdrop-fade.visible {
+  opacity: 1;
+}
+
+.modal-content-bounce {
+  opacity: 0;
+  transform: scale(0.9) translateY(-20px);
+  transition: all var(--transition-base) cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+.modal-content-bounce.visible {
+  opacity: 1;
+  transform: scale(1) translateY(0);
+}
+
+/* ==================== Toast Notifications ==================== */
+.toast-slide-in {
+  animation: toastSlideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes toastSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.toast-slide-out {
+  animation: toastSlideOut 0.2s ease-in forwards;
+}
+
+@keyframes toastSlideOut {
+  to {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+}
+
+/* ==================== Badge Animations ==================== */
+.badge-bounce-in {
+  animation: badgeBounceIn 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+@keyframes badgeBounceIn {
+  0% {
+    opacity: 0;
+    transform: scale(0);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.badge-pulse {
+  animation: badgePulse 2s ease-in-out infinite;
+}
+
+@keyframes badgePulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 0.9;
+  }
+}
+
+/* ==================== Skeleton Pulse Enhancement ==================== */
+.skeleton-wave {
+  position: relative;
+  overflow: hidden;
+  background-color: var(--color-gray-200);
+}
+
+.skeleton-wave::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.6),
+    transparent
+  );
+  animation: skeletonWave 1.5s infinite;
+}
+
+@keyframes skeletonWave {
+  to {
+    left: 100%;
+  }
+}
+
+/* ==================== Icon Animations ==================== */
+.icon-spin {
+  animation: iconSpin 1s linear infinite;
+}
+
+@keyframes iconSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.icon-bounce {
+  animation: iconBounce 1s ease-in-out infinite;
+}
+
+@keyframes iconBounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+.icon-shake {
+  animation: iconShake 0.5s ease-in-out;
+}
+
+@keyframes iconShake {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-4px);
+  }
+  75% {
+    transform: translateX(4px);
+  }
+}
+
+.icon-heartbeat {
+  animation: iconHeartbeat 1.5s ease-in-out infinite;
+}
+
+@keyframes iconHeartbeat {
+  0%, 100% {
+    transform: scale(1);
+  }
+  10%, 30% {
+    transform: scale(1.1);
+  }
+  20%, 40% {
+    transform: scale(1);
+  }
+}
+
+/* ==================== List Item Stagger ==================== */
+.list-item-stagger {
+  animation: listItemStagger 0.3s ease-out backwards;
+}
+
+.list-item-stagger:nth-child(1) {
+  animation-delay: 0.05s;
+}
+
+.list-item-stagger:nth-child(2) {
+  animation-delay: 0.1s;
+}
+
+.list-item-stagger:nth-child(3) {
+  animation-delay: 0.15s;
+}
+
+.list-item-stagger:nth-child(4) {
+  animation-delay: 0.2s;
+}
+
+.list-item-stagger:nth-child(5) {
+  animation-delay: 0.25s;
+}
+
+@keyframes listItemStagger {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ==================== Hover Scale ==================== */
+.hover-scale {
+  transition: transform var(--transition-base);
+}
+
+.hover-scale:hover {
+  transform: scale(1.05);
+}
+
+.hover-scale-sm:hover {
+  transform: scale(1.02);
+}
+
+.hover-scale-lg:hover {
+  transform: scale(1.1);
+}
+
+/* ==================== Hover Brightness ==================== */
+.hover-brighten {
+  transition: filter var(--transition-base);
+}
+
+.hover-brighten:hover {
+  filter: brightness(1.1);
+}
+
+.hover-darken {
+  transition: filter var(--transition-base);
+}
+
+.hover-darken:hover {
+  filter: brightness(0.9);
+}
+
+/* ==================== Glow Effects ==================== */
+.glow-primary {
+  box-shadow: 0 0 20px rgba(37, 99, 235, 0.3);
+}
+
+.glow-success {
+  box-shadow: 0 0 20px rgba(22, 163, 74, 0.3);
+}
+
+.glow-warning {
+  box-shadow: 0 0 20px rgba(217, 119, 6, 0.3);
+}
+
+.glow-danger {
+  box-shadow: 0 0 20px rgba(220, 38, 38, 0.3);
+}
+
+/* Pulsing glow */
+.glow-pulse {
+  animation: glowPulse 2s ease-in-out infinite;
+}
+
+@keyframes glowPulse {
+  0%, 100% {
+    box-shadow: 0 0 10px rgba(37, 99, 235, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 30px rgba(37, 99, 235, 0.4);
+  }
+}
+
+/* ==================== Focus Animations ==================== */
+.focus-ring-animated {
+  transition: box-shadow var(--transition-base);
+}
+
+.focus-ring-animated:focus {
+  box-shadow: 0 0 0 3px var(--color-primary-100),
+              0 0 0 6px var(--color-primary-50);
+  animation: focusRingExpand 0.3s ease-out;
+}
+
+@keyframes focusRingExpand {
+  from {
+    box-shadow: 0 0 0 0 var(--color-primary-100),
+                0 0 0 0 var(--color-primary-50);
+  }
+  to {
+    box-shadow: 0 0 0 3px var(--color-primary-100),
+                0 0 0 6px var(--color-primary-50);
+  }
+}
+
+/* ==================== Attention Seekers ==================== */
+.attention-pulse {
+  animation: attentionPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes attentionPulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 var(--color-primary-400);
+  }
+  50% {
+    transform: scale(1.02);
+    box-shadow: 0 0 0 8px transparent;
+  }
+}
+
+.attention-shake {
+  animation: attentionShake 0.5s ease-in-out;
+}
+
+@keyframes attentionShake {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  10%, 30%, 50%, 70%, 90% {
+    transform: translateX(-3px);
+  }
+  20%, 40%, 60%, 80% {
+    transform: translateX(3px);
+  }
+}
+
+/* ==================== Progress Indicators ==================== */
+.progress-bar-animated {
+  position: relative;
+  overflow: hidden;
+}
+
+.progress-bar-animated::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.3),
+    transparent
+  );
+  animation: progressBarSlide 1.5s infinite;
+}
+
+@keyframes progressBarSlide {
+  to {
+    left: 100%;
+  }
+}
+
+/* ==================== Reduced Motion Overrides ==================== */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .card-lift:hover {
+    transform: none;
+  }
+
+  .btn-press:active {
+    transform: none;
+  }
+
+  .skeleton-wave::after,
+  .progress-shimmer::after,
+  .btn-shine::before {
+    animation: none;
+    display: none;
+  }
+}
+
+/* ==================== Performance Optimizations ==================== */
+/* Use transform and opacity for animations (GPU accelerated) */
+.will-animate {
+  will-change: transform, opacity;
+}
+
+.will-animate-done {
+  will-change: auto;
+}
+
+/* Disable hover effects on touch devices */
+@media (hover: none) {
+  .hover-scale:hover,
+  .hover-scale-sm:hover,
+  .hover-scale-lg:hover,
+  .hover-brighten:hover,
+  .hover-darken:hover {
+    transform: none;
+    filter: none;
+  }
+
+  .card-lift:hover {
+    transform: none;
+  }
+}
