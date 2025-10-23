@@ -17,6 +17,7 @@ import { AnalysisTypesManager } from './components/AnalysisTypesManager.js';
 import { SourceTypesManager } from './components/SourceTypesManager.js';
 import { SettingsSidebar } from './components/SettingsSidebar.js';
 import { KeyboardShortcuts } from './components/KeyboardShortcuts.js';
+import { PageHeader } from './components/PageHeader.js';
 
 class MeridianApp {
   constructor() {
@@ -42,8 +43,8 @@ class MeridianApp {
     this.keyboardShortcuts = new KeyboardShortcuts(this.eventBus, this.router);
     this.dashboard = new Dashboard(this.api, this.stateManager, this.eventBus);
     this.insightsPanel = new InsightsPanel(this.api, this.stateManager);
-    this.analysisTypesManager = new AnalysisTypesManager(this.api, this.eventBus, this.toast);
-    this.sourceTypesManager = new SourceTypesManager(this.api, this.eventBus, this.toast);
+    this.analysisTypesManager = new AnalysisTypesManager(this.api, this.eventBus, this.toast, this.router);
+    this.sourceTypesManager = new SourceTypesManager(this.api, this.eventBus, this.toast, this.router);
 
     // Component state
     this.state = this.stateManager.state;
@@ -318,18 +319,34 @@ class MeridianApp {
       const pipelines = await this.api.getPipelines();
       this.state.pipelines = pipelines || [];
 
+      // Create PageHeader instance
+      const pageHeader = new PageHeader(this.router, this.eventBus);
+
       const html = `
         <div class="analyses-list-view">
-          <div class="view-header">
-            <h1 class="view-title">All Analyses</h1>
-            <button class="btn btn-primary" data-action="new-analysis">
-              <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <line x1="12" y1="5" x2="12" y2="19"></line>
-                <line x1="5" y1="12" x2="19" y2="12"></line>
-              </svg>
-              New Analysis
-            </button>
-          </div>
+          ${pageHeader.render({
+            title: 'All Analyses',
+            subtitle: 'Browse and manage all your analysis pipelines',
+            breadcrumbs: [
+              {
+                label: 'Home',
+                path: '#/',
+                icon: '<rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect>'
+              },
+              {
+                label: 'Analyses',
+                path: '#/analyses-list'
+              }
+            ],
+            actions: [
+              {
+                label: 'New Analysis',
+                action: 'new-analysis',
+                variant: 'primary',
+                icon: '<line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line>'
+              }
+            ]
+          })}
           <div class="analyses-grid">
             ${this.renderAnalysesGrid(pipelines)}
           </div>
@@ -341,12 +358,16 @@ class MeridianApp {
       // Attach event handlers (in app-content area)
       const contentArea = container.querySelector('.app-content');
 
-      const newAnalysisBtn = contentArea.querySelector('[data-action="new-analysis"]');
-      if (newAnalysisBtn) {
-        newAnalysisBtn.addEventListener('click', () => {
+      // Attach PageHeader handlers
+      pageHeader.attachEventHandlers(contentArea);
+
+      // Listen for page header actions
+      const headerActionHandler = (action) => {
+        if (action === 'new-analysis') {
           this.eventBus.emit('navigate', 'new-analysis');
-        });
-      }
+        }
+      };
+      this.eventBus.on('page-header-action', headerActionHandler);
 
       const pipelineCards = contentArea.querySelectorAll('[data-pipeline-id]');
       pipelineCards.forEach(card => {

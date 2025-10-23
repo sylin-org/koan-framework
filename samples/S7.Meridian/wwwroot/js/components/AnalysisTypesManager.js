@@ -12,17 +12,20 @@ import { TypeFormView } from './TypeFormView.js';
 import { AICreateTypeModal } from './AICreateTypeModal.js';
 import { EmptyState } from './EmptyState.js';
 import { LoadingState } from './LoadingState.js';
+import { PageHeader } from './PageHeader.js';
 
 export class AnalysisTypesManager {
-  constructor(api, eventBus, toast) {
+  constructor(api, eventBus, toast, router) {
     this.api = api;
     this.eventBus = eventBus;
     this.toast = toast;
+    this.router = router;
     this.types = [];
     this.filteredTypes = [];
     this.selectedIds = new Set();
     this.searchQuery = '';
     this.aiCreateModal = null;
+    this.pageHeader = new PageHeader(router, eventBus);
   }
 
   /**
@@ -45,32 +48,35 @@ export class AnalysisTypesManager {
    * Render header with title and primary actions
    */
   renderHeader() {
-    return `
-      <div class="types-manager-header">
-        <div class="types-manager-title-section">
-          <h1 class="types-manager-title">Analysis Types</h1>
-          <p class="types-manager-subtitle">
-            Manage analysis type definitions that determine how documents are processed and insights are extracted.
-          </p>
-        </div>
-        <div class="types-manager-actions">
-          <button class="btn btn-secondary btn-press" data-action="create">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <line x1="12" y1="5" x2="12" y2="19"></line>
-              <line x1="5" y1="12" x2="19" y2="12"></line>
-            </svg>
-            Create Type
-          </button>
-          <button class="btn btn-primary btn-press" data-action="ai-create">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="12" cy="12" r="3"></circle>
-              <path d="M12 1v6m0 6v6m8.66-13.66l-4.24 4.24m-4.84 4.84l-4.24 4.24M23 12h-6m-6 0H1m20.66 8.66l-4.24-4.24m-4.84-4.84l-4.24-4.24"></path>
-            </svg>
-            AI Create
-          </button>
-        </div>
-      </div>
-    `;
+    return this.pageHeader.render({
+      title: 'Analysis Types',
+      subtitle: 'Manage analysis type definitions that determine how documents are processed and insights are extracted.',
+      breadcrumbs: [
+        {
+          label: 'Home',
+          path: '#/',
+          icon: '<rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect>'
+        },
+        {
+          label: 'Analysis Types',
+          path: '#/analysis-types'
+        }
+      ],
+      actions: [
+        {
+          label: 'Create Type',
+          action: 'create',
+          variant: 'secondary',
+          icon: '<line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line>'
+        },
+        {
+          label: 'AI Create',
+          action: 'ai-create',
+          variant: 'primary',
+          icon: '<circle cx="12" cy="12" r="3"></circle><path d="M12 1v6m0 6v6m8.66-13.66l-4.24 4.24m-4.84 4.84l-4.24 4.24M23 12h-6m-6 0H1m20.66 8.66l-4.24-4.24m-4.84-4.84l-4.24-4.24"></path>'
+        }
+      ]
+    });
   }
 
   /**
@@ -292,16 +298,21 @@ export class AnalysisTypesManager {
   attachEventHandlers(container) {
     if (!container) return;
 
-    // Header actions
-    const createBtn = container.querySelector('[data-action="create"]');
-    if (createBtn) {
-      createBtn.addEventListener('click', () => this.navigateToCreate());
-    }
+    // Attach PageHeader event handlers
+    this.pageHeader.attachEventHandlers(container);
 
-    const aiCreateBtns = container.querySelectorAll('[data-action="ai-create"]');
-    aiCreateBtns.forEach(btn => {
-      btn.addEventListener('click', () => this.openAICreateModal());
-    });
+    // Listen for PageHeader action events
+    const headerActionHandler = (action) => {
+      switch (action) {
+        case 'create':
+          this.navigateToCreate();
+          break;
+        case 'ai-create':
+          this.openAICreateModal();
+          break;
+      }
+    };
+    this.eventBus.on('page-header-action', headerActionHandler);
 
     // Search input
     const searchInput = container.querySelector('[data-search-input]');
