@@ -8,8 +8,9 @@
 .authoritative-notes-section {
   padding: 0;
   margin: 0;
-  background-color: var(--color-gold-bg);
-  border-bottom: 1px solid var(--color-gold-border);
+  background-color: var(--color-bg-secondary);
+  border: 1px solid var(--color-border-medium);
+  border-radius: 12px;
   transition: all var(--transition-slow);
   overflow: hidden;
 }
@@ -59,7 +60,7 @@
   align-items: center;
   gap: var(--spacing-1);
   padding: var(--spacing-2) var(--spacing-3);
-  background-color: white;
+  background-color: var(--color-bg-hover);
   color: var(--color-gold);
   font-size: var(--font-size-small);
   font-weight: 500;
@@ -70,12 +71,12 @@
 
 .btn-notes-action:hover {
   background-color: var(--color-gold);
-  color: white;
+  color: var(--color-text-inverse);
 }
 
 .btn-notes-action.btn-primary {
   background-color: var(--color-gold);
-  color: white;
+  color: var(--color-text-inverse);
   border-color: var(--color-gold);
 }
 
@@ -93,8 +94,8 @@
   width: 100%;
   min-height: 200px;
   padding: var(--spacing-4);
-  background-color: white;
-  border: 2px solid var(--color-gold-border);
+  background-color: var(--color-bg-canvas);
+  border: 1px solid var(--color-border-medium);
   border-radius: var(--radius-lg);
   font-family: var(--font-sans);
   font-size: var(--font-size-body);
@@ -107,7 +108,7 @@
 .notes-textarea:focus {
   outline: none;
   border-color: var(--color-gold);
-  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.1);
+  box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.2);
 }
 
 .notes-textarea::placeholder {
@@ -125,8 +126,8 @@
 /* ==================== Notes Preview/Display Mode ==================== */
 .notes-display {
   padding: var(--spacing-4);
-  background-color: white;
-  border: 2px solid var(--color-gold-border);
+  background-color: var(--color-bg-canvas);
+  border: 1px solid var(--color-border-medium);
   border-radius: var(--radius-lg);
   font-size: var(--font-size-body);
   line-height: 1.6;
@@ -180,7 +181,7 @@
   align-items: center;
   gap: var(--spacing-1);
   padding: var(--spacing-1) var(--spacing-2);
-  background-color: white;
+  background-color: var(--color-bg-hover);
   border: 1px solid var(--color-gold-border);
   border-radius: var(--radius-md);
   font-size: var(--font-size-small);
@@ -208,8 +209,8 @@
 .notes-matching-feedback {
   margin-top: var(--spacing-3);
   padding: var(--spacing-3);
-  background-color: white;
-  border: 1px solid rgba(245, 158, 11, 0.3);
+  background-color: var(--color-bg-canvas);
+  border: 1px solid var(--color-border-medium);
   border-radius: var(--radius-md);
 }
 
@@ -302,7 +303,7 @@
   align-items: center;
   gap: var(--spacing-1);
   padding: var(--spacing-1) var(--spacing-2);
-  background-color: white;
+  background-color: var(--color-bg-hover);
   border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius-md);
   font-size: var(--font-size-small);
