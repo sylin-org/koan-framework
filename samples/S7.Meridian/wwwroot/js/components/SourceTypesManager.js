@@ -112,6 +112,11 @@ export class SourceTypesManager {
    * Render types list (grid or empty state)
    */
   renderTypesList() {
+    // Show loading skeleton while data is being fetched
+    if (this.isLoading) {
+      return LoadingState.render('card', { count: 6 });
+    }
+
     if (this.types.length === 0) {
       return this.renderEmptyState();
     }
@@ -254,6 +259,7 @@ export class SourceTypesManager {
    * Load types from API
    */
   async loadTypes() {
+    this.isLoading = true;
     try {
       this.types = await this.api.getSourceTypes();
       this.applyFilters();
@@ -262,6 +268,8 @@ export class SourceTypesManager {
       this.toast.error('Failed to load source types');
       this.types = [];
       this.filteredTypes = [];
+    } finally {
+      this.isLoading = false;
     }
   }
 
