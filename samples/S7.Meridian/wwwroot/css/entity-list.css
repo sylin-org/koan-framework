@@ -1,0 +1,406 @@
+/**
+ * Entity List Styles
+ *
+ * Design Pattern: Standardized list/grid layouts for all entity types
+ * Features: Grid/list views, bulk actions, responsive layouts
+ * Used by: All entity managers (Analysis Types, Source Types, etc.)
+ */
+
+/* ==================== List Container ==================== */
+.entity-list-container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-6);
+}
+
+/* ==================== Grid Layout ==================== */
+.entity-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: var(--spacing-4);
+  padding: var(--spacing-2) 0;
+}
+
+.entity-grid.grid-compact {
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--spacing-3);
+}
+
+.entity-grid.grid-wide {
+  grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+  gap: var(--spacing-5);
+}
+
+/* ==================== List View (Alternative to Grid) ==================== */
+.entity-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3);
+  padding: var(--spacing-2) 0;
+}
+
+.entity-list-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-4);
+  padding: var(--spacing-4);
+  background-color: var(--color-bg-elevated);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-lg);
+  transition: all var(--transition-base);
+}
+
+.entity-list-item:hover {
+  border-color: var(--color-border-medium);
+  box-shadow: var(--shadow-sm);
+}
+
+.entity-list-item.selected {
+  border-color: var(--color-primary-600);
+  background-color: var(--color-primary-50);
+}
+
+/* ==================== View Toggle ==================== */
+.entity-view-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-1);
+  background-color: var(--color-bg-secondary);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-1);
+}
+
+.entity-view-toggle-btn {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+}
+
+.entity-view-toggle-btn:hover {
+  color: var(--color-text-secondary);
+  background-color: var(--color-bg-hover);
+}
+
+.entity-view-toggle-btn.active {
+  color: var(--color-primary-600);
+  background-color: var(--color-bg-elevated);
+  box-shadow: var(--shadow-sm);
+}
+
+.entity-view-toggle-btn:focus-visible {
+  outline: 2px solid var(--color-primary-600);
+  outline-offset: 2px;
+}
+
+/* ==================== Bulk Actions Bar ==================== */
+.bulk-actions-bar {
+  position: fixed;
+  bottom: -100px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: var(--z-modal-backdrop);
+  background-color: var(--color-bg-elevated);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-xl);
+  padding: var(--spacing-4) var(--spacing-6);
+  box-shadow: var(--shadow-xl);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-4);
+  transition: bottom var(--transition-base) ease-out;
+  max-width: 600px;
+  width: calc(100% - var(--spacing-8));
+}
+
+.bulk-actions-bar.visible {
+  bottom: var(--spacing-6);
+}
+
+.bulk-selection-count {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  padding-right: var(--spacing-2);
+  border-right: 1px solid var(--color-border-light);
+}
+
+.bulk-actions-bar .btn {
+  font-size: var(--font-size-sm);
+  height: 36px;
+  padding: 0 var(--spacing-3);
+}
+
+.bulk-actions-bar .btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* ==================== List Stats and Controls ==================== */
+.entity-list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-4);
+  flex-wrap: wrap;
+}
+
+.entity-list-stats {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+}
+
+.entity-stat-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--spacing-1) var(--spacing-3);
+  background-color: var(--color-bg-secondary);
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-secondary);
+}
+
+.entity-stat-badge.stat-selected {
+  background-color: var(--color-primary-100);
+  color: var(--color-primary-700);
+}
+
+.entity-list-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-3);
+}
+
+/* ==================== Select All Checkbox ==================== */
+.entity-select-all {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  padding: var(--spacing-2) var(--spacing-3);
+  background-color: var(--color-bg-secondary);
+  border-radius: var(--radius-md);
+}
+
+.entity-select-all-checkbox {
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--color-border-medium);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  appearance: none;
+  background-color: var(--color-bg-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.entity-select-all-checkbox:hover {
+  border-color: var(--color-primary-600);
+}
+
+.entity-select-all-checkbox:checked {
+  background-color: var(--color-primary-600);
+  border-color: var(--color-primary-600);
+}
+
+.entity-select-all-checkbox:checked::after {
+  content: '';
+  width: 8px;
+  height: 4px;
+  border: solid white;
+  border-width: 0 0 2px 2px;
+  transform: rotate(-45deg);
+  margin-bottom: 1px;
+}
+
+.entity-select-all-label {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  user-select: none;
+}
+
+/* ==================== Loading State ==================== */
+.entity-list-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-16);
+  color: var(--color-text-tertiary);
+}
+
+/* ==================== Pagination ==================== */
+.entity-list-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-2);
+  padding-top: var(--spacing-6);
+}
+
+.pagination-btn {
+  min-width: 36px;
+  height: 36px;
+  padding: 0 var(--spacing-2);
+  border: 1px solid var(--color-border-medium);
+  border-radius: var(--radius-md);
+  background-color: var(--color-bg-primary);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pagination-btn:hover:not(:disabled) {
+  background-color: var(--color-bg-hover);
+  border-color: var(--color-border-dark);
+  color: var(--color-text-primary);
+}
+
+.pagination-btn.active {
+  background-color: var(--color-primary-600);
+  border-color: var(--color-primary-600);
+  color: white;
+  font-weight: var(--font-weight-semibold);
+}
+
+.pagination-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.pagination-btn:focus-visible {
+  outline: 2px solid var(--color-primary-600);
+  outline-offset: 2px;
+}
+
+.pagination-ellipsis {
+  padding: 0 var(--spacing-2);
+  color: var(--color-text-tertiary);
+}
+
+/* ==================== Responsive Design ==================== */
+@media (max-width: 1024px) {
+  .entity-grid {
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  }
+
+  .entity-grid.grid-wide {
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .entity-grid,
+  .entity-grid.grid-compact,
+  .entity-grid.grid-wide {
+    grid-template-columns: 1fr;
+  }
+
+  .entity-list-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .entity-list-stats,
+  .entity-list-controls {
+    justify-content: space-between;
+  }
+
+  .bulk-actions-bar {
+    flex-direction: column;
+    align-items: stretch;
+    padding: var(--spacing-3);
+    width: calc(100% - var(--spacing-4));
+  }
+
+  .bulk-selection-count {
+    padding-right: 0;
+    padding-bottom: var(--spacing-2);
+    border-right: none;
+    border-bottom: 1px solid var(--color-border-light);
+    text-align: center;
+  }
+
+  .bulk-actions-bar .btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .entity-list-pagination {
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 480px) {
+  .entity-grid {
+    gap: var(--spacing-3);
+  }
+
+  .entity-list {
+    gap: var(--spacing-2);
+  }
+
+  .entity-list-item {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .bulk-actions-bar {
+    bottom: var(--spacing-3);
+  }
+
+  .bulk-actions-bar.visible {
+    bottom: var(--spacing-3);
+  }
+}
+
+/* ==================== Accessibility ==================== */
+@media (prefers-reduced-motion: reduce) {
+  .entity-list-item,
+  .entity-view-toggle-btn,
+  .pagination-btn,
+  .bulk-actions-bar {
+    transition: none;
+  }
+
+  .bulk-actions-bar.visible {
+    transition: none;
+  }
+}
+
+/* ==================== Dark Mode (Future) ==================== */
+@media (prefers-color-scheme: dark) {
+  .entity-select-all-checkbox:checked::after {
+    border-color: var(--color-bg-primary);
+  }
+}
+
+/* ==================== Print Styles ==================== */
+@media print {
+  .bulk-actions-bar,
+  .entity-list-pagination,
+  .entity-view-toggle,
+  .entity-select-all {
+    display: none;
+  }
+
+  .entity-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--spacing-3);
+  }
+}
