@@ -8,11 +8,11 @@
   /* ==================== Color Semantics ==================== */
   /* Per UX Spec: Gold = Authoritative, Blue = Primary, Green = Verified, Amber = Attention, Red = Error */
 
-  /* Gold - Authoritative Notes and user overrides */
-  --color-gold: #F59E0B;
-  --color-gold-bg: #FFFBEB;
-  --color-gold-border: #F59E0B;
-  --color-gold-hover: #D97706;
+  /* Gold - Authoritative Notes and user overrides (Dark Theme) */
+  --color-gold: #FBBF24;
+  --color-gold-bg: rgba(251, 191, 36, 0.15);
+  --color-gold-border: #FBBF24;
+  --color-gold-hover: #FCD34D;
 
   /* Blue - Primary actions and interactive elements (adjusted for dark theme) */
   --color-blue: #5B9FFF;
