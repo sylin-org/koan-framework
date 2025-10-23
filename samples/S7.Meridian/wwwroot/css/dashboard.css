@@ -11,39 +11,28 @@
   padding: 24px;
   max-width: 1600px;
   margin: 0 auto;
-  background: var(--color-bg-base);
+  background: var(--color-bg-canvas);
 }
 
 /* ==================== Hero Section ==================== */
 .dashboard-hero {
-  background: linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(37, 99, 235, 0.05) 100%);
-  border: 1px solid var(--color-border-light);
-  color: var(--color-text-primary);
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border-subtle);
   padding: 48px;
   border-radius: 12px;
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 32px;
-  position: relative;
-  overflow: hidden;
+  transition: border-color 200ms ease;
 }
 
-.dashboard-hero::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: radial-gradient(circle at top right, rgba(59, 130, 246, 0.1) 0%, transparent 50%);
-  pointer-events: none;
+.dashboard-hero:hover {
+  border-color: var(--color-border-medium);
 }
 
 .hero-content {
   flex: 1;
-  position: relative;
-  z-index: 1;
 }
 
 .hero-title {
@@ -66,8 +55,6 @@
   display: flex;
   gap: 12px;
   flex-shrink: 0;
-  position: relative;
-  z-index: 1;
 }
 
 .hero-actions .btn {
@@ -103,10 +90,15 @@
 
 /* ==================== System Overview - Metrics Grid ==================== */
 .system-overview {
-  background: var(--color-bg-elevated);
-  border: 1px solid var(--color-border-light);
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border-subtle);
   border-radius: 12px;
   padding: 24px;
+  transition: border-color 200ms ease;
+}
+
+.system-overview:hover {
+  border-color: var(--color-border-medium);
 }
 
 .metrics-grid {
@@ -116,8 +108,8 @@
 }
 
 .metric-card {
-  background: var(--color-bg-base);
-  border: 1px solid var(--color-border-light);
+  background: var(--color-bg-canvas);
+  border: 1px solid var(--color-border-subtle);
   border-radius: 8px;
   padding: 20px;
   display: flex;
@@ -129,7 +121,8 @@
 .metric-card:hover {
   transform: translateY(-2px);
   box-shadow: var(--shadow-md);
-  border-color: var(--color-border-medium);
+  border-color: var(--color-border-interactive);
+  background: var(--color-bg-hover);
 }
 
 .metric-icon {
@@ -172,12 +165,17 @@
 
 /* ==================== Quick Actions Sidebar ==================== */
 .quick-actions {
-  background: var(--color-bg-elevated);
-  border: 1px solid var(--color-border-light);
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border-subtle);
   border-radius: 12px;
   padding: 20px;
   position: sticky;
   top: 24px;
+  transition: border-color 200ms ease;
+}
+
+.quick-actions:hover {
+  border-color: var(--color-border-medium);
 }
 
 .quick-actions-title {
@@ -198,8 +196,8 @@
   align-items: center;
   gap: 12px;
   padding: 12px;
-  background: var(--color-bg-base);
-  border: 1px solid var(--color-border-light);
+  background: var(--color-bg-canvas);
+  border: 1px solid var(--color-border-subtle);
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -209,7 +207,7 @@
 
 .quick-action-item:hover {
   background: var(--color-bg-hover);
-  border-color: var(--color-blue);
+  border-color: var(--color-border-interactive);
   transform: translateX(4px);
 }
 
@@ -241,10 +239,15 @@
 
 /* ==================== Recent Activity ==================== */
 .recent-activity {
-  background: var(--color-bg-elevated);
-  border: 1px solid var(--color-border-light);
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border-subtle);
   border-radius: 12px;
   padding: 24px;
+  transition: border-color 200ms ease;
+}
+
+.recent-activity:hover {
+  border-color: var(--color-border-medium);
 }
 
 .activity-list {
@@ -279,8 +282,8 @@
   width: 40px;
   height: 40px;
   border-radius: 8px;
-  background: var(--color-bg-base);
-  border: 1px solid var(--color-border-light);
+  background: var(--color-bg-canvas);
+  border: 1px solid var(--color-border-subtle);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -328,10 +331,15 @@
 
 /* ==================== Favorites ==================== */
 .favorites {
-  background: var(--color-bg-elevated);
-  border: 1px solid var(--color-border-light);
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border-subtle);
   border-radius: 12px;
   padding: 24px;
+  transition: border-color 200ms ease;
+}
+
+.favorites:hover {
+  border-color: var(--color-border-medium);
 }
 
 .favorites-section {
@@ -356,8 +364,8 @@
 }
 
 .favorite-type-card {
-  background: var(--color-bg-base);
-  border: 1px solid var(--color-border-light);
+  background: var(--color-bg-canvas);
+  border: 1px solid var(--color-border-subtle);
   border-radius: 8px;
   padding: 16px;
   display: flex;
@@ -369,7 +377,8 @@
 .favorite-type-card:hover {
   transform: translateY(-2px);
   box-shadow: var(--shadow-md);
-  border-color: var(--color-blue);
+  border-color: var(--color-border-interactive);
+  background: var(--color-bg-hover);
 }
 
 .favorite-type-header {
@@ -436,7 +445,7 @@
 
 /* ==================== Dashboard Error ==================== */
 .dashboard-error {
-  background: var(--color-bg-elevated);
+  background: var(--color-bg-secondary);
   border: 1px solid var(--color-red);
   border-radius: 12px;
   padding: 48px 24px;
