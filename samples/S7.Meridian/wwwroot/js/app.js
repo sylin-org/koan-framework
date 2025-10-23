@@ -56,8 +56,7 @@ class MeridianApp {
   async init() {
     console.log('[Meridian] Initializing...');
 
-    // Initialize keyboard shortcuts and settings sidebar
-    this.settingsSidebar.init();
+    // Initialize keyboard shortcuts
     this.keyboardShortcuts.init();
 
     // Setup navigation event listeners

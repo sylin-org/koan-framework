@@ -27,6 +27,7 @@ export class AnalysisTypesManager {
     this.searchQuery = '';
     this.sortBy = 'name';
     this.sortDirection = 'asc';
+    this.isLoading = false;
     this.aiCreateModal = null;
     this.pageHeader = new PageHeader(router, eventBus);
     this.searchFilter = new SearchFilter(eventBus, {
@@ -111,6 +112,11 @@ export class AnalysisTypesManager {
    * Render types list (grid or empty state)
    */
   renderTypesList() {
+    // Show loading skeleton while data is being fetched
+    if (this.isLoading) {
+      return LoadingState.render('card', { count: 6 });
+    }
+
     if (this.types.length === 0) {
       return this.renderEmptyState();
     }
@@ -257,6 +263,7 @@ export class AnalysisTypesManager {
    * Load types from API
    */
   async loadTypes() {
+    this.isLoading = true;
     try {
       this.types = await this.api.getAnalysisTypes();
       this.applyFilters();
@@ -265,6 +272,8 @@ export class AnalysisTypesManager {
       this.toast.error('Failed to load analysis types');
       this.types = [];
       this.filteredTypes = [];
+    } finally {
+      this.isLoading = false;
     }
   }
 

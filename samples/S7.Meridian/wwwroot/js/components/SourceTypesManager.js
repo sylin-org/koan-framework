@@ -27,6 +27,7 @@ export class SourceTypesManager {
     this.searchQuery = '';
     this.sortBy = 'name';
     this.sortDirection = 'asc';
+    this.isLoading = false;
     this.aiCreateModal = null;
     this.pageHeader = new PageHeader(router, eventBus);
     this.searchFilter = new SearchFilter(eventBus, {
