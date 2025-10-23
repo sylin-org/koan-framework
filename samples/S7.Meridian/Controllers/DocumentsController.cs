@@ -23,6 +23,13 @@ public sealed class DocumentsController : ControllerBase
         _jobs = jobs;
     }
 
+    [HttpGet]
+    public async Task<ActionResult<List<SourceDocument>>> GetDocuments(string pipelineId, CancellationToken ct)
+    {
+        var documents = await SourceDocument.Query(d => d.PipelineId == pipelineId, ct).ConfigureAwait(false);
+        return Ok(documents.ToList());
+    }
+
     [HttpPost]
     [RequestSizeLimit(200_000_000)]
     public async Task<ActionResult<DocumentIngestionResponse>> Upload(string pipelineId, [FromForm] List<IFormFile>? files, CancellationToken ct)

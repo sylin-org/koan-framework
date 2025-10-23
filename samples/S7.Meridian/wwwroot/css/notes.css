@@ -1,0 +1,351 @@
+/**
+ * Meridian Authoritative Notes Styles
+ * Gold visual treatment for user-provided authoritative information
+ * Per UX Spec: "Gold = Authoritative, user overrides, star ratings"
+ */
+
+/* ==================== Authoritative Notes Section ==================== */
+.authoritative-notes-section {
+  padding: 0;
+  margin: 0;
+  background-color: var(--color-gold-bg);
+  border-bottom: 1px solid var(--color-gold-border);
+  transition: all var(--transition-slow);
+  overflow: hidden;
+}
+
+.authoritative-notes-section[data-state="collapsed"] {
+  max-height: 0;
+  border-bottom-width: 0;
+}
+
+.authoritative-notes-section[data-state="expanded"] {
+  max-height: 600px; /* Will be overridden by JS for proper height */
+}
+
+.notes-container {
+  padding: var(--spacing-5) var(--spacing-6);
+}
+
+/* ==================== Notes Header ==================== */
+.notes-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--spacing-4);
+}
+
+.notes-title {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  font-size: var(--font-size-section-header);
+  font-weight: var(--font-weight-section-header);
+  color: var(--color-gold);
+}
+
+.notes-icon {
+  font-size: 24px;
+}
+
+.notes-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+}
+
+.btn-notes-action {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-1);
+  padding: var(--spacing-2) var(--spacing-3);
+  background-color: white;
+  color: var(--color-gold);
+  font-size: var(--font-size-small);
+  font-weight: 500;
+  border: 1px solid var(--color-gold-border);
+  border-radius: var(--radius-md);
+  transition: all var(--transition-fast);
+}
+
+.btn-notes-action:hover {
+  background-color: var(--color-gold);
+  color: white;
+}
+
+.btn-notes-action.btn-primary {
+  background-color: var(--color-gold);
+  color: white;
+  border-color: var(--color-gold);
+}
+
+.btn-notes-action.btn-primary:hover {
+  background-color: var(--color-gold-hover);
+  border-color: var(--color-gold-hover);
+}
+
+/* ==================== Notes Editor ==================== */
+.notes-editor {
+  position: relative;
+}
+
+.notes-textarea {
+  width: 100%;
+  min-height: 200px;
+  padding: var(--spacing-4);
+  background-color: white;
+  border: 2px solid var(--color-gold-border);
+  border-radius: var(--radius-lg);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-body);
+  line-height: 1.6;
+  color: var(--color-text-primary);
+  resize: vertical;
+  transition: all var(--transition-fast);
+}
+
+.notes-textarea:focus {
+  outline: none;
+  border-color: var(--color-gold);
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.1);
+}
+
+.notes-textarea::placeholder {
+  color: var(--color-text-tertiary);
+  font-style: italic;
+}
+
+.notes-help-text {
+  font-size: var(--font-size-small);
+  color: var(--color-text-secondary);
+  margin-top: var(--spacing-2);
+  font-style: italic;
+}
+
+/* ==================== Notes Preview/Display Mode ==================== */
+.notes-display {
+  padding: var(--spacing-4);
+  background-color: white;
+  border: 2px solid var(--color-gold-border);
+  border-radius: var(--radius-lg);
+  font-size: var(--font-size-body);
+  line-height: 1.6;
+  color: var(--color-text-primary);
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.notes-display-empty {
+  color: var(--color-text-tertiary);
+  font-style: italic;
+}
+
+/* ==================== Notes Metadata ==================== */
+.notes-metadata {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: var(--spacing-3);
+  padding-top: var(--spacing-3);
+  border-top: 1px solid rgba(245, 158, 11, 0.2);
+  font-size: var(--font-size-small);
+  color: var(--color-text-secondary);
+}
+
+.notes-override-count {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  font-weight: 500;
+}
+
+.notes-override-count .icon {
+  color: var(--color-gold);
+}
+
+.notes-last-edited {
+  font-style: italic;
+}
+
+/* ==================== Field Override Indicators ==================== */
+.notes-override-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-2);
+  margin-top: var(--spacing-3);
+}
+
+.override-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-1);
+  padding: var(--spacing-1) var(--spacing-2);
+  background-color: white;
+  border: 1px solid var(--color-gold-border);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-small);
+  color: var(--color-gold);
+  font-weight: 500;
+}
+
+.override-badge .icon {
+  font-size: 14px;
+}
+
+.override-badge-value {
+  color: var(--color-text-primary);
+  margin-left: var(--spacing-1);
+}
+
+.override-badge-previous {
+  color: var(--color-text-tertiary);
+  text-decoration: line-through;
+  margin-left: var(--spacing-1);
+  font-size: var(--font-size-metadata);
+}
+
+/* ==================== Live Matching Feedback ==================== */
+.notes-matching-feedback {
+  margin-top: var(--spacing-3);
+  padding: var(--spacing-3);
+  background-color: white;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: var(--radius-md);
+}
+
+.matching-feedback-title {
+  font-size: var(--font-size-small);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  margin-bottom: var(--spacing-2);
+}
+
+.matching-feedback-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-1);
+}
+
+.matching-feedback-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  font-size: var(--font-size-small);
+  padding: var(--spacing-1) 0;
+}
+
+.matching-feedback-item .icon {
+  color: var(--color-green);
+  flex-shrink: 0;
+}
+
+.matching-feedback-field {
+  font-weight: 500;
+  color: var(--color-text-primary);
+}
+
+.matching-feedback-value {
+  color: var(--color-text-secondary);
+}
+
+/* ==================== Reprocess Confirmation ==================== */
+.notes-reprocess-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-3);
+  background-color: rgba(37, 99, 235, 0.1);
+  border: 1px solid var(--color-blue);
+  border-radius: var(--radius-md);
+  margin-top: var(--spacing-3);
+}
+
+.reprocess-banner-text {
+  font-size: var(--font-size-small);
+  color: var(--color-blue-dark);
+}
+
+.reprocess-banner-actions {
+  display: flex;
+  gap: var(--spacing-2);
+}
+
+.btn-reprocess {
+  padding: var(--spacing-2) var(--spacing-3);
+  background-color: var(--color-blue);
+  color: white;
+  font-size: var(--font-size-small);
+  font-weight: 500;
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
+}
+
+.btn-reprocess:hover {
+  background-color: var(--color-blue-dark);
+}
+
+.btn-dismiss-reprocess {
+  padding: var(--spacing-2) var(--spacing-3);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-small);
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
+}
+
+.btn-dismiss-reprocess:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+/* ==================== Auto-save Indicator ==================== */
+.notes-save-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-1);
+  padding: var(--spacing-1) var(--spacing-2);
+  background-color: white;
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-small);
+  color: var(--color-text-tertiary);
+  transition: all var(--transition-fast);
+}
+
+.notes-save-indicator[data-status="saving"] {
+  color: var(--color-blue);
+  border-color: var(--color-blue);
+}
+
+.notes-save-indicator[data-status="saved"] {
+  color: var(--color-green);
+  border-color: var(--color-green);
+}
+
+.notes-save-indicator[data-status="error"] {
+  color: var(--color-red);
+  border-color: var(--color-red);
+}
+
+.save-indicator-icon {
+  font-size: 12px;
+}
+
+/* ==================== Responsive Adjustments ==================== */
+@media (max-width: 768px) {
+  .notes-container {
+    padding: var(--spacing-4);
+  }
+
+  .notes-textarea {
+    min-height: 150px;
+    font-size: var(--font-size-small);
+  }
+
+  .notes-override-list {
+    flex-direction: column;
+  }
+
+  .override-badge {
+    width: 100%;
+    justify-content: space-between;
+  }
+}

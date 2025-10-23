@@ -1,0 +1,288 @@
+/**
+ * Meridian Design Tokens
+ * Based on UX Specification Section VII - Visual Design System
+ * Color semantics follow the principle: "Color conveys meaning, not decoration"
+ */
+
+:root {
+  /* ==================== Color Semantics ==================== */
+  /* Per UX Spec: Gold = Authoritative, Blue = Primary, Green = Verified, Amber = Attention, Red = Error */
+
+  /* Gold - Authoritative Notes and user overrides */
+  --color-gold: #F59E0B;
+  --color-gold-bg: #FFFBEB;
+  --color-gold-border: #F59E0B;
+  --color-gold-hover: #D97706;
+
+  /* Blue - Primary actions and interactive elements */
+  --color-blue: #2563EB;
+  --color-blue-light: #3B82F6;
+  --color-blue-dark: #1D4ED8;
+  --color-blue-bg: rgba(37, 99, 235, 0.1);
+
+  /* Green - Verified/High confidence (>90%) */
+  --color-green: #059669;
+  --color-green-light: #10B981;
+  --color-green-bg: rgba(5, 150, 105, 0.1);
+
+  /* Amber - Attention needed, medium confidence */
+  --color-amber: #D97706;
+  --color-amber-light: #F59E0B;
+  --color-amber-bg: rgba(217, 119, 6, 0.1);
+
+  /* Red - Error/Critical, low confidence */
+  --color-red: #DC2626;
+  --color-red-light: #EF4444;
+  --color-red-bg: rgba(220, 38, 38, 0.1);
+
+  /* Gray - Secondary text, document sources, metadata */
+  --color-gray-50: #F9FAFB;
+  --color-gray-100: #F3F4F6;
+  --color-gray-200: #E5E7EB;
+  --color-gray-300: #D1D5DB;
+  --color-gray-400: #9CA3AF;
+  --color-gray-500: #6B7280;
+  --color-gray-600: #4B5563;
+  --color-gray-700: #374151;
+  --color-gray-800: #1F2937;
+  --color-gray-900: #111827;
+
+  /* Neutral backgrounds */
+  --color-bg-primary: #FFFFFF;
+  --color-bg-secondary: #F9FAFB;
+  --color-bg-tertiary: #F3F4F6;
+  --color-bg-elevated: #FFFFFF;
+
+  /* Text colors */
+  --color-text-primary: #111827;
+  --color-text-secondary: #6B7280;
+  --color-text-tertiary: #9CA3AF;
+  --color-text-inverse: #FFFFFF;
+
+  /* Border colors */
+  --color-border-light: #E5E7EB;
+  --color-border-medium: #D1D5DB;
+  --color-border-dark: #9CA3AF;
+
+  /* ==================== Typography Hierarchy ==================== */
+  /* Per UX Spec: Value is hero, everything else supports */
+
+  /* Font families */
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  --font-mono: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Consolas', monospace;
+
+  /* Analysis Title - The Entity */
+  --font-size-analysis-title: 32px;
+  --line-height-analysis-title: 40px;
+  --font-weight-analysis-title: 600;
+
+  /* Section Headers - Grouping */
+  --font-size-section-header: 20px;
+  --line-height-section-header: 28px;
+  --font-weight-section-header: 600;
+
+  /* Field Value - The Data (Hero) */
+  --font-size-field-value: 28px;
+  --line-height-field-value: 36px;
+  --font-weight-field-value: 700;
+
+  /* Field Label - Context */
+  --font-size-field-label: 16px;
+  --line-height-field-label: 24px;
+  --font-weight-field-label: 500;
+
+  /* Evidence Text - Source passages */
+  --font-size-evidence: 14px;
+  --line-height-evidence: 20px;
+  --font-weight-evidence: 400;
+  --font-style-evidence: italic;
+
+  /* Metadata - Timestamps, document refs */
+  --font-size-metadata: 12px;
+  --line-height-metadata: 16px;
+  --font-weight-metadata: 400;
+
+  /* Body text */
+  --font-size-body: 14px;
+  --line-height-body: 20px;
+
+  /* Small text */
+  --font-size-small: 12px;
+  --line-height-small: 16px;
+
+  /* ==================== Spacing System ==================== */
+  /* Per UX Spec: Generous whitespace for clarity */
+
+  /* Card padding */
+  --spacing-card: 20px;
+
+  /* Section gaps */
+  --spacing-section: 24px;
+
+  /* Label to value */
+  --spacing-label-value: 16px;
+
+  /* Evidence spacing */
+  --spacing-evidence-before: 12px;
+  --spacing-evidence-within: 8px;
+
+  /* Action button spacing */
+  --spacing-actions: 8px;
+  --spacing-actions-large: 12px;
+
+  /* Base spacing scale (8px system) */
+  --spacing-1: 4px;
+  --spacing-2: 8px;
+  --spacing-3: 12px;
+  --spacing-4: 16px;
+  --spacing-5: 20px;
+  --spacing-6: 24px;
+  --spacing-8: 32px;
+  --spacing-10: 40px;
+  --spacing-12: 48px;
+  --spacing-16: 64px;
+
+  /* ==================== Border Radius ==================== */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-full: 9999px;
+
+  /* ==================== Shadows ==================== */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+
+  /* ==================== Transitions ==================== */
+  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-base: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* ==================== Z-Index Scale ==================== */
+  --z-dropdown: 1000;
+  --z-sticky: 1020;
+  --z-fixed: 1030;
+  --z-modal-backdrop: 1040;
+  --z-modal: 1050;
+  --z-popover: 1060;
+  --z-tooltip: 1070;
+}
+
+/* ==================== Global Resets & Base Styles ==================== */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: var(--font-sans);
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+  color: var(--color-text-primary);
+  background-color: var(--color-bg-primary);
+}
+
+/* ==================== Typography Utilities ==================== */
+h1, h2, h3, h4, h5, h6 {
+  margin: 0;
+  font-weight: 600;
+}
+
+p {
+  margin: 0;
+}
+
+a {
+  color: var(--color-blue);
+  text-decoration: none;
+  transition: color var(--transition-fast);
+}
+
+a:hover {
+  color: var(--color-blue-dark);
+}
+
+/* ==================== Button Reset ==================== */
+button {
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  user-select: none;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* ==================== Input Reset ==================== */
+input,
+textarea {
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+  color: inherit;
+}
+
+/* ==================== Focus Styles ==================== */
+:focus {
+  outline: none;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-blue);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* ==================== Scrollbar Styling ==================== */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-gray-100);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-gray-300);
+  border-radius: var(--radius-full);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-gray-400);
+}
+
+/* ==================== Selection Styling ==================== */
+::selection {
+  background-color: var(--color-blue-bg);
+  color: var(--color-blue-dark);
+}
+
+/* ==================== Accessibility ==================== */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

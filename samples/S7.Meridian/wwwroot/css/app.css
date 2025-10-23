@@ -1,0 +1,563 @@
+/**
+ * Meridian Main Application Layout
+ * Overall page structure: Header, Sidebar, Main Content, Footer
+ */
+
+/* ==================== Layout Structure ==================== */
+body {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 60px;
+  padding: 0 var(--spacing-6);
+  background-color: var(--color-bg-elevated);
+  border-bottom: 1px solid var(--color-border-light);
+  flex-shrink: 0;
+}
+
+.app-content {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.status-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 32px;
+  padding: 0 var(--spacing-4);
+  background-color: var(--color-bg-secondary);
+  border-top: 1px solid var(--color-border-light);
+  font-size: var(--font-size-small);
+  color: var(--color-text-secondary);
+  flex-shrink: 0;
+}
+
+/* ==================== Header ==================== */
+.header-left,
+.header-center,
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-4);
+}
+
+.header-left {
+  flex: 0 0 auto;
+}
+
+.header-center {
+  flex: 1 1 auto;
+  justify-content: center;
+  min-width: 0;
+}
+
+.header-right {
+  flex: 0 0 auto;
+}
+
+.logo {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  letter-spacing: -0.02em;
+}
+
+.btn-back {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  padding: var(--spacing-2) var(--spacing-3);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-small);
+  border-radius: var(--radius-md);
+  transition: all var(--transition-fast);
+}
+
+.btn-back:hover {
+  background-color: var(--color-bg-tertiary);
+  color: var(--color-text-primary);
+}
+
+.analysis-title-zone {
+  text-align: center;
+}
+
+.analysis-title {
+  font-size: var(--font-size-section-header);
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.analysis-metadata {
+  font-size: var(--font-size-small);
+  color: var(--color-text-secondary);
+  margin-top: var(--spacing-1);
+}
+
+/* ==================== Sidebars ==================== */
+.sidebar-left {
+  width: 260px;
+  background-color: var(--color-bg-secondary);
+  border-right: 1px solid var(--color-border-light);
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+
+.sidebar-section {
+  padding: var(--spacing-4) var(--spacing-3);
+  border-bottom: 1px solid var(--color-border-light);
+}
+
+.sidebar-section:last-child {
+  border-bottom: none;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-tertiary);
+  margin-bottom: var(--spacing-3);
+}
+
+.btn-new-analysis {
+  color: var(--color-text-tertiary);
+  padding: var(--spacing-1);
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
+}
+
+.btn-new-analysis:hover {
+  background-color: var(--color-bg-tertiary);
+  color: var(--color-text-primary);
+}
+
+.section-items {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-1);
+}
+
+.sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  padding: var(--spacing-2) var(--spacing-3);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-small);
+  border-radius: var(--radius-md);
+  transition: all var(--transition-fast);
+  text-align: left;
+  width: 100%;
+}
+
+.sidebar-item:hover {
+  background-color: var(--color-bg-tertiary);
+  color: var(--color-text-primary);
+}
+
+.sidebar-item.active {
+  background-color: var(--color-blue-bg);
+  color: var(--color-blue);
+}
+
+.item-icon {
+  flex-shrink: 0;
+}
+
+.item-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.item-badge {
+  flex-shrink: 0;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 var(--spacing-1);
+  background-color: var(--color-gray-300);
+  color: var(--color-gray-700);
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sidebar-item.active .item-badge {
+  background-color: var(--color-blue);
+  color: var(--color-text-inverse);
+}
+
+.item-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  margin-left: auto;
+}
+
+/* ==================== Main Content ==================== */
+.main-content {
+  flex: 1;
+  overflow-y: auto;
+  background-color: var(--color-bg-primary);
+}
+
+.workspace {
+  display: none;
+  flex-direction: column;
+  height: 100%;
+}
+
+.workspace.active {
+  display: flex;
+}
+
+.content-header {
+  padding: var(--spacing-6);
+  border-bottom: 1px solid var(--color-border-light);
+  flex-shrink: 0;
+}
+
+.header-title-zone {
+  margin-bottom: var(--spacing-2);
+}
+
+.page-title {
+  font-size: var(--font-size-analysis-title);
+  font-weight: var(--font-weight-analysis-title);
+  line-height: var(--line-height-analysis-title);
+  color: var(--color-text-primary);
+}
+
+.page-subtitle {
+  font-size: var(--font-size-body);
+  color: var(--color-text-secondary);
+  margin-top: var(--spacing-2);
+}
+
+/* ==================== Analyses Grid (List View) ==================== */
+.analyses-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: var(--spacing-6);
+  padding: var(--spacing-6);
+}
+
+.analysis-card {
+  background-color: var(--color-bg-elevated);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-5);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.analysis-card:hover {
+  border-color: var(--color-border-medium);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+
+.analysis-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: var(--spacing-3);
+}
+
+.analysis-card-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin-bottom: var(--spacing-1);
+}
+
+.analysis-card-type {
+  font-size: var(--font-size-small);
+  color: var(--color-text-tertiary);
+}
+
+.analysis-card-stats {
+  display: flex;
+  gap: var(--spacing-4);
+  padding-top: var(--spacing-3);
+  border-top: 1px solid var(--color-border-light);
+  font-size: var(--font-size-small);
+  color: var(--color-text-secondary);
+}
+
+.analysis-card-stat {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-1);
+}
+
+/* ==================== Status Bar ==================== */
+.status-left,
+.status-right {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-4);
+}
+
+.btn-shortcuts {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  padding: var(--spacing-1) var(--spacing-2);
+  color: var(--color-text-tertiary);
+  font-size: var(--font-size-small);
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
+}
+
+.btn-shortcuts:hover {
+  background-color: var(--color-bg-tertiary);
+  color: var(--color-text-primary);
+}
+
+/* ==================== Loading State ==================== */
+.app-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  background: var(--color-bg-base);
+}
+
+.spinner {
+  animation: spin 1s linear infinite;
+  color: var(--color-blue);
+  margin-bottom: var(--spacing-4);
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.app-loading p {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-body);
+}
+
+/* ==================== View Containers ==================== */
+#app {
+  width: 100%;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.analyses-list-view,
+.types-management-view,
+.workspace-view {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ==================== View Headers ==================== */
+.view-header {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-4);
+  padding: var(--spacing-4) var(--spacing-6);
+  background: var(--color-bg-elevated);
+  border-bottom: 1px solid var(--color-border-light);
+  flex-shrink: 0;
+}
+
+.view-title {
+  flex: 1;
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.view-actions {
+  display: flex;
+  gap: var(--spacing-3);
+}
+
+/* ==================== Workspace View ==================== */
+.workspace-header {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-4);
+  padding: var(--spacing-4) var(--spacing-6);
+  background: var(--color-bg-elevated);
+  border-bottom: 1px solid var(--color-border-light);
+  flex-shrink: 0;
+}
+
+.workspace-title-zone {
+  flex: 1;
+}
+
+.workspace-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.workspace-metadata {
+  font-size: var(--font-size-small);
+  color: var(--color-text-secondary);
+  margin-top: 4px;
+}
+
+.workspace-actions {
+  display: flex;
+  gap: var(--spacing-2);
+}
+
+/* ==================== Types Grid ==================== */
+.types-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  gap: var(--spacing-5);
+  padding: var(--spacing-6);
+}
+
+.type-card {
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-5);
+  transition: all var(--transition-fast);
+}
+
+.type-card:hover {
+  border-color: var(--color-border-medium);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+
+.type-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--spacing-3);
+}
+
+.type-card-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0;
+  flex: 1;
+  min-width: 0;
+}
+
+.type-badge {
+  padding: 4px 8px;
+  background: var(--color-gray-200);
+  color: var(--color-gray-700);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  border-radius: var(--radius-sm);
+  letter-spacing: 0.05em;
+}
+
+.type-card-description {
+  font-size: var(--font-size-small);
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+  margin: 0 0 var(--spacing-4) 0;
+}
+
+/* ==================== Error State ==================== */
+.error-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  padding: var(--spacing-6);
+  text-align: center;
+}
+
+.error-state h2 {
+  color: var(--color-red);
+  margin: 0 0 var(--spacing-2) 0;
+}
+
+.error-state p {
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+/* ==================== Analyses Grid Scrollable Container ==================== */
+.analyses-list-view > .analyses-grid,
+.types-management-view > .types-grid {
+  overflow-y: auto;
+}
+
+/* ==================== Responsive Layout ==================== */
+@media (max-width: 1024px) {
+  .sidebar-left {
+    width: 220px;
+  }
+
+  .types-grid {
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .sidebar-left {
+    position: absolute;
+    left: -260px;
+    z-index: var(--z-fixed);
+    height: 100%;
+    transition: left var(--transition-slow);
+  }
+
+  .sidebar-left.open {
+    left: 0;
+  }
+
+  .analyses-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .types-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .view-header {
+    flex-wrap: wrap;
+  }
+
+  .view-actions {
+    width: 100%;
+    order: 3;
+  }
+}

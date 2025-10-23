@@ -1,0 +1,298 @@
+/**
+ * Insights Panel - SnapVault-inspired dark theme with compact fact rows
+ * 3x information density vs. card-based layout
+ */
+
+/* ==================== Panel Container ==================== */
+.insights-panel {
+  background: #1a1d24;
+  color: rgba(255, 255, 255, 0.95);
+  border-radius: 12px;
+  overflow: hidden;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ==================== Section Layout ==================== */
+.insights-section {
+  padding: 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.insights-section:last-child {
+  border-bottom: none;
+}
+
+.insights-section-header {
+  margin-bottom: 16px;
+}
+
+.insights-section-title {
+  font-size: 14px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: rgba(255, 255, 255, 0.6);
+  margin: 0;
+}
+
+/* ==================== Rows Container ==================== */
+.insights-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ==================== Insight Row (Fact Row Pattern) ==================== */
+.insight-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.03);
+  transition: background 0.2s ease;
+}
+
+.insight-row:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+/* Gold highlight for notes-sourced insights */
+.insight-row-notes,
+.insight-row[data-source="notes"] {
+  background: rgba(245, 158, 11, 0.08);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+}
+
+.insight-row-notes:hover {
+  background: rgba(245, 158, 11, 0.12);
+  border-color: rgba(245, 158, 11, 0.3);
+}
+
+/* ==================== Label & Value (CRITICAL: Compact Sizing) ==================== */
+.insight-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.6);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.insight-value-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.insight-value {
+  font-size: 14px; /* NOT 28px - compact display */
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.95);
+  line-height: 1.4;
+  flex: 1;
+  word-break: break-word;
+}
+
+/* ==================== Tags (Source & Confidence) ==================== */
+.insight-tags {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+/* Source tags */
+.tag-source[data-source="notes"] {
+  background: rgba(245, 158, 11, 0.15);
+  color: rgba(251, 191, 36, 1);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.tag-source[data-source="doc"] {
+  background: rgba(59, 130, 246, 0.15);
+  color: rgba(96, 165, 250, 1);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+/* Confidence tags */
+.tag-confidence[data-confidence="high"] {
+  background: rgba(5, 150, 105, 0.15);
+  color: rgba(52, 211, 153, 1);
+  border: 1px solid rgba(5, 150, 105, 0.3);
+}
+
+.tag-confidence[data-confidence="medium"] {
+  background: rgba(217, 119, 6, 0.15);
+  color: rgba(251, 146, 60, 1);
+  border: 1px solid rgba(217, 119, 6, 0.3);
+}
+
+.tag-confidence[data-confidence="low"] {
+  background: rgba(220, 38, 38, 0.15);
+  color: rgba(248, 113, 113, 1);
+  border: 1px solid rgba(220, 38, 38, 0.3);
+}
+
+/* ==================== Override Notice ==================== */
+.insight-override-notice {
+  font-size: 11px;
+  color: rgba(251, 191, 36, 0.9);
+  background: rgba(245, 158, 11, 0.1);
+  padding: 6px 8px;
+  border-radius: 4px;
+  border: 1px solid rgba(245, 158, 11, 0.2);
+  margin-top: 4px;
+}
+
+/* ==================== Document Reference ==================== */
+.insight-doc-reference {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.5);
+  font-style: italic;
+  margin-top: 4px;
+}
+
+/* ==================== Summary Section ==================== */
+.insights-summary-content {
+  font-size: 13px;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.85);
+  white-space: pre-wrap;
+}
+
+/* ==================== Actions Section ==================== */
+.insights-actions {
+  display: flex;
+  gap: 12px;
+  padding: 16px 20px;
+  background: rgba(0, 0, 0, 0.2);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.insights-actions .btn {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.insights-actions .btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+/* ==================== Empty State ==================== */
+.insights-panel-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 48px 24px;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.insights-panel-empty svg {
+  margin-bottom: 16px;
+  opacity: 0.5;
+}
+
+.insights-panel-empty p {
+  margin: 0 0 8px 0;
+  font-size: 16px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.empty-hint {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+/* ==================== Scrolling ==================== */
+.insights-panel {
+  overflow-y: auto;
+}
+
+.insights-panel::-webkit-scrollbar {
+  width: 8px;
+}
+
+.insights-panel::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.insights-panel::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+}
+
+.insights-panel::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* ==================== Responsive Adjustments ==================== */
+@media (max-width: 768px) {
+  .insights-section {
+    padding: 16px;
+  }
+
+  .insights-rows {
+    gap: 12px;
+  }
+
+  .insight-row {
+    padding: 10px;
+  }
+
+  .insight-value-container {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .insight-tags {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .insights-actions {
+    flex-direction: column;
+  }
+
+  .insights-actions .btn {
+    width: 100%;
+  }
+}
+
+/* ==================== Information Density Comparison ==================== */
+/*
+  BEFORE (Card Layout):
+  - 400px card height
+  - 28px value font size
+  - 32px padding
+  - ~3-4 insights per screen
+
+  AFTER (Fact Row Layout):
+  - ~80px row height
+  - 14px value font size
+  - 12px padding
+  - ~10-12 insights per screen
+
+  RESULT: 3x information density improvement
+*/

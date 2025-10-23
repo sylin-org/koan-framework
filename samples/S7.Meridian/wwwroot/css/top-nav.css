@@ -1,0 +1,317 @@
+/**
+ * Top Navigation - Persistent navigation menu
+ * Sticky header with main navigation links
+ */
+
+/* ==================== Top Nav Container ==================== */
+.top-nav {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  background: var(--color-bg-elevated);
+  border-bottom: 1px solid var(--color-border-light);
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+}
+
+.top-nav-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  height: 64px;
+}
+
+/* ==================== Brand/Logo ==================== */
+.top-nav-brand {
+  flex-shrink: 0;
+}
+
+.brand-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  color: var(--color-text-primary);
+  font-weight: 600;
+  font-size: 18px;
+  transition: opacity 0.2s ease;
+}
+
+.brand-link:hover {
+  opacity: 0.8;
+}
+
+.brand-icon {
+  color: var(--color-blue);
+  flex-shrink: 0;
+}
+
+.brand-name {
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+/* ==================== Navigation Links ==================== */
+.top-nav-links {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+}
+
+.top-nav-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  text-decoration: none;
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.top-nav-link:hover {
+  color: var(--color-text-primary);
+  background: var(--color-bg-hover);
+}
+
+.top-nav-link.active {
+  color: var(--color-blue);
+  background: var(--color-blue-bg);
+}
+
+.top-nav-link.active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 16px;
+  right: 16px;
+  height: 2px;
+  background: var(--color-blue);
+}
+
+.nav-icon {
+  flex-shrink: 0;
+  opacity: 0.8;
+}
+
+.top-nav-link.active .nav-icon {
+  opacity: 1;
+}
+
+.nav-label {
+  white-space: nowrap;
+}
+
+/* ==================== Right Actions ==================== */
+.top-nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.top-nav-action-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-secondary);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.top-nav-action-btn:hover {
+  color: var(--color-text-primary);
+  background: var(--color-bg-hover);
+}
+
+.mobile-menu-toggle {
+  display: none; /* Hidden on desktop */
+}
+
+/* ==================== Mobile Menu ==================== */
+.mobile-menu {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  z-index: 2000;
+  display: none;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.mobile-menu.open {
+  display: flex;
+  flex-direction: column;
+  opacity: 1;
+}
+
+.mobile-menu-header {
+  background: var(--color-bg-elevated);
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--color-border-light);
+  flex-shrink: 0;
+}
+
+.mobile-menu-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.mobile-menu-close {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-secondary);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.mobile-menu-close:hover {
+  color: var(--color-text-primary);
+  background: var(--color-bg-hover);
+}
+
+.mobile-menu-links {
+  background: var(--color-bg-elevated);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.mobile-menu-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 8px;
+  text-decoration: none;
+  color: var(--color-text-primary);
+  font-size: 16px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.mobile-menu-link:hover {
+  background: var(--color-bg-hover);
+}
+
+.mobile-menu-link.active {
+  color: var(--color-blue);
+  background: var(--color-blue-bg);
+}
+
+.mobile-menu-link .nav-icon {
+  opacity: 0.7;
+}
+
+.mobile-menu-link.active .nav-icon {
+  opacity: 1;
+}
+
+/* ==================== App Content Adjustment ==================== */
+/* Ensure content doesn't hide under sticky nav */
+.app-with-nav {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-with-nav .top-nav {
+  flex-shrink: 0;
+}
+
+.app-with-nav .app-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ==================== Responsive Design ==================== */
+@media (max-width: 768px) {
+  .top-nav-container {
+    padding: 0 16px;
+    gap: 16px;
+  }
+
+  /* Hide desktop links on mobile */
+  .top-nav-links {
+    display: none;
+  }
+
+  /* Show mobile menu toggle */
+  .mobile-menu-toggle {
+    display: flex;
+  }
+
+  /* Brand adjustments */
+  .brand-name {
+    display: none; /* Show icon only on very small screens */
+  }
+}
+
+@media (max-width: 480px) {
+  .top-nav-container {
+    height: 56px;
+  }
+}
+
+/* ==================== Desktop Navigation Hidden Labels (Optional) ==================== */
+@media (max-width: 1024px) and (min-width: 769px) {
+  /* On tablets, optionally hide labels and show icons only */
+  .nav-label {
+    display: none;
+  }
+
+  .top-nav-link {
+    padding: 8px 12px;
+  }
+}
+
+/* ==================== Accessibility ==================== */
+@media (prefers-reduced-motion: reduce) {
+  .top-nav-link,
+  .top-nav-action-btn,
+  .brand-link,
+  .mobile-menu,
+  .mobile-menu-link {
+    transition: none;
+  }
+}
+
+.top-nav-link:focus-visible,
+.top-nav-action-btn:focus-visible,
+.mobile-menu-close:focus-visible {
+  outline: 2px solid var(--color-blue);
+  outline-offset: 2px;
+}
+
+/* ==================== Dark Mode Support (Future) ==================== */
+@media (prefers-color-scheme: dark) {
+  /* Dark mode styles can be added here in the future */
+}
