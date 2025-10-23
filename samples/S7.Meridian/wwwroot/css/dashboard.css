@@ -16,19 +16,34 @@
 
 /* ==================== Hero Section ==================== */
 .dashboard-hero {
-  background: linear-gradient(135deg, var(--color-blue) 0%, #1e40af 100%);
-  color: white;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(37, 99, 235, 0.05) 100%);
+  border: 1px solid var(--color-border-light);
+  color: var(--color-text-primary);
   padding: 48px;
-  border-radius: 16px;
+  border-radius: 12px;
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 32px;
-  box-shadow: var(--shadow-lg);
+  position: relative;
+  overflow: hidden;
+}
+
+.dashboard-hero::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: radial-gradient(circle at top right, rgba(59, 130, 246, 0.1) 0%, transparent 50%);
+  pointer-events: none;
 }
 
 .hero-content {
   flex: 1;
+  position: relative;
+  z-index: 1;
 }
 
 .hero-title {
@@ -36,13 +51,14 @@
   font-weight: 700;
   margin: 0 0 12px 0;
   line-height: 1.2;
+  color: var(--color-text-primary);
 }
 
 .hero-subtitle {
   font-size: 18px;
   line-height: 1.6;
   margin: 0;
-  opacity: 0.95;
+  color: var(--color-text-secondary);
   max-width: 600px;
 }
 
@@ -50,32 +66,12 @@
   display: flex;
   gap: 12px;
   flex-shrink: 0;
+  position: relative;
+  z-index: 1;
 }
 
 .hero-actions .btn {
   white-space: nowrap;
-}
-
-.hero-actions .btn-primary {
-  background: white;
-  color: var(--color-blue);
-  border: none;
-}
-
-.hero-actions .btn-primary:hover {
-  background: rgba(255, 255, 255, 0.9);
-  transform: translateY(-2px);
-}
-
-.hero-actions .btn-secondary {
-  background: rgba(255, 255, 255, 0.15);
-  color: white;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-}
-
-.hero-actions .btn-secondary:hover {
-  background: rgba(255, 255, 255, 0.25);
-  border-color: rgba(255, 255, 255, 0.5);
 }
 
 /* ==================== Dashboard Content Layout ==================== */
