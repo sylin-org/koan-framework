@@ -568,17 +568,22 @@ export class AnalysisTypesManager {
 
     try {
       const createdType = await this.aiCreateModal.openAICreate();
+      console.log('AI Create completed, returned:', createdType);
 
-      if (createdType) {
-        // Reload types
-        await this.loadTypes();
+      // Always reload types after AI create attempt
+      // (Backend might have created it even if modal didn't return proper data)
+      await this.loadTypes();
 
-        // Refresh view
-        const container = document.querySelector('#app');
-        if (container) this.updateView(container);
-      }
+      // Refresh view
+      const container = document.querySelector('#app');
+      if (container) this.updateView(container);
+
     } catch (error) {
       console.error('AI Create modal error:', error);
+      // Still reload in case backend succeeded but frontend failed
+      await this.loadTypes();
+      const container = document.querySelector('#app');
+      if (container) this.updateView(container);
     }
   }
 
