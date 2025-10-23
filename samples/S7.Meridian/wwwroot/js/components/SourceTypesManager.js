@@ -13,6 +13,7 @@ import { AICreateTypeModal } from './AICreateTypeModal.js';
 import { EmptyState } from './EmptyState.js';
 import { LoadingState } from './LoadingState.js';
 import { PageHeader } from './PageHeader.js';
+import { SearchFilter } from './SearchFilter.js';
 
 export class SourceTypesManager {
   constructor(api, eventBus, toast, router) {
@@ -24,8 +25,20 @@ export class SourceTypesManager {
     this.filteredTypes = [];
     this.selectedIds = new Set();
     this.searchQuery = '';
+    this.sortBy = 'name';
+    this.sortDirection = 'asc';
     this.aiCreateModal = null;
     this.pageHeader = new PageHeader(router, eventBus);
+    this.searchFilter = new SearchFilter(eventBus, {
+      searchPlaceholder: 'Search source types by name or tags...',
+      sortOptions: [
+        { value: 'name', label: 'Name' },
+        { value: 'updated', label: 'Recently Updated' },
+        { value: 'created', label: 'Recently Created' }
+      ],
+      defaultSort: 'name',
+      defaultSortDirection: 'asc'
+    });
   }
 
   /**
@@ -85,19 +98,7 @@ export class SourceTypesManager {
   renderToolbar() {
     return `
       <div class="types-manager-toolbar">
-        <div class="search-box">
-          <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="11" cy="11" r="8"></circle>
-            <path d="m21 21-4.35-4.35"></path>
-          </svg>
-          <input
-            type="text"
-            class="search-input"
-            placeholder="Search by name or tags..."
-            value="${this.escapeHtml(this.searchQuery)}"
-            data-search-input
-          />
-        </div>
+        ${this.searchFilter.render()}
         <div class="types-manager-stats">
           <span class="stat-badge">${this.filteredTypes.length} ${this.filteredTypes.length === 1 ? 'type' : 'types'}</span>
           ${this.selectedIds.size > 0 ? `<span class="stat-badge stat-selected">${this.selectedIds.size} selected</span>` : ''}
@@ -264,28 +265,48 @@ export class SourceTypesManager {
   }
 
   /**
-   * Apply search filters
+   * Apply search filters and sorting
    */
   applyFilters() {
     const query = this.searchQuery.toLowerCase().trim();
 
-    if (!query) {
-      this.filteredTypes = [...this.types];
-      return;
+    // Filter
+    let filtered = [...this.types];
+    if (query) {
+      filtered = filtered.filter(type => {
+        // Search in name
+        if (type.name?.toLowerCase().includes(query)) return true;
+
+        // Search in description
+        if (type.description?.toLowerCase().includes(query)) return true;
+
+        // Search in tags
+        if (type.tags?.some(tag => tag.toLowerCase().includes(query))) return true;
+
+        return false;
+      });
     }
 
-    this.filteredTypes = this.types.filter(type => {
-      // Search in name
-      if (type.name?.toLowerCase().includes(query)) return true;
+    // Sort
+    filtered.sort((a, b) => {
+      let comparison = 0;
 
-      // Search in description
-      if (type.description?.toLowerCase().includes(query)) return true;
+      switch (this.sortBy) {
+        case 'name':
+          comparison = (a.name || '').localeCompare(b.name || '');
+          break;
+        case 'updated':
+          comparison = new Date(b.updatedAt || b.createdAt || 0) - new Date(a.updatedAt || a.createdAt || 0);
+          break;
+        case 'created':
+          comparison = new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+          break;
+      }
 
-      // Search in tags
-      if (type.tags?.some(tag => tag.toLowerCase().includes(query))) return true;
-
-      return false;
+      return this.sortDirection === 'asc' ? comparison : -comparison;
     });
+
+    this.filteredTypes = filtered;
   }
 
   /**
@@ -310,27 +331,18 @@ export class SourceTypesManager {
     };
     this.eventBus.on('page-header-action', headerActionHandler);
 
-    // Search input
-    const searchInput = container.querySelector('[data-search-input]');
-    if (searchInput) {
-      searchInput.addEventListener('input', (e) => {
-        this.searchQuery = e.target.value;
-        this.applyFilters();
-        this.updateView(container);
-      });
-    }
+    // Attach SearchFilter event handlers
+    this.searchFilter.attachEventHandlers(container);
 
-    // Clear search button
-    const clearSearchBtn = container.querySelector('[data-action="clear-search"]');
-    if (clearSearchBtn) {
-      clearSearchBtn.addEventListener('click', () => {
-        this.searchQuery = '';
-        const searchInput = container.querySelector('[data-search-input]');
-        if (searchInput) searchInput.value = '';
-        this.applyFilters();
-        this.updateView(container);
-      });
-    }
+    // Listen for search/filter changes
+    const searchFilterHandler = (state) => {
+      this.searchQuery = state.search || '';
+      this.sortBy = state.sortBy || 'name';
+      this.sortDirection = state.sortDirection || 'asc';
+      this.applyFilters();
+      this.updateView(container);
+    };
+    this.eventBus.on('search-filter-changed', searchFilterHandler);
 
     // Bulk selection checkboxes
     const checkboxes = container.querySelectorAll('[data-checkbox]');
