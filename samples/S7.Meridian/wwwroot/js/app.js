@@ -15,6 +15,8 @@ import { InsightsPanel } from './components/InsightsPanel.js';
 import { TypeFormView } from './components/TypeFormView.js';
 import { AnalysisTypesManager } from './components/AnalysisTypesManager.js';
 import { SourceTypesManager } from './components/SourceTypesManager.js';
+import { SettingsSidebar } from './components/SettingsSidebar.js';
+import { KeyboardShortcuts } from './components/KeyboardShortcuts.js';
 
 class MeridianApp {
   constructor() {
@@ -36,6 +38,8 @@ class MeridianApp {
 
     // Initialize components
     this.topNav = new TopNav(this.router, this.eventBus);
+    this.settingsSidebar = new SettingsSidebar(this.eventBus, this.router);
+    this.keyboardShortcuts = new KeyboardShortcuts(this.eventBus, this.router);
     this.dashboard = new Dashboard(this.api, this.stateManager, this.eventBus);
     this.insightsPanel = new InsightsPanel(this.api, this.stateManager);
     this.analysisTypesManager = new AnalysisTypesManager(this.api, this.eventBus, this.toast);
@@ -50,6 +54,10 @@ class MeridianApp {
 
   async init() {
     console.log('[Meridian] Initializing...');
+
+    // Initialize keyboard shortcuts and settings sidebar
+    this.settingsSidebar.init();
+    this.keyboardShortcuts.init();
 
     // Setup navigation event listeners
     this.setupNavigation();
