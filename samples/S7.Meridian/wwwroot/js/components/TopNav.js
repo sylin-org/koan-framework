@@ -55,29 +55,29 @@ export class TopNav {
               <span class="nav-label">Analyses</span>
             </a>
 
-            <a href="#/insights"
-               class="top-nav-link ${this.isActive('insights', currentPath) ? 'active' : ''} disabled"
-               data-nav="insights"
-               title="Insights (Coming Soon)"
-               aria-disabled="true">
+            <a href="#/analysis-types"
+               class="top-nav-link ${this.isActive('analysis-types', currentPath) ? 'active' : ''}"
+               data-nav="analysis-types"
+               title="Analysis Types">
               <svg class="nav-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
+                <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
               </svg>
-              <span class="nav-label">Insights</span>
-              <span class="nav-badge">Soon</span>
+              <span class="nav-label">Analysis Types</span>
             </a>
 
-            <a href="#/documents"
-               class="top-nav-link ${this.isActive('documents', currentPath) ? 'active' : ''} disabled"
-               data-nav="documents"
-               title="Documents (Coming Soon)"
-               aria-disabled="true">
+            <a href="#/source-types"
+               class="top-nav-link ${this.isActive('source-types', currentPath) ? 'active' : ''}"
+               data-nav="source-types"
+               title="Source Types">
               <svg class="nav-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path>
-                <polyline points="13 2 13 9 20 9"></polyline>
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
+                <line x1="16" y1="13" x2="8" y2="13"></line>
+                <line x1="16" y1="17" x2="8" y2="17"></line>
+                <polyline points="10 9 9 9 8 9"></polyline>
               </svg>
-              <span class="nav-label">Documents</span>
-              <span class="nav-badge">Soon</span>
+              <span class="nav-label">Source Types</span>
             </a>
           </div>
 
@@ -128,20 +128,22 @@ export class TopNav {
               </svg>
               <span>Analyses</span>
             </a>
-            <a href="#/insights" class="mobile-menu-link disabled" data-nav="insights" aria-disabled="true">
+            <a href="#/analysis-types" class="mobile-menu-link ${this.isActive('analysis-types', currentPath) ? 'active' : ''}" data-nav="analysis-types">
               <svg class="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
+                <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
               </svg>
-              <span>Insights</span>
-              <span class="mobile-menu-badge">Soon</span>
+              <span>Analysis Types</span>
             </a>
-            <a href="#/documents" class="mobile-menu-link disabled" data-nav="documents" aria-disabled="true">
+            <a href="#/source-types" class="mobile-menu-link ${this.isActive('source-types', currentPath) ? 'active' : ''}" data-nav="source-types">
               <svg class="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path>
-                <polyline points="13 2 13 9 20 9"></polyline>
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
+                <line x1="16" y1="13" x2="8" y2="13"></line>
+                <line x1="16" y1="17" x2="8" y2="17"></line>
+                <polyline points="10 9 9 9 8 9"></polyline>
               </svg>
-              <span>Documents</span>
-              <span class="mobile-menu-badge">Soon</span>
+              <span>Source Types</span>
             </a>
             <hr class="mobile-menu-divider" />
             <button class="mobile-menu-link" data-action="open-settings-mobile">

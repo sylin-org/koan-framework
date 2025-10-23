@@ -159,12 +159,12 @@
 }
 
 .top-nav-settings-btn {
-  color: var(--color-purple-600);
+  color: var(--color-text-secondary);
 }
 
 .top-nav-settings-btn:hover {
-  background-color: var(--color-purple-50);
-  color: var(--color-purple-700);
+  background-color: var(--color-bg-hover);
+  color: var(--color-text-primary);
 }
 
 .mobile-menu-toggle {

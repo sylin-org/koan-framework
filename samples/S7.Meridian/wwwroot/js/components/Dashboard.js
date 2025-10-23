@@ -79,8 +79,6 @@ export class Dashboard {
 
       return `
         <div class="dashboard">
-          ${this.renderHero()}
-
           <div class="dashboard-content">
             <div class="dashboard-main">
               ${this.renderSystemOverview(types.length, sourceTypes.length, pipelines.length, totalDocuments, processingJobs, completedAnalyses)}
