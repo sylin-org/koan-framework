@@ -6,9 +6,12 @@
  * - Bulk selection and operations
  * - Per-card actions: View, Edit, Delete
  * - Integration with TypeFormView and AICreateTypeModal
+ * - Uses standardized EmptyState and LoadingState components
  */
 import { TypeFormView } from './TypeFormView.js';
 import { AICreateTypeModal } from './AICreateTypeModal.js';
+import { EmptyState } from './EmptyState.js';
+import { LoadingState } from './LoadingState.js';
 
 export class SourceTypesManager {
   constructor(api, eventBus, toast) {
@@ -51,14 +54,14 @@ export class SourceTypesManager {
           </p>
         </div>
         <div class="types-manager-actions">
-          <button class="btn btn-secondary" data-action="create">
+          <button class="btn btn-secondary btn-press" data-action="create">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <line x1="12" y1="5" x2="12" y2="19"></line>
               <line x1="5" y1="12" x2="19" y2="12"></line>
             </svg>
             Create Type
           </button>
-          <button class="btn btn-primary" data-action="ai-create">
+          <button class="btn btn-primary btn-press" data-action="ai-create">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <circle cx="12" cy="12" r="3"></circle>
               <path d="M12 1v6m0 6v6m8.66-13.66l-4.24 4.24m-4.84 4.84l-4.24 4.24M23 12h-6m-6 0H1m20.66 8.66l-4.24-4.24m-4.84-4.84l-4.24-4.24"></path>
@@ -123,7 +126,7 @@ export class SourceTypesManager {
     const isSelected = this.selectedIds.has(type.id);
 
     return `
-      <div class="type-card ${isSelected ? 'selected' : ''}" data-type-id="${type.id}">
+      <div class="type-card card-lift ${isSelected ? 'selected' : ''}" data-type-id="${type.id}">
         <div class="type-card-select">
           <input
             type="checkbox"
@@ -165,7 +168,7 @@ export class SourceTypesManager {
 
         <div class="type-card-actions">
           <button
-            class="type-card-action-btn"
+            class="type-card-action-btn btn-press"
             title="View"
             data-action="view"
             data-id="${type.id}"
@@ -176,7 +179,7 @@ export class SourceTypesManager {
             </svg>
           </button>
           <button
-            class="type-card-action-btn"
+            class="type-card-action-btn btn-press"
             title="Edit"
             data-action="edit"
             data-id="${type.id}"
@@ -187,7 +190,7 @@ export class SourceTypesManager {
             </svg>
           </button>
           <button
-            class="type-card-action-btn action-delete"
+            class="type-card-action-btn action-delete btn-press"
             title="Delete"
             data-action="delete"
             data-id="${type.id}"
@@ -206,49 +209,14 @@ export class SourceTypesManager {
    * Render empty state (no types exist)
    */
   renderEmptyState() {
-    return `
-      <div class="type-form-empty">
-        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-          <polyline points="14 2 14 8 20 8"></polyline>
-          <line x1="16" y1="13" x2="8" y2="13"></line>
-          <line x1="16" y1="17" x2="8" y2="17"></line>
-        </svg>
-        <h3>No Source Types Yet</h3>
-        <p>Create your first source type to define what data to extract from input documents.</p>
-        <div class="empty-state-actions">
-          <button class="btn btn-primary" data-action="ai-create">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="12" cy="12" r="3"></circle>
-              <path d="M12 1v6m0 6v6m8.66-13.66l-4.24 4.24m-4.84 4.84l-4.24 4.24M23 12h-6m-6 0H1m20.66 8.66l-4.24-4.24m-4.84-4.84l-4.24-4.24"></path>
-            </svg>
-            AI Create Type
-          </button>
-          <button class="btn btn-secondary" data-action="create">
-            Create Manually
-          </button>
-        </div>
-      </div>
-    `;
+    return EmptyState.forSourceTypes();
   }
 
   /**
    * Render no search results state
    */
   renderNoResults() {
-    return `
-      <div class="type-form-empty">
-        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="11" cy="11" r="8"></circle>
-          <path d="m21 21-4.35-4.35"></path>
-        </svg>
-        <h3>No Results Found</h3>
-        <p>No source types match your search criteria.</p>
-        <button class="btn btn-secondary" data-action="clear-search">
-          Clear Search
-        </button>
-      </div>
-    `;
+    return EmptyState.forSearchResults();
   }
 
   /**
