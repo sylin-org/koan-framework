@@ -119,14 +119,14 @@ export class Dashboard {
           </p>
         </div>
         <div class="hero-actions">
-          <button class="btn btn-primary" data-action="new-analysis">
+          <button class="btn btn-primary btn-press" data-action="new-analysis">
             <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <line x1="12" y1="5" x2="12" y2="19"></line>
               <line x1="5" y1="12" x2="19" y2="12"></line>
             </svg>
             New Analysis
           </button>
-          <button class="btn btn-secondary" data-action="new-type-ai">
+          <button class="btn btn-secondary btn-press" data-action="new-type-ai">
             <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <circle cx="12" cy="12" r="3"></circle>
               <path d="M12 1v6m0 6v6m8.66-13.66l-4.24 4.24m-4.84 4.84l-4.24 4.24M23 12h-6m-6 0H1m20.66 8.66l-4.24-4.24m-4.84-4.84l-4.24-4.24"></path>
@@ -146,7 +146,7 @@ export class Dashboard {
       <div class="quick-actions">
         <h3 class="quick-actions-title">Quick Actions</h3>
         <div class="quick-actions-list">
-          <button class="quick-action-item" data-action="new-analysis">
+          <button class="quick-action-item hover-scale" data-action="new-analysis">
             <div class="quick-action-icon">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
@@ -159,7 +159,7 @@ export class Dashboard {
             </div>
           </button>
 
-          <button class="quick-action-item" data-action="new-type">
+          <button class="quick-action-item hover-scale" data-action="new-type">
             <div class="quick-action-icon">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
@@ -173,7 +173,7 @@ export class Dashboard {
             </div>
           </button>
 
-          <button class="quick-action-item" data-action="new-type-ai">
+          <button class="quick-action-item hover-scale" data-action="new-type-ai">
             <div class="quick-action-icon">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <circle cx="12" cy="12" r="3"></circle>
@@ -186,7 +186,7 @@ export class Dashboard {
             </div>
           </button>
 
-          <button class="quick-action-item" data-action="manage-analysis-types">
+          <button class="quick-action-item hover-scale" data-action="manage-analysis-types">
             <div class="quick-action-icon">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <rect x="3" y="3" width="7" height="7"></rect>
@@ -201,7 +201,7 @@ export class Dashboard {
             </div>
           </button>
 
-          <button class="quick-action-item" data-action="manage-source-types">
+          <button class="quick-action-item hover-scale" data-action="manage-source-types">
             <div class="quick-action-icon">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
@@ -216,7 +216,7 @@ export class Dashboard {
             </div>
           </button>
 
-          <button class="quick-action-item" data-action="view-analyses">
+          <button class="quick-action-item hover-scale" data-action="view-analyses">
             <div class="quick-action-icon">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path>
@@ -254,7 +254,7 @@ export class Dashboard {
             <div class="metric-value">${analysisTypesCount}</div>
             <div class="metric-label">Analysis Types</div>
             <div class="metric-change">
-              <button class="metric-action" data-action="manage-analysis-types">View All →</button>
+              <button class="metric-action btn-press" data-action="manage-analysis-types">View All →</button>
             </div>
           </div>
 
@@ -270,7 +270,7 @@ export class Dashboard {
             <div class="metric-value">${sourceTypesCount}</div>
             <div class="metric-label">Source Types</div>
             <div class="metric-change">
-              <button class="metric-action" data-action="manage-source-types">View All →</button>
+              <button class="metric-action btn-press" data-action="manage-source-types">View All →</button>
             </div>
           </div>
 
@@ -284,7 +284,7 @@ export class Dashboard {
             <div class="metric-value">${analysesCount}</div>
             <div class="metric-label">Active Analyses</div>
             <div class="metric-change">
-              <button class="metric-action" data-action="view-analyses">View All →</button>
+              <button class="metric-action btn-press" data-action="view-analyses">View All →</button>
             </div>
           </div>
 
@@ -353,7 +353,7 @@ export class Dashboard {
               <line x1="12" y1="16" x2="12.01" y2="16"></line>
             </svg>
             <p>No recent activity</p>
-            <button class="btn btn-primary" data-action="new-analysis">Create Your First Analysis</button>
+            <button class="btn btn-primary btn-press" data-action="new-analysis">Create Your First Analysis</button>
           </div>
         </div>
       `;

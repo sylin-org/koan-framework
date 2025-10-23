@@ -77,7 +77,7 @@ export class PageHeader {
 
     return `
       <div class="page-header-action-wrapper ${hasDropdown ? 'has-dropdown' : ''}">
-        <button class="btn btn-${variant} ${disabled ? 'disabled' : ''}"
+        <button class="btn btn-${variant} btn-press ${disabled ? 'disabled' : ''}"
                 data-action="${this.escapeHtml(actionName)}"
                 ${disabled ? 'disabled' : ''}
                 ${hasDropdown ? 'data-dropdown-toggle' : ''}>

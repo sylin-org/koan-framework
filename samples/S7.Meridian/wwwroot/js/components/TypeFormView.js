@@ -206,7 +206,7 @@ export class TypeFormView {
       return `
         <div class="type-form-footer">
           <div class="type-form-footer-left">
-            <button class="btn btn-danger" data-action="delete">
+            <button class="btn btn-danger btn-press" data-action="delete">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="3 6 5 6 21 6"></polyline>
                 <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
@@ -215,10 +215,10 @@ export class TypeFormView {
             </button>
           </div>
           <div class="type-form-footer-right">
-            <button class="btn btn-secondary" data-action="back">
+            <button class="btn btn-secondary btn-press" data-action="back">
               Back to List
             </button>
-            <button class="btn btn-primary" data-action="edit">
+            <button class="btn btn-primary btn-press" data-action="edit">
               Edit Type
             </button>
           </div>
@@ -244,10 +244,10 @@ export class TypeFormView {
           ` : ''}
         </div>
         <div class="type-form-footer-right">
-          <button class="btn btn-secondary" data-action="cancel">
+          <button class="btn btn-secondary btn-press" data-action="cancel">
             Cancel
           </button>
-          <button class="btn btn-primary" data-action="save">
+          <button class="btn btn-primary btn-press" data-action="save">
             ${this.mode === 'create' ? 'Create' : 'Save Changes'}
           </button>
         </div>
