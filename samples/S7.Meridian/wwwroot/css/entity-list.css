@@ -44,8 +44,8 @@
   align-items: center;
   gap: var(--spacing-4);
   padding: var(--spacing-4);
-  background-color: var(--color-bg-elevated);
-  border: 1px solid var(--color-border-light);
+  background-color: var(--color-bg-secondary);
+  border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius-lg);
   transition: all var(--transition-base);
 }
@@ -92,7 +92,7 @@
 
 .entity-view-toggle-btn.active {
   color: var(--color-primary-600);
-  background-color: var(--color-bg-elevated);
+  background-color: var(--color-bg-secondary);
   box-shadow: var(--shadow-sm);
 }
 
@@ -108,8 +108,8 @@
   left: 50%;
   transform: translateX(-50%);
   z-index: var(--z-modal-backdrop);
-  background-color: var(--color-bg-elevated);
-  border: 1px solid var(--color-border-light);
+  background-color: var(--color-bg-secondary);
+  border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius-xl);
   padding: var(--spacing-4) var(--spacing-6);
   box-shadow: var(--shadow-xl);
@@ -130,7 +130,7 @@
   font-weight: var(--font-weight-semibold);
   color: var(--color-text-primary);
   padding-right: var(--spacing-2);
-  border-right: 1px solid var(--color-border-light);
+  border-right: 1px solid var(--color-border-subtle);
 }
 
 .bulk-actions-bar .btn {
@@ -199,7 +199,7 @@
   cursor: pointer;
   transition: all var(--transition-fast);
   appearance: none;
-  background-color: var(--color-bg-primary);
+  background-color: var(--color-bg-canvas);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -255,7 +255,7 @@
   padding: 0 var(--spacing-2);
   border: 1px solid var(--color-border-medium);
   border-radius: var(--radius-md);
-  background-color: var(--color-bg-primary);
+  background-color: var(--color-bg-canvas);
   color: var(--color-text-secondary);
   font-size: var(--font-size-sm);
   cursor: pointer;
@@ -332,7 +332,7 @@
     padding-right: 0;
     padding-bottom: var(--spacing-2);
     border-right: none;
-    border-bottom: 1px solid var(--color-border-light);
+    border-bottom: 1px solid var(--color-border-subtle);
     text-align: center;
   }
 
@@ -386,7 +386,7 @@
 /* ==================== Dark Mode (Future) ==================== */
 @media (prefers-color-scheme: dark) {
   .entity-select-all-checkbox:checked::after {
-    border-color: var(--color-bg-primary);
+    border-color: var(--color-bg-canvas);
   }
 }
 

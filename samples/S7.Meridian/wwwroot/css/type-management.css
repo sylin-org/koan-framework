@@ -18,8 +18,8 @@
   align-items: center;
   gap: 16px;
   padding: 16px 24px;
-  background: var(--color-bg-elevated);
-  border-bottom: 1px solid var(--color-border-light);
+  background: var(--color-bg-secondary);
+  border-bottom: 1px solid var(--color-border-subtle);
   flex-shrink: 0;
 }
 
@@ -95,8 +95,8 @@
 
 /* ==================== Form Sections ==================== */
 .type-form-section {
-  background: var(--color-bg-elevated);
-  border: 1px solid var(--color-border-light);
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border-subtle);
   border-radius: 12px;
   padding: 24px;
   transition: border-color 0.2s ease;
@@ -112,7 +112,7 @@
   gap: 12px;
   margin-bottom: 20px;
   padding-bottom: 16px;
-  border-bottom: 1px solid var(--color-border-light);
+  border-bottom: 1px solid var(--color-border-subtle);
 }
 
 .type-form-section-icon {
@@ -177,7 +177,7 @@
   background: var(--color-bg-secondary);
   color: var(--color-text-tertiary);
   cursor: not-allowed;
-  border-color: var(--color-border-light);
+  border-color: var(--color-border-subtle);
 }
 
 .type-form-field-textarea {
@@ -235,7 +235,7 @@
 
 .type-form-tags.disabled {
   background: var(--color-bg-secondary);
-  border-color: var(--color-border-light);
+  border-color: var(--color-border-subtle);
   cursor: not-allowed;
 }
 
@@ -306,8 +306,8 @@
 /* ==================== Sticky Footer ==================== */
 .type-form-footer {
   padding: 16px 32px;
-  background: var(--color-bg-elevated);
-  border-top: 1px solid var(--color-border-light);
+  background: var(--color-bg-secondary);
+  border-top: 1px solid var(--color-border-subtle);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -589,8 +589,8 @@
   align-items: center;
   justify-content: space-between;
   padding: 24px 32px;
-  background: var(--color-bg-elevated);
-  border-bottom: 1px solid var(--color-border-light);
+  background: var(--color-bg-secondary);
+  border-bottom: 1px solid var(--color-border-subtle);
   flex-shrink: 0;
   gap: 24px;
 }
@@ -627,7 +627,7 @@
   gap: 16px;
   padding: 16px 32px;
   background: var(--color-bg-base);
-  border-bottom: 1px solid var(--color-border-light);
+  border-bottom: 1px solid var(--color-border-subtle);
   flex-shrink: 0;
 }
 
@@ -653,7 +653,7 @@
   border-radius: 8px;
   font-size: 14px;
   color: var(--color-text-primary);
-  background: var(--color-bg-elevated);
+  background: var(--color-bg-secondary);
   transition: all 0.2s ease;
 }
 
@@ -714,8 +714,8 @@
 
 /* ==================== Type Card ==================== */
 .type-card {
-  background: var(--color-bg-elevated);
-  border: 1px solid var(--color-border-light);
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border-subtle);
   border-radius: 12px;
   padding: 16px;
   transition: all 0.2s ease;
@@ -818,7 +818,7 @@
   display: flex;
   gap: 12px;
   padding-top: 8px;
-  border-top: 1px solid var(--color-border-light);
+  border-top: 1px solid var(--color-border-subtle);
 }
 
 .type-card-meta-item {

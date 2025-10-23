@@ -69,8 +69,8 @@
   align-items: center;
   gap: var(--spacing-4);
   padding: var(--spacing-4);
-  background-color: var(--color-bg-elevated);
-  border: 1px solid var(--color-border-light);
+  background-color: var(--color-bg-secondary);
+  border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius-lg);
 }
 
@@ -112,8 +112,8 @@
 }
 
 .skeleton-card {
-  background-color: var(--color-bg-elevated);
-  border: 1px solid var(--color-border-light);
+  background-color: var(--color-bg-secondary);
+  border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius-lg);
   padding: var(--spacing-5);
   display: flex;
@@ -137,13 +137,13 @@
   display: flex;
   gap: var(--spacing-2);
   padding-top: var(--spacing-3);
-  border-top: 1px solid var(--color-border-light);
+  border-top: 1px solid var(--color-border-subtle);
 }
 
 /* ==================== Table Skeleton ==================== */
 .skeleton-table {
-  background-color: var(--color-bg-elevated);
-  border: 1px solid var(--color-border-light);
+  background-color: var(--color-bg-secondary);
+  border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius-lg);
   overflow: hidden;
 }
@@ -152,7 +152,7 @@
   display: flex;
   gap: var(--spacing-4);
   padding: var(--spacing-4);
-  border-bottom: 1px solid var(--color-border-light);
+  border-bottom: 1px solid var(--color-border-subtle);
   background-color: var(--color-bg-secondary);
 }
 
@@ -162,7 +162,7 @@
 
 .skeleton-table-row td {
   padding: var(--spacing-4);
-  border-bottom: 1px solid var(--color-border-light);
+  border-bottom: 1px solid var(--color-border-subtle);
 }
 
 .skeleton-table-row:last-child td {
@@ -195,8 +195,8 @@
   align-items: center;
   justify-content: space-between;
   padding: var(--spacing-6) var(--spacing-8);
-  border-bottom: 1px solid var(--color-border-light);
-  background-color: var(--color-bg-elevated);
+  border-bottom: 1px solid var(--color-border-subtle);
+  background-color: var(--color-bg-secondary);
 }
 
 .skeleton-page-content {
@@ -215,7 +215,7 @@
   flex-direction: column;
   gap: var(--spacing-2);
   padding-bottom: var(--spacing-4);
-  border-bottom: 1px solid var(--color-border-light);
+  border-bottom: 1px solid var(--color-border-subtle);
 }
 
 .skeleton-detail-section {

@@ -32,7 +32,7 @@
   right: 0;
   width: var(--sidebar-width);
   height: calc(100vh - var(--top-nav-height));
-  background-color: var(--color-bg-elevated);
+  background-color: var(--color-bg-secondary);
   box-shadow: var(--shadow-2xl);
   transform: translateX(100%);
   transition: transform var(--transition-base);
@@ -52,7 +52,7 @@
   align-items: center;
   justify-content: space-between;
   padding: var(--spacing-6);
-  border-bottom: 1px solid var(--color-border-light);
+  border-bottom: 1px solid var(--color-border-subtle);
   flex-shrink: 0;
 }
 
@@ -125,7 +125,7 @@
 /* ==================== Navigation Sections ==================== */
 .settings-nav-section {
   padding: var(--spacing-4) 0;
-  border-bottom: 1px solid var(--color-border-light);
+  border-bottom: 1px solid var(--color-border-subtle);
 }
 
 .settings-nav-section:last-child {
@@ -227,7 +227,7 @@
 /* ==================== Sidebar Footer ==================== */
 .settings-sidebar-footer {
   padding: var(--spacing-4) var(--spacing-6);
-  border-top: 1px solid var(--color-border-light);
+  border-top: 1px solid var(--color-border-subtle);
   flex-shrink: 0;
 }
 

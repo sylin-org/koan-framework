@@ -26,7 +26,7 @@
 
 /* ==================== Modal Dialog ==================== */
 .modal-dialog {
-  background: var(--color-bg-elevated);
+  background: var(--color-bg-secondary);
   border-radius: 16px;
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
   max-height: 90vh;
@@ -62,7 +62,7 @@
 /* ==================== Modal Header ==================== */
 .modal-header {
   padding: 24px 24px 16px;
-  border-bottom: 1px solid var(--color-border-light);
+  border-bottom: 1px solid var(--color-border-subtle);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -128,7 +128,7 @@
 /* ==================== Modal Footer ==================== */
 .modal-footer {
   padding: 16px 24px;
-  border-top: 1px solid var(--color-border-light);
+  border-top: 1px solid var(--color-border-subtle);
   display: flex;
   gap: 12px;
   justify-content: flex-end;
@@ -202,7 +202,7 @@ textarea.form-input {
 
 /* ==================== Collapsible Section ==================== */
 .form-section-collapsible {
-  border: 1px solid var(--color-border-light);
+  border: 1px solid var(--color-border-subtle);
   border-radius: 8px;
   overflow: hidden;
 }
@@ -252,7 +252,7 @@ textarea.form-input {
 }
 
 .form-examples details {
-  border: 1px solid var(--color-border-light);
+  border: 1px solid var(--color-border-subtle);
   border-radius: 8px;
   padding: 12px;
   background: var(--color-bg-secondary);
@@ -293,7 +293,7 @@ textarea.form-input {
 
 .example-item {
   padding: 12px;
-  background: var(--color-bg-elevated);
+  background: var(--color-bg-secondary);
   border-radius: 6px;
   font-size: 12px;
   line-height: 1.6;
@@ -317,7 +317,7 @@ textarea.form-input {
   align-items: center;
   gap: 12px;
   padding-bottom: 16px;
-  border-bottom: 1px solid var(--color-border-light);
+  border-bottom: 1px solid var(--color-border-subtle);
 }
 
 .preview-header h3 {
@@ -334,7 +334,7 @@ textarea.form-input {
 
 .schema-preview {
   background: var(--color-bg-secondary);
-  border: 1px solid var(--color-border-light);
+  border: 1px solid var(--color-border-subtle);
   border-radius: 8px;
   padding: 16px;
   overflow-x: auto;

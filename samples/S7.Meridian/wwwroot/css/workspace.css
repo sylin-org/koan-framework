@@ -10,7 +10,7 @@
   gap: var(--spacing-2);
   padding: var(--spacing-4) var(--spacing-6);
   background-color: var(--color-bg-secondary);
-  border-bottom: 1px solid var(--color-border-light);
+  border-bottom: 1px solid var(--color-border-subtle);
   flex-shrink: 0;
 }
 
@@ -28,7 +28,7 @@
   flex-direction: column;
   height: 100%;
   overflow-y: auto;
-  border-right: 1px solid var(--color-border-light);
+  border-right: 1px solid var(--color-border-subtle);
 }
 
 .workspace-column:last-child {
@@ -39,8 +39,8 @@
   position: sticky;
   top: 0;
   z-index: 10;
-  background: var(--color-bg-elevated);
-  border-bottom: 1px solid var(--color-border-light);
+  background: var(--color-bg-secondary);
+  border-bottom: 1px solid var(--color-border-subtle);
   padding: var(--spacing-4) var(--spacing-6);
 }
 
@@ -65,7 +65,7 @@
 
   .workspace-column {
     border-right: none;
-    border-bottom: 1px solid var(--color-border-light);
+    border-bottom: 1px solid var(--color-border-subtle);
     height: auto;
     overflow-y: visible;
   }
@@ -80,7 +80,7 @@
 .documents-section,
 .quality-dashboard-section {
   padding: var(--spacing-section) var(--spacing-6);
-  border-bottom: 1px solid var(--color-border-light);
+  border-bottom: 1px solid var(--color-border-subtle);
 }
 
 .section-title {
@@ -100,8 +100,8 @@
 
 /* ==================== Insight Card (Evidence-First Pattern) ==================== */
 .insight-card {
-  background-color: var(--color-bg-elevated);
-  border: 1px solid var(--color-border-light);
+  background-color: var(--color-bg-secondary);
+  border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius-lg);
   padding: var(--spacing-card);
   transition: all var(--transition-fast);
@@ -151,7 +151,7 @@
 
 /* From Document - Standard Treatment */
 .insight-card[data-source="document"] {
-  background-color: var(--color-bg-elevated);
+  background-color: var(--color-bg-secondary);
 }
 
 /* Conflict State - Amber Treatment */
@@ -164,7 +164,7 @@
 .insight-evidence {
   margin-top: var(--spacing-evidence-before);
   padding-top: var(--spacing-evidence-before);
-  border-top: 1px solid var(--color-border-light);
+  border-top: 1px solid var(--color-border-subtle);
 }
 
 .evidence-header {
@@ -221,7 +221,7 @@
 }
 
 .evidence-alternatives-toggle:hover {
-  background-color: var(--color-bg-tertiary);
+  background-color: var(--color-bg-hover);
   color: var(--color-text-primary);
 }
 
@@ -232,7 +232,7 @@
 
 .evidence-alternative-item {
   padding: var(--spacing-2) 0;
-  border-bottom: 1px solid var(--color-border-light);
+  border-bottom: 1px solid var(--color-border-subtle);
 }
 
 .evidence-alternative-item:last-child {
@@ -261,8 +261,8 @@
 
 .document-info-box {
   padding: var(--spacing-4);
-  background-color: var(--color-bg-elevated);
-  border: 1px solid var(--color-border-light);
+  background-color: var(--color-bg-secondary);
+  border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius-md);
   margin-bottom: var(--spacing-3);
 }
@@ -333,8 +333,8 @@
   align-items: center;
   gap: var(--spacing-3);
   padding: var(--spacing-3) var(--spacing-4);
-  background-color: var(--color-bg-elevated);
-  border: 1px solid var(--color-border-light);
+  background-color: var(--color-bg-secondary);
+  border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius-md);
   transition: all var(--transition-fast);
 }
