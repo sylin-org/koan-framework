@@ -55,39 +55,38 @@ export class TopNav {
               <span class="nav-label">Analyses</span>
             </a>
 
-            <a href="#/analysis-types"
-               class="top-nav-link ${this.isActive('analysis-types', currentPath) ? 'active' : ''}"
-               data-nav="analysis-types"
-               title="Analysis Types">
+            <a href="#/insights"
+               class="top-nav-link ${this.isActive('insights', currentPath) ? 'active' : ''} disabled"
+               data-nav="insights"
+               title="Insights (Coming Soon)"
+               aria-disabled="true">
               <svg class="nav-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                <line x1="12" y1="8" x2="12" y2="16"></line>
-                <line x1="8" y1="12" x2="16" y2="12"></line>
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
               </svg>
-              <span class="nav-label">Analysis Types</span>
+              <span class="nav-label">Insights</span>
+              <span class="nav-badge">Soon</span>
             </a>
 
-            <a href="#/source-types"
-               class="top-nav-link ${this.isActive('source-types', currentPath) ? 'active' : ''}"
-               data-nav="source-types"
-               title="Source Types">
+            <a href="#/documents"
+               class="top-nav-link ${this.isActive('documents', currentPath) ? 'active' : ''} disabled"
+               data-nav="documents"
+               title="Documents (Coming Soon)"
+               aria-disabled="true">
               <svg class="nav-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                <polyline points="14 2 14 8 20 8"></polyline>
-                <line x1="12" y1="11" x2="12" y2="17"></line>
-                <polyline points="9 14 12 17 15 14"></polyline>
+                <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path>
+                <polyline points="13 2 13 9 20 9"></polyline>
               </svg>
-              <span class="nav-label">Source Types</span>
+              <span class="nav-label">Documents</span>
+              <span class="nav-badge">Soon</span>
             </a>
           </div>
 
           <!-- Right Side Actions -->
           <div class="top-nav-actions">
-            <button class="top-nav-action-btn" data-action="help" title="Help">
+            <button class="top-nav-action-btn top-nav-settings-btn" data-action="open-settings" title="Settings (⌘,)">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="12" cy="12" r="10"></circle>
-                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
-                <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                <circle cx="12" cy="12" r="3"></circle>
+                <path d="M12 1v6m0 6v6m8.66-13.66l-4.24 4.24m-4.84 4.84l-4.24 4.24M23 12h-6m-6 0H1m20.66 8.66l-4.24-4.24m-4.84-4.84l-4.24-4.24"></path>
               </svg>
             </button>
 
@@ -129,23 +128,29 @@ export class TopNav {
               </svg>
               <span>Analyses</span>
             </a>
-            <a href="#/analysis-types" class="mobile-menu-link ${this.isActive('analysis-types', currentPath) ? 'active' : ''}" data-nav="analysis-types">
+            <a href="#/insights" class="mobile-menu-link disabled" data-nav="insights" aria-disabled="true">
               <svg class="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                <line x1="12" y1="8" x2="12" y2="16"></line>
-                <line x1="8" y1="12" x2="16" y2="12"></line>
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
               </svg>
-              <span>Analysis Types</span>
+              <span>Insights</span>
+              <span class="mobile-menu-badge">Soon</span>
             </a>
-            <a href="#/source-types" class="mobile-menu-link ${this.isActive('source-types', currentPath) ? 'active' : ''}" data-nav="source-types">
+            <a href="#/documents" class="mobile-menu-link disabled" data-nav="documents" aria-disabled="true">
               <svg class="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                <polyline points="14 2 14 8 20 8"></polyline>
-                <line x1="12" y1="11" x2="12" y2="17"></line>
-                <polyline points="9 14 12 17 15 14"></polyline>
+                <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path>
+                <polyline points="13 2 13 9 20 9"></polyline>
               </svg>
-              <span>Source Types</span>
+              <span>Documents</span>
+              <span class="mobile-menu-badge">Soon</span>
             </a>
+            <hr class="mobile-menu-divider" />
+            <button class="mobile-menu-link" data-action="open-settings-mobile">
+              <svg class="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="3"></circle>
+                <path d="M12 1v6m0 6v6m8.66-13.66l-4.24 4.24m-4.84 4.84l-4.24 4.24M23 12h-6m-6 0H1m20.66 8.66l-4.24-4.24m-4.84-4.84l-4.24-4.24"></path>
+              </svg>
+              <span>Settings</span>
+            </button>
           </div>
         </div>
       </nav>
@@ -184,12 +189,28 @@ export class TopNav {
     // Navigation link clicks (use default browser behavior for hash links)
     // The router will handle the navigation automatically
 
-    // Help button
-    const helpBtn = topNav.querySelector('[data-action="help"]');
-    if (helpBtn) {
-      helpBtn.addEventListener('click', (e) => {
+    // Settings button
+    const settingsBtn = topNav.querySelector('[data-action="open-settings"]');
+    if (settingsBtn) {
+      settingsBtn.addEventListener('click', (e) => {
         e.preventDefault();
-        this.showHelp();
+        this.eventBus.emit('open-settings');
+      });
+    }
+
+    // Mobile settings button
+    const settingsBtnMobile = topNav.querySelector('[data-action="open-settings-mobile"]');
+    if (settingsBtnMobile) {
+      settingsBtnMobile.addEventListener('click', (e) => {
+        e.preventDefault();
+        // Close mobile menu first
+        const mobileMenu = topNav.querySelector('[data-mobile-menu]');
+        if (mobileMenu) {
+          mobileMenu.classList.remove('open');
+          document.body.style.overflow = '';
+        }
+        // Then open settings
+        this.eventBus.emit('open-settings');
       });
     }
 

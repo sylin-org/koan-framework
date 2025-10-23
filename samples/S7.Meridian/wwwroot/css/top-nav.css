@@ -85,6 +85,25 @@
   background: var(--color-blue-bg);
 }
 
+.top-nav-link.disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.nav-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 6px;
+  border-radius: var(--radius-full);
+  font-size: 10px;
+  font-weight: var(--font-weight-semibold);
+  background-color: var(--color-warning-100);
+  color: var(--color-warning-700);
+  margin-left: var(--spacing-1);
+}
+
 .top-nav-link.active::after {
   content: '';
   position: absolute;
@@ -133,6 +152,19 @@
 .top-nav-action-btn:hover {
   color: var(--color-text-primary);
   background: var(--color-bg-hover);
+}
+
+.top-nav-action-btn:active {
+  transform: scale(0.95);
+}
+
+.top-nav-settings-btn {
+  color: var(--color-purple-600);
+}
+
+.top-nav-settings-btn:hover {
+  background-color: var(--color-purple-50);
+  color: var(--color-purple-700);
 }
 
 .mobile-menu-toggle {
@@ -215,6 +247,11 @@
   font-size: 16px;
   font-weight: 500;
   transition: all 0.2s ease;
+  background: none;
+  border: none;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
 }
 
 .mobile-menu-link:hover {
@@ -232,6 +269,31 @@
 
 .mobile-menu-link.active .nav-icon {
   opacity: 1;
+}
+
+.mobile-menu-link.disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.mobile-menu-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  font-size: 11px;
+  font-weight: var(--font-weight-semibold);
+  background-color: var(--color-warning-100);
+  color: var(--color-warning-700);
+  margin-left: auto;
+}
+
+.mobile-menu-divider {
+  margin: var(--spacing-2) 0;
+  border: none;
+  border-top: 1px solid var(--color-border-light);
 }
 
 /* ==================== App Content Adjustment ==================== */
