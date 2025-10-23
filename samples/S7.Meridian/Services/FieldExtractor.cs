@@ -97,7 +97,9 @@ public sealed class FieldExtractor : IFieldExtractor
         HashSet<string>? filter = null;
         if (fieldFilter is { Count: > 0 })
         {
-            filter = new HashSet<string>(fieldFilter, StringComparer.Ordinal);
+            filter = fieldFilter
+                .Select(FieldPathCanonicalizer.Canonicalize)
+                .ToHashSet(StringComparer.Ordinal);
         }
 
         if (filter is { Count: 0 })
@@ -105,7 +107,7 @@ public sealed class FieldExtractor : IFieldExtractor
             return results;
         }
 
-        var fieldPaths = EnumerateLeafSchemas(schema).ToList();
+    var fieldPaths = EnumerateLeafSchemas(schema).ToList();
         _logger.LogInformation("Extracting {Count} fields for pipeline {PipelineId}", fieldPaths.Count, pipeline.Id);
 
         foreach (var (fieldPath, fieldSchema) in fieldPaths)
@@ -260,7 +262,7 @@ public sealed class FieldExtractor : IFieldExtractor
                     continue;
                 }
 
-                var key = NormalizeFieldPath(kvp.Key);
+                var key = FieldPathCanonicalizer.Canonicalize(kvp.Key);
                 var value = kvp.Value.Trim();
 
                 if (overrides.TryGetValue(key, out var existing))
@@ -334,30 +336,12 @@ public sealed class FieldExtractor : IFieldExtractor
         return $"Prioritize passages mentioning: {string.Join(", ", normalized)}.";
     }
 
-    private static string NormalizeFieldPath(string fieldPath)
-    {
-        if (string.IsNullOrWhiteSpace(fieldPath))
-        {
-            return string.Empty;
-        }
-
-        var trimmed = fieldPath.Trim();
-        if (trimmed.StartsWith("$."))
-        {
-            return trimmed;
-        }
-
-        return trimmed.StartsWith("$", StringComparison.Ordinal)
-            ? trimmed
-            : $"$.{trimmed.TrimStart('.')}";
-    }
-
     private static bool TryGetQueryOverride(
         string fieldPath,
         IReadOnlyDictionary<string, string> overrides,
         out string? query)
     {
-        var normalized = NormalizeFieldPath(fieldPath);
+    var normalized = FieldPathCanonicalizer.Canonicalize(fieldPath);
         if (normalized.Length == 0)
         {
             query = null;
@@ -369,7 +353,7 @@ public sealed class FieldExtractor : IFieldExtractor
             return true;
         }
 
-        if (normalized.EndsWith("[]", StringComparison.Ordinal))
+    if (normalized.EndsWith("[]", StringComparison.Ordinal))
         {
             var singular = normalized[..^2];
             if (overrides.TryGetValue(singular, out query))
@@ -398,11 +382,13 @@ public sealed class FieldExtractor : IFieldExtractor
             return overrideQuery!;
         }
 
-        var fieldName = fieldPath.TrimStart('$', '.');
-        var spaced = Regex.Replace(fieldName, "([a-z])([A-Z])", "$1 $2").ToLower();
-
+        var fieldName = FieldPathCanonicalizer.ToDisplayName(fieldPath);
         var builder = new StringBuilder();
-        builder.Append("Find information about ").Append(spaced).Append('.');
+        var normalizedName = string.IsNullOrWhiteSpace(fieldName)
+            ? "the specified field"
+            : fieldName.ToLowerInvariant();
+
+        builder.Append("Find information about ").Append(normalizedName).Append('.');
 
         if (!string.IsNullOrWhiteSpace(pipeline.BiasNotes))
         {
@@ -698,11 +684,15 @@ public sealed class FieldExtractor : IFieldExtractor
         JSchema fieldSchema,
         string instructionBlock)
     {
-        var fieldName = fieldPath.TrimStart('$', '.');
+        var displayName = FieldPathCanonicalizer.ToDisplayName(fieldPath);
+        if (string.IsNullOrWhiteSpace(displayName))
+        {
+            displayName = fieldPath.TrimStart('$', '.');
+        }
         var fieldType = fieldSchema.Type?.ToString() ?? "string";
         var schemaExcerpt = fieldSchema.ToString();
 
-        var prompt = $@"Extract the value for '{fieldName}' from the following passages.
+        var prompt = $@"Extract the value for '{displayName}' from the following passages.
 
 Field type: {fieldType}
 Field schema: {schemaExcerpt}
@@ -1128,28 +1118,33 @@ If the field cannot be found, respond with:
         {
             foreach (var property in root.Properties)
             {
-                var childPath = string.IsNullOrEmpty(prefix)
-                    ? property.Key
+                var nextPrefix = prefix == "$"
+                    ? $"$.{property.Key}"
                     : $"{prefix}.{property.Key}";
 
-                foreach (var nested in EnumerateLeafSchemas(property.Value, childPath))
+                foreach (var nested in EnumerateLeafSchemas(property.Value, nextPrefix))
                 {
                     yield return nested;
                 }
             }
+
             yield break;
         }
 
         if (root.Type == JSchemaType.Array && root.Items.Count > 0)
         {
-            var next = prefix.EndsWith("[]", StringComparison.Ordinal) ? prefix : $"{prefix}[]";
-            foreach (var nested in EnumerateLeafSchemas(root.Items[0], next))
+            var nextPrefix = prefix.EndsWith("[]", StringComparison.Ordinal)
+                ? prefix
+                : $"{prefix}[]";
+
+            foreach (var nested in EnumerateLeafSchemas(root.Items[0], nextPrefix))
             {
                 yield return nested;
             }
+
             yield break;
         }
 
-        yield return (prefix, root);
+        yield return (FieldPathCanonicalizer.Canonicalize(prefix), root);
     }
 }

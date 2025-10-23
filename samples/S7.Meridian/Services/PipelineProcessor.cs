@@ -22,6 +22,7 @@ public sealed class PipelineProcessor : IPipelineProcessor
     private readonly IPassageChunker _chunker;
     private readonly IPassageIndexer _indexer;
     private readonly IFieldExtractor _fieldExtractor;
+    private readonly INotesExtractionService _notesExtractor;
     private readonly IDocumentMerger _merger;
     private readonly IDocumentClassifier _classifier;
     private readonly IRunLogWriter _runLog;
@@ -34,6 +35,7 @@ public sealed class PipelineProcessor : IPipelineProcessor
         IPassageChunker chunker,
         IPassageIndexer indexer,
         IFieldExtractor fieldExtractor,
+        INotesExtractionService notesExtractor,
         IDocumentMerger merger,
         IDocumentClassifier classifier,
         IRunLogWriter runLog,
@@ -45,6 +47,7 @@ public sealed class PipelineProcessor : IPipelineProcessor
         _chunker = chunker;
         _indexer = indexer;
         _fieldExtractor = fieldExtractor;
+        _notesExtractor = notesExtractor;
         _merger = merger;
         _classifier = classifier;
         _runLog = runLog;
@@ -67,6 +70,17 @@ public sealed class PipelineProcessor : IPipelineProcessor
         pipeline.Status = PipelineStatus.Processing;
         pipeline.UpdatedAt = DateTime.UtcNow;
         await pipeline.Save(ct).ConfigureAwait(false);
+
+        // STEP 1: Create virtual document from Authoritative Notes (if present)
+        string? virtualDocumentId = null;
+        if (!string.IsNullOrWhiteSpace(pipeline.AuthoritativeNotes))
+        {
+            virtualDocumentId = await CreateVirtualDocumentFromNotesAsync(pipeline, ct);
+            _logger.LogInformation(
+                "Created virtual document {VirtualDocId} from Authoritative Notes for pipeline {PipelineId}",
+                virtualDocumentId,
+                pipeline.Id);
+        }
 
         var changedDocuments = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var passages = new List<Passage>();
@@ -264,7 +278,13 @@ public sealed class PipelineProcessor : IPipelineProcessor
         await pipeline.Save(ct);
 
         var allPassages = await Passage.Query(p => p.PipelineId == pipeline.Id, ct);
-        var existingFields = (await ExtractedField.Query(e => e.PipelineId == pipeline.Id, ct).ConfigureAwait(false)).ToList();
+        var existingFields = (await ExtractedField.Query(e => e.PipelineId == pipeline.Id, ct).ConfigureAwait(false))
+            .Select(field =>
+            {
+                field.FieldPath = FieldPathCanonicalizer.Canonicalize(field.FieldPath);
+                return field;
+            })
+            .ToList();
         var plan = await _refreshPlanner.PlanAsync(pipeline, changedDocuments, existingFields, ct).ConfigureAwait(false);
 
         var planTimestamp = DateTime.UtcNow;
@@ -305,10 +325,25 @@ public sealed class PipelineProcessor : IPipelineProcessor
             freshExtractions = await _fieldExtractor.ExtractAsync(pipeline, allPassages, _options, fieldFilter, ct).ConfigureAwait(false);
         }
 
+        // STEP 2: Extract from Authoritative Notes (if present) - these have precedence=1 (highest)
+        if (virtualDocumentId != null)
+        {
+            var notesExtractions = await _notesExtractor.ExtractFromNotesAsync(pipeline, virtualDocumentId, ct);
+            _logger.LogInformation(
+                "Extracted {Count} fields from Authoritative Notes for pipeline {PipelineId}",
+                notesExtractions.Count,
+                pipeline.Id);
+
+            // Notes extractions are added FIRST (will take priority in merge)
+            freshExtractions.InsertRange(0, notesExtractions);
+        }
+
         var existingByField = existingFields.ToDictionary(e => e.FieldPath, StringComparer.Ordinal);
         var savedExtractions = new List<ExtractedField>();
         foreach (var extraction in freshExtractions)
         {
+            extraction.FieldPath = FieldPathCanonicalizer.Canonicalize(extraction.FieldPath);
+
             if (existingByField.TryGetValue(extraction.FieldPath, out var prior))
             {
                 extraction.Id = prior.Id;
@@ -400,5 +435,57 @@ public sealed class PipelineProcessor : IPipelineProcessor
         // Remove from active jobs collection to prevent TryClaimAnyAsync from finding it
         await job.Delete(ct).ConfigureAwait(false);
         _logger.LogInformation("Job {JobId} archived and removed from active queue", job.Id);
+    }
+
+    /// <summary>
+    /// Create a virtual document from Authoritative Notes to enable extraction via standard pipeline.
+    /// Virtual documents have precedence=1 (highest priority) to override all other sources.
+    /// </summary>
+    private async Task<string> CreateVirtualDocumentFromNotesAsync(
+        DocumentPipeline pipeline,
+        CancellationToken ct)
+    {
+        var virtualDoc = new SourceDocument
+        {
+            PipelineId = pipeline.Id,
+            OriginalFileName = "Authoritative Notes (User Override)",
+            StorageKey = $"virtual-notes-{pipeline.Id}", // No actual file storage
+            MediaType = "text/plain",
+            Size = pipeline.AuthoritativeNotes?.Length ?? 0,
+            IsVirtual = true,
+            Precedence = 1, // Highest priority
+            SourceType = MeridianConstants.SourceTypes.AuthoritativeNotes,
+            ExtractedText = pipeline.AuthoritativeNotes ?? string.Empty,
+            Status = DocumentProcessingStatus.Indexed, // Skip text extraction/classification
+            ExtractionConfidence = 1.0,
+            ExtractedAt = DateTime.UtcNow,
+            ClassificationConfidence = 1.0,
+            ClassificationMethod = ClassificationMethod.Manual,
+            ClassificationReason = "Virtual document from Authoritative Notes",
+            TextHash = TextExtractor.ComputeTextHash(pipeline.AuthoritativeNotes ?? string.Empty),
+            PageCount = 1,
+            UploadedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+
+        var saved = await virtualDoc.Save(ct).ConfigureAwait(false);
+
+        await _runLog.AppendAsync(new RunLog
+        {
+            PipelineId = pipeline.Id,
+            Stage = "virtual-document",
+            DocumentId = saved.Id,
+            FieldPath = null,
+            StartedAt = DateTime.UtcNow,
+            FinishedAt = DateTime.UtcNow,
+            Status = "success",
+            Metadata = new Dictionary<string, string>
+            {
+                ["source"] = "Authoritative Notes",
+                ["size"] = virtualDoc.Size.ToString()
+            }
+        }, ct);
+
+        return saved.Id;
     }
 }

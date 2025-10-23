@@ -374,7 +374,7 @@ public class SourceExtraction : Entity<SourceExtraction>
 {
     // Ownership
     public string SourceFileId { get; set; } = "";
-    public string FieldPath { get; set; } = ""; // JSON path (e.g., "annualRevenue")
+    public string FieldPath { get; set; } = ""; // Canonical JSON path (e.g., "$.annual_revenue")
 
     // Extracted value (validated against schema)
     public JsonDocument ExtractedValue { get; set; } = null!;
@@ -441,7 +441,7 @@ public class DeliverableField : Entity<DeliverableField>
 
     // Selected value (result of merge rules)
     public JsonDocument SelectedValue { get; set; } = null!;
-
+    public string FieldPath { get; set; } = ""; // Canonical JSON path (e.g., "$.annual_revenue")
     // All candidates from different sources
     public List<FieldCandidate> Candidates { get; set; } = new();
 

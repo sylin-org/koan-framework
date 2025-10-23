@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Koan.Samples.Meridian.Infrastructure;
 using Koan.Samples.Meridian.Models;
 using Microsoft.Extensions.Logging;
 
@@ -48,7 +49,7 @@ public sealed class IncrementalRefreshPlan
     public static IncrementalRefreshPlan NoChanges(IReadOnlyCollection<ExtractedField> existingFields)
     {
         var preserved = existingFields
-            .Select(f => f.FieldPath)
+            .Select(f => FieldPathCanonicalizer.Canonicalize(f.FieldPath))
             .Distinct(StringComparer.Ordinal)
             .ToHashSet(StringComparer.Ordinal);
 
@@ -110,29 +111,30 @@ public sealed class IncrementalRefreshPlanner : IIncrementalRefreshPlanner
 
         foreach (var field in existingFields)
         {
+            var canonicalPath = FieldPathCanonicalizer.Canonicalize(field.FieldPath);
             var sourceId = ResolveSourceDocumentId(field);
             if (string.IsNullOrWhiteSpace(sourceId))
             {
-                toExtract.Add(field.FieldPath);
-                reasons[field.FieldPath] = "no-source";
+                toExtract.Add(canonicalPath);
+                reasons[canonicalPath] = "no-source";
                 continue;
             }
 
             if (changedSet.Contains(sourceId))
             {
-                toExtract.Add(field.FieldPath);
-                reasons[field.FieldPath] = $"source:{sourceId}";
+                toExtract.Add(canonicalPath);
+                reasons[canonicalPath] = $"source:{sourceId}";
                 continue;
             }
 
             if (field.Overridden)
             {
-                toPreserve.Add(field.FieldPath);
-                reasons[field.FieldPath] = "override";
+                toPreserve.Add(canonicalPath);
+                reasons[canonicalPath] = "override";
                 continue;
             }
 
-            toPreserve.Add(field.FieldPath);
+            toPreserve.Add(canonicalPath);
         }
 
         if (toExtract.Count == 0)

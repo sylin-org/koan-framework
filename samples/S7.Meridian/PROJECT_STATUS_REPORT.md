@@ -236,7 +236,7 @@ var results = await VectorWorkflow<Passage>.Query(
         "Strategy": "latest",
         "Transform": "numberRounding:0"
       },
-      "$.productLines": {
+      "$.product_lines": {
         "Strategy": "collection",
         "CollectionStrategy": "union",
         "Transform": "dedupeFuzzy"

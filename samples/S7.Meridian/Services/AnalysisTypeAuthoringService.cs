@@ -114,8 +114,8 @@ public sealed class AnalysisTypeAuthoringService : IAnalysisTypeAuthoringService
         builder.AppendLine("}");
         builder.AppendLine();
         builder.AppendLine("CRITICAL: Define 3-7 output field names in outputFields that capture the analysis goal.");
-        builder.AppendLine("Use Mustache syntax {{fieldName}} in outputTemplate matching the field names exactly.");
-        builder.AppendLine("Field names should be camelCase without special characters.");
+    builder.AppendLine("Use Mustache syntax {{field_name}} in outputTemplate matching the field names exactly.");
+    builder.AppendLine("Field names must be snake_case (lowercase letters and underscores only).");
         builder.AppendLine();
         builder.Append("Analysis goal: ").AppendLine(request.Goal.Trim());
 
@@ -148,17 +148,22 @@ public sealed class AnalysisTypeAuthoringService : IAnalysisTypeAuthoringService
         try
         {
             var json = JObject.Parse(rawResponse);
-            
+
             // Parse output fields and build simple schema
             var outputFields = ExtractArray(json["outputFields"]);
-            var schemaJson = BuildSchemaFromFields(outputFields);
+            var canonicalFields = outputFields
+                .Select(FieldPathCanonicalizer.ToTemplateKey)
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            var schemaJson = BuildSchemaFromFields(canonicalFields);
             
             var draft = new AnalysisTypeDraft
             {
                 Name = json["name"]?.Value<string>()?.Trim() ?? string.Empty,
                 Description = json["description"]?.Value<string>()?.Trim() ?? string.Empty,
                 Instructions = json["instructions"]?.Value<string>()?.Trim() ?? string.Empty,
-                OutputTemplate = json["outputTemplate"]?.Value<string>()?.Trim() ?? string.Empty,
+                OutputTemplate = FieldPathCanonicalizer.CanonicalizeTemplatePlaceholders(json["outputTemplate"]?.Value<string>()?.Trim() ?? string.Empty),
                 OutputSchemaJson = schemaJson,
                 Tags = ExtractArray(json["tags"]),
                 Descriptors = ExtractArray(json["descriptors"]),
@@ -204,9 +209,16 @@ public sealed class AnalysisTypeAuthoringService : IAnalysisTypeAuthoringService
         };
 
         var properties = (JObject)schema["properties"]!;
+        var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var field in fields)
         {
-            properties[field] = new JObject { ["type"] = "string" };
+            var canonical = FieldPathCanonicalizer.ToTemplateKey(field);
+            if (string.IsNullOrWhiteSpace(canonical) || !visited.Add(canonical))
+            {
+                continue;
+            }
+
+            properties[canonical] = new JObject { ["type"] = "string" };
         }
 
         return schema.ToString(Formatting.None);
@@ -218,7 +230,9 @@ public sealed class AnalysisTypeAuthoringService : IAnalysisTypeAuthoringService
         draft.Description = draft.Description.Truncate(512);
         draft.Instructions = draft.Instructions.Truncate(2000);
         draft.OutputTemplate = draft.OutputTemplate.Truncate(4000);
-        draft.OutputSchemaJson = draft.OutputSchemaJson?.Truncate(8000) ?? string.Empty;
+        draft.OutputTemplate = FieldPathCanonicalizer.CanonicalizeTemplatePlaceholders(draft.OutputTemplate);
+    draft.OutputSchemaJson = draft.OutputSchemaJson?.Truncate(8000) ?? string.Empty;
+    draft.OutputSchemaJson = FieldPathCanonicalizer.CanonicalizeJsonSchema(draft.OutputSchemaJson);
 
         draft.Tags = draft.Tags
             .Where(value => !string.IsNullOrWhiteSpace(value))
@@ -251,6 +265,7 @@ public sealed class AnalysisTypeAuthoringService : IAnalysisTypeAuthoringService
         {
             warnings.Add("AI response did not include an output template; default template applied.");
             draft.OutputTemplate = "# Executive Summary\n\n## Findings\n- {{finding}}\n";
+            draft.OutputTemplate = FieldPathCanonicalizer.CanonicalizeTemplatePlaceholders(draft.OutputTemplate);
         }
         
         if (string.IsNullOrWhiteSpace(draft.OutputSchemaJson))

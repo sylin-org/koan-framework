@@ -37,7 +37,7 @@ public sealed class PipelineOverridesController : ControllerBase
             return NotFound();
         }
 
-        var normalizedPath = NormalizeFieldPath(fieldPath);
+    var normalizedPath = FieldPathCanonicalizer.Canonicalize(fieldPath);
         var existing = await ExtractedField.Query(f => f.PipelineId == pipelineId && f.FieldPath == normalizedPath, ct);
         var field = existing.OrderByDescending(f => f.UpdatedAt).FirstOrDefault();
         var now = DateTime.UtcNow;
@@ -89,7 +89,7 @@ public sealed class PipelineOverridesController : ControllerBase
             return NotFound();
         }
 
-        var normalizedPath = NormalizeFieldPath(fieldPath);
+    var normalizedPath = FieldPathCanonicalizer.Canonicalize(fieldPath);
         var existing = await ExtractedField.Query(f => f.PipelineId == pipelineId && f.FieldPath == normalizedPath, ct);
         var field = existing.OrderByDescending(f => f.UpdatedAt).FirstOrDefault();
         if (field is null)
@@ -112,21 +112,4 @@ public sealed class PipelineOverridesController : ControllerBase
         return NoContent();
     }
 
-    private static string NormalizeFieldPath(string fieldPath)
-    {
-        if (string.IsNullOrWhiteSpace(fieldPath))
-        {
-            return "$";
-        }
-
-        var trimmed = fieldPath.Trim();
-        if (trimmed.StartsWith("$", StringComparison.Ordinal))
-        {
-            return trimmed;
-        }
-
-        return trimmed.StartsWith(".", StringComparison.Ordinal)
-            ? "$" + trimmed
-            : "$." + trimmed;
-    }
 }

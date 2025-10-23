@@ -1,4 +1,4 @@
-version: "3.9"
+name: koan-s7-meridian
 services:
   meridian-mongo:
     image: mongo:7
@@ -23,18 +23,46 @@ services:
       - "6060:8884"
     restart: unless-stopped
 
+  meridian-weaviate:
+    image: semitechnologies/weaviate:latest
+    container_name: meridian-weaviate
+    environment:
+      QUERY_DEFAULTS_LIMIT: "25"
+      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: "true"
+      PERSISTENCE_DATA_PATH: "/var/lib/weaviate"
+      DEFAULT_VECTORIZER_MODULE: "none"
+      CLUSTER_HOSTNAME: "node1"
+      RAFT_BOOTSTRAP_EXPECT: "1"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/v1/meta"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    ports:
+      - "5081:8080"
+    volumes:
+      - ../storage/weaviate:/var/lib/weaviate
+    restart: unless-stopped
+
   meridian-api:
     build:
       context: ../../..
       dockerfile: samples/S7.Meridian/Dockerfile
     container_name: meridian-api
     depends_on:
-      - meridian-mongo
-      - meridian-pandoc
-      - meridian-tesseract
+      meridian-mongo:
+        condition: service_started
+      meridian-pandoc:
+        condition: service_started
+      meridian-tesseract:
+        condition: service_started
+      meridian-weaviate:
+        condition: service_healthy
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: http://+:8080
+      Koan__Data__Vector__Endpoint: http://meridian-weaviate:8080
+      Koan__Data__Weaviate__Endpoint: http://meridian-weaviate:8080
     ports:
       - "5080:8080"
     volumes:

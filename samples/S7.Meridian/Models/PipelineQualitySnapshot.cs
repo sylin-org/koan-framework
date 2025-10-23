@@ -22,6 +22,8 @@ public sealed class PipelineQualitySnapshot : Entity<PipelineQualitySnapshot>
         = 0;
     public int ManualReviewNeeded { get; set; }
         = 0;
+    public int NotesSourced { get; set; }
+        = 0;
 
     public TimeSpan ExtractionP95 { get; set; }
         = TimeSpan.Zero;

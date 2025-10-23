@@ -72,7 +72,7 @@ A local-first document intelligence workbench that transforms mixed source files
 
 - .NET 10 SDK
 - Docker Desktop (for MongoDB, Weaviate, Ollama, and OCR containers)
-- Optional: set `WEAVIATE_ENDPOINT` to reuse an existing Weaviate instance (defaults to the Koan test fixture)
+- Optional: set `WEAVIATE_ENDPOINT` to reuse an existing Weaviate instance (the compose stack exposes one at `http://localhost:5081`)
 - 16GB RAM minimum (for local LLMs)
 
 ### Run the Sample
@@ -93,8 +93,9 @@ docker compose -p koan-s7-meridian -f docker/compose.yml up -d --build
 ```
 
 The Windows script and the `docker compose` command both:
-- Build and start the full Meridian stack (MongoDB, Pandoc renderer, Tesseract OCR, ASP.NET API)
+- Build and start the full Meridian stack (MongoDB, Weaviate vector search, Pandoc renderer, Tesseract OCR, ASP.NET API)
 - Expose the API at `http://localhost:5080`
+- Expose Weaviate at `http://localhost:5081`
 - Make Swagger UI available at `http://localhost:5080/swagger/index.html`
 
 To stop everything:
@@ -205,7 +206,7 @@ public class Passage : Entity<Passage>
 public class DeliverableField : Entity<DeliverableField>
 {
     public string RequestId { get; set; } = "";
-    public string FieldPath { get; set; } = ""; // e.g., "annualRevenue"
+    public string FieldPath { get; set; } = ""; // e.g., "$.annual_revenue"
     public JsonDocument SelectedValue { get; set; } = null!;
     public List<FieldCandidate> Candidates { get; set; } = new();
     public List<Citation> Citations { get; set; } = new();
@@ -217,6 +218,8 @@ public class DeliverableField : Entity<DeliverableField>
 **Descriptor hints** live on each `SourceType` (`Discriminators.DescriptorHints` and `SignalPhrases`). They are short AI-authored summaries and canonical phrases that characterize the document. Authors tune them when curating source types; analysts can still pick a type manually when hints do not apply, and the pipeline leaves items untyped when no confident match is available.
 
 **Key Insight**: Rich value objects (not primitive obsession). `Citation`, `ClassificationResult`, `MergeRules` are strongly typed.
+
+> **Canonical field paths**: All values use snake_case JSONPath identifiers (for example, `$.financial_health.revenue`). Use `FieldPathCanonicalizer` to convert incoming paths before persistence or lookups.
 
 ---
 

@@ -13,6 +13,21 @@ public sealed class SourceDocument : Entity<SourceDocument>
     public long Size { get; set; }
         = 0;
 
+    /// <summary>
+    /// Indicates if this is a virtual document (created from Authoritative Notes)
+    /// rather than a real uploaded file.
+    /// </summary>
+    public bool IsVirtual { get; set; }
+        = false;
+
+    /// <summary>
+    /// Precedence level for merge conflicts (lower = higher priority).
+    /// Virtual documents from Authoritative Notes have precedence=1.
+    /// Regular documents have precedence=10+.
+    /// </summary>
+    public int Precedence { get; set; }
+        = 10;
+
     /// <summary>Classification of the source document (e.g., AuditedFinancial, VendorPrescreen).</summary>
     public string SourceType { get; set; } = MeridianConstants.SourceTypes.Unclassified;
 

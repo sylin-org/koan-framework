@@ -166,7 +166,7 @@ public sealed class DocumentMerger : IDocumentMerger
             };
             await decision.Save(ct).ConfigureAwait(false);
 
-            var templateKey = NormalizeKey(group.Key);
+            var templateKey = FieldPathCanonicalizer.ToTemplateKey(group.Key);
             var formattedValue = FormatValueForTemplate(mergeResult.ValueToken);
 
             if (_options.Merge.EnableCitations)
@@ -244,6 +244,7 @@ public sealed class DocumentMerger : IDocumentMerger
         var templateMarkdown = string.IsNullOrWhiteSpace(pipeline.TemplateMarkdown)
             ? "# Meridian Deliverable\n"
             : pipeline.TemplateMarkdown;
+        templateMarkdown = FieldPathCanonicalizer.CanonicalizeTemplatePlaceholders(templateMarkdown);
         var templateHash = ComputeHash(templateMarkdown);
 
         var metadataObject = new JObject
@@ -343,6 +344,7 @@ public sealed class DocumentMerger : IDocumentMerger
             TotalConflicts = pipeline.Quality.TotalConflicts,
             AutoResolved = pipeline.Quality.AutoResolved,
             ManualReviewNeeded = pipeline.Quality.ManualReviewNeeded,
+            NotesSourced = pipeline.Quality.NotesSourced,
             ExtractionP95 = pipeline.Quality.ExtractionP95,
             MergeP95 = pipeline.Quality.MergeP95,
             CreatedAt = now
@@ -391,7 +393,9 @@ public sealed class DocumentMerger : IDocumentMerger
 
     private MergePolicyDescriptor ResolvePolicy(string fieldPath)
     {
-        if (_options.Merge.Policies.TryGetValue(fieldPath, out var policy))
+        var canonicalPath = FieldPathCanonicalizer.Canonicalize(fieldPath);
+
+        if (_options.Merge.Policies.TryGetValue(canonicalPath, out var policy))
         {
             return new MergePolicyDescriptor(
                 ParseStrategy(policy.Strategy),
@@ -406,7 +410,7 @@ public sealed class DocumentMerger : IDocumentMerger
 
         return new MergePolicyDescriptor(
             MergeStrategyType.HighestConfidence,
-            _options.Merge.DefaultSourcePrecedence,
+        _options.Merge.DefaultSourcePrecedence,
             null,
             null,
             null,
@@ -432,6 +436,30 @@ public sealed class DocumentMerger : IDocumentMerger
         Dictionary<string, SourceDocument?> sourceCache,
         CancellationToken ct)
     {
+        // PRIORITY 1: Authoritative Notes (precedence=1, Source=AuthoritativeNotes)
+        var authoritativeCandidate = candidates
+            .Where(c => c.Source == FieldSource.AuthoritativeNotes || c.Precedence == 1)
+            .OrderByDescending(c => c.UpdatedAt)
+            .FirstOrDefault();
+
+        if (authoritativeCandidate is not null)
+        {
+            var authToken = ParseToken(authoritativeCandidate.ValueJson);
+            authoritativeCandidate.Confidence = 1.0; // Authoritative Notes always 100%
+            authoritativeCandidate.Evidence.Metadata["source"] = "Authoritative Notes (User Override)";
+            authoritativeCandidate.Evidence.Metadata["precedence"] = "1";
+            var transformedAuth = MergeTransforms.Apply(descriptor.Transform, authToken);
+            authoritativeCandidate.ValueJson = transformedAuth.ToString(Formatting.None);
+            return new FieldMergeResult(
+                authoritativeCandidate,
+                candidates.Where(c => c.Id != authoritativeCandidate.Id).ToList(),
+                "authoritative-notes",
+                "Value from Authoritative Notes (unconditional override).",
+                transformedAuth,
+                null);
+        }
+
+        // PRIORITY 2: Manual override during review
         var overrideCandidate = candidates
             .Where(c => c.Overridden && !string.IsNullOrWhiteSpace(c.OverrideValueJson))
             .OrderByDescending(c => c.UpdatedAt)
@@ -813,6 +841,7 @@ public sealed class DocumentMerger : IDocumentMerger
             TotalConflicts = totalConflicts,
             AutoResolved = autoResolved,
             ManualReviewNeeded = accepted.Count(f => f.Confidence < confidence.LowThreshold),
+            NotesSourced = accepted.Count(f => f.Source == FieldSource.AuthoritativeNotes || f.Precedence == 1),
             ExtractionP95 = TimeSpan.Zero,
             MergeP95 = TimeSpan.Zero
         };
@@ -822,19 +851,6 @@ public sealed class DocumentMerger : IDocumentMerger
     {
         var renderer = _stubbleBuilder.Build();
         return renderer.Render(template, payload);
-    }
-
-    private static string NormalizeKey(string fieldPath)
-    {
-        if (string.IsNullOrWhiteSpace(fieldPath))
-        {
-            return string.Empty;
-        }
-
-        var trimmed = fieldPath.TrimStart('$', '.');
-        return trimmed
-            .Replace("[]", "_list", StringComparison.Ordinal)
-            .Replace('.', '_');
     }
 
     private static string FormatValueForTemplate(JToken? token)

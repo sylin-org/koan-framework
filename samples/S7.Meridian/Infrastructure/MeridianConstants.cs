@@ -65,6 +65,7 @@ public static class MeridianConstants
 
     public static class SourceTypes
     {
+        public const string AuthoritativeNotes = "AuthoritativeNotes";
         public const string AuditedFinancial = "AuditedFinancial";
         public const string VendorPrescreen = "VendorPrescreen";
         public const string KnowledgeBase = "KnowledgeBase";

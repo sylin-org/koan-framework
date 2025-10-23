@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Koan.Samples.Meridian.Infrastructure;
 using Koan.Samples.Meridian.Models;
 using Koan.Web.Hooks;
 using Microsoft.Extensions.Logging;
@@ -99,11 +100,13 @@ public sealed class DocumentPipelineAnalysisTypeHook : IModelHook<DocumentPipeli
             }
         }
 
+        model.SchemaJson = FieldPathCanonicalizer.CanonicalizeJsonSchema(model.SchemaJson);
+
         if (deliverableType is not null && (deliverableChanged || string.IsNullOrWhiteSpace(model.TemplateMarkdown)))
         {
             if (!string.IsNullOrWhiteSpace(deliverableType.TemplateMd))
             {
-                model.TemplateMarkdown = deliverableType.TemplateMd;
+                model.TemplateMarkdown = FieldPathCanonicalizer.CanonicalizeTemplatePlaceholders(deliverableType.TemplateMd);
             }
         }
         else if (analysisChanged || string.IsNullOrWhiteSpace(model.TemplateMarkdown))
@@ -115,13 +118,17 @@ public sealed class DocumentPipelineAnalysisTypeHook : IModelHook<DocumentPipeli
             }
             else
             {
-                model.TemplateMarkdown = template;
+                model.TemplateMarkdown = FieldPathCanonicalizer.CanonicalizeTemplatePlaceholders(template);
             }
         }
 
         if (string.IsNullOrWhiteSpace(model.TemplateMarkdown))
         {
             model.TemplateMarkdown = "# Meridian Deliverable\n";
+        }
+        else
+        {
+            model.TemplateMarkdown = FieldPathCanonicalizer.CanonicalizeTemplatePlaceholders(model.TemplateMarkdown);
         }
 
         model.UpdatedAt = DateTime.UtcNow;

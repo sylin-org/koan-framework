@@ -47,6 +47,14 @@ public sealed class DocumentPipeline : Entity<DocumentPipeline>
     public string? BiasNotes { get; set; }
         = null;
 
+    /// <summary>
+    /// Authoritative notes containing user-provided data that MUST override any
+    /// information extracted from documents. AI will interpret free-text format
+    /// and map to field names using fuzzy matching.
+    /// </summary>
+    public string? AuthoritativeNotes { get; set; }
+        = null;
+
     /// <summary>Current pipeline status for orchestrators and dashboards.</summary>
     public PipelineStatus Status { get; set; }
         = PipelineStatus.Pending;
@@ -114,6 +122,10 @@ public sealed class PipelineQualityMetrics
         = 0;
 
     public int ManualReviewNeeded { get; set; }
+        = 0;
+
+    /// <summary>Number of fields sourced from Authoritative Notes (user override).</summary>
+    public int NotesSourced { get; set; }
         = 0;
 
     public TimeSpan ExtractionP95 { get; set; }
