@@ -33,7 +33,7 @@
 
 .entity-card.selected {
   border-color: var(--color-primary-600);
-  background-color: var(--color-primary-50);
+  background-color: rgba(91, 159, 255, 0.1);
   box-shadow: var(--shadow-md);
 }
 
@@ -130,28 +130,33 @@
 }
 
 .entity-badge.badge-analysis {
-  background-color: var(--color-blue-100);
-  color: var(--color-blue-700);
+  background-color: rgba(91, 159, 255, 0.15);
+  color: var(--color-blue);
+  border: 1px solid rgba(91, 159, 255, 0.3);
 }
 
 .entity-badge.badge-source {
-  background-color: var(--color-purple-100);
-  color: var(--color-purple-700);
+  background-color: rgba(168, 85, 247, 0.15);
+  color: #A855F7;
+  border: 1px solid rgba(168, 85, 247, 0.3);
 }
 
 .entity-badge.badge-document {
-  background-color: var(--color-green-100);
-  color: var(--color-green-700);
+  background-color: rgba(74, 222, 128, 0.15);
+  color: var(--color-green);
+  border: 1px solid rgba(74, 222, 128, 0.3);
 }
 
 .entity-badge.badge-insight {
-  background-color: var(--color-orange-100);
-  color: var(--color-orange-700);
+  background-color: rgba(251, 191, 36, 0.15);
+  color: var(--color-amber);
+  border: 1px solid rgba(251, 191, 36, 0.3);
 }
 
 .entity-badge.badge-pipeline {
-  background-color: var(--color-indigo-100);
-  color: var(--color-indigo-700);
+  background-color: rgba(99, 102, 241, 0.15);
+  color: #6366F1;
+  border: 1px solid rgba(99, 102, 241, 0.3);
 }
 
 /* ==================== Card Description ==================== */
@@ -301,7 +306,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(255, 255, 255, 0.8);
+  background-color: rgba(10, 10, 10, 0.8);
   border-radius: var(--radius-lg);
   display: flex;
   align-items: center;
