@@ -10,7 +10,7 @@
   display: flex;
   align-items: center;
   gap: var(--spacing-3);
-  padding: var(--spacing-3) 0;
+  padding: 0;
 }
 
 /* ==================== Back Button ==================== */
