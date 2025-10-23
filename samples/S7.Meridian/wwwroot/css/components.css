@@ -45,6 +45,34 @@
   border-color: var(--color-border-dark);
 }
 
+.btn-danger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-2);
+  padding: var(--spacing-3) var(--spacing-5);
+  background-color: var(--color-red-bg);
+  color: var(--color-red);
+  font-weight: 500;
+  border: 1px solid var(--color-red);
+  border-radius: var(--radius-md);
+  transition: all var(--transition-fast);
+}
+
+.btn-danger:hover:not(:disabled) {
+  background-color: var(--color-red);
+  color: white;
+}
+
+.btn-danger:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.btn-sm {
+  padding: var(--spacing-2) var(--spacing-3);
+  font-size: var(--font-size-small);
+}
+
 .btn-icon {
   display: inline-flex;
   align-items: center;

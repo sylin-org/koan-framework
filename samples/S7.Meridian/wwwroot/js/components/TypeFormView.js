@@ -205,7 +205,15 @@ export class TypeFormView {
     if (this.mode === 'view') {
       return `
         <div class="type-form-footer">
-          <div class="type-form-footer-left"></div>
+          <div class="type-form-footer-left">
+            <button class="btn btn-danger" data-action="delete">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+              </svg>
+              Delete
+            </button>
+          </div>
           <div class="type-form-footer-right">
             <button class="btn btn-secondary" data-action="back">
               Back to List
@@ -225,6 +233,15 @@ export class TypeFormView {
             <span class="type-form-dirty-dot"></span>
             <span>Unsaved changes</span>
           </div>
+          ${this.mode === 'edit' ? `
+            <button class="btn btn-danger btn-sm" data-action="delete">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+              </svg>
+              Delete
+            </button>
+          ` : ''}
         </div>
         <div class="type-form-footer-right">
           <button class="btn btn-secondary" data-action="cancel">
@@ -359,6 +376,11 @@ export class TypeFormView {
     const editBtn = container.querySelector('[data-action="edit"]');
     if (editBtn) {
       editBtn.addEventListener('click', () => this.switchToEditMode());
+    }
+
+    const deleteBtn = container.querySelector('[data-action="delete"]');
+    if (deleteBtn) {
+      deleteBtn.addEventListener('click', () => this.delete());
     }
   }
 
@@ -564,6 +586,40 @@ export class TypeFormView {
 
     this.cleanup();
     this.navigateToList();
+  }
+
+  /**
+   * Delete entity with confirmation
+   */
+  async delete() {
+    if (!this.entity || !this.entity.id) {
+      this.toast.error('Cannot delete: No entity loaded');
+      return;
+    }
+
+    const typeName = this.entityType === 'analysis' ? 'Analysis Type' : 'Source Type';
+    const confirmed = confirm(
+      `Are you sure you want to delete "${this.entity.name}"?\n\nThis action cannot be undone.`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      // Call appropriate delete API
+      if (this.entityType === 'analysis') {
+        await this.api.deleteAnalysisType(this.entity.id);
+      } else {
+        await this.api.deleteSourceType(this.entity.id);
+      }
+
+      this.toast.success(`${typeName} deleted successfully`);
+      this.cleanup();
+      this.navigateToList();
+
+    } catch (error) {
+      console.error('Failed to delete:', error);
+      this.toast.error(`Failed to delete ${typeName}. Please try again.`);
+    }
   }
 
   /**

@@ -1,10 +1,18 @@
+import { EntityClient } from './services/EntityClient.js';
+
 /**
  * Meridian API Client
  * Handles all communication with the Meridian backend API
+ * Uses EntityClient for standard CRUD operations
  */
 export class API {
   constructor(baseUrl = '') {
     this.baseUrl = baseUrl || window.location.origin;
+
+    // Initialize entity clients for standard CRUD
+    this.analysisTypes = new EntityClient('analysistypes', this.baseUrl);
+    this.sourceTypes = new EntityClient('sourcetypes', this.baseUrl);
+    this.pipelines = new EntityClient('pipelines', this.baseUrl);
   }
 
   /**
@@ -121,21 +129,21 @@ export class API {
    * Get all analysis types
    */
   async getAnalysisTypes() {
-    return this.get('/api/analysistypes');
+    return this.analysisTypes.getAll();
   }
 
   /**
    * Get analysis type by ID
    */
   async getAnalysisType(id) {
-    return this.get(`/api/analysistypes/${id}`);
+    return this.analysisTypes.getById(id);
   }
 
   /**
    * Create analysis type
    */
   async createAnalysisType(analysisType) {
-    return this.post('/api/analysistypes', analysisType);
+    return this.analysisTypes.create(analysisType);
   }
 
   /**
@@ -180,7 +188,7 @@ export class API {
    * Delete analysis type
    */
   async deleteAnalysisType(id) {
-    return this.delete(`/api/analysistypes/${id}`);
+    return this.analysisTypes.delete(id);
   }
 
   /**
@@ -200,14 +208,14 @@ export class API {
    * Get all source types
    */
   async getSourceTypes() {
-    return this.get('/api/sourcetypes');
+    return this.sourceTypes.getAll();
   }
 
   /**
    * Get source type by ID
    */
   async getSourceType(id) {
-    return this.get(`/api/sourcetypes/${id}`);
+    return this.sourceTypes.getById(id);
   }
 
   /**
@@ -221,7 +229,7 @@ export class API {
    * Create source type
    */
   async createSourceType(sourceType) {
-    return this.post('/api/sourcetypes', sourceType);
+    return this.sourceTypes.create(sourceType);
   }
 
   /**
@@ -247,7 +255,7 @@ export class API {
    * Delete source type
    */
   async deleteSourceType(id) {
-    return this.delete(`/api/sourcetypes/${id}`);
+    return this.sourceTypes.delete(id);
   }
 
   /**
@@ -285,28 +293,28 @@ export class API {
    * Get all pipelines
    */
   async getPipelines() {
-    return this.get('/api/pipelines');
+    return this.pipelines.getAll();
   }
 
   /**
    * Get pipeline by ID
    */
   async getPipeline(id) {
-    return this.get(`/api/pipelines/${id}`);
+    return this.pipelines.getById(id);
   }
 
   /**
    * Create pipeline
    */
   async createPipeline(pipeline) {
-    return this.post('/api/pipelines', pipeline);
+    return this.pipelines.create(pipeline);
   }
 
   /**
    * Delete pipeline
    */
   async deletePipeline(id) {
-    return this.delete(`/api/pipelines/${id}`);
+    return this.pipelines.delete(id);
   }
 
   // ==================== Authoritative Notes ====================
