@@ -1066,10 +1066,16 @@ This sample can be extended with:
 
 ## Documentation
 
+### Core Documentation
 - **README.md** (this file) - Tutorial and getting started
+- **`docs/UX-SPECIFICATION.md`** ✅ CANONICAL - Official user experience specification
 - **ARCHITECTURE.md** - Deep technical dive, design decisions
-- **DESIGN.md** - UX/UI guidelines, component specs
-- **ADRs** (future) - Architectural decision records
+- **MERIDIAN_EXPLAINED.md** - Narrative guide to RAG architecture and document intelligence
+- **`docs/AUTHORITATIVE-NOTES-PROPOSAL.md`** - Complete technical specification for notes override feature
+- **`docs/GETTING_STARTED.md`** - Developer onboarding guide
+
+### Historical Reference
+- **`docs/ux-archive/`** - Superseded UX explorations (historical reference only)
 
 ---
 

@@ -870,8 +870,10 @@ That's document intelligence done right.
 ---
 
 **Ready to dive deeper?**
+- See **`docs/UX-SPECIFICATION.md`** ✅ for the canonical user experience vision
 - See `PROPOSAL.md` for the full technical specification
 - See `ARCHITECTURE.md` for system design details
+- See `docs/AUTHORITATIVE-NOTES-PROPOSAL.md` for notes override feature spec
 - See `TESTING.md` for hands-on tutorials
 - See `PROJECT_STATUS_REPORT.md` for implementation status
 
