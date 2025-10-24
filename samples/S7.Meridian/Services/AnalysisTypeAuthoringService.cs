@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using Koan.AI;
 using Koan.AI.Contracts.Options;
 using Koan.Samples.Meridian.Contracts;
@@ -21,6 +22,19 @@ public interface IAnalysisTypeAuthoringService
 public sealed class AnalysisTypeAuthoringService : IAnalysisTypeAuthoringService
 {
     private const int MaxListItems = 16;
+    private static readonly Regex MustachePlaceholder = new(@"{{
+        \\s*
+        ([#\^/])?
+        \\s*
+        ([^}]+?)
+        \\s*
+    }}", RegexOptions.Compiled | RegexOptions.IgnorePatternWhitespace);
+    private static readonly Regex MustacheTriplePlaceholder = new(@"{{{
+        \\s*
+        ([^}]+?)
+        \\s*
+    }}}
+    ", RegexOptions.Compiled | RegexOptions.IgnorePatternWhitespace);
 
     private readonly MeridianOptions _options;
     private readonly IAiAssistAuditor _auditor;
@@ -72,7 +86,23 @@ public sealed class AnalysisTypeAuthoringService : IAnalysisTypeAuthoringService
 
         var warnings = new List<string>();
         var draft = ParseDraft(rawResponse, request.Prompt, warnings);
-        SanitizeDraft(draft, warnings);
+        SanitizeDraft(draft, warnings, request.Prompt);
+
+        if (!DraftMeetsQuality(draft, out var failureReason))
+        {
+            warnings.Add($"AI draft failed validation: {failureReason}. Falling back to hardened template.");
+            _logger.LogWarning("AI analysis draft failed validation: {Reason}. Falling back to hardened template for prompt '{Prompt}'", failureReason, request.Prompt.Truncate(80));
+
+            draft = BuildFallbackDraft(request.Prompt);
+            SanitizeDraft(draft, warnings, request.Prompt);
+
+            if (!DraftMeetsQuality(draft, out var fallbackFailure))
+            {
+                warnings.Add($"Fallback analysis template failed validation: {fallbackFailure}.");
+                _logger.LogError("Fallback analysis template failed validation: {Reason}", fallbackFailure);
+                throw new InvalidOperationException("Failed to produce a valid analysis draft.");
+            }
+        }
 
         var requestSummary = BuildRequestSummary(request);
         var responseSummary = BuildResponseSummary(draft);
@@ -329,7 +359,7 @@ public sealed class AnalysisTypeAuthoringService : IAnalysisTypeAuthoringService
         return schema.ToString(Formatting.None);
     }
 
-    private static void SanitizeDraft(AnalysisTypeDraft draft, List<string> warnings)
+    private static void SanitizeDraft(AnalysisTypeDraft draft, List<string> warnings, string originalPrompt)
     {
         draft.Name = draft.Name.Truncate(128);
         draft.Description = draft.Description.Truncate(512);
@@ -337,7 +367,8 @@ public sealed class AnalysisTypeAuthoringService : IAnalysisTypeAuthoringService
         draft.OutputTemplate = draft.OutputTemplate.Truncate(10000);
         draft.OutputTemplate = FieldPathCanonicalizer.CanonicalizeTemplatePlaceholders(draft.OutputTemplate);
         draft.JsonSchema = draft.JsonSchema?.Truncate(16000) ?? string.Empty;
-        draft.JsonSchema = FieldPathCanonicalizer.CanonicalizeJsonSchema(draft.JsonSchema); draft.Tags = draft.Tags
+        draft.JsonSchema = FieldPathCanonicalizer.CanonicalizeJsonSchema(draft.JsonSchema);
+        draft.Tags = draft.Tags
                 .Where(value => !string.IsNullOrWhiteSpace(value))
                 .Select(value => value.Trim())
                 .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -354,20 +385,15 @@ public sealed class AnalysisTypeAuthoringService : IAnalysisTypeAuthoringService
         if (string.IsNullOrWhiteSpace(draft.Instructions))
         {
             warnings.Add("AI response did not include instructions; fallback instructions applied.");
-            draft.Instructions = "Synthesize the attached documents into a cohesive narrative.";
+            draft.Instructions = BuildFallbackInstructions(originalPrompt);
         }
 
-        if (string.IsNullOrWhiteSpace(draft.OutputTemplate))
+        if (string.IsNullOrWhiteSpace(draft.OutputTemplate) || string.IsNullOrWhiteSpace(draft.JsonSchema))
         {
-            warnings.Add("AI response did not include an output template; default template applied.");
-            draft.OutputTemplate = "# Executive Summary\n\n## Findings\n- {{finding}}\n";
-            draft.OutputTemplate = FieldPathCanonicalizer.CanonicalizeTemplatePlaceholders(draft.OutputTemplate);
-        }
-
-        if (string.IsNullOrWhiteSpace(draft.JsonSchema))
-        {
-            warnings.Add("AI response did not include output fields; default schema applied.");
-            draft.JsonSchema = "{\"type\":\"object\",\"properties\":{\"summary\":{\"type\":\"string\"}}}";
+            warnings.Add("AI response missing template or schema; hardened fallback applied.");
+            var fallback = BuildFallbackDraft(originalPrompt);
+            draft.OutputTemplate = fallback.OutputTemplate;
+            draft.JsonSchema = fallback.JsonSchema;
         }
     }
 
@@ -380,5 +406,251 @@ public sealed class AnalysisTypeAuthoringService : IAnalysisTypeAuthoringService
     private static string BuildResponseSummary(AnalysisTypeDraft draft)
     {
         return $"name={draft.Name};tags={draft.Tags.Count};descriptors={draft.Descriptors.Count}";
+    }
+
+    private static bool DraftMeetsQuality(AnalysisTypeDraft draft, out string failureReason)
+    {
+        failureReason = string.Empty;
+
+        if (draft is null)
+        {
+            failureReason = "Draft was null";
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(draft.JsonSchema))
+        {
+            failureReason = "Missing JsonSchema";
+            return false;
+        }
+
+        JObject schema;
+        try
+        {
+            schema = JObject.Parse(draft.JsonSchema);
+        }
+        catch (Exception ex)
+        {
+            failureReason = $"JsonSchema invalid: {ex.Message}";
+            return false;
+        }
+
+        if (schema["properties"] is not JObject properties || !properties.Properties().Any())
+        {
+            failureReason = "JsonSchema.properties missing";
+            return false;
+        }
+
+        var propertyNames = properties
+            .Properties()
+            .Select(prop => FieldPathCanonicalizer.ToTemplateKey(prop.Name))
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        if (propertyNames.Count == 0)
+        {
+            failureReason = "JsonSchema.properties contains no usable fields";
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(draft.OutputTemplate))
+        {
+            failureReason = "OutputTemplate missing";
+            return false;
+        }
+
+        var placeholders = ExtractPlaceholders(draft.OutputTemplate);
+        if (placeholders.Count == 0)
+        {
+            failureReason = "OutputTemplate missing placeholders";
+            return false;
+        }
+
+        if (!placeholders.Overlaps(propertyNames))
+        {
+            failureReason = "Template placeholders do not reference schema fields";
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(draft.Instructions))
+        {
+            failureReason = "Instructions missing";
+            return false;
+        }
+
+        return true;
+    }
+
+    private static HashSet<string> ExtractPlaceholders(string template)
+    {
+        var placeholders = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (Match match in MustachePlaceholder.Matches(template))
+        {
+            var indicator = match.Groups[1].Value;
+            var rawToken = match.Groups[2].Value?.Trim();
+            if (string.IsNullOrWhiteSpace(rawToken))
+            {
+                continue;
+            }
+
+            if (rawToken is "." or "..")
+            {
+                continue;
+            }
+
+            var canonical = FieldPathCanonicalizer.ToTemplateKey(rawToken);
+            if (string.IsNullOrWhiteSpace(canonical))
+            {
+                continue;
+            }
+
+            placeholders.Add(canonical);
+
+            // Section tokens (e.g., #metadata_sources) should also count the token itself.
+            if (!string.IsNullOrEmpty(indicator) && indicator is "#" or "^" or "/")
+            {
+                placeholders.Add(canonical);
+            }
+        }
+
+        foreach (Match match in MustacheTriplePlaceholder.Matches(template))
+        {
+            var rawToken = match.Groups[1].Value?.Trim();
+            if (string.IsNullOrWhiteSpace(rawToken))
+            {
+                continue;
+            }
+
+            if (rawToken is "." or "..")
+            {
+                continue;
+            }
+
+            var canonical = FieldPathCanonicalizer.ToTemplateKey(rawToken);
+            if (!string.IsNullOrWhiteSpace(canonical))
+            {
+                placeholders.Add(canonical);
+            }
+        }
+
+        return placeholders;
+    }
+
+    private static AnalysisTypeDraft BuildFallbackDraft(string originalPrompt)
+    {
+        var name = DeriveNameFromPrompt(originalPrompt);
+        var schema = new JObject
+        {
+            ["type"] = "object",
+            ["properties"] = new JObject
+            {
+                ["document_title"] = new JObject
+                {
+                    ["type"] = "string",
+                    ["description"] = "Title of the synthesized deliverable."
+                },
+                ["review_date"] = new JObject
+                {
+                    ["type"] = "string",
+                    ["description"] = "Date associated with the latest assessment or document."
+                },
+                ["executive_summary"] = new JObject
+                {
+                    ["type"] = "string",
+                    ["description"] = "Concise executive summary of key observations."
+                },
+                ["context"] = new JObject
+                {
+                    ["type"] = "string",
+                    ["description"] = "Narrative context derived from source materials."
+                },
+                ["financial_health"] = new JObject
+                {
+                    ["type"] = "string",
+                    ["description"] = "Financial observations, metrics, and risk indicators."
+                },
+                ["staffing"] = new JObject
+                {
+                    ["type"] = "string",
+                    ["description"] = "Staffing capacity, gaps, and mitigations."
+                },
+                ["security_posture"] = new JObject
+                {
+                    ["type"] = "string",
+                    ["description"] = "Security controls, findings, and recommendations."
+                },
+                ["recommendations"] = new JObject
+                {
+                    ["type"] = "string",
+                    ["description"] = "Prioritized, actionable recommendations for stakeholders."
+                },
+                ["metadata_sources"] = new JObject
+                {
+                    ["type"] = "array",
+                    ["items"] = new JObject { ["type"] = "string" },
+                    ["description"] = "List of contributing document identifiers."
+                }
+            },
+            ["required"] = new JArray("document_title", "review_date", "executive_summary")
+        };
+
+        var template = @"## Enterprise Architecture Readiness Review
+
+### Review Details
+- **Document Title**: {{document_title}}
+- **Review Date**: {{review_date}}
+
+### Executive Summary
+{{executive_summary}}
+
+### Context
+{{context}}
+
+### Financial Health
+{{financial_health}}
+
+### Staffing
+{{staffing}}
+
+### Security Posture
+{{security_posture}}
+
+### Recommendations
+{{recommendations}}
+
+### Metadata
+- Sources:
+{{#metadata_sources}}
+  - {{.}}
+{{/metadata_sources}}
+";
+
+        return new AnalysisTypeDraft
+        {
+            Name = string.IsNullOrWhiteSpace(name) ? "Fallback Analysis" : $"Fallback: {name}",
+            Description = ($"Analysis derived from prompt: {originalPrompt}").Truncate(512),
+            Instructions = BuildFallbackInstructions(originalPrompt),
+            OutputTemplate = FieldPathCanonicalizer.CanonicalizeTemplatePlaceholders(template),
+            JsonSchema = FieldPathCanonicalizer.CanonicalizeJsonSchema(schema.ToString(Formatting.None)),
+            Tags = new List<string>(),
+            Descriptors = new List<string>()
+        };
+    }
+
+    private static string BuildFallbackInstructions(string originalPrompt)
+    {
+        var builder = new StringBuilder();
+        builder.AppendLine("As an enterprise architecture reviewer, synthesize all provided materials into a readiness assessment for leadership.");
+        builder.AppendLine("Summarize context, financial health, staffing, security posture, and prioritized recommendations.");
+        builder.AppendLine("Reference every contributing source in the metadata section and thread user overrides directly into the findings.");
+
+        if (!string.IsNullOrWhiteSpace(originalPrompt))
+        {
+            builder.Append("Prompt context: ").AppendLine(originalPrompt.Trim());
+        }
+
+        return builder.ToString().Trim();
     }
 }

@@ -11,6 +11,7 @@ public sealed class SourceDocument : Entity<SourceDocument>
         = null;
     public long Size { get; set; }
         = 0;
+    public string ContentHash { get; set; } = string.Empty;
 
     /// <summary>
     /// Indicates if this is a virtual document (created from Authoritative Notes)

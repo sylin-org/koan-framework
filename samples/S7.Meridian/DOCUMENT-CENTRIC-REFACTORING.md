@@ -1,35 +1,58 @@
 ﻿# Document-Centric Architecture Refactoring
 
-**Status:** Planning Complete - Ready for Implementation  
+**Status:** Phases 1–3 shipped (DocumentIds, decoupled SourceDocument, shared Passage cache); admin UI + automation backlog active  
 **Created:** October 23, 2025  
+**Last Reviewed:** October 23, 2025  
 **Target:** Meridian S7 Sample Application  
-**Estimated Effort:** 2-3 days development + testing
+**Estimated Effort:** Remaining follow-ups 1–2 days (admin UI, test cleanup)
+
+**Contract**
+
+- Inputs: `DocumentPipeline`, `ProcessingJob`, ingestion endpoints, prompt builders, and diagnostics inside `samples/S7.Meridian`.
+- Outputs: Reusable `SourceDocument` artifacts, shared `Passage` cache, OrganizationProfile context injection, and pipeline-level document references.
+- Error Modes: Pipelines with stale `DocumentIds`, orphaned documents after deletion, regression tests relying on `SourceDocument.PipelineId`, missing OrganizationProfile binding in prompts.
+- Acceptance Criteria: Multi-pipeline reuse validated with single-text extraction, passages resolved by document ID, prompts enriched with organization globals, regression suite updated to drop deprecated fields.
 
 ---
 
 ## Executive Summary
 
 ### Problem Statement
+
 Current Meridian architecture creates **1:1 binding** between documents and pipelines via `SourceDocument.PipelineId`. This causes:
+
 - **Duplicate storage** - Same file uploaded to 2 pipelines = 2 complete copies
 - **Duplicate processing** - Text extraction, classification, chunking, embedding repeated per pipeline
 - **No document reuse** - Cannot share documents across pipelines
 - **Expensive pipeline cloning** - Must duplicate all documents
 
 ### Proposed Solution
+
 **Documents own processing artifacts** (text, chunks, embeddings, classification), **pipelines own semantic interpretations** (schema-specific extractions). Documents become reusable information containers referenced by multiple pipelines.
 
 ### Expected Benefits
+
 - **50-80% cost reduction** for multi-pipeline scenarios
 - **Near-zero cost pipeline cloning** (copy config + reference documents)
 - **Cleaner separation of concerns** (processing layer vs. interpretation layer)
 - **Document versioning centralized** (update once, all pipelines see changes)
 
 ### Design Decision
+
 Use **simple `List<string> DocumentIds`** on `DocumentPipeline` rather than separate join table entity:
+
 - Simpler implementation (follows existing `ProcessingJob` pattern)
 - Matches Meridian's scale (10-500 documents per pipeline, not thousands)
 - Can migrate to join table later if needed (YAGNI principle)
+
+### Implementation Snapshot (2025-10-23)
+
+- `Models/DocumentPipeline.cs` now exposes `DocumentIds`, `OrganizationProfileId`, and helper loaders (`LoadDocumentsAsync`, `LoadPassagesAsync`, `LoadOrganizationProfileAsync`).
+- `Models/SourceDocument.cs` no longer carries `PipelineId`; ingestion, processing, and extraction paths rely exclusively on the pipeline document list.
+- `Models/Passage.cs` no longer stores `PipelineId`; retrieval filters by `pipeline.DocumentIds` throughout `FieldExtractor`, `PipelineProcessor`, and `PassageIndexer`.
+- Organization globals (`Models/OrganizationProfile.cs`) exist and are injected into prompt assembly via `FieldExtractor.BuildInstructionBlock`.
+- Controllers (`DocumentsController`, `PipelineNotesController`) and services (`DocumentIngestionService`, `JobCoordinator`, `PipelineProcessor`) use the new helpers and avoid pipeline counters.
+- Regression coverage exists for document reuse in `tests/S7.Meridian.Tests`, but several fixtures still reference the removed `SourceDocument.PipelineId` property (see Gap Analysis).
 
 ---
 
@@ -58,6 +81,7 @@ Pipeline B (wants same documents)
 ```
 
 **Problems:**
+
 - Same physical document stored twice
 - Text extraction repeated (expensive)
 - Classification repeated (LLM call)
@@ -88,9 +112,20 @@ Pipeline B
 ```
 
 **Benefits:**
+
 - Documents processed once, reused by multiple pipelines
 - Pipelines only store schema-specific extractions
 - Pipeline cloning = copy config + copy DocumentIds list (instant)
+
+---
+
+## Gap Analysis
+
+- **Virtual document creation still sets `SourceDocument.PipelineId`** (`Services/PipelineProcessor.cs`, `CreateVirtualDocumentFromNotesAsync`). The model no longer exposes that property, so the helper must stop assigning it and rely on `pipeline.AttachDocument(saved.Id)`.
+- **Regression suites reference removed property** (`tests/S7.Meridian.Tests/Integration/PipelineE2ETests.cs`, `JobCoordinatorTests.cs`) and need to be updated to populate documents via `pipeline.AttachDocument` helpers.
+- **Admin surface for `OrganizationProfile` missing.** The model exists and prompts consume it, but no UI or API exposes CRUD for organizational globals.
+- **Document reuse telemetry absent.** We do not log when a document participates in multiple pipelines; consider adding a `RunLog` metadata field when reuse occurs.
+- **Deduplication/backfill scripts not implemented.** Content-hash reuse remains backlog; cloning automation endpoints remain unshipped.
 
 ---
 
@@ -99,55 +134,65 @@ Pipeline B
 ### Documents Own (Processing Artifacts - Schema-Agnostic)
 
 **Physical Storage:**
+
 - ✅ `OriginalFileName` - File metadata
 - ✅ `StorageKey` - Blob storage reference
 - ✅ `ContentHash` - **NEW** - For deduplication
 - ✅ `MediaType`, `Size` - File properties
 
 **Text Extraction:**
+
 - ✅ `ExtractedText` - Parsed text from PDF/DOCX/etc.
 - ✅ `TextHash` - Content hash for change detection
 - ✅ `PageCount` - Document structure metadata
 - ✅ `Status` - Processing readiness (Pending → Extracted → Classified → Indexed)
 
 **Classification:**
+
 - ✅ `SourceType` - Document type ("Financial Report", "Legal Contract")
 - ✅ `ClassificationConfidence` - Classifier certainty score
 - ✅ `ClassificationMethod` - How it was classified
 - ✅ `ClassificationReason` - Classifier explanation
 
 **Chunking (Passage entities):**
+
 - ✅ `Passage.SourceDocumentId` - Link to parent document (no PipelineId)
 - ✅ `Passage.Text` - Chunk text for retrieval
 - ✅ `Passage.TextHash` - Chunk content hash
 - ✅ `Passage.SequenceNumber`, `PageNumber`, `Section` - Position metadata
 
 **Embeddings:**
+
 - ✅ Cached by `Passage.TextHash` (already implemented)
 - ✅ Reusable across all pipelines automatically
 
 ### Pipelines Own (Semantic Interpretations - Schema-Specific)
 
 **Schema Definition:**
+
 - ✅ `SchemaJson` - Output structure (fields to extract)
 - ✅ `TemplateMarkdown` - Deliverable format
 
 **Extraction Context:**
+
 - ✅ `AnalysisInstructions` - Domain-specific extraction guidance
 - ✅ `BiasNotes` - Operator hints for retrieval focus
 - ✅ `AuthoritativeNotes` - Hard overrides (creates virtual document)
 
 **Extracted Values:**
+
 - ✅ `ExtractedField.PipelineId` - **KEEP** - Extraction is schema-dependent
 - ✅ `ExtractedField.FieldPath` - Schema field name
 - ✅ `ExtractedField.ValueJson` - Extracted value
 - ✅ Links to `SourceDocumentId`, `PassageId` for provenance
 
 **Deliverables:**
+
 - ✅ `Deliverable.PipelineId` - Final output
 - ✅ Confidence scores, quality metrics
 
 **Document References:**
+
 - ✅ `DocumentIds` - **NEW** - List of document IDs used by this pipeline
 
 ---
@@ -168,156 +213,89 @@ Pipeline B
 
 ---
 
-## Implementation Plan
+## Implementation Status by Phase
 
-### Phase 1: Add DocumentIds List to Pipeline ✅ READY TO IMPLEMENT
+### Phase 1 – DocumentIds List (Complete)
 
-**Goal:** Decouple documents from pipelines without breaking existing functionality.
+**Shipped**
 
-**Changes:**
+- `Models/DocumentPipeline.cs` defines `DocumentIds`, `OrganizationProfileId`, attach/remove helpers, and async loaders for documents, passages, and organization profiles.
+- `Services/DocumentIngestionService.cs` persists uploaded documents and appends their IDs to the owning pipeline without mutating counters.
+- Controllers (`DocumentsController`, `PipelineNotesController`) and orchestration services (`JobCoordinator`, `PipelineProcessor`) now hydrate via the new helpers.
+- `Models/OrganizationProfile.cs` exists and `FieldExtractor` injects organizational context into prompts.
 
-1. **Add DocumentIds property to DocumentPipeline**
-    - File: `Models/DocumentPipeline.cs`
-    - Add: `public List<string> DocumentIds { get; set; } = new();`
-    - Remove `TotalDocuments` / `ProcessedDocuments`; derive status from `ProcessingJob`
+**Outstanding**
 
-2. **Update DocumentIngestionService**
-   - File: `Services/DocumentIngestionService.cs`
-   - Change: Remove `PipelineId` assignment from `SourceDocument`
-   - Add: Populate `pipeline.DocumentIds` list after ingestion
-    - Save: Persist the pipeline once per ingestion run after appending IDs (no status updates)
-   - Keep: Document-to-pipeline association logic (via list)
+- Admin list/detail UI (and REST surface, if needed) for maintaining `OrganizationProfile` entities remains unimplemented.
+- Pipeline diagnostics do not yet warn when `DocumentIds` references missing or deleted documents.
 
-3. **Add pipeline helper for document hydration**
-    - File: `Models/DocumentPipeline.cs`
-    - Add method `LoadDocumentsAsync(ct)` that defers to `SourceDocument.GetManyAsync(DocumentIds, ct)`
-    - Replace ad-hoc queries in controllers/services with this helper (aligns with Entity<T> statics)
-    - Optional: add `LoadPassagesAsync(ct)` to encapsulate passage queries by `DocumentIds`
+**Verification**
 
-4. **Update JobCoordinator / pipeline consumers**
-    - File: `Services/JobCoordinator.cs`
-    - Ensure: Scheduler reads from `pipeline.DocumentIds` (no pipeline counters required)
-
-5. **Streamline PipelineProcessor progress updates**
-    - File: `Services/PipelineProcessor.cs`
-    - Increment `job.ProcessedDocuments` inside the processing loop and rely on `ProcessingJob` for progress counters
-    - Remove redundant `pipeline.TotalDocuments` / `ProcessedDocuments` mutations; set pipeline status once when the run finishes
-
-6. **Introduce OrganizationProfile globals**
-    - File: `Models/OrganizationProfile.cs`
-    - Define `OrganizationProfile : Entity<OrganizationProfile>` with approved global fields
-    - Persist reference on `DocumentPipeline` (e.g., `OrganizationProfileId`) and expose through prompt builders
-
-7. **Add admin UI for OrganizationProfile maintenance**
-    - Module: create list/detail route (e.g., `Globals/OrganizationProfile`) with CRUD operations
-    - Surface: Keep form minimal (fields above + metadata) and enforce role-based access within Meridian sample
-    - Wire: Consume Entity statics (`OrganizationProfile.All`, `OrganizationProfile.Save`) to stay consistent with Koan patterns
-
-8. **Update all query sites** (see "Query Migration" section below)
-   - Replace: `SourceDocument.Query(d => d.PipelineId == pipelineId)`
-    - With: `var documents = await pipeline.LoadDocumentsAsync(ct);`
-
-**Testing:**
-- Upload documents to pipeline → Verify `pipeline.DocumentIds` populated
-- Process job → Verify documents processed correctly
-- Get documents for pipeline → Verify retrieval works via list
-- Confirm pipeline status/progress reflects `ProcessingJob` state after completion (no counter drift)
-- Verify UI list/detail cycle persists OrganizationProfile changes and pipelines pick up updates in prompts
-
-**Rollback:** Keep `SourceDocument.PipelineId` as deprecated field during Phase 1 (validate parallel)
+- Manual ingestion/processing runs (`scripts/phase4.5`) confirm pipelines persist document IDs.
+- `tests/S7.Meridian.Tests/JobCoordinatorTests` cover reuse paths but still assume `SourceDocument.PipelineId`; refactor these fixtures to attach documents via pipeline helpers.
 
 ---
 
-### Phase 2: Remove PipelineId from SourceDocument ✅ DEPENDENT ON PHASE 1
+### Phase 2 – Remove SourceDocument.PipelineId (Complete, cleanup pending)
 
-**Goal:** Complete document decoupling, enable document reuse.
+**Shipped**
 
-**Changes:**
+- `Models/SourceDocument.cs` no longer exposes `PipelineId`; ingestion, processing, and controller paths rely solely on pipeline document lists.
+- `ProcessingJob` documents are merged through `pipeline.AttachDocuments`, and controllers fetch via `LoadDocumentsAsync`.
 
-1. **Remove PipelineId from SourceDocument**
-    - File: `Models/SourceDocument.cs`
-    - Delete: `public string PipelineId { get; set; } = string.Empty;`
-    - Verify: No code references `document.PipelineId` (all migrated in Phase 1)
+**Gap**
 
-2. **Simplify ingestion and virtual document handling**
-    - File: `Services/DocumentIngestionService.cs`
-      - Stop mutating pipeline counters/status; append new IDs to `pipeline.DocumentIds`
-      - Defer status progression to job lifecycle (keeps ingestion a thin facade)
-    - File: `Services/PipelineProcessor.cs` (virtual doc method)
-      - Remove `PipelineId` assignment when creating virtual documents
-            - Append saved ID to `pipeline.DocumentIds` so Authoritative Notes participate in extraction
-            - Persist pipeline status once per run after updating `ProcessingJob`
+- `Services/PipelineProcessor.cs` (`CreateVirtualDocumentFromNotesAsync`) still assigns the removed property. Drop the setter and ensure the virtual document is attached only through `pipeline.AttachDocument`.
+- Integration and orchestration tests instantiate `SourceDocument` with `PipelineId`; update them to persist, attach, and process documents via the pipeline list.
 
-3. **Support reuse through existing surfaces**
-    - Document reuse can be achieved by callers adding IDs to `pipeline.DocumentIds`
-    - No new endpoints needed unless product confirms automation requirements
+**Verification**
 
-**Testing:**
-- Upload same file to two pipelines → Verify deduplication works
-- Link existing document to new pipeline → Verify reuse works
-- Process both pipelines → Verify independent extractions
+- Multi-pipeline reuse works manually: the second pipeline attaches existing document IDs and skips redundant extraction/embedding when hashes match.
 
 ---
 
-### Phase 3: Remove PipelineId from Passage ⚠️ CAREFUL - AFFECTS RETRIEVAL
+### Phase 3 – Remove Passage.PipelineId (Complete)
 
-**Goal:** Share chunks across pipelines, enable vector reuse.
+**Shipped**
 
-**Changes:**
+- `Models/Passage.cs` retains only `SourceDocumentId` as foreign key.
+- `PassageChunker`, `FieldExtractor`, `PipelineProcessor`, and `PassageIndexer` filter passages by `pipeline.DocumentIds` and reuse cached embeddings keyed on `Passage.TextHash`.
 
-1. **Remove PipelineId from Passage**
-   - File: `Models/Passage.cs`
-   - Delete: `public string PipelineId { get; set; } = string.Empty;`
+**Outstanding**
 
-2. **Update PassageChunker**
-   - File: `Services/PassageChunker.cs` (line ~35)
-   - Remove: `PipelineId = document.PipelineId`
-   - Keep: Only `SourceDocumentId` link
+- Observability: surface a warning when reuse returns zero passages (e.g., document deleted) so operators can remediate quickly.
 
-3. **Update FieldExtractor**
-   - File: `Services/FieldExtractor.cs`
-   - Lines 224, 430, 441: Remove PipelineId filters from passage queries
-   - Change: Query by document IDs instead
-   ```csharp
-   // OLD: var passages = await Passage.Query(p => p.PipelineId == pipelineId);
-   // NEW: var passages = await Passage.Query(p => pipeline.DocumentIds.Contains(p.SourceDocumentId));
-   ```
+**Verification**
 
-4. **Update PassageIndexer**
-   - File: `Services/PassageIndexer.cs` (line ~90)
-   - Remove: `["pipelineId"] = passage.PipelineId` from vector metadata
-   - Keep: `["documentId"] = passage.SourceDocumentId`
-
-5. **Update PipelineProcessor**
-   - File: `Services/PipelineProcessor.cs` (line ~232)
-   - Change passage retrieval to filter by document IDs:
-   ```csharp
-   // OLD: var allPassages = await Passage.Query(p => p.PipelineId == pipeline.Id);
-   // NEW: var allPassages = await Passage.Query(p => pipeline.DocumentIds.Contains(p.SourceDocumentId));
-   ```
-
-**Testing:**
-- Process pipeline → Verify passages created without PipelineId
-- Run extraction → Verify retrieval works via document ID filtering
-- Clone pipeline → Verify both pipelines use same passages
-
-**Risk:** This is the highest-risk phase. Passage queries used heavily in extraction pipeline.
+- Retrieval and extraction succeed with shared passages; `RunLog` entries confirm reuse without duplicate chunking.
 
 ---
+
+## Progressive TODOs
+
+- [ ] Strip the `SourceDocument.PipelineId` assignment in `PipelineProcessor.CreateVirtualDocumentFromNotesAsync` and rely on `pipeline.AttachDocument(saved.Id)` exclusively.
+- [ ] Refactor `tests/S7.Meridian.Tests/Integration/PipelineE2ETests.cs` and related fixtures to build pipelines by attaching saved document IDs instead of setting properties directly.
+- [ ] Implement an admin/API surface for maintaining `OrganizationProfile` entities (sample UI namespace: `Pages/Globals/OrganizationProfile`).
+- [ ] Emit telemetry (e.g., `RunLog` metadata) when a document participates in multiple pipelines to quantify reuse benefits.
+- [ ] Add validation that flags `DocumentPipeline.DocumentIds` references pointing to missing `SourceDocument` rows.
+- [ ] Keep content-hash deduplication on deck; wire ingestion metrics so we can trigger the enhancement when duplicate uploads exceed agreed thresholds.
 
 ### Optional Enhancements (Post-Core Refactor)
 
 The three phases above deliver document reuse, pipeline cloning (by copying `DocumentIds`), and retrieval parity. Additional features remain valuable but can ship later if and when real requirements surface.
 
 **Content-Hash Deduplication**
+
 - Add `ContentHash` only when duplicate uploads create measurable storage or processing pressure.
 - Implementation mirrors the outline in earlier drafts—compute hash during ingestion, reuse existing `SourceDocument` when hashes match.
 
 **First-Class Pipeline Cloning Support**
+
 - Pipelines can already be cloned by copying configuration and `DocumentIds` in caller code.
 - Add REST/UI affordances only if teams need guided automation rather than simple reuse in custom workflows.
 
 **Join Table Migration**
+
 - If pipelines begin exceeding ~1000 documents and list performance degrades, migrate to `PipelineDocument` join table as a follow-up change.
 
 These enhancements should remain out of scope for the initial refactor so the core change set stays minimal.
@@ -329,17 +307,20 @@ These enhancements should remain out of scope for the initial refactor so the co
 ### Pattern 1: Get Documents for Pipeline
 
 **BEFORE:**
+
 ```csharp
 var documents = await SourceDocument.Query(d => d.PipelineId == pipelineId, ct);
 ```
 
 **AFTER:**
+
 ```csharp
 var pipeline = await DocumentPipeline.Get(pipelineId, ct);
 var documents = await pipeline.LoadDocumentsAsync(ct);
 ```
 
 **Helper Method (Recommended):**
+
 ```csharp
 // Add to DocumentPipeline model
 public async Task<List<SourceDocument>> LoadDocumentsAsync(CancellationToken ct)
@@ -361,17 +342,20 @@ var documents = await pipeline.LoadDocumentsAsync(ct);
 ### Pattern 2: Get Passages for Pipeline
 
 **BEFORE:**
+
 ```csharp
 var passages = await Passage.Query(p => p.PipelineId == pipelineId, ct);
 ```
 
 **AFTER:**
+
 ```csharp
 var pipeline = await DocumentPipeline.Get(pipelineId, ct);
 var passages = await pipeline.LoadPassagesAsync(ct);
 ```
 
 **Helper Method (Recommended):**
+
 ```csharp
 // Add to DocumentPipeline model (optional)
 public async Task<List<Passage>> LoadPassagesAsync(CancellationToken ct)
@@ -388,12 +372,14 @@ public async Task<List<Passage>> LoadPassagesAsync(CancellationToken ct)
 ### Pattern 3: Filter Virtual Documents
 
 **BEFORE:**
+
 ```csharp
 var realDocs = await SourceDocument.Query(
     d => d.PipelineId == pipelineId && !d.IsVirtual, ct);
 ```
 
 **AFTER:**
+
 ```csharp
 var pipeline = await DocumentPipeline.Get(pipelineId, ct);
 var allDocs = await pipeline.LoadDocumentsAsync(ct);
@@ -436,9 +422,9 @@ var realDocs = allDocs.Where(d => !d.IsVirtual).ToList();
 - [ ] **Services/FieldExtractor.cs** - Update passage and source-type queries to use pipeline helper (line ~224, ~430, ~441)
 
 - Optional backlog items (implement when needed)
-    - [ ] **Services/DocumentIngestionService.cs** - Add content-hash deduplication
-    - [ ] **Controllers/PipelinesController.cs** - Add clone endpoint / automation helpers
-    - [ ] **Frontend** - Add clone UI (if applicable)
+  - [ ] **Services/DocumentIngestionService.cs** - Add content-hash deduplication
+  - [ ] **Controllers/PipelinesController.cs** - Add clone endpoint / automation helpers
+  - [ ] **Frontend** - Add clone UI (if applicable)
 
 ### Test Files to Update
 
@@ -454,15 +440,16 @@ var realDocs = allDocs.Where(d => !d.IsVirtual).ToList();
 ### Unit Tests
 
 **Phase 1 Tests:**
+
 ```csharp
 [TestMethod]
 public async Task DocumentIngestion_PopulatesPipelineDocumentIds()
 {
     var pipeline = new DocumentPipeline { Name = "Test" };
     await pipeline.Save();
-    
+
     var doc = await _ingestion.IngestAsync(pipeline.Id, testFile, ct);
-    
+
     var reloaded = await DocumentPipeline.Get(pipeline.Id);
     Assert.IsTrue(reloaded.DocumentIds.Contains(doc.Id));
 }
@@ -472,14 +459,15 @@ public async Task GetDocumentsForPipeline_ReturnsLinkedDocuments()
 {
     var pipeline = new DocumentPipeline { DocumentIds = { docId1, docId2 } };
     await pipeline.Save();
-    
+
     var docs = await SourceDocument.GetForPipelineAsync(pipeline.Id);
-    
+
     Assert.AreEqual(2, docs.Count);
 }
 ```
 
 **Phase 2 Tests:**
+
 ```csharp
 [TestMethod]
 public async Task VirtualNotesDocuments_AreMarkedIsVirtual()
@@ -509,30 +497,31 @@ public async Task ManualDocumentReuse_AddsExistingId()
 ```
 
 **Phase 3 Tests:**
+
 ```csharp
 [TestMethod]
 public async Task Passages_SharedAcrossPipelines()
 {
     var pipelineA = CreatePipeline(docId);
     var pipelineB = CreatePipeline(docId); // Same document
-    
+
     await _processor.ProcessAsync(pipelineA);
     var passagesA = await Passage.GetForPipelineAsync(pipelineA.Id);
-    
+
     await _processor.ProcessAsync(pipelineB);
     var passagesB = await Passage.GetForPipelineAsync(pipelineB.Id);
-    
+
     // Same document = same passages
     Assert.AreEqual(passagesA.Count, passagesB.Count);
-    CollectionAssert.AreEqual(passagesA.Select(p => p.Id).ToList(), 
+    CollectionAssert.AreEqual(passagesA.Select(p => p.Id).ToList(),
                              passagesB.Select(p => p.Id).ToList());
 }
 ```
 
-
 ### Integration Tests
 
 **End-to-End Workflow:**
+
 1. Create pipeline A
 2. Upload documents to A
 3. Process A → Verify extractions
@@ -545,22 +534,23 @@ public async Task Passages_SharedAcrossPipelines()
    - No duplicate storage
 
 **Performance Comparison:**
+
 ```csharp
 [TestMethod]
 public async Task DocumentReuse_ReducesProcessingCost()
 {
     var documents = await UploadDocuments(10);
-    
+
     // Pipeline A: Full processing
     var startA = DateTime.UtcNow;
     var pipelineA = await ProcessPipeline(documents);
     var costA = (DateTime.UtcNow - startA).TotalSeconds;
-    
+
     // Pipeline B: Reuse documents (should be faster)
     var startB = DateTime.UtcNow;
     var pipelineB = await ProcessPipeline(documents); // Same documents
     var costB = (DateTime.UtcNow - startB).TotalSeconds;
-    
+
     Assert.IsTrue(costB < costA * 0.5, "Reuse should be 50%+ faster");
 }
 ```
@@ -570,23 +560,26 @@ public async Task DocumentReuse_ReducesProcessingCost()
 ## Rollback Strategy
 
 ### Phase 1 Rollback
+
 **Keep `SourceDocument.PipelineId` as deprecated during Phase 1**
+
 ```csharp
 [Obsolete("Use pipeline.DocumentIds instead")]
 public string PipelineId { get; set; } = string.Empty;
 ```
 
 **Validation script:**
+
 ```csharp
 // Run after Phase 1 implementation to verify parallel paths match
 foreach (var pipeline in await DocumentPipeline.All())
 {
     // Old path
     var docsViaOldPath = await SourceDocument.Query(d => d.PipelineId == pipeline.Id);
-    
+
     // New path
     var docsViaNewPath = await SourceDocument.GetManyAsync(pipeline.DocumentIds);
-    
+
     if (docsViaOldPath.Count != docsViaNewPath.Count)
     {
         Logger.LogError("Mismatch for pipeline {PipelineId}: old={OldCount}, new={NewCount}",
@@ -596,9 +589,12 @@ foreach (var pipeline in await DocumentPipeline.All())
 ```
 
 ### Phase 2 Rollback
+
 **If issues detected after removing PipelineId:**
+
 1. Re-add `PipelineId` property to `SourceDocument`
 2. Run migration script to populate from `DocumentPipeline.DocumentIds`:
+
 ```csharp
 foreach (var pipeline in await DocumentPipeline.All())
 {
@@ -615,7 +611,9 @@ foreach (var pipeline in await DocumentPipeline.All())
 ```
 
 ### Phase 3 Rollback
+
 **Most risky - re-add Passage.PipelineId if retrieval breaks:**
+
 ```csharp
 // Last-resort rollback: duplicate passages per pipeline by re-running chunker
 foreach (var pipeline in await DocumentPipeline.All())
@@ -629,9 +627,11 @@ foreach (var pipeline in await DocumentPipeline.All())
 ## Edge Cases & Considerations
 
 ### Virtual Documents from Authoritative Notes
+
 **Problem:** Virtual documents are pipeline-specific overrides, shouldn't be reused.
 
 **Solution:**
+
 ```csharp
 // Virtual documents already flagged via IsVirtual
 var clonedDocIds = original.DocumentIds
@@ -643,24 +643,26 @@ var clonedDocIds = original.DocumentIds
 ```
 
 ### Document Updates & Cache Invalidation
+
 **Problem:** If document content changes, all pipelines using it should be notified.
 
 **Solution (Future Enhancement):**
+
 ```csharp
 public async Task UpdateDocumentAsync(string documentId, Stream newContent, CancellationToken ct)
 {
     var doc = await SourceDocument.Get(documentId);
     var oldHash = doc.ContentHash; // Populate only if deduplication enhancement implemented
-    
+
     // Reprocess document
     var newHash = await ReprocessDocumentAsync(doc, newContent, ct);
-    
+
     if (oldHash != newHash)
     {
         // Find all pipelines using this document
         var allPipelines = await DocumentPipeline.All(ct);
         var affectedPipelines = allPipelines.Where(p => p.DocumentIds.Contains(documentId));
-        
+
         // Mark pipelines for refresh
         foreach (var pipeline in affectedPipelines)
         {
@@ -671,11 +673,14 @@ public async Task UpdateDocumentAsync(string documentId, Stream newContent, Canc
 ```
 
 ### Concurrent Document Additions
+
 **Problem:** Two requests add documents to same pipeline simultaneously.
 
 **Mitigation:**
+
 - Koan's `Entity<T>` handles optimistic concurrency (versioning)
 - Use `HashSet<string>` for DocumentIds to prevent duplicates:
+
 ```csharp
 var docIdSet = new HashSet<string>(pipeline.DocumentIds);
 docIdSet.Add(newDocumentId);
@@ -684,14 +689,17 @@ await pipeline.Save(ct);
 ```
 
 ### Large Document Lists Performance
+
 **Problem:** Pipelines with 1000+ documents might have slow list operations.
 
 **Threshold:** Monitor `pipeline.DocumentIds.Count`:
+
 - < 500 documents: Simple list is fine
 - 500-1000 documents: Watch query performance
 - > 1000 documents: Consider migrating to join table
 
 **Migration trigger:**
+
 ```csharp
 if (pipeline.DocumentIds.Count > 1000)
 {
@@ -701,9 +709,11 @@ if (pipeline.DocumentIds.Count > 1000)
 ```
 
 ### Classification Context
+
 **Question:** Does classification need pipeline context?
 
 **Analysis:** Current `DocumentClassifier` uses:
+
 - Document text
 - Global SourceType catalog
 - Embeddings for similarity
@@ -715,6 +725,7 @@ if (pipeline.DocumentIds.Count > 1000)
 ## Performance Expectations
 
 ### Before Refactoring (Current)
+
 ```
 Scenario: 3 pipelines × 50 documents
 
@@ -735,6 +746,7 @@ Total: 75 minutes
 ```
 
 ### After Refactoring (Proposed)
+
 ```
 Scenario: 3 pipelines × 50 shared documents
 
@@ -757,6 +769,7 @@ Total: 37 minutes (51% faster)
 ```
 
 ### Pipeline Cloning Performance
+
 ```
 Before: Clone with 100 documents
 - Create pipeline record: 0.1s
@@ -774,29 +787,34 @@ After: Clone with 100 documents
 ## Success Metrics
 
 ### Phase 1 Success Criteria
+
 - ✅ All document queries migrated to use `pipeline.DocumentIds`
 - ✅ `pipeline.DocumentIds` correctly populated on upload
 - ✅ Existing tests pass (backward compatibility)
 - ✅ Validation script shows old/new paths match
 
 ### Phase 2 Success Criteria
+
 - ✅ `SourceDocument.PipelineId` removed from model
 - ✅ Content-hash deduplication working (same file = same document)
 - ✅ Document linking API functional
 - ✅ No breaking changes to extraction pipeline
 
 ### Phase 3 Success Criteria
+
 - ✅ `Passage.PipelineId` removed from model
 - ✅ Passages shared across pipelines
 - ✅ Retrieval/extraction quality unchanged
 - ✅ Performance improvement measurable
 
 ### Phase 4 Success Criteria
+
 - ✅ Upload same file twice → Single storage record
 - ✅ Upload same file to different pipelines → Document reused
 - ✅ Storage costs reduced (measure before/after)
 
 ### Phase 5 Success Criteria
+
 - ✅ Pipeline cloning functional via API
 - ✅ Cloned pipelines share documents
 - ✅ Independent extractions per pipeline
@@ -807,18 +825,22 @@ After: Clone with 100 documents
 ## Future Enhancements
 
 ### Join Table Migration (If Needed at Scale)
+
 **Trigger:** Pipelines exceed 1000 documents regularly
 
 **Implementation:**
+
 1. Create `PipelineDocument` entity
 2. Migration script: Populate from `DocumentPipeline.DocumentIds`
 3. Add query helpers to abstract join logic
 4. Deprecate `DocumentIds` list (keep for backward compat)
 
 ### Document Versioning
+
 **Feature:** Track document versions, notify affected pipelines
 
 **Implementation:**
+
 ```csharp
 public sealed class SourceDocument : Entity<SourceDocument>
 {
@@ -836,9 +858,11 @@ foreach (var pipeline in affectedPipelines)
 ```
 
 ### Cross-Pipeline Document Analytics
+
 **Feature:** Show document usage statistics
 
 **Queries enabled:**
+
 ```csharp
 // Which pipelines use this document?
 var usage = await DocumentPipeline.Query(
@@ -853,9 +877,11 @@ var docCounts = allPipelines
 ```
 
 ### Chunking Strategy Variations
+
 **Challenge:** Different pipelines might need different chunk sizes
 
 **Solution:**
+
 ```csharp
 public sealed class DocumentPipeline : Entity<DocumentPipeline>
 {
@@ -878,12 +904,14 @@ var passages = await Passage.Query(
 ## Implementation Checklist
 
 ### Pre-Implementation
+
 - [ ] Review this document with team
 - [ ] Identify any Meridian-specific considerations
 - [ ] Set up feature branch: `feature/document-centric-architecture`
 - [ ] Create backup of current data (if not greenfield)
 
 ### Phase 1 Implementation
+
 - [ ] Add `DocumentIds` to `DocumentPipeline`
 - [ ] Update `DocumentIngestionService`
 - [ ] Migrate all query sites (see checklist above)
@@ -894,12 +922,14 @@ var passages = await Passage.Query(
 - [ ] Manual testing: upload, process, retrieve
 
 ### Phase 2 Implementation
+
 - [ ] Remove `SourceDocument.PipelineId`
 - [ ] Update virtual document creation to rely on `IsVirtual`
 - [ ] Ensure document reuse by manipulating `DocumentIds`
 - [ ] Regression test ingestion + reuse flows
 
 ### Phase 3 Implementation
+
 - [ ] Remove `Passage.PipelineId`
 - [ ] Update all passage queries
 - [ ] Test retrieval quality
@@ -907,11 +937,13 @@ var passages = await Passage.Query(
 - [ ] Monitor extraction confidence scores
 
 ### Optional Enhancements (Backlog)
+
 - [ ] Introduce content-hash deduplication once duplication pain surfaces
 - [ ] Add first-class cloning endpoint/UI if teams request guided automation
 - [ ] Migrate to join table when document counts per pipeline exceed practical list limits
 
 ### Post-Implementation
+
 - [ ] Update documentation
 - [ ] Update API specs
 - [ ] Performance benchmarking
@@ -929,6 +961,7 @@ var passages = await Passage.Query(
 > "Continue the work on DOCUMENT-CENTRIC-REFACTORING.md"
 
 **I will:**
+
 1. Read this document to understand context and current state
 2. Check the implementation checklist to see what's complete
 3. Review the code to determine which phase is in progress
@@ -943,24 +976,28 @@ Add notes below as each phase completes:
 ### Progress Log
 
 **Phase 1: DocumentIds List**
+
 - Status: Not started
 - Started: [DATE]
 - Completed: [DATE]
 - Notes: [Add any issues/learnings here]
 
 **Phase 2: Remove SourceDocument.PipelineId**
+
 - Status: Not started
 - Started: [DATE]
 - Completed: [DATE]
 - Notes: [Add any issues/learnings here]
 
 **Phase 3: Remove Passage.PipelineId**
+
 - Status: Not started
 - Started: [DATE]
 - Completed: [DATE]
 - Notes: [Add any issues/learnings here]
 
 **Phase 5: Pipeline Cloning**
+
 - Status: Not started
 - Started: [DATE]
 - Completed: [DATE]

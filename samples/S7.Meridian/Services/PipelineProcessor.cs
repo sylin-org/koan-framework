@@ -241,7 +241,7 @@ public sealed class PipelineProcessor : IPipelineProcessor
             }
         }
 
-    var allPassages = await pipeline.LoadPassagesAsync(ct);
+        var allPassages = await pipeline.LoadPassagesAsync(ct);
         var existingFields = (await ExtractedField.Query(e => e.PipelineId == pipeline.Id, ct).ConfigureAwait(false))
             .Select(field =>
             {
@@ -381,7 +381,7 @@ public sealed class PipelineProcessor : IPipelineProcessor
         await _merger.MergeAsync(pipeline, mergeCandidates, ct);
 
         var completedAt = DateTime.UtcNow;
-    pipeline.Status = PipelineStatus.Completed;
+        pipeline.Status = PipelineStatus.Completed;
         pipeline.CompletedAt = completedAt;
         pipeline.UpdatedAt = completedAt;
         await pipeline.Save(ct).ConfigureAwait(false);
@@ -390,11 +390,11 @@ public sealed class PipelineProcessor : IPipelineProcessor
         job.Status = JobStatus.Completed;
         job.CompletedAt = completedAt;
         job.HeartbeatAt = completedAt;
-    job.ProcessedDocuments = job.TotalDocuments;
-        
+        job.ProcessedDocuments = job.TotalDocuments;
+
         _logger.LogInformation("Archiving completed job {JobId} to completed-jobs partition", job.Id);
         await job.Save("completed-jobs", ct).ConfigureAwait(false);
-        
+
         // Remove from active jobs collection to prevent TryClaimAnyAsync from finding it
         await job.Delete(ct).ConfigureAwait(false);
         _logger.LogInformation("Job {JobId} archived and removed from active queue", job.Id);
@@ -408,24 +408,27 @@ public sealed class PipelineProcessor : IPipelineProcessor
         DocumentPipeline pipeline,
         CancellationToken ct)
     {
+        var notesContent = pipeline.AuthoritativeNotes ?? string.Empty;
+        var notesHash = TextExtractor.ComputeTextHash(notesContent);
+
         var virtualDoc = new SourceDocument
         {
-            PipelineId = pipeline.Id,
             OriginalFileName = "Authoritative Notes (User Override)",
             StorageKey = $"virtual-notes-{pipeline.Id}", // No actual file storage
             MediaType = "text/plain",
-            Size = pipeline.AuthoritativeNotes?.Length ?? 0,
+            Size = notesContent.Length,
+            ContentHash = notesHash,
             IsVirtual = true,
             Precedence = 1, // Highest priority
             SourceType = MeridianConstants.SourceTypes.AuthoritativeNotes,
-            ExtractedText = pipeline.AuthoritativeNotes ?? string.Empty,
+            ExtractedText = notesContent,
             Status = DocumentProcessingStatus.Indexed, // Skip text extraction/classification
             ExtractionConfidence = 1.0,
             ExtractedAt = DateTime.UtcNow,
             ClassificationConfidence = 1.0,
             ClassificationMethod = ClassificationMethod.Manual,
             ClassificationReason = "Virtual document from Authoritative Notes",
-            TextHash = TextExtractor.ComputeTextHash(pipeline.AuthoritativeNotes ?? string.Empty),
+            TextHash = notesHash,
             PageCount = 1,
             UploadedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow

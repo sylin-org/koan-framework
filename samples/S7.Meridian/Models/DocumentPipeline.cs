@@ -125,7 +125,7 @@ public sealed class DocumentPipeline : Entity<DocumentPipeline>
             return;
         }
 
-    DocumentIds.RemoveAll(id => string.Equals(id, documentId, StringComparison.Ordinal));
+        DocumentIds.RemoveAll(id => string.Equals(id, documentId, StringComparison.Ordinal));
     }
 
     public async Task<List<SourceDocument>> LoadDocumentsAsync(CancellationToken ct = default)
@@ -145,7 +145,7 @@ public sealed class DocumentPipeline : Entity<DocumentPipeline>
             return new List<SourceDocument>();
         }
 
-        var loaded = await SourceDocument.GetManyAsync(ids, ct).ConfigureAwait(false);
+        var loaded = await SourceDocument.Get(ids, ct).ConfigureAwait(false);
         return loaded
             .Where(doc => doc is not null)
             .Select(doc => doc!)

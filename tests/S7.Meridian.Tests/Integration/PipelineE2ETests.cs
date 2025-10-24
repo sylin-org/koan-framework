@@ -82,7 +82,6 @@ public sealed class PipelineE2ETests
 
             var document = new SourceDocument
             {
-                PipelineId = pipeline.Id,
                 OriginalFileName = "financials.txt",
                 StorageKey = storageKey,
                 SourceType = MeridianConstants.SourceTypes.AuditedFinancial,
@@ -93,6 +92,10 @@ public sealed class PipelineE2ETests
                 UpdatedAt = DateTime.UtcNow
             };
             await document.Save(ct);
+
+            pipeline.AttachDocument(document.Id);
+            pipeline.UpdatedAt = DateTime.UtcNow;
+            await pipeline.Save(ct);
 
             var job = new ProcessingJob
             {

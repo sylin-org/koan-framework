@@ -89,9 +89,9 @@ public sealed class FieldExtractor : IFieldExtractor
             return results;
         }
 
-    var sourceTypes = await LoadSourceTypesAsync(pipeline, ct).ConfigureAwait(false);
-    var organizationProfile = await pipeline.LoadOrganizationProfileAsync(ct).ConfigureAwait(false);
-    var instructionBlock = BuildInstructionBlock(pipeline, sourceTypes, organizationProfile);
+        var sourceTypes = await LoadSourceTypesAsync(pipeline, ct).ConfigureAwait(false);
+        var organizationProfile = await pipeline.LoadOrganizationProfileAsync(ct).ConfigureAwait(false);
+        var instructionBlock = BuildInstructionBlock(pipeline, sourceTypes, organizationProfile);
         var fieldQueryOverrides = BuildFieldQueryOverrides(sourceTypes);
         var keywordHint = BuildKeywordHint(pipeline, sourceTypes);
 
@@ -108,7 +108,7 @@ public sealed class FieldExtractor : IFieldExtractor
             return results;
         }
 
-    var fieldPaths = EnumerateLeafSchemas(schema).ToList();
+        var fieldPaths = EnumerateLeafSchemas(schema).ToList();
         _logger.LogInformation("Extracting {Count} fields for pipeline {PipelineId}", fieldPaths.Count, pipeline.Id);
 
         foreach (var (fieldPath, fieldSchema) in fieldPaths)
@@ -356,9 +356,9 @@ public sealed class FieldExtractor : IFieldExtractor
             keywords.AddRange(pipeline.AnalysisTags);
         }
 
-    keywords.AddRange(sourceTypes.SelectMany(type => type.SignalPhrases ?? new List<string>()));
+        keywords.AddRange(sourceTypes.SelectMany(type => type.SignalPhrases ?? new List<string>()));
         keywords.AddRange(sourceTypes.SelectMany(type => type.Tags ?? new List<string>()));
-    keywords.AddRange(sourceTypes.SelectMany(type => type.DescriptorHints ?? new List<string>()));
+        keywords.AddRange(sourceTypes.SelectMany(type => type.DescriptorHints ?? new List<string>()));
 
         var normalized = keywords
             .Where(value => !string.IsNullOrWhiteSpace(value))
@@ -380,7 +380,7 @@ public sealed class FieldExtractor : IFieldExtractor
         IReadOnlyDictionary<string, string> overrides,
         out string? query)
     {
-    var normalized = FieldPathCanonicalizer.Canonicalize(fieldPath);
+        var normalized = FieldPathCanonicalizer.Canonicalize(fieldPath);
         if (normalized.Length == 0)
         {
             query = null;
@@ -392,7 +392,7 @@ public sealed class FieldExtractor : IFieldExtractor
             return true;
         }
 
-    if (normalized.EndsWith("[]", StringComparison.Ordinal))
+        if (normalized.EndsWith("[]", StringComparison.Ordinal))
         {
             var singular = normalized[..^2];
             if (overrides.TryGetValue(singular, out query))
@@ -819,7 +819,7 @@ If the field cannot be found, respond with:
         return new ExtractionResponse(valueToken, confidence, passageIndex);
     }
 
-        private sealed record ExtractionResponse(JToken? Value, double Confidence, int? PassageIndex);
+    private sealed record ExtractionResponse(JToken? Value, double Confidence, int? PassageIndex);
 
     private JObject? TryParseJson(string text)
     {

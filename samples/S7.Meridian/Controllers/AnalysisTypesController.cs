@@ -33,6 +33,17 @@ public sealed class AnalysisTypesController : EntityController<AnalysisType>
         try
         {
             var response = await _authoring.SuggestAsync(request, ct).ConfigureAwait(false);
+
+            if (response.Warnings?.Count > 0)
+            {
+                foreach (var warning in response.Warnings)
+                {
+                    _logger.LogWarning("AI analysis suggest warning: {Warning}", warning);
+                }
+
+                Response.Headers[MeridianConstants.Headers.AiWarnings] = string.Join(" | ", response.Warnings);
+            }
+
             return Ok(response);
         }
         catch (ArgumentException ex)
@@ -51,6 +62,16 @@ public sealed class AnalysisTypesController : EntityController<AnalysisType>
         {
             var response = await _authoring.SuggestAsync(request, ct).ConfigureAwait(false);
             var draft = response.Draft;
+
+            if (response.Warnings?.Count > 0)
+            {
+                foreach (var warning in response.Warnings)
+                {
+                    _logger.LogWarning("AI analysis create warning: {Warning}", warning);
+                }
+
+                Response.Headers[MeridianConstants.Headers.AiWarnings] = string.Join(" | ", response.Warnings);
+            }
 
             // Convert draft to entity and save
             var entity = new AnalysisType

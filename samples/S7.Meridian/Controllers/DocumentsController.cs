@@ -38,7 +38,7 @@ public sealed class DocumentsController : ControllerBase
 
     [HttpPost]
     [RequestSizeLimit(200_000_000)]
-    public async Task<ActionResult<DocumentIngestionResponse>> Upload(string pipelineId, [FromForm] List<IFormFile>? files, CancellationToken ct)
+    public async Task<ActionResult<DocumentIngestionResponse>> Upload(string pipelineId, [FromForm] List<IFormFile>? files, [FromQuery] bool force = false, CancellationToken ct)
     {
         var collected = new FormFileCollection();
 
@@ -69,19 +69,39 @@ public sealed class DocumentsController : ControllerBase
             return BadRequest("At least one file is required.");
         }
 
-        var documents = await _ingestion.IngestAsync(pipelineId, collected, ct).ConfigureAwait(false);
-        var documentIds = documents
+        var result = await _ingestion.IngestAsync(pipelineId, collected, force, ct).ConfigureAwait(false);
+        var newIds = result.NewDocuments
             .Select(d => d.Id)
             .Where(id => !string.IsNullOrWhiteSpace(id))
             .Select(id => id!)
             .ToList();
 
-        var job = await _jobs.ScheduleAsync(pipelineId, documentIds, ct).ConfigureAwait(false);
+        var reusedIds = result.ReusedDocuments
+            .Select(d => d.Id)
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .Select(id => id!)
+            .ToList();
+
+        if (newIds.Count == 0)
+        {
+            var reuseResponse = new DocumentIngestionResponse
+            {
+                DocumentId = reusedIds.FirstOrDefault() ?? string.Empty,
+                DocumentIds = reusedIds,
+                ReusedDocumentIds = reusedIds,
+                Status = "Unchanged"
+            };
+
+            return Ok(reuseResponse);
+        }
+
+        var job = await _jobs.ScheduleAsync(pipelineId, newIds, ct).ConfigureAwait(false);
 
         var response = new DocumentIngestionResponse
         {
-            DocumentId = documentIds.FirstOrDefault() ?? string.Empty,
-            DocumentIds = documentIds,
+            DocumentId = newIds.FirstOrDefault() ?? string.Empty,
+            DocumentIds = newIds,
+            ReusedDocumentIds = reusedIds,
             JobId = job.Id,
             Status = job.Status.ToString()
         };
@@ -94,6 +114,7 @@ public sealed class DocumentIngestionResponse
 {
     public string DocumentId { get; set; } = string.Empty;
     public List<string> DocumentIds { get; set; } = new();
+    public List<string> ReusedDocumentIds { get; set; } = new();
     public string JobId { get; set; } = string.Empty;
     public string Status { get; set; } = string.Empty;
 }

@@ -34,7 +34,7 @@ public sealed class MeridianJobWorker : BackgroundService
                     continue;
                 }
 
-                _logger.LogInformation("Claimed job {JobId} (status: {Status}, retryCount: {RetryCount}) for pipeline {PipelineId}", 
+                _logger.LogInformation("Claimed job {JobId} (status: {Status}, retryCount: {RetryCount}) for pipeline {PipelineId}",
                     job.Id, job.Status, job.RetryCount, job.PipelineId);
 
                 try

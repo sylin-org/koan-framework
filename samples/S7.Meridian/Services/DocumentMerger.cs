@@ -289,8 +289,8 @@ public sealed class DocumentMerger : IDocumentMerger
         var canonicalJson = canonical.ToString(Formatting.None);
         var dataHash = ComputeHash(canonicalJson);
 
-    pipeline.Quality = ComputeQualityMetrics(acceptedFields, groups.Count, totalConflicts, autoResolved);
-    pipeline.UpdatedAt = now;
+        pipeline.Quality = ComputeQualityMetrics(acceptedFields, groups.Count, totalConflicts, autoResolved);
+        pipeline.UpdatedAt = now;
 
         string? pdfKey = null;
         try
@@ -968,8 +968,7 @@ public sealed class DocumentMerger : IDocumentMerger
     {
         return token.Type switch
         {
-            JTokenType.Object => token.Children<JProperty>()
-                .ToDictionary(prop => prop.Name, prop => ConvertTokenToTemplateObject(prop.Value), StringComparer.OrdinalIgnoreCase),
+            JTokenType.Object => CoalesceObjectProperties(token.Children<JProperty>()),
             JTokenType.Array => token.Values<JToken>().Select(ConvertTokenToTemplateObject).ToList(),
             JTokenType.Integer => token.Value<long>(),
             JTokenType.Float => token.Value<double>(),
@@ -977,6 +976,71 @@ public sealed class DocumentMerger : IDocumentMerger
             JTokenType.Null => null,
             _ => token.ToString(Formatting.None)
         };
+    }
+
+    private static IDictionary<string, object?> CoalesceObjectProperties(IEnumerable<JProperty> properties)
+    {
+        var result = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var property in properties)
+        {
+            var normalizedName = NormalizeMetadataKey(property.Name);
+            var converted = ConvertTokenToTemplateObject(property.Value);
+
+            if (!result.TryGetValue(normalizedName, out var existing))
+            {
+                result[normalizedName] = converted;
+                continue;
+            }
+
+            if (existing is List<object?> list)
+            {
+                list.Add(converted);
+            }
+            else
+            {
+                result[normalizedName] = new List<object?> { existing, converted };
+            }
+        }
+
+        return result;
+    }
+
+    // Normalizes metadata keys to a predictable snake_case shape so duplicate producers coalesce cleanly.
+    private static string NormalizeMetadataKey(string key)
+    {
+        if (string.IsNullOrWhiteSpace(key))
+        {
+            return key;
+        }
+
+        var builder = new StringBuilder(key.Length * 2);
+        char? previous = null;
+
+        foreach (var current in key)
+        {
+            var shouldInsertUnderscore = previous.HasValue &&
+                ((char.IsLower(previous.Value) && char.IsUpper(current)) ||
+                 (char.IsDigit(previous.Value) && char.IsLetter(current)));
+
+            if (char.IsWhiteSpace(current) || current == '-' || current == '.')
+            {
+                builder.Append('_');
+                previous = '_';
+                continue;
+            }
+
+            if (shouldInsertUnderscore && previous != '_')
+            {
+                builder.Append('_');
+            }
+
+            builder.Append(char.ToLowerInvariant(current));
+            previous = current;
+        }
+
+        var normalized = builder.ToString();
+        return normalized.Trim('_');
     }
 
     private static string SerializePolicyDescriptor(MergePolicyDescriptor descriptor)

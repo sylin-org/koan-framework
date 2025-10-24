@@ -63,6 +63,11 @@ public static class MeridianConstants
         public const string AiSuggestSegment = "ai-suggest";
     }
 
+    public static class Headers
+    {
+        public const string AiWarnings = "X-Meridian-AI-Warnings";
+    }
+
     public static class SourceTypes
     {
         public const string AuthoritativeNotes = "AuthoritativeNotes";
