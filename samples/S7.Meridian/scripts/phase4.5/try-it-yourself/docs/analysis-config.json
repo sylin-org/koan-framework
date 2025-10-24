@@ -1,0 +1,12 @@
+{
+  "pipeline": {
+    "name": "Enterprise Architecture Review 20251024-171600",
+    "bias": "Focus on technical feasibility and cost-effectiveness",
+    "description": "Try It Yourself - Auto-classified documents",
+    "notes": "This is a sample Enterprise Architecture Review created via the file-only API.\r\nAll documents are auto-classified using AI-powered document classification."
+  },
+  "analysis": {
+    "type": "EAR"
+  },
+  "manifest": {}
+}

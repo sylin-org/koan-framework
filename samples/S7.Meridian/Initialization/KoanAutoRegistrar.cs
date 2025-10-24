@@ -80,6 +80,8 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         services.AddSingleton<IModelHook<DocumentPipeline>, DocumentPipelineAnalysisTypeHook>();
         services.AddSingleton<IDocumentMerger, DocumentMerger>();
         services.AddSingleton<IPipelineProcessor, PipelineProcessor>();
+        services.AddSingleton<ITypeCodeResolver, TypeCodeResolver>();
+        services.AddSingleton<IPipelineBootstrapService, PipelineBootstrapService>();
         services.AddHostedService<MeridianJobWorker>();
     }
 

@@ -290,6 +290,17 @@ Extract all matching fields now:
                     continue;
                 }
 
+                // Skip sentinel values indicating "not present" - these should be omitted entirely
+                var valueStr = value.ToString();
+                if (IsSentinelValue(valueStr))
+                {
+                    _logger.LogDebug(
+                        "Skipping field {FieldPath} with sentinel value: {Value}",
+                        fieldPath,
+                        valueStr);
+                    continue;
+                }
+
                 // Normalize field path to match schema (case-insensitive)
                 var canonicalPath = FieldPathCanonicalizer.Canonicalize(fieldPath);
 
@@ -334,6 +345,32 @@ Extract all matching fields now:
         }
 
         return results;
+    }
+
+    /// <summary>
+    /// Detects sentinel values indicating a field is not present in the notes.
+    /// AI sometimes returns these instead of omitting the field entirely.
+    /// </summary>
+    private static bool IsSentinelValue(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        var normalized = value.Trim().ToLowerInvariant();
+
+        // Common patterns indicating "not present"
+        return normalized.Contains("not explicitly mentioned") ||
+               normalized.Contains("not mentioned") ||
+               normalized.Contains("omitted") ||
+               normalized.Contains("not present") ||
+               normalized.Contains("not found") ||
+               normalized.Contains("not specified") ||
+               normalized.Contains("not available") ||
+               normalized == "n/a" ||
+               normalized == "na" ||
+               normalized == "none";
     }
 
     private IEnumerable<(string path, JSchema schema)> EnumerateLeafSchemas(JSchema root, string prefix = "$")

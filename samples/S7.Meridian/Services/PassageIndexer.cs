@@ -87,6 +87,7 @@ public sealed class PassageIndexer : IPassageIndexer
     private static Dictionary<string, object?> BuildMetadata(Passage passage)
         => new()
         {
+            ["docId"] = passage.Id, // Required for VectorWorkflow to map Weaviate results back to entity IDs
             ["sourceDocumentId"] = passage.SourceDocumentId,
             ["sequenceNumber"] = passage.SequenceNumber,
             ["section"] = passage.Section

@@ -1,4 +1,7 @@
 using System;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using Koan.Data.Core;
 using Koan.Samples.Meridian.Contracts;
 using Koan.Samples.Meridian.Infrastructure;
@@ -108,5 +111,29 @@ public sealed class AnalysisTypesController : EntityController<AnalysisType>
             _logger.LogError(ex, "Failed to create analysis type with AI.");
             return StatusCode(500, new { error = "Failed to create analysis type" });
         }
+    }
+
+    /// <summary>
+    /// Gets available analysis type codes for file-only pipeline creation.
+    /// GET /api/analysistypes/codes
+    /// </summary>
+    [HttpGet("codes")]
+    public async Task<ActionResult> GetTypeCodesAsync(CancellationToken ct)
+    {
+        var analysisTypes = await AnalysisType.All(ct).ConfigureAwait(false);
+
+        var codes = analysisTypes
+            .Where(t => !string.IsNullOrWhiteSpace(t.Code))
+            .OrderBy(t => t.Code)
+            .Select(t => new
+            {
+                code = t.Code,
+                name = t.Name,
+                description = t.Description,
+                tags = t.Tags
+            })
+            .ToList();
+
+        return Ok(new { types = codes });
     }
 }
