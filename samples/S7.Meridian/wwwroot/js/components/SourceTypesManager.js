@@ -138,7 +138,10 @@ export class SourceTypesManager {
         <div class="type-card card-lift" data-type-id="${type.id}">
           <div class="type-card-content">
             <div class="type-card-header">
-              <h3 class="type-card-name">${this.escapeHtml(type.name)}</h3>
+              <div class="type-card-title-row">
+                <h3 class="type-card-name">${this.escapeHtml(type.name)}</h3>
+                ${type.code ? `<span class="type-code-badge">${this.escapeHtml(type.code)}</span>` : ''}
+              </div>
               <span class="type-badge type-badge-source">Source</span>
             </div>
 

@@ -5,6 +5,10 @@ namespace Koan.Samples.Meridian.Models;
 public sealed class AnalysisType : Entity<AnalysisType>
 {
     public string Name { get; set; } = string.Empty;
+
+    /// <summary>Exclusive short code for this analysis type (e.g., "EAR", "VDD", "SEC").</summary>
+    public string Code { get; set; } = string.Empty;
+
     public string Description { get; set; } = string.Empty;
     public int Version { get; set; } = 1;
 

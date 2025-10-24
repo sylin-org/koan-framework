@@ -90,7 +90,10 @@ public sealed class FieldExtractor : IFieldExtractor
         }
 
         var sourceTypes = await LoadSourceTypesAsync(pipeline, ct).ConfigureAwait(false);
-        var organizationProfile = await pipeline.LoadOrganizationProfileAsync(ct).ConfigureAwait(false);
+
+        // Load the active OrganizationProfile to merge its fields into extraction
+        var organizationProfile = await OrganizationProfile.GetActiveAsync(ct).ConfigureAwait(false);
+
         var instructionBlock = BuildInstructionBlock(pipeline, sourceTypes, organizationProfile);
         var fieldQueryOverrides = BuildFieldQueryOverrides(sourceTypes);
         var keywordHint = BuildKeywordHint(pipeline, sourceTypes);
@@ -108,7 +111,25 @@ public sealed class FieldExtractor : IFieldExtractor
             return results;
         }
 
-    var fieldPaths = SchemaFieldEnumerator.EnumerateLeaves(schema).ToList();
+        // Enumerate schema fields
+        var fieldPaths = SchemaFieldEnumerator.EnumerateLeaves(schema).ToList();
+
+        // Merge organization profile fields into extraction list
+        if (organizationProfile?.Fields is { Count: > 0 })
+        {
+            foreach (var orgField in organizationProfile.Fields.OrderBy(f => f.DisplayOrder))
+            {
+                var fieldPath = $"$.{orgField.FieldName}";
+                // Add as simple string field (organization fields don't have complex schemas)
+                fieldPaths.Add((fieldPath, new JSchema { Type = JSchemaType.String }));
+            }
+
+            _logger.LogInformation(
+                "Merged {OrgFieldCount} organization fields from active profile '{ProfileName}' into extraction",
+                organizationProfile.Fields.Count,
+                organizationProfile.Name);
+        }
+
         _logger.LogInformation("Extracting {Count} fields for pipeline {PipelineId}", fieldPaths.Count, pipeline.Id);
 
         foreach (var (fieldPath, fieldSchema) in fieldPaths)
@@ -287,46 +308,27 @@ public sealed class FieldExtractor : IFieldExtractor
     {
         var builder = new StringBuilder();
 
-        if (organizationProfile is not null)
+        // Include organization field hints if active profile exists
+        if (organizationProfile?.Fields is { Count: > 0 })
         {
-            var parts = new List<string>();
-
-            if (!string.IsNullOrWhiteSpace(organizationProfile.ScopeClassification))
+            var fieldHints = new List<string>();
+            foreach (var field in organizationProfile.Fields.OrderBy(f => f.DisplayOrder))
             {
-                parts.Add($"Scope={organizationProfile.ScopeClassification}");
-            }
-
-            if (!string.IsNullOrWhiteSpace(organizationProfile.RegulatoryRegime))
-            {
-                parts.Add($"Regulation={organizationProfile.RegulatoryRegime}");
-            }
-
-            if (!string.IsNullOrWhiteSpace(organizationProfile.LineOfBusiness))
-            {
-                parts.Add($"LineOfBusiness={organizationProfile.LineOfBusiness}");
-            }
-
-            if (!string.IsNullOrWhiteSpace(organizationProfile.Department))
-            {
-                parts.Add($"Department={organizationProfile.Department}");
-            }
-
-            if (organizationProfile.PrimaryStakeholders is { Count: > 0 })
-            {
-                var stakeholders = organizationProfile.PrimaryStakeholders
-                    .Where(kvp => kvp.Value is { Count: > 0 })
-                    .Select(kvp => $"{kvp.Key}:{string.Join(",", kvp.Value)}")
-                    .ToList();
-
-                if (stakeholders.Count > 0)
+                var hint = field.FieldName;
+                if (field.Examples is { Count: > 0 })
                 {
-                    parts.Add($"Stakeholders={string.Join(" | ", stakeholders)}");
+                    hint += $" (e.g., {string.Join(", ", field.Examples.Take(3))})";
                 }
+                if (!string.IsNullOrWhiteSpace(field.Description))
+                {
+                    hint += $" - {field.Description}";
+                }
+                fieldHints.Add(hint);
             }
 
-            if (parts.Count > 0)
+            if (fieldHints.Count > 0)
             {
-                builder.AppendLine($"[Organization] {string.Join("; ", parts)}");
+                builder.AppendLine($"[Organization Fields] Extract: {string.Join("; ", fieldHints)}");
             }
         }
 

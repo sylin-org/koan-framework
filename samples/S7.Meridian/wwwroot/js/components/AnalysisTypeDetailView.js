@@ -90,6 +90,12 @@ export class AnalysisTypeDetailView {
               : `<div class="readonly-value">${this.escape(this.type.name)}</div>`}
           </div>
           <div class="form-field">
+            <label>Code</label>
+            ${this.isEditing
+              ? `<input type="text" name="code" value="${this.escapeAttr(this.type.code || '')}" maxlength="10" style="text-transform: uppercase;" />`
+              : `<div class="readonly-value">${this.type.code ? `<span class="type-code-badge">${this.escape(this.type.code)}</span>` : '<span class="empty-value">Not set</span>'}</div>`}
+          </div>
+          <div class="form-field">
             <label>Description</label>
             ${this.isEditing
               ? `<textarea name="description" rows="3" maxlength="512">${this.escape(this.type.description)}</textarea>`
@@ -185,6 +191,7 @@ export class AnalysisTypeDetailView {
     const csv = (v) => v.split(',').map(s => s.trim()).filter(Boolean);
     return {
       name: val(get('input[name="name"]')) || this.type.name,
+      code: val(get('input[name="code"]')).toUpperCase() || this.type.code,
       description: val(get('textarea[name="description"]')) || this.type.description,
       outputTemplate: val(get('textarea[name="outputTemplate"]')) || this.type.outputTemplate,
       instructions: val(get('textarea[name="instructions"]')) || this.type.instructions,

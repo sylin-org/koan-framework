@@ -113,6 +113,10 @@ export class SourceTypeDetailView {
             ${editing ? `<input type="text" data-field="name" value="${this.escapeAttr(t.name)}" />` : `<div class="readonly-value">${this.escapeHtml(t.name)}</div>`}
           </div>
           <div class="form-field">
+            <label>Code</label>
+            ${editing ? `<input type="text" data-field="code" value="${this.escapeAttr(t.code || '')}" maxlength="10" style="text-transform: uppercase;" />` : `<div class="readonly-value">${t.code ? `<span class="type-code-badge">${this.escapeHtml(t.code)}</span>` : '<span class="empty-value">Not set</span>'}</div>`}
+          </div>
+          <div class="form-field">
             <label>Description</label>
             ${editing ? `<textarea data-field="description" rows="3">${this.escapeAttr(t.description)}</textarea>` : `<div class="readonly-value">${this.escapeHtml(t.description || 'No description')}</div>`}
           </div>
@@ -221,6 +225,8 @@ export class SourceTypeDetailView {
       return el ? el.value : undefined;
     };
     edits.name = getVal('[data-field="name"]');
+    const codeVal = getVal('[data-field="code"]');
+    if (codeVal !== undefined) edits.code = codeVal.trim().toUpperCase();
     edits.description = getVal('[data-field="description"]');
     const versionVal = getVal('[data-field="version"]');
     if (versionVal) edits.version = parseInt(versionVal, 10);

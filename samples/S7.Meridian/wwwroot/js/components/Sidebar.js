@@ -32,6 +32,7 @@ export class Sidebar {
       zap: '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>',
       folder: '<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>',
       bookmark: '<path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>',
+      building: '<path d="M3 21h18"></path><path d="M9 8h1"></path><path d="M9 12h1"></path><path d="M9 16h1"></path><path d="M14 8h1"></path><path d="M14 12h1"></path><path d="M14 16h1"></path><path d="M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16"></path>',
     };
 
     return [
@@ -99,6 +100,13 @@ export class Sidebar {
             label: 'Source Types',
             icon: icons.fileText,
             view: 'source-types-list',
+          },
+          {
+            id: 'organization-profiles',
+            label: 'Organization Profiles',
+            icon: icons.building,
+            view: 'organization-profiles',
+            shortcut: ['G', 'O'],
           },
           {
             id: 'integrations',
@@ -247,6 +255,8 @@ export class Sidebar {
       this.activeItemId = 'analysis-types';
     } else if (normalized.startsWith('source-types')) {
       this.activeItemId = 'source-types';
+    } else if (normalized.startsWith('organization-profiles')) {
+      this.activeItemId = 'organization-profiles';
     }
 
     this.updateActiveStyles();
@@ -268,6 +278,9 @@ export class Sidebar {
       case 'source-type-create':
       case 'source-type-edit':
         this.activeItemId = 'source-types';
+        break;
+      case 'organization-profiles':
+        this.activeItemId = 'organization-profiles';
         break;
       case 'analyses-list':
       case 'analysis-workspace':

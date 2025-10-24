@@ -210,15 +210,28 @@ Pipeline B
 
 **Entity:** `OrganizationProfile : Entity<OrganizationProfile>`
 
-- `ScopeClassification` - data boundary tag
-- `RegulatoryRegime` - controlling statutes (HIPAA, SOX, etc.)
-- `LineOfBusiness` - business unit anchor
-- `Department` - accountable team name
-- `PrimaryStakeholders` - role → contacts map
+An OrganizationProfile is a **template defining fields that should be extracted from ALL pipelines**, regardless of their AnalysisType. This allows organizations to standardize extraction of common organizational facts across all document analyses.
 
-**Prompt Contract:** always inject `OrganizationProfile` fields when assembling document-oriented prompts; keep formatting terse to avoid drift.
+**Design:**
+- `Name` - User-friendly label (e.g., "Geisinger Healthcare", "Kaiser Permanente")
+- `Active` - Boolean flag; **only ONE profile can be active at a time**
+- `Fields` - Collection of `OrganizationFieldDefinition`:
+  - `FieldName` - Name of field to extract (e.g., "RegulatoryRegime", "Department")
+  - `Description` - Optional guidance for extraction
+  - `Examples` - List of example values to enrich prompts (e.g., ["HIPAA", "SOC 2"])
 
-**UI Contract:** expose a lightweight list/detail surface so operators can view and edit organizational globals without touching configuration files.
+**Extraction Contract:**
+- FieldExtractor queries for the **active** OrganizationProfile on every pipeline run
+- Profile field definitions are **merged into the extraction schema** alongside AnalysisType fields
+- Profile fields are extracted as first-class `ExtractedField` entities with confidence scores, evidence, and passage references
+
+**Use Case:** A healthcare consulting firm maintains separate profiles for each client organization. By activating the "Geisinger" profile, every analysis (financial, clinical, operational) automatically extracts Geisinger-specific organizational fields from documents.
+
+**UI Contract:**
+- Expose CRUD for OrganizationProfile entities
+- Support dynamic field editor (add/remove/reorder fields)
+- Provide "Activate" action to set the active profile
+- Only one profile can be active; activating another deactivates the current one
 
 ---
 
@@ -228,14 +241,15 @@ Pipeline B
 
 **Shipped**
 
-- `Models/DocumentPipeline.cs` defines `DocumentIds`, `OrganizationProfileId`, attach/remove helpers, and async loaders for documents, passages, and organization profiles.
+- `Models/DocumentPipeline.cs` defines `DocumentIds`, attach/remove helpers, and async loaders for documents and passages.
 - `Services/DocumentIngestionService.cs` persists uploaded documents and appends their IDs to the owning pipeline without mutating counters.
 - Controllers (`DocumentsController`, `PipelineNotesController`) and orchestration services (`JobCoordinator`, `PipelineProcessor`) now hydrate via the new helpers.
-- `Models/OrganizationProfile.cs` exists and `FieldExtractor` injects organizational context into prompts.
 
 **Outstanding**
 
-- Admin list/detail UI (and REST surface, if needed) for maintaining `OrganizationProfile` entities remains unimplemented.
+- `Models/OrganizationProfile.cs` requires refactoring to support dynamic field definitions and Active flag (see Organizational Globals design above).
+- `FieldExtractor` must merge active profile fields into extraction schema instead of injecting as prompt context.
+- Admin UI for OrganizationProfile with dynamic field editor and activation controls.
 - Pipeline diagnostics do not yet warn when `DocumentIds` references missing or deleted documents.
 
 **Verification**

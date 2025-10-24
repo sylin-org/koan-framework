@@ -1,15 +1,12 @@
-﻿import { PageHeader } from './PageHeader.js';
+import { PageHeader } from './PageHeader.js';
 import { SearchFilter } from './SearchFilter.js';
 import { EmptyState } from './EmptyState.js';
 import { LoadingState } from './LoadingState.js';
 
 const DEFAULT_FORM = {
   name: '',
-  scopeClassification: '',
-  regulatoryRegime: '',
-  lineOfBusiness: '',
-  department: '',
-  stakeholdersText: ''
+  active: false,
+  fields: []
 };
 
 export class OrganizationProfilesManager {
@@ -21,7 +18,7 @@ export class OrganizationProfilesManager {
 
     this.pageHeader = new PageHeader(router, eventBus);
     this.searchFilter = new SearchFilter(eventBus, {
-      searchPlaceholder: 'Search organization profiles by name or department…',
+      searchPlaceholder: 'Search organization profiles by name…',
       sortOptions: [
         { value: 'name', label: 'Name' },
         { value: 'updated', label: 'Recently Updated' },
@@ -62,7 +59,7 @@ export class OrganizationProfilesManager {
   renderHeader() {
     return this.pageHeader.render({
       title: 'Organization Profiles',
-      subtitle: 'Manage organizational context injected into extraction prompts and deliverables.',
+      subtitle: 'Define fields that should be extracted from ALL documents, regardless of pipeline type.',
       breadcrumbs: [
         {
           label: 'Home',
@@ -119,39 +116,33 @@ export class OrganizationProfilesManager {
       <section class="profiles-form" data-profiles-form>
         <header class="form-header">
           <h2>${isEdit ? 'Edit Organization Profile' : 'Create Organization Profile'}</h2>
-          <p>${isEdit
-            ? 'Update organizational attributes that shape prompt context across pipelines.'
-            : 'Define organizational context available to all pipelines and prompt builders.'}</p>
+          <p>Define organizational fields that will be extracted from every document, regardless of pipeline type.</p>
         </header>
         <form data-profile-form>
           <div class="form-grid">
             <label class="form-field">
-              <span class="form-label">Name</span>
-              <input type="text" name="name" value="${this.escapeHtml(this.formValues.name)}" required maxlength="128" />
-            </label>
-            <label class="form-field">
-              <span class="form-label">Scope Classification</span>
-              <input type="text" name="scopeClassification" value="${this.escapeHtml(this.formValues.scopeClassification)}" maxlength="128" />
-            </label>
-            <label class="form-field">
-              <span class="form-label">Regulatory Regime</span>
-              <input type="text" name="regulatoryRegime" value="${this.escapeHtml(this.formValues.regulatoryRegime)}" maxlength="128" />
-            </label>
-            <label class="form-field">
-              <span class="form-label">Line of Business</span>
-              <input type="text" name="lineOfBusiness" value="${this.escapeHtml(this.formValues.lineOfBusiness)}" maxlength="128" />
-            </label>
-            <label class="form-field">
-              <span class="form-label">Department</span>
-              <input type="text" name="department" value="${this.escapeHtml(this.formValues.department)}" maxlength="128" />
+              <span class="form-label">Profile Name</span>
+              <input type="text" name="name" value="${this.escapeHtml(this.formValues.name)}" required maxlength="128" placeholder="e.g., Geisinger Healthcare" />
+              <span class="form-help">User-friendly label for this profile</span>
             </label>
           </div>
 
-          <label class="form-field">
-            <span class="form-label">Primary Stakeholders</span>
-            <textarea name="stakeholdersText" rows="5" placeholder="Role: contact one, contact two">${this.escapeHtml(this.formValues.stakeholdersText)}</textarea>
-            <span class="form-help">One role per line. Example: <code>Legal: Alex Carter, Priya Shah</code></span>
-          </label>
+          <div class="form-section">
+            <h3>Field Definitions</h3>
+            <p>Define fields that should be extracted from all documents when this profile is active.</p>
+
+            <div class="fields-editor" data-fields-editor>
+              ${this.renderFieldsEditor()}
+            </div>
+
+            <button type="button" class="btn btn-secondary" data-action="add-field">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+              </svg>
+              Add Field
+            </button>
+          </div>
 
           <div class="form-actions">
             <button type="submit" class="btn btn-primary">${isEdit ? 'Save Changes' : 'Create Profile'}</button>
@@ -160,6 +151,44 @@ export class OrganizationProfilesManager {
         </form>
       </section>
     `;
+  }
+
+  renderFieldsEditor() {
+    if (this.formValues.fields.length === 0) {
+      return '<div class="empty-fields">No fields defined. Click "Add Field" to create your first field.</div>';
+    }
+
+    return this.formValues.fields.map((field, index) => `
+      <div class="field-editor-row" data-field-index="${index}">
+        <div class="field-editor-inputs">
+          <input
+            type="text"
+            name="field-name-${index}"
+            value="${this.escapeHtml(field.fieldName || '')}"
+            placeholder="Field Name (e.g., RegulatoryRegime)"
+            required
+          />
+          <input
+            type="text"
+            name="field-description-${index}"
+            value="${this.escapeHtml(field.description || '')}"
+            placeholder="Description (optional)"
+          />
+          <input
+            type="text"
+            name="field-examples-${index}"
+            value="${this.escapeHtml((field.examples || []).join(', '))}"
+            placeholder="Examples: HIPAA, SOC 2, ..."
+          />
+        </div>
+        <button type="button" class="btn btn-danger btn-icon" data-action="remove-field" data-field-index="${index}" title="Remove field">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+    `).join('');
   }
 
   renderProfilesList() {
@@ -171,7 +200,7 @@ export class OrganizationProfilesManager {
       return EmptyState.render({
         variant: 'onboarding',
         title: 'No organization profiles yet',
-        description: 'Create a profile to inject organization-wide context into analysis prompts and deliverables.',
+        description: 'Create a profile to define fields that should be extracted from ALL documents across all pipelines.',
         icon: '<circle cx="12" cy="12" r="3"></circle><path d="M12 1v6m0 6v6m8.66-13.66l-4.24 4.24m-4.84 4.84l-4.24 4.24M23 12h-6m-6 0H1"></path>',
         action: {
           label: 'Create Profile',
@@ -196,12 +225,20 @@ export class OrganizationProfilesManager {
   }
 
   renderProfileCard(profile) {
-    const stakeholders = this.formatStakeholders(profile.primaryStakeholders);
+    const isActive = profile.active || false;
+    const fieldCount = (profile.fields || []).length;
+
     return `
-      <article class="profile-card card-lift" data-profile-id="${this.escapeHtml(profile.id)}">
+      <article class="profile-card card-lift ${isActive ? 'profile-card-active' : ''}" data-profile-id="${this.escapeHtml(profile.id)}">
         <header class="profile-card-header">
-          <h3>${this.escapeHtml(profile.name)}</h3>
+          <div class="profile-card-title-row">
+            <h3>${this.escapeHtml(profile.name)}</h3>
+            ${isActive ? '<span class="badge badge-success">Active</span>' : ''}
+          </div>
           <div class="profile-card-actions">
+            ${!isActive ? `<button class="btn btn-primary btn-sm" data-action="activate-profile" data-profile-id="${this.escapeHtml(profile.id)}" title="Activate profile">
+              Activate
+            </button>` : ''}
             <button class="btn btn-secondary btn-icon" data-action="edit-profile" data-profile-id="${this.escapeHtml(profile.id)}" title="Edit profile">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z"></path>
@@ -218,20 +255,22 @@ export class OrganizationProfilesManager {
             </button>
           </div>
         </header>
-        <dl class="profile-meta">
-          ${profile.scopeClassification ? `<div><dt>Scope</dt><dd>${this.escapeHtml(profile.scopeClassification)}</dd></div>` : ''}
-          ${profile.regulatoryRegime ? `<div><dt>Regulation</dt><dd>${this.escapeHtml(profile.regulatoryRegime)}</dd></div>` : ''}
-          ${profile.lineOfBusiness ? `<div><dt>Line of Business</dt><dd>${this.escapeHtml(profile.lineOfBusiness)}</dd></div>` : ''}
-          ${profile.department ? `<div><dt>Department</dt><dd>${this.escapeHtml(profile.department)}</dd></div>` : ''}
-        </dl>
-        ${stakeholders ? `
-          <section class="profile-stakeholders">
-            <h4>Primary Stakeholders</h4>
-            <ul>
-              ${stakeholders.map(item => `<li><strong>${this.escapeHtml(item.role)}</strong>: ${this.escapeHtml(item.contacts)}</li>`).join('')}
+        <div class="profile-card-body">
+          <div class="profile-field-count">
+            <strong>${fieldCount}</strong> ${fieldCount === 1 ? 'field' : 'fields'} will be extracted from all documents
+          </div>
+          ${fieldCount > 0 ? `
+            <ul class="profile-fields-list">
+              ${(profile.fields || []).slice(0, 5).map(field => `
+                <li>
+                  <strong>${this.escapeHtml(field.fieldName)}</strong>
+                  ${field.examples && field.examples.length > 0 ? `<span class="field-examples">(e.g., ${this.escapeHtml(field.examples.slice(0, 2).join(', '))})</span>` : ''}
+                </li>
+              `).join('')}
+              ${fieldCount > 5 ? `<li class="more-fields">+${fieldCount - 5} more...</li>` : ''}
             </ul>
-          </section>
-        ` : ''}
+          ` : '<div class="no-fields">No fields defined</div>'}
+        </div>
         <footer class="profile-card-footer">
           <span>Updated ${this.formatRelativeTime(profile.updatedAt || profile.createdAt)}</span>
         </footer>
@@ -254,6 +293,24 @@ export class OrganizationProfilesManager {
         this.handleFormSubmit(new FormData(form));
       });
 
+      // Add field button
+      const addFieldBtn = form.querySelector('[data-action="add-field"]');
+      if (addFieldBtn) {
+        addFieldBtn.addEventListener('click', () => {
+          this.formValues.fields.push({ fieldName: '', description: '', examples: [] });
+          this.updateView(container);
+        });
+      }
+
+      // Remove field buttons
+      form.querySelectorAll('[data-action="remove-field"]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const index = parseInt(btn.getAttribute('data-field-index'), 10);
+          this.formValues.fields.splice(index, 1);
+          this.updateView(container);
+        });
+      });
+
       const cancelBtn = form.querySelector('[data-action="cancel-profile"]');
       if (cancelBtn) {
         cancelBtn.addEventListener('click', (event) => {
@@ -264,6 +321,7 @@ export class OrganizationProfilesManager {
       }
     }
 
+    // Create profile buttons
     container.querySelectorAll('[data-action="create-profile"]').forEach(button => {
       button.addEventListener('click', (event) => {
         event.preventDefault();
@@ -272,6 +330,7 @@ export class OrganizationProfilesManager {
       });
     });
 
+    // Cancel buttons
     container.querySelectorAll('[data-action="cancel-profile"]').forEach(button => {
       button.addEventListener('click', (event) => {
         event.preventDefault();
@@ -280,6 +339,7 @@ export class OrganizationProfilesManager {
       });
     });
 
+    // Edit buttons
     container.querySelectorAll('[data-action="edit-profile"]').forEach(button => {
       button.addEventListener('click', (event) => {
         event.preventDefault();
@@ -289,6 +349,17 @@ export class OrganizationProfilesManager {
       });
     });
 
+    // Activate buttons
+    container.querySelectorAll('[data-action="activate-profile"]').forEach(button => {
+      button.addEventListener('click', async (event) => {
+        event.preventDefault();
+        const id = button.getAttribute('data-profile-id');
+        await this.activateProfile(id);
+        this.updateView(container);
+      });
+    });
+
+    // Delete buttons
     container.querySelectorAll('[data-action="delete-profile"]').forEach(button => {
       button.addEventListener('click', async (event) => {
         event.preventDefault();
@@ -353,10 +424,6 @@ export class OrganizationProfilesManager {
     if (query) {
       filtered = filtered.filter(profile => {
         if (profile.name?.toLowerCase().includes(query)) return true;
-        if (profile.department?.toLowerCase().includes(query)) return true;
-        if (profile.scopeClassification?.toLowerCase().includes(query)) return true;
-        if (profile.regulatoryRegime?.toLowerCase().includes(query)) return true;
-        if (profile.lineOfBusiness?.toLowerCase().includes(query)) return true;
         return false;
       });
     }
@@ -392,7 +459,7 @@ export class OrganizationProfilesManager {
   startCreate() {
     this.mode = 'create';
     this.editingProfile = null;
-    this.formValues = { ...DEFAULT_FORM };
+    this.formValues = { ...DEFAULT_FORM, fields: [] };
   }
 
   startEdit(id) {
@@ -406,11 +473,12 @@ export class OrganizationProfilesManager {
     this.editingProfile = profile;
     this.formValues = {
       name: profile.name || '',
-      scopeClassification: profile.scopeClassification || '',
-      regulatoryRegime: profile.regulatoryRegime || '',
-      lineOfBusiness: profile.lineOfBusiness || '',
-      department: profile.department || '',
-      stakeholdersText: this.stringifyStakeholders(profile.primaryStakeholders)
+      active: profile.active || false,
+      fields: (profile.fields || []).map(f => ({
+        fieldName: f.fieldName || '',
+        description: f.description || '',
+        examples: f.examples || []
+      }))
     };
   }
 
@@ -431,23 +499,40 @@ export class OrganizationProfilesManager {
   resetForm() {
     this.mode = 'list';
     this.editingProfile = null;
-    this.formValues = { ...DEFAULT_FORM };
+    this.formValues = { ...DEFAULT_FORM, fields: [] };
   }
 
   async handleFormSubmit(formData) {
-    const payload = {
-      name: formData.get('name')?.trim() || '',
-      scopeClassification: formData.get('scopeClassification')?.trim() || '',
-      regulatoryRegime: formData.get('regulatoryRegime')?.trim() || '',
-      lineOfBusiness: formData.get('lineOfBusiness')?.trim() || '',
-      department: formData.get('department')?.trim() || '',
-      primaryStakeholders: this.parseStakeholders(formData.get('stakeholdersText'))
-    };
+    const name = formData.get('name')?.trim() || '';
 
-    if (!payload.name) {
+    if (!name) {
       this.toast.error('Name is required.');
       return;
     }
+
+    // Collect field definitions from form
+    const fields = [];
+    for (let i = 0; i < this.formValues.fields.length; i++) {
+      const fieldName = formData.get(`field-name-${i}`)?.trim();
+      const description = formData.get(`field-description-${i}`)?.trim() || '';
+      const examplesStr = formData.get(`field-examples-${i}`)?.trim() || '';
+      const examples = examplesStr ? examplesStr.split(',').map(e => e.trim()).filter(Boolean) : [];
+
+      if (fieldName) {
+        fields.push({
+          fieldName,
+          description,
+          examples,
+          displayOrder: i
+        });
+      }
+    }
+
+    const payload = {
+      name,
+      active: this.formValues.active,
+      fields
+    };
 
     try {
       if (this.mode === 'edit' && this.editingProfile?.id) {
@@ -466,10 +551,34 @@ export class OrganizationProfilesManager {
     }
   }
 
+  async activateProfile(id) {
+    const profile = this.profiles.find(p => p.id === id);
+    if (!profile) {
+      this.toast.error('Profile not found');
+      return;
+    }
+
+    try {
+      await this.api.request(`/api/organizationprofiles/${id}/activate`, {
+        method: 'POST'
+      });
+      this.toast.success(`Activated profile: ${profile.name}`);
+      await this.loadProfiles();
+    } catch (error) {
+      console.error('Failed to activate profile', error);
+      this.toast.error('Failed to activate profile');
+    }
+  }
+
   async deleteProfile(id) {
     const profile = this.profiles.find(p => p.id === id);
     if (!profile) {
       this.toast.error('Profile not found');
+      return;
+    }
+
+    if (profile.active) {
+      this.toast.error('Cannot delete the active profile. Activate another profile first.');
       return;
     }
 
@@ -508,56 +617,6 @@ export class OrganizationProfilesManager {
     `;
 
     this.attachEventHandlers(managerHost);
-  }
-
-  parseStakeholders(text) {
-    if (!text) {
-      return {};
-    }
-
-    const result = {};
-    const lines = String(text).split('\n');
-    for (const line of lines) {
-      if (!line.trim()) {
-        continue;
-      }
-      const [role, contacts] = line.split(':');
-      if (!role) {
-        continue;
-      }
-      const roleKey = role.trim();
-      const contactList = contacts
-        ? contacts.split(',').map(entry => entry.trim()).filter(Boolean)
-        : [];
-      result[roleKey] = contactList;
-    }
-    return result;
-  }
-
-  stringifyStakeholders(stakeholders) {
-    if (!stakeholders || Object.keys(stakeholders).length === 0) {
-      return '';
-    }
-
-    return Object.entries(stakeholders)
-      .map(([role, contacts]) => {
-        if (Array.isArray(contacts) && contacts.length > 0) {
-          return `${role}: ${contacts.join(', ')}`;
-        }
-        return role;
-      })
-      .join('\n');
-  }
-
-  formatStakeholders(stakeholders) {
-    if (!stakeholders) {
-      return null;
-    }
-
-    return Object.entries(stakeholders).map(([role, contacts]) => ({
-      role,
-      contacts: Array.isArray(contacts) ? contacts.join(', ') : ''
-    }));
   }
 
   formatRelativeTime(dateString) {

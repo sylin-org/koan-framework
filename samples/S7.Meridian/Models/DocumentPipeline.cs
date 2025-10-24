@@ -50,10 +50,6 @@ public sealed class DocumentPipeline : Entity<DocumentPipeline>
     /// <summary>List of document identifiers attached to this pipeline.</summary>
     public List<string> DocumentIds { get; set; } = new();
 
-    /// <summary>Organization-wide context applied to this pipeline.</summary>
-    public string? OrganizationProfileId { get; set; }
-        = null;
-
     /// <summary>
     /// Authoritative notes containing user-provided data that MUST override any
     /// information extracted from documents. AI will interpret free-text format
@@ -171,16 +167,6 @@ public sealed class DocumentPipeline : Entity<DocumentPipeline>
 
         var passages = await Passage.Query(p => ids.Contains(p.SourceDocumentId), ct).ConfigureAwait(false);
         return passages.ToList();
-    }
-
-    public async Task<OrganizationProfile?> LoadOrganizationProfileAsync(CancellationToken ct = default)
-    {
-        if (string.IsNullOrWhiteSpace(OrganizationProfileId))
-        {
-            return null;
-        }
-
-        return await OrganizationProfile.Get(OrganizationProfileId, ct).ConfigureAwait(false);
     }
 }
 

@@ -69,7 +69,7 @@ public sealed class PassageIndexer : IPassageIndexer
                 await _cache.SetAsync(contentHash, EmbeddingModel, embedding, nameof(Passage), ct);
             }
 
-            payload.Add((passage, embedding, BuildMetadata(pipelineId, passage)));
+            payload.Add((passage, embedding, BuildMetadata(passage)));
             passage.IndexedAt = DateTime.UtcNow;
             await passage.Save(ct);
         }
@@ -84,10 +84,9 @@ public sealed class PassageIndexer : IPassageIndexer
         }
     }
 
-    private static Dictionary<string, object?> BuildMetadata(string pipelineId, Passage passage)
+    private static Dictionary<string, object?> BuildMetadata(Passage passage)
         => new()
         {
-            ["pipelineId"] = pipelineId,
             ["sourceDocumentId"] = passage.SourceDocumentId,
             ["sequenceNumber"] = passage.SequenceNumber,
             ["section"] = passage.Section

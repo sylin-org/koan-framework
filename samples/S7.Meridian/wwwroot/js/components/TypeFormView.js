@@ -108,6 +108,26 @@ export class TypeFormView {
                 ${!isReadonly ? '<p class="type-form-field-help">A descriptive name for this type (e.g., "Financial Analysis", "Invoice Processing").</p>' : ''}
               </div>
 
+              <!-- Code Field -->
+              <div class="type-form-field">
+                <label class="type-form-field-label">
+                  Code
+                  ${!isReadonly ? '<span class="required">*</span>' : ''}
+                </label>
+                <input
+                  type="text"
+                  name="code"
+                  class="type-form-field-input"
+                  value="${this.escapeHtml(this.entity?.code || '')}"
+                  ${isReadonly ? 'readonly' : ''}
+                  ${!isReadonly ? 'required' : ''}
+                  placeholder="${isReadonly ? '' : this.entityType === 'analysis' ? 'e.g., EAR, VDD, SEC' : 'e.g., MEET, INV, CONT'}"
+                  maxlength="10"
+                  style="text-transform: uppercase;"
+                />
+                ${!isReadonly ? `<p class="type-form-field-help">A short, unique code to identify this ${this.entityType === 'analysis' ? 'analysis' : 'source'} type (2-10 characters, uppercase recommended).</p>` : ''}
+              </div>
+
               <!-- Description Field -->
               <div class="type-form-field">
                 <label class="type-form-field-label">
@@ -482,6 +502,18 @@ export class TypeFormView {
       nameInput?.classList.remove('error');
     }
 
+    // Validate Code field
+    const codeInput = document.querySelector('input[name="code"]');
+    if (!codeInput?.value.trim()) {
+      errors.push('Code is required');
+      codeInput?.classList.add('error');
+    } else if (codeInput.value.trim().length < 2) {
+      errors.push('Code must be at least 2 characters');
+      codeInput?.classList.add('error');
+    } else {
+      codeInput?.classList.remove('error');
+    }
+
     if (!descriptionInput?.value.trim()) {
       errors.push('Description is required');
       descriptionInput?.classList.add('error');
@@ -511,6 +543,7 @@ export class TypeFormView {
   getFormData() {
     const formData = {
       name: document.querySelector('input[name="name"]')?.value.trim() || '',
+      code: document.querySelector('input[name="code"]')?.value.trim().toUpperCase() || '',
       description: document.querySelector('textarea[name="description"]')?.value.trim() || '',
       tags: [...this.tags],
       prompt: document.querySelector('textarea[name="prompt"]')?.value.trim() || ''
