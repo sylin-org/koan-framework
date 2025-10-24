@@ -38,7 +38,7 @@ public sealed class DocumentsController : ControllerBase
 
     [HttpPost]
     [RequestSizeLimit(200_000_000)]
-    public async Task<ActionResult<DocumentIngestionResponse>> Upload(string pipelineId, [FromForm] List<IFormFile>? files, [FromQuery] bool force = false, CancellationToken ct)
+    public async Task<ActionResult<DocumentIngestionResponse>> Upload(string pipelineId, [FromForm] List<IFormFile>? files, [FromQuery] bool force, CancellationToken ct)
     {
         var collected = new FormFileCollection();
 

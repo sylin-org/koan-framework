@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -82,8 +83,24 @@ public sealed class DeliverablesController : ControllerBase
 
     private static async Task<Deliverable?> GetLatestDeliverable(string pipelineId, CancellationToken ct)
     {
+        var pipeline = await DocumentPipeline.Get(pipelineId, ct).ConfigureAwait(false);
+        if (pipeline is null)
+        {
+            return null;
+        }
+
+        if (!string.IsNullOrWhiteSpace(pipeline.DeliverableId))
+        {
+            var deliverable = await Deliverable.Get(pipeline.DeliverableId, ct).ConfigureAwait(false);
+            if (deliverable is not null)
+            {
+                return deliverable;
+            }
+        }
+
         var deliverables = await Deliverable.Query(d => d.PipelineId == pipelineId, ct).ConfigureAwait(false);
         return deliverables
+            .Where(d => string.Equals(d.PipelineId, pipelineId, StringComparison.Ordinal))
             .OrderByDescending(d => d.CreatedAt)
             .FirstOrDefault();
     }

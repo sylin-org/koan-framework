@@ -79,6 +79,22 @@ export class TopNav {
               </svg>
               <span class="nav-label">Source Types</span>
             </a>
+
+            <a href="#/organization-profiles"
+               class="top-nav-link ${this.isActive('organization-profiles', currentPath) ? 'active' : ''}"
+               data-nav="organization-profiles"
+               title="Organization Profiles">
+              <svg class="nav-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M16 21v-2a4 4 0 0 0-3-3.87"></path>
+                <path d="M8 21v-2a4 4 0 0 1 3-3.87"></path>
+                <circle cx="12" cy="7" r="4"></circle>
+                <path d="M5.5 20.5a4 4 0 0 0-2.5-3.5"></path>
+                <path d="M18.5 20.5a4 4 0 0 1 2.5-3.5"></path>
+                <circle cx="5" cy="11" r="3"></circle>
+                <circle cx="19" cy="11" r="3"></circle>
+              </svg>
+              <span class="nav-label">Org Profiles</span>
+            </a>
           </div>
 
           <!-- Right Side Actions -->
@@ -144,6 +160,18 @@ export class TopNav {
                 <polyline points="10 9 9 9 8 9"></polyline>
               </svg>
               <span>Source Types</span>
+            </a>
+            <a href="#/organization-profiles" class="mobile-menu-link ${this.isActive('organization-profiles', currentPath) ? 'active' : ''}" data-nav="organization-profiles">
+              <svg class="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M16 21v-2a4 4 0 0 0-3-3.87"></path>
+                <path d="M8 21v-2a4 4 0 0 1 3-3.87"></path>
+                <circle cx="12" cy="7" r="4"></circle>
+                <path d="M5.5 20.5a4 4 0 0 0-2.5-3.5"></path>
+                <path d="M18.5 20.5a4 4 0 0 1 2.5-3.5"></path>
+                <circle cx="5" cy="11" r="3"></circle>
+                <circle cx="19" cy="11" r="3"></circle>
+              </svg>
+              <span>Org Profiles</span>
             </a>
             <hr class="mobile-menu-divider" />
             <button class="mobile-menu-link" data-action="open-settings-mobile">

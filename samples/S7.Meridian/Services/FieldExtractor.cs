@@ -108,7 +108,7 @@ public sealed class FieldExtractor : IFieldExtractor
             return results;
         }
 
-        var fieldPaths = EnumerateLeafSchemas(schema).ToList();
+    var fieldPaths = SchemaFieldEnumerator.EnumerateLeaves(schema).ToList();
         _logger.LogInformation("Extracting {Count} fields for pipeline {PipelineId}", fieldPaths.Count, pipeline.Id);
 
         foreach (var (fieldPath, fieldSchema) in fieldPaths)
@@ -737,29 +737,33 @@ public sealed class FieldExtractor : IFieldExtractor
         {
             displayName = fieldPath.TrimStart('$', '.');
         }
-        var fieldType = fieldSchema.Type?.ToString() ?? "string";
-        var schemaExcerpt = fieldSchema.ToString();
+                var fieldType = fieldSchema.Type?.ToString() ?? "string";
+                var fieldDescription = string.IsNullOrWhiteSpace(fieldSchema.Description)
+                        ? "Use only grounded facts from the provided passages."
+                        : fieldSchema.Description.Trim();
+                var schemaExcerpt = fieldSchema.ToString();
 
-        var prompt = $@"Extract the value for '{displayName}' from the following passages.
+                var prompt = $@"You are preparing content for '{displayName}'. Analyze the passages and produce a grounded value that matches the schema.
 
 Field type: {fieldType}
-Field schema: {schemaExcerpt}
+Field description: {fieldDescription}
+Field schema excerpt: {schemaExcerpt}
 
 Passages:
 {string.Join("\n\n", passages.Select((p, i) => $"[{i}] {p.Text}"))}
 
 Instructions:
-1. Find the passage that best answers the question
-2. Extract the EXACT value (do NOT infer or calculate)
-3. If the value is not explicitly stated, respond with null
-4. Validate the extracted value against the schema
-5. Provide confidence based on text clarity (0.0-1.0)
+1. Review all passages and collect statements that answer the field requirement.
+2. Compose a concise response (paragraph or bullets) using only verifiable details; you may synthesize across multiple passages.
+3. Quote names, figures, and dates exactly as written; do not invent new facts.
+4. If evidence is absent, return null instead of placeholder text.
+5. Validate the final value against the schema and estimate confidence (0.0-1.0).
 
 Respond in JSON format:
 {{
-  ""value"": <extracted value matching schema type>,
-  ""confidence"": <0.0-1.0>,
-  ""passageIndex"": <0-based index of best passage>
+    ""value"": <extracted value matching schema type>,
+    ""confidence"": <0.0-1.0>,
+    ""passageIndex"": <0-based index of the strongest supporting passage>
 }}
 
 If the field cannot be found, respond with:
@@ -1156,43 +1160,4 @@ If the field cannot be found, respond with:
         return false;
     }
 
-    /// <summary>
-    /// Helper to enumerate leaf fields from JSON schema for field-by-field extraction.
-    /// KEEP: This schema traversal logic is correct and reusable.
-    /// </summary>
-    private static IEnumerable<(string FieldPath, JSchema Schema)> EnumerateLeafSchemas(JSchema root, string prefix = "$")
-    {
-        if (root.Type == JSchemaType.Object && root.Properties.Count > 0)
-        {
-            foreach (var property in root.Properties)
-            {
-                var nextPrefix = prefix == "$"
-                    ? $"$.{property.Key}"
-                    : $"{prefix}.{property.Key}";
-
-                foreach (var nested in EnumerateLeafSchemas(property.Value, nextPrefix))
-                {
-                    yield return nested;
-                }
-            }
-
-            yield break;
-        }
-
-        if (root.Type == JSchemaType.Array && root.Items.Count > 0)
-        {
-            var nextPrefix = prefix.EndsWith("[]", StringComparison.Ordinal)
-                ? prefix
-                : $"{prefix}[]";
-
-            foreach (var nested in EnumerateLeafSchemas(root.Items[0], nextPrefix))
-            {
-                yield return nested;
-            }
-
-            yield break;
-        }
-
-        yield return (FieldPathCanonicalizer.Canonicalize(prefix), root);
-    }
 }

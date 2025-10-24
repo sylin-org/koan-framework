@@ -70,7 +70,7 @@ public sealed class DocumentMerger : IDocumentMerger
     {
         if (extractions.Count == 0)
         {
-            throw new InvalidOperationException("No extractions supplied for merge.");
+            _logger.LogInformation("No extractions supplied for merge; generating empty deliverable for pipeline {PipelineId}.", pipeline.Id);
         }
 
         var groups = extractions
@@ -168,8 +168,9 @@ public sealed class DocumentMerger : IDocumentMerger
 
             var templateKey = FieldPathCanonicalizer.ToTemplateKey(group.Key);
             var formattedValue = FormatValueForTemplate(mergeResult.ValueToken);
+            var hasContent = !string.IsNullOrWhiteSpace(formattedValue);
 
-            if (_options.Merge.EnableCitations)
+            if (_options.Merge.EnableCitations && hasContent)
             {
                 var footnote = await BuildFootnoteAsync(savedAccepted, mergeResult.ValueToken, footnotes.Count + 1, sourceCache, passageCache, ct).ConfigureAwait(false);
                 if (footnote is { } info)
@@ -770,7 +771,13 @@ public sealed class DocumentMerger : IDocumentMerger
         }
         else
         {
-            builder.Append(valueToken.ToString(Formatting.None));
+            var fallback = FormatValueForTemplate(valueToken);
+            if (string.IsNullOrWhiteSpace(fallback))
+            {
+                return null;
+            }
+
+            builder.Append(fallback);
         }
 
         return new Footnote(index, builder.ToString());
@@ -861,10 +868,13 @@ public sealed class DocumentMerger : IDocumentMerger
 
         return token.Type switch
         {
+            JTokenType.String => token.Value<string>() ?? string.Empty,
             JTokenType.Float or JTokenType.Integer => ((double)token).ToString("G", CultureInfo.InvariantCulture),
             JTokenType.Boolean => token.Value<bool>() ? "true" : "false",
-            JTokenType.Array => string.Join(", ", token.Values<JToken?>().Select(FormatValueForTemplate)),
-            _ => token.ToString(Formatting.None)
+            JTokenType.Date => token.Value<DateTime>().ToString("O", CultureInfo.InvariantCulture),
+            JTokenType.Array => string.Join(", ", token.Values<JToken?>().Select(FormatValueForTemplate).Where(value => !string.IsNullOrWhiteSpace(value))),
+            JTokenType.Null or JTokenType.Undefined => string.Empty,
+            _ => token.ToString()
         };
     }
 
@@ -973,8 +983,13 @@ public sealed class DocumentMerger : IDocumentMerger
             JTokenType.Integer => token.Value<long>(),
             JTokenType.Float => token.Value<double>(),
             JTokenType.Boolean => token.Value<bool>(),
+            JTokenType.String => token.Value<string>(),
+            JTokenType.Date => token.Value<DateTime>().ToString("O", CultureInfo.InvariantCulture),
+            JTokenType.Guid => token.Value<Guid>().ToString(),
+            JTokenType.Uri => token.Value<Uri>()?.ToString(),
+            JTokenType.TimeSpan => token.Value<TimeSpan>().ToString(),
             JTokenType.Null => null,
-            _ => token.ToString(Formatting.None)
+            _ => token.ToString()
         };
     }
 

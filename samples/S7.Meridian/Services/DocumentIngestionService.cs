@@ -1,11 +1,13 @@
 using System;
 using System.Buffers;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
+using Koan.Data.Core;
 using Koan.Samples.Meridian.Infrastructure;
 using Koan.Samples.Meridian.Models;
 using Microsoft.AspNetCore.Http;
@@ -31,12 +33,14 @@ public sealed class DocumentIngestionService : IDocumentIngestionService
 {
     private readonly IDocumentStorage _storage;
     private readonly ISecureUploadValidator _validator;
+    private readonly IRunLogWriter _runLog;
     private readonly ILogger<DocumentIngestionService> _logger;
 
-    public DocumentIngestionService(IDocumentStorage storage, ISecureUploadValidator validator, ILogger<DocumentIngestionService> logger)
+    public DocumentIngestionService(IDocumentStorage storage, ISecureUploadValidator validator, IRunLogWriter runLog, ILogger<DocumentIngestionService> logger)
     {
         _storage = storage;
         _validator = validator;
+        _runLog = runLog;
         _logger = logger;
     }
 
@@ -57,6 +61,7 @@ public sealed class DocumentIngestionService : IDocumentIngestionService
 
         var newDocuments = new List<SourceDocument>();
         var reusedDocuments = new List<SourceDocument>();
+        var reuseTelemetryCandidates = new List<SourceDocument>();
         var attachmentsAdded = false;
 
         foreach (var file in files)
@@ -91,9 +96,11 @@ public sealed class DocumentIngestionService : IDocumentIngestionService
             {
                 var before = pipeline.DocumentIds.Count;
                 pipeline.AttachDocument(existingByHash.Id!);
-                if (pipeline.DocumentIds.Count > before)
+                var attached = pipeline.DocumentIds.Count > before;
+                if (attached)
                 {
                     attachmentsAdded = true;
+                    reuseTelemetryCandidates.Add(existingByHash);
                 }
 
                 if (forceReprocess)
@@ -158,6 +165,11 @@ public sealed class DocumentIngestionService : IDocumentIngestionService
             await pipeline.Save(ct).ConfigureAwait(false);
         }
 
+        if (reuseTelemetryCandidates.Count > 0)
+        {
+            await EmitDocumentReuseTelemetryAsync(pipeline, reuseTelemetryCandidates, ct).ConfigureAwait(false);
+        }
+
         return new DocumentIngestionResult(newDocuments, reusedDocuments);
     }
 
@@ -214,6 +226,62 @@ public sealed class DocumentIngestionService : IDocumentIngestionService
         if (index >= 0)
         {
             documents[index] = updated;
+        }
+    }
+
+    private async Task EmitDocumentReuseTelemetryAsync(DocumentPipeline pipeline, IReadOnlyList<SourceDocument> reusedDocuments, CancellationToken ct)
+    {
+        var distinctDocuments = reusedDocuments
+            .Where(doc => !string.IsNullOrWhiteSpace(doc.Id))
+            .GroupBy(doc => doc.Id!, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.First());
+
+        foreach (var document in distinctDocuments)
+        {
+            var pipelinesUsingDocument = await DocumentPipeline.Query(p => p.DocumentIds.Contains(document.Id!), ct).ConfigureAwait(false);
+            var pipelineIds = pipelinesUsingDocument
+                .Select(p => p.Id)
+                .Where(id => !string.IsNullOrWhiteSpace(id))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            if (pipelineIds.Count <= 1)
+            {
+                continue;
+            }
+
+            var sharedWith = pipelineIds
+                .Where(id => !string.Equals(id, pipeline.Id, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            var metadata = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["pipelineCount"] = pipelineIds.Count.ToString(CultureInfo.InvariantCulture),
+                ["ingestingPipeline"] = pipeline.Id ?? string.Empty
+            };
+
+            if (sharedWith.Count > 0)
+            {
+                metadata["sharedWith"] = string.Join(',', sharedWith);
+            }
+
+            if (!string.IsNullOrWhiteSpace(document.ContentHash))
+            {
+                metadata["contentHash"] = document.ContentHash!;
+            }
+
+            var timestamp = DateTime.UtcNow;
+
+            await _runLog.AppendAsync(new RunLog
+            {
+                PipelineId = pipeline.Id ?? string.Empty,
+                Stage = "document-reuse",
+                DocumentId = document.Id,
+                StartedAt = timestamp,
+                FinishedAt = timestamp,
+                Status = "shared",
+                Metadata = metadata
+            }, ct).ConfigureAwait(false);
         }
     }
 }

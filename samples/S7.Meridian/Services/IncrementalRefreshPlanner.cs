@@ -98,20 +98,19 @@ public sealed class IncrementalRefreshPlanner : IIncrementalRefreshPlanner
             return Task.FromResult(IncrementalRefreshPlan.Full(changedDocumentIds));
         }
 
-        if (changedDocumentIds.Count == 0)
-        {
-            _logger.LogDebug("No changed documents detected for pipeline {PipelineId}; preserving {FieldCount} fields.", pipeline.Id, existingFields.Count);
-            return Task.FromResult(IncrementalRefreshPlan.NoChanges(existingFields));
-        }
-
+        var schema = pipeline.TryParseSchema();
+        var schemaFields = SchemaFieldEnumerator.BuildCanonicalFieldSet(schema);
         var changedSet = changedDocumentIds.ToHashSet(StringComparer.OrdinalIgnoreCase);
         var toExtract = new HashSet<string>(StringComparer.Ordinal);
         var toPreserve = new HashSet<string>(StringComparer.Ordinal);
         var reasons = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var existingFieldSet = new HashSet<string>(StringComparer.Ordinal);
 
         foreach (var field in existingFields)
         {
             var canonicalPath = FieldPathCanonicalizer.Canonicalize(field.FieldPath);
+            existingFieldSet.Add(canonicalPath);
+
             var sourceId = ResolveSourceDocumentId(field);
             if (string.IsNullOrWhiteSpace(sourceId))
             {
@@ -123,7 +122,10 @@ public sealed class IncrementalRefreshPlanner : IIncrementalRefreshPlanner
             if (changedSet.Contains(sourceId))
             {
                 toExtract.Add(canonicalPath);
-                reasons[canonicalPath] = $"source:{sourceId}";
+                if (!reasons.ContainsKey(canonicalPath))
+                {
+                    reasons[canonicalPath] = $"source:{sourceId}";
+                }
                 continue;
             }
 
@@ -137,8 +139,43 @@ public sealed class IncrementalRefreshPlanner : IIncrementalRefreshPlanner
             toPreserve.Add(canonicalPath);
         }
 
+        var missingFields = schemaFields.Count == 0
+            ? new HashSet<string>(StringComparer.Ordinal)
+            : schemaFields
+                .Where(path => !existingFieldSet.Contains(path))
+                .ToHashSet(StringComparer.Ordinal);
+
+        if (missingFields.Count > 0)
+        {
+            foreach (var missing in missingFields)
+            {
+                var added = toExtract.Add(missing);
+                if (added && !reasons.ContainsKey(missing))
+                {
+                    reasons[missing] = "missing-field";
+                }
+
+                // Ensure we do not preserve missing fields so they are re-extracted.
+                toPreserve.Remove(missing);
+            }
+
+            if (changedDocumentIds.Count == 0)
+            {
+                _logger.LogInformation(
+                    "Pipeline {PipelineId} lacks {MissingCount} schema fields; scheduling targeted extraction without document changes.",
+                    pipeline.Id,
+                    missingFields.Count);
+            }
+        }
+
         if (toExtract.Count == 0)
         {
+            if (changedDocumentIds.Count == 0)
+            {
+                _logger.LogDebug("No changed documents detected for pipeline {PipelineId}; preserving {FieldCount} fields.", pipeline.Id, existingFields.Count);
+                return Task.FromResult(IncrementalRefreshPlan.NoChanges(existingFields));
+            }
+
             _logger.LogInformation(
                 "Changed documents for pipeline {PipelineId} had no mapped fields; falling back to full extraction.",
                 pipeline.Id);
@@ -162,4 +199,5 @@ public sealed class IncrementalRefreshPlanner : IIncrementalRefreshPlanner
 
         return field.Evidence?.PassageId;
     }
+
 }

@@ -1,6 +1,6 @@
 ﻿# Document-Centric Architecture Refactoring
 
-**Status:** Phases 1–3 shipped (DocumentIds, decoupled SourceDocument, shared Passage cache); admin UI + automation backlog active  
+**Status:** Phases 1–3 shipped (DocumentIds, decoupled SourceDocument, content-hash reuse, shared Passage cache); admin UI + telemetry backlog active  
 **Created:** October 23, 2025  
 **Last Reviewed:** October 23, 2025  
 **Target:** Meridian S7 Sample Application  
@@ -121,11 +121,20 @@ Pipeline B
 
 ## Gap Analysis
 
-- **Virtual document creation still sets `SourceDocument.PipelineId`** (`Services/PipelineProcessor.cs`, `CreateVirtualDocumentFromNotesAsync`). The model no longer exposes that property, so the helper must stop assigning it and rely on `pipeline.AttachDocument(saved.Id)`.
-- **Regression suites reference removed property** (`tests/S7.Meridian.Tests/Integration/PipelineE2ETests.cs`, `JobCoordinatorTests.cs`) and need to be updated to populate documents via `pipeline.AttachDocument` helpers.
-- **Admin surface for `OrganizationProfile` missing.** The model exists and prompts consume it, but no UI or API exposes CRUD for organizational globals.
-- **Document reuse telemetry absent.** We do not log when a document participates in multiple pipelines; consider adding a `RunLog` metadata field when reuse occurs.
-- **Deduplication/backfill scripts not implemented.** Content-hash reuse remains backlog; cloning automation endpoints remain unshipped.
+**Resolved (2025-10-24)**
+
+- Virtual document creation now relies on `pipeline.AttachDocument()`; `PipelineProcessor.CreateVirtualDocumentFromNotesAsync` no longer tries to set a removed property.
+- Integration and orchestration test fixtures attach saved document IDs instead of assigning `SourceDocument.PipelineId`.
+- Document reuse telemetry now emits a `RunLog` breadcrumb (`Stage = "document-reuse"`) whenever ingestion attaches a document already shared across pipelines.
+
+**Still Open**
+
+- Admin surface for `OrganizationProfile` remains unbuilt. The model exists and prompts consume it, but no UI or API exposes CRUD for organizational globals.
+- Deduplication observability is pending. SHA-256 content-hash reuse now ships in `DocumentIngestionService`, but we still need ingestion dashboards before enabling forced dedup.
+
+### Completed Enhancement: Missing Field Backfill
+
+- ✅ `IncrementalRefreshPlanner` now schedules targeted extraction for any schema field missing an `ExtractedField`, even if document hashes are unchanged. This unlocks latent facts from shared documents without requiring re-uploads.
 
 ---
 
@@ -236,17 +245,17 @@ Pipeline B
 
 ---
 
-### Phase 2 – Remove SourceDocument.PipelineId (Complete, cleanup pending)
+### Phase 2 – Remove SourceDocument.PipelineId (Complete)
 
 **Shipped**
 
 - `Models/SourceDocument.cs` no longer exposes `PipelineId`; ingestion, processing, and controller paths rely solely on pipeline document lists.
 - `ProcessingJob` documents are merged through `pipeline.AttachDocuments`, and controllers fetch via `LoadDocumentsAsync`.
 
-**Gap**
+**Status Update (2025-10-24)**
 
-- `Services/PipelineProcessor.cs` (`CreateVirtualDocumentFromNotesAsync`) still assigns the removed property. Drop the setter and ensure the virtual document is attached only through `pipeline.AttachDocument`.
-- Integration and orchestration tests instantiate `SourceDocument` with `PipelineId`; update them to persist, attach, and process documents via the pipeline list.
+- `PipelineProcessor.CreateVirtualDocumentFromNotesAsync` now saves virtual documents without attempting to back-fill a pipeline ID and relies entirely on `pipeline.AttachDocument(saved.Id)`.
+- Integration and orchestration tests persist documents and attach IDs through pipeline helpers, matching production code paths.
 
 **Verification**
 
@@ -273,21 +282,23 @@ Pipeline B
 
 ## Progressive TODOs
 
-- [ ] Strip the `SourceDocument.PipelineId` assignment in `PipelineProcessor.CreateVirtualDocumentFromNotesAsync` and rely on `pipeline.AttachDocument(saved.Id)` exclusively.
-- [ ] Refactor `tests/S7.Meridian.Tests/Integration/PipelineE2ETests.cs` and related fixtures to build pipelines by attaching saved document IDs instead of setting properties directly.
+- [x] Strip the `SourceDocument.PipelineId` assignment in `PipelineProcessor.CreateVirtualDocumentFromNotesAsync` and rely on `pipeline.AttachDocument(saved.Id)` exclusively.
+- [x] Refactor `tests/S7.Meridian.Tests/Integration/PipelineE2ETests.cs` and related fixtures to build pipelines by attaching saved document IDs instead of setting properties directly.
+- [x] Ship SHA-256 content-hash deduplication in `DocumentIngestionService`; reuse existing `SourceDocument` rows when hashes match.
 - [ ] Implement an admin/API surface for maintaining `OrganizationProfile` entities (sample UI namespace: `Pages/Globals/OrganizationProfile`).
-- [ ] Emit telemetry (e.g., `RunLog` metadata) when a document participates in multiple pipelines to quantify reuse benefits.
+- [x] Emit telemetry (RunLog `Stage = "document-reuse"`) when a document participates in multiple pipelines to quantify reuse benefits.
+- [x] Ensure incremental refresh requests extraction for any schema field missing an `ExtractedField`, even when document hashes match.
 - [ ] Add validation that flags `DocumentPipeline.DocumentIds` references pointing to missing `SourceDocument` rows.
-- [ ] Keep content-hash deduplication on deck; wire ingestion metrics so we can trigger the enhancement when duplicate uploads exceed agreed thresholds.
+- [ ] Instrument ingestion dashboards so we can monitor dedup adoption over time.
 
 ### Optional Enhancements (Post-Core Refactor)
 
 The three phases above deliver document reuse, pipeline cloning (by copying `DocumentIds`), and retrieval parity. Additional features remain valuable but can ship later if and when real requirements surface.
 
-**Content-Hash Deduplication**
+**Content-Hash Deduplication (Shipped 2025-10-24)**
 
-- Add `ContentHash` only when duplicate uploads create measurable storage or processing pressure.
-- Implementation mirrors the outline in earlier drafts—compute hash during ingestion, reuse existing `SourceDocument` when hashes match.
+- SHA-256 hashes are computed during ingestion; matching hashes reuse the existing `SourceDocument` and keep the pipeline list in sync.
+- Follow-up work: instrument ingestion dashboards so we can surface adoption/efficiency metrics. No backfill required after the storage reset.
 
 **First-Class Pipeline Cloning Support**
 

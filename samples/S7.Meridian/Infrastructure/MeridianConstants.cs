@@ -57,6 +57,11 @@ public static class MeridianConstants
         public const string AiSuggestSegment = "ai-suggest";
     }
 
+    public static class OrganizationProfiles
+    {
+        public const string Route = "api/organizationprofiles";
+    }
+
     public static class AnalysisTypeCatalog
     {
         public const string Route = "api/analysistypes";

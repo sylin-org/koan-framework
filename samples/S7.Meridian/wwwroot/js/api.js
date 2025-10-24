@@ -13,6 +13,7 @@ export class API {
     this.analysisTypes = new EntityClient('analysistypes', this.baseUrl);
     this.sourceTypes = new EntityClient('sourcetypes', this.baseUrl);
     this.pipelines = new EntityClient('pipelines', this.baseUrl);
+  this.organizationProfiles = new EntityClient('organizationprofiles', this.baseUrl);
   }
 
   /**
@@ -322,6 +323,28 @@ export class API {
    */
   async deletePipeline(id) {
     return this.pipelines.delete(id);
+  }
+
+  // ==================== Organization Profiles ====================
+
+  async getOrganizationProfiles() {
+    return this.organizationProfiles.getAll();
+  }
+
+  async getOrganizationProfile(id) {
+    return this.organizationProfiles.getById(id);
+  }
+
+  async createOrganizationProfile(profile) {
+    return this.organizationProfiles.create(profile);
+  }
+
+  async updateOrganizationProfile(id, profile) {
+    return this.organizationProfiles.update(id, profile);
+  }
+
+  async deleteOrganizationProfile(id) {
+    return this.organizationProfiles.delete(id);
   }
 
   // ==================== Authoritative Notes ====================

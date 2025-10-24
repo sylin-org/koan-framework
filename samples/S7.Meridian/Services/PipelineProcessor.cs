@@ -243,6 +243,7 @@ public sealed class PipelineProcessor : IPipelineProcessor
 
         var allPassages = await pipeline.LoadPassagesAsync(ct);
         var existingFields = (await ExtractedField.Query(e => e.PipelineId == pipeline.Id, ct).ConfigureAwait(false))
+            .Where(field => string.Equals(field.PipelineId, pipeline.Id, StringComparison.Ordinal))
             .Select(field =>
             {
                 field.FieldPath = FieldPathCanonicalizer.Canonicalize(field.FieldPath);

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Threading;
@@ -160,8 +161,13 @@ public sealed class TemplateRenderer : ITemplateRenderer
             JTokenType.Integer => token.Value<long>(),
             JTokenType.Float => token.Value<double>(),
             JTokenType.Boolean => token.Value<bool>(),
+            JTokenType.String => token.Value<string>(),
+            JTokenType.Date => token.Value<DateTime>().ToString("O", CultureInfo.InvariantCulture),
+            JTokenType.Guid => token.Value<Guid>().ToString(),
+            JTokenType.Uri => token.Value<Uri>()?.ToString(),
+            JTokenType.TimeSpan => token.Value<TimeSpan>().ToString(),
             JTokenType.Null => null,
-            _ => token.ToString(Formatting.None)
+            _ => token.ToString()
         };
     }
 

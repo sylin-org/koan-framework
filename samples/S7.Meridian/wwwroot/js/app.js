@@ -23,6 +23,7 @@ import { SettingsSidebar } from './components/SettingsSidebar.js';
 import { KeyboardShortcuts } from './components/KeyboardShortcuts.js';
 import { PageHeader } from './components/PageHeader.js';
 import { DetailPanel } from './components/DetailPanel.js';
+import { OrganizationProfilesManager } from './components/OrganizationProfilesManager.js';
 
 class MeridianApp {
   constructor() {
@@ -57,6 +58,7 @@ class MeridianApp {
     this.analysisDetailView = new AnalysisDetailView(this.api, this.eventBus, this.router, this.toast);
     this.sourceTypesManager = new SourceTypesManager(this.api, this.eventBus, this.toast, this.router);
     this.sourceTypeDetailView = new SourceTypeDetailView(this.api, this.eventBus, this.toast);
+  this.organizationProfilesManager = new OrganizationProfilesManager(this.api, this.eventBus, this.toast, this.router);
     // Component state
     this.state = this.stateManager.state;
 
@@ -172,6 +174,11 @@ class MeridianApp {
     this.router.route('source-types/:id/view', (params) => this.navigate('source-type-view', params));
     this.router.route('source-types/:id/edit', (params) => this.navigate('source-type-edit', params));
 
+  // Organization Profiles
+  this.router.route('organization-profiles', (params) => this.navigate('organization-profiles', params));
+  this.router.route('organization-profiles/create', (params) => this.navigate('organization-profiles', { ...params, mode: 'create' }));
+  this.router.route('organization-profiles/:id/edit', (params) => this.navigate('organization-profiles', { ...params, mode: 'edit', profileId: params.id }));
+
     // Legacy routes (for old navigation)
     this.router.route('manage-types', (params) => this.navigate('manage-types', params));
     this.router.route('new-analysis', (params) => this.navigate('new-analysis', params));
@@ -278,6 +285,7 @@ class MeridianApp {
       'source-type-view': params.id ? `source-types/${params.id}/view` : 'source-types',
       'source-type-create': 'source-types/create',
       'source-type-edit': params.id ? `source-types/${params.id}/edit` : 'source-types',
+      'organization-profiles': 'organization-profiles',
       'manage-types': 'manage-types',
       'new-analysis': 'new-analysis',
       'new-type': 'new-type',
@@ -373,6 +381,10 @@ class MeridianApp {
 
         case 'new-type-ai':
           await this.createTypeWithAI();
+          break;
+
+        case 'organization-profiles':
+          await this.renderOrganizationProfiles(appContainer, params);
           break;
 
         case 'manage-types':
@@ -1278,6 +1290,14 @@ EMPLOYEE COUNT: 175 employees as of October 2024">${this.escapeHtml(notes)}</tex
     if (!contentArea) return;
 
     typeFormView.attachEventHandlers(contentArea);
+  }
+
+  async renderOrganizationProfiles(container, params = {}) {
+    const html = await this.organizationProfilesManager.render(params);
+    const contentArea = this.renderWithNav(container, html);
+    if (!contentArea) return;
+
+    this.organizationProfilesManager.attachEventHandlers(contentArea);
   }
 
   /**
