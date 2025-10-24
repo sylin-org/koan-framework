@@ -6,55 +6,47 @@
     <meta name="description" content="Meridian - Evidence-driven living intelligence platform">
     <title>Meridian</title>
 
-    <!-- Design System Foundation -->
+    <!-- Foundation -->
     <link rel="stylesheet" href="/css/design-system.css">
     <link rel="stylesheet" href="/css/design-tokens.css">
-    <link rel="stylesheet" href="/css/components.css">
+
+    <!-- Layout -->
+    <link rel="stylesheet" href="/css/sidebar.css">
+    <!-- Removed legacy detail-panel.css (panel deprecated in favor of full-page detail views) -->
 
     <!-- Core Application Styles -->
     <link rel="stylesheet" href="/css/app.css">
+    <link rel="stylesheet" href="/css/components.css">
     <link rel="stylesheet" href="/css/workspace.css">
     <link rel="stylesheet" href="/css/evidence-panel.css">
     <link rel="stylesheet" href="/css/notes.css">
-
-    <!-- Navigation and Layout Components -->
     <link rel="stylesheet" href="/css/top-nav.css">
     <link rel="stylesheet" href="/css/settings-sidebar.css">
     <link rel="stylesheet" href="/css/breadcrumb.css">
     <link rel="stylesheet" href="/css/page-header.css">
-
-    <!-- UI Components -->
     <link rel="stylesheet" href="/css/dashboard.css">
     <link rel="stylesheet" href="/css/insights-panel.css">
     <link rel="stylesheet" href="/css/modal.css">
     <link rel="stylesheet" href="/css/empty-state.css">
     <link rel="stylesheet" href="/css/loading-state.css">
     <link rel="stylesheet" href="/css/search-filter.css">
-
-    <!-- Entity Management -->
     <link rel="stylesheet" href="/css/type-management.css">
     <link rel="stylesheet" href="/css/entity-card.css">
     <link rel="stylesheet" href="/css/entity-list.css">
-
-    <!-- Interactions and Accessibility -->
     <link rel="stylesheet" href="/css/micro-interactions.css">
     <link rel="stylesheet" href="/css/keyboard-shortcuts.css">
     <link rel="stylesheet" href="/css/accessibility.css">
 </head>
 <body>
     <!-- Skip Links for Accessibility -->
-    <a href="#main-content" class="skip-link">Skip to main content</a>
-    <a href="#main-navigation" class="skip-link">Skip to navigation</a>
+    <a href="#app-main" class="skip-link">Skip to main content</a>
+    <a href="#app-sidebar" class="skip-link">Skip to navigation</a>
 
     <!-- ARIA Live Region for Screen Readers -->
     <div aria-live="polite" aria-atomic="true" class="sr-only status-live-region" role="status"></div>
 
-    <!-- Toast Container (for notifications) -->
-    <div class="toast-container"></div>
-
-    <!-- Main App Container (dynamically populated by app.js) -->
-    <div id="app" class="app-with-nav">
-        <!-- Loading state -->
+    <!-- Application root; MeridianApp will render the shell -->
+    <div id="app">
         <div class="app-loading">
             <svg class="spinner icon-spin" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <circle cx="12" cy="12" r="10"></circle>

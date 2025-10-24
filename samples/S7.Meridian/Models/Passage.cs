@@ -4,7 +4,6 @@ namespace Koan.Samples.Meridian.Models;
 
 public sealed class Passage : Entity<Passage>
 {
-    public string PipelineId { get; set; } = string.Empty;
     public string SourceDocumentId { get; set; } = string.Empty;
 
     public int SequenceNumber { get; set; }

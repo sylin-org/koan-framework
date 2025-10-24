@@ -73,7 +73,6 @@ public sealed class AiSuggestEndpointTests : IClassFixture<MeridianWebApplicatio
         payload.Draft.Description.Should().NotBeNullOrWhiteSpace();
         payload.Draft.Instructions.Should().NotBeNullOrWhiteSpace();
         payload.Draft.OutputTemplate.Should().NotBeNullOrWhiteSpace();
-        payload.Draft.RequiredSourceTypes.Should().NotBeNull();
         payload.Warnings.Should().NotBeNull();
     }
 }

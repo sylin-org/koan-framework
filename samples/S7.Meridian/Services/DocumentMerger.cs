@@ -289,9 +289,8 @@ public sealed class DocumentMerger : IDocumentMerger
         var canonicalJson = canonical.ToString(Formatting.None);
         var dataHash = ComputeHash(canonicalJson);
 
-        pipeline.Quality = ComputeQualityMetrics(acceptedFields, groups.Count, totalConflicts, autoResolved);
-        pipeline.ProcessedDocuments = pipeline.TotalDocuments;
-        pipeline.UpdatedAt = now;
+    pipeline.Quality = ComputeQualityMetrics(acceptedFields, groups.Count, totalConflicts, autoResolved);
+    pipeline.UpdatedAt = now;
 
         string? pdfKey = null;
         try

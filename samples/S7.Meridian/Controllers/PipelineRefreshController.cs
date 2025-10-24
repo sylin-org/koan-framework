@@ -33,11 +33,8 @@ public sealed class PipelineRefreshController : ControllerBase
             return NotFound();
         }
 
-        var documents = await SourceDocument.Query(d => d.PipelineId == pipelineId, ct).ConfigureAwait(false);
-        var docList = documents
-            .Select(d => d.Id)
+        var docList = pipeline.DocumentIds
             .Where(id => !string.IsNullOrWhiteSpace(id))
-            .Select(id => id!)
             .Distinct(StringComparer.Ordinal)
             .ToList();
 

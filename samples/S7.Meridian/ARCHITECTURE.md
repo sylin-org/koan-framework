@@ -78,6 +78,7 @@
 ### Design Philosophy
 
 **Koan-First Thinking**:
+
 1. All domain concepts are `Entity<T>` (never custom repositories)
 2. Rich value objects (not primitive obsession)
 3. Navigation via async methods (not eager loading)
@@ -193,6 +194,7 @@ public enum MergeStrategy
 ```
 
 **Design Decision**: Mustache chosen over Razor/Scriban because:
+
 - Logic-less (can't hide business logic in templates)
 - Industry standard (portable to other languages)
 - Simple syntax (non-developers can edit)
@@ -360,6 +362,7 @@ public class Passage : Entity<Passage>
 ```
 
 **Design Decision**: Passages are ~900 characters with 10% overlap. This size:
+
 - Fits in LLM context (2-3 passages per extraction)
 - Small enough for precise citation
 - Large enough for context
@@ -547,6 +550,7 @@ AnalysisRequest (1)
 ```
 
 **No ORM navigation properties**. All relationships via async methods. This prevents:
+
 - Accidental eager loading (N+1 queries)
 - Circular serialization issues
 - Tight coupling between entities
@@ -568,6 +572,7 @@ The processing pipeline has clear stages that **must** run in order:
 7. **Render**: Generate Markdown and PDF
 
 Canon provides:
+
 - ✅ **Phase ordering**: Validation before Enrichment
 - ✅ **Retry logic**: Transient failures auto-retry
 - ✅ **Progress tracking**: Per-phase status
@@ -1508,6 +1513,7 @@ public class LocalDocumentStorage : IDocumentStorageService
 ```
 
 **Benefits**:
+
 - **Automatic deduplication**: Same file uploaded twice = single storage
 - **Immutable**: Hash never changes, content can't be modified
 - **Verifiable**: Can verify integrity later by recomputing hash
@@ -1616,6 +1622,7 @@ public class ProcessingWorker : BackgroundService
 ```
 
 **Design Rationale**:
+
 - **Simple**: Polling pattern, no custom queue infrastructure
 - **Graceful**: Respects cancellation token for clean shutdown
 - **Bounded**: Semaphore limits concurrency (prevents overload)
@@ -1639,6 +1646,7 @@ _logger.LogInformation(
 ```
 
 **Output** (JSON):
+
 ```json
 {
   "Timestamp": "2025-01-15T10:30:45.123Z",
@@ -1677,6 +1685,7 @@ public class ProcessingMetrics
 ```
 
 **Query examples**:
+
 ```csharp
 // Average processing time
 var avgDuration = await AnalysisRequest.Query(q =>
@@ -1704,12 +1713,14 @@ var citationCoverage = await DeliverableField.Query(q =>
 **Decision**: Use `Entity<T>` pattern, not custom `IRepository<T>` interfaces.
 
 **Rationale**:
+
 - ✅ Auto GUID v7 generation
 - ✅ Consistent API across all entities
 - ✅ Works with EntityController<T> (80% API auto-generated)
 - ✅ Koan philosophy: "Reference = Intent"
 
 **Consequences**:
+
 - All entities must inherit from `Entity<T>`
 - Can't use EF Core navigation properties (use async methods instead)
 - Custom queries via `.Query(q => q.Where(...))`
@@ -1723,6 +1734,7 @@ var citationCoverage = await DeliverableField.Query(q =>
 **Decision**: Use `CanonEntity<T>` with phase contributors.
 
 **Rationale**:
+
 - ✅ Built-in retry logic
 - ✅ Phase ordering (validation before enrichment)
 - ✅ Progress tracking
@@ -1730,6 +1742,7 @@ var citationCoverage = await DeliverableField.Query(q =>
 - ✅ Extensible (add new contributor without touching orchestrator)
 
 **Consequences**:
+
 - Pipeline is `AnalysisWorkflow : CanonEntity<T>`
 - Each stage is `ICanonPhaseContributor<AnalysisWorkflow>`
 - Auto-registration discovers contributors
@@ -1743,12 +1756,14 @@ var citationCoverage = await DeliverableField.Query(q =>
 **Decision**: Every extraction MUST validate against JSON Schema before acceptance.
 
 **Rationale**:
+
 - ✅ Prevents garbage data (hallucinated phone numbers, made-up dates)
 - ✅ Type safety (string vs number vs date)
 - ✅ Range validation (min/max, enum values)
 - ✅ Required field enforcement
 
 **Consequences**:
+
 - Schema must be defined upfront (can't extract arbitrary JSON)
 - LLM must return valid JSON (use `format: "json"` in Ollama)
 - Failed validation → extraction rejected, not saved
@@ -1762,11 +1777,13 @@ var citationCoverage = await DeliverableField.Query(q =>
 **Decision**: Store all candidates in `DeliverableField.Candidates`, not just selected value.
 
 **Rationale**:
+
 - ✅ User can switch to alternative without re-extraction
 - ✅ Evidence drawer shows all options
 - ✅ Debugging (why was this value not selected?)
 
 **Consequences**:
+
 - More storage (each field stores 1-N candidates)
 - Richer UI (can show alternatives)
 
@@ -1779,11 +1796,13 @@ var citationCoverage = await DeliverableField.Query(q =>
 **Decision**: Markdown is primary output. PDF is nice-to-have.
 
 **Rationale**:
+
 - ✅ Markdown always succeeds (text output)
 - ✅ PDF optional (Pandoc can fail gracefully)
 - ✅ Markdown is editable (user can tweak before PDF)
 
 **Consequences**:
+
 - Pipeline doesn't fail if PDF conversion fails
 - UI must handle "Markdown ready, PDF pending"
 
@@ -1794,12 +1813,14 @@ var citationCoverage = await DeliverableField.Query(q =>
 ### Chunking Strategy
 
 **900 characters, 10% overlap**:
+
 - ✅ Fits in LLM context (2-3 passages)
 - ✅ Small enough for precise citation
 - ✅ Large enough for context
 - ✅ Overlap prevents sentence splitting
 
 **Benchmark**:
+
 - 100-page PDF → ~1,500 passages
 - Embed time: ~30 seconds (batch, Ollama)
 - Storage: ~3MB passages + ~600KB vectors
@@ -1809,6 +1830,7 @@ var citationCoverage = await DeliverableField.Query(q =>
 ### Batch Embedding
 
 **Before** (one-by-one):
+
 ```csharp
 foreach (var passage in passages)
 {
@@ -1818,6 +1840,7 @@ foreach (var passage in passages)
 ```
 
 **After** (batched):
+
 ```csharp
 var embeddings = await _embedding.EmbedBatchAsync(
     passages.Select(p => p.Text).ToList()
@@ -1832,11 +1855,13 @@ var embeddings = await _embedding.EmbedBatchAsync(
 ### Hybrid Search Performance
 
 **Weaviate hybrid search** (BM25 + vector):
+
 - ✅ BM25 for exact keyword matches (fast)
 - ✅ Vector for semantic similarity (slower but smarter)
 - ✅ Alpha parameter balances (default 0.5)
 
 **Benchmark**:
+
 - 1,500 passages corpus
 - Query time: ~50ms (topK=12)
 - 95th percentile: ~120ms
@@ -1847,18 +1872,19 @@ var embeddings = await _embedding.EmbedBatchAsync(
 
 **Typical 5-file request** (25 pages each, 125 total):
 
-| Stage | Duration | Notes |
-|-------|----------|-------|
-| Ingest | 2s | Hash, store, metadata |
-| Classify | 3s | Cascade (mostly heuristic) |
-| Parse | 15s | PdfPig text extraction |
-| Embed | 45s | ~1,800 passages batched |
-| Extract | 90s | 20 fields × 4s each |
-| Aggregate | 5s | Merge rules, conflict detection |
-| Render | 8s | Mustache + Pandoc |
-| **Total** | **~3 minutes** | End-to-end |
+| Stage     | Duration       | Notes                           |
+| --------- | -------------- | ------------------------------- |
+| Ingest    | 2s             | Hash, store, metadata           |
+| Classify  | 3s             | Cascade (mostly heuristic)      |
+| Parse     | 15s            | PdfPig text extraction          |
+| Embed     | 45s            | ~1,800 passages batched         |
+| Extract   | 90s            | 20 fields × 4s each             |
+| Aggregate | 5s             | Merge rules, conflict detection |
+| Render    | 8s             | Mustache + Pandoc               |
+| **Total** | **~3 minutes** | End-to-end                      |
 
 **Scaling**:
+
 - Linear in files (5 files → 10 files ≈ 2× time)
 - Linear in fields (20 fields → 40 fields ≈ 2× time)
 - Sublinear in pages (chunking/embedding is batched)

@@ -4,14 +4,16 @@ services:
     image: mongo:7
     container_name: meridian-mongo
     ports:
-      - "27017:27017"
+      # Use 5082 to align all external Meridian ports in 5080-5089 band (internal still 27017)
+      - "5082:27017"
     restart: unless-stopped
 
   meridian-pandoc:
     build: ../containers/pandoc
     container_name: meridian-pandoc
     ports:
-      - "7070:7070"
+      # Standardize external port to 5083 (internal remains 7070)
+      - "5083:7070"
     environment:
       - UVICORN_WORKERS=1
     restart: unless-stopped
@@ -20,7 +22,8 @@ services:
     image: ghcr.io/hertzg/tesseract-server:latest
     container_name: meridian-tesseract
     ports:
-      - "6060:8884"
+      # Standardize external port to 5084 (internal remains 8884)
+      - "5084:8884"
     restart: unless-stopped
 
   meridian-weaviate:

@@ -75,14 +75,26 @@
   position: relative;
 }
 
+.top-nav-link:visited {
+  color: var(--color-text-secondary);
+}
+
 .top-nav-link:hover {
   color: var(--color-text-primary);
   background: var(--color-bg-hover);
 }
 
+.top-nav-link:visited:hover {
+  color: var(--color-text-primary);
+}
+
 .top-nav-link.active {
-  color: var(--color-blue);
-  background: var(--color-blue-bg);
+  color: var(--color-accent-primary);
+  background: rgba(91, 159, 255, 0.12);
+}
+
+.top-nav-link.active:visited {
+  color: var(--color-accent-primary);
 }
 
 .top-nav-link.disabled {
@@ -298,17 +310,23 @@
 
 /* ==================== App Content Adjustment ==================== */
 /* Ensure content doesn't hide under sticky nav */
-.app-with-nav {
+.app-shell {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
 }
 
-.app-with-nav .top-nav {
+.app-shell .top-nav {
   flex-shrink: 0;
 }
 
-.app-with-nav .app-content {
+.app-shell .app-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-shell .app-main-content {
   flex: 1;
   display: flex;
   flex-direction: column;

@@ -42,14 +42,9 @@ public sealed class SourceTypeDraft
 
 public sealed class AnalysisTypeAiSuggestRequest
 {
-    public string Goal { get; set; } = string.Empty;
-    public string? Audience { get; set; }
-        = null;
-    public List<string> IncludedSourceTypes { get; set; } = new();
-    public string? AdditionalContext { get; set; }
-        = null;
-    public string? Model { get; set; }
-        = null;
+    // Single free-form prompt describing the desired analysis type.
+    // Example: "An Enterprise Architecture Review, containing fields like the ServiceNow ID, the architect responsible for it, and recommendation status."
+    public string Prompt { get; set; } = string.Empty;
 }
 
 public sealed class AnalysisTypeAiSuggestResponse
@@ -66,6 +61,5 @@ public sealed class AnalysisTypeDraft
     public List<string> Descriptors { get; set; } = new();
     public string Instructions { get; set; } = string.Empty;
     public string OutputTemplate { get; set; } = string.Empty;
-    public string OutputSchemaJson { get; set; } = string.Empty;
-    public List<string> RequiredSourceTypes { get; set; } = new();
+    public string JsonSchema { get; set; } = string.Empty;
 }

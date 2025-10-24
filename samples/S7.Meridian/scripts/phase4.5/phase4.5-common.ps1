@@ -318,16 +318,23 @@ function Ensure-MeridianAnalysisTypeAi {
         [switch]$SkipCertificateCheck
     )
 
+    # Build a single prompt from the various parameters
+    $promptParts = @($Goal)
+    if (-not [string]::IsNullOrWhiteSpace($Audience)) {
+        $promptParts += "Target audience: $Audience."
+    }
+    if (-not [string]::IsNullOrWhiteSpace($AdditionalContext)) {
+        $promptParts += $AdditionalContext
+    }
+    $fullPrompt = $promptParts -join " "
+
     $existing = Get-MeridianCollection -BaseUrl $BaseUrl -Path '/api/analysistypes?size=100' -SkipCertificateCheck:$SkipCertificateCheck
-    $match = $existing | Where-Object { $_.description -eq $Goal }
+    $match = $existing | Where-Object { $_.description -eq $fullPrompt -or $_.description -eq $Goal }
     if ($match) {
         return $match
     }
 
-    $request = @{ goal = $Goal }
-    if (-not [string]::IsNullOrWhiteSpace($Audience)) { $request.audience = $Audience }
-    if ($IncludedSourceTypes.Count -gt 0) { $request.includedSourceTypes = $IncludedSourceTypes }
-    if (-not [string]::IsNullOrWhiteSpace($AdditionalContext)) { $request.additionalContext = $AdditionalContext }
+    $request = @{ prompt = $fullPrompt }
 
     $response = Invoke-MeridianRequest -BaseUrl $BaseUrl -Path '/api/analysistypes/ai-suggest' -Method 'POST' -Body $request -SkipCertificateCheck:$SkipCertificateCheck
     $draft = $response.draft
@@ -339,26 +346,19 @@ function Ensure-MeridianAnalysisTypeAi {
     if ($null -eq $tags) { $tags = @() }
     $descriptors = Normalize-List $draft.Descriptors
     if ($null -eq $descriptors) { $descriptors = @() }
-    $requiredSources = if ($draft.RequiredSourceTypes) { Normalize-List $draft.RequiredSourceTypes } else { @($IncludedSourceTypes | Where-Object { $_ }) }
-    if ($null -eq $requiredSources) { $requiredSources = @() }
 
     $payload = [ordered]@{
         Name                = $draft.Name
-        Description         = if ($draft.Description) { $draft.Description } else { $Goal }
-        Instructions        = if ($draft.Instructions) { $draft.Instructions } else { $Goal }
+        Description         = if ($draft.Description) { $draft.Description } else { $fullPrompt }
+        Instructions        = if ($draft.Instructions) { $draft.Instructions } else { $fullPrompt }
         OutputTemplate      = if ($draft.OutputTemplate) { $draft.OutputTemplate } else { "# Analysis`n{{SUMMARY}}" }
-        JsonSchema          = if ($draft.OutputSchemaJson) { $draft.OutputSchemaJson } else { "{}" }
+        JsonSchema          = if ($draft.JsonSchema) { $draft.JsonSchema } else { "{}" }
         Tags                = $tags
         Descriptors         = $descriptors
-        RequiredSourceTypes = $requiredSources
     }
 
     if ([string]::IsNullOrWhiteSpace($payload.Name)) {
-        $payload.Name = ConvertTo-TitleCaseSafe -Value $Goal -EmptyFallback "Generated Analysis Type"
-    }
-
-    if ($payload.RequiredSourceTypes.Count -eq 0 -and $IncludedSourceTypes.Count -gt 0) {
-        $payload.RequiredSourceTypes = @($IncludedSourceTypes | Where-Object { $_ })
+        $payload.Name = ConvertTo-TitleCaseSafe -Value $fullPrompt -EmptyFallback "Generated Analysis Type"
     }
 
     return Invoke-MeridianRequest -BaseUrl $BaseUrl -Path '/api/analysistypes' -Method 'POST' -Body $payload -SkipCertificateCheck:$SkipCertificateCheck

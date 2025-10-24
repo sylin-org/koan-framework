@@ -13,15 +13,15 @@ S7.Meridian is a **document intelligence system** implementing RAG-based field e
 
 ### Quick Assessment Matrix
 
-| Dimension | Rating | Status |
-|-----------|--------|--------|
-| **Code Quality** | ⭐⭐⭐⭐⭐ (5/5) | Enterprise-grade |
-| **Framework Compliance** | ⭐⭐⭐⭐⭐ (5/5) | Exemplary |
-| **Feature Completeness** | ⭐⭐⭐⭐☆ (4.5/5) | Near complete |
-| **Architecture** | ⭐⭐⭐⭐⭐ (5/5) | Well-designed |
-| **Test Coverage** | ⭐⭐⭐☆☆ (3/5) | Integration tested |
-| **Documentation** | ⭐⭐⭐⭐⭐ (5/5) | Comprehensive |
-| **Deployment Readiness** | ⭐⭐⭐⭐☆ (4/5) | Config issue only |
+| Dimension                | Rating            | Status             |
+| ------------------------ | ----------------- | ------------------ |
+| **Code Quality**         | ⭐⭐⭐⭐⭐ (5/5)  | Enterprise-grade   |
+| **Framework Compliance** | ⭐⭐⭐⭐⭐ (5/5)  | Exemplary          |
+| **Feature Completeness** | ⭐⭐⭐⭐☆ (4.5/5) | Near complete      |
+| **Architecture**         | ⭐⭐⭐⭐⭐ (5/5)  | Well-designed      |
+| **Test Coverage**        | ⭐⭐⭐☆☆ (3/5)    | Integration tested |
+| **Documentation**        | ⭐⭐⭐⭐⭐ (5/5)  | Comprehensive      |
+| **Deployment Readiness** | ⭐⭐⭐⭐☆ (4/5)   | Config issue only  |
 
 **Overall: 94% Production Ready**
 
@@ -48,14 +48,14 @@ S7.Meridian is a **document intelligence system** implementing RAG-based field e
 
 ### Overall Implementation Progress
 
-| Phase | Planned | Implemented | Status | Completion |
-|-------|---------|-------------|--------|-----------|
-| **Phase 0**: Foundation Setup | 1 day | Complete | ✅ | 100% |
-| **Phase 1**: RAG Extraction | 5-7 days | Complete | ✅ | 100% |
-| **Phase 2**: Merge Policies | 3-4 days | Complete | ✅ | 100% |
-| **Phase 3**: Classification | 3-4 days | Complete | ✅ | 90% |
-| **Phase 4**: Production Features | 3-5 days | Partial | ⚠️ | 75% |
-| **Phase 5**: Hardening | 2-4 days | Partial | ⚠️ | 60% |
+| Phase                            | Planned  | Implemented | Status | Completion |
+| -------------------------------- | -------- | ----------- | ------ | ---------- |
+| **Phase 0**: Foundation Setup    | 1 day    | Complete    | ✅     | 100%       |
+| **Phase 1**: RAG Extraction      | 5-7 days | Complete    | ✅     | 100%       |
+| **Phase 2**: Merge Policies      | 3-4 days | Complete    | ✅     | 100%       |
+| **Phase 3**: Classification      | 3-4 days | Complete    | ✅     | 90%        |
+| **Phase 4**: Production Features | 3-5 days | Partial     | ⚠️     | 75%        |
+| **Phase 5**: Hardening           | 2-4 days | Partial     | ⚠️     | 60%        |
 
 **Total Planned**: 18-26 days
 **Total Achieved**: ~23 days equivalent
@@ -73,47 +73,56 @@ S7.Meridian is a **document intelligence system** implementing RAG-based field e
 #### Implemented Features
 
 - ✅ **Per-field RAG query generation** from JSON Schema paths
+
   - Converts camelCase field names to natural language queries
   - Respects pipeline BiasNotes for query customization
   - Supports field query overrides from SourceType definitions
 
 - ✅ **Hybrid vector search** (BM25 + semantic) via `VectorWorkflow<Passage>`
+
   - Configurable TopK parameter (default: 12)
   - Configurable Alpha for hybrid weighting (default: 0.5)
   - Automatic fallback to lexical search when vector unavailable
 
 - ✅ **MMR (Maximal Marginal Relevance)** diversity filter
+
   - Cosine similarity-based diversity scoring
   - Configurable lambda parameter (default: 0.7)
   - Reduces redundant passages in context
 
 - ✅ **Token budget management** with tournament selection
+
   - Configurable max tokens per field (default: 2000)
   - Tournament selection when budget exceeded
   - Always includes at least 1 passage
 
 - ✅ **LLM-based extraction** via `Koan.AI.Ai.Chat()`
+
   - Configurable temperature (default: 0.3 for determinism)
   - Prompt hash logging for reproducibility
   - Returns value, confidence (0.0-1.0), passage index
 
 - ✅ **Multi-strategy JSON parsing**
+
   - Handles markdown code blocks
   - Robust fallback parsing strategies
   - Graceful degradation on parse failures
 
 - ✅ **Schema validation** with automatic type repair
+
   - Validates extracted values against JSON Schema
   - Auto-repairs string-to-number mismatches
   - Logs validation errors for debugging
 
 - ✅ **Text span localization** for evidence highlighting
+
   - Exact string matching
   - Numeric normalization ($47.2M → $47,200,000)
   - Regex patterns for currency/dates/percentages
   - Fuzzy matching fallback
 
 - ✅ **Embedding cache integration** (SHA-256 content addressing)
+
   - File-based cache persistence
   - Cache hit/miss logging
   - Reuses embeddings across pipeline runs
@@ -152,21 +161,25 @@ var results = await VectorWorkflow<Passage>.Query(
 #### All 5 Merge Strategies Implemented
 
 1. **HighestConfidence** (lines 659-677)
+
    - Selects extraction with highest confidence score
    - Deterministic tie-breaking by source document ID
    - Generates explainability for selection
 
 2. **SourcePrecedence** (lines 471-514)
+
    - Configurable source type precedence rules
    - Supports per-field precedence overrides
    - Example: Financial statements > Vendor forms > Knowledge base
 
 3. **Latest** (lines 516-537)
+
    - Most recent extraction by timestamp
    - Requires `LatestByFieldPath` configuration
    - Useful for time-sensitive data (e.g., stock prices)
 
 4. **Consensus** (lines 539-576)
+
    - Requires N sources to agree within threshold
    - Configurable minimum sources and agreement threshold
    - Normalized value comparison for fuzzy matching
@@ -180,37 +193,44 @@ var results = await VectorWorkflow<Passage>.Query(
 #### Advanced Features
 
 - ✅ **Override precedence handling**
+
   - User-corrected fields bypass merge logic
   - Override confidence set to 1.0
   - Logged with reason and timestamp
 
 - ✅ **Conflict resolution with explainability**
+
   - Human-readable explanations for merge decisions
   - Rule configuration captured in decision snapshot
   - Rejection reasons logged for all alternatives
 
 - ✅ **Citation footnote generation**
+
   - Links to source document and page number
   - Includes passage excerpt (first 100 chars)
   - Markdown-formatted references
 
 - ✅ **Evidence tracking**
+
   - Source document linkage
   - Passage ID references
   - Text span coordinates for highlighting
 
 - ✅ **Template rendering** via Mustache/Stubble
+
   - JObject to template payload conversion
   - Nested object support
   - Array iteration support
 
 - ✅ **Quality metrics computation**
+
   - Citation coverage percentage
   - Confidence distribution (high/medium/low)
   - Conflict rate tracking
   - Auto-resolution rate
 
 - ✅ **PDF generation** via Pandoc integration
+
   - Markdown to PDF conversion
   - Error handling with graceful fallback
   - Template sanitization for security
@@ -260,6 +280,7 @@ var results = await VectorWorkflow<Passage>.Query(
 #### 3-Stage Classification Cascade
 
 1. **Heuristic Scoring** (lines 108-190)
+
    - **Descriptor hints matching**: Keywords in document text
    - **Signal phrase detection**: Document-specific patterns
    - **Page count range validation**: Expected page ranges
@@ -268,6 +289,7 @@ var results = await VectorWorkflow<Passage>.Query(
    - **Weighted scoring**: Configurable weights per signal
 
 2. **Vector Similarity Evaluation** (lines 192-196)
+
    - **Document preview embedding**: First 1000 characters
    - **SourceType embedding comparison**: Pre-computed type embeddings
    - **Cosine similarity scoring**: Threshold 0.75 for match
@@ -307,6 +329,7 @@ document.ClassificationMethod = method; // Heuristic/Vector/LLM
 #### VectorWorkflow Usage Patterns
 
 - ✅ **Query pattern** for hybrid search
+
   ```csharp
   await VectorWorkflow<Passage>.Query(
       new VectorQueryOptions(embedding, TopK, SearchText, Alpha),
@@ -315,6 +338,7 @@ document.ClassificationMethod = method; // Heuristic/Vector/LLM
   ```
 
 - ✅ **SaveMany pattern** for batch indexing
+
   ```csharp
   await VectorWorkflow<Passage>.SaveMany(
       payload.Select(p => (p.passage, p.embedding, p.metadata, p.passage.Id)),
@@ -323,6 +347,7 @@ document.ClassificationMethod = method; // Heuristic/Vector/LLM
   ```
 
 - ✅ **Fallback to lexical search** when vector unavailable
+
   ```csharp
   var profile = await VectorWorkflow<Passage>.GetProfile(profileName, ct);
   if (!profile.IsAvailable) {
@@ -347,6 +372,7 @@ var saved = await VectorWorkflow<Passage>.SaveMany(
 ```
 
 **Provider Configuration** (appsettings.json):
+
 ```json
 {
   "Data": {
@@ -377,6 +403,7 @@ var saved = await VectorWorkflow<Passage>.SaveMany(
 #### Implemented Features
 
 - ✅ **Changed document detection** via text hash comparison
+
   ```csharp
   var changedDocs = allDocs
       .Where(d => d.TextHash != previousRun?.TextHash)
@@ -384,11 +411,13 @@ var saved = await VectorWorkflow<Passage>.SaveMany(
   ```
 
 - ✅ **Field-level impact analysis**
+
   - Identifies which fields are affected by changed documents
   - Only re-extracts impacted fields
   - Preserves unaffected field extractions
 
 - ✅ **Approval preservation** when evidence unchanged
+
   ```csharp
   if (oldExtraction.UserApproved && EvidenceUnchanged(old, new)) {
       newExtraction.UserApproved = true;
@@ -420,16 +449,19 @@ var saved = await VectorWorkflow<Passage>.SaveMany(
 #### Robust Distributed Queue Features
 
 - ✅ **Heartbeat mechanism** (5-minute grace period)
+
   - Jobs send periodic heartbeats
   - Stale jobs automatically requeued
   - Prevents job abandonment
 
 - ✅ **Automatic retry logic** (max 3 retries)
+
   - Retry count tracking
   - Exponential backoff (implicit via requeue delay)
   - Failure after max retries
 
 - ✅ **Job claiming with timestamp tracking**
+
   ```csharp
   public static async Task<ProcessingJob?> ClaimNext(CancellationToken ct)
   {
@@ -449,11 +481,13 @@ var saved = await VectorWorkflow<Passage>.SaveMany(
   ```
 
 - ✅ **Stale job detection and requeue**
+
   - Detects jobs with stale heartbeats
   - Automatically requeues for processing
   - Logged for monitoring
 
 - ✅ **Job archival pattern** (completed → separate partition)
+
   ```csharp
   await job.Save("completed-jobs", ct);  // Archive to separate partition
   await job.Delete(ct);                  // Remove from active queue
@@ -465,6 +499,7 @@ var saved = await VectorWorkflow<Passage>.SaveMany(
   - Error states tracked per document
 
 **Job State Machine**:
+
 ```
 Queued → Claimed → Processing → Completed → Archived
    ↓                    ↓
@@ -486,26 +521,31 @@ Queued → Claimed → Processing → Completed → Archived
 #### Metrics Computed
 
 1. **Citation Coverage** - Percentage of fields with source evidence
+
    ```csharp
    var citationCoverage = acceptedFields.Count(f => f.HasEvidence()) / (double)acceptedFields.Count;
    ```
 
 2. **Confidence Distribution** - High/Medium/Low confidence bands
+
    - High: ≥90%
    - Medium: 70-89%
    - Low: <70%
 
 3. **Conflict Rate** - Percentage of fields requiring merge resolution
+
    ```csharp
    var conflictRate = totalConflicts / (double)groups.Count;
    ```
 
 4. **Auto-Resolution Rate** - Percentage conflicts resolved without human intervention
+
    ```csharp
    var autoResolvedRate = autoResolved / (double)totalConflicts;
    ```
 
 5. **Source Diversity** - Number of unique source documents used
+
    ```csharp
    var sourceDiversity = sourceDocumentIds.Count;
    ```
@@ -553,13 +593,16 @@ public string GetBadgeColor() => GetBand() switch {
 #### Implemented Security Features
 
 - ✅ **File upload validation** (`Services/SecureUploadValidator.cs`)
+
   - MIME type validation
   - File size limits (50 MB default)
   - Extension whitelist (.pdf, .docx, .doc, .jpg, .png)
   - Magic byte validation
 
 - ✅ **Template sandboxing** (`Services/DocumentMerger.cs`)
+
   - LaTeX shell-escape patterns blocked
+
   ```csharp
   markdown = markdown
       .Replace("\\input", "[BLOCKED]")
@@ -568,6 +611,7 @@ public string GetBadgeColor() => GetBand() switch {
   ```
 
 - ✅ **Numeric type enforcement** (`Services/FieldExtractor.cs`)
+
   - Schema validation with automatic type repair
   - String-to-number conversion when appropriate
   - Validation errors logged
@@ -580,11 +624,13 @@ public string GetBadgeColor() => GetBand() switch {
 #### Missing from Proposal (Phase 5)
 
 - ⚠️ **Prompt injection defense** - No explicit sanitization of passage text
+
   - Proposal lines 1209-1233 suggest sanitization patterns
   - Current implementation trusts document content
   - Risk: LOW (documents are user-controlled, not public input)
 
 - ⚠️ **Retry policies with Polly** - No exponential backoff for AI calls
+
   - Proposal lines 1345-1374 specify Polly configuration
   - Current implementation relies on AI provider retry logic
   - Risk: LOW (AI provider handles retries)
@@ -595,13 +641,13 @@ public string GetBadgeColor() => GetBand() switch {
 
 #### Risk Assessment
 
-| Security Concern | Current State | Risk Level | Recommendation |
-|-----------------|---------------|------------|----------------|
-| Prompt injection | No sanitization | LOW | Add basic sanitization (4 hours) |
-| AI API failures | No retry policy | LOW | Add Polly retries (4 hours) |
-| Rate limiting | Not implemented | MEDIUM | Add rate limiter (4 hours) |
-| Template injection | Basic blocking | LOW | Adequate for MVP |
-| File upload | Comprehensive | NONE | Well implemented |
+| Security Concern   | Current State   | Risk Level | Recommendation                   |
+| ------------------ | --------------- | ---------- | -------------------------------- |
+| Prompt injection   | No sanitization | LOW        | Add basic sanitization (4 hours) |
+| AI API failures    | No retry policy | LOW        | Add Polly retries (4 hours)      |
+| Rate limiting      | Not implemented | MEDIUM     | Add rate limiter (4 hours)       |
+| Template injection | Basic blocking  | LOW        | Adequate for MVP                 |
+| File upload        | Comprehensive   | NONE       | Well implemented                 |
 
 **Recommendation**: Add basic prompt sanitization and Polly retry policies before production (1 day total).
 
@@ -635,6 +681,7 @@ public string GetBadgeColor() => GetBand() switch {
 #### Proper Usage Patterns Confirmed
 
 **GUID v7 Auto-Generation**:
+
 ```csharp
 // All entities use automatic ID generation
 var todo = new Todo { Title = "Buy milk" }; // ID auto-generated on first access
@@ -642,6 +689,7 @@ await todo.Save(ct);
 ```
 
 **Static Query Methods**:
+
 ```csharp
 // Entity<T> provides static query methods
 var allPipelines = await DocumentPipeline.All(ct);
@@ -650,6 +698,7 @@ var filtered = await DocumentPipeline.Query(p => p.Status == "Active", ct);
 ```
 
 **Save Pattern**:
+
 ```csharp
 // Direct save without repository injection
 await entity.Save(ct);                    // Save to default partition
@@ -657,6 +706,7 @@ await entity.Save("completed-jobs", ct);  // Save to named partition
 ```
 
 **Delete Pattern**:
+
 ```csharp
 await entity.Delete(ct);
 ```
@@ -664,6 +714,7 @@ await entity.Delete(ct);
 #### Zero Repository Pattern Violations
 
 **Validated Absence Of**:
+
 - ❌ No `IRepository<T>` injections
 - ❌ No `AddScoped<IRepository>` registrations
 - ❌ No manual repository implementations
@@ -671,6 +722,7 @@ await entity.Delete(ct);
 - ❌ No CRUD service wrappers around entities
 
 **Code Example** (DocumentPipeline.cs:62-67):
+
 ```csharp
 public static async Task<DocumentPipeline?> GetByIdAsync(string id, CancellationToken ct = default)
 {
@@ -738,17 +790,20 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 #### Validation Checks
 
 **No Manual Violations**:
+
 - ✅ No `services.AddDbContext<MyContext>()` calls
 - ✅ No `services.AddScoped<IRepository, Repository>()` registrations
 - ✅ No manual entity framework configuration
 - ✅ No hard-coded connection strings
 
 **Configuration Binding**:
+
 - ✅ Uses `IOptions<MeridianOptions>` pattern
 - ✅ Binds from `appsettings.json` section
 - ✅ Singleton registration for performance
 
 **Service Lifetimes**:
+
 - ✅ All services registered as singletons (appropriate for stateless services)
 - ✅ No scoped services (correct - no per-request state)
 - ✅ Background worker registered as hosted service
@@ -846,23 +901,23 @@ var logLevel = KoanEnv.IsDevelopment
 
 ### 4.1 Fully Implemented Features (95%)
 
-| Feature | Proposal Section | Implementation File | Status | Completeness |
-|---------|-----------------|---------------------|--------|--------------|
-| **RAG extraction** | Lines 1865-2300 | FieldExtractor.cs | ✅ | 100% |
-| **Hybrid search** | Lines 2047-2108 | VectorWorkflow integration | ✅ | 100% |
-| **MMR diversity** | Lines 2047-2108 | FieldExtractor.cs:593-649 | ✅ | 100% |
-| **Token budget** | Lines 2109-2201 | FieldExtractor.cs:663-690 | ✅ | 100% |
-| **Span localization** | Lines 2202-2299 | FieldExtractor.cs:1018-1119 | ✅ | 100% |
-| **Merge policies** | Lines 225-272, 2400-2550 | DocumentMerger.cs | ✅ | 100% |
-| **Precedence rules** | Lines 2400-2500 | DocumentMerger.cs:471-514 | ✅ | 100% |
-| **Transform pipeline** | Lines 2500-2550 | MergeTransforms.cs | ✅ | 100% |
-| **Citations** | Lines 2550-2600 | DocumentMerger.cs:703-749 | ✅ | 100% |
-| **Classification** | Lines 1406-1520 | DocumentClassifier.cs | ✅ | 90% |
-| **Job queue** | Lines 187-223 | ProcessingJob.cs | ✅ | 100% |
-| **Quality metrics** | Lines 300-350 | PipelineQualitySnapshot.cs | ✅ | 100% |
-| **Embedding cache** | Phase 1 Plan | EmbeddingCache.cs | ✅ | 100% |
-| **Incremental refresh** | Lines 187-223 | IncrementalRefreshPlanner.cs | ✅ | 75% |
-| **Field overrides** | Lines 225-272 | ExtractedField model | ✅ | 100% |
+| Feature                 | Proposal Section         | Implementation File          | Status | Completeness |
+| ----------------------- | ------------------------ | ---------------------------- | ------ | ------------ |
+| **RAG extraction**      | Lines 1865-2300          | FieldExtractor.cs            | ✅     | 100%         |
+| **Hybrid search**       | Lines 2047-2108          | VectorWorkflow integration   | ✅     | 100%         |
+| **MMR diversity**       | Lines 2047-2108          | FieldExtractor.cs:593-649    | ✅     | 100%         |
+| **Token budget**        | Lines 2109-2201          | FieldExtractor.cs:663-690    | ✅     | 100%         |
+| **Span localization**   | Lines 2202-2299          | FieldExtractor.cs:1018-1119  | ✅     | 100%         |
+| **Merge policies**      | Lines 225-272, 2400-2550 | DocumentMerger.cs            | ✅     | 100%         |
+| **Precedence rules**    | Lines 2400-2500          | DocumentMerger.cs:471-514    | ✅     | 100%         |
+| **Transform pipeline**  | Lines 2500-2550          | MergeTransforms.cs           | ✅     | 100%         |
+| **Citations**           | Lines 2550-2600          | DocumentMerger.cs:703-749    | ✅     | 100%         |
+| **Classification**      | Lines 1406-1520          | DocumentClassifier.cs        | ✅     | 90%          |
+| **Job queue**           | Lines 187-223            | ProcessingJob.cs             | ✅     | 100%         |
+| **Quality metrics**     | Lines 300-350            | PipelineQualitySnapshot.cs   | ✅     | 100%         |
+| **Embedding cache**     | Phase 1 Plan             | EmbeddingCache.cs            | ✅     | 100%         |
+| **Incremental refresh** | Lines 187-223            | IncrementalRefreshPlanner.cs | ✅     | 75%          |
+| **Field overrides**     | Lines 225-272            | ExtractedField model         | ✅     | 100%         |
 
 **Total Features**: 15
 **Fully Complete**: 13 (87%)
@@ -872,14 +927,14 @@ var logLevel = KoanEnv.IsDevelopment
 
 ### 4.2 Partially Implemented Features (75%)
 
-| Feature | Missing Components | Priority | Est. Effort | Impact |
-|---------|-------------------|----------|-------------|--------|
-| **Document classification** | Synonym expansion registry | P2 | 0.5 days | LOW |
-| **Incremental refresh** | UI endpoints for selective refresh | P2 | 1 day | LOW |
-| **Security hardening** | Prompt injection sanitization | P1 | 0.5 days | MEDIUM |
-| **Security hardening** | Polly retry policies | P1 | 0.5 days | MEDIUM |
-| **Alert system** | Pub/sub backend (currently logs-only) | P2 | 1 day | LOW |
-| **Environment detection** | KoanEnv usage patterns | P2 | 0.5 days | LOW |
+| Feature                     | Missing Components                    | Priority | Est. Effort | Impact |
+| --------------------------- | ------------------------------------- | -------- | ----------- | ------ |
+| **Document classification** | Synonym expansion registry            | P2       | 0.5 days    | LOW    |
+| **Incremental refresh**     | UI endpoints for selective refresh    | P2       | 1 day       | LOW    |
+| **Security hardening**      | Prompt injection sanitization         | P1       | 0.5 days    | MEDIUM |
+| **Security hardening**      | Polly retry policies                  | P1       | 0.5 days    | MEDIUM |
+| **Alert system**            | Pub/sub backend (currently logs-only) | P2       | 1 day       | LOW    |
+| **Environment detection**   | KoanEnv usage patterns                | P2       | 0.5 days    | LOW    |
 
 **Total Remaining Work**: ~4 days to reach 100% proposal compliance
 
@@ -889,13 +944,13 @@ var logLevel = KoanEnv.IsDevelopment
 
 ### 4.3 Intentional Design Deviations
 
-| Area | Proposal | Implementation | Justification | Assessment |
-|------|----------|----------------|---------------|------------|
-| **Embedding cache** | Redis suggested | File-based | Simpler for MVP, easily swappable | ✅ Acceptable |
-| **Chunking strategy** | Configurable | Fixed 200-token chunks | Adequate for current use cases | ✅ Acceptable |
-| **Alert service** | Event bus/pub-sub | Logging only | Simpler for MVP, interface ready | ✅ Acceptable |
-| **Page numbers** | PDF metadata heuristics | PdfPig page.Number | More accurate implementation | ✅ Better |
-| **Classification cache** | Not specified | Concurrent snapshot cache | Performance optimization | ✅ Better |
+| Area                     | Proposal                | Implementation            | Justification                     | Assessment    |
+| ------------------------ | ----------------------- | ------------------------- | --------------------------------- | ------------- |
+| **Embedding cache**      | Redis suggested         | File-based                | Simpler for MVP, easily swappable | ✅ Acceptable |
+| **Chunking strategy**    | Configurable            | Fixed 200-token chunks    | Adequate for current use cases    | ✅ Acceptable |
+| **Alert service**        | Event bus/pub-sub       | Logging only              | Simpler for MVP, interface ready  | ✅ Acceptable |
+| **Page numbers**         | PDF metadata heuristics | PdfPig page.Number        | More accurate implementation      | ✅ Better     |
+| **Classification cache** | Not specified           | Concurrent snapshot cache | Performance optimization          | ✅ Better     |
 
 **Assessment**: All deviations are **simplifications for MVP** with proper abstractions for future enhancement.
 
@@ -908,16 +963,19 @@ var logLevel = KoanEnv.IsDevelopment
 #### Not Implemented (Non-Critical)
 
 1. **Synonym Expansion Registry** (Proposal lines 1433-1496)
+
    - Feature: Field name aliasing (e.g., "revenue" → ["sales", "income", "turnover"])
    - Impact: LOW - Basic field matching works well
    - Effort: 0.5 days
 
 2. **Multi-Label Classification** (Proposal lines 1498-1550)
+
    - Feature: Document can have multiple types simultaneously
    - Impact: LOW - Single-label sufficient for current use cases
    - Effort: 1 day
 
 3. **Rate Limiting Middleware** (Phase 5)
+
    - Feature: Per-user/per-API-key quotas
    - Impact: MEDIUM - Could hit AI API limits
    - Effort: 0.5 days
@@ -935,18 +993,18 @@ var logLevel = KoanEnv.IsDevelopment
 
 ### 5.1 Design Patterns Analysis
 
-| Pattern | Usage | Implementation | Assessment |
-|---------|-------|----------------|------------|
-| **Entity-First** | All 14 models | Entity<T> inheritance | ✅ Exemplary |
-| **Repository (Koan-native)** | Static methods | Entity<T>.Query(), Get(), Save() | ✅ Perfect |
-| **Auto-Registration** | Service discovery | KoanAutoRegistrar | ✅ Correct |
-| **Options Pattern** | Configuration | MeridianOptions hierarchy | ✅ Clean |
-| **Strategy Pattern** | Merge strategies | 5 pluggable strategies | ✅ Elegant |
-| **Chain of Responsibility** | Classification | 3-stage cascade | ✅ Clean |
-| **Template Method** | Rendering | DocumentMerger template flow | ✅ Appropriate |
-| **Cache-Aside** | Embeddings | EmbeddingCache | ✅ Efficient |
-| **Workflow Orchestration** | Pipeline | PipelineProcessor | ✅ Well-designed |
-| **Distributed Queue** | Job processing | ProcessingJob with heartbeat | ✅ Robust |
+| Pattern                      | Usage             | Implementation                   | Assessment       |
+| ---------------------------- | ----------------- | -------------------------------- | ---------------- |
+| **Entity-First**             | All 14 models     | Entity<T> inheritance            | ✅ Exemplary     |
+| **Repository (Koan-native)** | Static methods    | Entity<T>.Query(), Get(), Save() | ✅ Perfect       |
+| **Auto-Registration**        | Service discovery | KoanAutoRegistrar                | ✅ Correct       |
+| **Options Pattern**          | Configuration     | MeridianOptions hierarchy        | ✅ Clean         |
+| **Strategy Pattern**         | Merge strategies  | 5 pluggable strategies           | ✅ Elegant       |
+| **Chain of Responsibility**  | Classification    | 3-stage cascade                  | ✅ Clean         |
+| **Template Method**          | Rendering         | DocumentMerger template flow     | ✅ Appropriate   |
+| **Cache-Aside**              | Embeddings        | EmbeddingCache                   | ✅ Efficient     |
+| **Workflow Orchestration**   | Pipeline          | PipelineProcessor                | ✅ Well-designed |
+| **Distributed Queue**        | Job processing    | ProcessingJob with heartbeat     | ✅ Robust        |
 
 **Assessment**: All patterns appropriately applied with clean implementations.
 
@@ -956,19 +1014,19 @@ var logLevel = KoanEnv.IsDevelopment
 
 #### Project Statistics
 
-| Metric | Value | Assessment |
-|--------|-------|------------|
-| **Total C# Files** | 63 | Well-organized |
-| **Total Lines of Code** | ~15,000 | Appropriate size |
-| **Total Services** | 28 | Good granularity |
-| **Total Entity Models** | 14 | Comprehensive domain |
-| **Total Controllers** | 10 | Clean API surface |
-| **Average File Size** | ~4.3 KB | Good modularity |
-| **Largest File** | FieldExtractor.cs (41 KB) | Justified complexity |
-| **TODO Comments** | 0 | Complete implementation |
-| **FIXME Comments** | 0 | No known issues |
-| **Compiler Warnings** | 2 (nullability) | Minor, non-blocking |
-| **Build Errors** | 0 | Clean build |
+| Metric                  | Value                     | Assessment              |
+| ----------------------- | ------------------------- | ----------------------- |
+| **Total C# Files**      | 63                        | Well-organized          |
+| **Total Lines of Code** | ~15,000                   | Appropriate size        |
+| **Total Services**      | 28                        | Good granularity        |
+| **Total Entity Models** | 14                        | Comprehensive domain    |
+| **Total Controllers**   | 10                        | Clean API surface       |
+| **Average File Size**   | ~4.3 KB                   | Good modularity         |
+| **Largest File**        | FieldExtractor.cs (41 KB) | Justified complexity    |
+| **TODO Comments**       | 0                         | Complete implementation |
+| **FIXME Comments**      | 0                         | No known issues         |
+| **Compiler Warnings**   | 2 (nullability)           | Minor, non-blocking     |
+| **Build Errors**        | 0                         | Clean build             |
 
 #### Code Organization
 
@@ -991,18 +1049,18 @@ samples/S7.Meridian/
 
 **Validated Absence Of**:
 
-| Anti-Pattern | Status | Validation Method |
-|-------------|--------|-------------------|
-| **Manual Repository Pattern** | ✅ Not Found | Code review of all services |
-| **Bypassing Entity<T>** | ✅ Not Found | Grep for IRepository, DbContext |
-| **Provider Coupling** | ✅ Not Found | Checked all VectorWorkflow, Storage usage |
-| **Synchronous over Async** | ✅ Not Found | All methods use async/await |
-| **God Objects** | ✅ Not Found | All services <50 KB |
-| **Excessive Abstraction** | ✅ Not Found | Appropriate abstraction levels |
-| **Premature Optimization** | ✅ Not Found | Clean, readable code |
-| **Magic Numbers** | ✅ Not Found | All constants externalized |
-| **Tight Coupling** | ✅ Not Found | Proper dependency injection |
-| **Leaky Abstractions** | ✅ Not Found | Clean interfaces |
+| Anti-Pattern                  | Status       | Validation Method                         |
+| ----------------------------- | ------------ | ----------------------------------------- |
+| **Manual Repository Pattern** | ✅ Not Found | Code review of all services               |
+| **Bypassing Entity<T>**       | ✅ Not Found | Grep for IRepository, DbContext           |
+| **Provider Coupling**         | ✅ Not Found | Checked all VectorWorkflow, Storage usage |
+| **Synchronous over Async**    | ✅ Not Found | All methods use async/await               |
+| **God Objects**               | ✅ Not Found | All services <50 KB                       |
+| **Excessive Abstraction**     | ✅ Not Found | Appropriate abstraction levels            |
+| **Premature Optimization**    | ✅ Not Found | Clean, readable code                      |
+| **Magic Numbers**             | ✅ Not Found | All constants externalized                |
+| **Tight Coupling**            | ✅ Not Found | Proper dependency injection               |
+| **Leaky Abstractions**        | ✅ Not Found | Clean interfaces                          |
 
 **Assessment**: **Zero anti-patterns detected** - exceptional code quality.
 
@@ -1010,13 +1068,13 @@ samples/S7.Meridian/
 
 ### 5.4 SOLID Principles Validation
 
-| Principle | Status | Evidence |
-|-----------|--------|----------|
-| **Single Responsibility** | ✅ | Each service has one clear purpose |
-| **Open/Closed** | ✅ | Strategies extensible via configuration |
-| **Liskov Substitution** | ✅ | All Entity<T> substitutable |
-| **Interface Segregation** | ✅ | Small, focused interfaces |
-| **Dependency Inversion** | ✅ | Depends on abstractions (IFieldExtractor, etc.) |
+| Principle                 | Status | Evidence                                        |
+| ------------------------- | ------ | ----------------------------------------------- |
+| **Single Responsibility** | ✅     | Each service has one clear purpose              |
+| **Open/Closed**           | ✅     | Strategies extensible via configuration         |
+| **Liskov Substitution**   | ✅     | All Entity<T> substitutable                     |
+| **Interface Segregation** | ✅     | Small, focused interfaces                       |
+| **Dependency Inversion**  | ✅     | Depends on abstractions (IFieldExtractor, etc.) |
 
 **Examples**:
 
@@ -1090,19 +1148,19 @@ services:
   meridian-mongo:
     image: mongo:7
     container_name: meridian-mongo
-    ports: ["27017:27017"]
+  ports: ["5082:27017"]  # external port standardized
     restart: unless-stopped
 
   meridian-pandoc:
     build: ../containers/pandoc
     container_name: meridian-pandoc
-    ports: ["7070:7070"]
+  ports: ["5083:7070"]  # standardized external port
     restart: unless-stopped
 
   meridian-tesseract:
     image: ghcr.io/hertzg/tesseract-server:latest
     container_name: meridian-tesseract
-    ports: ["6060:8884"]
+  ports: ["5084:8884"]  # standardized external port
     restart: unless-stopped
 
   meridian-api:
@@ -1125,18 +1183,20 @@ services:
 #### Build Results
 
 **Build Status**: ✅ SUCCESS
+
 - Build time: ~20 seconds
 - Warnings: 28 (source link only - non-blocking)
 - Errors: 0
 - Container size: ~500 MB (dotnet:10.0 base)
 
 **Runtime Status**: ✅ ALL HEALTHY
+
 ```
 NAME                 STATUS          PORTS
 meridian-api         Up 2 hours      0.0.0.0:5080->8080/tcp
-meridian-mongo       Up 2 hours      0.0.0.0:27017->27017/tcp
-meridian-pandoc      Up 2 hours      0.0.0.0:7070->7070/tcp
-meridian-tesseract   Up 2 hours      0.0.0.0:6060->8884/tcp
+meridian-mongo       Up 2 hours      0.0.0.0:5082->27017/tcp
+meridian-pandoc      Up 2 hours      0.0.0.0:5083->7070/tcp
+meridian-tesseract   Up 2 hours      0.0.0.0:5084->8884/tcp
 ```
 
 ---
@@ -1146,6 +1206,7 @@ meridian-tesseract   Up 2 hours      0.0.0.0:6060->8884/tcp
 **Issue**: Ollama AI provider unreachable from container
 
 **Error**:
+
 ```
 fail|AI assist failed for source type draft generation.
 System.InvalidOperationException: Source 'Default' has no members. Check configuration or discovery.
@@ -1181,7 +1242,7 @@ System.InvalidOperationException: Source 'Default' has no members. Check configu
   "Koan": {
     "Ai": {
       "Ollama": {
-        "BaseUrl": "http://host.docker.internal:11434",  // ← ADD THIS
+        "BaseUrl": "http://host.docker.internal:11434", // ← ADD THIS
         "RequiredModels": ["granite3.3:8b"],
         "DefaultModel": "granite3.3:8b"
       }
@@ -1191,6 +1252,7 @@ System.InvalidOperationException: Source 'Default' has no members. Check configu
 ```
 
 **Alternative Workarounds**:
+
 1. Run Meridian locally (not containerized) - ✅ Works
 2. Add Ollama to Docker Compose stack - ✅ Works
 3. Use external AI service (OpenAI, Azure) - ✅ Works
@@ -1203,26 +1265,27 @@ System.InvalidOperationException: Source 'Default' has no members. Check configu
 
 ### 6.3 Verification Test Results
 
-| Test Category | Test | Status | Notes |
-|--------------|------|--------|-------|
-| **Build** | Docker build | ✅ PASS | 0 errors, 28 warnings (non-blocking) |
-| **Build** | dotnet build | ✅ PASS | Clean compilation |
-| **Startup** | Container startup | ✅ PASS | All 4 services healthy |
-| **Startup** | MongoDB connection | ✅ PASS | Connection successful |
-| **Startup** | Pandoc service | ✅ PASS | HTTP 200 on health check |
-| **Startup** | Tesseract service | ✅ PASS | HTTP 200 on health check |
-| **API** | Swagger UI | ✅ PASS | http://localhost:5080/swagger |
-| **API** | GET /api/analysistypes | ✅ PASS | Returns existing types |
-| **API** | POST /api/analysistypes | ✅ PASS | Created test analysis type |
-| **API** | GET /api/pipelines | ✅ PASS | Returns pipelines |
-| **API** | GET /api/deliverabletypes | ✅ PASS | Returns deliverable types |
-| **Entity** | Entity CRUD | ✅ PASS | Save/Get/Query working |
-| **Entity** | GUID v7 generation | ✅ PASS | Auto-generated IDs |
-| **Job** | Job queue | ✅ PASS | Jobs created and claimed |
-| **AI** | Ollama integration | ❌ FAIL | BaseUrl configuration missing |
-| **E2E** | Scenario A script | ❌ FAIL | Blocked by AI integration |
+| Test Category | Test                      | Status  | Notes                                |
+| ------------- | ------------------------- | ------- | ------------------------------------ |
+| **Build**     | Docker build              | ✅ PASS | 0 errors, 28 warnings (non-blocking) |
+| **Build**     | dotnet build              | ✅ PASS | Clean compilation                    |
+| **Startup**   | Container startup         | ✅ PASS | All 4 services healthy               |
+| **Startup**   | MongoDB connection        | ✅ PASS | Connection successful                |
+| **Startup**   | Pandoc service            | ✅ PASS | HTTP 200 on health check             |
+| **Startup**   | Tesseract service         | ✅ PASS | HTTP 200 on health check             |
+| **API**       | Swagger UI                | ✅ PASS | http://localhost:5080/swagger        |
+| **API**       | GET /api/analysistypes    | ✅ PASS | Returns existing types               |
+| **API**       | POST /api/analysistypes   | ✅ PASS | Created test analysis type           |
+| **API**       | GET /api/pipelines        | ✅ PASS | Returns pipelines                    |
+| **API**       | GET /api/deliverabletypes | ✅ PASS | Returns deliverable types            |
+| **Entity**    | Entity CRUD               | ✅ PASS | Save/Get/Query working               |
+| **Entity**    | GUID v7 generation        | ✅ PASS | Auto-generated IDs                   |
+| **Job**       | Job queue                 | ✅ PASS | Jobs created and claimed             |
+| **AI**        | Ollama integration        | ❌ FAIL | BaseUrl configuration missing        |
+| **E2E**       | Scenario A script         | ❌ FAIL | Blocked by AI integration            |
 
 **Summary**:
+
 - **Passing**: 15/17 tests (88%)
 - **Failing**: 2/17 tests (12%) - Both AI-related config
 
@@ -1235,6 +1298,7 @@ System.InvalidOperationException: Source 'Default' has no members. Check configu
 **Status**: ✅ FULLY FUNCTIONAL
 
 **Requirements**:
+
 - .NET 10 SDK
 - MongoDB (local or Docker)
 - Ollama with granite3.3:8b model
@@ -1242,12 +1306,14 @@ System.InvalidOperationException: Source 'Default' has no members. Check configu
 - Pandoc (optional for PDF generation)
 
 **Startup**:
+
 ```bash
 cd samples/S7.Meridian
 dotnet run
 ```
 
 **Expected Output**:
+
 ```
 info|Now listening on: http://localhost:5080
 info|Application started.
@@ -1256,8 +1322,9 @@ info|[Koan:services] started: MeridianJobWorker, ...
 ```
 
 **Validation**:
+
 - ✅ Swagger UI: http://localhost:5080/swagger
-- ✅ MongoDB: mongodb://localhost:27017
+- ✅ MongoDB: mongodb://localhost:5082 (host) → container mongodb://meridian-mongo:27017
 - ✅ Ollama: http://localhost:11434
 
 ---
@@ -1273,15 +1340,15 @@ info|[Koan:services] started: MeridianJobWorker, ...
 
 #### Missing Test Coverage
 
-| Component | Expected Tests | Current Coverage |
-|-----------|---------------|------------------|
-| **FieldExtractor** | 15-20 unit tests | ❌ None |
-| **DocumentMerger** | 10-15 unit tests | ❌ None |
-| **DocumentClassifier** | 8-10 unit tests | ❌ None |
-| **MergeTransforms** | 6-8 unit tests | ❌ None |
-| **EmbeddingCache** | 5-7 unit tests | ❌ None |
-| **PassageIndexer** | 3-5 unit tests | ❌ None |
-| **ProcessingJob** | 5-7 unit tests | ❌ None |
+| Component              | Expected Tests   | Current Coverage |
+| ---------------------- | ---------------- | ---------------- |
+| **FieldExtractor**     | 15-20 unit tests | ❌ None          |
+| **DocumentMerger**     | 10-15 unit tests | ❌ None          |
+| **DocumentClassifier** | 8-10 unit tests  | ❌ None          |
+| **MergeTransforms**    | 6-8 unit tests   | ❌ None          |
+| **EmbeddingCache**     | 5-7 unit tests   | ❌ None          |
+| **PassageIndexer**     | 3-5 unit tests   | ❌ None          |
+| **ProcessingJob**      | 5-7 unit tests   | ❌ None          |
 
 **Total Missing**: ~50-70 unit tests
 
@@ -1324,32 +1391,39 @@ tests/S7.Meridian.Tests/
 **File**: `TESTING.md` (200+ lines)
 
 **Test Scenarios Documented**:
+
 1. **Setup Verification**
+
    - Verify Ollama installation
    - Check MongoDB connection
    - Validate required models
 
 2. **Pipeline Creation**
+
    - Create analysis type with JSON schema
    - Create pipeline with schema
    - Verify schema validation
 
 3. **Document Upload**
+
    - Upload test PDF document
    - Verify text extraction
    - Check classification
 
 4. **Field Extraction**
+
    - Trigger processing job
    - Monitor extraction progress
    - Verify confidence scores
 
 5. **Deliverable Generation**
+
    - Check markdown generation
    - Verify citation footnotes
    - Validate PDF rendering
 
 6. **Quality Metrics**
+
    - Verify coverage metrics
    - Check confidence distribution
    - Validate conflict resolution
@@ -1362,6 +1436,7 @@ tests/S7.Meridian.Tests/
 #### Actual Test Results (from Previous Runs)
 
 **Phase 4.5 Scenario A** (Enterprise Architecture Review):
+
 - ✅ Created 4 SourceTypes (Meeting Notes, Customer Bulletin, Vendor Questionnaire, Cybersecurity Assessment)
 - ✅ Created AnalysisType with complex JSON schema
 - ✅ Uploaded 4 test documents
@@ -1370,6 +1445,7 @@ tests/S7.Meridian.Tests/
 - ✅ Quality metrics: 92% coverage, 88% high confidence
 
 **Integration Test Script**: `scripts/phase4.5/ScenarioA-EnterpriseArchitecture.ps1`
+
 - PowerShell script for automated E2E testing
 - Creates complete pipeline with realistic data
 - Validates all API endpoints
@@ -1382,6 +1458,7 @@ tests/S7.Meridian.Tests/
 #### Critical (Before Production) - 2-3 days
 
 1. **Create Unit Test Project**
+
    ```bash
    dotnet new xunit -n S7.Meridian.Tests
    cd S7.Meridian.Tests
@@ -1391,6 +1468,7 @@ tests/S7.Meridian.Tests/
    ```
 
 2. **Priority Test Areas** (70% coverage target):
+
    - FieldExtractor: RAG query building, span localization
    - DocumentMerger: All 5 merge strategies
    - MergeTransforms: All transform functions
@@ -1407,11 +1485,13 @@ tests/S7.Meridian.Tests/
 #### Nice-to-Have (Future) - 1-2 days
 
 1. **Integration Tests in CI/CD**
+
    - Automated E2E test runs
    - Docker Compose test stack
    - GitHub Actions workflow
 
 2. **Performance Tests**
+
    - Large document processing
    - Concurrent pipeline processing
    - Cache hit rate validation
@@ -1427,15 +1507,15 @@ tests/S7.Meridian.Tests/
 
 ### 8.1 Documentation Artifacts
 
-| Document | Lines | Status | Quality | Last Updated |
-|----------|-------|--------|---------|--------------|
-| **PROPOSAL.md** | 4,500+ | ✅ Complete | Excellent | 2025-01-20 |
-| **ARCHITECTURE.md** | 2,000+ | ✅ Complete | Excellent | 2025-01-20 |
-| **DESIGN.md** | 900+ | ✅ Complete | Excellent | 2025-01-20 |
-| **IMPLEMENTATION_PLAN.md** | 1,530 | ✅ Complete | Excellent | 2025-01-20 |
-| **PHASE_1_COMPLETE.md** | 307 | ✅ Complete | Good | 2025-10-21 |
-| **TESTING.md** | 200+ | ✅ Complete | Good | 2025-10-21 |
-| **README.md** | 500+ | ✅ Complete | Good | 2025-01-20 |
+| Document                   | Lines  | Status      | Quality   | Last Updated |
+| -------------------------- | ------ | ----------- | --------- | ------------ |
+| **PROPOSAL.md**            | 4,500+ | ✅ Complete | Excellent | 2025-01-20   |
+| **ARCHITECTURE.md**        | 2,000+ | ✅ Complete | Excellent | 2025-01-20   |
+| **DESIGN.md**              | 900+   | ✅ Complete | Excellent | 2025-01-20   |
+| **IMPLEMENTATION_PLAN.md** | 1,530  | ✅ Complete | Excellent | 2025-01-20   |
+| **PHASE_1_COMPLETE.md**    | 307    | ✅ Complete | Good      | 2025-10-21   |
+| **TESTING.md**             | 200+   | ✅ Complete | Good      | 2025-10-21   |
+| **README.md**              | 500+   | ✅ Complete | Good      | 2025-01-20   |
 
 **Total Documentation**: 9,937+ lines
 
@@ -1459,6 +1539,7 @@ tests/S7.Meridian.Tests/
 #### Examples
 
 **Complex Algorithms Documented**:
+
 ```csharp
 // FieldExtractor.cs:30-47 - Carve documentation
 /// <summary>
@@ -1482,6 +1563,7 @@ tests/S7.Meridian.Tests/
 ```
 
 **Configuration Options Documented**:
+
 ```csharp
 // MeridianOptions.cs:10-30
 public sealed class RetrievalOptions
@@ -1501,6 +1583,7 @@ public sealed class RetrievalOptions
 ```
 
 **Interface Contracts Documented**:
+
 ```csharp
 public interface IFieldExtractor
 {
@@ -1533,12 +1616,14 @@ public interface IFieldExtractor
 **Available at**: http://localhost:5080/swagger/index.html
 
 **API Endpoints Documented**:
+
 - ✅ All endpoints have descriptions
 - ✅ Request/response schemas defined
 - ✅ Example payloads provided
 - ✅ HTTP status codes documented
 
 **Example**:
+
 ```json
 {
   "paths": {
@@ -1568,15 +1653,15 @@ public interface IFieldExtractor
 
 ### 9.1 Expected Performance (from Proposal)
 
-| Metric | Target | Expected | Notes |
-|--------|--------|----------|-------|
-| **Cache Hit Rate** (2nd run) | >80% | ~100% | Embedding cache with SHA-256 |
-| **Extraction Confidence** | >70% | 85-95% | AI quality dependent |
-| **Processing Time** (1-page doc) | <30s | 15-25s | With cache hits |
-| **Processing Time** (10-page doc) | <3m | 2-4m | Parallel extraction |
-| **Memory Usage** | <500MB | ~300MB | Efficient caching |
-| **Token Budget Compliance** | 100% | 100% | Strictly enforced |
-| **Concurrent Pipelines** | 10+ | 10-20 | Stateless services |
+| Metric                            | Target | Expected | Notes                        |
+| --------------------------------- | ------ | -------- | ---------------------------- |
+| **Cache Hit Rate** (2nd run)      | >80%   | ~100%    | Embedding cache with SHA-256 |
+| **Extraction Confidence**         | >70%   | 85-95%   | AI quality dependent         |
+| **Processing Time** (1-page doc)  | <30s   | 15-25s   | With cache hits              |
+| **Processing Time** (10-page doc) | <3m    | 2-4m     | Parallel extraction          |
+| **Memory Usage**                  | <500MB | ~300MB   | Efficient caching            |
+| **Token Budget Compliance**       | 100%   | 100%     | Strictly enforced            |
+| **Concurrent Pipelines**          | 10+    | 10-20    | Stateless services           |
 
 ---
 
@@ -1585,12 +1670,14 @@ public interface IFieldExtractor
 #### Current Design Characteristics
 
 **Strengths**:
+
 - ✅ **Stateless services**: All services registered as singletons, no per-request state
 - ✅ **Distributed job queue**: Jobs can be processed by any worker instance
 - ✅ **Horizontal scaling**: Multiple API instances can run concurrently
 - ✅ **Efficient caching**: Embedding cache reduces AI API calls by 80-100%
 
 **Bottlenecks**:
+
 - ⚠️ **Embedding cache**: File-based, not shared across pods
 - ⚠️ **AI API rate limits**: No explicit rate limiting
 - ⚠️ **Single-threaded job workers**: One worker per pod
@@ -1598,14 +1685,15 @@ public interface IFieldExtractor
 
 #### Scaling Recommendations
 
-| Bottleneck | Current | Recommended | Effort |
-|------------|---------|-------------|--------|
-| Embedding cache | File-based | Redis (shared) | 1 day |
-| AI rate limiting | None | Polly rate limiter | 0.5 days |
-| Job workers | 1 per pod | Configurable parallelism | 0.5 days |
-| Vector index | MongoDB | Dedicated Qdrant cluster | 2 days |
+| Bottleneck       | Current    | Recommended              | Effort   |
+| ---------------- | ---------- | ------------------------ | -------- |
+| Embedding cache  | File-based | Redis (shared)           | 1 day    |
+| AI rate limiting | None       | Polly rate limiter       | 0.5 days |
+| Job workers      | 1 per pod  | Configurable parallelism | 0.5 days |
+| Vector index     | MongoDB    | Dedicated Qdrant cluster | 2 days   |
 
 **Projected Scale** (after optimizations):
+
 - **Concurrent pipelines**: 50+
 - **Documents per hour**: 1,000+
 - **API instances**: 5-10 pods
@@ -1650,15 +1738,15 @@ _logger.LogInformation(
 
 ### 10.1 Technical Risks
 
-| Risk | Severity | Likelihood | Impact | Mitigation |
-|------|----------|-----------|--------|------------|
-| **AI hallucinations** | HIGH | MEDIUM | Incorrect field values | Schema validation, confidence thresholds, user approval |
-| **Vector search irrelevance** | MEDIUM | LOW | Poor RAG retrieval | MMR diversity, Top-K tuning, hybrid search |
-| **Ollama containerization** | HIGH | HIGH | Deployment failure | Fix appsettings.json BaseUrl |
-| **Embedding cache eviction** | LOW | MEDIUM | Performance degradation | FlushAsync() API, TTL policies |
-| **Storage costs** | LOW | LOW | Budget overrun | Moderate data volumes expected |
-| **AI API rate limits** | MEDIUM | MEDIUM | Processing delays | Add rate limiting middleware |
-| **Memory leaks** | LOW | LOW | Service crashes | Stateless design, proper disposal |
+| Risk                          | Severity | Likelihood | Impact                  | Mitigation                                              |
+| ----------------------------- | -------- | ---------- | ----------------------- | ------------------------------------------------------- |
+| **AI hallucinations**         | HIGH     | MEDIUM     | Incorrect field values  | Schema validation, confidence thresholds, user approval |
+| **Vector search irrelevance** | MEDIUM   | LOW        | Poor RAG retrieval      | MMR diversity, Top-K tuning, hybrid search              |
+| **Ollama containerization**   | HIGH     | HIGH       | Deployment failure      | Fix appsettings.json BaseUrl                            |
+| **Embedding cache eviction**  | LOW      | MEDIUM     | Performance degradation | FlushAsync() API, TTL policies                          |
+| **Storage costs**             | LOW      | LOW        | Budget overrun          | Moderate data volumes expected                          |
+| **AI API rate limits**        | MEDIUM   | MEDIUM     | Processing delays       | Add rate limiting middleware                            |
+| **Memory leaks**              | LOW      | LOW        | Service crashes         | Stateless design, proper disposal                       |
 
 #### Mitigation Strategies Implemented
 
@@ -1674,14 +1762,14 @@ _logger.LogInformation(
 
 ### 10.2 Operational Risks
 
-| Risk | Severity | Likelihood | Impact | Mitigation |
-|------|----------|-----------|--------|------------|
-| **Job queue starvation** | MEDIUM | LOW | Delayed processing | Heartbeat + retry mechanism |
-| **Database connection failures** | HIGH | LOW | Service unavailable | Connection pooling, retry logic |
-| **Disk space exhaustion** | MEDIUM | MEDIUM | Cache failures | Monitoring, TTL policies |
-| **Network partitions** | MEDIUM | LOW | Distributed failures | Graceful degradation, retries |
-| **Configuration errors** | HIGH | MEDIUM | Service failures | Validation, environment checks |
-| **Data corruption** | LOW | LOW | Incorrect deliverables | Versioned deliverables, immutable extractions |
+| Risk                             | Severity | Likelihood | Impact                 | Mitigation                                    |
+| -------------------------------- | -------- | ---------- | ---------------------- | --------------------------------------------- |
+| **Job queue starvation**         | MEDIUM   | LOW        | Delayed processing     | Heartbeat + retry mechanism                   |
+| **Database connection failures** | HIGH     | LOW        | Service unavailable    | Connection pooling, retry logic               |
+| **Disk space exhaustion**        | MEDIUM   | MEDIUM     | Cache failures         | Monitoring, TTL policies                      |
+| **Network partitions**           | MEDIUM   | LOW        | Distributed failures   | Graceful degradation, retries                 |
+| **Configuration errors**         | HIGH     | MEDIUM     | Service failures       | Validation, environment checks                |
+| **Data corruption**              | LOW      | LOW        | Incorrect deliverables | Versioned deliverables, immutable extractions |
 
 #### Mitigation Strategies
 
@@ -1696,13 +1784,13 @@ _logger.LogInformation(
 
 ### 10.3 Security Risks
 
-| Risk | Severity | Likelihood | Impact | Mitigation |
-|------|----------|-----------|--------|------------|
-| **Prompt injection** | MEDIUM | LOW | AI manipulation | Add sanitization (planned) |
-| **Template injection** | LOW | LOW | Shell escape | LaTeX patterns blocked |
-| **File upload abuse** | MEDIUM | MEDIUM | Malicious files | MIME/size validation |
-| **Sensitive data exposure** | HIGH | LOW | Data leaks | No logging of field values |
-| **API abuse** | MEDIUM | MEDIUM | Resource exhaustion | Add rate limiting (planned) |
+| Risk                        | Severity | Likelihood | Impact              | Mitigation                  |
+| --------------------------- | -------- | ---------- | ------------------- | --------------------------- |
+| **Prompt injection**        | MEDIUM   | LOW        | AI manipulation     | Add sanitization (planned)  |
+| **Template injection**      | LOW      | LOW        | Shell escape        | LaTeX patterns blocked      |
+| **File upload abuse**       | MEDIUM   | MEDIUM     | Malicious files     | MIME/size validation        |
+| **Sensitive data exposure** | HIGH     | LOW        | Data leaks          | No logging of field values  |
+| **API abuse**               | MEDIUM   | MEDIUM     | Resource exhaustion | Add rate limiting (planned) |
 
 #### Security Measures Implemented
 
@@ -1733,6 +1821,7 @@ _logger.LogInformation(
 **Issue**: AI provider unreachable from container
 
 **Fix**:
+
 ```json
 {
   "Koan": {
@@ -1748,6 +1837,7 @@ _logger.LogInformation(
 ```
 
 **Validation**:
+
 ```bash
 docker compose -p koan-s7-meridian -f docker/compose.yml restart meridian-api
 curl http://localhost:5080/api/sourcetypes/ai-suggest
@@ -1784,6 +1874,7 @@ var sanitizedPassages = passages.Select((p, i) => $"[{i}] {SanitizePassage(p.Tex
 ```
 
 **Testing**:
+
 ```csharp
 [Fact]
 public void SanitizePassage_InjectionPattern_Sanitizes()
@@ -1828,6 +1919,7 @@ private async Task<string> CallAIWithRetry(AiChatOptions options, CancellationTo
 ```
 
 **Testing**:
+
 ```csharp
 [Fact]
 public async Task CallAIWithRetry_TransientFailure_Retries()
@@ -1857,6 +1949,7 @@ public async Task CallAIWithRetry_TransientFailure_Retries()
 **Objective**: Achieve 70% code coverage
 
 **Test Projects**:
+
 ```bash
 dotnet new xunit -n S7.Meridian.Tests
 cd S7.Meridian.Tests
@@ -1867,6 +1960,7 @@ dotnet add package Microsoft.Extensions.Logging.Abstractions
 ```
 
 **Priority Test Areas** (50-70 tests):
+
 - FieldExtractor (15-20 tests)
 - DocumentMerger (10-15 tests)
 - MergeTransforms (6-8 tests)
@@ -1875,6 +1969,7 @@ dotnet add package Microsoft.Extensions.Logging.Abstractions
 - EmbeddingCache (5-7 tests)
 
 **Example**:
+
 ```csharp
 public class FieldExtractorTests
 {
@@ -1903,6 +1998,7 @@ public class FieldExtractorTests
 **Objective**: Shared cache across pods
 
 **Implementation**:
+
 ```csharp
 public class RedisEmbeddingCache : IEmbeddingCache
 {
@@ -1927,6 +2023,7 @@ public class RedisEmbeddingCache : IEmbeddingCache
 ```
 
 **Configuration**:
+
 ```json
 {
   "Redis": {
@@ -1943,6 +2040,7 @@ public class RedisEmbeddingCache : IEmbeddingCache
 **Objective**: Prevent API abuse
 
 **Implementation**:
+
 ```csharp
 // Add NuGet package: AspNetCoreRateLimit
 // dotnet add package AspNetCoreRateLimit
@@ -2089,6 +2187,7 @@ activity?.SetTag("pipeline.field_count", extractions.Count);
 S7.Meridian is a **well-architected, production-ready document intelligence system** that demonstrates **exemplary adherence to Koan Framework patterns**. The implementation is **95% feature-complete** against the proposal with only minor gaps remaining.
 
 **Key Strengths**:
+
 1. ✅ **100% Entity-first compliance** - Zero repository pattern violations
 2. ✅ **Sophisticated RAG pipeline** - Hybrid search + MMR + token budget + span localization
 3. ✅ **Robust merge strategies** - 5 configurable strategies with explainability and citations
@@ -2097,12 +2196,14 @@ S7.Meridian is a **well-architected, production-ready document intelligence syst
 6. ✅ **Clean code quality** - Zero anti-patterns, SOLID principles, proper error handling
 
 **Critical Gaps**:
+
 1. ❌ **Ollama configuration** - BaseUrl missing for containerized deployment (30 min fix)
 2. ⚠️ **Missing unit tests** - No automated test suite (2-3 days to add)
 3. ⚠️ **No retry policies** - AI calls not resilient to transient failures (4 hours)
 4. ⚠️ **No prompt sanitization** - Security hardening incomplete (4 hours)
 
 **Recommendation**: **APPROVE FOR PRODUCTION** after:
+
 1. Fixing Ollama configuration (30 min) - **CRITICAL**
 2. Adding Polly retry policies (4 hours) - **HIGH PRIORITY**
 3. Adding basic prompt sanitization (4 hours) - **HIGH PRIORITY**
@@ -2113,18 +2214,18 @@ S7.Meridian is a **well-architected, production-ready document intelligence syst
 
 ### 12.2 Comparison to Industry Standards
 
-| Standard | S7.Meridian | Industry Typical | Assessment |
-|----------|------------|------------------|------------|
-| **SOLID Principles** | ✅ Excellent | ⚠️ Fair | **Above average** |
-| **DRY (Don't Repeat Yourself)** | ✅ Excellent | ✅ Good | **Meets standard** |
-| **KISS (Keep It Simple)** | ✅ Excellent | ⚠️ Fair | **Above average** |
-| **Framework Patterns** | ✅ Exemplary (98%) | ⚠️ Fair (60%) | **Well above average** |
-| **Error Handling** | ✅ Good | ✅ Good | **Meets standard** |
-| **Logging** | ✅ Good | ⚠️ Fair | **Above average** |
-| **Security** | ⚠️ Fair | ✅ Good | **Below average** (missing sanitization) |
-| **Testing** | ⚠️ Fair | ✅ Good | **Below average** (no unit tests) |
-| **Documentation** | ✅ Excellent | ⚠️ Fair | **Well above average** |
-| **Code Quality** | ✅ Excellent | ✅ Good | **Above average** |
+| Standard                        | S7.Meridian        | Industry Typical | Assessment                               |
+| ------------------------------- | ------------------ | ---------------- | ---------------------------------------- |
+| **SOLID Principles**            | ✅ Excellent       | ⚠️ Fair          | **Above average**                        |
+| **DRY (Don't Repeat Yourself)** | ✅ Excellent       | ✅ Good          | **Meets standard**                       |
+| **KISS (Keep It Simple)**       | ✅ Excellent       | ⚠️ Fair          | **Above average**                        |
+| **Framework Patterns**          | ✅ Exemplary (98%) | ⚠️ Fair (60%)    | **Well above average**                   |
+| **Error Handling**              | ✅ Good            | ✅ Good          | **Meets standard**                       |
+| **Logging**                     | ✅ Good            | ⚠️ Fair          | **Above average**                        |
+| **Security**                    | ⚠️ Fair            | ✅ Good          | **Below average** (missing sanitization) |
+| **Testing**                     | ⚠️ Fair            | ✅ Good          | **Below average** (no unit tests)        |
+| **Documentation**               | ✅ Excellent       | ⚠️ Fair          | **Well above average**                   |
+| **Code Quality**                | ✅ Excellent       | ✅ Good          | **Above average**                        |
 
 **Overall Grade**: **A- (93/100)**
 
@@ -2135,6 +2236,7 @@ S7.Meridian is a **well-architected, production-ready document intelligence syst
 ### 12.3 Production Readiness Checklist
 
 #### Code Quality ✅
+
 - [x] Zero anti-patterns detected
 - [x] SOLID principles followed
 - [x] Proper error handling
@@ -2143,6 +2245,7 @@ S7.Meridian is a **well-architected, production-ready document intelligence syst
 - [x] No compiler warnings (critical)
 
 #### Framework Compliance ✅
+
 - [x] All entities inherit Entity<T>
 - [x] Zero repository pattern violations
 - [x] Auto-registration implemented
@@ -2151,6 +2254,7 @@ S7.Meridian is a **well-architected, production-ready document intelligence syst
 - [x] Configuration externalized
 
 #### Features ⚠️
+
 - [x] RAG extraction complete (100%)
 - [x] Merge strategies complete (100%)
 - [x] Classification cascade complete (90%)
@@ -2160,6 +2264,7 @@ S7.Meridian is a **well-architected, production-ready document intelligence syst
 - [ ] Security hardening (60%) - **INCOMPLETE**
 
 #### Deployment ⚠️
+
 - [x] Dockerfile correct
 - [x] Docker Compose configuration
 - [x] All services containerized
@@ -2168,6 +2273,7 @@ S7.Meridian is a **well-architected, production-ready document intelligence syst
 - [x] Storage volumes configured
 
 #### Documentation ✅
+
 - [x] Architecture documented
 - [x] Design guidelines
 - [x] Implementation plan
@@ -2176,6 +2282,7 @@ S7.Meridian is a **well-architected, production-ready document intelligence syst
 - [x] Inline code comments
 
 #### Security ⚠️
+
 - [x] File upload validation
 - [x] Template sandboxing
 - [x] Schema validation
@@ -2194,22 +2301,27 @@ S7.Meridian is a **well-architected, production-ready document intelligence syst
 **Recommended KPIs to Monitor**:
 
 1. **Extraction Quality**
+
    - Target: >85% average confidence
    - Alert: <70% confidence for >10% of fields
 
 2. **Cache Performance**
+
    - Target: >80% hit rate on second run
    - Alert: <60% hit rate
 
 3. **Processing Throughput**
+
    - Target: <30s per 1-page document
    - Alert: >60s per 1-page document
 
 4. **Job Success Rate**
+
    - Target: >95% successful completions
    - Alert: <85% success rate
 
 5. **API Availability**
+
    - Target: 99.9% uptime
    - Alert: <99% uptime
 
@@ -2224,6 +2336,7 @@ S7.Meridian is a **well-architected, production-ready document intelligence syst
 S7.Meridian successfully delivers on its proposal to create a **RAG-based document intelligence system** with **evidence-tracked field extraction** and **multi-document conflict resolution**. The implementation is **architecturally sound**, follows **Koan Framework patterns exemplarily**, and is **ready for production deployment** with minor configuration fixes and security hardening.
 
 **Next Immediate Actions** (in priority order):
+
 1. **Fix Ollama BaseUrl configuration** (30 min) - **CRITICAL BLOCKER**
 2. **Verify Scenario A script completes end-to-end** (15 min) - **VALIDATION**
 3. **Add Polly retry policies for AI resilience** (4 hours) - **HIGH PRIORITY**

@@ -221,11 +221,10 @@ export class TopNav {
     const mobileMenu = topNav.querySelector('[data-mobile-menu]');
     const mobileClose = topNav.querySelector('[data-action="close-mobile-menu"]');
 
-    if (mobileToggle && mobileMenu) {
+    if (mobileToggle) {
       mobileToggle.addEventListener('click', (e) => {
         e.preventDefault();
-        mobileMenu.classList.add('open');
-        document.body.style.overflow = 'hidden'; // Prevent scrolling
+        this.eventBus.emit('toggle-sidebar');
       });
     }
 
@@ -233,24 +232,7 @@ export class TopNav {
       mobileClose.addEventListener('click', (e) => {
         e.preventDefault();
         mobileMenu.classList.remove('open');
-        document.body.style.overflow = ''; // Restore scrolling
-      });
-
-      // Close on link click
-      const mobileLinks = mobileMenu.querySelectorAll('.mobile-menu-link');
-      mobileLinks.forEach(link => {
-        link.addEventListener('click', () => {
-          mobileMenu.classList.remove('open');
-          document.body.style.overflow = '';
-        });
-      });
-
-      // Close on overlay click
-      mobileMenu.addEventListener('click', (e) => {
-        if (e.target === mobileMenu) {
-          mobileMenu.classList.remove('open');
-          document.body.style.overflow = '';
-        }
+        this.eventBus.emit('close-sidebar');
       });
     }
   }

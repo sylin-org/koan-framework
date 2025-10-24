@@ -1,4 +1,7 @@
 using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using Koan.Data.Core.Model;
 using Newtonsoft.Json.Linq;
 using Newtonsoft.Json.Schema;
@@ -40,11 +43,15 @@ public sealed class DocumentPipeline : Entity<DocumentPipeline>
     /// <summary>Tags inherited from the AnalysisType (useful for filtering and telemetry).</summary>
     public List<string> AnalysisTags { get; set; } = new();
 
-    /// <summary>Source types required for this analysis. Empty list means no restriction.</summary>
-    public List<string> RequiredSourceTypes { get; set; } = new();
-
     /// <summary>Optional operator guidance that biases retrieval, not final values.</summary>
     public string? BiasNotes { get; set; }
+        = null;
+
+    /// <summary>List of document identifiers attached to this pipeline.</summary>
+    public List<string> DocumentIds { get; set; } = new();
+
+    /// <summary>Organization-wide context applied to this pipeline.</summary>
+    public string? OrganizationProfileId { get; set; }
         = null;
 
     /// <summary>
@@ -58,11 +65,6 @@ public sealed class DocumentPipeline : Entity<DocumentPipeline>
     /// <summary>Current pipeline status for orchestrators and dashboards.</summary>
     public PipelineStatus Status { get; set; }
         = PipelineStatus.Pending;
-
-    public int TotalDocuments { get; set; }
-        = 0;
-    public int ProcessedDocuments { get; set; }
-        = 0;
 
     public string? DeliverableId { get; set; }
         = null;
@@ -88,6 +90,97 @@ public sealed class DocumentPipeline : Entity<DocumentPipeline>
         {
             return null;
         }
+    }
+
+    public void AttachDocument(string? documentId)
+    {
+        if (string.IsNullOrWhiteSpace(documentId))
+        {
+            return;
+        }
+
+        if (!DocumentIds.Any(existing => string.Equals(existing, documentId, StringComparison.Ordinal)))
+        {
+            DocumentIds.Add(documentId);
+        }
+    }
+
+    public void AttachDocuments(IEnumerable<string>? documentIds)
+    {
+        if (documentIds is null)
+        {
+            return;
+        }
+
+        foreach (var id in documentIds)
+        {
+            AttachDocument(id);
+        }
+    }
+
+    public void RemoveDocument(string? documentId)
+    {
+        if (string.IsNullOrWhiteSpace(documentId))
+        {
+            return;
+        }
+
+    DocumentIds.RemoveAll(id => string.Equals(id, documentId, StringComparison.Ordinal));
+    }
+
+    public async Task<List<SourceDocument>> LoadDocumentsAsync(CancellationToken ct = default)
+    {
+        if (DocumentIds.Count == 0)
+        {
+            return new List<SourceDocument>();
+        }
+
+        var ids = DocumentIds
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+
+        if (ids.Count == 0)
+        {
+            return new List<SourceDocument>();
+        }
+
+        var loaded = await SourceDocument.GetManyAsync(ids, ct).ConfigureAwait(false);
+        return loaded
+            .Where(doc => doc is not null)
+            .Select(doc => doc!)
+            .ToList();
+    }
+
+    public async Task<List<Passage>> LoadPassagesAsync(CancellationToken ct = default)
+    {
+        if (DocumentIds.Count == 0)
+        {
+            return new List<Passage>();
+        }
+
+        var ids = DocumentIds
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+
+        if (ids.Count == 0)
+        {
+            return new List<Passage>();
+        }
+
+        var passages = await Passage.Query(p => ids.Contains(p.SourceDocumentId), ct).ConfigureAwait(false);
+        return passages.ToList();
+    }
+
+    public async Task<OrganizationProfile?> LoadOrganizationProfileAsync(CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(OrganizationProfileId))
+        {
+            return null;
+        }
+
+        return await OrganizationProfile.Get(OrganizationProfileId, ct).ConfigureAwait(false);
     }
 }
 

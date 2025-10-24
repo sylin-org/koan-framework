@@ -67,7 +67,6 @@ public sealed class MeridianJobWorker : BackgroundService
                         var pipeline = await DocumentPipeline.Get(job.PipelineId, stoppingToken).ConfigureAwait(false);
                         if (pipeline is not null)
                         {
-                            pipeline.ProcessedDocuments = job.ProcessedDocuments;
                             pipeline.UpdatedAt = now;
                             if (job.Status == JobStatus.Failed)
                             {

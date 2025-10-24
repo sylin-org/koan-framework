@@ -13,7 +13,6 @@ public sealed class AnalysisType : Entity<AnalysisType>
     public string Instructions { get; set; } = string.Empty;
     public string OutputTemplate { get; set; } = string.Empty;
     public string JsonSchema { get; set; } = string.Empty;
-    public List<string> RequiredSourceTypes { get; set; } = new();
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;

@@ -56,8 +56,7 @@ public sealed class PipelineE2ETests
                 Name = "Test Analysis",
                 Description = "Integration test analysis",
                 Instructions = "Summarize financial metrics with supporting context.",
-                OutputTemplate = "# Test Report\n\nRevenue: {{revenue}}\nEmployees: {{employees}}",
-                RequiredSourceTypes = new List<string> { MeridianConstants.SourceTypes.AuditedFinancial }
+                OutputTemplate = "# Test Report\n\nRevenue: {{revenue}}\nEmployees: {{employees}}"
             };
             await analysisType.Save(ct);
 

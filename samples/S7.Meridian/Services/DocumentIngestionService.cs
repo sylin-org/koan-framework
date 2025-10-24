@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Koan.Data.Core;
@@ -49,7 +50,8 @@ public sealed class DocumentIngestionService : IDocumentIngestionService
                 continue;
             }
 
-            var document = await IngestInternalAsync(pipeline, file, ct).ConfigureAwait(false);
+            var document = await IngestInternalAsync(file, ct).ConfigureAwait(false);
+            _logger.LogInformation("Stored document {DocumentId} for pipeline {PipelineId}.", document.Id, pipeline.Id);
             savedDocuments.Add(document);
         }
 
@@ -58,12 +60,7 @@ public sealed class DocumentIngestionService : IDocumentIngestionService
             throw new InvalidOperationException("No valid files were provided for ingestion.");
         }
 
-        pipeline.TotalDocuments += savedDocuments.Count;
-        if (pipeline.Status == PipelineStatus.Pending)
-        {
-            pipeline.Status = PipelineStatus.Queued;
-        }
-
+        pipeline.AttachDocuments(savedDocuments.Select(d => d.Id));
         pipeline.UpdatedAt = DateTime.UtcNow;
         await pipeline.Save(ct).ConfigureAwait(false);
 
@@ -81,7 +78,7 @@ public sealed class DocumentIngestionService : IDocumentIngestionService
         return results[0];
     }
 
-    private async Task<SourceDocument> IngestInternalAsync(DocumentPipeline pipeline, IFormFile file, CancellationToken ct)
+    private async Task<SourceDocument> IngestInternalAsync(IFormFile file, CancellationToken ct)
     {
         await _validator.ValidateAsync(file, ct).ConfigureAwait(false);
 
@@ -90,7 +87,6 @@ public sealed class DocumentIngestionService : IDocumentIngestionService
 
         var document = new SourceDocument
         {
-            PipelineId = pipeline.Id,
             OriginalFileName = file.FileName,
             StorageKey = storageKey,
             SourceType = MeridianConstants.SourceTypes.Unclassified,
@@ -102,8 +98,6 @@ public sealed class DocumentIngestionService : IDocumentIngestionService
         };
 
         await document.Save(ct).ConfigureAwait(false);
-
-        _logger.LogInformation("Stored document {DocumentId} for pipeline {PipelineId}.", document.Id, pipeline.Id);
         return document;
     }
 }

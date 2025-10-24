@@ -87,71 +87,29 @@ export class AICreateTypeModal extends Modal {
       <div class="ai-create-form">
         <div class="form-section">
           <label class="form-label">
-            What do you want to ${this.typeCategory === 'analysis' ? 'analyze' : 'process'}?
+            Describe the analysis type you want to create
             <span class="required">*</span>
           </label>
           <textarea
-            name="goal"
+            name="prompt"
             class="form-input"
-            rows="3"
-            placeholder="${examples[0].goal}"
+            rows="4"
+            placeholder="${examples[0].prompt}"
             required
             autofocus
           ></textarea>
           <p class="form-help">
-            ${this.typeCategory === 'analysis'
-              ? 'Describe the analysis goal in 1-2 sentences. Be specific about what insights you need.'
-              : 'Describe what kind of source documents you want to process and what information to extract.'
-            }
+            Provide a single descriptive sentence or short paragraph. Example: "An Enterprise Architecture Review including ServiceNow ID, architect, recommendation status, and architecture domain assessments."
           </p>
-        </div>
-
-        <div class="form-section">
-          <label class="form-label">
-            Who is the audience?
-            <span class="required">*</span>
-          </label>
-          <input
-            type="text"
-            name="audience"
-            class="form-input"
-            placeholder="${examples[0].audience}"
-            required
-          />
-          <p class="form-help">
-            Who will use ${this.typeCategory === 'analysis' ? 'these insights' : 'this data'}? This helps tailor the output format.
-          </p>
-        </div>
-
-        <div class="form-section form-section-collapsible">
-          <button class="form-section-toggle" type="button" aria-expanded="false" data-action="toggle-context">
-            <svg class="icon-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polyline points="6 9 12 15 18 9"></polyline>
-            </svg>
-            Additional Context (optional)
-          </button>
-          <div class="form-section-content" hidden>
-            <textarea
-              name="additionalContext"
-              class="form-input"
-              rows="4"
-              placeholder="Any specific requirements, data formats, or constraints..."
-            ></textarea>
-            <p class="form-help">
-              Provide any additional context that will help the AI generate a more accurate type definition.
-            </p>
-          </div>
         </div>
 
         <div class="form-examples">
           <details>
-            <summary>Show Examples</summary>
+            <summary>Show Prompt Examples</summary>
             <div class="example-list">
               ${examples.map(ex => `
                 <div class="example-item">
-                  <strong>Goal:</strong> ${this.escapeHtml(ex.goal)}
-                  <br>
-                  <strong>Audience:</strong> ${this.escapeHtml(ex.audience)}
+                  <strong>Prompt:</strong> ${this.escapeHtml(ex.prompt)}
                 </div>
               `).join('')}
             </div>
@@ -167,35 +125,16 @@ export class AICreateTypeModal extends Modal {
   getExamples() {
     if (this.typeCategory === 'analysis') {
       return [
-        {
-          goal: 'Extract key financial metrics from quarterly earnings reports',
-          audience: 'Executive team and investors'
-        },
-        {
-          goal: 'Analyze contract terms to identify non-standard clauses and risks',
-          audience: 'Legal team and contract managers'
-        },
-        {
-          goal: 'Identify customer pain points and feature requests from support tickets',
-          audience: 'Product managers and customer success team'
-        }
-      ];
-    } else {
-      return [
-        {
-          goal: 'Process customer support tickets to extract issue category, priority, and sentiment',
-          audience: 'Customer support team'
-        },
-        {
-          goal: 'Extract structured data from invoices (vendor, amount, date, line items)',
-          audience: 'Accounting and finance team'
-        },
-        {
-          goal: 'Parse resumes to extract skills, experience, and education details',
-          audience: 'HR and recruiting team'
-        }
+        { prompt: 'An Enterprise Architecture Review including identifier, architect, stakeholders, recommendation, and domain assessments.' },
+        { prompt: 'A Market Analysis summarizing competitors, pricing tiers, differentiators, strategic opportunities, and risk factors.' },
+        { prompt: 'A Security Posture Assessment capturing asset inventory summary, key vulnerabilities, mitigation recommendations, and compliance mapping.' }
       ];
     }
+    return [
+      { prompt: 'A resume parsing template extracting candidate name, contact info, skills list, years experience, and education summary.' },
+      { prompt: 'An invoice extraction schema capturing supplier name, invoice number, amount, due date, and line item details.' },
+      { prompt: 'A support ticket schema with issue category, severity, sentiment, root cause summary, and resolution steps.' }
+    ];
   }
 
   /**
@@ -206,8 +145,8 @@ export class AICreateTypeModal extends Modal {
     const formData = this.getFormData();
 
     // Validate required fields
-    if (!formData.goal || !formData.audience) {
-      this.toast.error('Please fill in all required fields');
+    if (!formData.prompt) {
+      this.toast.error('Prompt is required');
       return;
     }
 
@@ -217,19 +156,14 @@ export class AICreateTypeModal extends Modal {
 
     try {
       // Call appropriate API method
-      const suggestion = this.typeCategory === 'analysis'
-        ? await this.api.suggestAnalysisType(
-            formData.goal,
-            formData.audience,
-            formData.additionalContext || ''
-          )
-        : await this.api.suggestSourceType(
-            formData.goal,
-            formData.audience,
-            formData.additionalContext || ''
-          );
+      const suggestionResponse = this.typeCategory === 'analysis'
+        ? await this.api.suggestAnalysisType(formData.prompt)
+        : await this.api.suggestSourceType(formData.prompt);
 
-      this.aiSuggestion = suggestion;
+      // New response shape: { draft: {...}, warnings: [...] }
+      const draft = suggestionResponse.draft || {};
+      this.aiSuggestion = draft;
+      this.aiWarnings = suggestionResponse.warnings || [];
 
       // Move to preview step
       this.currentStep = 3;
@@ -247,7 +181,7 @@ export class AICreateTypeModal extends Modal {
 
       // Restore form data
       setTimeout(() => {
-        this.setFormData(formData);
+    this.setFormData(formData);
         this.attachInputFormHandlers();
       }, 100);
     }
@@ -276,7 +210,7 @@ export class AICreateTypeModal extends Modal {
   renderPreview() {
     if (!this.aiSuggestion) return '';
 
-    const suggestion = this.aiSuggestion;
+    const suggestion = this.aiSuggestion; // draft object
 
     return `
       <div class="ai-preview">
@@ -309,11 +243,13 @@ export class AICreateTypeModal extends Modal {
           <p class="form-help">You can edit this description if needed.</p>
         </div>
 
-        ${suggestion.template || suggestion.schema ? `
+        ${suggestion.outputTemplate || suggestion.jsonSchema ? `
           <div class="form-section">
             <label class="form-label">Generated ${this.typeCategory === 'analysis' ? 'Template' : 'Schema'}</label>
             <div class="schema-preview">
-              <pre><code>${this.escapeHtml(JSON.stringify(suggestion.template || suggestion.schema, null, 2))}</code></pre>
+              <pre><code>${this.typeCategory === 'analysis'
+                ? this.escapeHtml(suggestion.outputTemplate || '')
+                : this.escapeHtml(JSON.stringify(suggestion.jsonSchema || {}, null, 2))}</code></pre>
             </div>
             <p class="form-help">
               This ${this.typeCategory === 'analysis' ? 'template' : 'schema'} defines the structure of extracted data. You can further customize it after creation.
@@ -321,7 +257,7 @@ export class AICreateTypeModal extends Modal {
           </div>
         ` : ''}
 
-        ${suggestion.prompt || suggestion.instructions ? `
+        ${(suggestion.instructions) ? `
           <div class="form-section">
             <label class="form-label">AI Instructions</label>
             <textarea
@@ -329,8 +265,16 @@ export class AICreateTypeModal extends Modal {
               class="form-input"
               rows="4"
               readonly
-            >${this.escapeHtml(suggestion.prompt || suggestion.instructions || '')}</textarea>
+            >${this.escapeHtml(suggestion.instructions || '')}</textarea>
             <p class="form-help">These instructions guide the AI during extraction.</p>
+          </div>
+        ` : ''}
+        ${this.aiWarnings && this.aiWarnings.length ? `
+          <div class="form-section">
+            <label class="form-label">Warnings</label>
+            <ul class="warnings-list">
+              ${this.aiWarnings.map(w => `<li>${this.escapeHtml(w)}</li>`).join('')}
+            </ul>
           </div>
         ` : ''}
       </div>
@@ -346,9 +290,13 @@ export class AICreateTypeModal extends Modal {
 
     // Merge with AI suggestion
     const typeData = {
-      ...this.aiSuggestion,
-      name: formData.name || this.aiSuggestion.name,
-      description: formData.description || this.aiSuggestion.description,
+      name: formData.name || this.aiSuggestion.name || '',
+      description: formData.description || this.aiSuggestion.description || '',
+      tags: this.aiSuggestion.tags || [],
+      descriptors: this.aiSuggestion.descriptors || [],
+      instructions: this.aiSuggestion.instructions || '',
+      outputTemplate: this.aiSuggestion.outputTemplate || '',
+      jsonSchema: this.aiSuggestion.jsonSchema || ''
     };
 
     try {

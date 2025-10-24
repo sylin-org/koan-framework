@@ -64,9 +64,7 @@ public sealed class PipelineProcessor : IPipelineProcessor
         job.TotalDocuments = job.DocumentIds.Count;
         job.ProcessedDocuments = 0;
         // Status already set to Processing by TryClaimAnyAsync, no need to save again
-
-        pipeline.TotalDocuments = job.TotalDocuments;
-        pipeline.ProcessedDocuments = 0;
+        pipeline.AttachDocuments(job.DocumentIds);
         pipeline.Status = PipelineStatus.Processing;
         pipeline.UpdatedAt = DateTime.UtcNow;
         await pipeline.Save(ct).ConfigureAwait(false);
@@ -76,6 +74,12 @@ public sealed class PipelineProcessor : IPipelineProcessor
         if (!string.IsNullOrWhiteSpace(pipeline.AuthoritativeNotes))
         {
             virtualDocumentId = await CreateVirtualDocumentFromNotesAsync(pipeline, ct);
+            if (!string.IsNullOrWhiteSpace(virtualDocumentId))
+            {
+                pipeline.AttachDocument(virtualDocumentId);
+                pipeline.UpdatedAt = DateTime.UtcNow;
+                await pipeline.Save(ct).ConfigureAwait(false);
+            }
             _logger.LogInformation(
                 "Created virtual document {VirtualDocId} from Authoritative Notes for pipeline {PipelineId}",
                 virtualDocumentId,
@@ -95,6 +99,10 @@ public sealed class PipelineProcessor : IPipelineProcessor
             {
                 _logger.LogWarning("Document {DocumentId} missing for pipeline {PipelineId}.", documentId, job.PipelineId);
                 processedCount++;
+                job.ProcessedDocuments = processedCount;
+                job.LastDocumentId = documentId;
+                job.HeartbeatAt = DateTime.UtcNow;
+                await job.Save(ct).ConfigureAwait(false);
                 continue;
             }
 
@@ -156,6 +164,10 @@ public sealed class PipelineProcessor : IPipelineProcessor
                 }, ct);
 
                 processedCount++;
+                job.ProcessedDocuments = processedCount;
+                job.LastDocumentId = document.Id;
+                job.HeartbeatAt = DateTime.UtcNow;
+                await job.Save(ct).ConfigureAwait(false);
                 continue;
             }
 
@@ -170,53 +182,6 @@ public sealed class PipelineProcessor : IPipelineProcessor
             document.ClassificationMethod = classification.Method;
             document.ClassificationReason = classification.Reason;
 
-            var allowed = pipeline.RequiredSourceTypes is null ||
-                          pipeline.RequiredSourceTypes.Count == 0 ||
-                          pipeline.RequiredSourceTypes.Any(type =>
-                              string.Equals(type, classification.TypeId, StringComparison.OrdinalIgnoreCase));
-
-            if (!allowed)
-            {
-                var requiredList = pipeline.RequiredSourceTypes is { Count: > 0 }
-                    ? string.Join(", ", pipeline.RequiredSourceTypes)
-                    : "(unspecified)";
-                var exclusionReason = $"Classified as {classification.TypeId}, but analysis '{pipeline.AnalysisTypeId}' requires [{requiredList}].";
-
-                _logger.LogWarning("Document {DocumentId} classified as {TypeId} but pipeline {PipelineId} requires [{Required}]; excluding from run.",
-                    document.Id, classification.TypeId, pipeline.Id, requiredList);
-
-                document.Status = DocumentProcessingStatus.Failed;
-                document.ClassificationReason = exclusionReason;
-                document.UpdatedAt = classifyFinished;
-                await document.Save(ct);
-
-                var metadata = new Dictionary<string, string>
-                {
-                    ["typeId"] = classification.TypeId,
-                    ["confidence"] = classification.Confidence.ToString("0.00"),
-                    ["method"] = classification.Method.ToString(),
-                    ["allowed"] = "false",
-                    ["requiredSourceTypes"] = requiredList
-                };
-
-                await _runLog.AppendAsync(new RunLog
-                {
-                    PipelineId = pipeline.Id,
-                    Stage = "classify",
-                    DocumentId = document.Id,
-                    FieldPath = null,
-                    StartedAt = classifyStarted,
-                    FinishedAt = classifyFinished,
-                    Status = "excluded",
-                    ModelId = classification.Method.ToString(),
-                    ErrorMessage = exclusionReason,
-                    Metadata = metadata
-                }, ct);
-
-                processedCount++;
-                continue;
-            }
-
             document.Status = DocumentProcessingStatus.Classified;
             document.UpdatedAt = classifyFinished;
             await document.Save(ct);
@@ -228,8 +193,7 @@ public sealed class PipelineProcessor : IPipelineProcessor
                 ["typeId"] = classification.TypeId,
                 ["confidence"] = classification.Confidence.ToString("0.00"),
                 ["method"] = classification.Method.ToString(),
-                ["reason"] = classification.Reason,
-                ["allowed"] = "true"
+                ["reason"] = classification.Reason
             };
 
             await _runLog.AppendAsync(new RunLog
@@ -253,9 +217,13 @@ public sealed class PipelineProcessor : IPipelineProcessor
             }
 
             processedCount++;
+            job.ProcessedDocuments = processedCount;
+            job.LastDocumentId = document.Id;
+            job.HeartbeatAt = DateTime.UtcNow;
+            await job.Save(ct).ConfigureAwait(false);
         }
 
-        await _indexer.IndexAsync(passages, ct);
+        await _indexer.IndexAsync(pipeline.Id, passages, ct);
 
         foreach (var docId in job.DocumentIds)
         {
@@ -273,11 +241,7 @@ public sealed class PipelineProcessor : IPipelineProcessor
             }
         }
 
-        pipeline.ProcessedDocuments = job.ProcessedDocuments;
-        pipeline.UpdatedAt = DateTime.UtcNow;
-        await pipeline.Save(ct);
-
-        var allPassages = await Passage.Query(p => p.PipelineId == pipeline.Id, ct);
+    var allPassages = await pipeline.LoadPassagesAsync(ct);
         var existingFields = (await ExtractedField.Query(e => e.PipelineId == pipeline.Id, ct).ConfigureAwait(false))
             .Select(field =>
             {
@@ -417,8 +381,7 @@ public sealed class PipelineProcessor : IPipelineProcessor
         await _merger.MergeAsync(pipeline, mergeCandidates, ct);
 
         var completedAt = DateTime.UtcNow;
-        pipeline.Status = PipelineStatus.Completed;
-        pipeline.ProcessedDocuments = pipeline.TotalDocuments;
+    pipeline.Status = PipelineStatus.Completed;
         pipeline.CompletedAt = completedAt;
         pipeline.UpdatedAt = completedAt;
         await pipeline.Save(ct).ConfigureAwait(false);
@@ -427,7 +390,7 @@ public sealed class PipelineProcessor : IPipelineProcessor
         job.Status = JobStatus.Completed;
         job.CompletedAt = completedAt;
         job.HeartbeatAt = completedAt;
-        job.ProcessedDocuments = job.TotalDocuments;
+    job.ProcessedDocuments = job.TotalDocuments;
         
         _logger.LogInformation("Archiving completed job {JobId} to completed-jobs partition", job.Id);
         await job.Save("completed-jobs", ct).ConfigureAwait(false);

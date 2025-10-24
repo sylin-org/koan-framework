@@ -1,4 +1,4 @@
-# S7.Meridian - Comprehensive Architectural Proposal (REVISED)
+﻿# S7.Meridian - Comprehensive Architectural Proposal (REVISED)
 
 **Evidence-Backed Narrative Document Generation System for Koan Framework**
 
@@ -1496,7 +1496,6 @@ public class PassageChunker : IPassageChunker
   - `Name`, `Description`, `Version`
   - `Tags[]`, `Descriptors[]`
   - `Instructions` (synthesis prompt), `OutputTemplate`
-  - `RequiredSourceTypes[]` (optional gating)
 - **Controller**: `AnalysisTypesController : EntityController<AnalysisType>`
 - **AI Assist**: `POST /api/analysistypes/ai-suggest`
   - Request: analysis brief (goal, audience, inputs).

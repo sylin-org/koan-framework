@@ -8,6 +8,8 @@ export class Toast {
     if (!this.container) {
       this.container = document.createElement('div');
       this.container.className = 'toast-container';
+      this.container.setAttribute('aria-live', 'assertive');
+      this.container.setAttribute('aria-atomic', 'true');
       document.body.appendChild(this.container);
     }
   }

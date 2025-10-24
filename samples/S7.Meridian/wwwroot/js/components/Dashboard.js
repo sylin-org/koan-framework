@@ -569,7 +569,7 @@ export class Dashboard {
           break;
         case 'open-analysis':
           if (pipelineId) {
-            this.eventBus.emit('navigate', 'analysis-workspace', { pipelineId });
+            this.eventBus.emit('navigate', 'analysis-view', { id: pipelineId });
           }
           break;
         case 'use-type':

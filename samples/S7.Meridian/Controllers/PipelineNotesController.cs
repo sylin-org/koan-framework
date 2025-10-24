@@ -86,11 +86,10 @@ public sealed class PipelineNotesController : ControllerBase
         if (request.ReProcess)
         {
             // Get all documents for this pipeline
-            var documents = await SourceDocument.Query(
-                d => d.PipelineId == pipelineId && !d.IsVirtual,
-                ct);
+            var documents = await pipeline.LoadDocumentsAsync(ct).ConfigureAwait(false);
 
             var documentIds = documents
+                .Where(d => !d.IsVirtual)
                 .Where(d => d.Status == DocumentProcessingStatus.Indexed ||
                            d.Status == DocumentProcessingStatus.Classified)
                 .Select(d => d.Id)
@@ -136,11 +135,10 @@ public sealed class PipelineNotesController : ControllerBase
 
         if (reProcess)
         {
-            var documents = await SourceDocument.Query(
-                d => d.PipelineId == pipelineId && !d.IsVirtual,
-                ct);
+            var documents = await pipeline.LoadDocumentsAsync(ct).ConfigureAwait(false);
 
             var documentIds = documents
+                .Where(d => !d.IsVirtual)
                 .Where(d => d.Status == DocumentProcessingStatus.Indexed ||
                            d.Status == DocumentProcessingStatus.Classified)
                 .Select(d => d.Id)

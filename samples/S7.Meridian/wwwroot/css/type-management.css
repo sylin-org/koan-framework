@@ -354,105 +354,9 @@
   display: flex;
   gap: 12px;
 }
-
-/* ==================== Bulk Actions Bar ==================== */
-.bulk-actions-bar {
-  position: fixed;
-  bottom: 24px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: none;
-  align-items: center;
-  gap: 16px;
-  padding: 12px 24px;
-  background: var(--color-text-primary);
-  color: white;
-  border-radius: 12px;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-  z-index: 100;
-  animation: slideUpBounce 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
-}
-
-@keyframes slideUpBounce {
-  from {
-    opacity: 0;
-    transform: translateX(-50%) translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(-50%) translateY(0);
-  }
-}
-
-.bulk-actions-bar.visible {
-  display: flex;
-}
-
-.bulk-selection-count {
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.bulk-actions-bar .btn {
-  background: rgba(255, 255, 255, 0.15);
-  color: white;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-}
-
-.bulk-actions-bar .btn:hover {
-  background: rgba(255, 255, 255, 0.25);
-}
-
-/* ==================== Type List/Grid Actions ==================== */
-.type-card-actions {
-  display: flex;
-  gap: 4px;
-}
-
-.type-card-action-btn {
-  width: 32px;
-  height: 32px;
-  border-radius: 6px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--color-text-secondary);
-  transition: all 0.2s ease;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-}
-
-.type-card-action-btn:hover {
-  background: var(--color-bg-hover);
-  color: var(--color-text-primary);
-}
-
-.type-card-action-btn.action-delete:hover {
-  background: rgba(220, 38, 38, 0.1);
-  color: var(--color-red);
 }
 
 /* ==================== Checkbox for Bulk Selection ==================== */
-.bulk-select-checkbox {
-  width: 20px;
-  height: 20px;
-  border: 2px solid var(--color-border-medium);
-  border-radius: 4px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  flex-shrink: 0;
-}
-
-.bulk-select-checkbox:hover {
-  border-color: var(--color-blue);
-}
-
-.bulk-select-checkbox:checked {
-  background: var(--color-blue);
-  border-color: var(--color-blue);
-}
-
 /* ==================== Loading State ==================== */
 .type-form-loading {
   display: flex;
@@ -562,16 +466,6 @@
     width: 100%;
   }
 
-  .bulk-actions-bar {
-    left: 16px;
-    right: 16px;
-    transform: none;
-    flex-direction: column;
-    gap: 12px;
-  }
-
-  .bulk-actions-bar .btn {
-    width: 100%;
   }
 }
 
@@ -713,34 +607,36 @@
 }
 
 /* ==================== Type Card ==================== */
+.type-card-link {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+}
+
+.type-card-link:hover {
+  text-decoration: none;
+}
+
+.type-card-link:focus-visible {
+  outline: 2px solid var(--color-blue);
+  outline-offset: 2px;
+  border-radius: 12px;
+}
+
 .type-card {
   background: var(--color-bg-secondary);
   border: 1px solid var(--color-border-subtle);
   border-radius: 12px;
   padding: 16px;
   transition: all 0.2s ease;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
 }
 
-.type-card:hover {
+.type-card-link:hover .type-card {
   border-color: var(--color-border-medium);
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
 }
 
-.type-card.selected {
-  border-color: var(--color-blue);
-  background: rgba(37, 99, 235, 0.02);
-}
-
-.type-card-select {
-  display: flex;
-  align-items: center;
-}
-
 .type-card-content {
-  flex: 1;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -773,13 +669,15 @@
 }
 
 .type-badge-analysis {
-  background: var(--color-blue-bg);
-  color: var(--color-blue);
+  background: rgba(91, 159, 255, 0.15);
+  color: var(--color-accent-primary);
+  border: 1px solid rgba(91, 159, 255, 0.3);
 }
 
 .type-badge-source {
-  background: rgba(139, 92, 246, 0.1);
-  color: rgb(139, 92, 246);
+  background: rgba(167, 139, 250, 0.15);
+  color: var(--color-accent-semantic);
+  border: 1px solid rgba(167, 139, 250, 0.3);
 }
 
 .type-card-description {
@@ -802,8 +700,9 @@
 .type-card-tag {
   padding: 3px 8px;
   font-size: 12px;
-  background: var(--color-gray-200);
+  background: rgba(255, 255, 255, 0.08);
   color: var(--color-text-secondary);
+  border: 1px solid var(--color-border-subtle);
   border-radius: 4px;
 }
 
@@ -830,7 +729,8 @@
 }
 
 .type-card-meta-item svg {
-  opacity: 0.7;
+  opacity: 0.6;
+  stroke: currentColor;
 }
 
 /* ==================== Empty State Actions ==================== */
@@ -898,8 +798,6 @@
 @media (prefers-reduced-motion: reduce) {
   .type-form-field-input,
   .type-form-tag-remove,
-  .type-card-action-btn,
-  .bulk-actions-bar,
   .type-form-dirty-dot,
   .type-card {
     transition: none;
@@ -908,8 +806,283 @@
 }
 
 .type-form-field-input:focus-visible,
-.type-form-tag-remove:focus-visible,
-.type-card-action-btn:focus-visible {
+.type-form-tag-remove:focus-visible {
   outline: 2px solid var(--color-blue);
   outline-offset: 2px;
+}
+
+/* ==================== Detail View (Full-Page Entity Display) ==================== */
+.detail-view {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  height: 100%;
+  background: var(--color-bg-base);
+  overflow: hidden;
+}
+
+.detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 24px;
+  background: var(--color-bg-secondary);
+  border-bottom: 1px solid var(--color-border-subtle);
+  flex-shrink: 0;
+  gap: 16px;
+}
+
+.detail-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+}
+
+.detail-header h1 {
+  font-size: 20px;
+  font-weight: 600;
+  margin: 0;
+  color: var(--color-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.detail-header-actions {
+  display: flex;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.detail-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 32px;
+}
+
+.detail-body::-webkit-scrollbar {
+  width: 12px;
+}
+
+.detail-body::-webkit-scrollbar-track {
+  background: var(--color-bg-secondary);
+}
+
+.detail-body::-webkit-scrollbar-thumb {
+  background: var(--color-border-medium);
+  border-radius: 6px;
+  border: 3px solid var(--color-bg-secondary);
+}
+
+.detail-body::-webkit-scrollbar-thumb:hover {
+  background: var(--color-border-dark);
+}
+
+.detail-section {
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 24px;
+}
+
+.detail-section h2 {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 20px 0;
+  color: var(--color-text-primary);
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.detail-section:last-child {
+  margin-bottom: 0;
+}
+
+/* ==================== Field Grid Layout ==================== */
+.field-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+}
+
+.field-grid.cols-2 {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+@media (max-width: 768px) {
+  .field-grid.cols-2 {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ==================== Form Field (Unified View/Edit) ==================== */
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form-field label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  display: block;
+}
+
+.form-field input[type="text"],
+.form-field input[type="number"],
+.form-field textarea,
+.form-field select {
+  width: 100%;
+  padding: 12px 16px;
+  border: 2px solid var(--color-border-medium);
+  border-radius: 8px;
+  font-size: 14px;
+  color: var(--color-text-primary);
+  background: var(--color-bg-base);
+  transition: all 0.2s ease;
+  font-family: inherit;
+  line-height: 1.5;
+}
+
+.form-field textarea {
+  min-height: 100px;
+  resize: vertical;
+}
+
+.form-field textarea.mono {
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.form-field input:focus,
+.form-field textarea:focus,
+.form-field select:focus {
+  border-color: var(--color-blue);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+/* ==================== Readonly Value Display ==================== */
+.readonly-value {
+  padding: 12px 0;
+  font-size: 14px;
+  color: var(--color-text-primary);
+  line-height: 1.6;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+}
+
+.readonly-value:empty::before {
+  content: '—';
+  color: var(--color-text-tertiary);
+}
+
+.readonly-value pre {
+  margin: 0;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.readonly-value .template-preview,
+.readonly-value .schema-preview {
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 8px;
+  padding: 16px;
+  margin: 0;
+  overflow-x: auto;
+}
+
+.readonly-value .template-preview code,
+.readonly-value .schema-preview code {
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--color-text-primary);
+}
+
+.readonly-value .instructions-text {
+  white-space: pre-wrap;
+  line-height: 1.8;
+}
+
+.readonly-value .chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.readonly-value .chip {
+  padding: 4px 12px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.readonly-value .empty {
+  color: var(--color-text-tertiary);
+  font-style: italic;
+}
+
+/* ==================== Key-Value Display ==================== */
+.kv-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.kv-grid > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.kv-label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--color-text-secondary);
+}
+
+.kv-value {
+  font-size: 14px;
+  color: var(--color-text-primary);
+}
+
+/* ==================== Responsive Detail View ==================== */
+@media (max-width: 768px) {
+  .detail-body {
+    padding: 16px;
+  }
+
+  .detail-section {
+    padding: 16px;
+  }
+
+  .detail-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .detail-header-actions {
+    width: 100%;
+  }
+
+  .detail-header-actions .btn {
+    flex: 1;
+  }
 }

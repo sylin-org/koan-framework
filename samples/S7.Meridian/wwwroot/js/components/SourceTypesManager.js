@@ -23,7 +23,6 @@ export class SourceTypesManager {
     this.router = router;
     this.types = [];
     this.filteredTypes = [];
-    this.selectedIds = new Set();
     this.searchQuery = '';
     this.sortBy = 'name';
     this.sortDirection = 'asc';
@@ -53,7 +52,6 @@ export class SourceTypesManager {
         ${this.renderHeader()}
         ${this.renderToolbar()}
         ${this.renderTypesList()}
-        ${this.renderBulkActionsBar()}
       </div>
     `;
   }
@@ -102,7 +100,6 @@ export class SourceTypesManager {
         ${this.searchFilter.render()}
         <div class="types-manager-stats">
           <span class="stat-badge">${this.filteredTypes.length} ${this.filteredTypes.length === 1 ? 'type' : 'types'}</span>
-          ${this.selectedIds.size > 0 ? `<span class="stat-badge stat-selected">${this.selectedIds.size} selected</span>` : ''}
         </div>
       </div>
     `;
@@ -136,85 +133,40 @@ export class SourceTypesManager {
    * Render a single type card
    */
   renderTypeCard(type) {
-    const isSelected = this.selectedIds.has(type.id);
-
     return `
-      <div class="type-card card-lift ${isSelected ? 'selected' : ''}" data-type-id="${type.id}">
-        <div class="type-card-select">
-          <input
-            type="checkbox"
-            class="bulk-select-checkbox"
-            ${isSelected ? 'checked' : ''}
-            data-checkbox="${type.id}"
-          />
-        </div>
-
-        <div class="type-card-content">
-          <div class="type-card-header">
-            <h3 class="type-card-name">${this.escapeHtml(type.name)}</h3>
-            <span class="type-badge type-badge-source">Source</span>
-          </div>
-
-          <p class="type-card-description">
-            ${this.escapeHtml(type.description || 'No description provided')}
-          </p>
-
-          ${type.tags && type.tags.length > 0 ? `
-            <div class="type-card-tags">
-              ${type.tags.slice(0, 3).map(tag => `
-                <span class="type-card-tag">${this.escapeHtml(tag)}</span>
-              `).join('')}
-              ${type.tags.length > 3 ? `<span class="type-card-tag-more">+${type.tags.length - 3} more</span>` : ''}
+      <a href="#/source-types/${type.id}/view" class="type-card-link">
+        <div class="type-card card-lift" data-type-id="${type.id}">
+          <div class="type-card-content">
+            <div class="type-card-header">
+              <h3 class="type-card-name">${this.escapeHtml(type.name)}</h3>
+              <span class="type-badge type-badge-source">Source</span>
             </div>
-          ` : ''}
 
-          <div class="type-card-meta">
-            <span class="type-card-meta-item">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                <polyline points="14 2 14 8 20 8"></polyline>
-              </svg>
-              ${type.usageCount || 0} documents
-            </span>
+            <p class="type-card-description">
+              ${this.escapeHtml(type.description || 'No description provided')}
+            </p>
+
+            ${type.tags && type.tags.length > 0 ? `
+              <div class="type-card-tags">
+                ${type.tags.slice(0, 3).map(tag => `
+                  <span class="type-card-tag">${this.escapeHtml(tag)}</span>
+                `).join('')}
+                ${type.tags.length > 3 ? `<span class="type-card-tag-more">+${type.tags.length - 3} more</span>` : ''}
+              </div>
+            ` : ''}
+
+            <div class="type-card-meta">
+              <span class="type-card-meta-item">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                  <polyline points="14 2 14 8 20 8"></polyline>
+                </svg>
+                ${type.usageCount || 0} documents
+              </span>
+            </div>
           </div>
         </div>
-
-        <div class="type-card-actions">
-          <button
-            class="type-card-action-btn btn-press"
-            title="View"
-            data-action="view"
-            data-id="${type.id}"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-              <circle cx="12" cy="12" r="3"></circle>
-            </svg>
-          </button>
-          <button
-            class="type-card-action-btn btn-press"
-            title="Edit"
-            data-action="edit"
-            data-id="${type.id}"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-            </svg>
-          </button>
-          <button
-            class="type-card-action-btn action-delete btn-press"
-            title="Delete"
-            data-action="delete"
-            data-id="${type.id}"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polyline points="3 6 5 6 21 6"></polyline>
-              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-            </svg>
-          </button>
-        </div>
-      </div>
+      </a>
     `;
   }
 
@@ -230,29 +182,6 @@ export class SourceTypesManager {
    */
   renderNoResults() {
     return EmptyState.forSearchResults();
-  }
-
-  /**
-   * Render bulk actions bar
-   */
-  renderBulkActionsBar() {
-    return `
-      <div class="bulk-actions-bar ${this.selectedIds.size > 0 ? 'visible' : ''}" data-bulk-bar>
-        <span class="bulk-selection-count">
-          ${this.selectedIds.size} ${this.selectedIds.size === 1 ? 'type' : 'types'} selected
-        </span>
-        <button class="btn" data-action="deselect-all">
-          Deselect All
-        </button>
-        <button class="btn" data-action="bulk-delete">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="3 6 5 6 21 6"></polyline>
-            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-          </svg>
-          Delete Selected
-        </button>
-      </div>
-    `;
   }
 
   /**
@@ -353,61 +282,7 @@ export class SourceTypesManager {
     };
     this.eventBus.on('search-filter-changed', searchFilterHandler);
 
-    // Bulk selection checkboxes
-    const checkboxes = container.querySelectorAll('[data-checkbox]');
-    checkboxes.forEach(checkbox => {
-      checkbox.addEventListener('change', (e) => {
-        const typeId = checkbox.getAttribute('data-checkbox');
-        if (e.target.checked) {
-          this.selectedIds.add(typeId);
-        } else {
-          this.selectedIds.delete(typeId);
-        }
-        this.updateBulkActionsBar(container);
-        this.updateCardSelection(container, typeId);
-      });
-    });
-
-    // Card actions
-    const viewBtns = container.querySelectorAll('[data-action="view"]');
-    viewBtns.forEach(btn => {
-      btn.addEventListener('click', () => {
-        const id = btn.getAttribute('data-id');
-        this.navigateToView(id);
-      });
-    });
-
-    const editBtns = container.querySelectorAll('[data-action="edit"]');
-    editBtns.forEach(btn => {
-      btn.addEventListener('click', () => {
-        const id = btn.getAttribute('data-id');
-        this.navigateToEdit(id);
-      });
-    });
-
-    const deleteBtns = container.querySelectorAll('[data-action="delete"]');
-    deleteBtns.forEach(btn => {
-      btn.addEventListener('click', () => {
-        const id = btn.getAttribute('data-id');
-        this.deleteType(id);
-      });
-    });
-
-    // Bulk actions
-    const deselectAllBtn = container.querySelector('[data-action="deselect-all"]');
-    if (deselectAllBtn) {
-      deselectAllBtn.addEventListener('click', () => {
-        this.selectedIds.clear();
-        this.updateView(container);
-      });
-    }
-
-    const bulkDeleteBtn = container.querySelector('[data-action="bulk-delete"]');
-    if (bulkDeleteBtn) {
-      bulkDeleteBtn.addEventListener('click', () => {
-        this.bulkDeleteTypes();
-      });
-    }
+    // No card action buttons - cards are now fully clickable links
   }
 
   /**
@@ -421,78 +296,9 @@ export class SourceTypesManager {
       ${this.renderHeader()}
       ${this.renderToolbar()}
       ${this.renderTypesList()}
-      ${this.renderBulkActionsBar()}
     `;
 
     this.attachEventHandlers(container);
-  }
-
-  /**
-   * Update bulk actions bar visibility
-   */
-  updateBulkActionsBar(container) {
-    const bulkBar = container.querySelector('[data-bulk-bar]');
-    if (!bulkBar) return;
-
-    if (this.selectedIds.size > 0) {
-      bulkBar.classList.add('visible');
-      bulkBar.innerHTML = `
-        <span class="bulk-selection-count">
-          ${this.selectedIds.size} ${this.selectedIds.size === 1 ? 'type' : 'types'} selected
-        </span>
-        <button class="btn" data-action="deselect-all">
-          Deselect All
-        </button>
-        <button class="btn" data-action="bulk-delete">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="3 6 5 6 21 6"></polyline>
-            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-          </svg>
-          Delete Selected
-        </button>
-      `;
-    } else {
-      bulkBar.classList.remove('visible');
-    }
-
-    // Re-attach bulk action handlers
-    const deselectAllBtn = bulkBar.querySelector('[data-action="deselect-all"]');
-    if (deselectAllBtn) {
-      deselectAllBtn.addEventListener('click', () => {
-        this.selectedIds.clear();
-        this.updateView(container.closest('.types-manager').parentElement);
-      });
-    }
-
-    const bulkDeleteBtn = bulkBar.querySelector('[data-action="bulk-delete"]');
-    if (bulkDeleteBtn) {
-      bulkDeleteBtn.addEventListener('click', () => {
-        this.bulkDeleteTypes();
-      });
-    }
-
-    // Update stats in toolbar
-    const statsContainer = container.querySelector('.types-manager-stats');
-    if (statsContainer) {
-      statsContainer.innerHTML = `
-        <span class="stat-badge">${this.filteredTypes.length} ${this.filteredTypes.length === 1 ? 'type' : 'types'}</span>
-        ${this.selectedIds.size > 0 ? `<span class="stat-badge stat-selected">${this.selectedIds.size} selected</span>` : ''}
-      `;
-    }
-  }
-
-  /**
-   * Update card selection styling
-   */
-  updateCardSelection(container, typeId) {
-    const card = container.querySelector(`[data-type-id="${typeId}"]`);
-    if (!card) return;
-
-    if (this.selectedIds.has(typeId)) {
-      card.classList.add('selected');
-    } else {
-      card.classList.remove('selected');
-    }
   }
 
   /**
@@ -511,7 +317,6 @@ export class SourceTypesManager {
 
       // Remove from local state
       this.types = this.types.filter(t => t.id !== id);
-      this.selectedIds.delete(id);
       this.applyFilters();
 
       // Refresh view
@@ -521,36 +326,6 @@ export class SourceTypesManager {
     } catch (error) {
       console.error('Failed to delete type:', error);
       this.toast.error('Failed to delete type');
-    }
-  }
-
-  /**
-   * Bulk delete selected types
-   */
-  async bulkDeleteTypes() {
-    if (this.selectedIds.size === 0) return;
-
-    const confirmed = confirm(
-      `Are you sure you want to delete ${this.selectedIds.size} ${this.selectedIds.size === 1 ? 'type' : 'types'}? This action cannot be undone.`
-    );
-    if (!confirmed) return;
-
-    try {
-      await this.api.bulkDeleteSourceTypes(Array.from(this.selectedIds));
-      this.toast.success(`${this.selectedIds.size} ${this.selectedIds.size === 1 ? 'type' : 'types'} deleted successfully`);
-
-      // Remove from local state
-      this.types = this.types.filter(t => !this.selectedIds.has(t.id));
-      this.selectedIds.clear();
-      this.applyFilters();
-
-      // Refresh view
-      const container = document.querySelector('#app');
-      if (container) this.updateView(container);
-
-    } catch (error) {
-      console.error('Failed to bulk delete types:', error);
-      this.toast.error('Failed to delete types');
     }
   }
 
@@ -591,17 +366,45 @@ export class SourceTypesManager {
   }
 
   /**
-   * Navigate to view mode
+   * Open type in detail panel (view mode)
    */
   navigateToView(id) {
-    this.eventBus.emit('navigate', 'source-type-view', { id });
+    // Route-based full-page view
+    this.eventBus.emit('navigate', `source-type-view:${id}`);
   }
 
   /**
-   * Navigate to edit mode
+   * Open type in detail panel (edit mode)
    */
   navigateToEdit(id) {
-    this.eventBus.emit('navigate', 'source-type-edit', { id });
+    // Route-based full-page edit
+    this.eventBus.emit('navigate', `source-type-edit:${id}`);
+  }
+
+  /**
+   * Format date for display
+   */
+  formatDate(dateString) {
+    if (!dateString) return 'N/A';
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return 'Invalid date';
+    
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+    
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    
+    return date.toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: 'short', 
+      day: 'numeric' 
+    });
   }
 
   /**

@@ -55,9 +55,6 @@ public sealed class DocumentPipelineAnalysisTypeHook : IModelHook<DocumentPipeli
         model.AnalysisTags = analysisType.Tags is { Count: > 0 }
             ? new List<string>(analysisType.Tags)
             : new List<string>();
-        model.RequiredSourceTypes = analysisType.RequiredSourceTypes is { Count: > 0 }
-            ? new List<string>(analysisType.RequiredSourceTypes)
-            : new List<string>();
 
         // DeliverableType (optional but preferred)
         DeliverableType? deliverableType = null;

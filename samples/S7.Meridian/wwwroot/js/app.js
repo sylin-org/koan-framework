@@ -8,16 +8,21 @@ import { API } from './api.js';
 import { EventBus } from './utils/EventBus.js';
 import { StateManager } from './utils/StateManager.js';
 import { Router } from './utils/Router.js';
+import { Sidebar } from './components/Sidebar.js';
 import { Toast } from './components/Toast.js';
 import { TopNav } from './components/TopNav.js';
 import { Dashboard } from './components/Dashboard.js';
 import { InsightsPanel } from './components/InsightsPanel.js';
 import { TypeFormView } from './components/TypeFormView.js';
 import { AnalysisTypesManager } from './components/AnalysisTypesManager.js';
+import { AnalysisTypeDetailView } from './components/AnalysisTypeDetailView.js';
+import { AnalysisDetailView } from './components/AnalysisDetailView.js';
 import { SourceTypesManager } from './components/SourceTypesManager.js';
+import { SourceTypeDetailView } from './components/SourceTypeDetailView.js';
 import { SettingsSidebar } from './components/SettingsSidebar.js';
 import { KeyboardShortcuts } from './components/KeyboardShortcuts.js';
 import { PageHeader } from './components/PageHeader.js';
+import { DetailPanel } from './components/DetailPanel.js';
 
 class MeridianApp {
   constructor() {
@@ -36,31 +41,78 @@ class MeridianApp {
       notesExpanded: false,
     });
     this.toast = new Toast();
+    this.appRoot = null;
+    this.mainHost = null;
 
     // Initialize components
+    this.sidebar = new Sidebar(this.router, this.eventBus);
+    this.detailPanel = new DetailPanel(this.eventBus);
     this.topNav = new TopNav(this.router, this.eventBus);
-    this.settingsSidebar = new SettingsSidebar(this.eventBus, this.router);
+    // Legacy detail panel removed; full-page routes handle view/edit.
     this.keyboardShortcuts = new KeyboardShortcuts(this.eventBus, this.router);
     this.dashboard = new Dashboard(this.api, this.stateManager, this.eventBus);
     this.insightsPanel = new InsightsPanel(this.api, this.stateManager);
     this.analysisTypesManager = new AnalysisTypesManager(this.api, this.eventBus, this.toast, this.router);
+    this.analysisTypeDetailView = new AnalysisTypeDetailView(this.api, this.eventBus, this.router, this.toast);
+    this.analysisDetailView = new AnalysisDetailView(this.api, this.eventBus, this.router, this.toast);
     this.sourceTypesManager = new SourceTypesManager(this.api, this.eventBus, this.toast, this.router);
-
+    this.sourceTypeDetailView = new SourceTypeDetailView(this.api, this.eventBus, this.toast);
     // Component state
     this.state = this.stateManager.state;
+
+    this.setupDetailPanelEvents();
 
     // Setup routes
     this.setupRoutes();
   }
 
+  renderAppShell() {
+    this.appRoot = document.getElementById('app');
+    if (!this.appRoot) {
+      console.error('App root container not found');
+      return;
+    }
+
+    this.appRoot.innerHTML = `
+      <div class="app-layout">
+        <aside id="app-sidebar" class="app-sidebar" role="navigation" aria-label="Primary navigation"></aside>
+        <div class="app-shell">
+          ${this.topNav.render()}
+          <div class="app-main">
+            <main id="app-main" class="app-main-content" tabindex="-1">
+              <div class="app-loading">
+                <svg class="spinner icon-spin" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"></circle>
+                </svg>
+                <p>Loading Meridian...</p>
+              </div>
+            </main>
+          </div>
+        </div>
+      </div>
+    `;
+
+    this.topNav.attachEventHandlers(this.appRoot);
+
+    const sidebarHost = this.appRoot.querySelector('#app-sidebar');
+    this.sidebar.mount(sidebarHost);
+
+    this.mainHost = this.appRoot.querySelector('#app-main');
+  }
+
   async init() {
     console.log('[Meridian] Initializing...');
+
+    this.renderAppShell();
 
     // Initialize keyboard shortcuts
     this.keyboardShortcuts.init();
 
     // Setup navigation event listeners
     this.setupNavigation();
+
+    // Load initial badge counts
+    this.updateSidebarBadges();
 
     // Start router (this will load the initial route from URL)
     this.router.start((path, params) => {
@@ -73,6 +125,27 @@ class MeridianApp {
   }
 
   /**
+   * Update sidebar badge counts from API
+   */
+  async updateSidebarBadges() {
+    try {
+      const [pipelines, analysisTypes, sourceTypes] = await Promise.all([
+        this.api.getPipelines(),
+        this.api.getAnalysisTypes(),
+        this.api.getSourceTypes()
+      ]);
+
+      this.eventBus.emit('sidebar:update-badges', {
+        'all-analyses': pipelines.length,
+        'analysis-types': analysisTypes.length,
+        'source-types': sourceTypes.length
+      });
+    } catch (error) {
+      console.error('Failed to update sidebar badges:', error);
+    }
+  }
+
+  /**
    * Setup all application routes
    */
   setupRoutes() {
@@ -82,6 +155,9 @@ class MeridianApp {
 
     // Analyses
     this.router.route('analyses', (params) => this.navigate('analyses-list', params));
+    this.router.route('analyses/create', (params) => this.navigate('analysis-create', params));
+    this.router.route('analyses/:id/view', (params) => this.navigate('analysis-view', params));
+    this.router.route('analyses/:id/edit', (params) => this.navigate('analysis-edit', params));
     this.router.route('analyses/:pipelineId', (params) => this.navigate('analysis-workspace', params));
 
     // Analysis Types
@@ -113,6 +189,24 @@ class MeridianApp {
       this.router.navigate(routePath, params);
     });
 
+    this.eventBus.on('toggle-sidebar', () => {
+      if (this.sidebar.isOpen()) {
+        this.sidebar.close();
+      } else {
+        this.sidebar.open();
+      }
+    });
+
+    this.eventBus.on('close-sidebar', () => {
+      this.sidebar.close();
+    });
+
+    this.eventBus.on('escape-pressed', () => {
+      if (this.sidebar.isOpen()) {
+        this.sidebar.close();
+      }
+    });
+
     // Listen for favorites changes
     this.eventBus.on('favorites-changed', () => {
       if (this.state.currentView === 'dashboard') {
@@ -137,6 +231,30 @@ class MeridianApp {
     });
   }
 
+  setupDetailPanelEvents() {
+    // Redirect to workspace route for full-page experience instead of opening panel
+    this.eventBus.on('detail-panel:open-workspace', (pipelineId) => {
+      if (!pipelineId) {
+        return;
+      }
+      this.router.navigate(`analyses/${pipelineId}`);
+    });
+
+    this.eventBus.on('detail-panel:saved', () => {
+      if (this.state.currentView === 'analyses-list') {
+        this.updateSidebarPipelineBadges(this.state.pipelines);
+      }
+    });
+
+    this.eventBus.on('detail-panel:deleted', (pipelineId) => {
+      this.updateSidebarPipelineBadges(this.state.pipelines);
+
+      if (pipelineId && this.state.currentView === 'analysis-workspace' && this.state.currentPipelineId === pipelineId) {
+        this.eventBus.emit('navigate', 'analyses-list');
+      }
+    });
+  }
+
   /**
    * Convert view name to router path
    * @param {string} view - View name
@@ -148,6 +266,9 @@ class MeridianApp {
     const viewToPath = {
       'dashboard': '',
       'analyses-list': 'analyses',
+      'analysis-create': 'analyses/create',
+      'analysis-view': params.id ? `analyses/${params.id}/view` : 'analyses',
+      'analysis-edit': params.id ? `analyses/${params.id}/edit` : 'analyses',
       'analysis-workspace': params.pipelineId ? `analyses/${params.pipelineId}` : 'analyses',
       'analysis-types-list': 'analysis-types',
       'analysis-type-view': params.id ? `analysis-types/${params.id}/view` : 'analysis-types',
@@ -172,17 +293,19 @@ class MeridianApp {
    * @param {string} content - Page content HTML
    */
   renderWithNav(container, content) {
-    container.innerHTML = `
-      <div class="app-with-nav">
-        ${this.topNav.render()}
-        <div class="app-content">
-          ${content}
-        </div>
+    const host = this.mainHost || document.getElementById('app-main');
+    if (!host) {
+      console.error('Main content host not found');
+      return null;
+    }
+
+    host.innerHTML = `
+      <div class="app-content">
+        ${content}
       </div>
     `;
 
-    // Attach TopNav event handlers
-    this.topNav.attachEventHandlers(container);
+    return host.querySelector('.app-content');
   }
 
   /**
@@ -195,7 +318,7 @@ class MeridianApp {
 
     this.state.currentView = view;
 
-    const appContainer = document.getElementById('app');
+    const appContainer = this.appRoot || document.getElementById('app');
     if (!appContainer) {
       console.error('App container not found');
       return;
@@ -219,8 +342,29 @@ class MeridianApp {
           }
           break;
 
+        case 'analysis-create':
+          await this.renderAnalysisCreate(appContainer);
+          break;
+
+        case 'analysis-view':
+          if (params.id) {
+            await this.renderAnalysisView(appContainer, params.id);
+          } else {
+            this.toast.error('No analysis ID provided');
+          }
+          break;
+
+        case 'analysis-edit':
+          if (params.id) {
+            await this.renderAnalysisEdit(appContainer, params.id);
+          } else {
+            this.toast.error('No analysis ID provided');
+          }
+          break;
+
         case 'new-analysis':
-          await this.createAnalysis(params.typeId);
+          // Redirect to new analysis create route
+          await this.navigate('analysis-create', params);
           break;
 
         case 'new-type':
@@ -279,7 +423,7 @@ class MeridianApp {
 
         case 'source-type-edit':
           if (params.id) {
-            await this.renderSourceTypeForm(appContainer, 'edit', params.id);
+            await this.renderSourceTypeEdit(appContainer, params.id);
           } else {
             this.toast.error('No type ID provided');
           }
@@ -292,6 +436,11 @@ class MeridianApp {
 
       // Update top nav active state after navigation
       this.topNav.updateActiveState();
+      this.sidebar.setActiveByView(view);
+
+      if (window.matchMedia('(max-width: 1024px)').matches) {
+        this.sidebar.close();
+      }
     } catch (error) {
       console.error(`Failed to navigate to ${view}:`, error);
       this.toast.error(`Failed to load view: ${view}`);
@@ -303,10 +452,9 @@ class MeridianApp {
    */
   async renderDashboard(container) {
     const html = await this.dashboard.render();
-    this.renderWithNav(container, html);
+    const contentArea = this.renderWithNav(container, html);
+    if (!contentArea) return;
 
-    // Attach event handlers (in app-content area)
-    const contentArea = container.querySelector('.app-content');
     this.dashboard.attachEventHandlers(contentArea);
   }
 
@@ -317,6 +465,8 @@ class MeridianApp {
     try {
       const pipelines = await this.api.getPipelines();
       this.state.pipelines = pipelines || [];
+
+  this.updateSidebarPipelineBadges(this.state.pipelines);
 
       // Create PageHeader instance
       const pageHeader = new PageHeader(this.router, this.eventBus);
@@ -352,10 +502,10 @@ class MeridianApp {
         </div>
       `;
 
-      this.renderWithNav(container, html);
-
-      // Attach event handlers (in app-content area)
-      const contentArea = container.querySelector('.app-content');
+      const contentArea = this.renderWithNav(container, html);
+      if (!contentArea) {
+        return;
+      }
 
       // Attach PageHeader handlers
       pageHeader.attachEventHandlers(contentArea);
@@ -368,12 +518,7 @@ class MeridianApp {
       };
       this.eventBus.on('page-header-action', headerActionHandler);
 
-      const pipelineCards = contentArea.querySelectorAll('[data-pipeline-id]');
-      pipelineCards.forEach(card => {
-        card.addEventListener('click', () => {
-          this.eventBus.emit('navigate', 'analysis-workspace', { pipelineId: card.dataset.pipelineId });
-        });
-      });
+      // No action buttons or event handlers on analysis cards - cards are now fully clickable links to detail view
 
     } catch (error) {
       console.error('Failed to render analyses list:', error);
@@ -403,19 +548,27 @@ class MeridianApp {
       const id = pipeline.id || pipeline.Id;
       const typeName = pipeline.analysisType?.name || 'Unknown Type';
       const docCount = pipeline.documentCount || 0;
-      const status = pipeline.status || 'Unknown';
+      const statusValue = pipeline.status || pipeline.Status || 'Unknown';
+      const statusClass = statusValue.toString().toLowerCase().replace(/[^a-z0-9]+/g, '-');
+      const updatedAt = pipeline.updatedAt || pipeline.UpdatedAt || pipeline.lastUpdated || pipeline.LastUpdated;
+      const updatedLabel = this.formatRelativeDate(updatedAt);
 
       return `
-        <div class="analysis-card" data-pipeline-id="${id}">
-          <div class="analysis-card-header">
-            <h3 class="analysis-card-title">${this.escapeHtml(name)}</h3>
-            <span class="badge badge-${status.toLowerCase()}">${status}</span>
+        <a href="#/analyses/${id}/view" class="analysis-card-link">
+          <div class="analysis-card" data-pipeline-id="${id}">
+            <div class="analysis-card-header">
+              <h3 class="analysis-card-title">${this.escapeHtml(name)}</h3>
+              <span class="badge badge-${statusClass}">${this.escapeHtml(statusValue)}</span>
+            </div>
+            <p class="analysis-card-type">${this.escapeHtml(typeName)}</p>
+            <div class="analysis-card-stats">
+              <span>${docCount} ${docCount === 1 ? 'document' : 'documents'}</span>
+            </div>
+            <div class="analysis-card-meta">
+              <span>${updatedLabel}</span>
+            </div>
           </div>
-          <p class="analysis-card-type">${this.escapeHtml(typeName)}</p>
-          <div class="analysis-card-stats">
-            <span>${docCount} ${docCount === 1 ? 'document' : 'documents'}</span>
-          </div>
-        </div>
+        </a>
       `;
     }).join('');
   }
@@ -455,10 +608,10 @@ class MeridianApp {
         </div>
       `;
 
-      this.renderWithNav(container, html);
-
-      // Attach event handlers
-      const contentArea = container.querySelector('.app-content');
+      const contentArea = this.renderWithNav(container, html);
+      if (!contentArea) {
+        return;
+      }
 
       contentArea.querySelector('[data-action="new-type"]')?.addEventListener('click', () => {
         this.navigate('new-type');
@@ -604,12 +757,6 @@ class MeridianApp {
             <div class="workspace-metadata">Updated recently</div>
           </div>
           <div class="workspace-actions">
-            <button class="btn btn-secondary btn-press" data-action="toggle-notes">
-              <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
-              </svg>
-              Notes
-            </button>
             <button class="btn btn-secondary btn-press" data-action="export">
               <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
@@ -621,8 +768,8 @@ class MeridianApp {
           </div>
         </div>
 
-        <!-- Authoritative Notes Section (Collapsible) -->
-        <div class="authoritative-notes-section" data-state="collapsed">
+        <!-- Authoritative Notes Section -->
+        <div class="authoritative-notes-section" data-state="expanded">
           ${this.renderNotesSection()}
         </div>
 
@@ -651,10 +798,9 @@ class MeridianApp {
       </div>
     `;
 
-    this.renderWithNav(container, html);
+    const contentArea = this.renderWithNav(container, html);
+    if (!contentArea) return;
 
-    // Attach event handlers
-    const contentArea = container.querySelector('.app-content');
     this.attachWorkspaceEventHandlers(contentArea);
   }
 
@@ -801,11 +947,6 @@ EMPLOYEE COUNT: 175 employees as of October 2024">${this.escapeHtml(notes)}</tex
    * Attach workspace event handlers
    */
   attachWorkspaceEventHandlers(container) {
-    // Toggle notes
-    container.querySelector('[data-action="toggle-notes"]')?.addEventListener('click', () => {
-      this.toggleNotes();
-    });
-
     // Export
     container.querySelector('[data-action="export"]')?.addEventListener('click', () => {
       this.exportReport();
@@ -1029,27 +1170,74 @@ EMPLOYEE COUNT: 175 employees as of October 2024">${this.escapeHtml(notes)}</tex
    * Create type with AI
    */
   async createTypeWithAI() {
-    const goal = prompt('What do you want to analyze?');
-    if (!goal) return;
+    const promptText = prompt('Describe the analysis type you want (e.g., "An Enterprise Architecture Review with ServiceNow ID, architect, recommendation status")');
+    if (!promptText) return;
 
-    const audience = prompt('Who is the audience?');
-    if (!audience) return;
-
-    this.toast.info('AI is generating type...');
+    this.toast.info('AI is generating and saving type...');
 
     try {
-      const suggestedType = await this.api.suggestAnalysisType(goal, audience);
-
-      const confirm = window.confirm(`AI suggests:\n\nName: ${suggestedType.name}\n\nDescription: ${suggestedType.description}\n\nCreate this type?`);
-
-      if (confirm) {
-        await this.api.createAnalysisType(suggestedType);
-        this.toast.success('Type created with AI');
-        await this.navigate('manage-types');
-      }
+      const createdType = await this.api.createAnalysisTypeWithAI(promptText);
+      this.toast.success(`Created: ${createdType.name}`);
+      // Redirect to edit the newly created type
+      await this.navigate(`analysis-types/${createdType.id}/edit`);
     } catch (error) {
       console.error('Failed to create type with AI:', error);
       this.toast.error('Failed to create type with AI');
+    }
+  }
+
+  /**
+   * Render Analysis Create
+   */
+  async renderAnalysisCreate(container) {
+    try {
+      await this.analysisDetailView.initCreate();
+      const html = this.analysisDetailView.render();
+      const contentArea = this.renderWithNav(container, html);
+      if (!contentArea) return;
+      this.analysisDetailView.attachEventHandlers(contentArea);
+    } catch (err) {
+      const html = `<div class="error-state"><h2>Failed to initialize create form</h2><p>${this.escapeHtml(err.message)}</p></div>`;
+      this.renderWithNav(container, html);
+    }
+  }
+
+  /**
+   * Render Analysis View
+   */
+  async renderAnalysisView(container, id) {
+    try {
+      const contentArea = this.renderWithNav(container, '<div class="content-area">' + this.analysisDetailView.renderSkeleton() + '</div>');
+      if (!contentArea) return;
+      await this.analysisDetailView.load(id);
+      this.analysisDetailView.isEditing = false;
+      this.analysisDetailView.isCreating = false;
+      const html = this.analysisDetailView.render();
+      contentArea.innerHTML = html;
+      this.analysisDetailView.attachEventHandlers(contentArea.closest('.app-content'));
+    } catch (err) {
+      const html = `<div class="error-state"><h2>Failed to load analysis</h2><p>${this.escapeHtml(err.message)}</p></div>`;
+      this.renderWithNav(container, html);
+    }
+  }
+
+  /**
+   * Render Analysis Edit
+   */
+  async renderAnalysisEdit(container, id) {
+    try {
+      const contentArea = this.renderWithNav(container, '<div class="content-area">' + this.analysisDetailView.renderSkeleton() + '</div>');
+      if (!contentArea) return;
+      await this.analysisDetailView.load(id);
+      await this.analysisDetailView.loadAnalysisTypes(); // Load types for dropdown
+      this.analysisDetailView.isEditing = true;
+      this.analysisDetailView.isCreating = false;
+      const html = this.analysisDetailView.render();
+      contentArea.innerHTML = html;
+      this.analysisDetailView.attachEventHandlers(contentArea.closest('.app-content'));
+    } catch (err) {
+      const html = `<div class="error-state"><h2>Failed to load analysis</h2><p>${this.escapeHtml(err.message)}</p></div>`;
+      this.renderWithNav(container, html);
     }
   }
 
@@ -1058,9 +1246,9 @@ EMPLOYEE COUNT: 175 employees as of October 2024">${this.escapeHtml(notes)}</tex
    */
   async renderAnalysisTypesList(container) {
     const html = await this.analysisTypesManager.render();
-    this.renderWithNav(container, html);
+    const contentArea = this.renderWithNav(container, html);
+    if (!contentArea) return;
 
-    const contentArea = container.querySelector('.app-content');
     this.analysisTypesManager.attachEventHandlers(contentArea);
   }
 
@@ -1068,12 +1256,16 @@ EMPLOYEE COUNT: 175 employees as of October 2024">${this.escapeHtml(notes)}</tex
    * Render Analysis Type View
    */
   async renderAnalysisTypeView(container, id) {
-    const typeFormView = new TypeFormView('view', 'analysis', this.api, this.eventBus, this.toast);
-    const html = await typeFormView.render(id);
-    this.renderWithNav(container, html);
-
-    const contentArea = container.querySelector('.app-content');
-    typeFormView.attachEventHandlers(contentArea);
+    try {
+      const contentArea = this.renderWithNav(container, '<div class="content-area">' + this.analysisTypeDetailView.renderSkeleton() + '</div>');
+      if (!contentArea) return;
+      await this.analysisTypeDetailView.load(id);
+      this.analysisTypeDetailView.isEditing = false;
+      this.analysisTypeDetailView.refresh(contentArea.closest('.app-content'));
+    } catch (err) {
+      const html = `<div class="error-state"><h2>Failed to load analysis type</h2><p>${this.escapeHtml(err.message)}</p></div>`;
+      this.renderWithNav(container, html);
+    }
   }
 
   /**
@@ -1082,9 +1274,9 @@ EMPLOYEE COUNT: 175 employees as of October 2024">${this.escapeHtml(notes)}</tex
   async renderAnalysisTypeForm(container, mode, id = null) {
     const typeFormView = new TypeFormView(mode, 'analysis', this.api, this.eventBus, this.toast);
     const html = await typeFormView.render(id);
-    this.renderWithNav(container, html);
+    const contentArea = this.renderWithNav(container, html);
+    if (!contentArea) return;
 
-    const contentArea = container.querySelector('.app-content');
     typeFormView.attachEventHandlers(contentArea);
   }
 
@@ -1093,9 +1285,9 @@ EMPLOYEE COUNT: 175 employees as of October 2024">${this.escapeHtml(notes)}</tex
    */
   async renderSourceTypesList(container) {
     const html = await this.sourceTypesManager.render();
-    this.renderWithNav(container, html);
+    const contentArea = this.renderWithNav(container, html);
+    if (!contentArea) return;
 
-    const contentArea = container.querySelector('.app-content');
     this.sourceTypesManager.attachEventHandlers(contentArea);
   }
 
@@ -1103,12 +1295,16 @@ EMPLOYEE COUNT: 175 employees as of October 2024">${this.escapeHtml(notes)}</tex
    * Render Source Type View
    */
   async renderSourceTypeView(container, id) {
-    const typeFormView = new TypeFormView('view', 'source', this.api, this.eventBus, this.toast);
-    const html = await typeFormView.render(id);
-    this.renderWithNav(container, html);
-
-    const contentArea = container.querySelector('.app-content');
-    typeFormView.attachEventHandlers(contentArea);
+    try {
+      const contentArea = this.renderWithNav(container, '<div class="content-area">' + this.sourceTypeDetailView.renderSkeleton() + '</div>');
+      if (!contentArea) return;
+      await this.sourceTypeDetailView.load(id);
+      this.sourceTypeDetailView.isEditing = false;
+      this.sourceTypeDetailView.refresh(contentArea.closest('.app-content'));
+    } catch (err) {
+      const html = `<div class="error-state"><h2>Failed to load source type</h2><p>${this.escapeHtml(err.message)}</p></div>`;
+      this.renderWithNav(container, html);
+    }
   }
 
   /**
@@ -1117,10 +1313,165 @@ EMPLOYEE COUNT: 175 employees as of October 2024">${this.escapeHtml(notes)}</tex
   async renderSourceTypeForm(container, mode, id = null) {
     const typeFormView = new TypeFormView(mode, 'source', this.api, this.eventBus, this.toast);
     const html = await typeFormView.render(id);
-    this.renderWithNav(container, html);
+    const contentArea = this.renderWithNav(container, html);
+    if (!contentArea) return;
 
-    const contentArea = container.querySelector('.app-content');
     typeFormView.attachEventHandlers(contentArea);
+  }
+
+  /**
+   * Render Source Type Edit (Full-page detail view in edit mode)
+   */
+  async renderSourceTypeEdit(container, id) {
+    try {
+      const contentArea = this.renderWithNav(container, '<div class="content-area">' + this.sourceTypeDetailView.renderSkeleton() + '</div>');
+      if (!contentArea) return;
+      await this.sourceTypeDetailView.load(id);
+      this.sourceTypeDetailView.isEditing = true;
+      this.sourceTypeDetailView.refresh(contentArea.closest('.app-content'));
+    } catch (err) {
+      const html = `<div class="error-state"><h2>Failed to load source type</h2><p>${this.escapeHtml(err.message)}</p></div>`;
+      this.renderWithNav(container, html);
+    }
+  }
+
+  updateSidebarPipelineBadges(pipelines) {
+    if (!Array.isArray(pipelines)) {
+      return;
+    }
+
+    const total = pipelines.length;
+    const favorites = pipelines.filter(pipeline => {
+      const id = (pipeline.id || pipeline.Id || '').toString();
+      return this.dashboard.isFavorite('analysis', id);
+    }).length;
+
+    const active = pipelines.filter(pipeline => {
+      const status = (pipeline.status || pipeline.Status || '').toString().toLowerCase();
+      return status && status !== 'completed' && status !== 'archived';
+    }).length;
+
+    const badgeMap = {
+      'all-analyses': total,
+      favorites,
+      recent: Math.min(total, 5),
+      'active-analyses': active
+    };
+
+    this.sidebar.updateBadges(badgeMap);
+  }
+
+  async openPipelineDetail(pipelineId) {
+    if (!pipelineId) {
+      return;
+    }
+
+    try {
+      const id = pipelineId.toString();
+      let pipeline = this.state.pipelines.find(p => (p.id || p.Id || '').toString() === id);
+
+      if (!pipeline) {
+        pipeline = await this.api.getPipeline(id);
+      }
+
+      if (!pipeline) {
+        throw new Error('Pipeline not found');
+      }
+
+      const normalized = {
+        id,
+        name: pipeline.name || pipeline.Name || 'Untitled Analysis',
+        description: pipeline.description || pipeline.Description || '',
+        tags: pipeline.tags || pipeline.Tags || [],
+        status: pipeline.status || pipeline.Status || 'Unknown',
+        documentCount: pipeline.documentCount || pipeline.DocumentCount || 0,
+        updatedAt: pipeline.updatedAt || pipeline.UpdatedAt || pipeline.lastUpdated || pipeline.LastUpdated,
+      };
+
+      const meta = {
+        Status: normalized.status,
+        Documents: `${normalized.documentCount}`,
+        Updated: this.formatRelativeDate(normalized.updatedAt)
+      };
+
+      this.detailPanel.onSave = async (updates) => {
+        const payload = { ...pipeline, ...updates };
+        await this.api.pipelines.update(id, payload);
+        Object.assign(pipeline, payload);
+        this.toast.success('Analysis updated');
+        this.updateSidebarPipelineBadges(this.state.pipelines);
+      };
+
+      this.detailPanel.onDelete = async (deleteId) => {
+        await this.api.deletePipeline(deleteId);
+        this.toast.success('Analysis deleted');
+        this.state.pipelines = this.state.pipelines.filter(p => (p.id || p.Id || '').toString() !== deleteId);
+        this.updateSidebarPipelineBadges(this.state.pipelines);
+        if (this.state.currentView === 'analyses-list') {
+          await this.renderAnalysesList(this.appRoot || document.getElementById('app'));
+        }
+      };
+
+      this.detailPanel.open({
+        ...normalized,
+        description: normalized.description,
+        tags: normalized.tags,
+        meta,
+        links: {
+          workspace: `#/analyses/${id}`
+        }
+      }, 'view');
+    } catch (error) {
+      console.error('Failed to open pipeline detail panel:', error);
+      this.toast.error('Unable to open analysis details');
+    }
+  }
+
+  formatRelativeDate(value) {
+    if (!value) {
+      return 'Updated recently';
+    }
+
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return 'Updated recently';
+    }
+
+    const diffMs = Date.now() - date.getTime();
+    if (diffMs < 0) {
+      return 'Updated just now';
+    }
+
+    const minutes = Math.floor(diffMs / (1000 * 60));
+    if (minutes < 1) {
+      return 'Updated just now';
+    }
+    if (minutes < 60) {
+      return `Updated ${minutes} min${minutes === 1 ? '' : 's'} ago`;
+    }
+
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) {
+      return `Updated ${hours} hr${hours === 1 ? '' : 's'} ago`;
+    }
+
+    const days = Math.floor(hours / 24);
+    if (days < 7) {
+      return `Updated ${days} day${days === 1 ? '' : 's'} ago`;
+    }
+
+    const weeks = Math.floor(days / 7);
+    if (weeks < 5) {
+      return `Updated ${weeks} week${weeks === 1 ? '' : 's'} ago`;
+    }
+
+    const months = Math.floor(days / 30);
+    if (months < 12) {
+      return `Updated ${months} month${months === 1 ? '' : 's'} ago`;
+    }
+
+    const years = Math.floor(days / 365);
+    return `Updated ${years} year${years === 1 ? '' : 's'} ago`;
   }
 
   /**

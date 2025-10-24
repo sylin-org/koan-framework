@@ -8,7 +8,7 @@ namespace Koan.Samples.Meridian.Services;
 
 public interface IPassageIndexer
 {
-    Task IndexAsync(List<Passage> passages, CancellationToken ct);
+    Task IndexAsync(string pipelineId, List<Passage> passages, CancellationToken ct);
 }
 
 public sealed class PassageIndexer : IPassageIndexer
@@ -28,7 +28,7 @@ public sealed class PassageIndexer : IPassageIndexer
         _cache = cache;
     }
 
-    public async Task IndexAsync(List<Passage> passages, CancellationToken ct)
+    public async Task IndexAsync(string pipelineId, List<Passage> passages, CancellationToken ct)
     {
         if (passages.Count == 0)
         {
@@ -38,7 +38,7 @@ public sealed class PassageIndexer : IPassageIndexer
         if (!VectorWorkflow<Passage>.IsAvailable(MeridianConstants.VectorProfile))
         {
             _logger.LogWarning("Vector workflow {Profile} unavailable; skipping indexing.", MeridianConstants.VectorProfile);
-            await _alerts.PublishWarning(passages[0].PipelineId, "vector-unavailable", $"Vector profile '{MeridianConstants.VectorProfile}' unavailable; retrieval falls back to lexical search.", ct);
+            await _alerts.PublishWarning(pipelineId, "vector-unavailable", $"Vector profile '{MeridianConstants.VectorProfile}' unavailable; retrieval falls back to lexical search.", ct);
             return;
         }
 
@@ -69,7 +69,7 @@ public sealed class PassageIndexer : IPassageIndexer
                 await _cache.SetAsync(contentHash, EmbeddingModel, embedding, nameof(Passage), ct);
             }
 
-            payload.Add((passage, embedding, BuildMetadata(passage)));
+            payload.Add((passage, embedding, BuildMetadata(pipelineId, passage)));
             passage.IndexedAt = DateTime.UtcNow;
             await passage.Save(ct);
         }
@@ -84,10 +84,10 @@ public sealed class PassageIndexer : IPassageIndexer
         }
     }
 
-    private static Dictionary<string, object?> BuildMetadata(Passage passage)
+    private static Dictionary<string, object?> BuildMetadata(string pipelineId, Passage passage)
         => new()
         {
-            ["pipelineId"] = passage.PipelineId,
+            ["pipelineId"] = pipelineId,
             ["sourceDocumentId"] = passage.SourceDocumentId,
             ["sequenceNumber"] = passage.SequenceNumber,
             ["section"] = passage.Section

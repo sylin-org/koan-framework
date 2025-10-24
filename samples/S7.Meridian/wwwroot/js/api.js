@@ -149,11 +149,18 @@ export class API {
   /**
    * AI-generate analysis type from goal/audience
    */
-  async suggestAnalysisType(goal, audience, additionalContext = '') {
+  async suggestAnalysisType(prompt) {
     return this.post('/api/analysistypes/ai-suggest', {
-      goal,
-      audience,
-      additionalContext,
+      prompt
+    });
+  }
+
+  /**
+   * AI-create analysis type (generates AND saves)
+   */
+  async createAnalysisTypeWithAI(prompt) {
+    return this.post('/api/analysistypes/ai-create', {
+      prompt
     });
   }
 

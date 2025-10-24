@@ -1,0 +1,506 @@
+/**
+ * AnalysisDetailView - Full-page detail view for a single Analysis (Pipeline)
+ * Handles create, view, and edit modes for analyses
+ */
+export class AnalysisDetailView {
+  constructor(api, eventBus, router, toast) {
+    this.api = api;
+    this.eventBus = eventBus;
+    this.router = router;
+    this.toast = toast;
+    this.analysis = null;
+    this.analysisTypes = [];
+    this.isEditing = false;
+    this.isCreating = false;
+    this.filesToUpload = [];
+  }
+
+  /**
+   * Initialize for create mode
+   */
+  async initCreate() {
+    this.isCreating = true;
+    this.isEditing = true;
+    this.analysis = {
+      name: '',
+      description: '',
+      analysisTypeId: null,
+      notes: ''
+    };
+    await this.loadAnalysisTypes();
+  }
+
+  /**
+   * Load existing analysis
+   */
+  async load(id) {
+    try {
+      this.analysis = await this.api.getPipeline(id);
+      // Load notes
+      try {
+        const notesData = await this.api.getNotes(id);
+        this.analysis.notes = notesData.authoritativeNotes || '';
+      } catch (e) {
+        this.analysis.notes = '';
+      }
+    } catch (err) {
+      console.error('Failed to load analysis', err);
+      this.toast.error('Failed to load analysis');
+      this.analysis = null;
+    }
+  }
+
+  /**
+   * Load available analysis types for dropdown
+   */
+  async loadAnalysisTypes() {
+    try {
+      this.analysisTypes = await this.api.getAnalysisTypes();
+    } catch (err) {
+      console.error('Failed to load analysis types', err);
+      this.analysisTypes = [];
+    }
+  }
+
+  renderSkeleton() {
+    return `<div class="detail-view loading"><p>Loading analysis...</p></div>`;
+  }
+
+  render() {
+    if (!this.isCreating && !this.analysis) {
+      return `
+        <div class="detail-view error">
+          <h2>Analysis Not Found</h2>
+          <p>The requested analysis could not be loaded.</p>
+          <button class="btn" data-nav="back">Back</button>
+        </div>
+      `;
+    }
+
+    return `
+      <div class="detail-view analysis-detail">
+        ${this.renderHeader()}
+        <div class="detail-sections">
+          ${this.renderIdentitySection()}
+          ${this.renderNotesSection()}
+          ${this.isCreating || this.isEditing ? this.renderFileUploadSection() : ''}
+        </div>
+      </div>
+    `;
+  }
+
+  renderHeader() {
+    const title = this.isCreating ? 'New Analysis' : (this.analysis.name || 'Untitled');
+    const subtitle = this.isCreating
+      ? 'Create a new analysis pipeline'
+      : (this.analysis.description || 'No description provided.');
+
+    return `
+      <div class="page-header">
+        <div class="breadcrumbs">
+          <a href="#/analyses" class="breadcrumb">Analyses</a>
+          <span class="breadcrumb-sep">›</span>
+          <span class="breadcrumb current">${this.escape(title)}</span>
+        </div>
+        <div class="page-header-main">
+          <h1>${this.escape(title)}</h1>
+          <p class="subtitle">${this.escape(subtitle)}</p>
+        </div>
+        <div class="page-header-actions">
+          ${this.renderActions()}
+        </div>
+        ${!this.isCreating ? `
+          <div class="meta-line">
+            <span class="meta-item">ID: ${this.escape(this.analysis.id || this.analysis.Id || 'N/A')}</span>
+            <span class="meta-item">Status: ${this.escape(this.analysis.status || 'Active')}</span>
+          </div>
+        ` : ''}
+      </div>
+    `;
+  }
+
+  renderActions() {
+    if (this.isCreating) {
+      return `
+        <button class="btn btn-secondary" data-action="cancel">Cancel</button>
+        <button class="btn btn-primary" data-action="save-create">Create Analysis</button>
+      `;
+    }
+
+    if (this.isEditing) {
+      return `
+        <button class="btn btn-secondary" data-action="cancel">Cancel</button>
+        <button class="btn btn-primary" data-action="save">Save</button>
+      `;
+    }
+
+    return `
+      <button class="btn btn-primary" data-action="open-workspace">Open Workspace</button>
+      <button class="btn btn-secondary" data-action="edit">Edit</button>
+      <button class="btn btn-danger" data-action="delete">Delete</button>
+      <button class="btn" data-nav="back">Back</button>
+    `;
+  }
+
+  renderIdentitySection() {
+    return `
+      <section class="detail-section">
+        <h2>Identity</h2>
+        <div class="field-grid">
+          <div class="form-field">
+            <label>Name</label>
+            ${this.isCreating || this.isEditing
+              ? `<input type="text" name="name" value="${this.escapeAttr(this.analysis.name || '')}" maxlength="128" placeholder="My Analysis" required />`
+              : `<div class="readonly-value">${this.escape(this.analysis.name)}</div>`}
+          </div>
+          <div class="form-field">
+            <label>Description</label>
+            ${this.isCreating || this.isEditing
+              ? `<textarea name="description" rows="3" maxlength="512" placeholder="What this analysis is about...">${this.escape(this.analysis.description || '')}</textarea>`
+              : `<div class="readonly-value">${this.escape(this.analysis.description)}</div>`}
+          </div>
+          ${this.renderAnalysisTypeField()}
+        </div>
+      </section>
+    `;
+  }
+
+  renderAnalysisTypeField() {
+    if (this.isCreating) {
+      // Show dropdown for type selection during creation
+      const options = this.analysisTypes.map(type => {
+        const selected = this.analysis.analysisTypeId === type.id ? 'selected' : '';
+        return `<option value="${this.escapeAttr(type.id)}" ${selected}>${this.escape(type.name)}</option>`;
+      }).join('');
+
+      return `
+        <div class="form-field">
+          <label>Analysis Type</label>
+          <select name="analysisTypeId">
+            <option value="">Select a type...</option>
+            ${options}
+          </select>
+        </div>
+      `;
+    }
+
+    if (!this.isEditing && this.analysis.analysisTypeId) {
+      // Show readonly link to analysis type in view mode
+      return `
+        <div class="form-field">
+          <label>Analysis Type</label>
+          <div class="readonly-value">
+            <a href="#/analysis-types/${this.escapeAttr(this.analysis.analysisTypeId)}/view">
+              ${this.escape(this.analysis.analysisTypeName || this.analysis.analysisTypeId)}
+            </a>
+          </div>
+        </div>
+      `;
+    }
+
+    return '';
+  }
+
+  renderNotesSection() {
+    const notes = this.analysis.notes || '';
+
+    return `
+      <section class="detail-section">
+        <h2>Authoritative Notes</h2>
+        <div class="form-field">
+          <label>Notes</label>
+          ${this.isCreating || this.isEditing
+            ? `<textarea name="notes" rows="10" placeholder="Add authoritative information in natural language...
+
+Example:
+PRIMARY CONTACT: Jordan Kim is the VP of Enterprise Solutions
+REVENUE: FY2024 revenue was $52.3M USD
+EMPLOYEE COUNT: 175 employees as of October 2024">${this.escape(notes)}</textarea>
+              <div class="field-help">Use natural language. The system will automatically override document extractions.</div>`
+            : `<div class="readonly-value notes-text">${this.escape(notes)}</div>`}
+        </div>
+      </section>
+    `;
+  }
+
+  renderFileUploadSection() {
+    return `
+      <section class="detail-section">
+        <h2>Documents</h2>
+        <div class="form-field">
+          <label>Upload Files ${this.isCreating ? '(optional)' : ''}</label>
+          <input type="file" name="files" multiple accept=".pdf,.txt,.docx,.doc" data-action="select-files" />
+          <div class="field-help">Upload documents to be analyzed (PDF, TXT, DOCX supported)</div>
+          <div class="selected-files-list" style="display: none; margin-top: 12px;"></div>
+        </div>
+      </section>
+    `;
+  }
+
+  /**
+   * Attach event handlers
+   */
+  attachEventHandlers(container) {
+    if (!container) return;
+
+    // Back button
+    const backBtn = container.querySelector('[data-nav="back"]');
+    if (backBtn) {
+      backBtn.addEventListener('click', () => {
+        window.history.back();
+      });
+    }
+
+    // Action buttons
+    container.querySelectorAll('[data-action]').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        const action = btn.dataset.action;
+
+        switch (action) {
+          case 'save-create':
+            await this.handleSaveCreate(container);
+            break;
+          case 'save':
+            await this.handleSave(container);
+            break;
+          case 'edit':
+            this.handleEdit();
+            break;
+          case 'cancel':
+            await this.handleCancel();
+            break;
+          case 'delete':
+            await this.handleDelete();
+            break;
+          case 'open-workspace':
+            this.handleOpenWorkspace();
+            break;
+          case 'select-files':
+            // File input handled by change event
+            break;
+        }
+      });
+    });
+
+    // File input
+    const fileInput = container.querySelector('input[type="file"]');
+    if (fileInput) {
+      fileInput.addEventListener('change', (e) => {
+        this.filesToUpload = Array.from(e.target.files);
+        this.updateFilesList(container);
+      });
+    }
+  }
+
+  /**
+   * Update the files list display
+   */
+  updateFilesList(container) {
+    const filesList = container.querySelector('.selected-files-list');
+    if (!filesList) return;
+
+    if (this.filesToUpload.length === 0) {
+      filesList.style.display = 'none';
+      return;
+    }
+
+    filesList.style.display = 'block';
+    filesList.innerHTML = `
+      <strong>Selected files (${this.filesToUpload.length}):</strong>
+      <ul style="margin: 8px 0 0 20px; list-style: disc;">
+        ${this.filesToUpload.map(f => `<li>${this.escape(f.name)} (${this.formatFileSize(f.size)})</li>`).join('')}
+      </ul>
+    `;
+  }
+
+  /**
+   * Handle save for create mode
+   */
+  async handleSaveCreate(container) {
+    const formData = this.collectFormData(container);
+
+    if (!formData.name?.trim()) {
+      this.toast.error('Please enter a name for the analysis');
+      return;
+    }
+
+    try {
+      // Create pipeline
+      const pipeline = await this.api.createPipeline({
+        name: formData.name,
+        description: formData.description || '',
+        analysisTypeId: formData.analysisTypeId || null
+      });
+
+      const pipelineId = pipeline.id || pipeline.Id;
+      this.toast.success(`Analysis "${formData.name}" created`);
+
+      // Set notes if provided
+      if (formData.notes?.trim()) {
+        try {
+          await this.api.setNotes(pipelineId, formData.notes, false);
+        } catch (e) {
+          console.error('Failed to set notes:', e);
+          // Don't fail the whole operation if notes fail
+        }
+      }
+
+      // Upload files if provided
+      if (this.filesToUpload.length > 0) {
+        try {
+          for (const file of this.filesToUpload) {
+            await this.api.uploadDocument(pipelineId, file);
+          }
+          this.toast.success(`${this.filesToUpload.length} file(s) uploaded`);
+        } catch (e) {
+          console.error('Failed to upload files:', e);
+          this.toast.error('Failed to upload some files');
+        }
+      }
+
+      // Navigate to workspace
+      this.eventBus.emit('navigate', 'analysis-workspace', { pipelineId });
+
+    } catch (error) {
+      console.error('Failed to create analysis:', error);
+      this.toast.error('Failed to create analysis');
+    }
+  }
+
+  /**
+   * Handle save for edit mode
+   */
+  async handleSave(container) {
+    const formData = this.collectFormData(container);
+
+    if (!formData.name?.trim()) {
+      this.toast.error('Please enter a name for the analysis');
+      return;
+    }
+
+    try {
+      // Update notes
+      if (formData.notes !== this.analysis.notes) {
+        await this.api.setNotes(this.analysis.id || this.analysis.Id, formData.notes, false);
+      }
+
+      // Upload new files if provided
+      if (this.filesToUpload.length > 0) {
+        const pipelineId = this.analysis.id || this.analysis.Id;
+        for (const file of this.filesToUpload) {
+          await this.api.uploadDocument(pipelineId, file);
+        }
+        this.toast.success(`${this.filesToUpload.length} file(s) uploaded`);
+      }
+
+      this.toast.success('Analysis updated');
+
+      // Reload and switch to view mode
+      await this.load(this.analysis.id || this.analysis.Id);
+      this.isEditing = false;
+      this.filesToUpload = [];
+
+      // Refresh the view
+      const appContainer = document.querySelector('#app');
+      if (appContainer) {
+        this.eventBus.emit('navigate', 'analysis-view', { id: this.analysis.id || this.analysis.Id });
+      }
+
+    } catch (error) {
+      console.error('Failed to update analysis:', error);
+      this.toast.error('Failed to update analysis');
+    }
+  }
+
+  /**
+   * Handle edit button
+   */
+  handleEdit() {
+    this.isEditing = true;
+    this.eventBus.emit('navigate', 'analysis-edit', { id: this.analysis.id || this.analysis.Id });
+  }
+
+  /**
+   * Handle cancel button
+   */
+  async handleCancel() {
+    if (this.isCreating) {
+      this.eventBus.emit('navigate', 'analyses-list');
+    } else {
+      this.isEditing = false;
+      this.filesToUpload = [];
+      this.eventBus.emit('navigate', 'analysis-view', { id: this.analysis.id || this.analysis.Id });
+    }
+  }
+
+  /**
+   * Handle delete button
+   */
+  async handleDelete() {
+    const name = this.analysis.name || 'this analysis';
+    const confirmed = confirm(`Are you sure you want to delete "${name}"? This action cannot be undone.`);
+    if (!confirmed) return;
+
+    try {
+      await this.api.deletePipeline(this.analysis.id || this.analysis.Id);
+      this.toast.success('Analysis deleted');
+      this.eventBus.emit('navigate', 'analyses-list');
+    } catch (error) {
+      console.error('Failed to delete analysis:', error);
+      this.toast.error('Failed to delete analysis');
+    }
+  }
+
+  /**
+   * Handle open workspace button
+   */
+  handleOpenWorkspace() {
+    this.eventBus.emit('navigate', 'analysis-workspace', {
+      pipelineId: this.analysis.id || this.analysis.Id
+    });
+  }
+
+  /**
+   * Collect form data from container
+   */
+  collectFormData(container) {
+    const data = {};
+    container.querySelectorAll('input[name], textarea[name], select[name]').forEach(field => {
+      data[field.name] = field.value;
+    });
+    return data;
+  }
+
+  /**
+   * Format file size for display
+   */
+  formatFileSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  }
+
+  /**
+   * Escape HTML to prevent XSS
+   */
+  escape(text) {
+    if (text == null) return '';
+    const div = document.createElement('div');
+    div.textContent = String(text);
+    return div.innerHTML;
+  }
+
+  /**
+   * Escape HTML attribute values
+   */
+  escapeAttr(text) {
+    if (text == null) return '';
+    return String(text)
+      .replace(/&/g, '&amp;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+}

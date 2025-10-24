@@ -26,8 +26,14 @@ public sealed class DocumentsController : ControllerBase
     [HttpGet]
     public async Task<ActionResult<List<SourceDocument>>> GetDocuments(string pipelineId, CancellationToken ct)
     {
-        var documents = await SourceDocument.Query(d => d.PipelineId == pipelineId, ct).ConfigureAwait(false);
-        return Ok(documents.ToList());
+        var pipeline = await DocumentPipeline.Get(pipelineId, ct).ConfigureAwait(false);
+        if (pipeline is null)
+        {
+            return NotFound();
+        }
+
+        var documents = await pipeline.LoadDocumentsAsync(ct).ConfigureAwait(false);
+        return Ok(documents);
     }
 
     [HttpPost]

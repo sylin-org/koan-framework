@@ -43,19 +43,20 @@ public sealed class AnalysisTypeAuthoringService : IAnalysisTypeAuthoringService
             throw new ArgumentNullException(nameof(request));
         }
 
-        if (string.IsNullOrWhiteSpace(request.Goal))
+        if (string.IsNullOrWhiteSpace(request.Prompt))
         {
-            throw new ArgumentException("Goal is required.", nameof(request));
+            throw new ArgumentException("Prompt is required.", nameof(request));
         }
 
         var prompt = BuildPrompt(request);
-        var model = request.Model ?? _options.Extraction.Model ?? "granite3.3:8b";
+        // Model selection removed from request; use options default or fallback
+        var model = _options.Extraction.Model ?? "granite3.3:8b";
         var chatOptions = new AiChatOptions
         {
             Message = prompt,
             Model = model,
             Temperature = 0.1,
-            MaxTokens = 700
+            MaxTokens = 4000
         };
 
         string rawResponse;
@@ -70,7 +71,7 @@ public sealed class AnalysisTypeAuthoringService : IAnalysisTypeAuthoringService
         }
 
         var warnings = new List<string>();
-        var draft = ParseDraft(rawResponse, warnings);
+        var draft = ParseDraft(rawResponse, request.Prompt, warnings);
         SanitizeDraft(draft, warnings);
 
         var requestSummary = BuildRequestSummary(request);
@@ -78,7 +79,7 @@ public sealed class AnalysisTypeAuthoringService : IAnalysisTypeAuthoringService
         var metadata = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
             ["warnings"] = warnings.Count.ToString(),
-            ["audience"] = request.Audience ?? string.Empty
+            ["prompt"] = request.Prompt.Truncate(120)
         };
 
         await _auditor.RecordAsync(
@@ -109,45 +110,106 @@ public sealed class AnalysisTypeAuthoringService : IAnalysisTypeAuthoringService
         builder.AppendLine("  \"descriptors\": [\"string\"],");
         builder.AppendLine("  \"instructions\": \"string\",");
         builder.AppendLine("  \"outputFields\": [\"fieldName1\", \"fieldName2\", \"fieldName3\"],");
-        builder.AppendLine("  \"outputTemplate\": \"string\",");
-        builder.AppendLine("  \"requiredSourceTypes\": [\"string\"]");
+        builder.AppendLine("  \"outputTemplate\": \"string\"");
         builder.AppendLine("}");
         builder.AppendLine();
-        builder.AppendLine("CRITICAL: Define 3-7 output field names in outputFields that capture the analysis goal.");
-    builder.AppendLine("Use Mustache syntax {{field_name}} in outputTemplate matching the field names exactly.");
-    builder.AppendLine("Field names must be snake_case (lowercase letters and underscores only).");
+        builder.AppendLine("FIELD REQUIREMENTS:");
+        builder.AppendLine("- Define 5-20 output field names based on analysis complexity");
+        builder.AppendLine("- Use snake_case (lowercase letters and underscores only)");
+        builder.AppendLine("- Choose field names that comprehensively capture the analysis goal");
+        builder.AppendLine("- Include fields for context, findings, recommendations, and metadata");
         builder.AppendLine();
-        builder.Append("Analysis goal: ").AppendLine(request.Goal.Trim());
-
-        if (!string.IsNullOrWhiteSpace(request.Audience))
-        {
-            builder.Append("Intended audience: ").AppendLine(request.Audience.Trim());
-        }
-
-        if (request.IncludedSourceTypes.Count > 0)
-        {
-            builder.AppendLine("Available source types:");
-            foreach (var sourceType in request.IncludedSourceTypes)
-            {
-                builder.Append("- ").AppendLine(sourceType.Trim());
-            }
-        }
-
-        if (!string.IsNullOrWhiteSpace(request.AdditionalContext))
-        {
-            builder.Append("Additional context: ").AppendLine(request.AdditionalContext.Trim());
-        }
+        builder.AppendLine("TEMPLATE REQUIREMENTS:");
+        builder.AppendLine("- Use markdown format with semantic sections (## Section Name)");
+        builder.AppendLine("- Use Mustache syntax {{field_name}} matching field names exactly");
+        builder.AppendLine("- Group related fields into logical sections");
+        builder.AppendLine("- Use tables, lists, and formatting for readability");
+        builder.AppendLine("- Include descriptive headers that explain each section's purpose");
+        builder.AppendLine();
+        builder.AppendLine("INSTRUCTION REQUIREMENTS:");
+        builder.AppendLine("- Begin with role context (e.g., 'As a [role] at [organization]...')");
+        builder.AppendLine("- Explain the analysis purpose and intended audience");
+        builder.AppendLine("- Provide specific extraction criteria for each major field");
+        builder.AppendLine("- Include quality expectations and formatting guidance");
+        builder.AppendLine("- Write 200-500 words of detailed, actionable instructions");
+        builder.AppendLine();
+        builder.Append("Analysis type prompt: ").AppendLine(request.Prompt.Trim());
+        builder.AppendLine();
+        builder.AppendLine("Derive ALL output field names, instructions and template content solely from the provided prompt.");
+        builder.AppendLine("If the prompt implies domain-specific metadata fields, include them.");
+        builder.AppendLine("Do NOT invent unrelated fields; stay tightly aligned to the prompt context.");
 
         builder.AppendLine();
-        builder.AppendLine("Provide concise instructions suitable for prompt injection into an LLM.");
+        builder.AppendLine("EXAMPLE OF RICH TEMPLATE:");
+        builder.AppendLine("## Review Details");
+        builder.AppendLine("- **Document Title**: {{document_title}}");
+        builder.AppendLine("- **Review Date**: {{review_date}}");
+        builder.AppendLine();
+        builder.AppendLine("## Executive Summary");
+        builder.AppendLine("{{executive_summary}}");
+        builder.AppendLine();
+        builder.AppendLine("## Key Findings");
+        builder.AppendLine("{{key_findings}}");
+        builder.AppendLine();
+        builder.AppendLine("Generate comprehensive instructions suitable for prompt injection into an LLM.");
+        builder.AppendLine("Ensure instructions provide clear role context and specific extraction criteria.");
         return builder.ToString();
     }
 
-    private static AnalysisTypeDraft ParseDraft(string rawResponse, List<string> warnings)
+    private static AnalysisTypeDraft ParseDraft(string rawResponse, string originalPrompt, List<string> warnings)
     {
         try
         {
-            var json = JObject.Parse(rawResponse);
+            var cleaned = rawResponse?.Trim() ?? string.Empty;
+
+            // Strip markdown code fences if present
+            if (cleaned.StartsWith("```"))
+            {
+                // Remove initial fence line
+                var newlineIndex = cleaned.IndexOf('\n');
+                if (newlineIndex > -1)
+                {
+                    cleaned = cleaned[(newlineIndex + 1)..];
+                }
+                // Remove trailing fence
+                var fenceLast = cleaned.LastIndexOf("```");
+                if (fenceLast > -1)
+                {
+                    cleaned = cleaned[..fenceLast].Trim();
+                }
+            }
+
+            // Attempt direct parse first
+            JObject json;
+            try
+            {
+                json = JObject.Parse(cleaned);
+            }
+            catch
+            {
+                // Fallback: extract first JSON object substring
+                var firstBrace = cleaned.IndexOf('{');
+                var lastBrace = cleaned.LastIndexOf('}');
+                if (firstBrace >= 0 && lastBrace > firstBrace)
+                {
+                    var candidate = cleaned.Substring(firstBrace, lastBrace - firstBrace + 1);
+                    try
+                    {
+                        json = JObject.Parse(candidate);
+                        warnings.Add("AI response contained extraneous text; JSON extracted via substring.");
+                    }
+                    catch (Exception ex2)
+                    {
+                        warnings.Add($"Failed to parse AI response after substring attempt: {ex2.Message}");
+                        return BuildEmptyDraftWithFallback(originalPrompt, warnings);
+                    }
+                }
+                else
+                {
+                    warnings.Add("AI response lacked recognizable JSON braces.");
+                    return BuildEmptyDraftWithFallback(originalPrompt, warnings);
+                }
+            }
 
             // Parse output fields and build simple schema
             var outputFields = ExtractArray(json["outputFields"]);
@@ -157,26 +219,69 @@ public sealed class AnalysisTypeAuthoringService : IAnalysisTypeAuthoringService
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
             var schemaJson = BuildSchemaFromFields(canonicalFields);
-            
+
             var draft = new AnalysisTypeDraft
             {
                 Name = json["name"]?.Value<string>()?.Trim() ?? string.Empty,
                 Description = json["description"]?.Value<string>()?.Trim() ?? string.Empty,
                 Instructions = json["instructions"]?.Value<string>()?.Trim() ?? string.Empty,
                 OutputTemplate = FieldPathCanonicalizer.CanonicalizeTemplatePlaceholders(json["outputTemplate"]?.Value<string>()?.Trim() ?? string.Empty),
-                OutputSchemaJson = schemaJson,
+                JsonSchema = schemaJson,
                 Tags = ExtractArray(json["tags"]),
-                Descriptors = ExtractArray(json["descriptors"]),
-                RequiredSourceTypes = ExtractArray(json["requiredSourceTypes"])
+                Descriptors = ExtractArray(json["descriptors"])
             };
+
+            if (string.IsNullOrWhiteSpace(draft.Name))
+            {
+                draft.Name = DeriveNameFromPrompt(originalPrompt);
+                warnings.Add("Name missing in AI response; derived from prompt.");
+            }
+            if (string.IsNullOrWhiteSpace(draft.Description))
+            {
+                draft.Description = ($"Analysis derived from prompt: {originalPrompt}").Truncate(512);
+                warnings.Add("Description missing in AI response; fallback applied.");
+            }
 
             return draft;
         }
         catch (Exception ex)
         {
             warnings.Add($"Failed to parse AI response: {ex.Message}");
-            return new AnalysisTypeDraft();
+            return BuildEmptyDraftWithFallback(originalPrompt, warnings);
         }
+    }
+
+    private static AnalysisTypeDraft BuildEmptyDraftWithFallback(string originalPrompt, List<string> warnings)
+    {
+        var name = DeriveNameFromPrompt(originalPrompt);
+        var description = ($"Analysis derived from prompt: {originalPrompt}").Truncate(512);
+        return new AnalysisTypeDraft
+        {
+            Name = name,
+            Description = description,
+            Instructions = string.Empty,
+            OutputTemplate = string.Empty,
+            JsonSchema = string.Empty,
+            Tags = new List<string>(),
+            Descriptors = new List<string>()
+        };
+    }
+
+    private static string DeriveNameFromPrompt(string prompt)
+    {
+        if (string.IsNullOrWhiteSpace(prompt))
+        {
+            return "UntitledAnalysis";
+        }
+        var cleaned = new string(prompt.Take(160).ToArray());
+        // Replace non-letter/digit with space then pick first 5 words
+        cleaned = System.Text.RegularExpressions.Regex.Replace(cleaned, "[^A-Za-z0-9]+", " ").Trim();
+        var words = cleaned.Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(6).ToList();
+        if (words.Count == 0) return "UntitledAnalysis";
+        var title = string.Join(" ", words).Trim();
+        // TitleCase
+        title = System.Globalization.CultureInfo.InvariantCulture.TextInfo.ToTitleCase(title.ToLowerInvariant());
+        return title.Length > 48 ? title[..48] : title;
     }
 
     private static List<string> ExtractArray(JToken? token)
@@ -228,27 +333,18 @@ public sealed class AnalysisTypeAuthoringService : IAnalysisTypeAuthoringService
     {
         draft.Name = draft.Name.Truncate(128);
         draft.Description = draft.Description.Truncate(512);
-        draft.Instructions = draft.Instructions.Truncate(2000);
-        draft.OutputTemplate = draft.OutputTemplate.Truncate(4000);
+        draft.Instructions = draft.Instructions.Truncate(5000);
+        draft.OutputTemplate = draft.OutputTemplate.Truncate(10000);
         draft.OutputTemplate = FieldPathCanonicalizer.CanonicalizeTemplatePlaceholders(draft.OutputTemplate);
-    draft.OutputSchemaJson = draft.OutputSchemaJson?.Truncate(8000) ?? string.Empty;
-    draft.OutputSchemaJson = FieldPathCanonicalizer.CanonicalizeJsonSchema(draft.OutputSchemaJson);
-
-        draft.Tags = draft.Tags
-            .Where(value => !string.IsNullOrWhiteSpace(value))
-            .Select(value => value.Trim())
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .Take(MaxListItems)
-            .ToList();
+        draft.JsonSchema = draft.JsonSchema?.Truncate(16000) ?? string.Empty;
+        draft.JsonSchema = FieldPathCanonicalizer.CanonicalizeJsonSchema(draft.JsonSchema); draft.Tags = draft.Tags
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .Select(value => value.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Take(MaxListItems)
+                .ToList();
 
         draft.Descriptors = draft.Descriptors
-            .Where(value => !string.IsNullOrWhiteSpace(value))
-            .Select(value => value.Trim())
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .Take(MaxListItems)
-            .ToList();
-
-        draft.RequiredSourceTypes = draft.RequiredSourceTypes
             .Where(value => !string.IsNullOrWhiteSpace(value))
             .Select(value => value.Trim())
             .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -267,23 +363,22 @@ public sealed class AnalysisTypeAuthoringService : IAnalysisTypeAuthoringService
             draft.OutputTemplate = "# Executive Summary\n\n## Findings\n- {{finding}}\n";
             draft.OutputTemplate = FieldPathCanonicalizer.CanonicalizeTemplatePlaceholders(draft.OutputTemplate);
         }
-        
-        if (string.IsNullOrWhiteSpace(draft.OutputSchemaJson))
+
+        if (string.IsNullOrWhiteSpace(draft.JsonSchema))
         {
             warnings.Add("AI response did not include output fields; default schema applied.");
-            draft.OutputSchemaJson = "{\"type\":\"object\",\"properties\":{\"summary\":{\"type\":\"string\"}}}";
+            draft.JsonSchema = "{\"type\":\"object\",\"properties\":{\"summary\":{\"type\":\"string\"}}}";
         }
     }
 
     private static string BuildRequestSummary(AnalysisTypeAiSuggestRequest request)
     {
-        var audience = string.IsNullOrWhiteSpace(request.Audience) ? "n/a" : request.Audience.Trim();
-        var goalSnippet = request.Goal.Truncate(40).ReplaceLineEndings(" ").Trim();
-        return $"goal=\"{goalSnippet}\";audience={audience};sources={request.IncludedSourceTypes.Count}";
+        var promptSnippet = request.Prompt.Truncate(60).ReplaceLineEndings(" ").Trim();
+        return $"prompt=\"{promptSnippet}\"";
     }
 
     private static string BuildResponseSummary(AnalysisTypeDraft draft)
     {
-        return $"name={draft.Name};tags={draft.Tags.Count};requiredSources={draft.RequiredSourceTypes.Count}";
+        return $"name={draft.Name};tags={draft.Tags.Count};descriptors={draft.Descriptors.Count}";
     }
 }

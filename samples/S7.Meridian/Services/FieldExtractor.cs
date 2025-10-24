@@ -89,8 +89,9 @@ public sealed class FieldExtractor : IFieldExtractor
             return results;
         }
 
-        var sourceTypes = await LoadSourceTypesAsync(pipeline.Id, ct).ConfigureAwait(false);
-        var instructionBlock = BuildInstructionBlock(pipeline, sourceTypes);
+    var sourceTypes = await LoadSourceTypesAsync(pipeline, ct).ConfigureAwait(false);
+    var organizationProfile = await pipeline.LoadOrganizationProfileAsync(ct).ConfigureAwait(false);
+    var instructionBlock = BuildInstructionBlock(pipeline, sourceTypes, organizationProfile);
         var fieldQueryOverrides = BuildFieldQueryOverrides(sourceTypes);
         var keywordHint = BuildKeywordHint(pipeline, sourceTypes);
 
@@ -123,7 +124,7 @@ public sealed class FieldExtractor : IFieldExtractor
             {
                 var query = BuildRAGQuery(fieldPath, pipeline, fieldQueryOverrides, keywordHint);
 
-                var retrieval = await RetrievePassages(pipeline.Id, query, passages, options, ct);
+                var retrieval = await RetrievePassages(pipeline, query, passages, options, ct);
                 if (retrieval.Candidates.Count == 0)
                 {
                     _logger.LogDebug("No passages retrieved for field {FieldPath}, skipping extraction", fieldPath);
@@ -219,9 +220,9 @@ public sealed class FieldExtractor : IFieldExtractor
         return results;
     }
 
-    private async Task<List<SourceType>> LoadSourceTypesAsync(string pipelineId, CancellationToken ct)
+    private async Task<List<SourceType>> LoadSourceTypesAsync(DocumentPipeline pipeline, CancellationToken ct)
     {
-        var documents = await SourceDocument.Query(d => d.PipelineId == pipelineId, ct).ConfigureAwait(false);
+        var documents = await pipeline.LoadDocumentsAsync(ct).ConfigureAwait(false);
         var ids = documents
             .Select(d => d.ClassifiedTypeId ?? d.SourceType)
             .Where(id => !string.IsNullOrWhiteSpace(id) && !string.Equals(id, MeridianConstants.SourceTypes.Unclassified, StringComparison.OrdinalIgnoreCase))
@@ -240,7 +241,7 @@ public sealed class FieldExtractor : IFieldExtractor
             var sourceType = await SourceType.Get(id!, ct).ConfigureAwait(false);
             if (sourceType is null)
             {
-                _logger.LogWarning("Source type {SourceTypeId} referenced by pipeline {PipelineId} is missing. Documents may be unclassified.", id, pipelineId);
+                _logger.LogWarning("Source type {SourceTypeId} referenced by pipeline {PipelineId} is missing. Documents may be unclassified.", id, pipeline.Id);
                 continue;
             }
 
@@ -282,9 +283,52 @@ public sealed class FieldExtractor : IFieldExtractor
         return overrides;
     }
 
-    private static string BuildInstructionBlock(DocumentPipeline pipeline, IEnumerable<SourceType> sourceTypes)
+    private static string BuildInstructionBlock(DocumentPipeline pipeline, IEnumerable<SourceType> sourceTypes, OrganizationProfile? organizationProfile)
     {
         var builder = new StringBuilder();
+
+        if (organizationProfile is not null)
+        {
+            var parts = new List<string>();
+
+            if (!string.IsNullOrWhiteSpace(organizationProfile.ScopeClassification))
+            {
+                parts.Add($"Scope={organizationProfile.ScopeClassification}");
+            }
+
+            if (!string.IsNullOrWhiteSpace(organizationProfile.RegulatoryRegime))
+            {
+                parts.Add($"Regulation={organizationProfile.RegulatoryRegime}");
+            }
+
+            if (!string.IsNullOrWhiteSpace(organizationProfile.LineOfBusiness))
+            {
+                parts.Add($"LineOfBusiness={organizationProfile.LineOfBusiness}");
+            }
+
+            if (!string.IsNullOrWhiteSpace(organizationProfile.Department))
+            {
+                parts.Add($"Department={organizationProfile.Department}");
+            }
+
+            if (organizationProfile.PrimaryStakeholders is { Count: > 0 })
+            {
+                var stakeholders = organizationProfile.PrimaryStakeholders
+                    .Where(kvp => kvp.Value is { Count: > 0 })
+                    .Select(kvp => $"{kvp.Key}:{string.Join(",", kvp.Value)}")
+                    .ToList();
+
+                if (stakeholders.Count > 0)
+                {
+                    parts.Add($"Stakeholders={string.Join(" | ", stakeholders)}");
+                }
+            }
+
+            if (parts.Count > 0)
+            {
+                builder.AppendLine($"[Organization] {string.Join("; ", parts)}");
+            }
+        }
 
         if (!string.IsNullOrWhiteSpace(pipeline.AnalysisInstructions))
         {
@@ -310,11 +354,6 @@ public sealed class FieldExtractor : IFieldExtractor
         if (pipeline.AnalysisTags is { Count: > 0 })
         {
             keywords.AddRange(pipeline.AnalysisTags);
-        }
-
-        if (pipeline.RequiredSourceTypes is { Count: > 0 })
-        {
-            keywords.AddRange(pipeline.RequiredSourceTypes);
         }
 
     keywords.AddRange(sourceTypes.SelectMany(type => type.SignalPhrases ?? new List<string>()));
@@ -407,7 +446,7 @@ public sealed class FieldExtractor : IFieldExtractor
     /// Retrieves relevant passages using hybrid vector search (BM25 + semantic).
     /// </summary>
     private async Task<RetrievalResult> RetrievePassages(
-        string pipelineId,
+        DocumentPipeline pipeline,
         string query,
         IReadOnlyList<Passage> corpus,
         MeridianOptions options,
@@ -417,6 +456,15 @@ public sealed class FieldExtractor : IFieldExtractor
         var queryEmbedding = await Koan.AI.Ai.Embed(query, ct);
 
         var candidates = new List<(Passage passage, double score, float[]? vector)>();
+        var allowedDocuments = pipeline.DocumentIds
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .ToHashSet(StringComparer.Ordinal);
+
+        if (allowedDocuments.Count == 0)
+        {
+            _logger.LogWarning("Pipeline {PipelineId} has no document references; skipping retrieval.", pipeline.Id);
+            return new RetrievalResult(candidates, queryEmbedding);
+        }
 
         if (VectorWorkflow<Passage>.IsAvailable(MeridianConstants.VectorProfile))
         {
@@ -432,7 +480,7 @@ public sealed class FieldExtractor : IFieldExtractor
             foreach (var match in results.Matches)
             {
                 var passage = await Passage.Get(match.Id, ct);
-                if (passage != null && passage.PipelineId == pipelineId)
+                if (passage != null && allowedDocuments.Contains(passage.SourceDocumentId))
                 {
                     var vector = await GetPassageEmbeddingAsync(passage, ct);
                     candidates.Add((passage, match.Score, vector));
@@ -443,7 +491,7 @@ public sealed class FieldExtractor : IFieldExtractor
         {
             _logger.LogWarning("Vector profile {Profile} unavailable; falling back to lexical search.", MeridianConstants.VectorProfile);
 
-            foreach (var passage in corpus.Where(p => p.PipelineId == pipelineId))
+            foreach (var passage in corpus.Where(p => allowedDocuments.Contains(p.SourceDocumentId)))
             {
                 var score = ComputeKeywordScore(passage.Text, query);
                 if (score <= 0)

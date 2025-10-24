@@ -24,15 +24,6 @@ public sealed class AnalysisTypeCanonicalizationHook : IModelHook<AnalysisType>
         model.OutputTemplate = FieldPathCanonicalizer.CanonicalizeTemplatePlaceholders(model.OutputTemplate);
         model.JsonSchema = FieldPathCanonicalizer.CanonicalizeJsonSchema(model.JsonSchema);
 
-        if (model.RequiredSourceTypes.Count > 0)
-        {
-            model.RequiredSourceTypes = model.RequiredSourceTypes
-                .Where(value => !string.IsNullOrWhiteSpace(value))
-                .Select(value => value.Trim())
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToList();
-        }
-
         model.UpdatedAt = DateTime.UtcNow;
         return Task.CompletedTask;
     }

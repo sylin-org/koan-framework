@@ -4,13 +4,46 @@
 
 ---
 
-## 🎯 Quick Navigation
+## � NEW: UX Realignment Proposal (Oct 2025)
+
+### 📋 **[UX-REALIGNMENT-INDEX.md](UX-REALIGNMENT-INDEX.md)** ⭐ START HERE
+
+**Complete UX redesign proposal** addressing navigation inconsistencies and borrowing proven patterns from SnapVault.
+
+**5 comprehensive documents:**
+
+1. **Executive Summary** - Overview & key decisions (10 min)
+2. **Full Proposal** - Complete design specification (30 min)
+3. **Quick Reference** - Fast lookup for developers (5 min)
+4. **Visual Mockups** - ASCII art layouts & flows (15 min)
+5. **Implementation Guide** - Step-by-step code (25 min)
+
+**Problems solved:**
+
+- ✅ Fragmented navigation patterns (3 different approaches)
+- ✅ Unclear hierarchy (work vs configuration)
+- ✅ Context-breaking full-page jumps
+- ✅ Inconsistent list/detail access
+
+**Solutions:**
+
+- ✅ Unified sidebar navigation (SnapVault-inspired)
+- ✅ Contextual detail panels (60% width slide-ins)
+- ✅ Professional dark theme (#0A0A0A, #141414)
+- ✅ Consistent patterns across all entity types
+
+👉 **[READ THE INDEX](UX-REALIGNMENT-INDEX.md)** to find the right document for your role.
+
+---
+
+## �🎯 Quick Navigation
 
 ### I want to understand the user experience
 
-👉 **`UX-SPECIFICATION.md`** ✅ CANONICAL
+👉 **`UX-SPECIFICATION.md`** ✅ CANONICAL (Original Vision)
 
 This is the **authoritative UX north star** that defines:
+
 - Core interface patterns (evidence-inline, living workspace)
 - Authoritative Notes override experience
 - Clone to multi-perspective analysis
@@ -20,6 +53,17 @@ This is the **authoritative UX north star** that defines:
 
 **Everyone should read this first** to understand Meridian's UX vision.
 
+👉 **`UX-REALIGNMENT-INDEX.md`** 🎨 NEW (Redesign Proposal)
+
+**Addresses navigation issues** identified in current implementation:
+
+- Unified sidebar navigation
+- Consistent detail panels
+- SnapVault-inspired visual design
+- 4-phase implementation plan
+
+**Read this** if you're implementing the UI or reviewing the redesign.
+
 ---
 
 ### I want to understand how it works technically
@@ -27,6 +71,7 @@ This is the **authoritative UX north star** that defines:
 👉 **`../MERIDIAN_EXPLAINED.md`**
 
 A narrative guide that explains:
+
 - The problem Meridian solves (document chaos → structured intelligence)
 - How RAG (Retrieval-Augmented Generation) works
 - Step-by-step journey through the extraction pipeline
@@ -43,6 +88,7 @@ A narrative guide that explains:
 👉 **`../PROPOSAL.md`**
 
 Complete technical specification including:
+
 - System architecture and design decisions
 - Data models and entity relationships
 - API endpoints and contracts
@@ -59,6 +105,7 @@ Complete technical specification including:
 👉 **`AUTHORITATIVE-NOTES-PROPOSAL.md`**
 
 Comprehensive specification covering:
+
 - Virtual document pattern architecture
 - AI-powered field matching
 - Precedence-based merge logic
@@ -76,6 +123,7 @@ Comprehensive specification covering:
 👉 **`GETTING_STARTED.md`**
 
 Developer onboarding covering:
+
 - Environment setup
 - Running the sample locally
 - Database configuration
@@ -92,6 +140,7 @@ Developer onboarding covering:
 👉 **`../ARCHITECTURE.md`**
 
 Deep dive into:
+
 - Design decisions and trade-offs
 - Why RAG vs. alternatives
 - Vector database selection
@@ -173,27 +222,29 @@ samples/S7.Meridian/
 
 ## 📋 Documentation Status
 
-| Document | Status | Purpose |
-|----------|--------|---------|
-| **UX-SPECIFICATION.md** | ✅ CANONICAL | Authoritative UX north star |
-| **AUTHORITATIVE-NOTES-PROPOSAL.md** | ✅ Approved | Technical spec for notes feature |
-| **MERIDIAN_EXPLAINED.md** | ✅ Current | Narrative technical guide |
-| **PROPOSAL.md** | ✅ Current | Technical specification |
-| **ARCHITECTURE.md** | ✅ Current | Design rationale |
-| **GETTING_STARTED.md** | ✅ Current | Developer onboarding |
-| **ux-archive/** | ⚠️ Historical | Superseded UX explorations |
+| Document                            | Status        | Purpose                          |
+| ----------------------------------- | ------------- | -------------------------------- |
+| **UX-SPECIFICATION.md**             | ✅ CANONICAL  | Authoritative UX north star      |
+| **AUTHORITATIVE-NOTES-PROPOSAL.md** | ✅ Approved   | Technical spec for notes feature |
+| **MERIDIAN_EXPLAINED.md**           | ✅ Current    | Narrative technical guide        |
+| **PROPOSAL.md**                     | ✅ Current    | Technical specification          |
+| **ARCHITECTURE.md**                 | ✅ Current    | Design rationale                 |
+| **GETTING_STARTED.md**              | ✅ Current    | Developer onboarding             |
+| **ux-archive/**                     | ⚠️ Historical | Superseded UX explorations       |
 
 ---
 
 ## 🔍 Finding Specific Information
 
 ### User Experience Questions
+
 - **Interface patterns?** → `UX-SPECIFICATION.md` Section III
 - **Visual design (colors, typography)?** → `UX-SPECIFICATION.md` Section VII
 - **Mobile/responsive strategy?** → `UX-SPECIFICATION.md` Section VIII
 - **Success metrics?** → `UX-SPECIFICATION.md` Section IX
 
 ### Technical Questions
+
 - **How does RAG work?** → `MERIDIAN_EXPLAINED.md` Section on RAG
 - **Data models?** → `PROPOSAL.md` or `../README.md` Step 1
 - **API endpoints?** → `PROPOSAL.md` API section
@@ -201,6 +252,7 @@ samples/S7.Meridian/
 - **Confidence scoring?** → `MERIDIAN_EXPLAINED.md` Evidence section
 
 ### Feature Implementation Questions
+
 - **Authoritative Notes?** → `AUTHORITATIVE-NOTES-PROPOSAL.md`
 - **Clone feature?** → `UX-SPECIFICATION.md` Section IV.B
 - **Quality dashboard?** → `UX-SPECIFICATION.md` Section IV.C
@@ -213,6 +265,7 @@ samples/S7.Meridian/
 ### docs/ux-archive/
 
 This folder contains **superseded UX documentation** from earlier iterations:
+
 - prop2 living analysis exploration (concepts now integrated into UX-SPECIFICATION.md)
 - Early UX proposal drafts (00-04 series)
 - Component/layout explorations
@@ -250,6 +303,7 @@ When adding or updating documentation:
 ## 📞 Questions?
 
 If you can't find what you're looking for:
+
 1. Check the **Quick Navigation** section above
 2. Review the **Navigation Paths by Role**
 3. Use **Finding Specific Information** search guide
