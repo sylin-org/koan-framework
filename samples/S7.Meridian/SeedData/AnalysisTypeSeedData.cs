@@ -1,5 +1,10 @@
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
 using Koan.Samples.Meridian.Infrastructure;
 using Koan.Samples.Meridian.Models;
+using Newtonsoft.Json.Schema;
 
 namespace Koan.Samples.Meridian.SeedData;
 
@@ -9,8 +14,10 @@ namespace Koan.Samples.Meridian.SeedData;
 /// </summary>
 public static class AnalysisTypeSeedData
 {
-    public static AnalysisType[] GetAnalysisTypes() => new[]
+    public static AnalysisType[] GetAnalysisTypes()
     {
+        var types = new[]
+        {
         new AnalysisType
         {
             Id = "EnterpriseArchitectureReview",
@@ -763,4 +770,118 @@ Provide a compliance rating and prioritized remediation recommendations.",
             UpdatedAt = DateTime.UtcNow
         }
     };
+
+        for (var i = 0; i < types.Length; i++)
+        {
+            types[i] = WithTaxonomy(types[i]);
+        }
+
+        return types;
+    }
+
+    private static AnalysisType WithTaxonomy(AnalysisType type)
+    {
+        if (string.IsNullOrWhiteSpace(type.JsonSchema))
+        {
+            type.FactCategories = new List<FactBlueprint.FactCategory>();
+            type.FieldMappings = new List<FactBlueprint.FieldMapping>();
+            return type;
+        }
+
+        try
+        {
+            var schema = JSchema.Parse(type.JsonSchema);
+            var categories = new Dictionary<string, FactBlueprint.FactCategory>(StringComparer.OrdinalIgnoreCase);
+            var mappings = new List<FactBlueprint.FieldMapping>();
+
+            foreach (var (fieldPath, fieldSchema) in SchemaFieldEnumerator.EnumerateLeaves(schema))
+            {
+                var canonical = FieldPathCanonicalizer.Canonicalize(fieldPath);
+                var categoryId = BuildCategoryId(canonical);
+
+                if (!categories.TryGetValue(categoryId, out var category))
+                {
+                    category = new FactBlueprint.FactCategory
+                    {
+                        Id = categoryId,
+                        Label = FieldPathCanonicalizer.ToDisplayName(canonical),
+                        Attributes = new List<FactBlueprint.FactAttribute>
+                        {
+                            new FactBlueprint.FactAttribute
+                            {
+                                Id = "value",
+                                Label = FieldPathCanonicalizer.ToDisplayName(canonical),
+                                DataType = DescribeDataType(fieldSchema),
+                                Required = false
+                            }
+                        }
+                    };
+
+                    categories[categoryId] = category;
+                }
+
+                mappings.Add(new FactBlueprint.FieldMapping
+                {
+                    FieldPath = canonical,
+                    CategoryId = categoryId,
+                    AttributeId = "value",
+                    MinimumConfidence = 0.4,
+                    AllowSynthesis = true,
+                    Aggregation = fieldSchema.Type == JSchemaType.Array ? "collection" : null
+                });
+            }
+
+            type.FactCategories = categories.Values.ToList();
+            type.FieldMappings = mappings;
+        }
+        catch (JSchemaException)
+        {
+            type.FactCategories = new List<FactBlueprint.FactCategory>();
+            type.FieldMappings = new List<FactBlueprint.FieldMapping>();
+        }
+
+        return type;
+    }
+
+    private static string BuildCategoryId(string canonicalFieldPath)
+    {
+        var key = canonicalFieldPath.TrimStart('$').Trim('.');
+        if (string.IsNullOrWhiteSpace(key))
+        {
+            key = "root";
+        }
+
+        key = key.Replace("[]", "_items", StringComparison.Ordinal);
+        key = key.Replace('.', '_');
+
+        return "field::" + key;
+    }
+
+    private static string DescribeDataType(JSchema schema)
+    {
+        if (schema.Type is null)
+        {
+            return "string";
+        }
+
+        if (schema.Type == JSchemaType.Array && schema.Items.Count > 0)
+        {
+            return "array<" + DescribeDataType(schema.Items[0]) + ">";
+        }
+
+        if (!string.IsNullOrWhiteSpace(schema.Format))
+        {
+            return schema.Format;
+        }
+
+        return schema.Type.Value switch
+        {
+            JSchemaType.Integer => "integer",
+            JSchemaType.Number => "number",
+            JSchemaType.Boolean => "boolean",
+            JSchemaType.Array => "array",
+            JSchemaType.Object => "object",
+            _ => schema.Type.Value.ToString().ToLower(CultureInfo.InvariantCulture)
+        };
+    }
 }

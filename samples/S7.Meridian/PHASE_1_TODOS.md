@@ -7,6 +7,9 @@
 
 ---
 
+> **Architecture Update:** This checklist predates the migration to the fact catalog pipeline. Wherever you see `FieldExtractor`, substitute the combined work of `DocumentFactExtractor` and `FieldFactMatcher`.
+
+
 ## Pre-Implementation Setup
 
 ### ☐ SETUP-1: Verify Ollama Configuration

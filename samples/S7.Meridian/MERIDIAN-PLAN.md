@@ -13,6 +13,8 @@
 **Current Task**: Stabilize production endpoints & observability
 **Next Checkpoint**: Day 2 UI/alert persistence follow-up
 
+> **Architecture Update:** The legacy `FieldExtractor` workflow referenced in early task breakdowns has been superseded by the `DocumentFactExtractor` + `FieldFactMatcher` fact catalog pipeline. Treat any remaining FieldExtractor mentions in historical checklists as guidance for these services.
+
 ### Phase Completion Status
 ```
 ✅ Phase 0: Foundation Setup (COMPLETE)
@@ -85,7 +87,8 @@ samples/S7.Meridian/
 │   ├── ProcessingJob.cs             ✅ Durable queue
 │   └── RunLog.cs                    ✅ Audit trail
 ├── Services/
-│   ├── FieldExtractor.cs            ✅ Full RAG pipeline (Phase 1 delivered)
+│   ├── DocumentFactExtractor.cs     ✅ Fact catalog query + evidence extraction
+│   ├── FieldFactMatcher.cs          ✅ Field alignment + override handling
 │   ├── DocumentMerger.cs            ✅ Merge engine + incremental refresh preservation
 │   ├── TextExtractor.cs             ✅ PdfPig + DOCX
 │   ├── PassageChunker.cs            ✅ Semantic chunking

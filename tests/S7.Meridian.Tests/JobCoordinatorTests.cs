@@ -12,6 +12,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
+using static S7.Meridian.Tests.JobCoordinatorTestHost;
 
 namespace S7.Meridian.Tests;
 
@@ -153,7 +154,10 @@ internal static class JobCoordinatorTestHost
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["Koan:Environment"] = "Test",
-                ["Koan:Data:Provider"] = "Memory"
+                ["Koan:Data:Sources:Default:Adapter"] = "memory",
+                ["Koan:Data:Vector:EnableWorkflows"] = "false",
+                ["Koan:BackgroundServices:Enabled"] = "false",
+                ["Logging:EventLog:LogLevel:Default"] = "None"
             })
             .Build();
 

@@ -1,5 +1,7 @@
+using System;
 using System.Collections.Generic;
 using Koan.Data.Core.Model;
+using Koan.Samples.Meridian.Infrastructure;
 
 namespace Koan.Samples.Meridian.Models;
 
@@ -18,6 +20,8 @@ public sealed class AnalysisType : Entity<AnalysisType>
     public string Instructions { get; set; } = string.Empty;
     public string OutputTemplate { get; set; } = string.Empty;
     public string JsonSchema { get; set; } = string.Empty;
+    public List<FactBlueprint.FactCategory> FactCategories { get; set; } = new();
+    public List<FactBlueprint.FieldMapping> FieldMappings { get; set; } = new();
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;

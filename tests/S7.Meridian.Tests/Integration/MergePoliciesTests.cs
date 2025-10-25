@@ -144,7 +144,10 @@ public sealed class MergePoliciesTests
         var configurationValues = new Dictionary<string, string?>
         {
             ["Koan:Environment"] = "Test",
-            ["Koan:Data:Provider"] = "Memory",
+            ["Koan:Data:Sources:Default:Adapter"] = "memory",
+            ["Koan:Data:Vector:EnableWorkflows"] = "false",
+            ["Koan:BackgroundServices:Enabled"] = "false",
+            ["Logging:EventLog:LogLevel:Default"] = "None",
             ["Meridian:Merge:EnableCitations"] = "true",
             ["Meridian:Merge:EnableExplainability"] = "true",
             ["Meridian:Merge:EnableNormalizedComparison"] = "true",

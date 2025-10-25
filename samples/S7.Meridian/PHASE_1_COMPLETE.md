@@ -53,7 +53,8 @@
 ### Modified Files (6)
 
 ```
-✅ Services/FieldExtractor.cs           Gutted → Full RAG implementation (600+ lines)
+✅ Services/DocumentFactExtractor.cs    Fact catalog extraction (supersedes legacy FieldExtractor)
+✅ Services/FieldFactMatcher.cs         Deterministic taxonomy alignment for deliverable fields
 ✅ Services/PassageIndexer.cs           Added embedding cache integration
 ✅ Services/PipelineProcessor.cs        Added MeridianOptions injection
 ✅ Initialization/KoanAutoRegistrar.cs  Registered cache + options
@@ -263,12 +264,11 @@ Next implementation:
 ### Key Implementation Files
 
 ```
-Services/FieldExtractor.cs:68-82      BuildRAGQuery (camelCase conversion)
-Services/FieldExtractor.cs:89-122     RetrievePassages (hybrid search)
-Services/FieldExtractor.cs:147-204    ApplyMMR (diversity filter)
-Services/FieldExtractor.cs:253-285    BuildExtractionPrompt (LLM prompt)
-Services/FieldExtractor.cs:411-487    ExtractFromPassages (full pipeline)
-Services/FieldExtractor.cs:492-521    LocateSpanInPassage (evidence)
+Services/DocumentFactExtractor.cs:140-236  Build fact prompts + constraints
+Services/DocumentFactExtractor.cs:262-410  Parse taxonomy-aligned facts with anchors
+Services/FieldFactMatcher.cs:92-210        Match facts to deliverable schema fields
+Services/FieldFactMatcher.cs:402-520       Order candidates + build collection extractions
+Services/FieldFactMatcher.cs:615-694       Controlled synthesis fallback
 Services/EmbeddingCache.cs:25-30      ComputeContentHash (SHA-256)
 Services/PassageIndexer.cs:53-75      Cache-aware embedding
 ```
@@ -322,4 +322,4 @@ Services/PassageIndexer.cs:53-75      Cache-aware embedding
 
 ---
 
-_For questions or issues, refer to TESTING.md troubleshooting section or review the implementation in Services/FieldExtractor.cs_
+_For questions or issues, refer to TESTING.md troubleshooting section or review the implementations in Services/DocumentFactExtractor.cs and Services/FieldFactMatcher.cs_

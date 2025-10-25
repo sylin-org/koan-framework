@@ -52,16 +52,7 @@ public sealed class AiSuggestEndpointTests : IClassFixture<MeridianWebApplicatio
     {
         var request = new AnalysisTypeAiSuggestRequest
         {
-            Goal = "Produce an enterprise architecture review summarizing strengths, risks, and recommended actions.",
-            Audience = "CIO steering committee",
-            IncludedSourceTypes = new List<string>
-            {
-                "MeetingNotes",
-                "CustomerTechnicalBulletin",
-                "VendorPrescreenQuestionnaire",
-                "CybersecurityAssessment"
-            },
-            AdditionalContext = "Highlight integration risks, cybersecurity posture, and vendor roadmap alignment."
+            Prompt = "Produce an enterprise architecture review summarizing strengths, risks, and recommended actions for a CIO steering committee. Highlight integration risks, cybersecurity posture, and vendor roadmap alignment."
         };
 
         var response = await _client.PostAsJsonAsync("/api/analysistypes/ai-suggest", request);

@@ -64,7 +64,8 @@ public sealed class DocumentFactExtractor : IDocumentFactExtractor
         if (analysisType is null) throw new ArgumentNullException(nameof(analysisType));
 
         var schema = pipeline.TryParseSchema();
-        var expectationSummary = FieldExpectationBuilder.Build(analysisType, schema);
+    var expectationSummary = FieldExpectationBuilder.Build(analysisType, schema);
+    var taxonomy = FactBlueprint.Build(analysisType, schema);
         var organizationProfile = await OrganizationProfile.GetActiveAsync(ct).ConfigureAwait(false);
         var expectations = FieldExpectationBuilder.MergeWithOrganizationFields(expectationSummary, organizationProfile);
         var existing = await DocumentFact.Query(f =>
@@ -91,7 +92,7 @@ public sealed class DocumentFactExtractor : IDocumentFactExtractor
             return Array.Empty<DocumentFact>();
         }
 
-        var prompt = BuildPrompt(pipeline, analysisType, expectationSummary, expectations, document);
+    var prompt = BuildPrompt(pipeline, analysisType, expectationSummary, expectations, taxonomy, document);
         var promptHash = ComputePromptHash(prompt);
         var model = _options.Facts.ExtractionModel ?? _options.Extraction.Model ?? "granite3.3:8b";
         var chatOptions = new AiChatOptions
@@ -117,7 +118,7 @@ public sealed class DocumentFactExtractor : IDocumentFactExtractor
         IReadOnlyList<DocumentFact> parsed;
         try
         {
-            parsed = ParseFacts(raw, document, pipeline, analysisType);
+            parsed = ParseFacts(raw, document, pipeline, analysisType, taxonomy);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -145,7 +146,13 @@ public sealed class DocumentFactExtractor : IDocumentFactExtractor
         return savedFacts;
     }
 
-    private string BuildPrompt(DocumentPipeline pipeline, AnalysisType analysisType, AnalysisExpectationSummary expectationSummary, IReadOnlyList<FieldExpectation> expectations, SourceDocument document)
+    private string BuildPrompt(
+        DocumentPipeline pipeline,
+        AnalysisType analysisType,
+        AnalysisExpectationSummary expectationSummary,
+        IReadOnlyList<FieldExpectation> expectations,
+        FactBlueprint.Taxonomy taxonomy,
+        SourceDocument document)
     {
         var builder = new StringBuilder();
         builder.AppendLine($"You are cataloging grounded facts for the analysis \"{analysisType.Name}\".");
@@ -196,17 +203,51 @@ public sealed class DocumentFactExtractor : IDocumentFactExtractor
             }
         }
 
+        if (taxonomy.Categories.Count > 0)
+        {
+            builder.AppendLine();
+            builder.AppendLine("FACT CATEGORY DEFINITIONS:");
+            foreach (var category in taxonomy.Categories.Take(40))
+            {
+                builder.AppendLine($"- {category.Id} → {category.Label}");
+                if (!string.IsNullOrWhiteSpace(category.Description))
+                {
+                    builder.AppendLine($"  description: {category.Description}");
+                }
+
+                if (category.Synonyms.Count > 0)
+                {
+                    builder.AppendLine($"  synonyms: {string.Join(", ", category.Synonyms)}");
+                }
+
+                builder.AppendLine($"  attributes:");
+                foreach (var attribute in category.Attributes)
+                {
+                    var requirement = attribute.Required ? "required" : "optional";
+                    builder.AppendLine($"    - {attribute.Id} ({attribute.DataType}, {requirement})");
+                    if (attribute.Synonyms.Count > 0)
+                    {
+                        builder.AppendLine($"      synonyms: {string.Join(", ", attribute.Synonyms)}");
+                    }
+                }
+            }
+        }
+
         builder.AppendLine();
         builder.AppendLine("EXPECTED JSON OUTPUT:");
         builder.AppendLine("{");
         builder.AppendLine("  \"facts\": [");
         builder.AppendLine("    {");
+        builder.AppendLine("      \"categoryId\": \"field::servicenow_id\",");
+        builder.AppendLine("      \"label\": \"ServiceNow ticket reference\",");
         builder.AppendLine("      \"summary\": \"short fact summary\",");
         builder.AppendLine("      \"detail\": \"optional longer detail\",");
         builder.AppendLine("      \"confidence\": 0.0,");
         builder.AppendLine("      \"evidence\": \"direct quote or paraphrased sentence\",");
         builder.AppendLine("      \"reasoning\": \"brief justification\",");
-        builder.AppendLine("      \"facetHints\": [\"servicenow_id\", \"ticket\"],");
+        builder.AppendLine("      \"attributes\": {");
+        builder.AppendLine("        \"value\": \"SN-12345\"");
+        builder.AppendLine("      },");
         builder.AppendLine("      \"anchors\": [");
         builder.AppendLine("        { \"page\": 3, \"section\": \"Review Details\", \"span\": { \"start\": 214, \"end\": 240 } }");
         builder.AppendLine("      ]");
@@ -218,11 +259,12 @@ public sealed class DocumentFactExtractor : IDocumentFactExtractor
         builder.AppendLine("RULES:");
         builder.AppendLine("- Limit to " + Math.Clamp(expectations.Count * 4, 12, _options.Facts.MaxFactsPerDocument) + " total facts.");
         builder.AppendLine("- Facts must remain grounded in the source document (no fabrication).");
-        builder.AppendLine("- facetHints should be lower_snake_case tokens tied to the expectations above.");
         builder.AppendLine("- anchors should include any available location hints (page, section, span).");
-        builder.AppendLine("- Include facts even if you are unsure which field they map to.");
+        builder.AppendLine("- Include facts even if you are unsure which field they map to; the matcher will decide later.");
         builder.AppendLine("- Do not emit facts about missing or unknown information; if the document does not state something, omit it.");
-        builder.AppendLine("- Every fact must quote or paraphrase an explicit statement from the document; absence or speculation is not considered a fact.");
+        builder.AppendLine("- Ignore meta/disclaimer text (e.g., notes that the document is a sample, generated, auto-classified, or training content). If the document only contains such context, return { \"facts\": [] }.");
+        builder.AppendLine("- Populate only the attributes defined for each category; omit keys that are not supported.");
+        builder.AppendLine("- Every fact must quote or paraphrase an explicit statement from the document; absence, speculation, or meta commentary is not considered a fact.");
         builder.AppendLine();
         builder.AppendLine($"DOCUMENT NAME: {document.OriginalFileName}");
         builder.AppendLine("DOCUMENT TEXT:");
@@ -230,7 +272,12 @@ public sealed class DocumentFactExtractor : IDocumentFactExtractor
         return builder.ToString();
     }
 
-    private IReadOnlyList<DocumentFact> ParseFacts(string rawResponse, SourceDocument document, DocumentPipeline pipeline, AnalysisType analysisType)
+    private IReadOnlyList<DocumentFact> ParseFacts(
+        string rawResponse,
+        SourceDocument document,
+        DocumentPipeline pipeline,
+        AnalysisType analysisType,
+        FactBlueprint.Taxonomy taxonomy)
     {
         if (string.IsNullOrWhiteSpace(rawResponse))
         {
@@ -250,6 +297,18 @@ public sealed class DocumentFactExtractor : IDocumentFactExtractor
         var results = new List<DocumentFact>();
         foreach (var token in array.OfType<JObject>())
         {
+            var categoryId = token.Value<string>("categoryId")?.Trim();
+            if (string.IsNullOrWhiteSpace(categoryId))
+            {
+                continue;
+            }
+
+            var category = taxonomy.FindCategory(categoryId);
+            if (category is null)
+            {
+                continue;
+            }
+
             var summary = token.Value<string>("summary")?.Trim();
             if (string.IsNullOrWhiteSpace(summary))
             {
@@ -266,24 +325,52 @@ public sealed class DocumentFactExtractor : IDocumentFactExtractor
                 continue;
             }
 
-            var facetHints = token["facetHints"] is JArray hintsArray
-                ? hintsArray.Values<string?>()
-                    .Select(h => h?.Trim().ToLowerInvariant())
-                    .Where(h => !string.IsNullOrWhiteSpace(h))
-                    .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .Cast<string>()
-                    .ToList()
-                : new List<string>();
+            var label = token.Value<string>("label")?.Trim() ?? string.Empty;
+
+            var attributes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            if (token["attributes"] is JObject attributeObject)
+            {
+                foreach (var property in attributeObject.Properties())
+                {
+                    var value = property.Value?.ToString()?.Trim();
+                    if (string.IsNullOrWhiteSpace(value))
+                    {
+                        continue;
+                    }
+
+                    if (LooksLikeAbsenceFact(value))
+                    {
+                        continue;
+                    }
+
+                    var attributeDefinition = category.Attributes.FirstOrDefault(attribute =>
+                        string.Equals(attribute.Id, property.Name, StringComparison.OrdinalIgnoreCase));
+
+                    if (attributeDefinition is null)
+                    {
+                        continue;
+                    }
+
+                    attributes[attributeDefinition.Id] = value;
+                }
+            }
+
+            if (attributes.Count == 0)
+            {
+                continue;
+            }
 
             var anchors = ParseAnchors(token["anchors"]);
             var fact = new DocumentFact
             {
+                CategoryId = categoryId,
+                Label = label,
                 Summary = summary,
                 Detail = string.IsNullOrWhiteSpace(detail) ? null : detail,
                 Evidence = evidence,
                 Reasoning = token.Value<string>("reasoning")?.Trim(),
                 Confidence = confidence,
-                FacetHints = facetHints,
+                Attributes = attributes,
                 Anchors = anchors,
                 Metadata = BuildFactMetadata(token["metadata"], pipeline, analysisType, document)
             };

@@ -474,7 +474,8 @@ Koan automatically routes this to the right vector provider based on configurati
 
 Traditional code:
 ```csharp
-services.AddScoped<IFieldExtractor, FieldExtractor>();
+services.AddScoped<IDocumentFactExtractor, DocumentFactExtractor>();
+services.AddScoped<IFieldFactMatcher, FieldFactMatcher>();
 services.AddScoped<IDocumentMerger, DocumentMerger>();
 services.AddScoped<...>(25 more services);
 ```

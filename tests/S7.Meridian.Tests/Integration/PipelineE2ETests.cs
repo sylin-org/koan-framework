@@ -153,7 +153,10 @@ public sealed class PipelineE2ETests
         var configurationValues = new Dictionary<string, string?>
         {
             ["Koan:Environment"] = "Test",
-            ["Koan:Data:Provider"] = "Memory",
+            ["Koan:Data:Sources:Default:Adapter"] = "memory",
+            ["Koan:Data:Vector:EnableWorkflows"] = "false",
+            ["Koan:BackgroundServices:Enabled"] = "false",
+            ["Logging:EventLog:LogLevel:Default"] = "None",
             ["Meridian:Retrieval:TopK"] = "8",
             ["Meridian:Retrieval:Alpha"] = "0.5",
             ["Meridian:Retrieval:MmrLambda"] = "0.7",

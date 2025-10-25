@@ -276,7 +276,7 @@ public class PipelineBootstrapService : IPipelineBootstrapService
             file.FileName, inManifest, manifestEntry?.Type ?? "null");
 
         // Store the document once. Ingestion service handles attachment and dedupe.
-        var ingestionResult = await _ingestionService.IngestAsync(pipeline.Id, file, forceReprocess: false, ct);
+            var ingestionResult = await _ingestionService.IngestAsync(pipeline.Id, file, forceReprocess: false, typeHint: null, ct);
         var storedDocument = ingestionResult.NewDocuments.FirstOrDefault()
             ?? ingestionResult.ReusedDocuments.FirstOrDefault();
 

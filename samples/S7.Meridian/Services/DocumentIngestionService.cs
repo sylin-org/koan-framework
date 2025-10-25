@@ -17,8 +17,8 @@ namespace Koan.Samples.Meridian.Services;
 
 public interface IDocumentIngestionService
 {
-    Task<DocumentIngestionResult> IngestAsync(string pipelineId, IFormFileCollection files, bool forceReprocess, CancellationToken ct);
-    Task<DocumentIngestionResult> IngestAsync(string pipelineId, IFormFile file, bool forceReprocess, CancellationToken ct);
+    Task<DocumentIngestionResult> IngestAsync(string pipelineId, IFormFileCollection files, bool forceReprocess, string? typeHint, CancellationToken ct);
+    Task<DocumentIngestionResult> IngestAsync(string pipelineId, IFormFile file, bool forceReprocess, string? typeHint, CancellationToken ct);
 }
 
 public sealed record DocumentIngestionResult(
@@ -44,7 +44,7 @@ public sealed class DocumentIngestionService : IDocumentIngestionService
         _logger = logger;
     }
 
-    public async Task<DocumentIngestionResult> IngestAsync(string pipelineId, IFormFileCollection files, bool forceReprocess, CancellationToken ct)
+    public async Task<DocumentIngestionResult> IngestAsync(string pipelineId, IFormFileCollection files, bool forceReprocess, string? typeHint, CancellationToken ct)
     {
         if (files is null || files.Count == 0)
         {
@@ -64,7 +64,7 @@ public sealed class DocumentIngestionService : IDocumentIngestionService
         var reuseTelemetryCandidates = new List<SourceDocument>();
         var attachmentsAdded = false;
 
-        foreach (var file in files)
+    foreach (var file in files)
         {
             if (file is null || file.Length == 0)
             {
@@ -103,7 +103,22 @@ public sealed class DocumentIngestionService : IDocumentIngestionService
                     reuseTelemetryCandidates.Add(existingByHash);
                 }
 
-                if (forceReprocess)
+                var requiresReprocess = forceReprocess || !string.IsNullOrWhiteSpace(typeHint);
+
+                if (!string.IsNullOrWhiteSpace(typeHint))
+                {
+                    ApplyManualClassification(existingByHash, typeHint, "Upload hint");
+                    existingByHash.Status = DocumentProcessingStatus.Pending;
+                    existingByHash.UpdatedAt = DateTime.UtcNow;
+                    var updated = await existingByHash.Save(ct).ConfigureAwait(false);
+                    documentsByHash[hash] = updated;
+                    ReplaceDocument(existingDocuments, updated);
+                    existingByHash = updated;
+
+                    await AppendClassificationAuditAsync(pipeline, existingByHash, "manual-hint", ct).ConfigureAwait(false);
+                }
+
+                if (requiresReprocess)
                 {
                     existingByHash.Status = DocumentProcessingStatus.Pending;
                     existingByHash.UpdatedAt = DateTime.UtcNow;
@@ -117,7 +132,7 @@ public sealed class DocumentIngestionService : IDocumentIngestionService
                     ReplaceDocument(existingDocuments, refreshed);
                     newDocuments.Add(refreshed);
                     attachmentsAdded = true;
-                    _logger.LogInformation("Force reprocess enabled; queued existing document {DocumentId} for pipeline {PipelineId}.", refreshed.Id, pipeline.Id);
+                    _logger.LogInformation("Queued existing document {DocumentId} for reprocessing in pipeline {PipelineId}.", refreshed.Id, pipeline.Id);
                 }
                 else
                 {
@@ -144,6 +159,11 @@ public sealed class DocumentIngestionService : IDocumentIngestionService
                 UpdatedAt = DateTime.UtcNow
             };
 
+            if (!string.IsNullOrWhiteSpace(typeHint))
+            {
+                ApplyManualClassification(document, typeHint, "Upload hint");
+            }
+
             var saved = await document.Save(ct).ConfigureAwait(false);
             pipeline.AttachDocument(saved.Id!);
             attachmentsAdded = true;
@@ -152,6 +172,11 @@ public sealed class DocumentIngestionService : IDocumentIngestionService
             newDocuments.Add(saved);
 
             _logger.LogInformation("Stored document {DocumentId} for pipeline {PipelineId}.", saved.Id, pipeline.Id);
+
+            if (!string.IsNullOrWhiteSpace(typeHint))
+            {
+                await AppendClassificationAuditAsync(pipeline, saved, "manual-hint", ct).ConfigureAwait(false);
+            }
         }
 
         if (newDocuments.Count == 0 && reusedDocuments.Count == 0)
@@ -173,14 +198,44 @@ public sealed class DocumentIngestionService : IDocumentIngestionService
         return new DocumentIngestionResult(newDocuments, reusedDocuments);
     }
 
-    public async Task<DocumentIngestionResult> IngestAsync(string pipelineId, IFormFile file, bool forceReprocess, CancellationToken ct)
+    public async Task<DocumentIngestionResult> IngestAsync(string pipelineId, IFormFile file, bool forceReprocess, string? typeHint, CancellationToken ct)
     {
         if (file is null)
         {
             throw new ArgumentNullException(nameof(file));
         }
 
-        return await IngestAsync(pipelineId, new FormFileCollection { file }, forceReprocess, ct).ConfigureAwait(false);
+        return await IngestAsync(pipelineId, new FormFileCollection { file }, forceReprocess, typeHint, ct).ConfigureAwait(false);
+    }
+
+    private static void ApplyManualClassification(SourceDocument document, string typeId, string reason)
+    {
+        document.SourceType = typeId;
+        document.ClassifiedTypeId = typeId;
+        document.ClassifiedTypeVersion = 1;
+        document.ClassificationConfidence = 1.0;
+        document.ClassificationMethod = ClassificationMethod.Manual;
+        document.ClassificationReason = reason;
+    }
+
+    private async Task AppendClassificationAuditAsync(DocumentPipeline pipeline, SourceDocument document, string mode, CancellationToken ct)
+    {
+        await _runLog.AppendAsync(new RunLog
+        {
+            PipelineId = pipeline.Id ?? string.Empty,
+            Stage = "classify",
+            DocumentId = document.Id,
+            Status = mode,
+            StartedAt = DateTime.UtcNow,
+            FinishedAt = DateTime.UtcNow,
+            Metadata = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["typeId"] = document.ClassifiedTypeId ?? document.SourceType,
+                ["method"] = document.ClassificationMethod.ToString(),
+                ["reason"] = document.ClassificationReason ?? string.Empty,
+                ["confidence"] = document.ClassificationConfidence.ToString("0.00", CultureInfo.InvariantCulture)
+            }
+        }, ct).ConfigureAwait(false);
     }
 
     private static async Task<(string Hash, MemoryStream Content)> BufferAndHashAsync(IFormFile file, CancellationToken ct)

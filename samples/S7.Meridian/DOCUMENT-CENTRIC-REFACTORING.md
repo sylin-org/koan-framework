@@ -32,10 +32,8 @@ Current Meridian architecture creates **1:1 binding** between documents and pipe
 
 ### Expected Benefits
 
-- **50-80% cost reduction** for multi-pipeline scenarios
-- **Near-zero cost pipeline cloning** (copy config + reference documents)
-- **Cleaner separation of concerns** (processing layer vs. interpretation layer)
-- **Document versioning centralized** (update once, all pipelines see changes)
+
+> **Note:** Early drafts referenced a `FieldExtractor` service. That component has been retired in favour of the `DocumentFactExtractor` + `FieldFactMatcher` fact-catalog pipeline. Wherever this document mentions `FieldExtractor`, read it as guidance for the current fact extraction and alignment services.
 
 ### Design Decision
 
@@ -49,8 +47,8 @@ Use **simple `List<string> DocumentIds`** on `DocumentPipeline` rather than sepa
 
 - `Models/DocumentPipeline.cs` now exposes `DocumentIds`, `OrganizationProfileId`, and helper loaders (`LoadDocumentsAsync`, `LoadPassagesAsync`, `LoadOrganizationProfileAsync`).
 - `Models/SourceDocument.cs` no longer carries `PipelineId`; ingestion, processing, and extraction paths rely exclusively on the pipeline document list.
-- `Models/Passage.cs` no longer stores `PipelineId`; retrieval filters by `pipeline.DocumentIds` throughout `FieldExtractor`, `PipelineProcessor`, and `PassageIndexer`.
-- Organization globals (`Models/OrganizationProfile.cs`) exist and are injected into prompt assembly via `FieldExtractor.BuildInstructionBlock`.
+- `Models/Passage.cs` no longer stores `PipelineId`; retrieval filters by `pipeline.DocumentIds` throughout `DocumentFactExtractor`, `FieldFactMatcher`, `PipelineProcessor`, and `PassageIndexer`.
+- Organization globals (`Models/OrganizationProfile.cs`) exist and are injected into prompt assembly via the `DocumentFactExtractor` prompt builder.
 - Controllers (`DocumentsController`, `PipelineNotesController`) and services (`DocumentIngestionService`, `JobCoordinator`, `PipelineProcessor`) use the new helpers and avoid pipeline counters.
 - Regression coverage exists for document reuse in `tests/S7.Meridian.Tests`, but several fixtures still reference the removed `SourceDocument.PipelineId` property (see Gap Analysis).
 

@@ -1,11 +1,12 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using Koan.Data.Core.Model;
 
 namespace Koan.Samples.Meridian.Models;
 
 /// <summary>
 /// Normalized fact extracted from a document for a given analysis type.
-/// Facts are reusable across pipelines referencing the same document and are enriched with facet hints
+/// Facts are reusable across pipelines referencing the same document and carry taxonomy-aligned attributes
 /// so downstream processes can align them to deliverable expectations.
 /// </summary>
 public sealed class DocumentFact : Entity<DocumentFact>
@@ -13,6 +14,8 @@ public sealed class DocumentFact : Entity<DocumentFact>
     public string SourceDocumentId { get; set; } = string.Empty;
     public string AnalysisTypeId { get; set; } = string.Empty;
     public string DocumentHash { get; set; } = string.Empty;
+    public string CategoryId { get; set; } = string.Empty;
+    public string Label { get; set; } = string.Empty;
     public string Summary { get; set; } = string.Empty;
     public string? Detail { get; set; }
         = null;
@@ -26,7 +29,7 @@ public sealed class DocumentFact : Entity<DocumentFact>
         = 10;
     public bool IsAuthoritative { get; set; }
         = false;
-    public List<string> FacetHints { get; set; } = new();
+    public Dictionary<string, string> Attributes { get; set; } = new(StringComparer.OrdinalIgnoreCase);
     public List<FactAnchor> Anchors { get; set; } = new();
     public Dictionary<string, string> Metadata { get; set; } = new(StringComparer.OrdinalIgnoreCase);
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

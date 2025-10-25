@@ -18,6 +18,7 @@ A local-first document intelligence workbench that transforms mixed source files
 - **Hint-driven classification**: AI descriptors recommend source types with optional user selection
 - **Multi-source aggregation**: Merge data from multiple files with conflict resolution
 - **Citation tracking**: Every extracted value links back to source page and text span
+- **Hands-off pipeline**: Upload triggers automatic type detection and fact cataloging; overrides via `PUT /documents/{id}/type` and `PUT /pipelines/{id}/analysisType` kick off reprocessing without manual prompts
 
 ### 2. **Koan Framework Patterns**
 
@@ -42,6 +43,7 @@ A local-first document intelligence workbench that transforms mixed source files
 - **Observability**: Structured logging, metrics, phase tracking
 - **Versioned deliverables**: Each run snapshots hashed canonical data + evidence maps, rendering templated Markdown/JSON on demand
 - **Incremental refresh**: Targeted field re-extraction with job heartbeats and approval preservation
+- **Audit trail**: Run logs capture auto-classified vs. user-selected document types and analysis changes for each pipeline
 
 ---
 
