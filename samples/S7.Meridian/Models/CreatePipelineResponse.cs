@@ -52,7 +52,7 @@ public class DocumentCreationResult
     /// <summary>Source type name for display.</summary>
     public string SourceTypeName { get; set; } = string.Empty;
 
-    /// <summary>Classification method used (Manual, Heuristic, AI).</summary>
+    /// <summary>Classification method used (Manual) or the placeholder "Deferred" until background processing completes.</summary>
     public string Method { get; set; } = string.Empty;
 
     /// <summary>Classification confidence (0.0-1.0).</summary>

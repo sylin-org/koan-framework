@@ -30,6 +30,27 @@ public sealed class ProcessingJob : Entity<ProcessingJob>
     public int ProcessedDocuments { get; set; } = 0;
     public string? LastDocumentId { get; set; } = null;
 
+    public double Progress
+    {
+        get
+        {
+            if (TotalDocuments <= 0)
+            {
+                return 0;
+            }
+
+            var ratio = (double)ProcessedDocuments / TotalDocuments;
+            if (ratio < 0)
+            {
+                return 0;
+            }
+
+            return ratio > 1 ? 1 : ratio;
+        }
+    }
+
+    public int ProgressPercent => (int)Math.Round(Progress * 100, MidpointRounding.AwayFromZero);
+
     public static async Task<ProcessingJob?> FindPendingAsync(string pipelineId, CancellationToken ct)
     {
         var pending = await Query(j =>

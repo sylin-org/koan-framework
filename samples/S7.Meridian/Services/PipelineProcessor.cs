@@ -21,8 +21,8 @@ public sealed class PipelineProcessor : IPipelineProcessor
     private readonly ITextExtractor _textExtractor;
     private readonly IPassageChunker _chunker;
     private readonly IPassageIndexer _indexer;
-    private readonly IFieldExtractor _fieldExtractor;
-    private readonly INotesExtractionService _notesExtractor;
+    private readonly IDocumentFactExtractor _factExtractor;
+    private readonly IFieldFactMatcher _factMatcher;
     private readonly IDocumentMerger _merger;
     private readonly IDocumentClassifier _classifier;
     private readonly IRunLogWriter _runLog;
@@ -34,8 +34,8 @@ public sealed class PipelineProcessor : IPipelineProcessor
         ITextExtractor textExtractor,
         IPassageChunker chunker,
         IPassageIndexer indexer,
-        IFieldExtractor fieldExtractor,
-        INotesExtractionService notesExtractor,
+        IDocumentFactExtractor factExtractor,
+        IFieldFactMatcher factMatcher,
         IDocumentMerger merger,
         IDocumentClassifier classifier,
         IRunLogWriter runLog,
@@ -46,8 +46,8 @@ public sealed class PipelineProcessor : IPipelineProcessor
         _textExtractor = textExtractor;
         _chunker = chunker;
         _indexer = indexer;
-        _fieldExtractor = fieldExtractor;
-        _notesExtractor = notesExtractor;
+        _factExtractor = factExtractor;
+        _factMatcher = factMatcher;
         _merger = merger;
         _classifier = classifier;
         _runLog = runLog;
@@ -281,26 +281,32 @@ public sealed class PipelineProcessor : IPipelineProcessor
         HashSet<string>? fieldFilter = null;
         if (!plan.RequiresFullExtraction && plan.FieldsToExtract.Count > 0)
         {
-            fieldFilter = plan.FieldsToExtract.ToHashSet(StringComparer.Ordinal);
+            fieldFilter = plan.FieldsToExtract
+                .Select(FieldPathCanonicalizer.Canonicalize)
+                .ToHashSet(StringComparer.Ordinal);
         }
 
         var freshExtractions = new List<ExtractedField>();
         if (plan.RequiresFullExtraction || (fieldFilter?.Count ?? 0) > 0)
         {
-            freshExtractions = await _fieldExtractor.ExtractAsync(pipeline, allPassages, _options, fieldFilter, ct).ConfigureAwait(false);
-        }
+            var analysisType = await AnalysisType.Get(pipeline.AnalysisTypeId, ct).ConfigureAwait(false)
+                ?? throw new InvalidOperationException($"AnalysisType '{pipeline.AnalysisTypeId}' not found for pipeline {pipeline.Id}.");
 
-        // STEP 2: Extract from Authoritative Notes (if present) - these have precedence=1 (highest)
-        if (virtualDocumentId != null)
-        {
-            var notesExtractions = await _notesExtractor.ExtractFromNotesAsync(pipeline, virtualDocumentId, ct);
-            _logger.LogInformation(
-                "Extracted {Count} fields from Authoritative Notes for pipeline {PipelineId}",
-                notesExtractions.Count,
-                pipeline.Id);
+            var factCatalog = new List<DocumentFact>();
+            foreach (var docId in pipeline.DocumentIds.Distinct(StringComparer.Ordinal))
+            {
+                var factDocument = await SourceDocument.Get(docId, ct).ConfigureAwait(false);
+                if (factDocument is null)
+                {
+                    _logger.LogWarning("Unable to load document {DocumentId} for fact extraction", docId);
+                    continue;
+                }
 
-            // Notes extractions are added FIRST (will take priority in merge)
-            freshExtractions.InsertRange(0, notesExtractions);
+                var factsForDocument = await _factExtractor.ExtractAsync(pipeline, analysisType, factDocument, ct).ConfigureAwait(false);
+                factCatalog.AddRange(factsForDocument);
+            }
+
+            freshExtractions = await _factMatcher.MatchAsync(pipeline, analysisType, factCatalog, fieldFilter, ct).ConfigureAwait(false);
         }
 
         var existingByField = existingFields.ToDictionary(e => e.FieldPath, StringComparer.Ordinal);

@@ -481,15 +481,24 @@ function Wait-MeridianJob {
         [string]$BaseUrl,
         [string]$PipelineId,
         [string]$JobId,
-        [int]$TimeoutSeconds = 180,
-        [switch]$SkipCertificateCheck
+        [int]$TimeoutSeconds = 0,
+        [int]$PollSeconds = 2,
+        [switch]$SkipCertificateCheck,
+        [switch]$ShowProgress
     )
 
+    $pollInterval = [Math]::Max($PollSeconds, 1)
     $start = Get-Date
     $previousStatus = $null
     $lastTransition = $start
-    do {
-        Start-Sleep -Seconds 2
+    $hasTimeout = $TimeoutSeconds -gt 0
+    $timeoutSpan = if ($hasTimeout) { [TimeSpan]::FromSeconds($TimeoutSeconds) } else { [TimeSpan]::Zero }
+    $activity = "Processing job $JobId"
+    $job = $null
+
+    while ($true) {
+        Start-Sleep -Seconds $pollInterval
+
         try {
             $job = Invoke-MeridianRequest -BaseUrl $BaseUrl -Path "/api/pipelines/$PipelineId/jobs/$JobId" -SkipCertificateCheck:$SkipCertificateCheck
         }
@@ -497,13 +506,51 @@ function Wait-MeridianJob {
             continue
         }
 
-        if ($job.Status -in @('Completed','Failed','Cancelled')) {
+        $status = Get-Property -Object $job -Names 'status','Status'
+
+        if ($status -in @('Completed','Failed','Cancelled')) {
+            if ($ShowProgress) {
+                Write-Progress -Activity $activity -Completed
+            }
             return $job
         }
 
-        if ($job.Status -ne $previousStatus) {
-            $previousStatus = $job.Status
+        if ($status -ne $previousStatus) {
+            $previousStatus = $status
             $lastTransition = Get-Date
+        }
+
+        $processedRaw = Get-Property -Object $job -Names 'processedDocuments','ProcessedDocuments'
+        $totalRaw = Get-Property -Object $job -Names 'totalDocuments','TotalDocuments'
+        $progressPercentRaw = Get-Property -Object $job -Names 'progressPercent','ProgressPercent'
+        $progressRaw = Get-Property -Object $job -Names 'progress','Progress'
+
+        $processedCount = if ($processedRaw -ne $null) { [int]$processedRaw } else { 0 }
+        $totalCount = if ($totalRaw -ne $null) { [int]$totalRaw } else { 0 }
+
+        $percentValue = 0.0
+        if ($progressPercentRaw -ne $null) {
+            $percentValue = [double]$progressPercentRaw
+        }
+        elseif ($progressRaw -ne $null) {
+            $percentValue = [Math]::Round([double]$progressRaw * 100, 0)
+        }
+        elseif ($totalCount -gt 0) {
+            $percentValue = [Math]::Round(($processedCount / [double]$totalCount) * 100, 0)
+        }
+
+        if ($percentValue -lt 0) {
+            $percentValue = 0
+        }
+        elseif ($percentValue -gt 100) {
+            $percentValue = 100
+        }
+
+        $percent = [int]$percentValue
+
+        if ($ShowProgress) {
+            $statusText = if ($status) { "$status ($percent%)" } else { "$percent%" }
+            Write-Progress -Activity $activity -Status $statusText -PercentComplete $percent
         }
 
         $heartbeat = $null
@@ -520,23 +567,40 @@ function Wait-MeridianJob {
             $staleHeartbeat = (Get-Date) - $heartbeat -gt [TimeSpan]::FromMinutes(3)
         }
 
-        $agedState = (Get-Date) - $lastTransition -gt [TimeSpan]::FromSeconds($TimeoutSeconds / 3)
+        $agedState = $false
+        if ($hasTimeout -and $TimeoutSeconds -gt 0) {
+            $agedState = (Get-Date) - $lastTransition -gt [TimeSpan]::FromSeconds([Math]::Max([double]$TimeoutSeconds / 3, 30))
+        }
 
-        if ($job.Status -eq 'Pending' -and ($staleHeartbeat -or $agedState)) {
+        if ($status -eq 'Pending' -and ($staleHeartbeat -or $agedState)) {
             $cancelled = Stop-MeridianJob -BaseUrl $BaseUrl -PipelineId $PipelineId -JobId $JobId -Reason "stale" -SkipCertificateCheck:$SkipCertificateCheck
             if ($cancelled) {
+                if ($ShowProgress) {
+                    Write-Progress -Activity $activity -Completed
+                }
                 return $cancelled
             }
         }
-    }
-    while ((Get-Date) - $start -lt [TimeSpan]::FromSeconds($TimeoutSeconds))
 
-    $cancelled = Stop-MeridianJob -BaseUrl $BaseUrl -PipelineId $PipelineId -JobId $JobId -Reason "timeout" -SkipCertificateCheck:$SkipCertificateCheck
-    if ($cancelled) {
-        return $cancelled
+        if ($hasTimeout -and ((Get-Date) - $start) -ge $timeoutSpan) {
+            break
+        }
     }
 
-    throw "Job $JobId did not finish within $TimeoutSeconds seconds."
+    if ($ShowProgress) {
+        Write-Progress -Activity $activity -Completed
+    }
+
+    if ($hasTimeout) {
+        $cancelled = Stop-MeridianJob -BaseUrl $BaseUrl -PipelineId $PipelineId -JobId $JobId -Reason "timeout" -SkipCertificateCheck:$SkipCertificateCheck
+        if ($cancelled) {
+            return $cancelled
+        }
+
+        throw "Job $JobId did not finish within $TimeoutSeconds seconds."
+    }
+
+    return $job
 }
 
 function Stop-MeridianJob {

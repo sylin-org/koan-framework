@@ -155,9 +155,10 @@ files[]: vendor-prescreen.txt
   }
 }
 ```
-- Auto-classified using heuristics (signal phrases, descriptor hints)
-- `ClassificationMethod = Heuristic`
-- `Confidence = 0.0-1.0` (based on match quality)
+- Stored immediately with `SourceType = Unclassified`
+- Response marks the document as `method = "Deferred"` with `confidence = 0.0`
+- Classification runs during the background processing job (heuristics → vector → LLM)
+- Keeps upload latency low even for large batches
 
 ### 4. Error Handling
 
@@ -199,10 +200,10 @@ files[]: vendor-prescreen.txt
     {
       "documentId": "01936b1d-...",
       "fileName": "customer-bulletin.txt",
-      "sourceType": "RPT",
-      "sourceTypeName": "Technical Report",
-      "method": "Heuristic",
-      "confidence": 0.65,
+      "sourceType": "Unclassified",
+      "sourceTypeName": "Pending Classification",
+      "method": "Deferred",
+      "confidence": 0.0,
       "inManifest": false
     }
   ],
@@ -214,11 +215,38 @@ files[]: vendor-prescreen.txt
 }
 ```
 
+### Polling for Completion
+
+After upload the API returns immediately with a background **processing job**. Clients can poll `GET /api/pipelines/{pipelineId}/jobs/{jobId}` to monitor progress:
+
+```json
+{
+  "jobId": "01936b1c-7e8f-7890-abcd-ef1234567891",
+  "status": "Processing",
+  "processedDocuments": 2,
+  "totalDocuments": 5,
+  "progress": 0.4,
+  "progressPercent": 40,
+  "lastDocumentId": "01936b1d-..."
+}
+```
+
+- `progress` is a 0.0–1.0 ratio, `progressPercent` is the rounded percentage
+- `processedDocuments` increments as each document finishes extraction/classification
+- Once `status` reaches `Completed`, downstream clients can download deliverables via `GET /api/pipelines/{pipelineId}/deliverables/latest`
+
+The Phase 4.5 PowerShell helpers expose these controls:
+
+- `Wait-MeridianJob` accepts `-TimeoutSeconds 0` (wait indefinitely), `-PollSeconds`, and `-ShowProgress` to emit live progress bars
+- `TryItYourself.ps1` adds `-NoWait` for fire-and-forget uploads plus `-WaitTimeoutSeconds` and `-ShowProgress` passthrough switches
+
 ---
 
-## Auto-Classification Strategy
+## Auto-Classification Strategy (Background Job)
 
 ### Phase 1: Heuristic Matching (Current)
+
+When the pipeline worker runs it replays the familiar classification cascade, beginning with lightweight heuristics while richer models warm up.
 
 **Scoring Algorithm:**
 1. **Signal Phrases** - +10 points per match

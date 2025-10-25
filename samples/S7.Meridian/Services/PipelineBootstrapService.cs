@@ -1,11 +1,11 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Koan.Data.Core;
+using Koan.Samples.Meridian.Infrastructure;
 using Koan.Samples.Meridian.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
@@ -32,7 +32,6 @@ public interface IPipelineBootstrapService
 public class PipelineBootstrapService : IPipelineBootstrapService
 {
     private readonly ITypeCodeResolver _typeCodeResolver;
-    private readonly IDocumentClassifier _documentClassifier;
     private readonly IDocumentIngestionService _ingestionService;
     private readonly ILogger<PipelineBootstrapService> _logger;
 
@@ -40,12 +39,10 @@ public class PipelineBootstrapService : IPipelineBootstrapService
 
     public PipelineBootstrapService(
         ITypeCodeResolver typeCodeResolver,
-        IDocumentClassifier documentClassifier,
         IDocumentIngestionService ingestionService,
         ILogger<PipelineBootstrapService> logger)
     {
         _typeCodeResolver = typeCodeResolver;
-        _documentClassifier = documentClassifier;
         _ingestionService = ingestionService;
         _logger = logger;
     }
@@ -134,9 +131,13 @@ public class PipelineBootstrapService : IPipelineBootstrapService
             documentResults.Add(result);
 
             if (result.InManifest)
+            {
                 manifestCount++;
+            }
             else
+            {
                 autoClassifiedCount++;
+            }
         }
 
         // Save pipeline with attached document IDs
@@ -147,7 +148,9 @@ public class PipelineBootstrapService : IPipelineBootstrapService
         {
             PipelineId = pipeline.Id,
             Status = JobStatus.Pending,
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = DateTime.UtcNow,
+            TotalDocuments = documentResults.Count,
+            ProcessedDocuments = 0
         };
         job.MergeDocuments(documentResults.Select(d => d.DocumentId));
 
@@ -272,14 +275,22 @@ public class PipelineBootstrapService : IPipelineBootstrapService
         _logger.LogDebug("Document {FileName} inManifest={InManifest}, manifestEntry={Entry}",
             file.FileName, inManifest, manifestEntry?.Type ?? "null");
 
-        SourceType? sourceType;
+        // Store the document once. Ingestion service handles attachment and dedupe.
+        var ingestionResult = await _ingestionService.IngestAsync(pipeline.Id, file, forceReprocess: false, ct);
+        var storedDocument = ingestionResult.NewDocuments.FirstOrDefault()
+            ?? ingestionResult.ReusedDocuments.FirstOrDefault();
+
+        if (storedDocument == null)
+        {
+            throw new InvalidOperationException($"Unable to ingest document '{file.FileName}'.");
+        }
+
+        SourceType? sourceType = null;
         string method;
         double confidence;
-        int typeVersion;
 
         if (inManifest && manifestEntry != null)
         {
-            // Manual classification from manifest
             sourceType = await _typeCodeResolver.ResolveSourceTypeAsync(manifestEntry.Type, ct);
             if (sourceType == null)
             {
@@ -289,91 +300,64 @@ public class PipelineBootstrapService : IPipelineBootstrapService
                     $"Available codes: {string.Join(", ", availableCodes)}");
             }
 
+            storedDocument.SourceType = sourceType.Code;
+            storedDocument.ClassifiedTypeId = sourceType.Id;
+            storedDocument.ClassifiedTypeVersion = sourceType.Version;
+            storedDocument.ClassificationMethod = ClassificationMethod.Manual;
+            storedDocument.ClassificationConfidence = 1.0;
+            storedDocument.ClassificationReason = "Specified in manifest";
+            storedDocument.UpdatedAt = DateTime.UtcNow;
+            await storedDocument.Save(ct);
+
             method = "Manual";
             confidence = 1.0;
-            typeVersion = sourceType.Version;
         }
         else
         {
-            // Auto-classify using existing DocumentClassifier
-            // First, create a temporary SourceDocument for classification
-            using var stream = file.OpenReadStream();
-            using var reader = new StreamReader(stream);
-            var content = await reader.ReadToEndAsync(ct);
+            // Leave ingestion defaults (unclassified) for background processing.
+            method = "Deferred";
+            confidence = 0.0;
 
-            var tempDocument = new SourceDocument
+            if (string.IsNullOrWhiteSpace(storedDocument.SourceType))
             {
-                OriginalFileName = file.FileName,
-                ExtractedText = content,
-                MediaType = file.ContentType,
-                Size = file.Length,
-                PageCount = 1, // Estimate - will be updated during ingestion
-                UploadedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow
-            };
-
-            var classification = await _documentClassifier.ClassifyAsync(tempDocument, ct);
-
-            sourceType = await SourceType.Get(classification.TypeId, ct);
-            method = classification.Method.ToString();
-            confidence = classification.Confidence;
-            typeVersion = classification.Version;
-        }
-
-        // Create the actual document entity (document-centric, not tied to pipeline)
-        var document = new SourceDocument
-        {
-            OriginalFileName = file.FileName,
-            MediaType = file.ContentType,
-            Size = file.Length,
-            ClassifiedTypeId = sourceType?.Id ?? string.Empty,
-            ClassifiedTypeVersion = typeVersion,
-            ClassificationMethod = Enum.Parse<ClassificationMethod>(method, ignoreCase: true),
-            ClassificationConfidence = confidence,
-            ClassificationReason = inManifest ? $"Manually specified in manifest" : $"Auto-classified via {method}",
-            UploadedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow
-        };
-
-        await document.Save(ct);
-
-        // Add document to pipeline's document list
-        pipeline.AttachDocument(document.Id);
-
-        // Store document content via ingestion service
-        // Note: Ingestion service will create its own document with auto-classification,
-        // but we keep OUR document which has the correct manifest-based classification
-        var ingestionResult = await _ingestionService.IngestAsync(pipeline.Id, file, forceReprocess: false, ct);
-
-        // If ingestion created a different document, copy its storage info and remove it
-        var ingestedDoc = ingestionResult.NewDocuments.FirstOrDefault() ?? ingestionResult.ReusedDocuments.FirstOrDefault();
-        if (ingestedDoc != null && ingestedDoc.Id != document.Id)
-        {
-            // Copy storage key and other ingestion details from ingested document
-            document.StorageKey = ingestedDoc.StorageKey;
-            document.ContentHash = ingestedDoc.ContentHash;
-            document.ExtractedText = ingestedDoc.ExtractedText;
-            document.PageCount = ingestedDoc.PageCount;
-            await document.Save(ct);
-
-            // Remove the auto-classified document created by ingestion service
-            pipeline.DocumentIds.Remove(ingestedDoc.Id);
-            _logger.LogDebug("Copied storage key from ingested document {DupId} to manifest-classified document {CorrectId}, removed duplicate",
-                ingestedDoc.Id, document.Id);
+                storedDocument.SourceType = MeridianConstants.SourceTypes.Unclassified;
+                storedDocument.UpdatedAt = DateTime.UtcNow;
+                await storedDocument.Save(ct);
+            }
         }
 
         _logger.LogInformation(
-            "Created document {DocumentId} '{FileName}' for pipeline {PipelineId} " +
-            "(Source: {SourceType}, Method: {Method}, Confidence: {Confidence:P0}, InManifest: {InManifest})",
-            document.Id, file.FileName, pipeline.Id,
-            sourceType?.Code ?? "UNKNOWN", method, confidence, inManifest);
+            "Registered document {DocumentId} '{FileName}' for pipeline {PipelineId} " +
+            "(Source: {SourceType}, Method: {Method}, InManifest: {InManifest})",
+            storedDocument.Id, file.FileName, pipeline.Id,
+            sourceType?.Code ?? storedDocument.SourceType ?? "Unclassified",
+            method, inManifest);
+
+        var documentSourceType = sourceType?.Code ?? storedDocument.SourceType ?? MeridianConstants.SourceTypes.Unclassified;
+        var resolvedSourceTypeName = sourceType?.Name;
+
+        if (string.IsNullOrWhiteSpace(resolvedSourceTypeName))
+        {
+            if (inManifest)
+            {
+                resolvedSourceTypeName = "Manifest";
+            }
+            else if (string.Equals(documentSourceType, MeridianConstants.SourceTypes.Unclassified, StringComparison.OrdinalIgnoreCase))
+            {
+                resolvedSourceTypeName = "Pending Classification";
+            }
+            else
+            {
+                resolvedSourceTypeName = documentSourceType;
+            }
+        }
 
         return new DocumentCreationResult
         {
-            DocumentId = document.Id,
+            DocumentId = storedDocument.Id!,
             FileName = file.FileName,
-            SourceType = sourceType?.Code ?? "UNKNOWN",
-            SourceTypeName = sourceType?.Name ?? "Unknown",
+            SourceType = documentSourceType,
+            SourceTypeName = resolvedSourceTypeName,
             Method = method,
             Confidence = confidence,
             InManifest = inManifest

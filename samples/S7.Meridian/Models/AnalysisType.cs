@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Koan.Data.Core.Model;
 
 namespace Koan.Samples.Meridian.Models;

@@ -2,7 +2,10 @@ param(
     [string]$BaseUrl = "http://localhost:5080",
     [switch]$SkipCertificateCheck,
     [string]$OutputDirectory = "",
-    [string]$DocumentsFolder = ""
+    [string]$DocumentsFolder = "",
+    [switch]$NoWait,
+    [int]$WaitTimeoutSeconds = 0,
+    [switch]$ShowProgress
 )
 
 # Load required .NET assemblies for HTTP operations
@@ -351,13 +354,21 @@ try {
                 Write-Host "   Method:        Manual (from manifest)" -ForegroundColor White
                 Write-Host "   Confidence:    100%" -ForegroundColor White
             } else {
-                $confidencePercent = [Math]::Round($confidence * 100, 1)
-                $confidenceColor = if ($confidencePercent -ge 90) { "Green" } elseif ($confidencePercent -ge 70) { "Yellow" } else { "Red" }
+                $isDeferred = [string]::Equals($method, 'Deferred', [System.StringComparison]::OrdinalIgnoreCase)
 
                 Write-Host "📄 $fileName" -ForegroundColor Cyan
                 Write-Host "   Source Type:   $sourceTypeName ($sourceType)" -ForegroundColor White
-                Write-Host "   Method:        AI Auto-Classification ($method)" -ForegroundColor White
-                Write-Host "   Confidence:    $confidencePercent%" -ForegroundColor $confidenceColor
+
+                if ($isDeferred) {
+                    Write-Host "   Method:        Deferred (background processing)" -ForegroundColor White
+                    Write-Host "   Confidence:    Pending" -ForegroundColor DarkGray
+                } else {
+                    $confidencePercent = [Math]::Round($confidence * 100, 1)
+                    $confidenceColor = if ($confidencePercent -ge 90) { "Green" } elseif ($confidencePercent -ge 70) { "Yellow" } else { "Red" }
+
+                    Write-Host "   Method:        AI Auto-Classification ($method)" -ForegroundColor White
+                    Write-Host "   Confidence:    $confidencePercent%" -ForegroundColor $confidenceColor
+                }
             }
             Write-Host ""
         }
@@ -380,43 +391,50 @@ try {
         Write-Host ""
     }
 
-    # Step 6: Wait for job completion
-    Write-Host "[6/6] Waiting for analysis to complete..." -ForegroundColor Yellow
-    $job = Wait-MeridianJob -BaseUrl $BaseUrl -PipelineId $pipelineId -JobId $jobId -SkipCertificateCheck:$SkipCertificateCheck
-    Write-Host "  ✓ Analysis completed!" -ForegroundColor Green
-    Write-Host ""
+    if ($NoWait) {
+        Write-Host "[6/6] Background processing queued (skipping wait as requested)." -ForegroundColor Yellow
+        Write-Host "  • Job ID: $jobId" -ForegroundColor White
+        Write-Host "  • Poll with: Wait-MeridianJob -PipelineId '$pipelineId' -JobId '$jobId'" -ForegroundColor DarkGray
+        Write-Host ""
+    }
+    else {
+        Write-Host "[6/6] Waiting for analysis to complete..." -ForegroundColor Yellow
+        $job = Wait-MeridianJob -BaseUrl $BaseUrl -PipelineId $pipelineId -JobId $jobId -TimeoutSeconds $WaitTimeoutSeconds -PollSeconds 2 -SkipCertificateCheck:$SkipCertificateCheck -ShowProgress:$ShowProgress
+        Write-Host "  ✓ Analysis completed!" -ForegroundColor Green
+        Write-Host ""
 
-    # Get deliverable
-    Write-Host "Retrieving analysis deliverable..." -ForegroundColor Yellow
-    $deliverable = Get-MeridianDeliverable -BaseUrl $BaseUrl -PipelineId $pipelineId -SkipCertificateCheck:$SkipCertificateCheck
+        # Get deliverable
+        Write-Host "Retrieving analysis deliverable..." -ForegroundColor Yellow
+        $deliverable = Get-MeridianDeliverable -BaseUrl $BaseUrl -PipelineId $pipelineId -SkipCertificateCheck:$SkipCertificateCheck
 
-    if ($deliverable) {
-        $outputPath = Join-Path $OutputDirectory ("deliverable-" + (Get-Date -Format 'yyyyMMdd-HHmmss') + ".md")
-        $markdown = Get-Property -Object $deliverable -Names 'RenderedMarkdown','renderedMarkdown','Markdown','markdown'
-        if ($markdown) {
-            [IO.File]::WriteAllText($outputPath, $markdown)
-            Write-Host ""
-            Write-Host "============================================" -ForegroundColor Cyan
-            Write-Host " Analysis Complete" -ForegroundColor Cyan
-            Write-Host "============================================" -ForegroundColor Cyan
-            Write-Host ""
-            Write-Host "Deliverable saved to:" -ForegroundColor Green
-            Write-Host "  $outputPath" -ForegroundColor White
-            Write-Host ""
-            Write-Host "Preview:" -ForegroundColor Yellow
-            Write-Host "----------------------------------------" -ForegroundColor DarkGray
+        if ($deliverable) {
+            $outputPath = Join-Path $OutputDirectory ("deliverable-" + (Get-Date -Format 'yyyyMMdd-HHmmss') + ".md")
+            $markdown = Get-Property -Object $deliverable -Names 'RenderedMarkdown','renderedMarkdown','Markdown','markdown'
+            if ($markdown) {
+                [IO.File]::WriteAllText($outputPath, $markdown)
+                Write-Host ""
+                Write-Host "============================================" -ForegroundColor Cyan
+                Write-Host " Analysis Complete" -ForegroundColor Cyan
+                Write-Host "============================================" -ForegroundColor Cyan
+                Write-Host ""
+                Write-Host "Deliverable saved to:" -ForegroundColor Green
+                Write-Host "  $outputPath" -ForegroundColor White
+                Write-Host ""
+                Write-Host "Preview:" -ForegroundColor Yellow
+                Write-Host "----------------------------------------" -ForegroundColor DarkGray
 
-            # Show first 30 lines of deliverable
-            $lines = $markdown -split "`n"
-            $previewLines = $lines | Select-Object -First 30
-            foreach ($line in $previewLines) {
-                Write-Host $line -ForegroundColor Gray
+                # Show first 30 lines of deliverable
+                $lines = $markdown -split "`n"
+                $previewLines = $lines | Select-Object -First 30
+                foreach ($line in $previewLines) {
+                    Write-Host $line -ForegroundColor Gray
+                }
+
+                if ($lines.Count -gt 30) {
+                    Write-Host "... ($($lines.Count - 30) more lines)" -ForegroundColor DarkGray
+                }
+                Write-Host "----------------------------------------" -ForegroundColor DarkGray
             }
-
-            if ($lines.Count -gt 30) {
-                Write-Host "... ($($lines.Count - 30) more lines)" -ForegroundColor DarkGray
-            }
-            Write-Host "----------------------------------------" -ForegroundColor DarkGray
         }
     }
 
@@ -435,9 +453,16 @@ Write-Host "  Documents: $DocumentsFolder" -ForegroundColor Cyan
 Write-Host "  Output:    $OutputDirectory" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "Next steps:" -ForegroundColor Yellow
-Write-Host "  1. Review the analysis deliverable in output folder" -ForegroundColor White
-Write-Host "  2. Add your own documents to docs folder" -ForegroundColor White
-Write-Host "  3. Run this script again to see auto-classification in action" -ForegroundColor White
+if ($NoWait) {
+    Write-Host "  1. Monitor progress: Wait-MeridianJob -PipelineId '$pipelineId' -JobId '$jobId' -ShowProgress" -ForegroundColor White
+    Write-Host "  2. Download deliverables after completion via Get-MeridianDeliverable" -ForegroundColor White
+    Write-Host "  3. Add your own documents to docs folder" -ForegroundColor White
+}
+else {
+    Write-Host "  1. Review the analysis deliverable in output folder" -ForegroundColor White
+    Write-Host "  2. Add your own documents to docs folder" -ForegroundColor White
+    Write-Host "  3. Run this script again to see auto-classification in action" -ForegroundColor White
+}
 Write-Host ""
 Write-Host "To use your own documents:" -ForegroundColor Yellow
 Write-Host "  .\TryItYourself.ps1 -DocumentsFolder 'C:\path\to\your\documents'" -ForegroundColor Cyan

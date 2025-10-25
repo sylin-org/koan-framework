@@ -698,6 +698,12 @@ public sealed class FieldExtractor : IFieldExtractor
     /// </summary>
     private List<Passage> EnforceTokenBudget(List<Passage> passages, int maxTokens)
     {
+        if (maxTokens <= 0)
+        {
+            _logger.LogDebug("Token budget disabled; including all {Count} passages", passages.Count);
+            return passages;
+        }
+
         var estimatedTokens = 0;
         var selected = new List<Passage>();
 
@@ -754,18 +760,42 @@ Field schema excerpt: {schemaExcerpt}
 Passages:
 {string.Join("\n\n", passages.Select((p, i) => $"[{i}] {p.Text}"))}
 
-Instructions:
-1. Review all passages and collect statements that answer the field requirement.
-2. Compose a concise response (paragraph or bullets) using only verifiable details; you may synthesize across multiple passages.
-3. Quote names, figures, and dates exactly as written; do not invent new facts.
-4. If evidence is absent, return null instead of placeholder text.
-5. Validate the final value against the schema and estimate confidence (0.0-1.0).
+## CRITICAL RULES:
+
+**1. Semantic Type Matching (MOST IMPORTANT):**
+   - If field asks for a PERSON NAME → extract individual people ONLY
+     ✓ CORRECT: ""John Smith"", ""Sarah Chen (CTO)""
+     ✗ WRONG: ""CloudTech Solutions"", ""TechCorp Inc."" (these are companies)
+
+   - If field asks for an ID/NUMBER → extract identifiers ONLY
+     ✓ CORRECT: ""REQ-123456"", ""TICKET-789""
+     ✗ WRONG: ""CloudTech Solutions"" (this is a company name, not an ID)
+
+   - If field asks for a DATE → extract dates ONLY
+     ✓ CORRECT: ""2025-10-24"", ""January 15, 2025""
+     ✗ WRONG: ""Q1 2026"" (this is vague)
+
+   **Companies are NEVER correct answers for person name fields.**
+   **Person names are NEVER correct answers for ID fields.**
+
+**2. Prefer Specific Over General:**
+   - If you see ""Michael Torres (Lead Architect)"" and ""CloudTech Solutions"" in passages
+   - And field asks for ""Architect"" (a person)
+   - ALWAYS choose ""Michael Torres"" (the person), NOT ""CloudTech Solutions"" (the company)
+
+**3. Return NULL when unsure:**
+   - If field semantic type doesn't match any information in passages → return null
+   - Missing information is better than wrong information
+
+**4. For descriptive text fields:**
+   - Synthesize from relevant passages
+   - Focus on answering the specific question asked
 
 Respond in JSON format:
 {{
-    ""value"": <extracted value matching schema type>,
+    ""value"": <extracted value matching schema type, or null if not found>,
     ""confidence"": <0.0-1.0>,
-    ""passageIndex"": <0-based index of the strongest supporting passage>
+    ""passageIndex"": <0-based index of the strongest supporting passage, or null>
 }}
 
 If the field cannot be found, respond with:

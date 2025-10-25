@@ -741,22 +741,48 @@ public sealed class DocumentMerger : IDocumentMerger
             return null;
         }
 
-        var source = await GetSourceDocumentAsync(accepted.SourceDocumentId, sourceCache, ct);
-        var passage = await GetPassageAsync(accepted.PassageId, passageCache, ct);
+        var evidence = accepted.Evidence;
+        var sourceId = !string.IsNullOrWhiteSpace(accepted.SourceDocumentId)
+            ? accepted.SourceDocumentId
+            : GetMetadataValue(evidence, "sourceDocumentId");
+
+        var passageId = accepted.PassageId
+            ?? evidence.PassageId
+            ?? GetMetadataValue(evidence, "passageId");
+
+        var section = evidence.Section ?? GetMetadataValue(evidence, "section");
+        var page = evidence.Page ?? TryParseNullableInt(GetMetadataValue(evidence, "page"));
+
+        var source = await GetSourceDocumentAsync(sourceId, sourceCache, ct).ConfigureAwait(false);
+        var passage = await GetPassageAsync(passageId, passageCache, ct).ConfigureAwait(false);
 
         var builder = new StringBuilder();
         builder.Append(source?.OriginalFileName ?? "Source");
 
-        if (passage?.PageNumber is int page)
+        if (page.HasValue)
         {
-            builder.Append($" (p. {page})");
+            builder.Append($" (p. {page.Value})");
+        }
+        else if (passage?.PageNumber is int passagePage)
+        {
+            builder.Append($" (p. {passagePage})");
+        }
+
+        if (!string.IsNullOrWhiteSpace(section))
+        {
+            builder.Append($" · {section}");
         }
 
         builder.Append(": ");
-        var snippet = accepted.Evidence.OriginalText;
+        var snippet = evidence.OriginalText;
         if (string.IsNullOrWhiteSpace(snippet))
         {
             snippet = passage?.Text;
+        }
+
+        if (string.IsNullOrWhiteSpace(snippet))
+        {
+            snippet = GetMetadataValue(evidence, "factSummary") ?? GetMetadataValue(evidence, "factReasoning");
         }
 
         if (!string.IsNullOrWhiteSpace(snippet))
@@ -794,17 +820,33 @@ public sealed class DocumentMerger : IDocumentMerger
             return null;
         }
 
-        var source = await GetSourceDocumentAsync(accepted.SourceDocumentId, sourceCache, ct).ConfigureAwait(false);
-        var passage = await GetPassageAsync(accepted.PassageId, passageCache, ct).ConfigureAwait(false);
+        var evidence = accepted.Evidence;
+        var sourceId = !string.IsNullOrWhiteSpace(accepted.SourceDocumentId)
+            ? accepted.SourceDocumentId
+            : GetMetadataValue(evidence, "sourceDocumentId");
+
+        var passageId = accepted.PassageId
+            ?? evidence.PassageId
+            ?? GetMetadataValue(evidence, "passageId");
+
+        var section = evidence.Section ?? GetMetadataValue(evidence, "section");
+        var page = evidence.Page ?? TryParseNullableInt(GetMetadataValue(evidence, "page"));
+
+        var source = await GetSourceDocumentAsync(sourceId, sourceCache, ct).ConfigureAwait(false);
+        var passage = await GetPassageAsync(passageId, passageCache, ct).ConfigureAwait(false);
+
+        var textualEvidence = !string.IsNullOrWhiteSpace(evidence.OriginalText)
+            ? evidence.OriginalText
+            : GetMetadataValue(evidence, "factSummary") ?? string.Empty;
 
         var token = new JObject
         {
-            ["sourceDocumentId"] = accepted.SourceDocumentId ?? string.Empty,
+            ["sourceDocumentId"] = sourceId ?? string.Empty,
             ["sourceFileName"] = source?.OriginalFileName ?? string.Empty,
-            ["passageId"] = accepted.PassageId ?? string.Empty,
-            ["page"] = accepted.Evidence.Page,
-            ["section"] = accepted.Evidence.Section,
-            ["text"] = accepted.Evidence.OriginalText,
+            ["passageId"] = passageId ?? string.Empty,
+            ["page"] = page,
+            ["section"] = section,
+            ["text"] = textualEvidence,
             ["confidence"] = accepted.Confidence
         };
 
@@ -818,9 +860,14 @@ public sealed class DocumentMerger : IDocumentMerger
             token["sectionHeading"] = passage.Section;
         }
 
-        if (accepted.Evidence.Metadata.Count > 0)
+        if (evidence.Span is not null)
         {
-            token["metadata"] = JObject.FromObject(accepted.Evidence.Metadata);
+            token["span"] = JObject.FromObject(evidence.Span);
+        }
+
+        if (evidence.Metadata.Count > 0)
+        {
+            token["metadata"] = JObject.FromObject(evidence.Metadata);
         }
 
         return token;
@@ -834,7 +881,7 @@ public sealed class DocumentMerger : IDocumentMerger
     {
         var coverage = totalFields == 0
             ? 0
-            : accepted.Count(field => field.HasEvidenceText()) / (double)totalFields * 100;
+            : accepted.Count(HasSupportingEvidence) / (double)totalFields * 100;
 
         var confidence = _options.Confidence;
 
@@ -846,8 +893,8 @@ public sealed class DocumentMerger : IDocumentMerger
             LowConfidence = accepted.Count(f => f.Confidence < confidence.LowThreshold),
             TotalConflicts = totalConflicts,
             AutoResolved = autoResolved,
-            ManualReviewNeeded = accepted.Count(f => f.Confidence < confidence.LowThreshold),
-            NotesSourced = accepted.Count(f => f.Source == FieldSource.AuthoritativeNotes || f.Precedence == 1),
+            ManualReviewNeeded = accepted.Count(f => RequiresManualReview(f, confidence)),
+            NotesSourced = accepted.Count(IsNotesSourced),
             ExtractionP95 = TimeSpan.Zero,
             MergeP95 = TimeSpan.Zero
         };
@@ -938,6 +985,73 @@ public sealed class DocumentMerger : IDocumentMerger
         }
 
         return JToken.DeepEquals(left, right);
+    }
+
+    private static bool HasSupportingEvidence(ExtractedField field)
+    {
+        if (field.Evidence is null)
+        {
+            return false;
+        }
+
+        if (field.HasEvidenceText())
+        {
+            return true;
+        }
+
+        if (!string.IsNullOrWhiteSpace(field.SourceDocumentId))
+        {
+            return true;
+        }
+
+        var metadata = field.Evidence.Metadata;
+        return metadata.ContainsKey("passageId") || metadata.ContainsKey("factId");
+    }
+
+    private static bool RequiresManualReview(ExtractedField field, ConfidenceOptions confidence)
+    {
+        if (field.Evidence is not null &&
+            field.Evidence.Metadata.TryGetValue("reviewRequired", out var raw))
+        {
+            if (bool.TryParse(raw, out var parsed))
+            {
+                if (parsed)
+                {
+                    return true;
+                }
+            }
+            else if (string.Equals(raw, "true", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return field.Confidence < confidence.LowThreshold;
+    }
+
+    private static bool IsNotesSourced(ExtractedField field)
+        => field.Source == FieldSource.AuthoritativeNotes || field.Precedence == 1;
+
+    private static string? GetMetadataValue(TextSpanEvidence? evidence, string key)
+    {
+        if (evidence?.Metadata is null)
+        {
+            return null;
+        }
+
+        return evidence.Metadata.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value)
+            ? value
+            : null;
+    }
+
+    private static int? TryParseNullableInt(string? value)
+    {
+        if (int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed))
+        {
+            return parsed;
+        }
+
+        return null;
     }
 
     private static async Task<SourceDocument?> GetSourceDocumentAsync(string? id, Dictionary<string, SourceDocument?> cache, CancellationToken ct)

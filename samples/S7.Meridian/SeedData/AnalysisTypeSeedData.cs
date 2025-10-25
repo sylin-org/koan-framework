@@ -1,3 +1,4 @@
+using Koan.Samples.Meridian.Infrastructure;
 using Koan.Samples.Meridian.Models;
 
 namespace Koan.Samples.Meridian.SeedData;
@@ -38,12 +39,6 @@ public static class AnalysisTypeSeedData
 
 Analyze the provided documents, which detail an Enterprise Architecture Review. Populate the template fields by extracting information related to:
 
-- Key administrative details of the review (ID, Architect, Date, Stakeholders, Contributors)
-- The overall recommendation of the review
-- A concise overview of the request, including the business need and desired outcome
-- Detailed architectural considerations across application, infrastructure, and security
-- Support requirements for the proposed solution
-- Future considerations and relevant reference documentation
 
 The associated documents are meant to provide you with contextual information to drive your assessment.
 
@@ -52,7 +47,6 @@ If any of the expected data elements of the template can't be inferred from the 
 Provide insights on strategic architecture opportunities, if any.",
             OutputTemplate = @"# Enterprise Architecture Review
 
----
 
 ## Review Details
 **ServiceNow ID:** {{SERVICENOW_ID}}
@@ -62,7 +56,6 @@ Provide insights on strategic architecture opportunities, if any.",
 **Contributors:** {{CONTRIBUTORS}}
 **Recommendation Status:** {{RECOMMENDATION_STATUS}}
 
----
 
 ## Review Questions
 **Business/Solution Requirements Validated:** {{REQUIREMENTS_VALIDATED}}
@@ -71,43 +64,35 @@ Provide insights on strategic architecture opportunities, if any.",
 **Can Existing Solution Be Changed/Expanded:** {{CHANGE_EXISTING_SOLUTION}}
 **New Solution Needs Designed:** {{NEW_SOLUTION_NEEDED}}
 
----
 
 ## Request Overview
 {{REQUEST_OVERVIEW}}
 
----
 
 ## Application Architecture
 {{APPLICATION_ARCHITECTURE}}
 
----
 
 ## Infrastructure Architecture
 {{INFRASTRUCTURE_ARCHITECTURE}}
 
----
 
 ## Security Architecture
 {{SECURITY_ARCHITECTURE}}
 
----
 
 ## Support
 {{SUPPORT}}
 
----
 
 ## Recommendation
 **Overall Recommendation:** {{OVERALL_RECOMMENDATION}}
 **Reasoning:** {{RECOMMENDATION_REASONING}}
 
----
 
 ## Future Consideration
 {{FUTURE_CONSIDERATION}}
 
----
 
 ## Reference Documentation
 {{REFERENCE_DOCUMENTATION}}",

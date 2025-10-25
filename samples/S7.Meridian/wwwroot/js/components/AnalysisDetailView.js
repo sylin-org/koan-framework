@@ -13,6 +13,9 @@ export class AnalysisDetailView {
     this.isEditing = false;
     this.isCreating = false;
     this.filesToUpload = [];
+    this.documents = [];
+    this.deliverable = null;
+    this.deliverableError = null;
   }
 
   /**
@@ -28,6 +31,9 @@ export class AnalysisDetailView {
       notes: ''
     };
     await this.loadAnalysisTypes();
+    this.documents = [];
+    this.deliverable = null;
+    this.deliverableError = null;
   }
 
   /**
@@ -36,17 +42,16 @@ export class AnalysisDetailView {
   async load(id) {
     try {
       this.analysis = await this.api.getPipeline(id);
-      // Load notes
-      try {
-        const notesData = await this.api.getNotes(id);
-        this.analysis.notes = notesData.authoritativeNotes || '';
-      } catch (e) {
-        this.analysis.notes = '';
-      }
+      await this.loadNotes(id);
+      await this.loadDocuments(id);
+      await this.loadDeliverable(id);
     } catch (err) {
       console.error('Failed to load analysis', err);
       this.toast.error('Failed to load analysis');
       this.analysis = null;
+      this.documents = [];
+      this.deliverable = null;
+      this.deliverableError = null;
     }
   }
 
@@ -83,6 +88,8 @@ export class AnalysisDetailView {
         <div class="detail-sections">
           ${this.renderIdentitySection()}
           ${this.renderNotesSection()}
+          ${this.renderDeliverableSection()}
+          ${this.renderDocumentsSection()}
           ${this.isCreating || this.isEditing ? this.renderFileUploadSection() : ''}
         </div>
       </div>
@@ -223,10 +230,175 @@ EMPLOYEE COUNT: 175 employees as of October 2024">${this.escape(notes)}</textare
     `;
   }
 
+  renderDeliverableSection() {
+    if (this.isCreating) {
+      return '';
+    }
+
+    const pipelineId = this.analysis?.id || this.analysis?.Id;
+    const hasDeliverable = Boolean(this.deliverable);
+    const error = this.deliverableError;
+
+    const actionButtons = [];
+
+    if (hasDeliverable) {
+      actionButtons.push('<button class="btn btn-secondary" data-action="download-deliverable">Download Markdown</button>');
+    }
+
+    if (pipelineId) {
+      actionButtons.push(`<a class="btn" href="#/analyses/${this.escapeAttr(pipelineId)}" data-action="open-workspace">Open in Workspace</a>`);
+    }
+
+    const actions = actionButtons.length
+      ? `
+        <div class="deliverable-actions">
+          ${actionButtons.join('\n          ')}
+        </div>
+      `
+      : '';
+
+    let body = '';
+
+    if (error) {
+      body = `
+        <div class="deliverable-empty">
+          <strong>Unable to load deliverable.</strong>
+          <span>Please try again from the workspace. (${this.escape(error.message || 'Unknown error')})</span>
+        </div>
+      `;
+    } else if (!hasDeliverable) {
+      body = `
+        <div class="deliverable-empty">
+          No deliverable is available yet. Run the pipeline from the workspace to generate one.
+        </div>
+      `;
+    } else {
+      const deliverable = this.deliverable;
+      const docCount = Array.isArray(deliverable.sourceDocumentIds) ? deliverable.sourceDocumentIds.length : 0;
+      const quality = deliverable.quality || {};
+      const coverage = quality.citationCoverage != null ? `${quality.citationCoverage}% citation coverage` : null;
+      const confidence = quality.highConfidence != null ? `${quality.highConfidence} high-confidence facts` : null;
+
+      const metadataItems = [];
+      if (deliverable.deliverableTypeId) {
+        metadataItems.push(`Type: ${deliverable.deliverableTypeId}`);
+      }
+      if (docCount) {
+        metadataItems.push(`Documents: ${docCount}`);
+      }
+
+      const completedAt = this.formatTimestamp(deliverable.completedAt);
+      if (completedAt) {
+        metadataItems.push(`Completed: ${completedAt}`);
+      }
+
+      const updatedAt = this.formatTimestamp(deliverable.updatedAt);
+      if (updatedAt && updatedAt !== completedAt) {
+        metadataItems.push(`Updated: ${updatedAt}`);
+      }
+
+      if (coverage) {
+        metadataItems.push(coverage);
+      }
+
+      if (confidence) {
+        metadataItems.push(confidence);
+      }
+
+      const markdown = deliverable.renderedMarkdown || '';
+      const preview = this.buildDeliverablePreview(markdown);
+
+      body = `
+        ${metadataItems.length ? `
+          <div class="deliverable-meta">
+            ${metadataItems.map(item => `<span class="deliverable-meta-item">${this.escape(item)}</span>`).join('')}
+          </div>
+        ` : ''}
+        <div class="deliverable-preview">${this.escape(preview.text)}</div>
+        ${preview.remainingLines ? `<div class="deliverable-preview-footer">… ${preview.remainingLines} more line(s) in workspace</div>` : ''}
+      `;
+    }
+
+    return `
+      <section class="detail-section">
+        <h2>Latest Deliverable</h2>
+        ${actions}
+        ${body}
+      </section>
+    `;
+  }
+
+  renderDocumentsSection() {
+    const docs = Array.isArray(this.documents) ? this.documents : [];
+    const hasDocs = docs.length > 0;
+
+    if (this.isCreating) {
+      return `
+        <section class="detail-section">
+          <h2>Documents</h2>
+          <div class="document-empty-state">Documents will appear after the analysis is created. Selected uploads are queued below.</div>
+        </section>
+      `;
+    }
+
+    const list = hasDocs
+      ? `
+        <div class="documents-list">
+          ${docs.map(doc => this.renderDocumentItem(doc)).join('')}
+        </div>
+      `
+      : `<div class="document-empty-state">No documents uploaded yet.</div>`;
+
+    return `
+      <section class="detail-section">
+        <h2>Documents${hasDocs ? ` <span class="section-count">(${docs.length})</span>` : ''}</h2>
+        ${list}
+      </section>
+    `;
+  }
+
+  renderDocumentItem(doc) {
+    const fileName = doc.originalFileName || doc.OriginalFileName || doc.fileName || 'Untitled Document';
+    const statusValue = doc.status || doc.Status || 'Unknown';
+    const sizeBytes = doc.size || doc.Size || 0;
+    const sourceType = doc.sourceTypeName || doc.SourceTypeName || doc.sourceType || doc.SourceType || 'Unclassified';
+    const isVirtual = doc.isVirtual || doc.IsVirtual || false;
+    const confidenceValue = doc.classificationConfidence || doc.ClassificationConfidence;
+    const status = typeof statusValue === 'string' ? statusValue : this.mapDocumentStatus(statusValue);
+    const confidenceText = this.formatConfidence(confidenceValue);
+    const confidence = confidenceText ? `${confidenceText} confidence` : '';
+    const uploadedAt = doc.uploadedAt || doc.UploadedAt || doc.createdAt || doc.CreatedAt;
+    const statusKey = typeof status === 'string'
+      ? status.toLowerCase().replace(/[^a-z0-9]+/g, '-')
+      : 'unknown';
+
+    return `
+      <div class="document-item" data-document-id="${this.escapeAttr(doc.id || doc.Id || '')}">
+        <div class="document-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+          </svg>
+        </div>
+        <div class="document-info">
+          <div class="document-name">${this.escape(fileName)}</div>
+          <div class="document-meta">
+            <span class="document-status status-${this.escapeAttr(statusKey)}">${this.escape(status)}</span>
+            ${sizeBytes ? `<span class="document-size">${this.escape(this.formatFileSize(sizeBytes))}</span>` : ''}
+            ${sourceType ? `<span class="document-type">${this.escape(sourceType)}</span>` : ''}
+            ${isVirtual ? '<span class="document-badge">Virtual</span>' : ''}
+            ${confidence ? `<span class="document-confidence">${this.escape(confidence)}</span>` : ''}
+            ${uploadedAt ? `<span class="document-uploaded">${this.escape(this.formatTimestamp(uploadedAt))}</span>` : ''}
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
   renderFileUploadSection() {
     return `
       <section class="detail-section">
-        <h2>Documents</h2>
+        <h2>Upload Documents</h2>
         <div class="form-field">
           <label>Upload Files ${this.isCreating ? '(optional)' : ''}</label>
           <input type="file" name="files" multiple accept=".pdf,.txt,.docx,.doc" data-action="select-files" />
@@ -235,6 +407,42 @@ EMPLOYEE COUNT: 175 employees as of October 2024">${this.escape(notes)}</textare
         </div>
       </section>
     `;
+  }
+
+  async loadNotes(id) {
+    try {
+      const notesData = await this.api.getNotes(id);
+      this.analysis.notes = notesData?.authoritativeNotes || '';
+    } catch (error) {
+      this.analysis.notes = '';
+    }
+  }
+
+  async loadDocuments(id) {
+    try {
+      const docs = await this.api.getDocuments(id);
+      this.documents = Array.isArray(docs) ? docs : [];
+    } catch (error) {
+      console.warn('Failed to load documents', error);
+      this.documents = [];
+    }
+  }
+
+  async loadDeliverable(id) {
+    try {
+      const deliverable = await this.api.getDeliverable(id);
+      this.deliverable = deliverable || null;
+      this.deliverableError = null;
+    } catch (error) {
+      if (error?.status === 404) {
+        this.deliverable = null;
+        this.deliverableError = null;
+      } else {
+        console.warn('Failed to load deliverable', error);
+        this.deliverable = null;
+        this.deliverableError = error;
+      }
+    }
   }
 
   /**
@@ -276,6 +484,9 @@ EMPLOYEE COUNT: 175 employees as of October 2024">${this.escape(notes)}</textare
           case 'open-workspace':
             this.handleOpenWorkspace();
             break;
+          case 'download-deliverable':
+            await this.handleDownloadDeliverable();
+            break;
           case 'select-files':
             // File input handled by change event
             break;
@@ -291,6 +502,9 @@ EMPLOYEE COUNT: 175 employees as of October 2024">${this.escape(notes)}</textare
         this.updateFilesList(container);
       });
     }
+
+    // Refresh selected file list if files are already tracked
+    this.updateFilesList(container);
   }
 
   /**
@@ -309,7 +523,7 @@ EMPLOYEE COUNT: 175 employees as of October 2024">${this.escape(notes)}</textare
     filesList.innerHTML = `
       <strong>Selected files (${this.filesToUpload.length}):</strong>
       <ul style="margin: 8px 0 0 20px; list-style: disc;">
-        ${this.filesToUpload.map(f => `<li>${this.escape(f.name)} (${this.formatFileSize(f.size)})</li>`).join('')}
+        ${this.filesToUpload.map(f => `<li>${this.escape(f.name)} (${this.escape(this.formatFileSize(f.size))})</li>`).join('')}
       </ul>
     `;
   }
@@ -461,6 +675,37 @@ EMPLOYEE COUNT: 175 employees as of October 2024">${this.escape(notes)}</textare
     });
   }
 
+  async handleDownloadDeliverable() {
+    const pipelineId = this.analysis?.id || this.analysis?.Id;
+    if (!pipelineId) {
+      this.toast.error('Analysis ID is not available');
+      return;
+    }
+
+    try {
+      const markdown = await this.api.getDeliverableMarkdown(pipelineId);
+      if (!markdown) {
+        this.toast.info('Deliverable content is empty');
+        return;
+      }
+
+      const blob = new Blob([markdown], { type: 'text/markdown' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = this.buildDeliverableFileName(pipelineId);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      this.toast.success('Deliverable downloaded');
+    } catch (error) {
+      console.error('Failed to download deliverable:', error);
+      this.toast.error('Failed to download deliverable');
+    }
+  }
+
   /**
    * Collect form data from container
    */
@@ -479,6 +724,86 @@ EMPLOYEE COUNT: 175 employees as of October 2024">${this.escape(notes)}</textare
     if (bytes < 1024) return bytes + ' B';
     if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
     return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  }
+
+  mapDocumentStatus(statusValue) {
+    const statusMap = {
+      0: 'Pending',
+      1: 'Extracted',
+      2: 'Indexed',
+      3: 'Classified',
+      4: 'Failed',
+      Pending: 'Pending',
+      Extracted: 'Extracted',
+      Indexed: 'Indexed',
+      Classified: 'Classified',
+      Failed: 'Failed'
+    };
+
+    return statusMap[statusValue] || statusValue || 'Unknown';
+  }
+
+  formatConfidence(value) {
+    if (value == null || value === '') {
+      return '';
+    }
+
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) {
+      return String(value);
+    }
+
+    if (numeric <= 1) {
+      return `${Math.round(numeric * 100)}%`;
+    }
+
+    return `${Math.round(numeric)}%`;
+  }
+
+  formatTimestamp(value) {
+    if (!value) {
+      return '';
+    }
+
+    try {
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) {
+        return String(value);
+      }
+
+      return date.toLocaleString();
+    } catch (error) {
+      return String(value);
+    }
+  }
+
+  buildDeliverablePreview(markdown) {
+    if (!markdown) {
+      return {
+        text: 'Deliverable preview not available.',
+        remainingLines: 0
+      };
+    }
+
+    const lines = markdown.split('\n');
+    const limit = 32;
+    const previewLines = lines.slice(0, limit);
+    const remainingLines = Math.max(lines.length - previewLines.length, 0);
+
+    return {
+      text: previewLines.join('\n'),
+      remainingLines
+    };
+  }
+
+  buildDeliverableFileName(pipelineId) {
+    const name = this.analysis?.name || 'analysis';
+    const safeName = name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '') || `analysis-${pipelineId}`;
+
+    return `${safeName}-deliverable.md`;
   }
 
   /**

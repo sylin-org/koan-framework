@@ -100,6 +100,16 @@ internal sealed class OllamaOptionsConfigurator : AdapterOptionsConfigurator<Oll
             "Koan:Ai:Provider:Ollama:ModelDownloadTimeoutMinutes",
             "Koan:Ai:Ollama:ModelDownloadTimeoutMinutes");
 
+        options.MaxConcurrentRequests = ReadProviderConfiguration(
+            options.MaxConcurrentRequests,
+            "Koan:Ai:Provider:Ollama:MaxConcurrentRequests",
+            "Koan:Ai:Ollama:MaxConcurrentRequests");
+
+        if (options.MaxConcurrentRequests < 0)
+        {
+            options.MaxConcurrentRequests = 0;
+        }
+
         options.AutoDiscoveryEnabled = ReadProviderConfiguration(
             options.AutoDiscoveryEnabled,
             "Koan:Ai:Provider:Ollama:AutoDiscoveryEnabled",

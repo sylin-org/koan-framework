@@ -11,6 +11,7 @@ public sealed class MeridianOptions
     public ClassificationOptions Classification { get; set; } = new();
     public ConfidenceOptions Confidence { get; set; } = new();
     public RenderingOptions Rendering { get; set; } = new();
+    public FactCatalogOptions Facts { get; set; } = new();
 
     public void NormalizeFieldPaths()
     {
@@ -33,8 +34,8 @@ public sealed class RetrievalOptions
     /// <summary>MMR diversity parameter: higher = more diverse passages (default: 0.7).</summary>
     public double MmrLambda { get; set; } = 0.7;
 
-    /// <summary>Maximum tokens to send to LLM per field extraction (default: 2000).</summary>
-    public int MaxTokensPerField { get; set; } = 2000;
+    /// <summary>Maximum tokens to send to LLM per field extraction (0 = unlimited).</summary>
+    public int MaxTokensPerField { get; set; } = 0;
 }
 
 public sealed class ExtractionOptions
@@ -188,4 +189,35 @@ public sealed class PandocOptions
 
     /// <summary>Whether to strip dangerous LaTeX commands before rendering.</summary>
     public bool SanitizeLatex { get; set; } = true;
+}
+
+public sealed class FactCatalogOptions
+{
+    /// <summary>Model used for fact extraction (null = reuse extraction model).</summary>
+    public string? ExtractionModel { get; set; }
+        = null;
+
+    /// <summary>Model used for fact-to-field matching (null = reuse extraction model).</summary>
+    public string? MatchingModel { get; set; }
+        = null;
+
+    /// <summary>Temperature for fact extraction prompts.</summary>
+    public double ExtractionTemperature { get; set; }
+        = 0.0;
+
+    /// <summary>Temperature for field matching prompts.</summary>
+    public double MatchingTemperature { get; set; }
+        = 0.1;
+
+    /// <summary>Maximum facts produced per document.</summary>
+    public int MaxFactsPerDocument { get; set; }
+        = 48;
+
+    /// <summary>Maximum fact candidates sent to the matcher per field.</summary>
+    public int MaxCandidatesPerField { get; set; }
+        = 12;
+
+    /// <summary>Confidence threshold below which we flag a match for review.</summary>
+    public double ReviewThreshold { get; set; }
+        = 0.6;
 }

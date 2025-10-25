@@ -193,7 +193,8 @@ class MeridianApp {
       const routePath = this.viewToRoutePath(view, params);
 
       // Navigate using router (this will update URL and trigger route handler)
-      this.router.navigate(routePath, params);
+      const routeParams = this.filterNavigationParams(routePath, params);
+      this.router.navigate(routePath, routeParams);
     });
 
     this.eventBus.on('toggle-sidebar', () => {
@@ -293,6 +294,30 @@ class MeridianApp {
     };
 
     return viewToPath[view] || view;
+  }
+
+  filterNavigationParams(routePath, params = {}) {
+    if (!params || Object.keys(params).length === 0) {
+      return {};
+    }
+
+    const filtered = {};
+    const match = this.router.match(routePath);
+    const consumedKeys = match && match.params ? Object.keys(match.params) : [];
+
+    Object.entries(params).forEach(([key, value]) => {
+      if (value === undefined || value === null || value === '') {
+        return;
+      }
+
+      if (consumedKeys.includes(key)) {
+        return;
+      }
+
+      filtered[key] = value;
+    });
+
+    return filtered;
   }
 
   /**
