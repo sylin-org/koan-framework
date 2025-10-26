@@ -15,18 +15,27 @@
 }
 
 /* ==================== Two-Column Workspace Layout (40/60 Split) ==================== */
+.workspace-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
 .analysis-workspace {
   display: grid;
   grid-template-columns: 40% 60%;
   gap: 0;
   height: calc(100vh - 120px); /* Adjust based on header height */
   overflow: hidden;
+  flex: 1;
+  min-height: 0;
 }
 
 .workspace-column {
   display: flex;
   flex-direction: column;
   height: 100%;
+  min-height: 0;
   overflow-y: auto;
   border-right: 1px solid var(--color-border-subtle);
 }
@@ -54,6 +63,18 @@
 .workspace-column-content {
   flex: 1;
   padding: var(--spacing-section) var(--spacing-6);
+  min-height: 0;
+}
+
+.workspace-column-insights .workspace-column-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-4);
+}
+
+.workspace-column-insights .insights-panel {
+  flex: 1;
+  min-height: 0;
 }
 
 /* Responsive: Stack columns on smaller screens */

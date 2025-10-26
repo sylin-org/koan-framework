@@ -1,4 +1,5 @@
 using Koan.Samples.Meridian.Models;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
 using System.IO;
@@ -167,10 +168,15 @@ public sealed class DocumentMerger : IDocumentMerger
             await decision.Save(ct).ConfigureAwait(false);
 
             var templateKey = FieldPathCanonicalizer.ToTemplateKey(group.Key);
-            var formattedValue = FormatValueForTemplate(mergeResult.ValueToken);
-            var hasContent = !string.IsNullOrWhiteSpace(formattedValue);
+            var hasCanonicalContent = HasSubstantiveValue(mergeResult.ValueToken);
+            var formattedValue = hasCanonicalContent
+                ? FormatValueForTemplate(mergeResult.ValueToken)
+                : string.Empty;
 
-            if (_options.Merge.EnableCitations && hasContent)
+            _logger.LogDebug("Field {FieldPath} → {TemplateKey}: hasContent={HasContent}, tokenType={TokenType}, formatted={FormattedValue}",
+                group.Key, templateKey, hasCanonicalContent, mergeResult.ValueToken?.Type, formattedValue);
+
+            if (_options.Merge.EnableCitations && hasCanonicalContent && !string.IsNullOrWhiteSpace(formattedValue))
             {
                 var footnote = await BuildFootnoteAsync(savedAccepted, mergeResult.ValueToken, footnotes.Count + 1, sourceCache, passageCache, ct).ConfigureAwait(false);
                 if (footnote is { } info)
@@ -181,13 +187,24 @@ public sealed class DocumentMerger : IDocumentMerger
             }
 
             templatePayload[templateKey] = formattedValue;
-            mergedFields[templateKey] = mergeResult.ValueToken.DeepClone();
-            formattedFields[templateKey] = formattedValue;
-
-            var evidenceToken = await BuildEvidenceTokenAsync(savedAccepted, sourceCache, passageCache, ct).ConfigureAwait(false);
-            if (evidenceToken is not null)
+            if (hasCanonicalContent)
             {
-                evidence[templateKey] = evidenceToken;
+                var clonedValue = mergeResult.ValueToken.DeepClone();
+                mergedFields[templateKey] = clonedValue;
+                formattedFields[templateKey] = new JValue(formattedValue);
+
+                _logger.LogDebug("Canonical field {TemplateKey} populated: value={Value}, formatted={Formatted}",
+                    templateKey, clonedValue.ToString(Formatting.None), formattedValue);
+
+                var evidenceToken = await BuildEvidenceTokenAsync(savedAccepted, sourceCache, passageCache, ct).ConfigureAwait(false);
+                if (evidenceToken is not null && HasSubstantiveValue(evidenceToken))
+                {
+                    evidence[templateKey] = evidenceToken;
+                }
+            }
+            else
+            {
+                _logger.LogDebug("Field {TemplateKey} skipped from canonical (no substantive content)", templateKey);
             }
 
             if (!string.IsNullOrWhiteSpace(savedAccepted.SourceDocumentId))
@@ -904,6 +921,86 @@ public sealed class DocumentMerger : IDocumentMerger
     {
         var renderer = _stubbleBuilder.Build();
         return renderer.Render(template, payload);
+    }
+
+    private static readonly HashSet<string> MetadataOnlyKeys = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "confidence",
+        "confidencescore",
+        "sources",
+        "sourceids",
+        "authoritative",
+        "origin",
+        "conflicts",
+        "supportingfacts",
+        "span",
+        "metadata",
+        "mergeStrategy",
+        "mergepolicy",
+        "reasoning",
+        "provenance",
+        "notes"
+    };
+
+    private static readonly HashSet<string> ValueSignalKeys = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "value",
+        "values",
+        "text",
+        "formatted",
+        "summary",
+        "content",
+        "description",
+        "details",
+        "amount",
+        "number",
+        "numericvalue",
+        "date",
+        "range",
+        "items"
+    };
+
+    private static bool HasSubstantiveValue(JToken? token)
+    {
+        if (token is null || token.Type is JTokenType.Null or JTokenType.Undefined)
+        {
+            return false;
+        }
+
+        return token.Type switch
+        {
+            JTokenType.String => !string.IsNullOrWhiteSpace(token.Value<string>()),
+            JTokenType.Integer or JTokenType.Float or JTokenType.Boolean or JTokenType.Date or JTokenType.Guid or JTokenType.TimeSpan => true,
+            JTokenType.Array => token.Values<JToken?>().Any(HasSubstantiveValue),
+            JTokenType.Object => HasSubstantiveObjectValue((JObject)token),
+            _ => !string.IsNullOrWhiteSpace(token.ToString())
+        };
+    }
+
+    private static bool HasSubstantiveObjectValue(JObject token)
+    {
+        if (!token.HasValues)
+        {
+            return false;
+        }
+
+        // Check if ANY property has substantive value (not just value-signal keys)
+        foreach (var property in token.Properties())
+        {
+            // Skip metadata-only properties when determining substantive content
+            if (MetadataOnlyKeys.Contains(property.Name))
+            {
+                continue;
+            }
+
+            // Any non-metadata property with content counts as substantive
+            if (HasSubstantiveValue(property.Value))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static string FormatValueForTemplate(JToken? token)

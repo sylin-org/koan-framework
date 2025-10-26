@@ -10,92 +10,224 @@ export class InsightsPanel {
 
   /**
    * Render the insights panel
-   * @param {Object} deliverable - Analysis deliverable with insights
-   * @param {Object} authoritativeNotes - Parsed authoritative notes
+   * @param {Object} context - Render context containing canonical fact payload, notes, quality metrics, and deliverable metadata
    * @returns {string} HTML string
    */
-  render(deliverable, authoritativeNotes = {}) {
-    if (!deliverable || !deliverable.insights) {
-      return this.renderEmpty();
+  render(context = {}) {
+    const canonical = context.canonical;
+    const notes = context.notes ?? {};
+    const quality = context.quality;
+
+    if (!canonical || typeof canonical !== 'object') {
+      return this.renderEmpty(context);
     }
 
-    const insights = deliverable.insights;
-    const sections = this.organizeSections(insights, authoritativeNotes);
+    const summary = this.extractSummary(canonical);
+    const factEntries = this.buildFactEntries(canonical, notes);
+    const overview = this.buildOverviewEntries(quality, canonical.metadata, context.deliverable);
+    const groupedFacts = this.organizeFacts(factEntries);
+
+    const hasFacts = Object.values(groupedFacts).some(group => group.length > 0);
+    const hasOverview = overview.length > 0;
+    const hasSummary = Boolean(summary);
+
+    if (!hasFacts && !hasOverview && !hasSummary) {
+      return this.renderEmpty(context);
+    }
 
     return `
       <div class="insights-panel">
-        ${this.renderOverview(sections.overview)}
-        ${this.renderSummary(insights.summary)}
-        ${this.renderGroupedFacts(sections.facts)}
+        ${hasOverview ? this.renderOverview(overview) : ''}
+        ${hasSummary ? this.renderSummary(summary) : ''}
+        ${hasFacts ? this.renderGroupedFacts(groupedFacts) : ''}
         ${this.renderActions()}
       </div>
     `;
   }
 
-  /**
-   * Organize insights into hierarchical sections
-   */
-  organizeSections(insights, authoritativeNotes) {
-    const sections = {
-      overview: [],
-      facts: {}
-    };
+  extractSummary(canonical) {
+    const formatted = canonical?.formatted ?? {};
+    if (typeof formatted.summary === 'string' && formatted.summary.trim()) {
+      return formatted.summary.trim();
+    }
 
-    // Extract overview fields (high-level metrics)
-    const overviewFields = ['title', 'status', 'confidence', 'completeness', 'lastUpdated'];
-    overviewFields.forEach(field => {
-      if (insights[field] !== undefined) {
-        sections.overview.push({
-          key: field,
-          value: insights[field],
-          metadata: this.getFieldMetadata(field, insights, authoritativeNotes)
-        });
-      }
-    });
+    const fields = canonical?.fields ?? {};
+    if (typeof fields.summary === 'string' && fields.summary.trim()) {
+      return fields.summary.trim();
+    }
 
-    // Group remaining fields by category
-    Object.entries(insights).forEach(([key, value]) => {
-      if (overviewFields.includes(key) || key === 'summary') return;
+    return null;
+  }
 
-      const category = this.categorizeField(key);
-      if (!sections.facts[category]) {
-        sections.facts[category] = [];
+  buildFactEntries(canonical, notes) {
+    const fields = canonical?.fields ?? {};
+    const formatted = canonical?.formatted ?? {};
+    const evidence = canonical?.evidence ?? {};
+    const reserved = new Set(['summary']);
+    const entries = [];
+
+    Object.keys(fields).forEach((key) => {
+      if (reserved.has(key)) {
+        return;
       }
 
-      sections.facts[category].push({
+      const rawValue = fields[key];
+      if (rawValue === null || rawValue === undefined || rawValue === '') {
+        return;
+      }
+
+      const formattedValue = formatted[key] ?? rawValue;
+      const evidenceToken = evidence[key];
+      const noteValue = this.lookupNoteValue(notes, key);
+      const metadata = this.buildFieldMetadata(key, noteValue, evidenceToken);
+
+      entries.push({
         key,
-        value,
-        metadata: this.getFieldMetadata(key, insights, authoritativeNotes)
+        value: formattedValue,
+        metadata
       });
     });
 
-    return sections;
+    return entries;
   }
 
-  /**
-   * Get metadata for a field (source, confidence, override info)
-   */
-  getFieldMetadata(key, insights, authoritativeNotes) {
-    // Check if this field is overridden by authoritative notes
-    const notesValue = authoritativeNotes[key];
-    const isNotesSourced = notesValue !== undefined;
+  buildOverviewEntries(quality, metadata, deliverable) {
+    const entries = [];
 
-    // Get confidence from insights metadata
-    const confidenceData = insights._metadata?.confidence?.[key];
-    const confidence = isNotesSourced ? 100 : (confidenceData || 85);
+    if (quality) {
+      if (typeof quality.highConfidence === 'number') {
+        entries.push({
+          key: 'highConfidence',
+          value: `${quality.highConfidence} high-confidence fact${quality.highConfidence === 1 ? '' : 's'}`,
+          metadata: { source: 'system', confidence: 100 }
+        });
+      }
 
-    // Check for override scenario
-    const docValue = !isNotesSourced && insights[key];
-    const overrideNotice = isNotesSourced && docValue && docValue !== notesValue
-      ? `Doc said ${this.formatValue(docValue)} (overridden)`
-      : null;
+      if (typeof quality.mediumConfidence === 'number' && quality.mediumConfidence > 0) {
+        entries.push({
+          key: 'mediumConfidence',
+          value: `${quality.mediumConfidence} medium-confidence fact${quality.mediumConfidence === 1 ? '' : 's'}`,
+          metadata: { source: 'system', confidence: 100 }
+        });
+      }
 
-    return {
-      source: isNotesSourced ? 'notes' : 'doc',
+      if (typeof quality.totalConflicts === 'number') {
+        entries.push({
+          key: 'totalConflicts',
+          value: `${quality.totalConflicts} conflict${quality.totalConflicts === 1 ? '' : 's'}`,
+          metadata: { source: 'system', confidence: 100 }
+        });
+      }
+    }
+
+    const generated = metadata?.generatedAt ?? metadata?.GeneratedAt;
+    if (generated) {
+      entries.push({
+        key: 'generatedAt',
+        value: this.formatTimestamp(generated),
+        metadata: { source: 'system', confidence: 100 }
+      });
+    }
+
+    if (deliverable?.version) {
+      entries.push({
+        key: 'deliverableVersion',
+        value: `Deliverable v${deliverable.version}`,
+        metadata: { source: 'system', confidence: 100 }
+      });
+    }
+
+    return entries;
+  }
+
+  organizeFacts(entries) {
+    return entries.reduce((acc, entry) => {
+      const category = this.categorizeField(entry.key);
+      if (!acc[category]) {
+        acc[category] = [];
+      }
+      acc[category].push(entry);
+      return acc;
+    }, {});
+  }
+
+  lookupNoteValue(notes, key) {
+    if (!notes || typeof notes !== 'object') {
+      return undefined;
+    }
+
+    const normalized = key.toLowerCase();
+    if (Object.prototype.hasOwnProperty.call(notes, normalized)) {
+      return notes[normalized];
+    }
+
+    const underscored = normalized.replace(/[^a-z0-9]+/g, '_');
+    if (Object.prototype.hasOwnProperty.call(notes, underscored)) {
+      return notes[underscored];
+    }
+
+    return undefined;
+  }
+
+  buildFieldMetadata(key, noteValue, evidenceToken) {
+    const source = noteValue !== undefined ? 'notes' : 'doc';
+    const confidence = noteValue !== undefined ? 100 : this.extractConfidence(evidenceToken);
+    const docReference = this.buildDocReference(evidenceToken);
+
+    const metadata = {
+      source,
       confidence,
-      overrideNotice,
-      docReference: insights._metadata?.sources?.[key]
+      docReference
     };
+
+    if (source === 'notes' && docReference) {
+      metadata.overrideNotice = 'Authoritative notes override document values for this field.';
+    }
+
+    if (evidenceToken?.text) {
+      metadata.excerpt = evidenceToken.text;
+    }
+
+    return metadata;
+  }
+
+  extractConfidence(evidenceToken) {
+    if (!evidenceToken) {
+      return 85;
+    }
+
+    const value = typeof evidenceToken.confidence === 'number'
+      ? evidenceToken.confidence
+      : undefined;
+
+    if (value === undefined) {
+      return 85;
+    }
+
+    if (value > 1) {
+      return Math.round(value);
+    }
+
+    return Math.round(value * 100);
+  }
+
+  buildDocReference(evidenceToken) {
+    if (!evidenceToken) {
+      return null;
+    }
+
+    const parts = [];
+    if (evidenceToken.sourceFileName) {
+      parts.push(evidenceToken.sourceFileName);
+    }
+    if (typeof evidenceToken.page === 'number' && evidenceToken.page > 0) {
+      parts.push(`p. ${evidenceToken.page}`);
+    }
+    if (evidenceToken.sectionHeading) {
+      parts.push(evidenceToken.sectionHeading);
+    }
+
+    return parts.length > 0 ? parts.join(' · ') : null;
   }
 
   /**
@@ -248,7 +380,17 @@ export class InsightsPanel {
   /**
    * Render empty state
    */
-  renderEmpty() {
+  renderEmpty(context = {}) {
+    const documentCount = Array.isArray(context.documents) ? context.documents.length : 0;
+    const notesCount = context.notes ? Object.keys(context.notes).length : 0;
+
+    let hint = 'Upload documents to generate insights';
+    if (documentCount > 0) {
+      hint = 'Processing in progress. Refresh once the pipeline completes.';
+    } else if (notesCount > 0) {
+      hint = 'Add source documents so authoritative notes can be validated.';
+    }
+
     return `
       <div class="insights-panel-empty">
         <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
@@ -257,7 +399,7 @@ export class InsightsPanel {
           <line x1="12" y1="16" x2="12.01" y2="16"></line>
         </svg>
         <p>No insights yet</p>
-        <p class="empty-hint">Upload documents to generate insights</p>
+        <p class="empty-hint">${this.escapeHtml(hint)}</p>
       </div>
     `;
   }
@@ -286,6 +428,25 @@ export class InsightsPanel {
    */
   formatCategoryName(category) {
     return category.charAt(0).toUpperCase() + category.slice(1);
+  }
+
+  formatTimestamp(value) {
+    if (!value) {
+      return 'Generated just now';
+    }
+
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return String(value);
+    }
+
+    return date.toLocaleString(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   }
 
   /**

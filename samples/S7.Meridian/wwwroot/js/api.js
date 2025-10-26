@@ -312,6 +312,13 @@ export class API {
   }
 
   /**
+   * Get pipeline graph (unified snapshot with documents, deliverable, canonical, jobs, runs)
+   */
+  async getPipelineGraph(id) {
+    return this.get(`/api/pipelines/${id}/graph`);
+  }
+
+  /**
    * Create pipeline
    */
   async createPipeline(pipeline) {
@@ -323,6 +330,10 @@ export class API {
    */
   async deletePipeline(id) {
     return this.pipelines.delete(id);
+  }
+
+  async savePipeline(pipeline) {
+    return this.pipelines.create(pipeline);
   }
 
   // ==================== Organization Profiles ====================
@@ -409,6 +420,23 @@ export class API {
    */
   async getDocuments(pipelineId) {
     return this.get(`/api/pipelines/${pipelineId}/documents`);
+  }
+
+  /**
+   * Override the detected source type for a document
+   */
+  async overrideDocumentType(pipelineId, documentId, payload) {
+    return this.request(`/api/pipelines/${pipelineId}/documents/${documentId}/type`, {
+      method: 'PUT',
+      body: JSON.stringify(payload)
+    });
+  }
+
+  /**
+   * Delete a document from a pipeline
+   */
+  async deleteDocument(pipelineId, documentId) {
+    return this.delete(`/api/pipelines/${pipelineId}/documents/${documentId}`);
   }
 
   // ==================== Jobs ====================

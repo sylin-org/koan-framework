@@ -12,7 +12,6 @@ import { Sidebar } from './components/Sidebar.js';
 import { Toast } from './components/Toast.js';
 import { TopNav } from './components/TopNav.js';
 import { Dashboard } from './components/Dashboard.js';
-import { InsightsPanel } from './components/InsightsPanel.js';
 import { TypeFormView } from './components/TypeFormView.js';
 import { AnalysisTypesManager } from './components/AnalysisTypesManager.js';
 import { AnalysisTypeDetailView } from './components/AnalysisTypeDetailView.js';
@@ -31,15 +30,17 @@ class MeridianApp {
     this.eventBus = new EventBus();
     this.router = new Router();
     this.stateManager = new StateManager({
-      currentView: 'dashboard', // 'dashboard', 'analyses-list', 'analysis-workspace', 'manage-types'
+  currentView: 'dashboard', // 'dashboard', 'analyses-list', 'manage-types'
       currentPipelineId: null,
       currentTypeId: null,
       pipelines: [],
       analysisTypes: [],
       currentPipeline: null,
       deliverable: null,
+      deliverableCanonical: null,
       authoritativeNotes: null,
       notesExpanded: false,
+      pipelineQuality: null,
     });
     this.toast = new Toast();
     this.appRoot = null;
@@ -52,7 +53,6 @@ class MeridianApp {
     // Legacy detail panel removed; full-page routes handle view/edit.
     this.keyboardShortcuts = new KeyboardShortcuts(this.eventBus, this.router);
     this.dashboard = new Dashboard(this.api, this.stateManager, this.eventBus);
-    this.insightsPanel = new InsightsPanel(this.api, this.stateManager);
     this.analysisTypesManager = new AnalysisTypesManager(this.api, this.eventBus, this.toast, this.router);
     this.analysisTypeDetailView = new AnalysisTypeDetailView(this.api, this.eventBus, this.router, this.toast);
     this.analysisDetailView = new AnalysisDetailView(this.api, this.eventBus, this.router, this.toast);
@@ -160,7 +160,7 @@ class MeridianApp {
     this.router.route('analyses/create', (params) => this.navigate('analysis-create', params));
     this.router.route('analyses/:id/view', (params) => this.navigate('analysis-view', params));
     this.router.route('analyses/:id/edit', (params) => this.navigate('analysis-edit', params));
-    this.router.route('analyses/:pipelineId', (params) => this.navigate('analysis-workspace', params));
+  this.router.route('analyses/:pipelineId', (params) => this.navigate('analysis-view', { id: params.pipelineId }));
 
     // Analysis Types
     this.router.route('analysis-types', (params) => this.navigate('analysis-types-list', params));
@@ -228,13 +228,12 @@ class MeridianApp {
 
     // Listen for export/refresh events from insights panel
     this.eventBus.on('export-insights', () => {
-      this.exportReport();
+      this.analysisDetailView?.handleExportReport?.();
     });
 
     this.eventBus.on('refresh-analysis', () => {
-      if (this.state.currentPipelineId) {
-        // Re-render current pipeline without changing URL
-        this.openPipeline(this.state.currentPipelineId);
+      if (this.analysisDetailView?.analysis?.id) {
+        this.analysisDetailView.reload();
       }
     });
   }
@@ -245,7 +244,7 @@ class MeridianApp {
       if (!pipelineId) {
         return;
       }
-      this.router.navigate(`analyses/${pipelineId}`);
+      this.router.navigate(`analyses/${pipelineId}/view`);
     });
 
     this.eventBus.on('detail-panel:saved', () => {
@@ -257,7 +256,7 @@ class MeridianApp {
     this.eventBus.on('detail-panel:deleted', (pipelineId) => {
       this.updateSidebarPipelineBadges(this.state.pipelines);
 
-      if (pipelineId && this.state.currentView === 'analysis-workspace' && this.state.currentPipelineId === pipelineId) {
+      if (pipelineId && this.state.currentView === 'analysis-view' && this.state.currentPipelineId === pipelineId) {
         this.eventBus.emit('navigate', 'analyses-list');
       }
     });
@@ -277,7 +276,6 @@ class MeridianApp {
       'analysis-create': 'analyses/create',
       'analysis-view': params.id ? `analyses/${params.id}/view` : 'analyses',
       'analysis-edit': params.id ? `analyses/${params.id}/edit` : 'analyses',
-      'analysis-workspace': params.pipelineId ? `analyses/${params.pipelineId}` : 'analyses',
       'analysis-types-list': 'analysis-types',
       'analysis-type-view': params.id ? `analysis-types/${params.id}/view` : 'analysis-types',
       'analysis-type-create': 'analysis-types/create',
@@ -365,14 +363,6 @@ class MeridianApp {
 
         case 'analyses-list':
           await this.renderAnalysesList(appContainer);
-          break;
-
-        case 'analysis-workspace':
-          if (params.pipelineId) {
-            await this.openPipeline(params.pipelineId);
-          } else {
-            this.toast.error('No pipeline ID provided');
-          }
           break;
 
         case 'analysis-create':
@@ -706,456 +696,6 @@ class MeridianApp {
   /**
    * Open pipeline and render workspace
    */
-  async openPipeline(pipelineId) {
-    try {
-      this.toast.info('Loading analysis...');
-
-      console.log('[openPipeline] Loading pipeline:', pipelineId);
-
-      // Load pipeline data
-      const pipeline = await this.api.getPipeline(pipelineId);
-      console.log('[openPipeline] Pipeline loaded:', pipeline);
-      this.state.currentPipelineId = pipelineId;
-      this.state.currentPipeline = pipeline;
-
-      // Load deliverable
-      let deliverable = null;
-      try {
-        deliverable = await this.api.getDeliverable(pipelineId);
-        console.log('[openPipeline] Deliverable loaded:', deliverable);
-
-        // Parse dataJson to get insights
-        if (deliverable && deliverable.dataJson) {
-          try {
-            deliverable.insights = JSON.parse(deliverable.dataJson);
-            console.log('[openPipeline] Insights parsed:', deliverable.insights);
-          } catch (parseError) {
-            console.error('[openPipeline] Failed to parse dataJson:', parseError);
-            deliverable.insights = null;
-          }
-        }
-
-        this.state.deliverable = deliverable;
-      } catch (error) {
-        console.log('[openPipeline] No deliverable yet:', error);
-        this.state.deliverable = null;
-      }
-
-      // Load authoritative notes
-      let notesData = null;
-      try {
-        notesData = await this.api.getNotes(pipelineId);
-        console.log('[openPipeline] Notes loaded:', notesData);
-        this.state.authoritativeNotes = notesData?.authoritativeNotes || '';
-      } catch (error) {
-        console.log('[openPipeline] No notes yet:', error);
-        this.state.authoritativeNotes = '';
-      }
-
-      // Load documents
-      try {
-        const documents = await this.api.getDocuments(pipelineId);
-        console.log('[openPipeline] Documents loaded:', documents);
-        this.state.documents = documents || [];
-      } catch (error) {
-        console.log('[openPipeline] No documents yet:', error);
-        this.state.documents = [];
-      }
-
-      // Render workspace
-      await this.renderAnalysisWorkspace();
-
-      this.toast.success('Analysis loaded');
-    } catch (error) {
-      console.error('Failed to open pipeline:', error);
-      this.toast.error('Failed to open analysis');
-    }
-  }
-
-  /**
-   * Render Analysis Workspace (Two-Column Layout)
-   */
-  async renderAnalysisWorkspace() {
-    const pipeline = this.state.currentPipeline;
-    if (!pipeline) return;
-
-    const name = pipeline.name || pipeline.Name || 'Untitled Analysis';
-    const deliverable = this.state.deliverable;
-    const authoritativeNotes = this.state.authoritativeNotes;
-
-    const container = document.getElementById('app');
-    if (!container) return;
-
-    const html = `
-      <div class="workspace-view">
-        <div class="workspace-header">
-          <div class="workspace-title-zone">
-            <h1 class="workspace-title">${this.escapeHtml(name)}</h1>
-            <div class="workspace-metadata">Updated recently</div>
-          </div>
-          <div class="workspace-actions">
-            <button class="btn btn-secondary btn-press" data-action="export">
-              <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                <polyline points="7 10 12 15 17 10"></polyline>
-                <line x1="12" y1="15" x2="12" y2="3"></line>
-              </svg>
-              Export
-            </button>
-          </div>
-        </div>
-
-        <!-- Authoritative Notes Section -->
-        <div class="authoritative-notes-section" data-state="expanded">
-          ${this.renderNotesSection()}
-        </div>
-
-        <!-- Two-Column Workspace (40% Documents | 60% Insights) -->
-        <div class="analysis-workspace">
-          <!-- Documents Column (40%) -->
-          <div class="workspace-column workspace-column-documents">
-            <div class="workspace-column-header">
-              <h2 class="workspace-column-title">Source Documents</h2>
-            </div>
-            <div class="workspace-column-content">
-              ${this.renderDocumentsColumn()}
-            </div>
-          </div>
-
-          <!-- Insights Column (60%) -->
-          <div class="workspace-column workspace-column-insights">
-            <div class="workspace-column-header">
-              <h2 class="workspace-column-title">Key Insights</h2>
-            </div>
-            <div class="workspace-column-content">
-              ${this.renderInsightsColumn(deliverable, authoritativeNotes)}
-            </div>
-          </div>
-        </div>
-      </div>
-    `;
-
-    const contentArea = this.renderWithNav(container, html);
-    if (!contentArea) return;
-
-    this.attachWorkspaceEventHandlers(contentArea);
-  }
-
-  /**
-   * Render Notes Section
-   */
-  renderNotesSection() {
-    const notes = this.state.authoritativeNotes || '';
-
-    return `
-      <div class="notes-container">
-        <div class="notes-header">
-          <div class="notes-title">
-            <span class="notes-icon">🔆</span>
-            Authoritative Notes
-          </div>
-          <div class="notes-actions">
-            <button class="btn-notes-action btn-save-notes" style="display: none;">
-              <svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="20 6 9 17 4 12"></polyline>
-              </svg>
-              Save
-            </button>
-          </div>
-        </div>
-        <div class="notes-editor">
-          <textarea class="notes-textarea" placeholder="Add authoritative information in natural language...
-
-Example:
-PRIMARY CONTACT: Jordan Kim is the VP of Enterprise Solutions
-REVENUE: FY2024 revenue was $52.3M USD
-EMPLOYEE COUNT: 175 employees as of October 2024">${this.escapeHtml(notes)}</textarea>
-          <div class="notes-help-text">Use natural language. The system will automatically override document extractions.</div>
-        </div>
-      </div>
-    `;
-  }
-
-  /**
-   * Render Documents Column
-   */
-  renderDocumentsColumn() {
-    const documents = this.state.documents || [];
-
-    const documentsHtml = documents.length > 0
-      ? documents.map(doc => {
-          const fileName = doc.originalFileName || doc.OriginalFileName || 'Untitled Document';
-          const id = doc.id || doc.Id;
-          const status = doc.status || doc.Status || 'Unknown';
-          const size = doc.size || doc.Size || 0;
-          const sourceType = doc.sourceType || doc.SourceType || 'Unknown';
-          const isVirtual = doc.isVirtual || doc.IsVirtual || false;
-          const confidence = doc.classificationConfidence || doc.ClassificationConfidence || 0;
-
-          // Map status enum values to display names
-          const statusMap = {
-            0: 'Pending',
-            1: 'Extracted',
-            2: 'Indexed',
-            3: 'Classified',
-            4: 'Failed',
-            'Pending': 'Pending',
-            'Extracted': 'Extracted',
-            'Indexed': 'Indexed',
-            'Classified': 'Classified',
-            'Failed': 'Failed'
-          };
-
-          const statusDisplay = statusMap[status] || status;
-          const statusClass = statusDisplay.toLowerCase();
-
-          return `
-            <div class="document-item" data-document-id="${id}">
-              <div class="document-icon">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                  <polyline points="14 2 14 8 20 8"></polyline>
-                </svg>
-              </div>
-              <div class="document-info">
-                <div class="document-name">${this.escapeHtml(fileName)}</div>
-                <div class="document-meta">
-                  <span class="document-status status-${statusClass}">${statusDisplay}</span>
-                  ${size ? `<span class="document-size">${this.formatFileSize(size)}</span>` : ''}
-                  ${isVirtual ? '<span class="document-badge">Virtual</span>' : ''}
-                  ${sourceType !== 'Unknown' && sourceType !== 'Unclassified' ? `<span class="document-type">${this.escapeHtml(sourceType)}</span>` : ''}
-                </div>
-              </div>
-            </div>
-          `;
-        }).join('')
-      : '';
-
-    return `
-      <div class="documents-list">
-        ${documentsHtml}
-        <div class="drop-zone" data-action="upload-document">
-          <svg class="icon" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-            <polyline points="14 2 14 8 20 8"></polyline>
-          </svg>
-          <p>Drop documents here or click to browse</p>
-          <p class="hint">Always active - add anytime</p>
-        </div>
-      </div>
-    `;
-  }
-
-  /**
-   * Render Insights Column with compact panel
-   */
-  renderInsightsColumn(deliverable, authoritativeNotes) {
-    // Parse authoritative notes into key-value pairs
-    const parsedNotes = this.parseAuthoritativeNotes(authoritativeNotes);
-
-    // Render using InsightsPanel component
-    const html = this.insightsPanel.render(deliverable, parsedNotes);
-
-    return html;
-  }
-
-  /**
-   * Parse authoritative notes into key-value pairs
-   */
-  parseAuthoritativeNotes(notes) {
-    if (!notes) return {};
-
-    const parsed = {};
-    const lines = notes.split('\n');
-
-    lines.forEach(line => {
-      const match = line.match(/^([A-Z\s]+):\s*(.+)$/);
-      if (match) {
-        const key = match[1].trim().toLowerCase().replace(/\s+/g, '_');
-        const value = match[2].trim();
-        parsed[key] = value;
-      }
-    });
-
-    return parsed;
-  }
-
-  /**
-   * Attach workspace event handlers
-   */
-  attachWorkspaceEventHandlers(container) {
-    // Export
-    container.querySelector('[data-action="export"]')?.addEventListener('click', () => {
-      this.exportReport();
-    });
-
-    // Notes auto-save
-    const textarea = container.querySelector('.notes-textarea');
-    const btnSave = container.querySelector('.btn-save-notes');
-
-    if (textarea && btnSave) {
-      let saveTimeout;
-      textarea.addEventListener('input', () => {
-        btnSave.style.display = 'inline-flex';
-
-        clearTimeout(saveTimeout);
-        saveTimeout = setTimeout(() => {
-          this.saveNotes(textarea.value);
-          btnSave.style.display = 'none';
-        }, 1000);
-      });
-
-      btnSave.addEventListener('click', () => {
-        this.saveNotes(textarea.value);
-        btnSave.style.display = 'none';
-      });
-    }
-
-    // Document upload - drop zone
-    const dropZone = container.querySelector('.drop-zone[data-action="upload-document"]');
-    if (dropZone) {
-      dropZone.addEventListener('click', () => {
-        this.uploadDocument();
-      });
-
-      // Drag and drop
-      dropZone.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        dropZone.classList.add('drag-over');
-      });
-
-      dropZone.addEventListener('dragleave', () => {
-        dropZone.classList.remove('drag-over');
-      });
-
-      dropZone.addEventListener('drop', (e) => {
-        e.preventDefault();
-        dropZone.classList.remove('drag-over');
-
-        const files = e.dataTransfer.files;
-        if (files.length > 0) {
-          this.handleFileUpload(files[0]);
-        }
-      });
-    }
-
-    // Insights panel event handlers
-    const insightsContent = container.querySelector('.workspace-column-insights .workspace-column-content');
-    if (insightsContent) {
-      this.insightsPanel.attachEventHandlers(insightsContent, this.eventBus);
-    }
-  }
-
-  /**
-   * Toggle notes section
-   */
-  toggleNotes() {
-    const notesSection = document.querySelector('.authoritative-notes-section');
-    if (!notesSection) return;
-
-    const currentState = notesSection.getAttribute('data-state');
-    const isExpanded = currentState === 'expanded';
-
-    notesSection.setAttribute('data-state', isExpanded ? 'collapsed' : 'expanded');
-    this.state.notesExpanded = !isExpanded;
-  }
-
-  /**
-   * Save authoritative notes
-   */
-  async saveNotes(notes) {
-    const pipelineId = this.state.currentPipelineId;
-    if (!pipelineId) return;
-
-    try {
-      await this.api.setNotes(pipelineId, notes, false);
-      this.state.authoritativeNotes = notes;
-      this.toast.success('Notes saved');
-    } catch (error) {
-      console.error('Failed to save notes:', error);
-      this.toast.error('Failed to save notes');
-    }
-  }
-
-  /**
-   * Upload document
-   */
-  uploadDocument() {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.pdf,.txt,.docx';
-
-    input.addEventListener('change', () => {
-      if (input.files && input.files.length > 0) {
-        this.handleFileUpload(input.files[0]);
-      }
-    });
-
-    input.click();
-  }
-
-  /**
-   * Handle file upload
-   */
-  async handleFileUpload(file) {
-    const pipelineId = this.state.currentPipelineId;
-    if (!pipelineId) return;
-
-    this.toast.info(`Uploading ${file.name}...`);
-
-    try {
-      const result = await this.api.uploadDocument(pipelineId, file);
-      const jobId = result.jobId || result.JobId;
-
-      this.toast.success(`Uploaded ${file.name}`);
-
-      // Wait for job completion
-      if (jobId) {
-        this.toast.info('Processing document...');
-        await this.api.waitForJob(pipelineId, jobId, (job) => {
-          console.log('Job progress:', job);
-        });
-
-        this.toast.success('Document processed!');
-
-        // Reload pipeline data
-        await this.openPipeline(pipelineId);
-      }
-    } catch (error) {
-      console.error('Failed to upload document:', error);
-      this.toast.error(`Failed to upload ${file.name}`);
-    }
-  }
-
-  /**
-   * Export report
-   */
-  async exportReport() {
-    const pipelineId = this.state.currentPipelineId;
-    if (!pipelineId) {
-      this.toast.warning('No analysis selected');
-      return;
-    }
-
-    try {
-      const markdown = await this.api.getDeliverableMarkdown(pipelineId);
-
-      // Download as file
-      const blob = new Blob([markdown], { type: 'text/markdown' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `analysis-${pipelineId}.md`;
-      a.click();
-      URL.revokeObjectURL(url);
-
-      this.toast.success('Report exported');
-    } catch (error) {
-      console.error('Failed to export report:', error);
-      this.toast.error('Failed to export report');
-    }
-  }
-
   /**
    * Create analysis
    */
@@ -1173,7 +713,7 @@ EMPLOYEE COUNT: 175 employees as of October 2024">${this.escapeHtml(notes)}</tex
       this.toast.success(`Analysis "${name}" created`);
 
       const pipelineId = pipeline.id || pipeline.Id;
-      await this.navigate('analysis-workspace', { pipelineId });
+  this.eventBus.emit('navigate', 'analysis-view', { id: pipelineId });
     } catch (error) {
       console.error('Failed to create analysis:', error);
       this.toast.error('Failed to create analysis');
@@ -1266,7 +806,6 @@ EMPLOYEE COUNT: 175 employees as of October 2024">${this.escapeHtml(notes)}</tex
       const contentArea = this.renderWithNav(container, '<div class="content-area">' + this.analysisDetailView.renderSkeleton() + '</div>');
       if (!contentArea) return;
       await this.analysisDetailView.load(id);
-      await this.analysisDetailView.loadAnalysisTypes(); // Load types for dropdown
       this.analysisDetailView.isEditing = true;
       this.analysisDetailView.isCreating = false;
       const html = this.analysisDetailView.render();
@@ -1463,7 +1002,7 @@ EMPLOYEE COUNT: 175 employees as of October 2024">${this.escapeHtml(notes)}</tex
         tags: normalized.tags,
         meta,
         links: {
-          workspace: `#/analyses/${id}`
+          workspace: `#/analyses/${id}/view`
         }
       }, 'view');
     } catch (error) {

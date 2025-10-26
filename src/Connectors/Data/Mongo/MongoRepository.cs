@@ -351,7 +351,12 @@ internal sealed class MongoRepository<TEntity, TKey> :
             using var activity = MongoTelemetry.Activity.StartActivity("mongo.query.all");
             activity?.SetTag("entity", typeof(TEntity).FullName);
             var collection = await GetCollectionAsync(ct).ConfigureAwait(false);
-            var results = await collection.Find(Builders<TEntity>.Filter.Empty).ToListAsync(ct).ConfigureAwait(false);
+
+            IFindFluent<TEntity, TEntity> cursor = query is Expression<Func<TEntity, bool>> predicate
+                ? FindWithPredicate(collection, predicate)
+                : collection.Find(Builders<TEntity>.Filter.Empty);
+
+            var results = await cursor.ToListAsync(ct).ConfigureAwait(false);
             return (IReadOnlyList<TEntity>)results;
         }, ct);
 
@@ -362,10 +367,12 @@ internal sealed class MongoRepository<TEntity, TKey> :
             var (defaultPageSize, maxPageSize) = _options.CurrentValue.GetPagingGuardrails();
             var collection = await GetCollectionAsync(ct).ConfigureAwait(false);
 
-            // Use centralized query extension for paging
-            var cursor = collection.Find(Builders<TEntity>.Filter.Empty)
-                .ApplyPaging(options, defaultPageSize, maxPageSize,
-                    (c, skip, take) => c.Skip(skip).Limit(take));
+            IFindFluent<TEntity, TEntity> cursor = query is Expression<Func<TEntity, bool>> predicate
+                ? FindWithPredicate(collection, predicate)
+                : collection.Find(Builders<TEntity>.Filter.Empty);
+
+            cursor = cursor.ApplyPaging(options, defaultPageSize, maxPageSize,
+                (c, skip, take) => c.Skip(skip).Limit(take));
 
             var results = await cursor.ToListAsync(ct).ConfigureAwait(false);
             return (IReadOnlyList<TEntity>)results;
@@ -383,8 +390,7 @@ internal sealed class MongoRepository<TEntity, TKey> :
             var (defaultPageSize, maxPageSize) = _options.CurrentValue.GetPagingGuardrails();
             var collection = await GetCollectionAsync(ct).ConfigureAwait(false);
 
-            // Use centralized query extension for paging
-            var cursor = collection.Find(predicate)
+            var cursor = FindWithPredicate(collection, predicate)
                 .ApplyPaging(options, defaultPageSize, maxPageSize,
                     (c, skip, take) => c.Skip(skip).Limit(take));
 
@@ -408,6 +414,12 @@ internal sealed class MongoRepository<TEntity, TKey> :
 
             if (request.Predicate is not null)
             {
+                if (TryBuildGuidFilter(request.Predicate, out var optimizedFilter))
+                {
+                    var optimizedCount = await collection.CountDocumentsAsync(optimizedFilter, cancellationToken: ct).ConfigureAwait(false);
+                    return CountResult.Exact((long)optimizedCount);
+                }
+
                 var count = await collection.CountDocumentsAsync(request.Predicate, cancellationToken: ct).ConfigureAwait(false);
                 return CountResult.Exact((long)count);
             }
@@ -600,6 +612,162 @@ internal sealed class MongoRepository<TEntity, TKey> :
 
             throw new InvalidOperationException("Unable to obtain Mongo database from collection.");
         }
+    }
+
+    private IFindFluent<TEntity, TEntity> FindWithPredicate(IMongoCollection<TEntity> collection, Expression<Func<TEntity, bool>> predicate)
+    {
+        if (TryBuildGuidFilter(predicate, out var optimizedFilter))
+        {
+            return collection.Find(optimizedFilter);
+        }
+
+        return collection.Find(predicate);
+    }
+
+    private bool TryBuildGuidFilter(Expression<Func<TEntity, bool>> predicate, out FilterDefinition<TEntity> filter)
+    {
+        filter = Builders<TEntity>.Filter.Empty;
+        if (predicate is null || predicate.Parameters.Count == 0)
+        {
+            return false;
+        }
+
+        return TryBuildGuidFilter(predicate.Parameters[0], predicate.Body, out filter);
+    }
+
+    private bool TryBuildGuidFilter(ParameterExpression parameter, Expression expression, out FilterDefinition<TEntity> filter)
+    {
+        filter = Builders<TEntity>.Filter.Empty;
+        expression = StripConvert(expression);
+
+        if (expression is BinaryExpression binary)
+        {
+            switch (binary.NodeType)
+            {
+                case ExpressionType.Equal:
+                    if (TryExtractComparison(parameter, binary.Left, binary.Right, out var fieldName, out var value) ||
+                        TryExtractComparison(parameter, binary.Right, binary.Left, out fieldName, out value))
+                    {
+                        if (value is string str && Guid.TryParse(str, out var guid))
+                        {
+                            var elementName = MapFieldName(fieldName);
+                            filter = Builders<TEntity>.Filter.Eq(elementName, new BsonBinaryData(guid, GuidRepresentation.Standard));
+                            return true;
+                        }
+                    }
+                    break;
+                case ExpressionType.AndAlso:
+                    if (TryBuildGuidFilter(parameter, binary.Left, out var left) && TryBuildGuidFilter(parameter, binary.Right, out var right))
+                    {
+                        filter = Builders<TEntity>.Filter.And(left, right);
+                        return true;
+                    }
+                    break;
+                case ExpressionType.OrElse:
+                    if (TryBuildGuidFilter(parameter, binary.Left, out var leftOr) && TryBuildGuidFilter(parameter, binary.Right, out var rightOr))
+                    {
+                        filter = Builders<TEntity>.Filter.Or(leftOr, rightOr);
+                        return true;
+                    }
+                    break;
+            }
+        }
+
+        return false;
+    }
+
+    private bool TryExtractComparison(ParameterExpression parameter, Expression fieldExpression, Expression valueExpression, out string fieldName, out object? value)
+    {
+        fieldName = string.Empty;
+        value = null;
+
+        var candidate = StripConvert(fieldExpression) as MemberExpression;
+        if (candidate is null)
+        {
+            return false;
+        }
+
+        if (candidate.Expression is null)
+        {
+            return false;
+        }
+
+        var owner = StripConvert(candidate.Expression);
+        if (owner != parameter)
+        {
+            return false;
+        }
+
+        fieldName = candidate.Member.Name;
+        return TryEvaluateExpression(valueExpression, out value);
+    }
+
+    private static Expression StripConvert(Expression expression)
+    {
+        while (expression.NodeType is ExpressionType.Convert or ExpressionType.ConvertChecked)
+        {
+            expression = ((UnaryExpression)expression).Operand;
+        }
+
+        return expression;
+    }
+
+    private bool TryEvaluateExpression(Expression expression, out object? value)
+    {
+        expression = StripConvert(expression);
+
+        try
+        {
+            var lambda = Expression.Lambda(expression);
+            value = lambda.Compile().DynamicInvoke();
+            return true;
+        }
+        catch
+        {
+            value = null;
+            return false;
+        }
+    }
+
+    private string MapFieldName(string propertyName)
+    {
+        if (string.IsNullOrWhiteSpace(propertyName))
+        {
+            return propertyName;
+        }
+
+        if (!string.IsNullOrWhiteSpace(_optimizationInfo.IdPropertyName) &&
+            string.Equals(propertyName, _optimizationInfo.IdPropertyName, StringComparison.Ordinal))
+        {
+            return "_id";
+        }
+
+        if (string.Equals(propertyName, "Id", StringComparison.OrdinalIgnoreCase))
+        {
+            return "_id";
+        }
+
+        return ToCamelCase(propertyName);
+    }
+
+    private static string ToCamelCase(string value)
+    {
+        if (string.IsNullOrEmpty(value))
+        {
+            return value;
+        }
+
+        if (!char.IsUpper(value[0]))
+        {
+            return value;
+        }
+
+        if (value.Length == 1)
+        {
+            return value.ToLowerInvariant();
+        }
+
+        return char.ToLowerInvariant(value[0]) + value.Substring(1);
     }
 
     private sealed class MongoBatch : IBatchSet<TEntity, TKey>
