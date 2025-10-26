@@ -586,7 +586,6 @@ export class AnalysisDetailView {
 		return `
 			<article class="${classes.join(' ')}" data-stat="${this.escapeAttr(stat.key || '')}">
 				<div class="mini-hero-value">${this.escape(stat.value ?? '')}</div>
-				<div class="mini-hero-label">${this.escape(stat.label ?? '')}</div>
 				${stat.helper ? `<div class="mini-hero-helper">${this.escape(stat.helper)}</div>` : ''}
 			</article>
 		`;
@@ -935,60 +934,157 @@ export class AnalysisDetailView {
 			return [];
 		}
 
-		// Parse evidence from dataJson if available
-		let evidence = null;
-		
-		// Check if canonical IS the full deliverable object with dataJson
-		if (canonical.dataJson || canonical.DataJson) {
+		const rawDataJson = canonical.dataJson || canonical.DataJson;
+		let parsedData = null;
+		if (rawDataJson) {
 			try {
-				const jsonStr = canonical.dataJson || canonical.DataJson;
-				const dataJson = typeof jsonStr === 'string' ? JSON.parse(jsonStr) : jsonStr;
-				evidence = dataJson.evidence || dataJson.Evidence;
+				parsedData = typeof rawDataJson === 'string' ? JSON.parse(rawDataJson) : rawDataJson;
 			} catch (error) {
-				console.warn('Failed to parse dataJson for evidence', error);
+				console.warn('Failed to parse dataJson payload', error);
 			}
 		}
 
-		// Try to get fields from multiple possible locations
+		let resolvedFactsSource = canonical.resolvedFacts || canonical.ResolvedFacts;
+		let evidenceSource = canonical.evidence || canonical.Evidence;
 		let fields = canonical.fields || canonical.Fields;
-		
-		// If no fields directly, try parsing from dataJson
-		if (!fields && (canonical.dataJson || canonical.DataJson)) {
-			try {
-				const jsonStr = canonical.dataJson || canonical.DataJson;
-				const dataJson = typeof jsonStr === 'string' ? JSON.parse(jsonStr) : jsonStr;
-				fields = dataJson.fields || dataJson.Fields;
-			} catch (error) {
-				console.warn('Failed to parse dataJson for fields', error);
-			}
+
+		if (!resolvedFactsSource && parsedData) {
+			resolvedFactsSource = parsedData.resolvedFacts || parsedData.ResolvedFacts;
+		}
+
+		if (!evidenceSource && parsedData) {
+			evidenceSource = parsedData.evidence || parsedData.Evidence;
+		}
+
+		if (!fields && parsedData) {
+			fields = parsedData.fields || parsedData.Fields;
 		}
 
 		if (!fields || typeof fields !== 'object') {
 			return [];
 		}
 
+		const buildLookup = (source) => {
+			if (!source || typeof source !== 'object') {
+				return () => null;
+			}
+
+			const map = new Map();
+			Object.entries(source).forEach(([name, value]) => {
+				if (typeof name !== 'string') {
+					return;
+				}
+				if (!map.has(name)) {
+					map.set(name, value);
+				}
+				const lower = name.toLowerCase();
+				if (!map.has(lower)) {
+					map.set(lower, value);
+				}
+			});
+
+			return (lookupKey) => {
+				if (!lookupKey) {
+					return null;
+				}
+				if (map.has(lookupKey)) {
+					return map.get(lookupKey);
+				}
+				const lower = lookupKey.toLowerCase();
+				return map.has(lower) ? map.get(lower) : null;
+			};
+		};
+
+		const getResolved = buildLookup(resolvedFactsSource);
+		const getEvidence = buildLookup(evidenceSource);
+
 		const entries = Object.entries(fields).map(([key, raw]) => {
 			const normalized = raw && typeof raw === 'object' && !Array.isArray(raw)
 				? raw
 				: { value: raw };
 
-			const value = this.formatFactValue(normalized.value ?? normalized.text ?? normalized);
-			
-			// Extract evidence metadata if available
-			let evidenceData = null;
-			if (evidence && evidence[key]) {
-				evidenceData = evidence[key];
+			const baseValue = normalized.value ?? normalized.text ?? normalized;
+			const resolved = getResolved(key);
+			const evidenceData = resolved?.evidence || getEvidence(key);
+
+			const displayValue = typeof resolved?.displayText === 'string' && resolved.displayText.trim().length > 0
+				? resolved.displayText
+				: this.formatFactValue(baseValue);
+
+			const valueHtml = typeof resolved?.displayHtml === 'string' && resolved.displayHtml.trim().length > 0
+				? resolved.displayHtml
+				: null;
+
+			const footnotes = Array.isArray(resolved?.footnotes)
+				? resolved.footnotes.map(item => {
+					const rawIndex = item?.index ?? item?.Index;
+					const numericIndex = typeof rawIndex === 'number' ? rawIndex : Number(rawIndex);
+					if (!Number.isFinite(numericIndex)) {
+						return null;
+					}
+					const rawContent = item?.content ?? item?.Content ?? '';
+					return {
+						index: numericIndex,
+						content: typeof rawContent === 'string' ? rawContent : String(rawContent ?? '')
+					};
+				}).filter(Boolean)
+				: [];
+			if (footnotes.length > 1) {
+				footnotes.sort((a, b) => a.index - b.index);
 			}
 
-			const confidenceRaw = evidenceData?.confidence ?? normalized.confidence ?? normalized.Confidence ?? normalized.confidenceScore ?? normalized.ConfidenceScore;
+			const confidenceRaw = resolved?.confidence
+				?? evidenceData?.confidence
+				?? normalized.confidence
+				?? normalized.Confidence
+				?? normalized.confidenceScore
+				?? normalized.ConfidenceScore;
 			const confidencePercent = this.normalizeConfidencePercent(confidenceRaw);
-			
+
 			const conflictsRaw = normalized.conflicts ?? normalized.Conflicts ?? [];
 			const conflictCount = Array.isArray(conflictsRaw) ? conflictsRaw.length : (Number(conflictsRaw) || 0);
-			
-			const sourcesRaw = normalized.sources ?? normalized.Sources ?? [];
-			const sourceCount = Array.isArray(sourcesRaw) ? sourcesRaw.length : (Number(sourcesRaw) || 0);
-			
+
+			const sourceCandidates = new Set();
+			const addSourceCandidate = (candidate, fallbackLabel) => {
+				if (candidate == null) {
+					return;
+				}
+				let value = candidate;
+				if (typeof value === 'object') {
+					const label = value.name ?? value.label ?? value.title ?? value.id ?? fallbackLabel;
+					value = label != null ? label : JSON.stringify(value);
+				}
+				const text = typeof value === 'string' ? value.trim() : String(value ?? '').trim();
+				if (!text) {
+					return;
+				}
+				sourceCandidates.add(text);
+			};
+
+			const sourcesRaw = normalized.sources ?? normalized.Sources;
+			if (Array.isArray(sourcesRaw)) {
+				sourcesRaw.forEach(item => addSourceCandidate(item));
+			} else if (sourcesRaw != null) {
+				addSourceCandidate(sourcesRaw);
+			}
+
+			if (Array.isArray(evidenceData?.sources)) {
+				evidenceData.sources.forEach(item => addSourceCandidate(item));
+			}
+			if (evidenceData?.sourceId) {
+				addSourceCandidate(evidenceData.sourceId);
+			}
+			if (evidenceData?.sourceFileName) {
+				const pageQualifier = evidenceData.page ? `#${evidenceData.page}` : '';
+				addSourceCandidate(`${evidenceData.sourceFileName}${pageQualifier}`);
+			}
+
+			if (footnotes.length > 0) {
+				footnotes.forEach(item => addSourceCandidate(`footnote-${item.index}`, item.content));
+			}
+
+			const sourceCount = sourceCandidates.size;
+
 			const authoritativeFlag = normalized.isAuthoritative ?? normalized.authoritative ?? normalized.Authoritative ?? false;
 			const origin = normalized.origin ?? normalized.Origin ?? '';
 			const authoritative = Boolean(authoritativeFlag || (typeof origin === 'string' && origin.toLowerCase().includes('authoritative')));
@@ -996,20 +1092,22 @@ export class AnalysisDetailView {
 			return {
 				key,
 				label: evidenceData?.metadata?.fieldDisplayName || this.formatFactLabel(key),
-				value,
+				value: displayValue,
+				valueHtml,
+				footnotes,
 				confidencePercent,
 				confidenceText: confidencePercent != null ? `${Math.round(confidencePercent)}%` : null,
 				conflictCount,
 				sourceCount,
 				authoritative,
-				// Enhanced metadata from evidence
 				sourceFileName: evidenceData?.sourceFileName,
 				page: evidenceData?.page,
 				section: evidenceData?.section,
 				reasoning: evidenceData?.metadata?.factReasoning,
 				supportingFacts: evidenceData?.metadata?.supportingFacts,
 				mergeStrategy: evidenceData?.metadata?.mergeStrategy,
-				span: evidenceData?.span
+				span: evidenceData?.span,
+				evidenceSummary: typeof resolved?.evidenceSummary === 'string' ? resolved.evidenceSummary : null
 			};
 		}).filter(entry => entry.value);
 
@@ -1032,9 +1130,6 @@ export class AnalysisDetailView {
 
 		const expanded = this.expandedFacts.has(fact.key);
 		const badges = [];
-		if (fact.confidenceText) {
-			badges.push(`<span class="fact-pill">${this.escape(fact.confidenceText)}</span>`);
-		}
 		if (fact.conflictCount > 0) {
 			badges.push(`<span class="fact-pill pill-alert">${this.escape(`${fact.conflictCount} conflict${fact.conflictCount === 1 ? '' : 's'}`)}</span>`);
 		}
@@ -1042,8 +1137,25 @@ export class AnalysisDetailView {
 			badges.push('<span class="fact-pill pill-authoritative">Authoritative</span>');
 		}
 
+		const summaryValue = fact.value != null && String(fact.value).trim().length > 0
+			? String(fact.value)
+			: '--';
+		const resolvedValueHtml = typeof fact.valueHtml === 'string' && fact.valueHtml.trim().length > 0
+			? fact.valueHtml
+			: null;
+		const summaryHtml = resolvedValueHtml ?? this.escape(summaryValue).replace(/\n/g, '<br />');
 		const badgesHtml = badges.length ? `<div class="fact-badges">${badges.join('')}</div>` : '';
-		const valueHtml = this.escape(fact.value).replace(/\n/g, '<br />');
+
+		const confidencePercent = Number.isFinite(fact.confidencePercent) ? fact.confidencePercent : null;
+		const confidenceClass = this.resolveConfidenceIntent(confidencePercent);
+		const confidenceLabel = fact.confidenceText ?? (confidencePercent != null ? `${Math.round(confidencePercent)}%` : null);
+		const confidenceIndicatorHtml = confidenceClass && confidenceLabel
+			? `<span class="fact-confidence-indicator" title="Confidence ${this.escape(confidenceLabel)}">
+				<span class="fact-confidence-dot ${confidenceClass}" aria-hidden="true"></span>
+				<span class="sr-only">Confidence ${this.escape(confidenceLabel)}</span>
+			</span>`
+			: '';
+		const labelHtml = `<span class="fact-label">${confidenceIndicatorHtml}<span class="fact-label-text">${this.escape(fact.label)}</span></span>`;
 
 		// Build enhanced metadata section
 		const metadataLines = [];
@@ -1054,7 +1166,7 @@ export class AnalysisDetailView {
 				sourceInfo += ` (p. ${fact.page})`;
 			}
 			if (fact.section) {
-				sourceInfo += ` · ${this.escape(fact.section)}`;
+				sourceInfo += ` - ${this.escape(fact.section)}`;
 			}
 			metadataLines.push(`<div class="fact-source"><strong>Source:</strong> ${sourceInfo}</div>`);
 		}
@@ -1062,36 +1174,134 @@ export class AnalysisDetailView {
 		if (fact.reasoning) {
 			metadataLines.push(`<div class="fact-reasoning"><strong>Reasoning:</strong> ${this.escape(fact.reasoning)}</div>`);
 		}
+		if (fact.evidenceSummary) {
+			const evidenceParts = fact.evidenceSummary
+				.split('|')
+				.map(part => part.trim())
+				.filter(Boolean)
+				.filter(part => {
+					const lower = part.toLowerCase();
+					if (fact.reasoning && lower === fact.reasoning.trim().toLowerCase()) {
+						return false;
+					}
+					if (fact.sourceFileName && part.startsWith(fact.sourceFileName)) {
+						return false;
+					}
+					return true;
+				});
+			if (evidenceParts.length > 0) {
+				const evidenceSummaryHtml = evidenceParts
+					.map(part => this.escape(part).replace(/\n/g, '<br />'))
+					.join('<br />');
+				metadataLines.push(`<div class="fact-evidence"><strong>Evidence:</strong> ${evidenceSummaryHtml}</div>`);
+			}
+		}
 		
 		const additionalInfo = [];
 		if (fact.supportingFacts) {
 			additionalInfo.push(`${fact.supportingFacts} supporting fact${fact.supportingFacts === 1 ? '' : 's'}`);
 		}
 		if (fact.mergeStrategy) {
-			additionalInfo.push(`Strategy: ${this.escape(fact.mergeStrategy)}`);
+			additionalInfo.push(`Strategy: ${fact.mergeStrategy}`);
 		}
 		if (fact.span) {
-			additionalInfo.push(`Span: ${fact.span.Start}–${fact.span.End}`);
+			const spanStart = fact.span.Start ?? fact.span.start ?? '';
+			const spanEnd = fact.span.End ?? fact.span.end ?? '';
+			if (spanStart || spanEnd) {
+				const startLabel = spanStart || '--';
+				const endLabel = spanEnd || '--';
+				additionalInfo.push(`Span: ${startLabel} - ${endLabel}`);
+			}
 		}
 		
 		if (additionalInfo.length > 0) {
-			metadataLines.push(`<div class="fact-technical"><strong>Details:</strong> ${this.escape(additionalInfo.join(' • '))}</div>`);
+			metadataLines.push(`<div class="fact-technical"><strong>Details:</strong> ${this.escape(additionalInfo.join(' | '))}</div>`);
+		}
+		if (Array.isArray(fact.footnotes) && fact.footnotes.length > 0) {
+			const footnoteItems = fact.footnotes.map(footnote => {
+				const indexLabel = this.escape(footnote.index ?? footnote.Index ?? '?');
+				const contentHtml = this.escape(footnote.content || footnote.Content || '').replace(/\n/g, '<br />');
+				return `
+					<div class="fact-footnote-entry">
+						<span class="fact-footnote-index">[${indexLabel}]</span>
+						<span class="fact-footnote-text">${contentHtml}</span>
+					</div>
+				`;
+			}).join('');
+			metadataLines.push(`<div class="fact-footnotes"><strong>Footnotes:</strong><div class="fact-footnote-list">${footnoteItems}</div></div>`);
 		}
 
 		const metadataHtml = metadataLines.length > 0 ? `<div class="fact-metadata">${metadataLines.join('')}</div>` : '';
+
+		const metrics = [];
+		if (fact.confidenceText) {
+			metrics.push(`
+				<div class="fact-detail">
+					<dt>Confidence</dt>
+					<dd>${this.escape(fact.confidenceText)}</dd>
+				</div>
+			`);
+		}
+		if (fact.sourceCount != null) {
+			const sourceLabel = fact.sourceCount === 1 ? 'Source' : 'Sources';
+			const sourceValue = fact.sourceCount > 0 ? `${fact.sourceCount}` : 'None';
+			metrics.push(`
+				<div class="fact-detail">
+					<dt>${this.escape(sourceLabel)}</dt>
+					<dd>${this.escape(sourceValue)}</dd>
+				</div>
+			`);
+		}
+		if (fact.conflictCount != null) {
+			const conflictValue = fact.conflictCount > 0
+				? `${fact.conflictCount}`
+				: 'None';
+			metrics.push(`
+				<div class="fact-detail">
+					<dt>Conflicts</dt>
+					<dd>${this.escape(conflictValue)}</dd>
+				</div>
+			`);
+		}
+		if (fact.authoritative) {
+			metrics.push(`
+				<div class="fact-detail">
+					<dt>Authority</dt>
+					<dd>Authoritative</dd>
+				</div>
+			`);
+		}
+
+		const metricsHtml = metrics.length > 0
+			? `<dl class="fact-detail-list">${metrics.join('')}</dl>`
+			: '';
+
+		const detailSections = [];
+		if (metricsHtml) {
+			detailSections.push(metricsHtml);
+		}
+		if (metadataHtml) {
+			detailSections.push(metadataHtml);
+		}
+		if (detailSections.length === 0) {
+			detailSections.push('<div class="fact-metadata fact-metadata-empty">No additional context available.</div>');
+		}
+
+		const detailsHtml = detailSections.join('');
+		const chevronHtml = `<span class="row-chevron" aria-hidden="true">${this.renderRowChevron(expanded)}</span>`;
 
 		return `
 			<li class="fact-row ${expanded ? 'expanded' : ''}" data-fact="${this.escapeAttr(fact.key)}">
 				<button class="fact-row-toggle" data-action="toggle-fact" data-fact="${this.escapeAttr(fact.key)}" aria-expanded="${expanded}" aria-controls="fact-details-${this.escapeAttr(fact.key)}">
 					<div class="fact-summary">
-						<span class="fact-label">${this.escape(fact.label)}</span>
+						${labelHtml}
+						<div class="fact-primary-value">${summaryHtml}</div>
 						${badgesHtml}
 					</div>
-					<span class="row-chevron" aria-hidden="true">${this.renderRowChevron(expanded)}</span>
+					${chevronHtml}
 				</button>
 				<div class="fact-row-details" id="fact-details-${this.escapeAttr(fact.key)}" ${expanded ? '' : 'hidden'}>
-					<div class="fact-value">${valueHtml}</div>
-					${metadataHtml}
+					${detailsHtml}
 				</div>
 			</li>
 		`;
@@ -1163,6 +1373,19 @@ export class AnalysisDetailView {
 		const clamped = Math.max(0, Math.min(100, Math.round(percent)));
 		return clamped;
 	}
+
+		resolveConfidenceIntent(percent) {
+			if (percent == null || !Number.isFinite(percent)) {
+				return null;
+			}
+			if (percent >= 90) {
+				return 'confidence-strong';
+			}
+			if (percent >= 60) {
+				return 'confidence-medium';
+			}
+			return 'confidence-low';
+		}
 
 	renderSelectedFiles() {
 		if (!this.filesToUpload.length) {

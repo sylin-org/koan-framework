@@ -2,10 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Net;
 using System.Security.Cryptography;
+using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Text;
 using Koan.Data.Core;
 using Koan.Samples.Meridian.Models;
 using Microsoft.Extensions.Logging;
@@ -83,6 +85,12 @@ public sealed class TemplateRenderer : ITemplateRenderer
     public Task<string> RenderJsonAsync(Deliverable deliverable, CancellationToken ct)
     {
         var data = ParseData(deliverable.DataJson);
+        var resolvedFacts = BuildResolvedFacts(data);
+        if (resolvedFacts.HasValues)
+        {
+            data.Root["resolvedFacts"] = resolvedFacts;
+        }
+
         return Task.FromResult(data.Root.ToString(Formatting.Indented));
     }
 
@@ -176,6 +184,266 @@ public sealed class TemplateRenderer : ITemplateRenderer
         var bytes = Encoding.UTF8.GetBytes(value);
         var hash = SHA256.HashData(bytes);
         return Convert.ToHexString(hash);
+    }
+
+    private static JObject BuildResolvedFacts(TemplateData data)
+    {
+        var resolved = new JObject();
+
+        var footnoteLookup = BuildFootnoteLookup(data.Footnotes);
+        var keys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var prop in data.Fields.Properties())
+        {
+            keys.Add(prop.Name);
+        }
+
+        foreach (var prop in data.Formatted.Properties())
+        {
+            keys.Add(prop.Name);
+        }
+
+        foreach (var prop in data.Evidence.Properties())
+        {
+            keys.Add(prop.Name);
+        }
+
+        foreach (var key in keys)
+        {
+            var fieldToken = data.Fields[key];
+            var formattedToken = data.Formatted[key];
+            var evidenceToken = data.Evidence[key];
+
+            var formattedText = formattedToken?.Type switch
+            {
+                null => string.Empty,
+                JTokenType.Null => string.Empty,
+                _ => formattedToken!.ToString()
+            };
+
+            var primaryText = string.IsNullOrWhiteSpace(formattedText)
+                ? fieldToken?.ToString() ?? string.Empty
+                : formattedText;
+
+            var displayText = BuildDisplayText(primaryText);
+            var displayHtml = BuildDisplayHtml(primaryText, footnoteLookup);
+            var footnotes = BuildFootnoteDetails(primaryText, footnoteLookup);
+
+            var fact = new JObject
+            {
+                ["value"] = fieldToken?.DeepClone() ?? JValue.CreateNull(),
+                ["formatted"] = string.IsNullOrWhiteSpace(formattedText) ? null : JToken.FromObject(formattedText),
+                ["displayText"] = displayText,
+                ["displayHtml"] = displayHtml
+            };
+
+            if (footnotes.Count > 0)
+            {
+                fact["footnotes"] = new JArray(footnotes);
+            }
+
+            if (evidenceToken is not null)
+            {
+                fact["evidence"] = evidenceToken.DeepClone();
+
+                if (evidenceToken is JObject evidenceObj)
+                {
+                    var metadata = evidenceObj["metadata"] as JObject;
+                    var confidence = metadata?["confidence"]?.ToString() ?? evidenceObj["confidence"]?.ToString();
+                    if (!string.IsNullOrWhiteSpace(confidence))
+                    {
+                        fact["confidence"] = confidence;
+                    }
+
+                    var summary = BuildEvidenceSummary(evidenceObj);
+                    if (!string.IsNullOrWhiteSpace(summary))
+                    {
+                        fact["evidenceSummary"] = summary;
+                    }
+                }
+            }
+
+            resolved[key] = fact;
+        }
+
+        return resolved;
+    }
+
+    private static IDictionary<int, string> BuildFootnoteLookup(JArray footnotes)
+    {
+        var lookup = new Dictionary<int, string>();
+
+        foreach (var token in footnotes.Children<JToken>())
+        {
+            if (token is not JObject obj)
+            {
+                continue;
+            }
+
+            var index = obj["index"]?.Value<int?>();
+            if (index is null)
+            {
+                continue;
+            }
+
+            var content = obj["content"]?.Value<string>() ?? string.Empty;
+            lookup[index.Value] = content;
+        }
+
+        return lookup;
+    }
+
+    private static readonly Regex FootnoteMarkerRegex = new(@"\[\^(?<index>\d+)\]", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+
+    private static string BuildDisplayText(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        return FootnoteMarkerRegex.Replace(value, match =>
+        {
+            var index = match.Groups["index"].Value;
+            return string.IsNullOrEmpty(index) ? string.Empty : $" [{index}]";
+        }).Trim();
+    }
+
+    private static string BuildDisplayHtml(string value, IDictionary<int, string> footnotes)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        var builder = new StringBuilder();
+        var lastIndex = 0;
+
+        foreach (Match match in FootnoteMarkerRegex.Matches(value))
+        {
+            if (match.Index > lastIndex)
+            {
+                AppendEncodedSegment(builder, value.Substring(lastIndex, match.Index - lastIndex));
+            }
+
+            if (!int.TryParse(match.Groups["index"].Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var index))
+            {
+                lastIndex = match.Index + match.Length;
+                continue;
+            }
+
+            var encodedContent = footnotes.TryGetValue(index, out var content)
+                ? WebUtility.HtmlEncode(content)
+                : string.Empty;
+
+            builder.AppendFormat(CultureInfo.InvariantCulture,
+                "<sup class=\"fact-footnote\" data-footnote-index=\"{0}\" title=\"{1}\">[{0}]</sup>",
+                index,
+                encodedContent);
+
+            lastIndex = match.Index + match.Length;
+        }
+
+        if (lastIndex < value.Length)
+        {
+            AppendEncodedSegment(builder, value.Substring(lastIndex));
+        }
+
+        return builder.ToString();
+    }
+
+    private static void AppendEncodedSegment(StringBuilder builder, string segment)
+    {
+        if (string.IsNullOrEmpty(segment))
+        {
+            return;
+        }
+
+        var encoded = WebUtility.HtmlEncode(segment);
+        encoded = encoded.Replace("\r\n", "\n");
+        encoded = encoded.Replace("\r", "\n");
+        encoded = encoded.Replace("\n", "<br />");
+
+        builder.Append(encoded);
+    }
+
+    private static List<JObject> BuildFootnoteDetails(string value, IDictionary<int, string> footnotes)
+    {
+        var details = new List<JObject>();
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return details;
+        }
+
+        var seen = new HashSet<int>();
+
+        foreach (Match match in FootnoteMarkerRegex.Matches(value))
+        {
+            if (!int.TryParse(match.Groups["index"].Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var index))
+            {
+                continue;
+            }
+
+            if (!seen.Add(index))
+            {
+                continue;
+            }
+
+            var content = footnotes.TryGetValue(index, out var valueContent)
+                ? valueContent
+                : string.Empty;
+
+            details.Add(new JObject
+            {
+                ["index"] = index,
+                ["content"] = content
+            });
+        }
+
+        return details;
+    }
+
+    private static string BuildEvidenceSummary(JObject evidence)
+    {
+        var parts = new List<string>();
+
+        var source = evidence.Value<string>("sourceFileName");
+        if (!string.IsNullOrWhiteSpace(source))
+        {
+            var page = evidence.Value<int?>("page");
+            var section = evidence.Value<string>("section");
+
+            var builder = new StringBuilder();
+            builder.Append(source);
+            if (page is > 0)
+            {
+                builder.Append(" (p. ");
+                builder.Append(page.Value.ToString(CultureInfo.InvariantCulture));
+                builder.Append(')');
+            }
+
+            if (!string.IsNullOrWhiteSpace(section))
+            {
+                builder.Append(" - ");
+                builder.Append(section);
+            }
+
+            parts.Add(builder.ToString());
+        }
+
+        var text = evidence.Value<string>("text");
+        if (!string.IsNullOrWhiteSpace(text))
+        {
+            parts.Add(text);
+        }
+
+        var reasoning = evidence.SelectToken("metadata.factReasoning")?.Value<string>();
+        if (!string.IsNullOrWhiteSpace(reasoning))
+        {
+            parts.Add(reasoning);
+        }
+
+        return string.Join(" | ", parts.Where(p => !string.IsNullOrWhiteSpace(p)));
     }
 
     private sealed record TemplateData(JObject Root, JObject Fields, JObject Formatted, JArray Footnotes, JObject Metadata, JObject Evidence)
