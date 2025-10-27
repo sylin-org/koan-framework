@@ -79,7 +79,25 @@ public sealed class PassageIndexer : IPassageIndexer
 
         if (payload.Count > 0)
         {
+            _logger.LogDebug("Attempting to upsert {Count} passages to Weaviate (profile: {Profile})",
+                payload.Count, MeridianConstants.VectorProfile);
+
             var result = await VectorWorkflow<Passage>.SaveMany(payload, MeridianConstants.VectorProfile, ct);
+
+            _logger.LogInformation("Weaviate SaveMany result: Documents={Docs}, Vectors={Vecs}, Payload={PayloadCount}",
+                result.Documents, result.Vectors, payload.Count);
+
+            if (result.Documents == 0)
+            {
+                _logger.LogWarning("Weaviate returned 0 documents! Expected {Expected}, got {Actual}. Vectors={Vecs}",
+                    payload.Count, result.Documents, result.Vectors);
+            }
+            else if (result.Documents < payload.Count)
+            {
+                _logger.LogWarning("Partial Weaviate upsert: {Actual}/{Expected} documents saved",
+                    result.Documents, payload.Count);
+            }
+
             _logger.LogInformation("Upserted {Count} passages into vector profile {Profile}.", result.Documents, MeridianConstants.VectorProfile);
         }
     }

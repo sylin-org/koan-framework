@@ -21,10 +21,13 @@ public sealed class PipelineProcessor : IPipelineProcessor
     private readonly ITextExtractor _textExtractor;
     private readonly IPassageChunker _chunker;
     private readonly IPassageIndexer _indexer;
-    private readonly IDocumentFactExtractor _factExtractor;
-    private readonly IFieldFactMatcher _factMatcher;
+    private readonly IFactCatalogBuilder _catalogBuilder;
+    private readonly IFactCategorizer _categorizer;
+    private readonly ISchemaGuidedExtractor _extractor;
+    private readonly IFieldConflictResolver _conflictResolver;
     private readonly IDocumentMerger _merger;
     private readonly IDocumentClassifier _classifier;
+    private readonly IDocumentStyleClassifier _styleClassifier;
     private readonly IRunLogWriter _runLog;
     private readonly IIncrementalRefreshPlanner _refreshPlanner;
     private readonly MeridianOptions _options;
@@ -34,10 +37,13 @@ public sealed class PipelineProcessor : IPipelineProcessor
         ITextExtractor textExtractor,
         IPassageChunker chunker,
         IPassageIndexer indexer,
-        IDocumentFactExtractor factExtractor,
-        IFieldFactMatcher factMatcher,
+        IFactCatalogBuilder catalogBuilder,
+        IFactCategorizer categorizer,
+        ISchemaGuidedExtractor extractor,
+        IFieldConflictResolver conflictResolver,
         IDocumentMerger merger,
         IDocumentClassifier classifier,
+        IDocumentStyleClassifier styleClassifier,
         IRunLogWriter runLog,
         IIncrementalRefreshPlanner refreshPlanner,
         MeridianOptions options,
@@ -46,10 +52,13 @@ public sealed class PipelineProcessor : IPipelineProcessor
         _textExtractor = textExtractor;
         _chunker = chunker;
         _indexer = indexer;
-        _factExtractor = factExtractor;
-        _factMatcher = factMatcher;
+        _catalogBuilder = catalogBuilder;
+        _categorizer = categorizer;
+        _extractor = extractor;
+        _conflictResolver = conflictResolver;
         _merger = merger;
         _classifier = classifier;
+        _styleClassifier = styleClassifier;
         _runLog = runLog;
         _refreshPlanner = refreshPlanner;
         _options = options;
@@ -209,6 +218,28 @@ public sealed class PipelineProcessor : IPipelineProcessor
                 Metadata = allowedMetadata
             }, ct);
 
+            // Check if document type should skip processing (e.g., test files, non-documents)
+            var sourceType = await SourceType.Get(classification.TypeId, ct);
+            if (sourceType?.SkipProcessing == true)
+            {
+                _logger.LogInformation(
+                    "Document {DocumentId} classified as {TypeName} with SkipProcessing=true ({Reason}). Skipping chunking and extraction.",
+                    document.Id,
+                    sourceType.Name,
+                    classification.Reason);
+
+                document.Status = DocumentProcessingStatus.Indexed; // Mark as processed
+                document.UpdatedAt = DateTime.UtcNow;
+                await document.Save(ct);
+
+                processedCount++;
+                job.ProcessedDocuments = processedCount;
+                job.LastDocumentId = document.Id;
+                job.HeartbeatAt = DateTime.UtcNow;
+                await job.Save(ct).ConfigureAwait(false);
+                continue; // Skip to next document
+            }
+
             var chunks = _chunker.Chunk(document, extraction.Text);
             foreach (var chunk in chunks)
             {
@@ -292,21 +323,98 @@ public sealed class PipelineProcessor : IPipelineProcessor
             var analysisType = await AnalysisType.Get(pipeline.AnalysisTypeId, ct).ConfigureAwait(false)
                 ?? throw new InvalidOperationException($"AnalysisType '{pipeline.AnalysisTypeId}' not found for pipeline {pipeline.Id}.");
 
-            var factCatalog = new List<DocumentFact>();
+            // STAGE 1: Build complete fact catalog from org profile + analysis type
+            var factCatalog = await _catalogBuilder.BuildAsync(pipeline, analysisType, ct).ConfigureAwait(false);
+
+            // STAGE 2: Semantic categorization of facts into contextual batches (cached)
+            var categorizationMap = await _categorizer.CategorizeAsync(factCatalog, analysisType, ct).ConfigureAwait(false);
+
+            // STAGE 3: Targeted extraction per batch per document
+            var allExtractedFields = new List<ExtractedField>();
+
             foreach (var docId in pipeline.DocumentIds.Distinct(StringComparer.Ordinal))
             {
-                var factDocument = await SourceDocument.Get(docId, ct).ConfigureAwait(false);
-                if (factDocument is null)
+                var document = await SourceDocument.Get(docId, ct).ConfigureAwait(false);
+                if (document is null)
                 {
                     _logger.LogWarning("Unable to load document {DocumentId} for fact extraction", docId);
                     continue;
                 }
 
-                var factsForDocument = await _factExtractor.ExtractAsync(pipeline, analysisType, factDocument, ct).ConfigureAwait(false);
-                factCatalog.AddRange(factsForDocument);
+                // STAGE 2.5: Document style classification (cached if already classified)
+                await _styleClassifier.ClassifyAsync(document, ct).ConfigureAwait(false);
+
+                foreach (var batch in categorizationMap.Batches)
+                {
+                    // Apply field filter if specified
+                    var batchToExtract = batch;
+                    if (fieldFilter != null)
+                    {
+                        var filteredBatch = new SemanticBatch
+                        {
+                            BatchId = batch.BatchId,
+                            CategoryName = batch.CategoryName,
+                            CategoryDescription = batch.CategoryDescription,
+                            FieldPaths = batch.FieldPaths
+                                .Where(fp => fieldFilter.Contains(fp))
+                                .ToList()
+                        };
+
+                        if (filteredBatch.FieldPaths.Count == 0)
+                        {
+                            continue; // Skip batch if no fields match filter
+                        }
+
+                        batchToExtract = filteredBatch;
+                    }
+
+                    var batchFields = await _extractor.ExtractBatchAsync(
+                        document, batchToExtract, factCatalog, pipeline.Id, ct).ConfigureAwait(false);
+                    allExtractedFields.AddRange(batchFields);
+                }
             }
 
-            freshExtractions = await _factMatcher.MatchAsync(pipeline, analysisType, factCatalog, fieldFilter, ct).ConfigureAwait(false);
+            // STAGE 3.5: Extract from authoritative notes (privileged source)
+            if (!string.IsNullOrWhiteSpace(pipeline.AuthoritativeNotes))
+            {
+                _logger.LogInformation("Extracting from authoritative notes for pipeline {PipelineId}", pipeline.Id);
+
+                foreach (var batch in categorizationMap.Batches)
+                {
+                    // Apply field filter if specified
+                    var batchToExtract = batch;
+                    if (fieldFilter != null)
+                    {
+                        var filteredBatch = new SemanticBatch
+                        {
+                            BatchId = batch.BatchId,
+                            CategoryName = batch.CategoryName,
+                            CategoryDescription = batch.CategoryDescription,
+                            FieldPaths = batch.FieldPaths
+                                .Where(fp => fieldFilter.Contains(fp))
+                                .ToList()
+                        };
+
+                        if (filteredBatch.FieldPaths.Count == 0)
+                        {
+                            continue;
+                        }
+
+                        batchToExtract = filteredBatch;
+                    }
+
+                    var notesBatchFields = await _extractor.ExtractBatchFromNotesAsync(
+                        pipeline.AuthoritativeNotes, batchToExtract, factCatalog, pipeline.Id, ct).ConfigureAwait(false);
+                    allExtractedFields.AddRange(notesBatchFields);
+                }
+            }
+
+            // STAGE 4: Conflict resolution (Notes precedence: 1, Documents precedence: 3)
+            freshExtractions = _conflictResolver.Resolve(allExtractedFields);
+
+            _logger.LogInformation(
+                "Schema-guided extraction complete: {TotalFields} fields extracted, {ResolvedFields} after conflict resolution",
+                allExtractedFields.Count, freshExtractions.Count);
         }
 
         var existingByField = existingFields.ToDictionary(e => e.FieldPath, StringComparer.Ordinal);
@@ -387,6 +495,29 @@ public sealed class PipelineProcessor : IPipelineProcessor
 
         await _merger.MergeAsync(pipeline, mergeCandidates, ct);
 
+        // Update all documents with the extraction version to detect stale extractions on reuse
+        if (!string.IsNullOrWhiteSpace(pipeline.AnalysisTypeId))
+        {
+            var analysisType = await AnalysisType.Get(pipeline.AnalysisTypeId, ct).ConfigureAwait(false);
+            if (analysisType != null)
+            {
+                foreach (var docId in pipeline.DocumentIds.Distinct(StringComparer.Ordinal))
+                {
+                    var document = await SourceDocument.Get(docId, ct).ConfigureAwait(false);
+                    if (document != null && !document.IsVirtual)
+                    {
+                        document.LastExtractedAnalysisTypeVersion = analysisType.Version;
+                        document.UpdatedAt = DateTime.UtcNow;
+                        await document.Save(ct).ConfigureAwait(false);
+                    }
+                }
+
+                _logger.LogInformation(
+                    "Updated {Count} documents with AnalysisType version {Version} for pipeline {PipelineId}",
+                    pipeline.DocumentIds.Count, analysisType.Version, pipeline.Id);
+            }
+        }
+
         var completedAt = DateTime.UtcNow;
         pipeline.Status = PipelineStatus.Completed;
         pipeline.CompletedAt = completedAt;
@@ -418,6 +549,51 @@ public sealed class PipelineProcessor : IPipelineProcessor
         var notesContent = pipeline.AuthoritativeNotes ?? string.Empty;
         var notesHash = TextExtractor.ComputeTextHash(notesContent);
 
+        // Check for existing virtual document attached to this pipeline
+        var existingVirtual = (await SourceDocument.Query(
+            d => d.IsVirtual && d.SourceType == MeridianConstants.SourceTypes.AuthoritativeNotes,
+            ct))
+            .FirstOrDefault(d => pipeline.DocumentIds.Contains(d.Id!));
+
+        if (existingVirtual != null)
+        {
+            // Update content if changed
+            if (existingVirtual.TextHash != notesHash)
+            {
+                _logger.LogInformation("Updating existing virtual document {DocId} with new notes (hash changed)", existingVirtual.Id);
+                existingVirtual.ExtractedText = notesContent;
+                existingVirtual.ContentHash = notesHash;
+                existingVirtual.TextHash = notesHash;
+                existingVirtual.Size = notesContent.Length;
+                existingVirtual.UpdatedAt = DateTime.UtcNow;
+                existingVirtual.ExtractedAt = DateTime.UtcNow;
+                await existingVirtual.Save(ct);
+
+                await _runLog.AppendAsync(new RunLog
+                {
+                    PipelineId = pipeline.Id,
+                    Stage = "virtual-document-update",
+                    DocumentId = existingVirtual.Id,
+                    FieldPath = null,
+                    StartedAt = DateTime.UtcNow,
+                    FinishedAt = DateTime.UtcNow,
+                    Status = "success",
+                    Metadata = new Dictionary<string, string>
+                    {
+                        ["source"] = "Authoritative Notes (Updated)",
+                        ["size"] = existingVirtual.Size.ToString()
+                    }
+                }, ct);
+            }
+            else
+            {
+                _logger.LogDebug("Reusing existing virtual document {DocId} (no changes)", existingVirtual.Id);
+            }
+
+            return existingVirtual.Id;
+        }
+
+        // Create new virtual document
         var virtualDoc = new SourceDocument
         {
             OriginalFileName = "Authoritative Notes (User Override)",

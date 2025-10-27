@@ -16,7 +16,9 @@ public static class SourceTypeSeedData
             CreateInvoice(),
             CreateContract(),
             CreateTechnicalReport(),
-            CreateEmail()
+            CreateEmail(),
+            CreateNonDocument(),
+            CreateUnspecified()
         };
     }
 
@@ -765,6 +767,159 @@ IMPORTANT: Preserve names and email addresses exactly as they appear. For email 
                 ["contextBackground"] = "What is the context or background?",
                 ["tone"] = "What is the tone of the email (formal, urgent, casual)?",
                 ["priority"] = "What is the priority level?"
+            },
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+    }
+
+    private static SourceType CreateNonDocument()
+    {
+        return new SourceType
+        {
+            Id = Guid.Parse("e5f6a7b8-9012-34ef-1234-567890123ef0").ToString(),
+            Name = "Non-Document",
+            Code = "NONE",
+            Description = "Test files, sample data, or meaningless content that should not be processed",
+            Version = 1,
+            Tags = new List<string>
+            {
+                "test",
+                "sample",
+                "ignore",
+                "non-document",
+                "placeholder",
+                "dummy"
+            },
+            DescriptorHints = new List<string>
+            {
+                "test file",
+                "sample",
+                "placeholder",
+                "dummy data",
+                "meaningless content",
+                "ignore this"
+            },
+            SignalPhrases = new List<string>
+            {
+                "this is a test",
+                "test file",
+                "sample data",
+                "lorem ipsum",
+                "placeholder",
+                "dummy content",
+                "ignore this",
+                "do not process",
+                "test document"
+            },
+            SupportsManualSelection = false,
+            SkipProcessing = true,
+            ExpectedPageCountMin = 0,
+            ExpectedPageCountMax = 999,
+            MimeTypes = new List<string>
+            {
+                "text/plain",
+                "application/pdf",
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                "application/msword"
+            },
+            Instructions = @"You are identifying test files or meaningless content that should be skipped.
+
+INSTRUCTIONS:
+1. Classify documents as Non-Document if they contain:
+   - Test data or sample files
+   - Placeholder text (Lorem Ipsum, etc.)
+   - Dummy content with no real information
+   - Explicit test markers or instructions to ignore
+   - Repetitive meaningless text
+   - Files that appear to be for testing purposes only
+
+2. DO NOT classify as Non-Document if the content has any real business value, even if informal.
+
+IMPORTANT: This classification triggers a no-op in the pipeline - the file will be marked as processed but no extraction will occur.",
+            OutputTemplate = @"# Non-Document Classification
+
+This file has been identified as test data or non-document content and will not be processed further.
+
+Classification reason: {{CLASSIFICATION_REASON}}",
+            FieldQueries = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["classificationReason"] = "Why is this classified as a non-document (test file, placeholder, etc.)?"
+            },
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+    }
+
+    private static SourceType CreateUnspecified()
+    {
+        return new SourceType
+        {
+            Id = "019a2200-0000-7000-a000-000000000099",
+            Name = "Unspecified Document Type",
+            Code = "UNSPECIFIED",
+            Description = "Catch-all category for documents that could not be automatically classified. Extraction will still be attempted using generic strategies.",
+            Version = 1,
+            Tags = new List<string>
+            {
+                "unspecified",
+                "unknown",
+                "fallback",
+                "generic"
+            },
+            DescriptorHints = new List<string>(),
+            SignalPhrases = new List<string>(),
+            SupportsManualSelection = false,
+            SkipProcessing = false, // Still attempt extraction
+            ExpectedPageCountMin = null,
+            ExpectedPageCountMax = null,
+            MimeTypes = new List<string>
+            {
+                "application/pdf",
+                "text/plain",
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                "application/msword",
+                "text/html"
+            },
+            Instructions = @"You are extracting facts from a document that could not be automatically classified into a specific type.
+
+INSTRUCTIONS:
+1. Identify any factual information present in the document
+2. Extract key entities (people, organizations, dates, locations, amounts)
+3. Note any decisions, actions, or commitments mentioned
+4. Capture important technical details or specifications
+5. Document any relationships or dependencies mentioned
+
+IMPORTANT: Since the document type is unknown, focus on extracting concrete, verifiable facts rather than making assumptions about structure or format.",
+            OutputTemplate = @"# Document Analysis (Unspecified Type)
+
+---
+
+## Key Facts Extracted
+{{KEY_FACTS}}
+
+---
+
+## Entities Identified
+**People:** {{PEOPLE}}
+**Organizations:** {{ORGANIZATIONS}}
+**Dates:** {{DATES}}
+**Locations:** {{LOCATIONS}}
+**Amounts/Values:** {{AMOUNTS}}
+
+---
+
+## Additional Context
+{{ADDITIONAL_CONTEXT}}",
+            FieldQueries = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["keyFacts"] = "What are the most important facts or pieces of information in this document?",
+                ["people"] = "What people are mentioned in the document?",
+                ["organizations"] = "What organizations or companies are mentioned?",
+                ["dates"] = "What significant dates are mentioned?",
+                ["locations"] = "What locations or places are mentioned?",
+                ["amounts"] = "What monetary amounts, quantities, or measurements are mentioned?",
+                ["additionalContext"] = "What additional context or background information is provided?"
             },
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow

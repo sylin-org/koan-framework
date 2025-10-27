@@ -18,6 +18,16 @@ public record AiPromptOptions
     public bool? Think { get; init; }
 
     /// <summary>
+    /// Request structured output format. Common values: "json", "text".
+    /// Provider support varies:
+    /// - Ollama: Maps to top-level "format" parameter (e.g., "json" enforces valid JSON output)
+    /// - OpenAI/LMStudio: Maps to "response_format": { "type": "json_object" }
+    /// - Anthropic: Gracefully ignored (relies on prompt engineering)
+    /// Use "json" to request JSON-formatted responses from compatible models.
+    /// </summary>
+    public string? ResponseFormat { get; init; }
+
+    /// <summary>
     /// Vendor-specific passthrough options. Any unknown fields posted alongside known options
     /// will be captured here and forwarded by adapters that support vendor option bags.
     /// Example (Ollama): { "mirostat": 2, "repeat_penalty": 1.1 }.

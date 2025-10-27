@@ -69,8 +69,11 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         services.AddSingleton<INotesExtractionService, NotesExtractionService>();
         services.AddSingleton<IIncrementalRefreshPlanner, IncrementalRefreshPlanner>();
         services.AddSingleton<IDocumentClassifier, DocumentClassifier>();
-        services.AddSingleton<IDocumentFactExtractor, DocumentFactExtractor>();
-        services.AddSingleton<IFieldFactMatcher, FieldFactMatcher>();
+        services.AddSingleton<IFactCatalogBuilder, FactCatalogBuilder>();
+        services.AddSingleton<IFactCategorizer, FactCategorizer>();
+        services.AddSingleton<ISchemaGuidedExtractor, SchemaGuidedExtractor>();
+        services.AddSingleton<IFieldConflictResolver, FieldConflictResolver>();
+        services.AddSingleton<IDocumentStyleClassifier, DocumentStyleClassifier>();
         services.AddSingleton<IRunLogWriter, RunLogWriter>();
         services.AddSingleton<ITemplateRenderer, TemplateRenderer>();
         services.AddSingleton<IAiAssistAuditor, AiAssistAuditor>();

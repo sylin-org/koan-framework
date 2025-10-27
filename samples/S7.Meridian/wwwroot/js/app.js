@@ -232,9 +232,7 @@ class MeridianApp {
     });
 
     this.eventBus.on('refresh-analysis', () => {
-      if (this.analysisDetailView?.analysis?.id) {
-        this.analysisDetailView.reload();
-      }
+      this.analysisDetailView?.handleRefreshAnalysis?.();
     });
   }
 

@@ -159,13 +159,19 @@ public sealed class TemplateRenderer : ITemplateRenderer
         return context;
     }
 
-    private static object? ConvertToken(JToken token)
+    private static object? ConvertToken(JToken? token)
     {
+        if (token is null)
+        {
+            return null;
+        }
+
         return token.Type switch
         {
+            JTokenType.Null or JTokenType.Undefined => null,
             JTokenType.Object => token.Children<JProperty>()
                 .ToDictionary(prop => prop.Name, prop => ConvertToken(prop.Value), StringComparer.OrdinalIgnoreCase),
-            JTokenType.Array => token.Values<JToken>().Select(ConvertToken).ToList(),
+            JTokenType.Array => token.Values<JToken?>().Select(ConvertToken).ToList(),
             JTokenType.Integer => token.Value<long>(),
             JTokenType.Float => token.Value<double>(),
             JTokenType.Boolean => token.Value<bool>(),
@@ -174,7 +180,6 @@ public sealed class TemplateRenderer : ITemplateRenderer
             JTokenType.Guid => token.Value<Guid>().ToString(),
             JTokenType.Uri => token.Value<Uri>()?.ToString(),
             JTokenType.TimeSpan => token.Value<TimeSpan>().ToString(),
-            JTokenType.Null => null,
             _ => token.ToString()
         };
     }

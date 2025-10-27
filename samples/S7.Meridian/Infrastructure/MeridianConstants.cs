@@ -79,6 +79,6 @@ public static class MeridianConstants
         public const string AuditedFinancial = "AuditedFinancial";
         public const string VendorPrescreen = "VendorPrescreen";
         public const string KnowledgeBase = "KnowledgeBase";
-        public const string Unclassified = "Unclassified";
+        public const string Unspecified = "019a2200-0000-7000-a000-000000000099"; // Catch-all for classification failures
     }
 }

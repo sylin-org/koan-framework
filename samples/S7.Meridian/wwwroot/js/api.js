@@ -336,6 +336,13 @@ export class API {
     return this.pipelines.create(pipeline);
   }
 
+  /**
+   * Trigger an incremental refresh for a pipeline
+   */
+  async refreshPipeline(pipelineId) {
+    return this.post(`/api/pipelines/${pipelineId}/refresh`, {});
+  }
+
   // ==================== Organization Profiles ====================
 
   async getOrganizationProfiles() {

@@ -14,10 +14,12 @@ public sealed class ProcessingJob : Entity<ProcessingJob>
     public string PipelineId { get; set; } = string.Empty;
     public JobStatus Status { get; set; } = JobStatus.Pending;
     public int RetryCount { get; set; } = 0;
+    public int Version { get; set; } = 1; // For optimistic concurrency control
 
     public string? WorkerId { get; set; } = null;
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? ClaimedAt { get; set; } = null;
     public DateTime? HeartbeatAt { get; set; } = null;
     public DateTime? CompletedAt { get; set; } = null;

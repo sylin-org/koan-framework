@@ -219,6 +219,13 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
                 body["think"] = thinkFlag;
             }
 
+            // Support structured output format (e.g., "json" for JSON-only responses)
+            if (!string.IsNullOrWhiteSpace(request.Options?.ResponseFormat))
+            {
+                body["format"] = request.Options.ResponseFormat;
+                Logger.LogDebug("Ollama: Using format={Format}", request.Options.ResponseFormat);
+            }
+
             Logger.LogDebug("Ollama: POST {Path} model={Model}", "/api/generate", model);
             var payload = JsonConvert.SerializeObject(body, new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore });
             using var resp = await http.PostAsync("/api/generate", new StringContent(payload, Encoding.UTF8, "application/json"), ct).ConfigureAwait(false);
@@ -283,6 +290,13 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
             if (request.Options?.Think is bool thinkFlag)
             {
                 streamBody["think"] = thinkFlag;
+            }
+
+            // Support structured output format (e.g., "json" for JSON-only responses)
+            if (!string.IsNullOrWhiteSpace(request.Options?.ResponseFormat))
+            {
+                streamBody["format"] = request.Options.ResponseFormat;
+                Logger.LogDebug("Ollama: Using format={Format} for streaming", request.Options.ResponseFormat);
             }
 
             var body = JsonConvert.SerializeObject(streamBody, new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore });

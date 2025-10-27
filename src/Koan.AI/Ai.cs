@@ -301,7 +301,8 @@ public static class Ai
             TopP = options.TopP,
             Stop = options.Stop,
             Seed = options.Seed,
-            Think = options.Think
+            Think = options.Think,
+            ResponseFormat = options.ResponseFormat
         };
 
         // Merge context overrides

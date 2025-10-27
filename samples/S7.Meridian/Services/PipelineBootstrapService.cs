@@ -320,7 +320,7 @@ public class PipelineBootstrapService : IPipelineBootstrapService
 
             if (string.IsNullOrWhiteSpace(storedDocument.SourceType))
             {
-                storedDocument.SourceType = MeridianConstants.SourceTypes.Unclassified;
+                storedDocument.SourceType = MeridianConstants.SourceTypes.Unspecified;
                 storedDocument.UpdatedAt = DateTime.UtcNow;
                 await storedDocument.Save(ct);
             }
@@ -333,7 +333,7 @@ public class PipelineBootstrapService : IPipelineBootstrapService
             sourceType?.Code ?? storedDocument.SourceType ?? "Unclassified",
             method, inManifest);
 
-        var documentSourceType = sourceType?.Code ?? storedDocument.SourceType ?? MeridianConstants.SourceTypes.Unclassified;
+        var documentSourceType = sourceType?.Code ?? storedDocument.SourceType ?? MeridianConstants.SourceTypes.Unspecified;
         var resolvedSourceTypeName = sourceType?.Name;
 
         if (string.IsNullOrWhiteSpace(resolvedSourceTypeName))
@@ -342,7 +342,7 @@ public class PipelineBootstrapService : IPipelineBootstrapService
             {
                 resolvedSourceTypeName = "Manifest";
             }
-            else if (string.Equals(documentSourceType, MeridianConstants.SourceTypes.Unclassified, StringComparison.OrdinalIgnoreCase))
+            else if (string.Equals(documentSourceType, MeridianConstants.SourceTypes.Unspecified, StringComparison.OrdinalIgnoreCase))
             {
                 resolvedSourceTypeName = "Pending Classification";
             }

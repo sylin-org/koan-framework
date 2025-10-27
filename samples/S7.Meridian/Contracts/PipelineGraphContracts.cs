@@ -16,7 +16,7 @@ public sealed record PipelineGraph
     public JToken? Canonical { get; init; }
         = null;
     public PipelineNotesSnapshot Notes { get; init; } = new();
-    public PipelineQualitySnapshot? Quality { get; init; }
+    public PipelineQualitySummary? Quality { get; init; }
         = null;
     public IReadOnlyList<JobSnapshot> Jobs { get; init; } = Array.Empty<JobSnapshot>();
     public IReadOnlyList<RunLogSnapshot> Runs { get; init; } = Array.Empty<RunLogSnapshot>();
@@ -100,7 +100,7 @@ public sealed record PipelineNotesSnapshot
         = null;
 }
 
-public sealed record PipelineQualitySnapshot
+public sealed record PipelineQualitySummary
 {
     public double CitationCoverage { get; init; }
         = 0.0;

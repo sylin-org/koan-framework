@@ -16,6 +16,12 @@ public sealed class SourceType : Entity<SourceType>
     public List<string> DescriptorHints { get; set; } = new();
     public List<string> SignalPhrases { get; set; } = new();
     public bool SupportsManualSelection { get; set; } = true;
+
+    /// <summary>
+    /// If true, documents classified with this type will be marked as processed but skipped from chunking, indexing, and extraction.
+    /// Used for test files or non-document content.
+    /// </summary>
+    public bool SkipProcessing { get; set; } = false;
     public int? ExpectedPageCountMin { get; set; }
         = null;
     public int? ExpectedPageCountMax { get; set; }

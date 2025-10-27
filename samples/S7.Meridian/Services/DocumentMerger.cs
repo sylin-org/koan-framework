@@ -187,9 +187,9 @@ public sealed class DocumentMerger : IDocumentMerger
             }
 
             templatePayload[templateKey] = formattedValue;
-            if (hasCanonicalContent)
+            if (hasCanonicalContent && mergeResult.ValueToken is { } canonicalToken)
             {
-                var clonedValue = mergeResult.ValueToken.DeepClone();
+                var clonedValue = canonicalToken.DeepClone();
                 mergedFields[templateKey] = clonedValue;
                 formattedFields[templateKey] = new JValue(formattedValue);
 
@@ -525,7 +525,7 @@ public sealed class DocumentMerger : IDocumentMerger
         foreach (var candidate in candidates)
         {
             var doc = await GetSourceDocumentAsync(candidate.SourceDocumentId, sourceCache, ct);
-            var sourceType = doc?.SourceType ?? MeridianConstants.SourceTypes.Unclassified;
+            var sourceType = doc?.SourceType ?? MeridianConstants.SourceTypes.Unspecified;
             var priority = precedence.FindIndex(type => string.Equals(type, sourceType, StringComparison.OrdinalIgnoreCase));
             if (priority < 0)
             {
@@ -747,7 +747,7 @@ public sealed class DocumentMerger : IDocumentMerger
 
     private async Task<Footnote?> BuildFootnoteAsync(
         ExtractedField accepted,
-        JToken valueToken,
+    JToken? valueToken,
         int index,
         Dictionary<string, SourceDocument?> sourceCache,
         Dictionary<string, Passage?> passageCache,
@@ -1185,12 +1185,18 @@ public sealed class DocumentMerger : IDocumentMerger
         return passage;
     }
 
-    private static object? ConvertTokenToTemplateObject(JToken token)
+    private static object? ConvertTokenToTemplateObject(JToken? token)
     {
+        if (token is null)
+        {
+            return null;
+        }
+
         return token.Type switch
         {
+            JTokenType.Null or JTokenType.Undefined => null,
             JTokenType.Object => CoalesceObjectProperties(token.Children<JProperty>()),
-            JTokenType.Array => token.Values<JToken>().Select(ConvertTokenToTemplateObject).ToList(),
+            JTokenType.Array => token.Values<JToken?>().Select(ConvertTokenToTemplateObject).ToList(),
             JTokenType.Integer => token.Value<long>(),
             JTokenType.Float => token.Value<double>(),
             JTokenType.Boolean => token.Value<bool>(),
@@ -1199,7 +1205,6 @@ public sealed class DocumentMerger : IDocumentMerger
             JTokenType.Guid => token.Value<Guid>().ToString(),
             JTokenType.Uri => token.Value<Uri>()?.ToString(),
             JTokenType.TimeSpan => token.Value<TimeSpan>().ToString(),
-            JTokenType.Null => null,
             _ => token.ToString()
         };
     }

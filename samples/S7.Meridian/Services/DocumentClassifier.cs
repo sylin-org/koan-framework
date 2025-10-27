@@ -10,6 +10,7 @@ using Koan.Samples.Meridian.Infrastructure;
 using Koan.Samples.Meridian.Models;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 namespace Koan.Samples.Meridian.Services;
@@ -54,7 +55,7 @@ public sealed class DocumentClassifier : IDocumentClassifier
         var types = await SourceType.All(ct);
         if (types.Count == 0)
         {
-            return new ClassificationResult(MeridianConstants.SourceTypes.Unclassified, 0.0, ClassificationMethod.Manual, 1, "No source types configured.");
+            return new ClassificationResult(MeridianConstants.SourceTypes.Unspecified, 0.0, ClassificationMethod.Manual, 1, "No source types configured.");
         }
 
         if (document.ClassificationMethod == ClassificationMethod.Manual &&
@@ -101,8 +102,8 @@ public sealed class DocumentClassifier : IDocumentClassifier
             return llm.Value;
         }
 
-        _logger.LogDebug("Document {DocumentId} remained unclassified after cascade.", document.Id);
-        return new ClassificationResult(MeridianConstants.SourceTypes.Unclassified, 0.0, ClassificationMethod.Heuristic, 1, "No classification strategy met confidence thresholds.");
+        _logger.LogWarning("Document {DocumentId} could not be classified - using Unspecified fallback type.", document.Id);
+        return new ClassificationResult(MeridianConstants.SourceTypes.Unspecified, 0.3, ClassificationMethod.Heuristic, 1, "Classification failed - using generic extraction strategy.");
     }
 
     private ClassificationResult? EvaluateHeuristics(SourceDocument document, string text, IReadOnlyList<SourceType> types)
@@ -278,7 +279,43 @@ public sealed class DocumentClassifier : IDocumentClassifier
         try
         {
             var response = await Ai.Chat(chatOptions, ct).ConfigureAwait(false);
-            var json = JObject.Parse(response);
+
+            // Check for empty response
+            if (string.IsNullOrWhiteSpace(response))
+            {
+                _logger.LogWarning("LLM returned empty response for document {DocumentId} classification.", document.Id);
+                return null;
+            }
+
+            // Strip markdown code fences if present (some LLMs wrap JSON in ```json blocks)
+            var cleaned = response.Trim();
+            if (cleaned.StartsWith("```"))
+            {
+                // Find first newline after opening fence
+                var firstNewline = cleaned.IndexOf('\n');
+                if (firstNewline > 0)
+                {
+                    cleaned = cleaned.Substring(firstNewline + 1);
+                }
+
+                // Remove closing fence if present
+                if (cleaned.EndsWith("```"))
+                {
+                    cleaned = cleaned.Substring(0, cleaned.Length - 3);
+                }
+
+                cleaned = cleaned.Trim();
+            }
+
+            // Validate looks like JSON
+            if (!cleaned.StartsWith("{") && !cleaned.StartsWith("["))
+            {
+                _logger.LogWarning("LLM returned non-JSON response for document {DocumentId}: {Preview}",
+                    document.Id, cleaned.Length > 100 ? cleaned.Substring(0, 100) + "..." : cleaned);
+                return null;
+            }
+
+            var json = JObject.Parse(cleaned);
 
             var rawTypeId = json["typeId"]?.Value<string>()?.Trim();
             var confidence = json["confidence"]?.Value<double?>() ?? 0.5;
@@ -296,9 +333,14 @@ public sealed class DocumentClassifier : IDocumentClassifier
             matched ??= types.First();
             return new ClassificationResult(matched.Id, confidence, ClassificationMethod.Llm, matched.Version, reasoning);
         }
-        catch (Exception ex)
+        catch (JsonException ex)
         {
-            _logger.LogDebug(ex, "LLM classification failed for document {DocumentId}.", document.Id);
+            _logger.LogWarning(ex, "LLM returned invalid JSON for document {DocumentId} classification - will fallback to Unspecified type.", document.Id);
+            return null;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "LLM classification failed for document {DocumentId} - will fallback to Unspecified type.", document.Id);
             return null;
         }
     }
