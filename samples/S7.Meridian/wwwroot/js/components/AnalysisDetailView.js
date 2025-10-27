@@ -37,6 +37,8 @@ export class AnalysisDetailView {
 		this.pendingPipelineUpdates = {};
 		this.pendingAnalysisType = null;
 		this.isDirty = false;
+		this.isRefreshingPipeline = false;
+		this.activeJob = null;
 	}
 
 	async initCreate() {
@@ -67,6 +69,8 @@ export class AnalysisDetailView {
 		this.pendingPipelineUpdates = {};
 		this.pendingAnalysisType = null;
 		this.isDirty = false;
+		this.isRefreshingPipeline = false;
+		this.activeJob = null;
 
 		await Promise.all([
 			this.loadAnalysisTypes(),
@@ -85,6 +89,8 @@ export class AnalysisDetailView {
 		this.pendingPipelineUpdates = {};
 		this.pendingAnalysisType = null;
 		this.isDirty = false;
+		this.isRefreshingPipeline = false;
+		this.activeJob = null;
 
 		try {
 			const [graphResponse, analysisTypes, sourceTypes] = await Promise.all([
@@ -119,6 +125,14 @@ export class AnalysisDetailView {
 
 			const rawQuality = graph.quality || graph.Quality;
 			this.pipelineQuality = this.normalizeQuality(rawQuality || this.analysis.quality || this.deliverable?.quality);
+
+			// Extract active job (Pending or Processing status)
+			const rawJobs = graph.jobs || graph.Jobs || [];
+			const jobs = Array.isArray(rawJobs) ? rawJobs : [];
+			this.activeJob = jobs.find(job => {
+				const status = (job.status || job.Status || '').toString().toLowerCase();
+				return status === 'pending' || status === 'processing';
+			}) || null;
 
 			if (!this.analysis?.id) {
 				throw new Error('Analysis identifier missing');
@@ -223,7 +237,31 @@ export class AnalysisDetailView {
 						${actions.secondary.join('')}
 					</div>
 				</div>
+				${this.renderProgressBar()}
 			</header>
+		`;
+	}
+
+	renderProgressBar() {
+		if (!this.activeJob) {
+			return '';
+		}
+
+		const processed = this.activeJob.processedDocuments ?? this.activeJob.ProcessedDocuments ?? 0;
+		const total = this.activeJob.totalDocuments ?? this.activeJob.TotalDocuments ?? 0;
+		const progressPercent = this.activeJob.progressPercent ?? this.activeJob.ProgressPercent ?? 0;
+		const status = this.activeJob.status ?? this.activeJob.Status ?? 'Processing';
+
+		return `
+			<div class="analysis-progress-bar">
+				<div class="progress-info">
+					<span class="progress-label">${this.escape(status)}: ${processed} of ${total} documents processed</span>
+					<span class="progress-percent">${Math.round(progressPercent)}%</span>
+				</div>
+				<div class="progress-track">
+					<div class="progress-fill" style="width: ${Math.round(progressPercent)}%"></div>
+				</div>
+			</div>
 		`;
 	}
 
@@ -295,14 +333,20 @@ export class AnalysisDetailView {
 
 		const secondary = [];
 
+		const hasActiveJob = this.activeJob !== null;
+		const refreshIconClass = this.isRefreshingPipeline ? 'icon icon-spin' : 'icon';
+		const refreshButtonClass = 'btn btn-secondary';
+		const refreshDisabledAttr = (this.isRefreshingPipeline || hasActiveJob) ? ' disabled' : '';
+		const refreshLabel = this.isRefreshingPipeline ? 'Refreshing...' : (hasActiveJob ? 'Job Running...' : 'Refresh');
+
 		secondary.push(`
-			<button class="btn btn-secondary" data-action="refresh-analysis">
-				<svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+			<button class="${refreshButtonClass}" data-action="refresh-analysis"${refreshDisabledAttr}>
+				<svg class="${refreshIconClass}" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
 					<polyline points="23 4 23 10 17 10"></polyline>
 					<polyline points="1 20 1 14 7 14"></polyline>
 					<path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
 				</svg>
-				Refresh
+				${refreshLabel}
 			</button>
 		`);
 
@@ -874,6 +918,49 @@ export class AnalysisDetailView {
 		const id = this.analysis.id;
 		await this.load(id);
 		this.refresh();
+	}
+
+	async handleRefreshAnalysis() {
+		if (!this.analysis?.id || this.isRefreshingPipeline) {
+			return;
+		}
+
+		this.isRefreshingPipeline = true;
+		this.refresh();
+
+		try {
+			this.toast.info('Scheduling refresh...');
+			const response = await this.api.refreshPipeline(this.analysis.id);
+			const jobId = response?.jobId || response?.JobId;
+			const rawDocumentCount = response?.documentCount ?? response?.DocumentCount;
+			const documentCount = typeof rawDocumentCount === 'number'
+				? rawDocumentCount
+				: Number.parseInt(rawDocumentCount, 10);
+
+			if (Number.isFinite(documentCount) && documentCount > 0) {
+				const label = documentCount === 1 ? 'document' : 'documents';
+				this.toast.info(`Queued ${documentCount} ${label} for refresh`);
+			}
+
+			if (jobId) {
+				await this.api.waitForJob(this.analysis.id, jobId);
+			}
+
+			this.toast.success('Refresh completed');
+			this.isRefreshingPipeline = false;
+			await this.reload();
+		} catch (error) {
+			this.isRefreshingPipeline = false;
+
+			const errorMessage = error?.data?.error || error?.message;
+			if (error?.status === 400 && errorMessage) {
+				this.toast.warning(errorMessage);
+			} else {
+				this.toast.error('Failed to refresh analysis');
+			}
+			console.error('Failed to refresh analysis', error);
+			this.refresh();
+		}
 	}
 
 	async handleReprocessPipeline() {
@@ -1594,7 +1681,7 @@ export class AnalysisDetailView {
 				this.eventBus.emit('navigate', 'analyses-list');
 				break;
 			case 'refresh-analysis':
-				this.reload();
+				this.handleRefreshAnalysis();
 				break;
 			case 'reprocess-pipeline':
 				this.handleReprocessPipeline();

@@ -564,3 +564,44 @@
 .quality-metric-bar {
   margin-top: var(--spacing-2);
 }
+
+/* ==================== Analysis Progress Bar ==================== */
+.analysis-progress-bar {
+  margin-top: var(--spacing-4);
+  padding: var(--spacing-3) var(--spacing-4);
+  background-color: var(--color-bg-secondary);
+  border-radius: var(--border-radius-md);
+  border: 1px solid var(--color-border-subtle);
+}
+
+.progress-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-2);
+  font-size: var(--font-size-small);
+}
+
+.progress-label {
+  color: var(--color-text-primary);
+  font-weight: 500;
+}
+
+.progress-percent {
+  color: var(--color-text-secondary);
+  font-weight: 600;
+}
+
+.progress-track {
+  height: 8px;
+  background-color: var(--color-bg-tertiary);
+  border-radius: var(--border-radius-sm);
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--color-primary-500), var(--color-primary-600));
+  border-radius: var(--border-radius-sm);
+  transition: width 0.3s ease;
+}
