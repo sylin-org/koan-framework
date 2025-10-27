@@ -38,6 +38,9 @@ public sealed class PipelineRefreshController : ControllerBase
             .Distinct(StringComparer.Ordinal)
             .ToList();
 
+        _logger.LogInformation("Pipeline {PipelineId} refresh found {Count} documents in pipeline.DocumentIds: {DocumentIds}",
+            pipelineId, docList.Count, string.Join(", ", docList));
+
         var existing = await ProcessingJob.FindPendingAsync(pipelineId, ct).ConfigureAwait(false);
 
         if (docList.Count == 0)

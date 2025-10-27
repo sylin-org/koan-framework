@@ -11,6 +11,7 @@ using Koan.Samples.Meridian.Models;
 using Koan.Samples.Meridian.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using Koan.Web.Controllers;
 using Newtonsoft.Json.Linq;
 
@@ -24,17 +25,20 @@ public sealed class PipelinesController : EntityController<DocumentPipeline>
     private readonly IJobCoordinator _jobs;
     private readonly IRunLogWriter _runLog;
     private readonly ITemplateRenderer _renderer;
+    private readonly ILogger<PipelinesController> _logger;
 
     public PipelinesController(
         IPipelineBootstrapService bootstrapService,
         IJobCoordinator jobs,
         IRunLogWriter runLog,
-        ITemplateRenderer renderer)
+        ITemplateRenderer renderer,
+        ILogger<PipelinesController> logger)
     {
         _bootstrapService = bootstrapService;
         _jobs = jobs;
         _runLog = runLog;
         _renderer = renderer;
+        _logger = logger;
     }
 
     [HttpGet("{pipelineId}/graph")]
@@ -49,6 +53,15 @@ public sealed class PipelinesController : EntityController<DocumentPipeline>
         }
 
         var documents = await pipeline.LoadDocumentsAsync(ct).ConfigureAwait(false);
+
+        _logger.LogInformation(
+            "GetPipelineGraph for {PipelineId}: Pipeline.DocumentIds={PipelineDocIds}, LoadedDocuments={LoadedCount}, LoadedIds=[{LoadedIds}], LoadedStatuses=[{Statuses}]",
+            pipelineId,
+            pipeline.DocumentIds.Count,
+            documents.Count,
+            string.Join(", ", documents.Select(d => d.Id)),
+            string.Join(", ", documents.Select(d => $"{d.Id}:{d.Status}")));
+
         var deliverable = await GetLatestDeliverableAsync(pipeline, ct).ConfigureAwait(false);
 
         JToken? canonical = null;
@@ -281,14 +294,14 @@ public sealed class PipelinesController : EntityController<DocumentPipeline>
         return latest;
     }
 
-    private static Koan.Samples.Meridian.Contracts.PipelineQualitySnapshot? MapQuality(PipelineQualityMetrics? metrics)
+    private static PipelineQualitySummary? MapQuality(PipelineQualityMetrics? metrics)
     {
         if (metrics is null)
         {
             return null;
         }
 
-        return new Koan.Samples.Meridian.Contracts.PipelineQualitySnapshot
+        return new PipelineQualitySummary
         {
             CitationCoverage = metrics.CitationCoverage,
             HighConfidence = metrics.HighConfidence,
@@ -317,7 +330,6 @@ public sealed class PipelinesController : EntityController<DocumentPipeline>
             return null;
         }
     }
-
 
 }
 

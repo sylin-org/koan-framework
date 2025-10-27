@@ -8,6 +8,7 @@ public interface IDocumentStorage
 {
     Task<string> StoreAsync(Stream content, string fileName, string? contentType, CancellationToken ct = default);
     Task<Stream> OpenReadAsync(string storageKey, CancellationToken ct = default);
+    Task DeleteAsync(string storageKey, CancellationToken ct = default);
 }
 
 public sealed class DocumentStorageOptions
@@ -38,4 +39,7 @@ public sealed class DocumentStorage : IDocumentStorage
 
     public Task<Stream> OpenReadAsync(string storageKey, CancellationToken ct = default)
         => _storage.ReadAsync(_options.Profile, _options.Container, storageKey, ct);
+
+    public Task DeleteAsync(string storageKey, CancellationToken ct = default)
+        => _storage.DeleteAsync(_options.Profile, _options.Container, storageKey, ct);
 }

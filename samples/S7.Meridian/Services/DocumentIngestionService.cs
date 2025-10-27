@@ -63,8 +63,11 @@ public sealed class DocumentIngestionService : IDocumentIngestionService
         var reusedDocuments = new List<SourceDocument>();
         var reuseTelemetryCandidates = new List<SourceDocument>();
         var attachmentsAdded = false;
+        var storedDocuments = new List<(SourceDocument Doc, string StorageKey)>(); // Track for rollback
 
-    foreach (var file in files)
+        try
+        {
+            foreach (var file in files)
         {
             if (file is null || file.Length == 0)
             {
@@ -72,31 +75,31 @@ public sealed class DocumentIngestionService : IDocumentIngestionService
                 continue;
             }
 
+            _logger.LogInformation("Processing file upload: {FileName}, Size: {Size} bytes", file.FileName, file.Length);
+
             await _validator.ValidateAsync(file, ct).ConfigureAwait(false);
 
             var buffered = await BufferAndHashAsync(file, ct).ConfigureAwait(false);
             await using var contentStream = buffered.Content;
             var hash = buffered.Hash;
 
-            if (!documentsByHash.TryGetValue(hash, out var existingByHash))
-            {
-                existingByHash = FindByBestGuess(existingDocuments, file);
-                if (existingByHash is not null)
-                {
-                    existingByHash.ContentHash = hash;
-                    existingByHash.UpdatedAt = DateTime.UtcNow;
-                    var normalized = await existingByHash.Save(ct).ConfigureAwait(false);
-                    documentsByHash[hash] = normalized;
-                    ReplaceDocument(existingDocuments, normalized);
-                    existingByHash = normalized;
-                }
-            }
+            _logger.LogInformation("File {FileName} hashed to {Hash}", file.FileName, hash);
+
+            // Try to find existing document by content hash (no filename-based best guess)
+            documentsByHash.TryGetValue(hash, out var existingByHash);
 
             if (existingByHash is not null)
             {
                 var before = pipeline.DocumentIds.Count;
+                var wasAlreadyAttached = pipeline.DocumentIds.Contains(existingByHash.Id!);
+
                 pipeline.AttachDocument(existingByHash.Id!);
                 var attached = pipeline.DocumentIds.Count > before;
+
+                _logger.LogInformation(
+                    "Document {DocumentId} reuse: wasAlreadyAttached={WasAlreadyAttached}, attached={Attached}, before={Before}, after={After}",
+                    existingByHash.Id, wasAlreadyAttached, attached, before, pipeline.DocumentIds.Count);
+
                 if (attached)
                 {
                     attachmentsAdded = true;
@@ -104,6 +107,30 @@ public sealed class DocumentIngestionService : IDocumentIngestionService
                 }
 
                 var requiresReprocess = forceReprocess || !string.IsNullOrWhiteSpace(typeHint);
+
+                // Check if extraction schema has changed since last extraction, or if never extracted
+                if (!requiresReprocess && !string.IsNullOrWhiteSpace(pipeline.AnalysisTypeId))
+                {
+                    var analysisType = await AnalysisType.Get(pipeline.AnalysisTypeId!, ct).ConfigureAwait(false);
+                    if (analysisType != null)
+                    {
+                        // Reprocess if never extracted OR if analysis type version has changed
+                        if (!existingByHash.LastExtractedAnalysisTypeVersion.HasValue)
+                        {
+                            requiresReprocess = true;
+                            _logger.LogInformation(
+                                "Document {DocumentId} requires processing - never extracted for this analysis type",
+                                existingByHash.Id);
+                        }
+                        else if (analysisType.Version > existingByHash.LastExtractedAnalysisTypeVersion.Value)
+                        {
+                            requiresReprocess = true;
+                            _logger.LogInformation(
+                                "Document {DocumentId} requires reprocessing - AnalysisType version changed from {OldVersion} to {NewVersion}",
+                                existingByHash.Id, existingByHash.LastExtractedAnalysisTypeVersion.Value, analysisType.Version);
+                        }
+                    }
+                }
 
                 if (!string.IsNullOrWhiteSpace(typeHint))
                 {
@@ -150,7 +177,7 @@ public sealed class DocumentIngestionService : IDocumentIngestionService
             {
                 OriginalFileName = file.FileName,
                 StorageKey = storageKey,
-                SourceType = MeridianConstants.SourceTypes.Unclassified,
+                SourceType = MeridianConstants.SourceTypes.Unspecified,
                 MediaType = file.ContentType,
                 Size = file.Length,
                 ContentHash = hash,
@@ -165,6 +192,10 @@ public sealed class DocumentIngestionService : IDocumentIngestionService
             }
 
             var saved = await document.Save(ct).ConfigureAwait(false);
+
+            // Track for rollback in case pipeline.Save fails
+            storedDocuments.Add((saved, storageKey));
+
             pipeline.AttachDocument(saved.Id!);
             attachmentsAdded = true;
             documentsByHash[hash] = saved;
@@ -177,25 +208,64 @@ public sealed class DocumentIngestionService : IDocumentIngestionService
             {
                 await AppendClassificationAuditAsync(pipeline, saved, "manual-hint", ct).ConfigureAwait(false);
             }
-        }
+            }
 
         if (newDocuments.Count == 0 && reusedDocuments.Count == 0)
         {
             throw new InvalidOperationException("No valid files were provided for ingestion.");
         }
 
-        if (attachmentsAdded)
-        {
-            pipeline.UpdatedAt = DateTime.UtcNow;
-            await pipeline.Save(ct).ConfigureAwait(false);
-        }
+            if (attachmentsAdded)
+            {
+                pipeline.UpdatedAt = DateTime.UtcNow;
+                await pipeline.Save(ct).ConfigureAwait(false);
+                _logger.LogInformation("Pipeline {PipelineId} now has {Count} attached documents: {DocumentIds}",
+                    pipeline.Id, pipeline.DocumentIds.Count, string.Join(", ", pipeline.DocumentIds));
+            }
 
-        if (reuseTelemetryCandidates.Count > 0)
-        {
-            await EmitDocumentReuseTelemetryAsync(pipeline, reuseTelemetryCandidates, ct).ConfigureAwait(false);
-        }
+            if (reuseTelemetryCandidates.Count > 0)
+            {
+                await EmitDocumentReuseTelemetryAsync(pipeline, reuseTelemetryCandidates, ct).ConfigureAwait(false);
+            }
 
-        return new DocumentIngestionResult(newDocuments, reusedDocuments);
+            _logger.LogInformation(
+                "Upload complete for pipeline {PipelineId}: {NewCount} new documents, {ReusedCount} reused documents. New IDs: [{NewIds}], Reused IDs: [{ReusedIds}]",
+                pipeline.Id,
+                newDocuments.Count,
+                reusedDocuments.Count,
+                string.Join(", ", newDocuments.Select(d => d.Id)),
+                string.Join(", ", reusedDocuments.Select(d => d.Id)));
+
+            return new DocumentIngestionResult(newDocuments, reusedDocuments);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // Rollback: Delete any storage objects and entities we created
+            _logger.LogError(ex, "Upload failed for pipeline {PipelineId}, rolling back {Count} stored documents",
+                pipeline.Id, storedDocuments.Count);
+
+            foreach (var (doc, storageKey) in storedDocuments)
+            {
+                try
+                {
+                    // Delete from blob storage
+                    await _storage.DeleteAsync(storageKey, ct).ConfigureAwait(false);
+                    _logger.LogDebug("Rolled back storage for document {DocumentId}, key {StorageKey}",
+                        doc.Id, storageKey);
+                }
+                catch (Exception rollbackEx)
+                {
+                    _logger.LogWarning(rollbackEx, "Rollback failed for storage key {Key}, document {DocumentId}",
+                        storageKey, doc.Id);
+                }
+
+                // Note: We don't delete SourceDocument entities as they may have been indexed already
+                // and deleting them could cause referential integrity issues. Instead, they'll be
+                // orphaned but can be cleaned up by a background job later.
+            }
+
+            throw; // Re-throw to inform caller
+        }
     }
 
     public async Task<DocumentIngestionResult> IngestAsync(string pipelineId, IFormFile file, bool forceReprocess, string? typeHint, CancellationToken ct)
@@ -265,14 +335,6 @@ public sealed class DocumentIngestionService : IDocumentIngestionService
         var hash = Convert.ToHexString(hashBytes);
         memory.Position = 0;
         return (hash, memory);
-    }
-
-    private static SourceDocument? FindByBestGuess(IReadOnlyList<SourceDocument> existingDocuments, IFormFile file)
-    {
-        return existingDocuments.FirstOrDefault(doc =>
-            string.IsNullOrWhiteSpace(doc.ContentHash) &&
-            doc.Size == file.Length &&
-            string.Equals(doc.OriginalFileName, file.FileName, StringComparison.OrdinalIgnoreCase));
     }
 
     private static void ReplaceDocument(List<SourceDocument> documents, SourceDocument updated)

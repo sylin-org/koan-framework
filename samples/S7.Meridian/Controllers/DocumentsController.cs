@@ -9,6 +9,7 @@ using Koan.Samples.Meridian.Models;
 using Koan.Samples.Meridian.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using System.Globalization;
 
 namespace Koan.Samples.Meridian.Controllers;
@@ -20,12 +21,14 @@ public sealed class DocumentsController : ControllerBase
     private readonly IDocumentIngestionService _ingestion;
     private readonly IJobCoordinator _jobs;
     private readonly IRunLogWriter _runLog;
+    private readonly ILogger<DocumentsController> _logger;
 
-    public DocumentsController(IDocumentIngestionService ingestion, IJobCoordinator jobs, IRunLogWriter runLog)
+    public DocumentsController(IDocumentIngestionService ingestion, IJobCoordinator jobs, IRunLogWriter runLog, ILogger<DocumentsController> logger)
     {
         _ingestion = ingestion;
         _jobs = jobs;
         _runLog = runLog;
+        _logger = logger;
     }
 
     [HttpGet]
@@ -89,29 +92,36 @@ public sealed class DocumentsController : ControllerBase
 
         if (newIds.Count == 0)
         {
+            _logger.LogInformation(
+                "Upload response for pipeline {PipelineId}: Only reused documents ({Count}). Returning reused IDs: [{ReusedIds}]",
+                pipelineId, reusedIds.Count, string.Join(", ", reusedIds));
+
             var reuseResponse = new DocumentIngestionResponse
             {
                 DocumentId = reusedIds.FirstOrDefault() ?? string.Empty,
                 DocumentIds = reusedIds,
                 ReusedDocumentIds = reusedIds,
-                Status = "Unchanged"
+                Status = "Uploaded"
             };
 
             return Ok(reuseResponse);
         }
 
-    var job = await _jobs.ScheduleAsync(pipelineId, newIds, ct).ConfigureAwait(false);
+        // Documents uploaded and staged - processing happens on explicit Refresh
+        _logger.LogInformation(
+            "Upload response for pipeline {PipelineId}: {NewCount} new, {ReusedCount} reused. Returning new IDs: [{NewIds}], reused: [{ReusedIds}]",
+            pipelineId, newIds.Count, reusedIds.Count, string.Join(", ", newIds), string.Join(", ", reusedIds));
 
         var response = new DocumentIngestionResponse
         {
             DocumentId = newIds.FirstOrDefault() ?? string.Empty,
             DocumentIds = newIds,
             ReusedDocumentIds = reusedIds,
-            JobId = job.Id,
-            Status = job.Status.ToString()
+            JobId = null, // No auto-processing
+            Status = "Uploaded"
         };
 
-        return Accepted(response);
+        return Ok(response);
     }
 
     [HttpPut("{documentId}/type")]
