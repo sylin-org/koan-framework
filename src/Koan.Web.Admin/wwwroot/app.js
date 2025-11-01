@@ -1646,130 +1646,158 @@ function renderMeshServices(meshData) {
   }
 
   servicesGrid.innerHTML = meshData.services.map(service => `
-    <div class="service-card">
+    <div class="service-card compact">
       <div class="service-card-header">
         <div class="service-title-group">
           <h4 class="service-name">${escapeHtml(service.displayName)}</h4>
           <span class="service-id">${escapeHtml(service.serviceId)}</span>
         </div>
-        <div class="service-health-badges">
-          ${service.health.healthy > 0 ? `<span class="health-badge healthy">${service.health.healthy} ✓</span>` : ''}
-          ${service.health.degraded > 0 ? `<span class="health-badge degraded">${service.health.degraded} ⚠</span>` : ''}
-          ${service.health.unhealthy > 0 ? `<span class="health-badge unhealthy">${service.health.unhealthy} ✗</span>` : ''}
+        <div class="service-health-compact">
+          ${service.health.healthy > 0 ? `<span class="health-pill healthy" title="Healthy instances">${service.health.healthy}</span>` : ''}
+          ${service.health.degraded > 0 ? `<span class="health-pill degraded" title="Degraded instances">${service.health.degraded}</span>` : ''}
+          ${service.health.unhealthy > 0 ? `<span class="health-pill unhealthy" title="Unhealthy instances">${service.health.unhealthy}</span>` : ''}
         </div>
       </div>
 
-      ${service.description ? `<div class="service-description">${escapeHtml(service.description)}</div>` : ''}
+      <div class="service-card-body">
+        <!-- Quick Stats Row -->
+        <div class="service-quick-stats">
+          <div class="quick-stat">
+            <span class="stat-icon">📦</span>
+            <div class="stat-info">
+              <span class="stat-value">${service.instanceCount}</span>
+              <span class="stat-label">instances</span>
+            </div>
+          </div>
+          <div class="quick-stat">
+            <span class="stat-icon">🔗</span>
+            <div class="stat-info">
+              <span class="stat-value">${service.capacity.totalConnections}</span>
+              <span class="stat-label">connections</span>
+            </div>
+          </div>
+          <div class="quick-stat">
+            <span class="stat-icon">⚡</span>
+            <div class="stat-info">
+              <span class="stat-value">${service.capacity.utilizationPercent}%</span>
+              <span class="stat-label">utilization</span>
+            </div>
+          </div>
+          ${service.avgResponseTime ? `
+          <div class="quick-stat">
+            <span class="stat-icon">⏱️</span>
+            <div class="stat-info">
+              <span class="stat-value">${formatDuration(service.avgResponseTime)}</span>
+              <span class="stat-label">avg response</span>
+            </div>
+          </div>
+          ` : ''}
+        </div>
 
-      <div class="service-meta">
-        <div class="service-meta-item">
-          <span class="meta-label">Instances:</span>
-          <span class="meta-value">${service.instanceCount}</span>
+        <!-- Health Bar -->
+        <div class="health-bar-compact">
+          ${service.health.healthy > 0 ? `<div class="health-segment healthy" style="width: ${service.health.healthyPercent}%" title="${service.health.healthy} healthy (${service.health.healthyPercent}%)"></div>` : ''}
+          ${service.health.degraded > 0 ? `<div class="health-segment degraded" style="width: ${service.health.degradedPercent}%" title="${service.health.degraded} degraded (${service.health.degradedPercent}%)"></div>` : ''}
+          ${service.health.unhealthy > 0 ? `<div class="health-segment unhealthy" style="width: ${service.health.unhealthyPercent}%" title="${service.health.unhealthy} unhealthy (${service.health.unhealthyPercent}%)"></div>` : ''}
         </div>
-        <div class="service-meta-item">
-          <span class="meta-label">Load Balancing:</span>
-          <span class="meta-value">${escapeHtml(service.loadBalancing.policy)}</span>
-        </div>
-        ${service.avgResponseTime ? `
-        <div class="service-meta-item">
-          <span class="meta-label">Avg Response:</span>
-          <span class="meta-value">${formatDuration(service.avgResponseTime)}</span>
+
+        <!-- Capabilities -->
+        ${service.capabilities && service.capabilities.length > 0 ? `
+        <div class="service-capabilities-compact">
+          ${service.capabilities.map(cap => `<span class="capability-tag">${escapeHtml(cap)}</span>`).join('')}
         </div>
         ` : ''}
-      </div>
 
-      ${service.capabilities && service.capabilities.length > 0 ? `
-      <div class="service-capabilities">
-        <span class="capabilities-label">Capabilities:</span>
-        ${service.capabilities.map(cap => `<span class="capability-badge">${escapeHtml(cap)}</span>`).join('')}
-      </div>
-      ` : ''}
+        <!-- Expandable Details -->
+        <details class="service-details-toggle">
+          <summary class="details-summary">
+            <span class="summary-text">Show ${service.instanceCount} instance${service.instanceCount !== 1 ? 's' : ''} & details</span>
+            <span class="summary-icon">▼</span>
+          </summary>
+          <div class="service-details-content">
+            <!-- Instances Compact List -->
+            <div class="instances-compact-list">
+              ${service.instances.map(instance => renderCompactInstance(instance)).join('')}
+            </div>
 
-      <div class="service-health-distribution">
-        <div class="health-dist-header">
-          <span class="health-dist-title">Health Distribution</span>
-        </div>
-        <div class="health-progress-bar">
-          ${service.health.healthy > 0 ? `<div class="health-segment healthy" style="width: ${service.health.healthyPercent}%" title="Healthy: ${service.health.healthy} (${service.health.healthyPercent}%)"></div>` : ''}
-          ${service.health.degraded > 0 ? `<div class="health-segment degraded" style="width: ${service.health.degradedPercent}%" title="Degraded: ${service.health.degraded} (${service.health.degradedPercent}%)"></div>` : ''}
-          ${service.health.unhealthy > 0 ? `<div class="health-segment unhealthy" style="width: ${service.health.unhealthyPercent}%" title="Unhealthy: ${service.health.unhealthy} (${service.health.unhealthyPercent}%)"></div>` : ''}
-        </div>
-        <div class="health-dist-legend">
-          ${service.health.healthy > 0 ? `<span class="legend-item healthy">Healthy: ${service.health.healthy} (${service.health.healthyPercent}%)</span>` : ''}
-          ${service.health.degraded > 0 ? `<span class="legend-item degraded">Degraded: ${service.health.degraded} (${service.health.degradedPercent}%)</span>` : ''}
-          ${service.health.unhealthy > 0 ? `<span class="legend-item unhealthy">Unhealthy: ${service.health.unhealthy} (${service.health.unhealthyPercent}%)</span>` : ''}
-        </div>
-      </div>
+            <!-- Config & Metrics Grid -->
+            <div class="details-grid">
+              <div class="detail-section">
+                <div class="detail-section-title">Capacity & Load</div>
+                <div class="detail-items">
+                  <div class="detail-item">
+                    <span class="detail-label">Available Capacity:</span>
+                    <span class="detail-value">${service.capacity.availableCapacity} / ${service.capacity.totalCapacity}</span>
+                  </div>
+                  <div class="detail-item">
+                    <span class="detail-label">Avg Load/Instance:</span>
+                    <span class="detail-value">${service.capacity.averageLoadPerInstance.toFixed(1)}</span>
+                  </div>
+                  <div class="detail-item">
+                    <span class="detail-label">Load Balancing:</span>
+                    <span class="detail-value">${escapeHtml(service.loadBalancing.policy)}</span>
+                  </div>
+                </div>
+              </div>
 
-      <div class="service-capacity-metrics">
-        <div class="capacity-header">Capacity & Load</div>
-        <div class="capacity-stats-grid">
-          <div class="capacity-stat">
-            <span class="capacity-label">Total Capacity:</span>
-            <span class="capacity-value">${service.capacity.totalCapacity} instances</span>
-          </div>
-          <div class="capacity-stat">
-            <span class="capacity-label">Available:</span>
-            <span class="capacity-value">${service.capacity.availableCapacity} healthy</span>
-          </div>
-          <div class="capacity-stat">
-            <span class="capacity-label">Utilization:</span>
-            <span class="capacity-value">${service.capacity.capacityUtilizationPercent}%</span>
-          </div>
-          <div class="capacity-stat">
-            <span class="capacity-label">Total Connections:</span>
-            <span class="capacity-value">${service.capacity.totalConnections}</span>
-          </div>
-          <div class="capacity-stat">
-            <span class="capacity-label">Avg Load/Instance:</span>
-            <span class="capacity-value">${service.capacity.averageLoadPerInstance.toFixed(1)}</span>
-          </div>
-        </div>
-      </div>
-
-      ${service.configuration ? `
-      <details class="service-config-details">
-        <summary class="service-config-summary">Configuration</summary>
-        <div class="service-config-content">
-          <div class="config-grid">
-            <div class="config-item">
-              <span class="config-label">Port:</span>
-              <span class="config-value">${service.configuration.port}</span>
+              ${service.configuration ? `
+              <div class="detail-section">
+                <div class="detail-section-title">Configuration</div>
+                <div class="detail-items">
+                  <div class="detail-item">
+                    <span class="detail-label">Port:</span>
+                    <span class="detail-value">${service.configuration.port}</span>
+                  </div>
+                  <div class="detail-item">
+                    <span class="detail-label">Health Check:</span>
+                    <span class="detail-value">${escapeHtml(service.configuration.healthEndpoint)}</span>
+                  </div>
+                  ${service.configuration.containerImage ? `
+                  <div class="detail-item">
+                    <span class="detail-label">Image:</span>
+                    <span class="detail-value">${escapeHtml(service.configuration.containerImage)}${service.configuration.defaultTag ? ':' + escapeHtml(service.configuration.defaultTag) : ''}</span>
+                  </div>
+                  ` : ''}
+                </div>
+              </div>
+              ` : ''}
             </div>
-            <div class="config-item">
-              <span class="config-label">Health Endpoint:</span>
-              <span class="config-value">${escapeHtml(service.configuration.healthEndpoint)}</span>
-            </div>
-            <div class="config-item">
-              <span class="config-label">Manifest Endpoint:</span>
-              <span class="config-value">${escapeHtml(service.configuration.manifestEndpoint)}</span>
-            </div>
-            <div class="config-item">
-              <span class="config-label">Service Channel:</span>
-              <span class="config-value">${service.configuration.enableServiceChannel ? 'Enabled' : 'Disabled'}</span>
-            </div>
-            ${service.configuration.enableServiceChannel && service.configuration.serviceMulticastGroup ? `
-            <div class="config-item">
-              <span class="config-label">Service Multicast:</span>
-              <span class="config-value">${escapeHtml(service.configuration.serviceMulticastGroup)}:${service.configuration.serviceMulticastPort || 'N/A'}</span>
-            </div>
-            ` : ''}
-            ${service.configuration.containerImage ? `
-            <div class="config-item">
-              <span class="config-label">Container Image:</span>
-              <span class="config-value">${escapeHtml(service.configuration.containerImage)}${service.configuration.defaultTag ? ':' + escapeHtml(service.configuration.defaultTag) : ''}</span>
-            </div>
-            ` : ''}
           </div>
-        </div>
-      </details>
-      ` : ''}
-
-      <div class="service-instances">
-        ${service.instances.map(instance => renderServiceInstance(instance)).join('')}
+        </details>
       </div>
     </div>
   `).join('');
+}
+
+function renderCompactInstance(instance) {
+  const statusClass = instance.status.toLowerCase();
+  const statusIcon = instance.status === 'Healthy' ? '✓' :
+                     instance.status === 'Degraded' ? '⚠' : '✗';
+
+  const lastSeenDate = new Date(instance.lastSeen);
+  const formattedTimestamp = lastSeenDate.toLocaleString();
+
+  return `
+    <div class="instance-compact status-${statusClass}">
+      <div class="instance-compact-header">
+        <span class="instance-status-badge status-${statusClass}">${statusIcon}</span>
+        <span class="instance-id-short" title="${escapeHtml(instance.instanceId)}">${escapeHtml(instance.instanceId.substring(0, 8))}</span>
+        <span class="instance-mode-badge">${instance.deploymentMode === 'Container' ? '🐳' : '⚙️'}</span>
+      </div>
+      <div class="instance-compact-body">
+        <div class="instance-endpoint-compact">
+          <a href="${escapeHtml(instance.httpEndpoint)}" target="_blank" rel="noopener" class="endpoint-link">
+            ${escapeHtml(instance.httpEndpoint)}
+          </a>
+        </div>
+        <div class="instance-metrics-compact">
+          <span class="metric-compact" title="Active connections">🔗 ${instance.activeConnections}</span>
+          <span class="metric-compact" title="Average response time">⏱️ ${escapeHtml(instance.averageResponseTime)}</span>
+          <span class="metric-compact" title="Last seen: ${escapeHtml(formattedTimestamp)}">👁️ ${escapeHtml(instance.timeSinceLastSeen)}</span>
+        </div>
+      </div>
+    </div>
+  `;
 }
 
 function renderServiceInstance(instance) {
