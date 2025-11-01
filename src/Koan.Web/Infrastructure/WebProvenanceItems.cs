@@ -37,4 +37,11 @@ internal static class WebProvenanceItems
         MustSanitize: true,
         DefaultValue: string.Empty,
         DefaultConsumers: SecurityConsumers);
+
+    internal static readonly ProvenanceItem ApplicationUrl = new(
+        ConfigurationConstants.Web.Section + ":" + ConfigurationConstants.Web.Keys.ApplicationUrl,
+        "Application Base URL",
+        "Explicit override for application base URL. When set, takes precedence over ASPNETCORE_URLS detection. Used for generating absolute URLs in container environments.",
+        DefaultValue: "(detected from ASPNETCORE_URLS)",
+        DefaultConsumers: new[] { "Koan.Web.Urls", "Koan.Web.Admin", "Koan.Web.Connector.Swagger" });
 }

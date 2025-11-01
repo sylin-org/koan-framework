@@ -9,6 +9,7 @@ using Koan.Web.Connector.Swagger.Infrastructure;
 using Swashbuckle.AspNetCore.Swagger;
 using SwaggerItems = Koan.Web.Connector.Swagger.Infrastructure.SwaggerProvenanceItems;
 using ProvenanceModes = Koan.Core.Hosting.Bootstrap.ProvenancePublicationModeExtensions;
+using Koan.Web;
 
 namespace Koan.Web.Connector.Swagger.Initialization;
 
@@ -72,6 +73,18 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         Publish(module, SwaggerItems.RoutePrefix, routePrefix);
         Publish(module, SwaggerItems.RequireAuthOutsideDevelopment, requireAuth);
         Publish(module, SwaggerItems.IncludeXmlComments, includeXmlComments);
+
+        // Report full Swagger URL for immediate discoverability
+        if (enabledEffective)
+        {
+            var swaggerUrl = KoanWeb.Urls.Build(routePrefix.Value ?? "swagger", cfg, env);
+            module.AddSetting(
+                SwaggerItems.SwaggerUrl,
+                ProvenancePublicationMode.Custom,
+                swaggerUrl,
+                sourceKey: "Resolved from ApplicationUrl and RoutePrefix",
+                usedDefault: false);
+        }
     }
 
     private static void Publish<T>(

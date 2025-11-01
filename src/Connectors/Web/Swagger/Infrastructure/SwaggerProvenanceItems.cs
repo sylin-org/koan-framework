@@ -44,4 +44,11 @@ internal static class SwaggerProvenanceItems
         "Controls whether XML documentation files are loaded into Swagger metadata.",
         DefaultValue: "true",
         DefaultConsumers: Consumers);
+
+    internal static readonly ProvenanceItem SwaggerUrl = new(
+        "web.urls.swagger",
+        "Swagger UI URL",
+        "Full URL to the Swagger UI endpoint, resolved from application base URL and route prefix.",
+        DefaultValue: "(detected)",
+        DefaultConsumers: Consumers);
 }

@@ -11,6 +11,7 @@ public static class ConfigurationConstants
             public const string IsProxiedApi = nameof(IsProxiedApi);
             public const string ContentSecurityPolicy = nameof(ContentSecurityPolicy);
             public const string AutoMapControllers = nameof(AutoMapControllers);
+            public const string ApplicationUrl = nameof(ApplicationUrl);
         }
     }
 
