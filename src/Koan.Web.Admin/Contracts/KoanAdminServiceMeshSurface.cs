@@ -13,6 +13,7 @@ public sealed record KoanAdminServiceMeshSurface(
     int HealthyInstancesCount,
     int DegradedInstancesCount,
     int UnhealthyInstancesCount,
+    MeshConfiguration? Configuration,
     IReadOnlyList<KoanAdminServiceSurface> Services
 )
 {
@@ -25,6 +26,7 @@ public sealed record KoanAdminServiceMeshSurface(
         HealthyInstancesCount: 0,
         DegradedInstancesCount: 0,
         UnhealthyInstancesCount: 0,
+        Configuration: null,
         Services: Array.Empty<KoanAdminServiceSurface>()
     );
 }
@@ -40,13 +42,18 @@ public sealed record KoanAdminServiceSurface(
     TimeSpan? MinResponseTime,
     TimeSpan? MaxResponseTime,
     TimeSpan? AvgResponseTime,
+    ServiceConfiguration? Configuration,
+    CapacityMetrics Capacity,
     IReadOnlyList<KoanAdminServiceInstanceSurface> Instances
 );
 
 public sealed record ServiceHealthDistribution(
     int Healthy,
     int Degraded,
-    int Unhealthy
+    int Unhealthy,
+    int HealthyPercent,
+    int DegradedPercent,
+    int UnhealthyPercent
 );
 
 public sealed record LoadBalancingInfo(
@@ -57,6 +64,7 @@ public sealed record LoadBalancingInfo(
 public sealed record KoanAdminServiceInstanceSurface(
     string InstanceId,
     string HttpEndpoint,
+    string? ServiceChannelEndpoint,  // e.g., "239.255.42.10:42010" (optional)
     string Status,  // "Healthy", "Degraded", "Unhealthy"
     DateTime LastSeen,
     string TimeSinceLastSeen,  // Formatted like "5 seconds ago"
@@ -65,4 +73,40 @@ public sealed record KoanAdminServiceInstanceSurface(
     string DeploymentMode,  // "InProcess", "Container"
     string? ContainerId,
     string[] Capabilities
+);
+
+/// <summary>
+/// Mesh-wide configuration settings.
+/// </summary>
+public sealed record MeshConfiguration(
+    string OrchestratorMulticastGroup,
+    int OrchestratorMulticastPort,
+    string HeartbeatInterval,  // Formatted like "10s"
+    string StaleThreshold,  // Formatted like "30s"
+    string? SelfInstanceId  // The instance ID of the current node (if hosting services)
+);
+
+/// <summary>
+/// Service-specific configuration settings.
+/// </summary>
+public sealed record ServiceConfiguration(
+    int Port,
+    string HealthEndpoint,
+    string ManifestEndpoint,
+    bool EnableServiceChannel,
+    string? ServiceMulticastGroup,
+    int? ServiceMulticastPort,
+    string? ContainerImage,
+    string? DefaultTag
+);
+
+/// <summary>
+/// Service capacity and load metrics.
+/// </summary>
+public sealed record CapacityMetrics(
+    int TotalCapacity,  // Total instances
+    int AvailableCapacity,  // Healthy instances
+    int CapacityUtilizationPercent,  // Percentage of capacity in use (based on connections)
+    int TotalConnections,  // Total active connections across all instances
+    double AverageLoadPerInstance  // Average connections per instance
 );

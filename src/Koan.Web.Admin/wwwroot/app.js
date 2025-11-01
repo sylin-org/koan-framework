@@ -1507,6 +1507,7 @@ async function renderMeshView() {
   }
 
   renderMeshOverview(meshData);
+  renderMeshConfiguration(meshData);
   renderMeshServices(meshData);
 }
 
@@ -1581,6 +1582,60 @@ function renderMeshOverview(meshData) {
   `;
 }
 
+function renderMeshConfiguration(meshData) {
+  // Find or create a configuration panel container
+  const servicesPanel = document.querySelector('.services-panel');
+  if (!servicesPanel) return;
+
+  // Check if config panel already exists
+  let configPanel = document.querySelector('.mesh-config-panel');
+  if (!configPanel) {
+    // Create and insert config panel before services panel
+    configPanel = document.createElement('section');
+    configPanel.className = 'panel mesh-config-panel';
+    servicesPanel.parentNode.insertBefore(configPanel, servicesPanel);
+  }
+
+  if (!meshData.configuration) {
+    configPanel.style.display = 'none';
+    return;
+  }
+
+  configPanel.style.display = 'block';
+  const config = meshData.configuration;
+
+  configPanel.innerHTML = `
+    <header class="panel-header">
+      <div>
+        <h3>Mesh Configuration</h3>
+        <p class="panel-subtitle">Orchestrator and heartbeat settings</p>
+      </div>
+    </header>
+    <div class="panel-body">
+      <div class="config-grid">
+        <div class="config-item">
+          <span class="config-label">Orchestrator Channel:</span>
+          <span class="config-value">${escapeHtml(config.orchestratorMulticastGroup)}:${config.orchestratorMulticastPort}</span>
+        </div>
+        <div class="config-item">
+          <span class="config-label">Heartbeat Interval:</span>
+          <span class="config-value">${escapeHtml(config.heartbeatInterval)}</span>
+        </div>
+        <div class="config-item">
+          <span class="config-label">Stale Threshold:</span>
+          <span class="config-value">${escapeHtml(config.staleThreshold)}</span>
+        </div>
+        ${config.selfInstanceId ? `
+        <div class="config-item">
+          <span class="config-label">Self Instance ID:</span>
+          <span class="config-value">${escapeHtml(config.selfInstanceId)}</span>
+        </div>
+        ` : ''}
+      </div>
+    </div>
+  `;
+}
+
 function renderMeshServices(meshData) {
   const servicesGrid = document.getElementById('services-grid');
   if (!servicesGrid) return;
@@ -1630,6 +1685,86 @@ function renderMeshServices(meshData) {
       </div>
       ` : ''}
 
+      <div class="service-health-distribution">
+        <div class="health-dist-header">
+          <span class="health-dist-title">Health Distribution</span>
+        </div>
+        <div class="health-progress-bar">
+          ${service.health.healthy > 0 ? `<div class="health-segment healthy" style="width: ${service.health.healthyPercent}%" title="Healthy: ${service.health.healthy} (${service.health.healthyPercent}%)"></div>` : ''}
+          ${service.health.degraded > 0 ? `<div class="health-segment degraded" style="width: ${service.health.degradedPercent}%" title="Degraded: ${service.health.degraded} (${service.health.degradedPercent}%)"></div>` : ''}
+          ${service.health.unhealthy > 0 ? `<div class="health-segment unhealthy" style="width: ${service.health.unhealthyPercent}%" title="Unhealthy: ${service.health.unhealthy} (${service.health.unhealthyPercent}%)"></div>` : ''}
+        </div>
+        <div class="health-dist-legend">
+          ${service.health.healthy > 0 ? `<span class="legend-item healthy">Healthy: ${service.health.healthy} (${service.health.healthyPercent}%)</span>` : ''}
+          ${service.health.degraded > 0 ? `<span class="legend-item degraded">Degraded: ${service.health.degraded} (${service.health.degradedPercent}%)</span>` : ''}
+          ${service.health.unhealthy > 0 ? `<span class="legend-item unhealthy">Unhealthy: ${service.health.unhealthy} (${service.health.unhealthyPercent}%)</span>` : ''}
+        </div>
+      </div>
+
+      <div class="service-capacity-metrics">
+        <div class="capacity-header">Capacity & Load</div>
+        <div class="capacity-stats-grid">
+          <div class="capacity-stat">
+            <span class="capacity-label">Total Capacity:</span>
+            <span class="capacity-value">${service.capacity.totalCapacity} instances</span>
+          </div>
+          <div class="capacity-stat">
+            <span class="capacity-label">Available:</span>
+            <span class="capacity-value">${service.capacity.availableCapacity} healthy</span>
+          </div>
+          <div class="capacity-stat">
+            <span class="capacity-label">Utilization:</span>
+            <span class="capacity-value">${service.capacity.capacityUtilizationPercent}%</span>
+          </div>
+          <div class="capacity-stat">
+            <span class="capacity-label">Total Connections:</span>
+            <span class="capacity-value">${service.capacity.totalConnections}</span>
+          </div>
+          <div class="capacity-stat">
+            <span class="capacity-label">Avg Load/Instance:</span>
+            <span class="capacity-value">${service.capacity.averageLoadPerInstance.toFixed(1)}</span>
+          </div>
+        </div>
+      </div>
+
+      ${service.configuration ? `
+      <details class="service-config-details">
+        <summary class="service-config-summary">Configuration</summary>
+        <div class="service-config-content">
+          <div class="config-grid">
+            <div class="config-item">
+              <span class="config-label">Port:</span>
+              <span class="config-value">${service.configuration.port}</span>
+            </div>
+            <div class="config-item">
+              <span class="config-label">Health Endpoint:</span>
+              <span class="config-value">${escapeHtml(service.configuration.healthEndpoint)}</span>
+            </div>
+            <div class="config-item">
+              <span class="config-label">Manifest Endpoint:</span>
+              <span class="config-value">${escapeHtml(service.configuration.manifestEndpoint)}</span>
+            </div>
+            <div class="config-item">
+              <span class="config-label">Service Channel:</span>
+              <span class="config-value">${service.configuration.enableServiceChannel ? 'Enabled' : 'Disabled'}</span>
+            </div>
+            ${service.configuration.enableServiceChannel && service.configuration.serviceMulticastGroup ? `
+            <div class="config-item">
+              <span class="config-label">Service Multicast:</span>
+              <span class="config-value">${escapeHtml(service.configuration.serviceMulticastGroup)}:${service.configuration.serviceMulticastPort || 'N/A'}</span>
+            </div>
+            ` : ''}
+            ${service.configuration.containerImage ? `
+            <div class="config-item">
+              <span class="config-label">Container Image:</span>
+              <span class="config-value">${escapeHtml(service.configuration.containerImage)}${service.configuration.defaultTag ? ':' + escapeHtml(service.configuration.defaultTag) : ''}</span>
+            </div>
+            ` : ''}
+          </div>
+        </div>
+      </details>
+      ` : ''}
+
       <div class="service-instances">
         ${service.instances.map(instance => renderServiceInstance(instance)).join('')}
       </div>
@@ -1642,6 +1777,10 @@ function renderServiceInstance(instance) {
   const statusIcon = instance.status === 'Healthy' ? '✓' :
                      instance.status === 'Degraded' ? '⚠' : '✗';
 
+  // Format absolute timestamp
+  const lastSeenDate = new Date(instance.lastSeen);
+  const formattedTimestamp = lastSeenDate.toLocaleString();
+
   return `
     <div class="instance-row status-${statusClass}">
       <div class="instance-main">
@@ -1653,12 +1792,18 @@ function renderServiceInstance(instance) {
               ${escapeHtml(instance.httpEndpoint)}
             </a>
           </div>
+          ${instance.serviceChannelEndpoint ? `
+          <div class="instance-channel-endpoint">
+            <span class="endpoint-label">Service Channel:</span>
+            <span class="endpoint-value">${escapeHtml(instance.serviceChannelEndpoint)}</span>
+          </div>
+          ` : ''}
         </div>
       </div>
       <div class="instance-stats">
         <div class="instance-stat">
           <span class="stat-label">Last Seen:</span>
-          <span class="stat-value">${escapeHtml(instance.timeSinceLastSeen)}</span>
+          <span class="stat-value" title="${escapeHtml(formattedTimestamp)}">${escapeHtml(instance.timeSinceLastSeen)}</span>
         </div>
         <div class="instance-stat">
           <span class="stat-label">Connections:</span>

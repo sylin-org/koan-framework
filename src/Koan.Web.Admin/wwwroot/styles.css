@@ -2075,6 +2075,219 @@ h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-mono);
 }
 
+/* Configuration Grid (Mesh & Service configs) */
+.config-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1rem;
+  padding: 0;
+}
+
+.config-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.config-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.config-value {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  word-break: break-all;
+}
+
+/* Service Configuration Details (collapsible) */
+.service-config-details {
+  padding: 0;
+  border-top: 1px solid var(--border-subtle);
+  background: var(--surface-sunken);
+}
+
+.service-config-summary {
+  padding: 0.875rem 1.5rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  user-select: none;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  list-style: none;
+  transition: all 0.2s ease;
+}
+
+.service-config-summary:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.service-config-summary::marker {
+  content: '';
+}
+
+.service-config-summary::before {
+  content: '▶';
+  display: inline-block;
+  margin-right: 0.5rem;
+  transition: transform 0.2s ease;
+  font-size: 0.7rem;
+}
+
+.service-config-details[open] .service-config-summary::before {
+  transform: rotate(90deg);
+}
+
+.service-config-content {
+  padding: 1rem 1.5rem;
+  border-top: 1px solid var(--border-subtle);
+}
+
+/* Instance Channel Endpoint */
+.instance-channel-endpoint {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  margin-top: 0.25rem;
+}
+
+.endpoint-label {
+  font-weight: 500;
+  margin-right: 0.5rem;
+}
+
+.endpoint-value {
+  font-family: var(--font-mono);
+  color: var(--accent-info);
+}
+
+/* Health Distribution Visualization */
+.service-health-distribution {
+  padding: 1rem 1.5rem;
+  background: var(--surface-sunken);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.health-dist-header {
+  margin-bottom: 0.75rem;
+}
+
+.health-dist-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.health-progress-bar {
+  display: flex;
+  height: 24px;
+  background: var(--surface-base);
+  border-radius: 6px;
+  overflow: hidden;
+  margin-bottom: 0.75rem;
+  border: 1px solid var(--border-subtle);
+}
+
+.health-segment {
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: white;
+}
+
+.health-segment.healthy {
+  background: linear-gradient(135deg, var(--accent-success), #16a34a);
+}
+
+.health-segment.degraded {
+  background: linear-gradient(135deg, var(--accent-warning), #f59e0b);
+}
+
+.health-segment.unhealthy {
+  background: linear-gradient(135deg, var(--accent-danger), #dc2626);
+}
+
+.health-dist-legend {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  font-size: 0.8rem;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 500;
+}
+
+.legend-item.healthy {
+  color: var(--accent-success);
+}
+
+.legend-item.degraded {
+  color: var(--accent-warning);
+}
+
+.legend-item.unhealthy {
+  color: var(--accent-danger);
+}
+
+/* Service Capacity Metrics */
+.service-capacity-metrics {
+  padding: 1rem 1.5rem;
+  background: var(--surface-base);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.capacity-header {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 0.75rem;
+}
+
+.capacity-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1rem;
+}
+
+.capacity-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.capacity-label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.capacity-value {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+}
+
 /* Empty state */
 .empty-state {
   padding: 3rem 2rem;

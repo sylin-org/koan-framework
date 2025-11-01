@@ -18,10 +18,20 @@ internal static class KoanAdminServiceMeshSurfaceFactory
 
         if (!serviceIds.Any())
         {
+            // No services discovered yet, but mesh is enabled
+            var defaultMeshConfig = new MeshConfiguration(
+                "239.255.42.1",
+                42001,
+                "10s",
+                "30s",
+                null
+            );
+
             return KoanAdminServiceMeshSurface.Empty with
             {
                 Enabled = true,
-                CapturedAt = capturedAt
+                CapturedAt = capturedAt,
+                Configuration = defaultMeshConfig
             };
         }
 
@@ -58,6 +68,7 @@ internal static class KoanAdminServiceMeshSurfaceFactory
                 return new KoanAdminServiceInstanceSurface(
                     inst.InstanceId,
                     inst.HttpEndpoint,
+                    inst.ServiceChannelEndpoint,
                     inst.Status.ToString(),
                     inst.LastSeen,
                     FormatTimeSince(timeSince),
@@ -69,10 +80,35 @@ internal static class KoanAdminServiceMeshSurfaceFactory
                 );
             }).ToList();
 
+            // Calculate health distribution with percentages for this service
+            var svcHealthyCount = instanceSurfaces.Count(i => i.Status == "Healthy");
+            var svcDegradedCount = instanceSurfaces.Count(i => i.Status == "Degraded");
+            var svcUnhealthyCount = instanceSurfaces.Count(i => i.Status == "Unhealthy");
+            var totalCount = instanceSurfaces.Count;
+
             var health = new ServiceHealthDistribution(
-                instanceSurfaces.Count(i => i.Status == "Healthy"),
-                instanceSurfaces.Count(i => i.Status == "Degraded"),
-                instanceSurfaces.Count(i => i.Status == "Unhealthy")
+                svcHealthyCount,
+                svcDegradedCount,
+                svcUnhealthyCount,
+                totalCount > 0 ? (int)Math.Round(svcHealthyCount * 100.0 / totalCount) : 0,
+                totalCount > 0 ? (int)Math.Round(svcDegradedCount * 100.0 / totalCount) : 0,
+                totalCount > 0 ? (int)Math.Round(svcUnhealthyCount * 100.0 / totalCount) : 0
+            );
+
+            // Calculate capacity metrics
+            var totalConnections = instanceSurfaces.Sum(i => i.ActiveConnections);
+            var averageLoad = totalCount > 0 ? (double)totalConnections / totalCount : 0;
+            var maxConnectionsPerInstance = 100; // Assumed max capacity per instance
+            var utilizationPercent = svcHealthyCount > 0 && totalConnections > 0
+                ? Math.Min(100, (int)Math.Round(totalConnections * 100.0 / (svcHealthyCount * maxConnectionsPerInstance)))
+                : 0;
+
+            var capacity = new CapacityMetrics(
+                totalCount,
+                svcHealthyCount,
+                utilizationPercent,
+                totalConnections,
+                averageLoad
             );
 
             var responseTimes = instanceSurfaces
@@ -93,6 +129,20 @@ internal static class KoanAdminServiceMeshSurfaceFactory
                 "Distributes requests evenly across healthy instances"
             );
 
+            // Build service configuration if descriptor is available
+            ServiceConfiguration? serviceConfig = descriptor != null
+                ? new ServiceConfiguration(
+                    descriptor.Port,
+                    descriptor.HealthEndpoint,
+                    descriptor.ManifestEndpoint,
+                    descriptor.EnableServiceChannel,
+                    descriptor.ServiceMulticastGroup,
+                    descriptor.ServiceMulticastPort,
+                    descriptor.ContainerImage,
+                    descriptor.DefaultTag
+                )
+                : null;
+
             services.Add(new KoanAdminServiceSurface(
                 serviceId,
                 descriptor?.DisplayName ?? ToPascalCase(serviceId),
@@ -104,12 +154,25 @@ internal static class KoanAdminServiceMeshSurfaceFactory
                 responseTimes.Any() ? responseTimes.Min() : null,
                 responseTimes.Any() ? responseTimes.Max() : null,
                 responseTimes.Any() ? TimeSpan.FromTicks((long)responseTimes.Average(t => t.Ticks)) : null,
+                serviceConfig,
+                capacity,
                 instanceSurfaces
             ));
         }
 
-        // Get orchestrator channel from configuration
-        var orchestratorChannel = "239.255.42.1:42001";  // Default, could read from config
+        // Build mesh configuration from first service descriptor (or use defaults)
+        var firstDescriptor = services.Select(s => TryGetServiceDescriptor(serviceProvider, s.ServiceId))
+            .FirstOrDefault(d => d != null);
+
+        var meshConfig = new MeshConfiguration(
+            firstDescriptor?.OrchestratorMulticastGroup ?? "239.255.42.1",
+            firstDescriptor?.OrchestratorMulticastPort ?? 42001,
+            FormatDuration(firstDescriptor?.HeartbeatInterval ?? TimeSpan.FromSeconds(10)),
+            FormatDuration(firstDescriptor?.StaleThreshold ?? TimeSpan.FromSeconds(30)),
+            null  // SelfInstanceId - not available from current mesh interface
+        );
+
+        var orchestratorChannel = $"{meshConfig.OrchestratorMulticastGroup}:{meshConfig.OrchestratorMulticastPort}";
 
         return new KoanAdminServiceMeshSurface(
             Enabled: true,
@@ -120,6 +183,7 @@ internal static class KoanAdminServiceMeshSurfaceFactory
             HealthyInstancesCount: healthyCount,
             DegradedInstancesCount: degradedCount,
             UnhealthyInstancesCount: unhealthyCount,
+            Configuration: meshConfig,
             Services: services
         );
     }
