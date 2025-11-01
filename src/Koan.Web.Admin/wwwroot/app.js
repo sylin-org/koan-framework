@@ -1637,15 +1637,35 @@ function renderMeshConfiguration(meshData) {
 }
 
 function renderMeshServices(meshData) {
-  const servicesGrid = document.getElementById('services-grid');
-  if (!servicesGrid) return;
+  // Find the services panel and replace it with individual service cards
+  const servicesPanel = document.querySelector('.services-panel');
+  if (!servicesPanel) return;
 
   if (!meshData.services || meshData.services.length === 0) {
-    servicesGrid.innerHTML = '<div class="empty-state">No services discovered</div>';
+    servicesPanel.innerHTML = `
+      <header class="panel-header">
+        <div>
+          <h3>Discovered Services</h3>
+          <p class="panel-subtitle">No services discovered</p>
+        </div>
+      </header>
+      <div class="panel-body">
+        <div class="empty-state">No services found in the mesh</div>
+      </div>
+    `;
     return;
   }
 
-  servicesGrid.innerHTML = meshData.services.map(service => `
+  // Create a section header + grid container
+  const servicesSection = document.createElement('div');
+  servicesSection.className = 'services-section';
+  servicesSection.innerHTML = `
+    <div class="section-header">
+      <h3 class="section-title">Discovered Services</h3>
+      <p class="section-subtitle">${meshData.services.length} service${meshData.services.length !== 1 ? 's' : ''} active in the mesh</p>
+    </div>
+    <div class="services-grid">
+      ${meshData.services.map(service => `
     <div class="service-card compact">
       <div class="service-card-header">
         <div class="service-title-group">
@@ -1766,7 +1786,12 @@ function renderMeshServices(meshData) {
         </details>
       </div>
     </div>
-  `).join('');
+      `).join('')}
+    </div>
+  `;
+
+  // Replace the panel with the new section
+  servicesPanel.parentNode.replaceChild(servicesSection, servicesPanel);
 }
 
 function renderCompactInstance(instance) {
