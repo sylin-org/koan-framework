@@ -1489,7 +1489,7 @@ function stopAutoRefresh() {
 
 async function fetchMeshData() {
   try {
-    const response = await fetch('api/status/service-mesh');
+    const response = await fetch('api/service-mesh');
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     return await response.json();
   } catch (error) {
