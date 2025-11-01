@@ -139,6 +139,8 @@ function parseHash() {
       return { view: 'framework', params: {} };
     case 'configuration':
       return { view: 'configuration', params: {} };
+    case 'mesh':
+      return { view: 'mesh', params: {} };
     case 'pillar':
       return { view: 'pillar', params: { pillar: rest[0] } };
     case 'module':
@@ -161,6 +163,7 @@ function updateNavHighlight(view) {
     'ops': 'ops',
     'framework': 'framework',
     'configuration': 'configuration',
+    'mesh': 'mesh',
     'pillar': 'dashboard',  // Pillar views don't highlight nav
     'module': 'dashboard'   // Module views don't highlight nav
   };
@@ -194,6 +197,9 @@ function switchView(view, params = {}) {
       break;
     case 'configuration':
       renderConfigurationView();
+      break;
+    case 'mesh':
+      renderMeshView();
       break;
     case 'pillar':
       if (params.pillar) {
@@ -1475,6 +1481,220 @@ function stopAutoRefresh() {
     clearInterval(refreshTimer);
     refreshTimer = null;
   }
+}
+
+// ========================================
+// Service Mesh View
+// ========================================
+
+async function fetchMeshData() {
+  try {
+    const response = await fetch('api/status/service-mesh');
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return await response.json();
+  } catch (error) {
+    console.error('Failed to fetch mesh data:', error);
+    return null;
+  }
+}
+
+async function renderMeshView() {
+  const meshData = await fetchMeshData();
+
+  if (!meshData || !meshData.enabled) {
+    renderMeshDisabled();
+    return;
+  }
+
+  renderMeshOverview(meshData);
+  renderMeshServices(meshData);
+}
+
+function renderMeshDisabled() {
+  const statsGrid = document.getElementById('mesh-stats-grid');
+  const servicesGrid = document.getElementById('services-grid');
+  const subtitle = document.getElementById('mesh-subtitle');
+
+  if (subtitle) {
+    subtitle.textContent = 'Service mesh not enabled';
+  }
+
+  if (statsGrid) {
+    statsGrid.innerHTML = '<div class="empty-state">Service Mesh is not enabled or no services are registered.</div>';
+  }
+
+  if (servicesGrid) {
+    servicesGrid.innerHTML = '';
+  }
+}
+
+function renderMeshOverview(meshData) {
+  const statsGrid = document.getElementById('mesh-stats-grid');
+  const subtitle = document.getElementById('mesh-subtitle');
+
+  if (!statsGrid) return;
+
+  if (subtitle) {
+    subtitle.textContent = `Orchestrator: ${meshData.orchestratorChannel || 'N/A'}`;
+  }
+
+  const healthyPercent = meshData.totalInstancesCount > 0
+    ? Math.round((meshData.healthyInstancesCount / meshData.totalInstancesCount) * 100)
+    : 0;
+
+  statsGrid.innerHTML = `
+    <div class="mesh-stat-card">
+      <div class="mesh-stat-icon">🕸️</div>
+      <div class="mesh-stat-content">
+        <div class="mesh-stat-value">${meshData.totalServicesCount}</div>
+        <div class="mesh-stat-label">Services</div>
+      </div>
+    </div>
+    <div class="mesh-stat-card">
+      <div class="mesh-stat-icon">📦</div>
+      <div class="mesh-stat-content">
+        <div class="mesh-stat-value">${meshData.totalInstancesCount}</div>
+        <div class="mesh-stat-label">Total Instances</div>
+      </div>
+    </div>
+    <div class="mesh-stat-card status-healthy">
+      <div class="mesh-stat-icon">✓</div>
+      <div class="mesh-stat-content">
+        <div class="mesh-stat-value">${meshData.healthyInstancesCount}</div>
+        <div class="mesh-stat-label">Healthy (${healthyPercent}%)</div>
+      </div>
+    </div>
+    <div class="mesh-stat-card status-degraded">
+      <div class="mesh-stat-icon">⚠</div>
+      <div class="mesh-stat-content">
+        <div class="mesh-stat-value">${meshData.degradedInstancesCount}</div>
+        <div class="mesh-stat-label">Degraded</div>
+      </div>
+    </div>
+    <div class="mesh-stat-card status-unhealthy">
+      <div class="mesh-stat-icon">✗</div>
+      <div class="mesh-stat-content">
+        <div class="mesh-stat-value">${meshData.unhealthyInstancesCount}</div>
+        <div class="mesh-stat-label">Unhealthy</div>
+      </div>
+    </div>
+  `;
+}
+
+function renderMeshServices(meshData) {
+  const servicesGrid = document.getElementById('services-grid');
+  if (!servicesGrid) return;
+
+  if (!meshData.services || meshData.services.length === 0) {
+    servicesGrid.innerHTML = '<div class="empty-state">No services discovered</div>';
+    return;
+  }
+
+  servicesGrid.innerHTML = meshData.services.map(service => `
+    <div class="service-card">
+      <div class="service-card-header">
+        <div class="service-title-group">
+          <h4 class="service-name">${escapeHtml(service.displayName)}</h4>
+          <span class="service-id">${escapeHtml(service.serviceId)}</span>
+        </div>
+        <div class="service-health-badges">
+          ${service.health.healthy > 0 ? `<span class="health-badge healthy">${service.health.healthy} ✓</span>` : ''}
+          ${service.health.degraded > 0 ? `<span class="health-badge degraded">${service.health.degraded} ⚠</span>` : ''}
+          ${service.health.unhealthy > 0 ? `<span class="health-badge unhealthy">${service.health.unhealthy} ✗</span>` : ''}
+        </div>
+      </div>
+
+      ${service.description ? `<div class="service-description">${escapeHtml(service.description)}</div>` : ''}
+
+      <div class="service-meta">
+        <div class="service-meta-item">
+          <span class="meta-label">Instances:</span>
+          <span class="meta-value">${service.instanceCount}</span>
+        </div>
+        <div class="service-meta-item">
+          <span class="meta-label">Load Balancing:</span>
+          <span class="meta-value">${escapeHtml(service.loadBalancing.policy)}</span>
+        </div>
+        ${service.avgResponseTime ? `
+        <div class="service-meta-item">
+          <span class="meta-label">Avg Response:</span>
+          <span class="meta-value">${formatDuration(service.avgResponseTime)}</span>
+        </div>
+        ` : ''}
+      </div>
+
+      ${service.capabilities && service.capabilities.length > 0 ? `
+      <div class="service-capabilities">
+        <span class="capabilities-label">Capabilities:</span>
+        ${service.capabilities.map(cap => `<span class="capability-badge">${escapeHtml(cap)}</span>`).join('')}
+      </div>
+      ` : ''}
+
+      <div class="service-instances">
+        ${service.instances.map(instance => renderServiceInstance(instance)).join('')}
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderServiceInstance(instance) {
+  const statusClass = instance.status.toLowerCase();
+  const statusIcon = instance.status === 'Healthy' ? '✓' :
+                     instance.status === 'Degraded' ? '⚠' : '✗';
+
+  return `
+    <div class="instance-row status-${statusClass}">
+      <div class="instance-main">
+        <div class="instance-status-icon">${statusIcon}</div>
+        <div class="instance-info">
+          <div class="instance-id">${escapeHtml(instance.instanceId)}</div>
+          <div class="instance-endpoint">
+            <a href="${escapeHtml(instance.httpEndpoint)}" target="_blank" rel="noopener">
+              ${escapeHtml(instance.httpEndpoint)}
+            </a>
+          </div>
+        </div>
+      </div>
+      <div class="instance-stats">
+        <div class="instance-stat">
+          <span class="stat-label">Last Seen:</span>
+          <span class="stat-value">${escapeHtml(instance.timeSinceLastSeen)}</span>
+        </div>
+        <div class="instance-stat">
+          <span class="stat-label">Connections:</span>
+          <span class="stat-value">${instance.activeConnections}</span>
+        </div>
+        <div class="instance-stat">
+          <span class="stat-label">Response:</span>
+          <span class="stat-value">${escapeHtml(instance.averageResponseTime)}</span>
+        </div>
+        <div class="instance-stat">
+          <span class="stat-label">Mode:</span>
+          <span class="stat-value">${escapeHtml(instance.deploymentMode)}</span>
+        </div>
+        ${instance.containerId ? `
+        <div class="instance-stat">
+          <span class="stat-label">Container:</span>
+          <span class="stat-value" title="${escapeHtml(instance.containerId)}">${escapeHtml(instance.containerId.substring(0, 12))}</span>
+        </div>
+        ` : ''}
+      </div>
+    </div>
+  `;
+}
+
+function formatDuration(timeSpan) {
+  // timeSpan is like { ticks: 123456, days: 0, hours: 0, ... }
+  if (!timeSpan) return 'N/A';
+
+  const totalMs = timeSpan.totalMilliseconds || 0;
+  if (totalMs < 1) return `${Math.round(totalMs * 1000)}μs`;
+  if (totalMs < 1000) return `${Math.round(totalMs)}ms`;
+  if (totalMs < 60000) return `${(totalMs / 1000).toFixed(2)}s`;
+
+  const minutes = Math.floor(totalMs / 60000);
+  const seconds = Math.round((totalMs % 60000) / 1000);
+  return `${minutes}m ${seconds}s`;
 }
 
 // ========================================

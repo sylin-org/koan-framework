@@ -64,6 +64,10 @@
             <span class="nav-icon">⚙️</span>
             <span class="nav-label">Configuration</span>
           </a>
+          <a href="#/mesh" class="nav-item" data-nav="mesh">
+            <span class="nav-icon">🕸️</span>
+            <span class="nav-label">Service Mesh</span>
+          </a>
         </nav>
 
         <!-- Pillar Accordion -->
@@ -353,6 +357,46 @@
                 </div>
               </section>
             </div>
+          </div>
+
+          <!-- Service Mesh View -->
+          <div class="view mesh-view" id="mesh-view">
+            <div class="view-header">
+              <div class="view-title-group">
+                <h2 class="view-title">Service Mesh</h2>
+                <p class="view-subtitle">Microservice discovery, health monitoring, and load balancing</p>
+              </div>
+            </div>
+
+            <!-- Mesh Overview Panel -->
+            <section class="panel mesh-overview-panel">
+              <header class="panel-header">
+                <div>
+                  <h3>Mesh Overview</h3>
+                  <p class="panel-subtitle" id="mesh-subtitle">Orchestrator channel and instance health</p>
+                </div>
+              </header>
+              <div class="panel-body">
+                <div class="mesh-stats-grid" id="mesh-stats-grid">
+                  <!-- Dynamically populated -->
+                </div>
+              </div>
+            </section>
+
+            <!-- Services Grid -->
+            <section class="panel services-panel">
+              <header class="panel-header">
+                <div>
+                  <h3>Discovered Services</h3>
+                  <p class="panel-subtitle">Active services and their instances</p>
+                </div>
+              </header>
+              <div class="panel-body">
+                <div class="services-grid" id="services-grid">
+                  <!-- Dynamically populated -->
+                </div>
+              </div>
+            </section>
           </div>
 
           <!-- Pillar View -->
