@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PolyglotShop - AI Translation Service</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <div class="header-brand">
+                    <i class="fas fa-language"></i>
+                    <h1>PolyglotShop</h1>
+                </div>
+                <div class="header-subtitle">
+                    AI-Powered Translation Service
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="container">
+            <!-- Translation Card -->
+            <div class="card">
+                <div class="card-header">
+                    <h2><i class="fas fa-globe"></i> Translate Text</h2>
+                </div>
+                <div class="card-body">
+                    <!-- Language Selection -->
+                    <div class="language-selection">
+                        <div class="form-group">
+                            <label for="sourceLanguage">
+                                <i class="fas fa-arrow-right"></i> Source Language
+                            </label>
+                            <select id="sourceLanguage" class="form-select">
+                                <option value="auto">Auto-detect</option>
+                            </select>
+                        </div>
+
+                        <button id="swapLanguages" class="btn-swap" title="Swap languages">
+                            <i class="fas fa-exchange-alt"></i>
+                        </button>
+
+                        <div class="form-group">
+                            <label for="targetLanguage">
+                                <i class="fas fa-arrow-left"></i> Target Language
+                            </label>
+                            <select id="targetLanguage" class="form-select">
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Text Areas -->
+                    <div class="translation-area">
+                        <div class="text-panel">
+                            <div class="panel-header">
+                                <span class="panel-title">Original Text</span>
+                                <span id="sourceCharCount" class="char-count">0 characters</span>
+                            </div>
+                            <textarea
+                                id="sourceText"
+                                class="text-input"
+                                placeholder="Enter text to translate..."
+                                rows="8"
+                            ></textarea>
+                            <div class="panel-footer">
+                                <button id="clearBtn" class="btn-secondary">
+                                    <i class="fas fa-times"></i> Clear
+                                </button>
+                                <button id="translateBtn" class="btn-primary" disabled>
+                                    <i class="fas fa-language"></i> Translate
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="text-panel">
+                            <div class="panel-header">
+                                <span class="panel-title">Translation</span>
+                                <button id="copyBtn" class="btn-icon" title="Copy to clipboard" style="display: none;">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </div>
+                            <textarea
+                                id="targetText"
+                                class="text-input"
+                                placeholder="Translation will appear here..."
+                                rows="8"
+                                readonly
+                            ></textarea>
+                            <div class="panel-footer">
+                                <div id="translationInfo" class="translation-info"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Examples -->
+            <div class="card">
+                <div class="card-header">
+                    <h3><i class="fas fa-lightbulb"></i> Quick Examples</h3>
+                </div>
+                <div class="card-body">
+                    <div class="examples-grid">
+                        <button class="example-btn" data-text="Hello, how are you?" data-target="es">
+                            <i class="fas fa-comment"></i>
+                            <span>Greeting (EN → ES)</span>
+                        </button>
+                        <button class="example-btn" data-text="Thank you for your purchase" data-target="fr">
+                            <i class="fas fa-shopping-cart"></i>
+                            <span>E-commerce (EN → FR)</span>
+                        </button>
+                        <button class="example-btn" data-text="Your order has been shipped" data-target="de">
+                            <i class="fas fa-shipping-fast"></i>
+                            <span>Shipping (EN → DE)</span>
+                        </button>
+                        <button class="example-btn" data-text="Product description and specifications" data-target="ja">
+                            <i class="fas fa-box"></i>
+                            <span>Product (EN → JA)</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Service Info -->
+            <div class="card">
+                <div class="card-header">
+                    <h3><i class="fas fa-info-circle"></i> About This Service</h3>
+                </div>
+                <div class="card-body">
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <i class="fas fa-server"></i>
+                            <div>
+                                <strong>Architecture</strong>
+                                <p>Koan Services with UDP multicast discovery</p>
+                            </div>
+                        </div>
+                        <div class="info-item">
+                            <i class="fas fa-robot"></i>
+                            <div>
+                                <strong>AI Powered</strong>
+                                <p>Uses Ollama for accurate translations</p>
+                            </div>
+                        </div>
+                        <div class="info-item">
+                            <i class="fas fa-network-wired"></i>
+                            <div>
+                                <strong>Service Mesh</strong>
+                                <p>Automatic discovery and load balancing</p>
+                            </div>
+                        </div>
+                        <div class="info-item">
+                            <i class="fas fa-code"></i>
+                            <div>
+                                <strong>Entity-First</strong>
+                                <p>Simple Translation.Translate() API</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <p>
+                <i class="fas fa-code"></i> Built with <strong>Koan Framework</strong>
+                | Sample S8.PolyglotShop
+            </p>
+        </div>
+    </footer>
+
+    <!-- Toast Container -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay" style="display: none;">
+        <div class="loading-spinner">
+            <i class="fas fa-circle-notch fa-spin"></i>
+            <p>Translating...</p>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="/js/constants.js"></script>
+    <script src="/js/api.js"></script>
+    <script src="/js/toasts.js"></script>
+    <script src="/js/main.js"></script>
+    <script src="/js/index.page.js"></script>
+</body>
+</html>

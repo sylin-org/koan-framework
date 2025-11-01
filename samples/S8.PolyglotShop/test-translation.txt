@@ -1,0 +1,7 @@
+Hello! Welcome to PolyglotShop.
+
+This is a test file to demonstrate the drag-and-drop translation feature.
+
+You can drop .txt or .md files directly onto the Original Text area, and the content will be automatically loaded and translated.
+
+This makes it easy to translate documents, README files, or any text content without having to manually copy and paste.
