@@ -1772,8 +1772,8 @@ h1, h2, h3, h4, h5, h6 {
   align-items: center;
   gap: 1rem;
   padding: 1.25rem;
-  background: var(--surface-raised);
-  border: 1px solid var(--border-subtle);
+  background: var(--surface-elevated);
+  border: 1px solid var(--border-soft);
   border-radius: 12px;
   transition: all 0.2s ease;
 }
@@ -1839,19 +1839,19 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .service-card {
-  background: var(--surface-raised);
-  border: 1px solid var(--border-subtle);
-  border-radius: 12px;
+  background: var(--surface-elevated);
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-lg);
   overflow: hidden;
-  transition: all 0.2s ease;
+  transition: all var(--transition-fast);
   display: flex;
   flex-direction: column;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  box-shadow: var(--shadow-soft);
 }
 
 .service-card:hover {
-  border-color: var(--border-default);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-medium);
   transform: translateY(-1px);
 }
 
@@ -1864,8 +1864,8 @@ h1, h2, h3, h4, h5, h6 {
   justify-content: space-between;
   align-items: flex-start;
   padding: 1.25rem 1.5rem;
-  border-bottom: 1px solid var(--border-subtle);
-  background: var(--surface-base);
+  border-bottom: 1px solid var(--border-soft);
+  background: var(--surface-panel);
 }
 
 .service-title-group {
@@ -1883,7 +1883,7 @@ h1, h2, h3, h4, h5, h6 {
   font-size: 0.875rem;
   font-family: var(--font-mono);
   color: var(--text-secondary);
-  background: var(--surface-sunken);
+  background: var(--surface-layer);
   padding: 0.125rem 0.5rem;
   border-radius: 4px;
 }
@@ -1923,8 +1923,8 @@ h1, h2, h3, h4, h5, h6 {
   padding: 1rem 1.5rem;
   color: var(--text-secondary);
   font-size: 0.9rem;
-  border-bottom: 1px solid var(--border-subtle);
-  background: var(--surface-base);
+  border-bottom: 1px solid var(--border-soft);
+  background: var(--surface-panel);
 }
 
 .service-meta {
@@ -1932,8 +1932,8 @@ h1, h2, h3, h4, h5, h6 {
   flex-wrap: wrap;
   gap: 1.5rem;
   padding: 1rem 1.5rem;
-  background: var(--surface-sunken);
-  border-bottom: 1px solid var(--border-subtle);
+  background: var(--surface-layer);
+  border-bottom: 1px solid var(--border-soft);
 }
 
 .service-meta-item {
@@ -1958,8 +1958,8 @@ h1, h2, h3, h4, h5, h6 {
   align-items: center;
   gap: 0.5rem;
   padding: 1rem 1.5rem;
-  background: var(--surface-base);
-  border-bottom: 1px solid var(--border-subtle);
+  background: var(--surface-panel);
+  border-bottom: 1px solid var(--border-soft);
 }
 
 .capabilities-label {
@@ -1973,7 +1973,7 @@ h1, h2, h3, h4, h5, h6 {
 .capability-badge {
   font-size: 0.8rem;
   font-family: var(--font-mono);
-  background: var(--surface-raised);
+  background: var(--surface-elevated);
   color: var(--text-primary);
   padding: 0.25rem 0.75rem;
   border-radius: 6px;
@@ -1990,7 +1990,7 @@ h1, h2, h3, h4, h5, h6 {
   justify-content: space-between;
   align-items: center;
   padding: 1rem 1.5rem;
-  border-bottom: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-soft);
   transition: background 0.2s ease;
 }
 
@@ -2127,8 +2127,8 @@ h1, h2, h3, h4, h5, h6 {
 /* Service Configuration Details (collapsible) */
 .service-config-details {
   padding: 0;
-  border-top: 1px solid var(--border-subtle);
-  background: var(--surface-sunken);
+  border-top: 1px solid var(--border-soft);
+  background: var(--surface-layer);
 }
 
 .service-config-summary {
@@ -2167,7 +2167,7 @@ h1, h2, h3, h4, h5, h6 {
 
 .service-config-content {
   padding: 1rem 1.5rem;
-  border-top: 1px solid var(--border-subtle);
+  border-top: 1px solid var(--border-soft);
 }
 
 /* Instance Channel Endpoint */
@@ -2190,8 +2190,8 @@ h1, h2, h3, h4, h5, h6 {
 /* Health Distribution Visualization */
 .service-health-distribution {
   padding: 1rem 1.5rem;
-  background: var(--surface-sunken);
-  border-top: 1px solid var(--border-subtle);
+  background: var(--surface-layer);
+  border-top: 1px solid var(--border-soft);
 }
 
 .health-dist-header {
@@ -2209,11 +2209,11 @@ h1, h2, h3, h4, h5, h6 {
 .health-progress-bar {
   display: flex;
   height: 24px;
-  background: var(--surface-base);
+  background: var(--surface-panel);
   border-radius: 6px;
   overflow: hidden;
   margin-bottom: 0.75rem;
-  border: 1px solid var(--border-subtle);
+  border: 1px solid var(--border-soft);
 }
 
 .health-segment {
@@ -2267,8 +2267,8 @@ h1, h2, h3, h4, h5, h6 {
 /* Service Capacity Metrics */
 .service-capacity-metrics {
   padding: 1rem 1.5rem;
-  background: var(--surface-base);
-  border-top: 1px solid var(--border-subtle);
+  background: var(--surface-panel);
+  border-top: 1px solid var(--border-soft);
 }
 
 .capacity-header {
@@ -2360,9 +2360,9 @@ h1, h2, h3, h4, h5, h6 {
   align-items: center;
   gap: 0.5rem;
   padding: 0.5rem 0.75rem;
-  background: var(--surface-sunken);
+  background: var(--surface-layer);
   border-radius: 8px;
-  border: 1px solid var(--border-subtle);
+  border: 1px solid var(--border-soft);
 }
 
 .stat-icon {
@@ -2395,10 +2395,10 @@ h1, h2, h3, h4, h5, h6 {
 .health-bar-compact {
   display: flex;
   height: 8px;
-  background: var(--surface-base);
+  background: var(--surface-panel);
   border-radius: 4px;
   overflow: hidden;
-  border: 1px solid var(--border-subtle);
+  border: 1px solid var(--border-soft);
 }
 
 /* Compact Capabilities */
@@ -2411,7 +2411,7 @@ h1, h2, h3, h4, h5, h6 {
 .capability-tag {
   font-size: 0.7rem;
   font-family: var(--font-mono);
-  background: var(--surface-sunken);
+  background: var(--surface-layer);
   color: var(--text-primary);
   padding: 0.25rem 0.625rem;
   border-radius: 6px;
@@ -2422,7 +2422,7 @@ h1, h2, h3, h4, h5, h6 {
 /* Details Toggle */
 .service-details-toggle {
   margin-top: 0.5rem;
-  border-top: 1px solid var(--border-subtle);
+  border-top: 1px solid var(--border-soft);
   padding-top: 0.75rem;
 }
 
@@ -2477,9 +2477,9 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .instance-compact {
-  background: var(--surface-sunken);
+  background: var(--surface-layer);
   border-radius: 8px;
-  border: 1px solid var(--border-subtle);
+  border: 1px solid var(--border-soft);
   padding: 0.75rem;
   transition: all 0.2s ease;
 }
@@ -2590,10 +2590,10 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .detail-section {
-  background: var(--surface-sunken);
+  background: var(--surface-layer);
   border-radius: 8px;
   padding: 0.875rem;
-  border: 1px solid var(--border-subtle);
+  border: 1px solid var(--border-soft);
 }
 
 .detail-section-title {
