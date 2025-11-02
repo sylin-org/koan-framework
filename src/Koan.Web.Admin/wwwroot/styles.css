@@ -1846,11 +1846,13 @@ h1, h2, h3, h4, h5, h6 {
   transition: all 0.2s ease;
   display: flex;
   flex-direction: column;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
 .service-card:hover {
   border-color: var(--border-default);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  transform: translateY(-1px);
 }
 
 .service-card.compact {
@@ -1861,7 +1863,7 @@ h1, h2, h3, h4, h5, h6 {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  padding: 1.5rem;
+  padding: 1.25rem 1.5rem;
   border-bottom: 1px solid var(--border-subtle);
   background: var(--surface-base);
 }
