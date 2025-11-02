@@ -1637,35 +1637,20 @@ function renderMeshConfiguration(meshData) {
 }
 
 function renderMeshServices(meshData) {
-  // Find the services panel and replace it with individual service cards
+  // Find the services panel and replace it with grid of service cards
   const servicesPanel = document.querySelector('.services-panel');
   if (!servicesPanel) return;
 
   if (!meshData.services || meshData.services.length === 0) {
-    servicesPanel.innerHTML = `
-      <header class="panel-header">
-        <div>
-          <h3>Discovered Services</h3>
-          <p class="panel-subtitle">No services discovered</p>
-        </div>
-      </header>
-      <div class="panel-body">
-        <div class="empty-state">No services found in the mesh</div>
-      </div>
-    `;
+    servicesPanel.innerHTML = '<div class="empty-state">No services discovered</div>';
+    servicesPanel.style.padding = '2rem';
     return;
   }
 
-  // Create a section header + grid container
-  const servicesSection = document.createElement('div');
-  servicesSection.className = 'services-section';
-  servicesSection.innerHTML = `
-    <div class="section-header">
-      <h3 class="section-title">Discovered Services</h3>
-      <p class="section-subtitle">${meshData.services.length} service${meshData.services.length !== 1 ? 's' : ''} active in the mesh</p>
-    </div>
-    <div class="services-grid">
-      ${meshData.services.map(service => `
+  // Create grid container directly (no section wrapper)
+  const servicesGrid = document.createElement('div');
+  servicesGrid.className = 'services-grid';
+  servicesGrid.innerHTML = meshData.services.map(service => `
     <div class="service-card compact">
       <div class="service-card-header">
         <div class="service-title-group">
@@ -1786,12 +1771,10 @@ function renderMeshServices(meshData) {
         </details>
       </div>
     </div>
-      `).join('')}
-    </div>
-  `;
+  `).join('');
 
-  // Replace the panel with the new section
-  servicesPanel.parentNode.replaceChild(servicesSection, servicesPanel);
+  // Replace the panel with just the grid
+  servicesPanel.parentNode.replaceChild(servicesGrid, servicesPanel);
 }
 
 function renderCompactInstance(instance) {
