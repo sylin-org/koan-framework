@@ -1699,7 +1699,7 @@ function renderMeshServices(meshData) {
           <div class="quick-stat">
             <span class="stat-icon">⚡</span>
             <div class="stat-info">
-              <span class="stat-value">${service.capacity.utilizationPercent}%</span>
+              <span class="stat-value">${service.capacity.capacityUtilizationPercent}%</span>
               <span class="stat-label">utilization</span>
             </div>
           </div>

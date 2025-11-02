@@ -1852,6 +1852,16 @@ h1, h2, h3, h4, h5, h6 {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(450px, 1fr));
   gap: 1.25rem;
+  max-width: 100%;
+}
+
+/* Limit width when only 1-2 services */
+.services-grid:has(.service-card:only-child) {
+  grid-template-columns: minmax(450px, 600px);
+}
+
+.services-grid:has(.service-card:nth-child(2):last-child) {
+  grid-template-columns: repeat(2, minmax(450px, 600px));
 }
 
 .service-card {
