@@ -1,7 +1,7 @@
-using Koan.Services.Abstractions;
-using Koan.Services.Execution;
-using Koan.Services.Translation;
-using Koan.Services.Translation.Models;
+using Koan.ServiceMesh.Abstractions;
+using Koan.ServiceMesh.Execution;
+using Koan.Service.Translation;
+using Koan.Service.Translation.Models;
 using Microsoft.AspNetCore.Mvc;
 
 namespace S8.PolyglotShop.Controllers;

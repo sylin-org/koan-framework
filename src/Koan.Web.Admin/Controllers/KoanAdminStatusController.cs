@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 using Koan.Admin.Contracts;
 using Koan.Admin.Services;
 using Koan.Core;
-using Koan.Services.Abstractions;
+using Koan.ServiceMesh.Abstractions;
 using Koan.Web.Admin.Contracts;
 using Koan.Web.Admin.Infrastructure;
 using Microsoft.AspNetCore.Authorization;

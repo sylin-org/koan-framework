@@ -1,4 +1,4 @@
-using Koan.Services.Abstractions;
+using Koan.ServiceMesh.Abstractions;
 using Koan.Web.Admin.Contracts;
 using Microsoft.Extensions.DependencyInjection;
 

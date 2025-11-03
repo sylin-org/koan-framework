@@ -11,7 +11,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Koan.Admin\Koan.Admin.csproj" />
-    <ProjectReference Include="..\Koan.Services.Abstractions\Koan.Services.Abstractions.csproj" />
+    <ProjectReference Include="..\Koan.ServiceMesh.Abstractions\Koan.ServiceMesh.Abstractions.csproj" />
     <ProjectReference Include="..\Koan.Web\Koan.Web.csproj" />
   </ItemGroup>
   <ItemGroup>
