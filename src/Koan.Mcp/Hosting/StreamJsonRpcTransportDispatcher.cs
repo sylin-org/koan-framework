@@ -53,7 +53,7 @@ public sealed class StreamJsonRpcTransportDispatcher : IMcpTransportDispatcher
             completionSource.TrySetCanceled(cancellationToken);
         });
 
-        await completionSource.Task.ConfigureAwait(false);
+        await completionSource.Task;
     }
 }
 

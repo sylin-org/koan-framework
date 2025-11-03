@@ -106,8 +106,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             ? ProvenanceModes.FromBootSource(BootSettingSource.Auto, usedDefault: true)
             : ProvenanceModes.FromConfigurationValue(connection);
 
-        Publish(
-            module,
+        module.PublishConfigValue(
             OllamaItems.ConnectionString,
             connection,
             displayOverride: effectiveConnection,
@@ -121,11 +120,11 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             baseUrlDisplay = effectiveConnection;
         }
 
-        Publish(module, OllamaItems.BaseUrl, baseUrl, displayOverride: baseUrlDisplay);
-        Publish(module, OllamaItems.DefaultModel, defaultModel);
-        Publish(module, OllamaItems.AutoDownloadModels, autoDownload, sanitizeOverride: false);
-        Publish(module, OllamaItems.DefaultPageSize, defaultPageSize);
-        Publish(module, OllamaItems.MaxPageSize, maxPageSize);
+        module.PublishConfigValue(OllamaItems.BaseUrl, baseUrl, displayOverride: baseUrlDisplay);
+        module.PublishConfigValue(OllamaItems.DefaultModel, defaultModel);
+        module.PublishConfigValue(OllamaItems.AutoDownloadModels, autoDownload, sanitizeOverride: false);
+        module.PublishConfigValue(OllamaItems.DefaultPageSize, defaultPageSize);
+        module.PublishConfigValue(OllamaItems.MaxPageSize, maxPageSize);
     }
 
     private static Dictionary<string, object>? BuildDiscoveryParameters(string? defaultModel, bool autoDownload)
@@ -151,25 +150,6 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 
         var port = Infrastructure.Constants.Discovery.DefaultPort;
         return $"http://localhost:{port}";
-    }
-
-    private static void Publish<T>(
-        ProvenanceModuleWriter module,
-        ProvenanceItem item,
-        ConfigurationValue<T> value,
-        object? displayOverride = null,
-        ProvenancePublicationMode? modeOverride = null,
-        bool? usedDefaultOverride = null,
-        string? sourceKeyOverride = null,
-        bool? sanitizeOverride = null)
-    {
-        module.AddSetting(
-            item,
-            modeOverride ?? ProvenanceModes.FromConfigurationValue(value),
-            displayOverride ?? value.Value,
-            sourceKey: sourceKeyOverride ?? value.ResolvedKey,
-            usedDefault: usedDefaultOverride ?? value.UsedDefault,
-            sanitizeOverride: sanitizeOverride);
     }
 }
 

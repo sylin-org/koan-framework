@@ -57,7 +57,7 @@ internal sealed class JobProgressBroker
         foreach (var subscription in targets)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            await subscription.InvokeAsync(update).ConfigureAwait(false);
+            await subscription.InvokeAsync(update);
         }
     }
 

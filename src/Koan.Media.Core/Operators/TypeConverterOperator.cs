@@ -51,7 +51,7 @@ public sealed class TypeConverterOperator : IMediaOperator
         Image image;
         try
         {
-            image = await Image.LoadAsync(source, ct).ConfigureAwait(false);
+            image = await Image.LoadAsync(source, ct);
         }
         catch (Exception ex)
         {
@@ -65,15 +65,15 @@ public sealed class TypeConverterOperator : IMediaOperator
         {
             case "jpg" or "jpeg":
                 var encJpeg = new JpegEncoder { Quality = q ?? 82 };
-                await image.SaveAsJpegAsync(destination, encJpeg, ct).ConfigureAwait(false);
+                await image.SaveAsJpegAsync(destination, encJpeg, ct);
                 return ("image/jpeg", destination.CanSeek ? destination.Length : 0);
             case "png":
                 var encPng = new PngEncoder();
-                await image.SaveAsPngAsync(destination, encPng, ct).ConfigureAwait(false);
+                await image.SaveAsPngAsync(destination, encPng, ct);
                 return ("image/png", destination.CanSeek ? destination.Length : 0);
             case "webp":
                 var encWebp = new WebpEncoder { Quality = q ?? 82 };
-                await image.SaveAsWebpAsync(destination, encWebp, ct).ConfigureAwait(false);
+                await image.SaveAsWebpAsync(destination, encWebp, ct);
                 return ("image/webp", destination.CanSeek ? destination.Length : 0);
             default:
                 throw new NotSupportedException($"Unsupported format '{fmt}'.");

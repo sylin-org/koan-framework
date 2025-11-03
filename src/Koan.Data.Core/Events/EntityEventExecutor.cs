@@ -14,7 +14,7 @@ internal static class EntityEventExecutor<TEntity, TKey>
     {
         if (loader == null) throw new ArgumentNullException(nameof(loader));
 
-        var entity = await loader(cancellationToken).ConfigureAwait(false);
+        var entity = await loader(cancellationToken);
         if (entity is null)
         {
             return null;
@@ -27,17 +27,17 @@ internal static class EntityEventExecutor<TEntity, TKey>
 
         var state = new EntityEventOperationState();
         var context = new EntityEventContext<TEntity>(entity, EntityEventOperation.Load, EntityEventPrior<TEntity>.Empty, state, cancellationToken);
-        await RunSetupAsync(context).ConfigureAwait(false);
+        await RunSetupAsync(context);
         context.CaptureProtectionSnapshot();
 
-        var before = await RunBeforeAsync(context, EntityEventOperation.Load).ConfigureAwait(false);
+        var before = await RunBeforeAsync(context, EntityEventOperation.Load);
         if (before.IsCancelled)
         {
             throw new EntityEventCancelledException(EntityEventOperation.Load, before.Reason!, before.Code);
         }
 
         context.ValidateProtection();
-        await RunAfterAsync(context, EntityEventOperation.Load).ConfigureAwait(false);
+        await RunAfterAsync(context, EntityEventOperation.Load);
         context.ValidateProtection();
         return context.Current;
     }
@@ -48,7 +48,7 @@ internal static class EntityEventExecutor<TEntity, TKey>
     {
         if (loader == null) throw new ArgumentNullException(nameof(loader));
 
-        var entities = await loader(cancellationToken).ConfigureAwait(false);
+        var entities = await loader(cancellationToken);
 
         if (!EntityEventRegistry<TEntity, TKey>.HasLoadPipeline)
         {
@@ -68,17 +68,17 @@ internal static class EntityEventExecutor<TEntity, TKey>
 
             var state = new EntityEventOperationState();
             var context = new EntityEventContext<TEntity>(entity, EntityEventOperation.Load, EntityEventPrior<TEntity>.Empty, state, cancellationToken);
-            await RunSetupAsync(context).ConfigureAwait(false);
+            await RunSetupAsync(context);
             context.CaptureProtectionSnapshot();
 
-            var before = await RunBeforeAsync(context, EntityEventOperation.Load).ConfigureAwait(false);
+            var before = await RunBeforeAsync(context, EntityEventOperation.Load);
             if (before.IsCancelled)
             {
                 throw new EntityEventCancelledException(EntityEventOperation.Load, before.Reason!, before.Code);
             }
 
             context.ValidateProtection();
-            await RunAfterAsync(context, EntityEventOperation.Load).ConfigureAwait(false);
+            await RunAfterAsync(context, EntityEventOperation.Load);
             context.ValidateProtection();
             results[i] = context.Current;
         }
@@ -94,17 +94,17 @@ internal static class EntityEventExecutor<TEntity, TKey>
     {
         if (!EntityEventRegistry<TEntity, TKey>.HasUpsertPipeline)
         {
-            return await persist(entity, cancellationToken).ConfigureAwait(false);
+            return await persist(entity, cancellationToken);
         }
 
         var state = new EntityEventOperationState();
         var prior = new EntityEventPrior<TEntity>(priorLoader);
         var context = new EntityEventContext<TEntity>(entity, EntityEventOperation.Upsert, prior, state, cancellationToken);
 
-        await RunSetupAsync(context).ConfigureAwait(false);
+        await RunSetupAsync(context);
         context.CaptureProtectionSnapshot();
 
-        var before = await RunBeforeAsync(context, EntityEventOperation.Upsert).ConfigureAwait(false);
+        var before = await RunBeforeAsync(context, EntityEventOperation.Upsert);
         if (before.IsCancelled)
         {
             throw new EntityEventCancelledException(EntityEventOperation.Upsert, before.Reason!, before.Code);
@@ -112,10 +112,10 @@ internal static class EntityEventExecutor<TEntity, TKey>
 
         context.ValidateProtection();
 
-        var persisted = await persist(context.Current, cancellationToken).ConfigureAwait(false);
+        var persisted = await persist(context.Current, cancellationToken);
         context.UpdateCurrent(persisted);
 
-        await RunAfterAsync(context, EntityEventOperation.Upsert).ConfigureAwait(false);
+        await RunAfterAsync(context, EntityEventOperation.Upsert);
         context.ValidateProtection();
 
         return context.Current;
@@ -129,7 +129,7 @@ internal static class EntityEventExecutor<TEntity, TKey>
     {
         if (!EntityEventRegistry<TEntity, TKey>.HasUpsertPipeline)
         {
-            return await persist(entities, cancellationToken).ConfigureAwait(false);
+            return await persist(entities, cancellationToken);
         }
 
         var outcomes = new List<EntityOutcome>();
@@ -145,10 +145,10 @@ internal static class EntityEventExecutor<TEntity, TKey>
             var prior = new EntityEventPrior<TEntity>(ct => priorLoader(entity, ct));
             var context = new EntityEventContext<TEntity>(entity, EntityEventOperation.Upsert, prior, state, cancellationToken);
 
-            await RunSetupAsync(context).ConfigureAwait(false);
+            await RunSetupAsync(context);
             context.CaptureProtectionSnapshot();
 
-            var result = await RunBeforeAsync(context, EntityEventOperation.Upsert).ConfigureAwait(false);
+            var result = await RunBeforeAsync(context, EntityEventOperation.Upsert);
             if (result.IsCancelled)
             {
                 outcomes.Add(new EntityOutcome(GetEntityKey(entity), EntityEventOperation.Upsert, result));
@@ -174,12 +174,12 @@ internal static class EntityEventExecutor<TEntity, TKey>
         }
 
         var persistedCount = payload.Count > 0
-            ? await persist(payload, cancellationToken).ConfigureAwait(false)
+            ? await persist(payload, cancellationToken)
             : 0;
 
         foreach (var context in executingContexts)
         {
-            await RunAfterAsync(context, EntityEventOperation.Upsert).ConfigureAwait(false);
+            await RunAfterAsync(context, EntityEventOperation.Upsert);
             context.ValidateProtection();
         }
 
@@ -194,12 +194,12 @@ internal static class EntityEventExecutor<TEntity, TKey>
     {
         if (!EntityEventRegistry<TEntity, TKey>.HasRemovePipeline)
         {
-            var entity = await loader(cancellationToken).ConfigureAwait(false);
+            var entity = await loader(cancellationToken);
             if (entity is null) return false;
-            return await remover(entity, cancellationToken).ConfigureAwait(false);
+            return await remover(entity, cancellationToken);
         }
 
-        var entityToRemove = await loader(cancellationToken).ConfigureAwait(false);
+        var entityToRemove = await loader(cancellationToken);
         if (entityToRemove is null)
         {
             return false;
@@ -209,18 +209,18 @@ internal static class EntityEventExecutor<TEntity, TKey>
         var prior = new EntityEventPrior<TEntity>(_ => new ValueTask<TEntity?>(entityToRemove));
         var context = new EntityEventContext<TEntity>(entityToRemove, EntityEventOperation.Remove, prior, state, cancellationToken);
 
-        await RunSetupAsync(context).ConfigureAwait(false);
+        await RunSetupAsync(context);
         context.CaptureProtectionSnapshot();
 
-        var before = await RunBeforeAsync(context, EntityEventOperation.Remove).ConfigureAwait(false);
+        var before = await RunBeforeAsync(context, EntityEventOperation.Remove);
         if (before.IsCancelled)
         {
             throw new EntityEventCancelledException(EntityEventOperation.Remove, before.Reason!, before.Code);
         }
 
         context.ValidateProtection();
-        var removed = await remover(context.Current, cancellationToken).ConfigureAwait(false);
-        await RunAfterAsync(context, EntityEventOperation.Remove).ConfigureAwait(false);
+        var removed = await remover(context.Current, cancellationToken);
+        await RunAfterAsync(context, EntityEventOperation.Remove);
         context.ValidateProtection();
         return removed;
     }
@@ -232,7 +232,7 @@ internal static class EntityEventExecutor<TEntity, TKey>
     {
         if (!EntityEventRegistry<TEntity, TKey>.HasRemovePipeline)
         {
-            return await remover(existingEntities, cancellationToken).ConfigureAwait(false);
+            return await remover(existingEntities, cancellationToken);
         }
 
         var outcomes = new List<EntityOutcome>();
@@ -246,10 +246,10 @@ internal static class EntityEventExecutor<TEntity, TKey>
             var prior = new EntityEventPrior<TEntity>(_ => new ValueTask<TEntity?>(entity));
             var context = new EntityEventContext<TEntity>(entity, EntityEventOperation.Remove, prior, state, cancellationToken);
 
-            await RunSetupAsync(context).ConfigureAwait(false);
+            await RunSetupAsync(context);
             context.CaptureProtectionSnapshot();
 
-            var result = await RunBeforeAsync(context, EntityEventOperation.Remove).ConfigureAwait(false);
+            var result = await RunBeforeAsync(context, EntityEventOperation.Remove);
             if (result.IsCancelled)
             {
                 outcomes.Add(new EntityOutcome(GetEntityKey(entity), EntityEventOperation.Remove, result));
@@ -275,12 +275,12 @@ internal static class EntityEventExecutor<TEntity, TKey>
         }
 
         var removed = payload.Count > 0
-            ? await remover(payload, cancellationToken).ConfigureAwait(false)
+            ? await remover(payload, cancellationToken)
             : 0;
 
         foreach (var context in executingContexts)
         {
-            await RunAfterAsync(context, EntityEventOperation.Remove).ConfigureAwait(false);
+            await RunAfterAsync(context, EntityEventOperation.Remove);
             context.ValidateProtection();
         }
 
@@ -293,7 +293,7 @@ internal static class EntityEventExecutor<TEntity, TKey>
         for (var i = 0; i < memory.Length; i++)
         {
             var handler = memory.Span[i];
-            await handler(context).ConfigureAwait(false);
+            await handler(context);
         }
     }
 
@@ -311,7 +311,7 @@ internal static class EntityEventExecutor<TEntity, TKey>
         for (var i = 0; i < handlers.Length; i++)
         {
             var handler = handlers.Span[i];
-            result = await handler(context).ConfigureAwait(false);
+            result = await handler(context);
             if (result.IsCancelled)
             {
                 return result;
@@ -334,7 +334,7 @@ internal static class EntityEventExecutor<TEntity, TKey>
         for (var i = 0; i < handlers.Length; i++)
         {
             var handler = handlers.Span[i];
-            await handler(context).ConfigureAwait(false);
+            await handler(context);
         }
     }
 

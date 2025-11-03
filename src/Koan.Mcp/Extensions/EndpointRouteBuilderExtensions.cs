@@ -61,8 +61,8 @@ public static class EndpointRouteBuilderExtensions
 
         group.MapPost("rpc", async context =>
         {
-            var result = await transport.SubmitRequestAsync(context).ConfigureAwait(false);
-            await result.ExecuteAsync(context).ConfigureAwait(false);
+            var result = await transport.SubmitRequestAsync(context);
+            await result.ExecuteAsync(context);
         })
             .WithName("KoanMcpRpcSubmit")
             .WithMetadata(new ProducesResponseTypeAttribute(typeof(IResult), StatusCodes.Status202Accepted, "application/json"));
@@ -71,8 +71,8 @@ public static class EndpointRouteBuilderExtensions
         {
             group.MapGet("capabilities", async context =>
             {
-                var document = await capabilityReporter.GetCapabilitiesAsync(context.RequestAborted).ConfigureAwait(false);
-                await context.Response.WriteAsJsonAsync(document, cancellationToken: context.RequestAborted).ConfigureAwait(false);
+                var document = await capabilityReporter.GetCapabilitiesAsync(context.RequestAborted);
+                await context.Response.WriteAsJsonAsync(document, cancellationToken: context.RequestAborted);
             })
             .WithName("KoanMcpCapabilities")
             .WithMetadata(new ProducesResponseTypeAttribute(typeof(McpCapabilityDocument), StatusCodes.Status200OK, "application/json"));

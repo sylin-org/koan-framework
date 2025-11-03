@@ -90,14 +90,14 @@ internal sealed class LMStudioDiscoveryAdapter : ServiceDiscoveryAdapterBase
             using var request = new HttpRequestMessage(HttpMethod.Get, modelsUri);
             AttachAuthHeader(context, request);
 
-            var response = await httpClient.SendAsync(request, cts.Token).ConfigureAwait(false);
+            var response = await httpClient.SendAsync(request, cts.Token);
             if (!response.IsSuccessStatusCode)
             {
                 _logger.LogDebug("LM Studio health check failed for {Url}: {Status}", modelsUri, response.StatusCode);
                 return false;
             }
 
-            var payload = await response.Content.ReadAsStringAsync(cts.Token).ConfigureAwait(false);
+            var payload = await response.Content.ReadAsStringAsync(cts.Token);
             if (context.Parameters != null &&
                 context.Parameters.TryGetValue("requiredModel", out var requiredModelObj) &&
                 requiredModelObj is string requiredModel &&
@@ -126,7 +126,7 @@ internal sealed class LMStudioDiscoveryAdapter : ServiceDiscoveryAdapterBase
             _configuration[$"{Constants.Section}:BaseUrl"];
     }
 
-    private IEnumerable<DiscoveryCandidate> GetEnvironmentCandidates()
+    protected override IEnumerable<DiscoveryCandidate> GetEnvironmentCandidates()
     {
         var candidates = new List<DiscoveryCandidate>();
 

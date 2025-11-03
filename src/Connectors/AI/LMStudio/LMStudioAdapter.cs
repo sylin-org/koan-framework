@@ -96,8 +96,8 @@ internal sealed class LMStudioAdapter : BaseKoanAdapter,
 
         AttachAuth(message);
 
-        using var response = await httpClient.SendAsync(message, ct).ConfigureAwait(false);
-        var body = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+        using var response = await httpClient.SendAsync(message, ct);
+        var body = await response.Content.ReadAsStringAsync(ct);
         if (!response.IsSuccessStatusCode)
         {
             Logger.LogWarning("LM Studio chat request failed ({Status}): {Body}", (int)response.StatusCode, body);
@@ -123,7 +123,7 @@ internal sealed class LMStudioAdapter : BaseKoanAdapter,
         AiChatRequest request,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
     {
-        await WaitForReadinessAsync(null, ct).ConfigureAwait(false);
+        await WaitForReadinessAsync(null, ct);
 
         var httpClient = GetHttpClientForRequest(request.InternalConnectionString);
         var model = ResolveModel(request.Model);
@@ -137,10 +137,10 @@ internal sealed class LMStudioAdapter : BaseKoanAdapter,
         message.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/event-stream"));
         AttachAuth(message);
 
-        using var response = await httpClient.SendAsync(message, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
+        using var response = await httpClient.SendAsync(message, HttpCompletionOption.ResponseHeadersRead, ct);
         response.EnsureSuccessStatusCode();
 
-        await foreach (var chunk in ReadServerSentEvents(response, ct).ConfigureAwait(false))
+        await foreach (var chunk in ReadServerSentEvents(response, ct))
         {
             if (chunk is null)
             {
@@ -183,8 +183,8 @@ internal sealed class LMStudioAdapter : BaseKoanAdapter,
 
         AttachAuth(message);
 
-        using var response = await httpClient.SendAsync(message, ct).ConfigureAwait(false);
-        var body = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+        using var response = await httpClient.SendAsync(message, ct);
+        var body = await response.Content.ReadAsStringAsync(ct);
         if (!response.IsSuccessStatusCode)
         {
             Logger.LogWarning("LM Studio embeddings request failed ({Status}): {Body}", (int)response.StatusCode, body);
@@ -211,9 +211,9 @@ internal sealed class LMStudioAdapter : BaseKoanAdapter,
         using var message = new HttpRequestMessage(HttpMethod.Get, Constants.Discovery.ModelsPath);
         AttachAuth(message);
 
-        using var response = await httpClient.SendAsync(message, ct).ConfigureAwait(false);
+        using var response = await httpClient.SendAsync(message, ct);
         response.EnsureSuccessStatusCode();
-        var body = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+        var body = await response.Content.ReadAsStringAsync(ct);
 
         var doc = JsonConvert.DeserializeObject<ModelsResponse>(body);
         if (doc?.data is null)
@@ -278,7 +278,7 @@ internal sealed class LMStudioAdapter : BaseKoanAdapter,
 
         try
         {
-            await _stateManager.WaitAsync(effective, ct).ConfigureAwait(false);
+            await _stateManager.WaitAsync(effective, ct);
         }
         catch (TimeoutException ex)
         {
@@ -310,7 +310,7 @@ internal sealed class LMStudioAdapter : BaseKoanAdapter,
 
         try
         {
-            await WaitForReadinessAsync(ReadinessTimeout, cancellationToken).ConfigureAwait(false);
+            await WaitForReadinessAsync(ReadinessTimeout, cancellationToken);
         }
         catch (AdapterNotReadyException ex)
         {
@@ -327,7 +327,7 @@ internal sealed class LMStudioAdapter : BaseKoanAdapter,
         _ = EnsureInitializationStarted();
         try
         {
-            await WaitForReadinessAsync(ReadinessTimeout, cancellationToken).ConfigureAwait(false);
+            await WaitForReadinessAsync(ReadinessTimeout, cancellationToken);
         }
         catch (AdapterNotReadyException ex)
         {
@@ -342,10 +342,10 @@ internal sealed class LMStudioAdapter : BaseKoanAdapter,
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
             using var request = new HttpRequestMessage(HttpMethod.Get, Constants.Discovery.ModelsPath);
             AttachAuth(request);
-            using var response = await _http.SendAsync(request, cancellationToken).ConfigureAwait(false);
+            using var response = await _http.SendAsync(request, cancellationToken);
             stopwatch.Stop();
 
-            var payload = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+            var payload = await response.Content.ReadAsStringAsync(cancellationToken);
 
             var metadata = new Dictionary<string, object?>
             {
@@ -429,8 +429,8 @@ internal sealed class LMStudioAdapter : BaseKoanAdapter,
                 timeoutCts.CancelAfter(ReadinessTimeout);
             }
 
-            await VerifyModelsEndpointAsync(timeoutCts.Token).ConfigureAwait(false);
-            var defaultReady = await EnsureDefaultModelAvailableAsync(timeoutCts.Token).ConfigureAwait(false);
+            await VerifyModelsEndpointAsync(timeoutCts.Token);
+            var defaultReady = await EnsureDefaultModelAvailableAsync(timeoutCts.Token);
 
             var newState = defaultReady ? AdapterReadinessState.Ready : AdapterReadinessState.Degraded;
             _stateManager.TransitionTo(newState);
@@ -454,7 +454,7 @@ internal sealed class LMStudioAdapter : BaseKoanAdapter,
         using var request = new HttpRequestMessage(HttpMethod.Get, Constants.Discovery.ModelsPath);
         AttachAuth(request);
 
-        using var response = await _http.SendAsync(request, ct).ConfigureAwait(false);
+        using var response = await _http.SendAsync(request, ct);
         response.EnsureSuccessStatusCode();
     }
 
@@ -467,7 +467,7 @@ internal sealed class LMStudioAdapter : BaseKoanAdapter,
 
         try
         {
-            var models = await ListModelsAsync(ct).ConfigureAwait(false);
+            var models = await ListModelsAsync(ct);
             return models.Any(m => string.Equals(m.Name, _defaultModel, StringComparison.OrdinalIgnoreCase) ||
                                    string.Equals(m.Family, _defaultModel, StringComparison.OrdinalIgnoreCase));
         }
@@ -654,12 +654,12 @@ internal sealed class LMStudioAdapter : BaseKoanAdapter,
 
     private async IAsyncEnumerable<ChatCompletionChunk?> ReadServerSentEvents(HttpResponseMessage response, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
     {
-        await using var stream = await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
+        await using var stream = await response.Content.ReadAsStreamAsync(ct);
         using var reader = new StreamReader(stream, Encoding.UTF8);
 
         while (!ct.IsCancellationRequested)
         {
-            var line = await reader.ReadLineAsync().ConfigureAwait(false);
+            var line = await reader.ReadLineAsync();
             if (line is null)
             {
                 yield break;

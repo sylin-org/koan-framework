@@ -84,8 +84,8 @@ internal sealed class JobProgressTracker : IJobProgress
     {
         try
         {
-            await _store.UpdateAsync(_job, _metadata, _cancellationToken).ConfigureAwait(false);
-            await _broker.PublishAsync(_job, _cancellationToken).ConfigureAwait(false);
+            await _store.UpdateAsync(_job, _metadata, _cancellationToken);
+            await _broker.PublishAsync(_job, _cancellationToken);
         }
         catch (OperationCanceledException)
         {

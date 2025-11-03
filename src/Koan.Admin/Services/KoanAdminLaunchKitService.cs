@@ -81,7 +81,7 @@ internal sealed class KoanAdminLaunchKitService : IKoanAdminLaunchKitService
         var openApiClients = ResolveOpenApiClients(request.OpenApiClients, generate.OpenApiClients);
 
         var generatedAt = DateTimeOffset.UtcNow;
-        var manifest = await _manifestService.BuildAsync(cancellationToken).ConfigureAwait(false);
+        var manifest = await _manifestService.BuildAsync(cancellationToken);
         var routes = _routes.Current;
 
         var files = new List<FileBuffer>();

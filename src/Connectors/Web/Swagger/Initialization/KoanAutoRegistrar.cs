@@ -63,16 +63,15 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             module.AddNote("AllowMagicInProduction forced Swagger enabled");
         }
 
-        Publish(
-            module,
+        module.PublishConfigValue(
             SwaggerItems.Enabled,
             enabled,
             displayOverride: enabledEffective,
             usedDefaultOverride: magic.Value ? false : null);
 
-        Publish(module, SwaggerItems.RoutePrefix, routePrefix);
-        Publish(module, SwaggerItems.RequireAuthOutsideDevelopment, requireAuth);
-        Publish(module, SwaggerItems.IncludeXmlComments, includeXmlComments);
+        module.PublishConfigValue(SwaggerItems.RoutePrefix, routePrefix);
+        module.PublishConfigValue(SwaggerItems.RequireAuthOutsideDevelopment, requireAuth);
+        module.PublishConfigValue(SwaggerItems.IncludeXmlComments, includeXmlComments);
 
         // Report full Swagger URL for immediate discoverability
         if (enabledEffective)
@@ -85,25 +84,6 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
                 sourceKey: "Resolved from ApplicationUrl and RoutePrefix",
                 usedDefault: false);
         }
-    }
-
-    private static void Publish<T>(
-        ProvenanceModuleWriter module,
-        ProvenanceItem item,
-        ConfigurationValue<T> value,
-        object? displayOverride = null,
-        ProvenancePublicationMode? modeOverride = null,
-        bool? usedDefaultOverride = null,
-        string? sourceKeyOverride = null,
-        bool? sanitizeOverride = null)
-    {
-        module.AddSetting(
-            item,
-            modeOverride ?? ProvenanceModes.FromConfigurationValue(value),
-            displayOverride ?? value.Value,
-            sourceKey: sourceKeyOverride ?? value.ResolvedKey,
-            usedDefault: usedDefaultOverride ?? value.UsedDefault,
-            sanitizeOverride: sanitizeOverride);
     }
 }
 

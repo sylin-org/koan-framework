@@ -52,7 +52,7 @@ public sealed class StorageService : IStorageService
                 try
                 {
                     int read;
-                    while ((read = await content.ReadAsync(buffer.AsMemory(0, buffer.Length), ct).ConfigureAwait(false)) > 0)
+                    while ((read = await content.ReadAsync(buffer.AsMemory(0, buffer.Length), ct)) > 0)
                     {
                         sha.TransformBlock(buffer, 0, read, null, 0);
                     }
@@ -72,7 +72,7 @@ public sealed class StorageService : IStorageService
             // Determine size if available
             try { size = content.Length - originalPos; } catch { size = 0; }
 
-            await provider.WriteAsync(resolvedContainer, key, content, contentType, ct).ConfigureAwait(false);
+            await provider.WriteAsync(resolvedContainer, key, content, contentType, ct);
         }
         else
         {
@@ -82,10 +82,10 @@ public sealed class StorageService : IStorageService
             try
             {
                 int read;
-                while ((read = await content.ReadAsync(buffer.AsMemory(0, buffer.Length), ct).ConfigureAwait(false)) > 0)
+                while ((read = await content.ReadAsync(buffer.AsMemory(0, buffer.Length), ct)) > 0)
                 {
                     sha.TransformBlock(buffer, 0, read, null, 0);
-                    await ms.WriteAsync(buffer.AsMemory(0, read), ct).ConfigureAwait(false);
+                    await ms.WriteAsync(buffer.AsMemory(0, read), ct);
                 }
                 sha.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
                 hashHex = Convert.ToHexString(sha.Hash!).ToLowerInvariant();
@@ -99,14 +99,14 @@ public sealed class StorageService : IStorageService
             // Intentionally keep reported size as 0 for non-seekable uploads (contract: size unknown)
             // Tests assert this behavior. We still write the full buffered content.
             size = 0;
-            await provider.WriteAsync(resolvedContainer, key, ms, contentType, ct).ConfigureAwait(false);
+            await provider.WriteAsync(resolvedContainer, key, ms, contentType, ct);
         }
 
         // If seekable and size could not be determined, attempt best-effort stat.
         // For non-seekable uploads we intentionally leave size as 0.
         if (wasSeekable && size == 0 && provider is IStatOperations statOps)
         {
-            var stat = await statOps.HeadAsync(resolvedContainer, key, ct).ConfigureAwait(false);
+            var stat = await statOps.HeadAsync(resolvedContainer, key, ct);
             if (stat?.Length is long len) size = len;
         }
 
@@ -147,18 +147,18 @@ public sealed class StorageService : IStorageService
     public async Task<bool> ExistsAsync(string profile, string container, string key, CancellationToken ct = default)
     {
         var (provider, resolvedContainer) = Resolve(profile, container);
-        return await provider.ExistsAsync(resolvedContainer, key, ct).ConfigureAwait(false);
+        return await provider.ExistsAsync(resolvedContainer, key, ct);
     }
 
     public async Task<ObjectStat?> HeadAsync(string profile, string container, string key, CancellationToken ct = default)
     {
         var (provider, resolvedContainer) = Resolve(profile, container);
         if (provider is IStatOperations stat)
-            return await stat.HeadAsync(resolvedContainer, key, ct).ConfigureAwait(false);
+            return await stat.HeadAsync(resolvedContainer, key, ct);
         // Fallback: infer length via range 0-0 or full open (best-effort)
         try
         {
-            using var s = await provider.OpenReadAsync(resolvedContainer, key, ct).ConfigureAwait(false);
+            using var s = await provider.OpenReadAsync(resolvedContainer, key, ct);
             long? len = null;
             try { len = s.CanSeek ? s.Length : null; } catch { }
             return new ObjectStat(len, null, null, null);
@@ -175,13 +175,13 @@ public sealed class StorageService : IStorageService
         // Attempt server-side copy when possible
         if (ReferenceEquals(src, dst) && (src is IServerSideCopy ssc))
         {
-            var ok = await ssc.CopyAsync(srcContainer, key, dstContainer, key, ct).ConfigureAwait(false);
+            var ok = await ssc.CopyAsync(srcContainer, key, dstContainer, key, ct);
             if (ok)
             {
                 if (deleteSource && !(srcContainer == dstContainer))
-                    await src.DeleteAsync(srcContainer, key, ct).ConfigureAwait(false);
+                    await src.DeleteAsync(srcContainer, key, ct);
                 // Compose StorageObject with best-effort stat
-                var stat = await HeadAsync(targetProfile, dstContainer, key, ct).ConfigureAwait(false);
+                var stat = await HeadAsync(targetProfile, dstContainer, key, ct);
                 return new StorageObject
                 {
                     Id = $"{dst.Name}:{dstContainer}:{key}",
@@ -200,10 +200,10 @@ public sealed class StorageService : IStorageService
         }
 
         // Stream copy fallback
-        await using var read = await src.OpenReadAsync(srcContainer, key, ct).ConfigureAwait(false);
-        var obj = await PutAsync(targetProfile, dstContainer, key, read, null, ct).ConfigureAwait(false);
+        await using var read = await src.OpenReadAsync(srcContainer, key, ct);
+        var obj = await PutAsync(targetProfile, dstContainer, key, read, null, ct);
         if (deleteSource)
-            await src.DeleteAsync(srcContainer, key, ct).ConfigureAwait(false);
+            await src.DeleteAsync(srcContainer, key, ct);
         return obj;
     }
 

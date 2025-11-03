@@ -54,7 +54,7 @@ internal sealed class InMemoryJobSweeper : KoanBackgroundServiceBase
 
             try
             {
-                await Task.Delay(interval, cancellationToken).ConfigureAwait(false);
+                await Task.Delay(interval, cancellationToken);
             }
             catch (OperationCanceledException)
             {

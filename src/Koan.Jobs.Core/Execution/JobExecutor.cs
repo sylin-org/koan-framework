@@ -46,7 +46,7 @@ internal sealed class JobExecutor
     {
         var metadata = new JobStoreMetadata(item.StorageMode, item.Source, item.Partition, item.AuditExecutions, _options.SerializerOptions);
         var store = _resolver.Resolve(item.StorageMode);
-        var job = await store.GetAsync(item.JobId, metadata, cancellationToken).ConfigureAwait(false);
+        var job = await store.GetAsync(item.JobId, metadata, cancellationToken);
         if (job == null)
         {
             _logger.LogWarning("Job {JobId} not found in store {StorageMode}", item.JobId, item.StorageMode);
@@ -64,13 +64,13 @@ internal sealed class JobExecutor
             job.Status = JobStatus.Cancelled;
             job.CompletedAt ??= DateTimeOffset.UtcNow;
             job.Duration = job.CompletedAt - job.CreatedAt;
-            await store.UpdateAsync(job, metadata, cancellationToken).ConfigureAwait(false);
-            await _eventPublisher.PublishCancelledAsync(job, cancellationToken).ConfigureAwait(false);
+            await store.UpdateAsync(job, metadata, cancellationToken);
+            await _eventPublisher.PublishCancelledAsync(job, cancellationToken);
             return;
         }
 
         var descriptor = ResolveRetryPolicy(item.JobType);
-        var attempt = await DetermineStartingAttemptAsync(store, metadata, job.Id, item.AuditExecutions, cancellationToken).ConfigureAwait(false);
+        var attempt = await DetermineStartingAttemptAsync(store, metadata, job.Id, item.AuditExecutions, cancellationToken);
 
         while (attempt < descriptor.MaxAttempts)
         {
@@ -87,7 +87,7 @@ internal sealed class JobExecutor
 
             if (item.AuditExecutions)
             {
-                await store.CreateExecutionAsync(execution, metadata, cancellationToken).ConfigureAwait(false);
+                await store.CreateExecutionAsync(execution, metadata, cancellationToken);
             }
 
             job.Status = JobStatus.Running;
@@ -96,12 +96,12 @@ internal sealed class JobExecutor
             job.ProgressMessage = null;
             job.LastError = null;
 
-            await store.UpdateAsync(job, metadata, cancellationToken).ConfigureAwait(false);
-            await _eventPublisher.PublishStartedAsync(job, cancellationToken).ConfigureAwait(false);
+            await store.UpdateAsync(job, metadata, cancellationToken);
+            await _eventPublisher.PublishStartedAsync(job, cancellationToken);
 
             var tracker = new JobProgressTracker(job, store, metadata, _progressBroker, _index, cancellationToken);
-            var outcome = await InvokeRunner(item, job, tracker, cancellationToken).ConfigureAwait(false);
-            await tracker.FlushAsync(cancellationToken).ConfigureAwait(false);
+            var outcome = await InvokeRunner(item, job, tracker, cancellationToken);
+            await tracker.FlushAsync(cancellationToken);
 
             if (item.AuditExecutions)
             {
@@ -111,7 +111,7 @@ internal sealed class JobExecutor
                 execution.ErrorMessage = outcome.Error?.Message;
                 execution.StackTrace = outcome.Error?.StackTrace;
                 execution.Metrics["attempt"] = attempt;
-                await store.UpdateExecutionAsync(execution, metadata, cancellationToken).ConfigureAwait(false);
+                await store.UpdateExecutionAsync(execution, metadata, cancellationToken);
             }
 
             if (outcome.Status == JobExecutionStatus.Succeeded)
@@ -119,8 +119,8 @@ internal sealed class JobExecutor
                 job.Status = JobStatus.Completed;
                 job.CompletedAt = DateTimeOffset.UtcNow;
                 job.Duration = job.CompletedAt - job.CreatedAt;
-                await store.UpdateAsync(job, metadata, cancellationToken).ConfigureAwait(false);
-                await _eventPublisher.PublishCompletedAsync(job, cancellationToken).ConfigureAwait(false);
+                await store.UpdateAsync(job, metadata, cancellationToken);
+                await _eventPublisher.PublishCompletedAsync(job, cancellationToken);
                 return;
             }
 
@@ -129,8 +129,8 @@ internal sealed class JobExecutor
                 job.Status = JobStatus.Cancelled;
                 job.CompletedAt = DateTimeOffset.UtcNow;
                 job.Duration = job.CompletedAt - job.CreatedAt;
-                await store.UpdateAsync(job, metadata, cancellationToken).ConfigureAwait(false);
-                await _eventPublisher.PublishCancelledAsync(job, cancellationToken).ConfigureAwait(false);
+                await store.UpdateAsync(job, metadata, cancellationToken);
+                await _eventPublisher.PublishCancelledAsync(job, cancellationToken);
                 return;
             }
 
@@ -141,22 +141,22 @@ internal sealed class JobExecutor
                 job.Status = JobStatus.Failed;
                 job.CompletedAt = DateTimeOffset.UtcNow;
                 job.Duration = job.CompletedAt - job.CreatedAt;
-                await store.UpdateAsync(job, metadata, cancellationToken).ConfigureAwait(false);
-                await _eventPublisher.PublishFailedAsync(job, outcome.Error?.Message, cancellationToken).ConfigureAwait(false);
+                await store.UpdateAsync(job, metadata, cancellationToken);
+                await _eventPublisher.PublishFailedAsync(job, outcome.Error?.Message, cancellationToken);
                 return;
             }
 
             var delay = descriptor.ComputeDelay(attempt);
             job.Status = JobStatus.Queued;
             job.QueuedAt = DateTimeOffset.UtcNow.Add(delay);
-            await store.UpdateAsync(job, metadata, cancellationToken).ConfigureAwait(false);
-            await _eventPublisher.PublishFailedAsync(job, outcome.Error?.Message, cancellationToken).ConfigureAwait(false);
+            await store.UpdateAsync(job, metadata, cancellationToken);
+            await _eventPublisher.PublishFailedAsync(job, outcome.Error?.Message, cancellationToken);
 
             if (delay > TimeSpan.Zero)
             {
                 try
                 {
-                    await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
+                    await Task.Delay(delay, cancellationToken);
                 }
                 catch (OperationCanceledException)
                 {
@@ -165,7 +165,7 @@ internal sealed class JobExecutor
             }
 
             _logger.LogInformation("Re-queueing job {JobId} after attempt {Attempt}", job.Id, attempt);
-            await _queue.EnqueueAsync(item, cancellationToken).ConfigureAwait(false);
+            await _queue.EnqueueAsync(item, cancellationToken);
             return;
         }
     }
@@ -183,7 +183,7 @@ internal sealed class JobExecutor
         var task = method?.Invoke(null, new object[] { job, tracker, cancellationToken }) as Task<JobExecutionOutcome>;
         if (task == null)
             throw new InvalidOperationException($"Unable to invoke JobRunner for {item.JobType.Name}.");
-        return await task.ConfigureAwait(false);
+        return await task;
     }
 
     private static async Task<int> DetermineStartingAttemptAsync(IJobStore store, JobStoreMetadata metadata, string jobId, bool auditEnabled, CancellationToken cancellationToken)
@@ -191,7 +191,7 @@ internal sealed class JobExecutor
         if (!auditEnabled)
             return 0;
 
-        var executions = await store.ListExecutionsAsync(jobId, metadata, cancellationToken).ConfigureAwait(false);
+        var executions = await store.ListExecutionsAsync(jobId, metadata, cancellationToken);
         return executions.Count;
     }
 }

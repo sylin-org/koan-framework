@@ -18,7 +18,7 @@ internal static class JobRunner<TJob, TContext, TResult>
 
         try
         {
-            var result = await typedJob.InvokeExecute(context, tracker, cancellationToken).ConfigureAwait(false);
+            var result = await typedJob.InvokeExecute(context, tracker, cancellationToken);
             typedJob.Result = result;
             return new JobExecutionOutcome(JobExecutionStatus.Succeeded, result, null);
         }

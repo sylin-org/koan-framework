@@ -22,7 +22,7 @@ internal sealed class AggregateSchemaHealthContributor<TEntity, TKey> : ISchemaH
     var repo = global::Koan.Data.Core.AggregateConfigs.Get<TEntity, TKey>(_services).Repository;
         if (repo is ISchemaHealthContributor<TEntity, TKey> contributor)
         {
-            await contributor.EnsureHealthyAsync(ct).ConfigureAwait(false);
+            await contributor.EnsureHealthyAsync(ct);
         }
     }
 

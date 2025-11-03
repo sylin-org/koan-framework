@@ -81,8 +81,8 @@ public sealed class CouchbaseOrchestrationEvaluator : BaseOrchestrationEvaluator
             }
 
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
-            await using var cluster = await Cluster.ConnectAsync(connectionString, options).ConfigureAwait(false);
-            await cluster.PingAsync(new PingOptions().CancellationToken(cts.Token)).ConfigureAwait(false);
+            await using var cluster = await Cluster.ConnectAsync(connectionString, options);
+            await cluster.PingAsync(new PingOptions().CancellationToken(cts.Token));
             return true;
         }
         catch

@@ -121,7 +121,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
                         HealthCheckTimeout = TimeSpan.FromSeconds(10)
                     };
 
-                    var result = coordinator.DiscoverServiceAsync(Constants.Discovery.WellKnownServiceName, context).ConfigureAwait(false).GetAwaiter().GetResult();
+                    var result = coordinator.DiscoverServiceAsync(Constants.Discovery.WellKnownServiceName, context).GetAwaiter().GetResult();
                     if (result.IsSuccessful && !string.IsNullOrWhiteSpace(result.ServiceUrl))
                     {
                         return result.ServiceUrl!;

@@ -80,83 +80,8 @@ internal sealed class MilvusDiscoveryAdapter : ServiceDiscoveryAdapterBase
                _configuration["Koan:Data:ConnectionString"];
     }
 
-    /// <summary>Milvus-specific discovery candidates with proper container-first priority</summary>
-    protected override IEnumerable<DiscoveryCandidate> BuildDiscoveryCandidates(Koan.Orchestration.Attributes.KoanServiceAttribute attribute, DiscoveryContext context)
-    {
-        var candidates = new List<DiscoveryCandidate>();
-
-        // Add Milvus-specific candidates from environment variables (highest priority)
-        candidates.AddRange(GetEnvironmentCandidates());
-
-        // Add explicit configuration candidates
-        var explicitConfig = ReadExplicitConfiguration();
-        if (!string.IsNullOrWhiteSpace(explicitConfig))
-        {
-            candidates.Add(new DiscoveryCandidate(explicitConfig, "explicit-config", 1));
-        }
-
-        // Container vs Local detection logic
-        if (KoanEnv.InContainer)
-        {
-            // In container: Try container instance first, then local fallback
-            if (!string.IsNullOrWhiteSpace(attribute.Host))
-            {
-                var containerUrl = $"{attribute.Scheme}://{attribute.Host}:{attribute.EndpointPort}";
-                candidates.Add(new DiscoveryCandidate(containerUrl, "container-instance", 2));
-                _logger.LogDebug("Milvus adapter: Added container candidate {ContainerUrl} (in container environment)", containerUrl);
-            }
-
-            // Local fallback when in container
-            if (!string.IsNullOrWhiteSpace(attribute.LocalHost))
-            {
-                var localhostUrl = $"{attribute.LocalScheme}://{attribute.LocalHost}:{attribute.LocalPort}";
-                candidates.Add(new DiscoveryCandidate(localhostUrl, "local-fallback", 3));
-                _logger.LogDebug("Milvus adapter: Added local fallback {LocalUrl}", localhostUrl);
-            }
-        }
-        else
-        {
-            // Standalone (not in container): Local only
-            if (!string.IsNullOrWhiteSpace(attribute.LocalHost))
-            {
-                var localhostUrl = $"{attribute.LocalScheme}://{attribute.LocalHost}:{attribute.LocalPort}";
-                candidates.Add(new DiscoveryCandidate(localhostUrl, "local", 2));
-                _logger.LogDebug("Milvus adapter: Added local candidate {LocalUrl} (standalone environment)", localhostUrl);
-            }
-        }
-
-        // Special handling for Aspire
-        if (context.OrchestrationMode == OrchestrationMode.AspireAppHost)
-        {
-            var aspireUrl = ReadAspireServiceDiscovery();
-            if (!string.IsNullOrWhiteSpace(aspireUrl))
-            {
-                // Aspire takes priority over container/local discovery
-                candidates.Insert(0, new DiscoveryCandidate(aspireUrl, "aspire-discovery", 1));
-                _logger.LogDebug("Milvus adapter: Added Aspire candidate {AspireUrl}", aspireUrl);
-            }
-        }
-
-        // Apply Milvus-specific connection parameters if provided
-        if (context.Parameters != null)
-        {
-            for (int i = 0; i < candidates.Count; i++)
-            {
-                if (!string.IsNullOrWhiteSpace(candidates[i].Url))
-                {
-                    candidates[i] = candidates[i] with
-                    {
-                        Url = BuildMilvusConnectionString(candidates[i].Url, context.Parameters)
-                    };
-                }
-            }
-        }
-
-        return candidates.Where(c => !string.IsNullOrWhiteSpace(c.Url));
-    }
-
     /// <summary>Milvus-specific environment variable handling</summary>
-    private IEnumerable<DiscoveryCandidate> GetEnvironmentCandidates()
+    protected override IEnumerable<DiscoveryCandidate> GetEnvironmentCandidates()
     {
         var milvusUrls = Environment.GetEnvironmentVariable("MILVUS_URLS") ??
                         Environment.GetEnvironmentVariable("MILVUS_ENDPOINTS");
@@ -166,6 +91,12 @@ internal sealed class MilvusDiscoveryAdapter : ServiceDiscoveryAdapterBase
 
         return milvusUrls.Split(new[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries)
                          .Select(url => new DiscoveryCandidate(url.Trim(), "environment-milvus-urls", 0));
+    }
+
+    /// <summary>Milvus-specific connection string parameter application</summary>
+    protected override string ApplyConnectionParameters(string baseUrl, IDictionary<string, object> parameters)
+    {
+        return BuildMilvusConnectionString(baseUrl, parameters);
     }
 
     /// <summary>Milvus-specific connection string construction</summary>

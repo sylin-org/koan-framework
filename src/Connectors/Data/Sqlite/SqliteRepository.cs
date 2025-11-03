@@ -262,7 +262,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
     {
         ct.ThrowIfCancellationRequested();
         using var conn = CreateConnection();
-        await EnsureOrchestratedAsync(conn, ct).ConfigureAwait(false);
+        await EnsureOrchestratedAsync(conn, ct);
     }
 
     public void InvalidateHealth()
@@ -285,7 +285,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         var ddl = new SqliteDdlExecutor(conn, table);
         var feats = new SqliteStoreFeatures();
         // Always validate first to discover DDL allowance and current state
-        var vReport = (IDictionary<string, object?>)await orch.ValidateAsync<TEntity, TKey>(ddl, feats, ct).ConfigureAwait(false);
+        var vReport = (IDictionary<string, object?>)await orch.ValidateAsync<TEntity, TKey>(ddl, feats, ct);
         var vState = (vReport["State"] as string) ?? "Unknown";
         var vDdlAllowed = vReport.TryGetValue("DdlAllowed", out var vDa) && vDa is bool vb && vb;
         var vTableExists = vReport.TryGetValue("TableExists", out var vTe) && vTe is bool vtb && vtb;
@@ -328,7 +328,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                 ("table", table));
             try
             {
-                await orch.EnsureCreatedAsync<TEntity, TKey>(ddl, feats, ct).ConfigureAwait(false);
+                await orch.EnsureCreatedAsync<TEntity, TKey>(ddl, feats, ct);
             }
             catch (InvalidOperationException ex) when (ex.Message?.Contains("DDL is disabled", StringComparison.OrdinalIgnoreCase) == true)
             {

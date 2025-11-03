@@ -32,17 +32,17 @@ public static class PipelineVectorExtensions
 			{
 				if (TryGetEmbedding(envelope, out var embedding, out var metadata))
 				{
-					await VectorData<TEntity>.SaveWithVector(envelope.Entity, embedding, metadata, ct).ConfigureAwait(false);
+					await VectorData<TEntity>.SaveWithVector(envelope.Entity, embedding, metadata, ct);
 					envelope.Metadata["vector:affected"] = 1;
 				}
 				else
 				{
-					await envelope.Entity.Save(ct).ConfigureAwait(false);
+					await envelope.Entity.Save(ct);
 				}
 			}
 			catch (InvalidOperationException)
 			{
-				await envelope.Entity.Save(ct).ConfigureAwait(false);
+				await envelope.Entity.Save(ct);
 				envelope.Metadata["vector:affected"] = 0;
 			}
 			catch (Exception ex)
@@ -70,17 +70,17 @@ public static class PipelineVectorExtensions
 			{
 				if (TryGetEmbedding(envelope, out var embedding, out var metadata))
 				{
-					await VectorData<TEntity>.SaveWithVector(envelope.Entity, embedding, metadata, ct).ConfigureAwait(false);
+					await VectorData<TEntity>.SaveWithVector(envelope.Entity, embedding, metadata, ct);
 					envelope.Metadata["vector:affected"] = 1;
 				}
 				else
 				{
-					await envelope.Entity.Save(ct).ConfigureAwait(false);
+					await envelope.Entity.Save(ct);
 				}
 			}
 			catch (InvalidOperationException)
 			{
-				await envelope.Entity.Save(ct).ConfigureAwait(false);
+				await envelope.Entity.Save(ct);
 				envelope.Metadata["vector:affected"] = 0;
 			}
 			catch (Exception ex)

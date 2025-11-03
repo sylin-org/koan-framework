@@ -45,7 +45,7 @@ public static class StorageObjectExtensions
                                  .FirstOrDefault();
         var profile = binding?.Profile ?? string.Empty;
         var container = binding?.Container ?? string.Empty;
-        var result = await Storage().TransferToProfileAsync(obj.Provider ?? string.Empty, obj.Container ?? string.Empty, obj.Key, profile, container, deleteSource: false, ct).ConfigureAwait(false);
+        var result = await Storage().TransferToProfileAsync(obj.Provider ?? string.Empty, obj.Container ?? string.Empty, obj.Key, profile, container, deleteSource: false, ct);
 
         // If TTarget derives from StorageEntity<TTarget>, hydrate metadata; else return a minimal proxy via StorageObject cast if possible
         if (Activator.CreateInstance<TTarget>() is Model.StorageEntity<TTarget> se)
@@ -75,7 +75,7 @@ public static class StorageObjectExtensions
                                  .FirstOrDefault();
         var profile = binding?.Profile ?? string.Empty;
         var container = binding?.Container ?? string.Empty;
-        var result = await Storage().TransferToProfileAsync(obj.Provider ?? string.Empty, obj.Container ?? string.Empty, obj.Key, profile, container, deleteSource: true, ct).ConfigureAwait(false);
+        var result = await Storage().TransferToProfileAsync(obj.Provider ?? string.Empty, obj.Container ?? string.Empty, obj.Key, profile, container, deleteSource: true, ct);
 
         if (Activator.CreateInstance<TTarget>() is Model.StorageEntity<TTarget> se)
         {

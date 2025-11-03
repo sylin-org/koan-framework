@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 
 namespace Koan.Core.Modules;
@@ -28,6 +29,32 @@ public static class OptionsExtensions
         {
             builder.ValidateOnStart();
         }
+        return builder;
+    }
+
+    // Overload with configurator type - eliminates manual TryAddEnumerable boilerplate
+    public static OptionsBuilder<TOptions> AddKoanOptions<TOptions, TConfigurator>(
+        this IServiceCollection services,
+        string? configPath = null,
+        bool validateOnStart = true,
+        ServiceLifetime configuratorLifetime = ServiceLifetime.Singleton)
+        where TOptions : class
+        where TConfigurator : class, IConfigureOptions<TOptions>
+    {
+        // Register options with binding and validation
+        var builder = services.AddKoanOptions<TOptions>(configPath, validateOnStart);
+
+        // Register configurator using TryAddEnumerable (preserves multi-registration pattern)
+        var descriptor = configuratorLifetime switch
+        {
+            ServiceLifetime.Singleton => ServiceDescriptor.Singleton<IConfigureOptions<TOptions>, TConfigurator>(),
+            ServiceLifetime.Scoped => ServiceDescriptor.Scoped<IConfigureOptions<TOptions>, TConfigurator>(),
+            ServiceLifetime.Transient => ServiceDescriptor.Transient<IConfigureOptions<TOptions>, TConfigurator>(),
+            _ => throw new ArgumentException($"Invalid lifetime: {configuratorLifetime}", nameof(configuratorLifetime))
+        };
+
+        services.TryAddEnumerable(descriptor);
+
         return builder;
     }
 

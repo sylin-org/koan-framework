@@ -47,7 +47,7 @@ public sealed class EntityEventPrior<TEntity> where TEntity : class
             return _value;
         }
 
-        var value = await _loader(cancellationToken).ConfigureAwait(false);
+        var value = await _loader(cancellationToken);
         lock (_sync)
         {
             if (!_loaded)

@@ -25,7 +25,7 @@ internal sealed class InMemoryJobQueue : IJobQueue
 
     public async IAsyncEnumerable<JobQueueItem> ReadAllAsync([EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        while (await _channel.Reader.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
+        while (await _channel.Reader.WaitToReadAsync(cancellationToken))
         {
             while (_channel.Reader.TryRead(out var item))
             {

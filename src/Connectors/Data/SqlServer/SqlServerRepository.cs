@@ -172,12 +172,12 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
                 var orch = (IRelationalSchemaOrchestrator)_sp.GetRequiredService(typeof(IRelationalSchemaOrchestrator));
                 var ddl = new MsSqlDdlExecutor(conn);
                 var feats = new MsSqlStoreFeatures();
-                var report = (IDictionary<string, object?>)await orch.ValidateAsync<TEntity, TKey>(ddl, feats, runCt).ConfigureAwait(false);
+                var report = (IDictionary<string, object?>)await orch.ValidateAsync<TEntity, TKey>(ddl, feats, runCt);
                 var ddlAllowed = report.TryGetValue("DdlAllowed", out var da) && da is bool allowed && allowed;
                 var tableExists = report.TryGetValue("TableExists", out var te) && te is bool exists && exists;
                 if (ddlAllowed)
                 {
-                    await orch.EnsureCreatedAsync<TEntity, TKey>(ddl, feats, runCt).ConfigureAwait(false);
+                    await orch.EnsureCreatedAsync<TEntity, TKey>(ddl, feats, runCt);
                     _healthyCache[cacheKey] = true;
                     return;
                 }
@@ -200,11 +200,11 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
     {
         ct.ThrowIfCancellationRequested();
         await using var conn = new SqlConnection(_options.ConnectionString);
-        await conn.OpenAsync(ct).ConfigureAwait(false);
+        await conn.OpenAsync(ct);
         var cacheKey = BuildCacheKey(conn, TableName);
         try
         {
-            await EnsureOrchestratedAsync(conn, cacheKey, ct).ConfigureAwait(false);
+            await EnsureOrchestratedAsync(conn, cacheKey, ct);
         }
         catch (Exception ex)
         {

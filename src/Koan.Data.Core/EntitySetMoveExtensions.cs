@@ -9,11 +9,11 @@ public static class EntityPartitionMoveExtensions
         where TKey : notnull
     {
         // Upsert into target
-        await Data<TEntity, TKey>.UpsertAsync(model, toPartition, ct).ConfigureAwait(false);
+        await Data<TEntity, TKey>.UpsertAsync(model, toPartition, ct);
         if (!copy)
         {
             var from = fromPartition ?? EntityContext.Current?.Partition;
-            await Data<TEntity, TKey>.DeleteAsync(model.Id, from ?? "root", ct).ConfigureAwait(false);
+            await Data<TEntity, TKey>.DeleteAsync(model.Id, from ?? "root", ct);
         }
     }
 }

@@ -21,7 +21,7 @@ internal sealed class DefaultCanonPersistence : ICanonPersistence
 
     public async Task<CanonIndex?> GetIndexAsync(string entityType, string key, CancellationToken cancellationToken)
     {
-        var matches = await CanonIndex.Query(index => index.EntityType == entityType && index.Key == key, cancellationToken).ConfigureAwait(false);
+        var matches = await CanonIndex.Query(index => index.EntityType == entityType && index.Key == key, cancellationToken);
         return matches.FirstOrDefault();
     }
 

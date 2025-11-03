@@ -39,6 +39,6 @@ public sealed class DefaultCanonAuditSink : ICanonAuditSink
             Evidence = new Dictionary<string, string?>(entry.Evidence, StringComparer.OrdinalIgnoreCase)
         }).ToList();
 
-        await CanonAuditLog.UpsertMany(models, cancellationToken).ConfigureAwait(false);
+        await CanonAuditLog.UpsertMany(models, cancellationToken);
     }
 }

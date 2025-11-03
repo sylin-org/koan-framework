@@ -27,14 +27,14 @@ internal sealed class CacheSingleflightRegistry
         try
         {
             ct.ThrowIfCancellationRequested();
-            if (!await gate.Semaphore.WaitAsync(timeout <= TimeSpan.Zero ? TimeSpan.FromSeconds(5) : timeout, ct).ConfigureAwait(false))
+            if (!await gate.Semaphore.WaitAsync(timeout <= TimeSpan.Zero ? TimeSpan.FromSeconds(5) : timeout, ct))
             {
                 throw new TimeoutException($"Failed to acquire singleflight lock for cache key '{key}' within {timeout}.");
             }
 
             try
             {
-                return await action(ct).ConfigureAwait(false);
+                return await action(ct);
             }
             finally
             {

@@ -34,7 +34,7 @@ internal sealed class OllamaHealthContributor : IHealthContributor
             {
                 using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
                 cts.CancelAfter(TimeSpan.FromSeconds(2));
-                var list = await a.ListModelsAsync(cts.Token).ConfigureAwait(false);
+                var list = await a.ListModelsAsync(cts.Token);
                 foreach (var m in list) if (!string.IsNullOrWhiteSpace(m.Name)) models.Add(m.Name);
                 reachable++;
             }

@@ -67,7 +67,7 @@ public sealed class CanonAdminController : ControllerBase
         try
         {
             var task = (Task)method.Invoke(_runtime, new object?[] { request.CanonicalId, request.Views, ct })!;
-            await task.ConfigureAwait(false);
+            await task;
         }
         catch (TargetInvocationException ex)
         {

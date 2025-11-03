@@ -137,8 +137,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar, IKoanAspireRegistrar
             ? ProvenanceModes.FromBootSource(BootSettingSource.Auto, usedDefault: true)
             : ProvenanceModes.FromConfigurationValue(connection);
 
-        Publish(
-            module,
+        module.PublishConfigValue(
             RedisItems.ConnectionString,
             connection,
             displayOverride: effectiveConnectionString,
@@ -146,21 +145,10 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar, IKoanAspireRegistrar
             usedDefaultOverride: connectionIsAuto ? true : connection.UsedDefault,
             sourceKeyOverride: connectionSourceKey);
 
-        Publish(module, RedisItems.Database, database);
-        Publish(module, RedisItems.EnsureCreatedSupported, ensureCreated);
-        Publish(module, RedisItems.DefaultPageSize, defaultPageSize);
-        Publish(module, RedisItems.MaxPageSize, maxPageSize);
-    }
-
-    private static void Publish<T>(ProvenanceModuleWriter module, ProvenanceItem item, ConfigurationValue<T> value, object? displayOverride = null, ProvenancePublicationMode? modeOverride = null, bool? usedDefaultOverride = null, string? sourceKeyOverride = null, bool? sanitizeOverride = null)
-    {
-        module.AddSetting(
-            item,
-            modeOverride ?? ProvenanceModes.FromConfigurationValue(value),
-            displayOverride ?? value.Value,
-            sourceKey: sourceKeyOverride ?? value.ResolvedKey,
-            usedDefault: usedDefaultOverride ?? value.UsedDefault,
-            sanitizeOverride: sanitizeOverride);
+        module.PublishConfigValue(RedisItems.Database, database);
+        module.PublishConfigValue(RedisItems.EnsureCreatedSupported, ensureCreated);
+        module.PublishConfigValue(RedisItems.DefaultPageSize, defaultPageSize);
+        module.PublishConfigValue(RedisItems.MaxPageSize, maxPageSize);
     }
 
     private static string BuildRedisFallback(RedisOptions defaults)
@@ -182,16 +170,18 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar, IKoanAspireRegistrar
         var options = new RedisOptions();
         new RedisOptionsConfigurator(configuration).Configure(options);
 
-        // Parse connection string to extract port and password if provided
-        var connectionParts = ParseRedisConnectionString(options.ConnectionString);
+        // ARCH-0068: Use static ConnectionStringParser for unified parsing
+        var components = Koan.Core.Orchestration.ConnectionStringParser.Parse(
+            options.ConnectionString ?? "localhost:6379",
+            "redis");
 
-        var redis = builder.AddRedis("redis", port: connectionParts.Port)
+        var redis = builder.AddRedis("redis", port: components.Port)
             .WithDataVolume();
 
         // Set password if one is provided and not empty
-        if (!string.IsNullOrEmpty(connectionParts.Password))
+        if (!string.IsNullOrEmpty(components.Password))
         {
-            redis.WithEnvironment("REDIS_PASSWORD", connectionParts.Password);
+            redis.WithEnvironment("REDIS_PASSWORD", components.Password);
         }
 
         // Set default database if not 0
@@ -223,69 +213,6 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar, IKoanAspireRegistrar
                !string.IsNullOrEmpty(configuration["ConnectionStrings:Redis"]);
     }
 
-    private (int Port, string? Password) ParseRedisConnectionString(string? connectionString)
-    {
-        // Default values
-        int port = 6379;
-        string? password = null;
-
-        if (string.IsNullOrEmpty(connectionString))
-        {
-            return (port, password);
-        }
-
-        // Redis connection string formats:
-        // "localhost:6379"
-        // "localhost:6379,password=mypassword"
-        // "redis://localhost:6379"
-        // "redis://:password@localhost:6379"
-
-        try
-        {
-            // Handle redis:// URL format
-            if (connectionString.StartsWith("redis://"))
-            {
-                var uri = new Uri(connectionString);
-                port = uri.Port != -1 ? uri.Port : 6379;
-
-                if (!string.IsNullOrEmpty(uri.UserInfo))
-                {
-                    var userInfo = uri.UserInfo.Split(':');
-                    if (userInfo.Length > 1)
-                        password = userInfo[1];
-                }
-
-                return (port, password);
-            }
-
-            // Handle comma-separated options format
-            var parts = connectionString.Split(',');
-            var hostPort = parts[0].Trim();
-
-            // Extract port from host:port
-            var hostPortParts = hostPort.Split(':');
-            if (hostPortParts.Length > 1 && int.TryParse(hostPortParts[1], out var parsedPort))
-            {
-                port = parsedPort;
-            }
-
-            // Look for password in options
-            foreach (var part in parts.Skip(1))
-            {
-                var option = part.Trim();
-                if (option.StartsWith("password=", StringComparison.OrdinalIgnoreCase))
-                {
-                    password = option.Substring(9);
-                }
-            }
-        }
-        catch
-        {
-            // If parsing fails, use defaults
-        }
-
-        return (port, password);
-    }
 }
 
 

@@ -86,7 +86,7 @@ internal sealed class CacheEntryBuilder<T> : ICacheEntryBuilder<T>
         => _client.SetAsync(Key, value, _options, ct);
 
     public async ValueTask RemoveAsync(CancellationToken ct)
-        => await _client.RemoveAsync(Key, ct).ConfigureAwait(false);
+        => await _client.RemoveAsync(Key, ct);
 
     public ValueTask TouchAsync(CancellationToken ct)
         => _client.TouchAsync(Key, _options, ct);

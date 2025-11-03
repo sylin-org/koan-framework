@@ -42,7 +42,7 @@ public sealed class MirrorTransferBuilder<TEntity, TKey> : EntityTransferBuilder
         {
             case MirrorMode.Push:
             {
-                var items = await FetchEntitiesAsync(FromContext, cancellationToken).ConfigureAwait(false);
+                var items = await FetchEntitiesAsync(FromContext, cancellationToken);
                 readCount = items.Count;
                 var pushProgress = await UpsertBatchesAsync(
                     items,
@@ -53,7 +53,7 @@ public sealed class MirrorTransferBuilder<TEntity, TKey> : EntityTransferBuilder
                     audit,
                     cancellationToken,
                     batchCounter,
-                    totalProcessed).ConfigureAwait(false);
+                    totalProcessed);
                 copied = pushProgress.Copied;
                 batchCounter = pushProgress.BatchCounter;
                 totalProcessed = pushProgress.TotalProcessed;
@@ -61,7 +61,7 @@ public sealed class MirrorTransferBuilder<TEntity, TKey> : EntityTransferBuilder
             }
             case MirrorMode.Pull:
             {
-                var items = await FetchEntitiesAsync(ToContext, cancellationToken).ConfigureAwait(false);
+                var items = await FetchEntitiesAsync(ToContext, cancellationToken);
                 readCount = items.Count;
                 var pullProgress = await UpsertBatchesAsync(
                     items,
@@ -72,7 +72,7 @@ public sealed class MirrorTransferBuilder<TEntity, TKey> : EntityTransferBuilder
                     audit,
                     cancellationToken,
                     batchCounter,
-                    totalProcessed).ConfigureAwait(false);
+                    totalProcessed);
                 copied = pullProgress.Copied;
                 batchCounter = pullProgress.BatchCounter;
                 totalProcessed = pullProgress.TotalProcessed;
@@ -80,8 +80,8 @@ public sealed class MirrorTransferBuilder<TEntity, TKey> : EntityTransferBuilder
             }
             case MirrorMode.Bidirectional:
             {
-                var sourceItems = await FetchEntitiesAsync(FromContext, cancellationToken).ConfigureAwait(false);
-                var targetItems = await FetchEntitiesAsync(ToContext, cancellationToken).ConfigureAwait(false);
+                var sourceItems = await FetchEntitiesAsync(FromContext, cancellationToken);
+                var targetItems = await FetchEntitiesAsync(ToContext, cancellationToken);
                 readCount = sourceItems.Count + targetItems.Count;
 
                 var timestampProperty = ResolveTimestampProperty();
@@ -146,7 +146,7 @@ public sealed class MirrorTransferBuilder<TEntity, TKey> : EntityTransferBuilder
                     audit,
                     cancellationToken,
                     batchCounter,
-                    totalProcessed).ConfigureAwait(false);
+                    totalProcessed);
                 copied += destProgress.Copied;
                 batchCounter = destProgress.BatchCounter;
                 totalProcessed = destProgress.TotalProcessed;
@@ -160,7 +160,7 @@ public sealed class MirrorTransferBuilder<TEntity, TKey> : EntityTransferBuilder
                     audit,
                     cancellationToken,
                     batchCounter,
-                    totalProcessed).ConfigureAwait(false);
+                    totalProcessed);
                 copied += sourceProgress.Copied;
                 batchCounter = sourceProgress.BatchCounter;
                 totalProcessed = sourceProgress.TotalProcessed;

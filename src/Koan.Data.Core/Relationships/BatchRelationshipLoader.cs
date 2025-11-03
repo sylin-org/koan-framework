@@ -54,7 +54,7 @@ namespace Koan.Data.Core.Relationships
                             continue;
                         }
 
-                        await task.ConfigureAwait(false);
+                        await task;
                         var resultProp = task.GetType().GetProperty("Result");
                         var parent = resultProp?.GetValue(task);
                         parentDict[id] = parent;
@@ -97,7 +97,7 @@ namespace Koan.Data.Core.Relationships
                     continue;
                 }
 
-                await allTask.ConfigureAwait(false);
+                await allTask;
                 var resultProp = allTask.GetType().GetProperty("Result");
                 var allChildren = resultProp?.GetValue(allTask) as System.Collections.IEnumerable;
                 if (allChildren is null)

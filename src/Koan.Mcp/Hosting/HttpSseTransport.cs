@@ -65,14 +65,14 @@ public sealed class HttpSseTransport
             {
                 error = "https_required",
                 message = "HTTP+SSE transport requires HTTPS in non-containerized production environments."
-            }, cancellationToken: context.RequestAborted).ConfigureAwait(false);
+            }, cancellationToken: context.RequestAborted);
             return;
         }
 
         if (options.RequireAuthentication && context.User?.Identity?.IsAuthenticated != true)
         {
             context.Response.StatusCode = StatusCodes.Status401Unauthorized;
-            await context.Response.WriteAsJsonAsync(new { error = "unauthorized" }, cancellationToken: context.RequestAborted).ConfigureAwait(false);
+            await context.Response.WriteAsJsonAsync(new { error = "unauthorized" }, cancellationToken: context.RequestAborted);
             return;
         }
 
@@ -80,14 +80,14 @@ public sealed class HttpSseTransport
         if (registrations.Count == 0)
         {
             context.Response.StatusCode = StatusCodes.Status404NotFound;
-            await context.Response.WriteAsJsonAsync(new { error = "no_entities" }, cancellationToken: context.RequestAborted).ConfigureAwait(false);
+            await context.Response.WriteAsJsonAsync(new { error = "no_entities" }, cancellationToken: context.RequestAborted);
             return;
         }
 
         if (!_sessions.TryOpenSession(context, out var session))
         {
             context.Response.StatusCode = StatusCodes.Status429TooManyRequests;
-            await context.Response.WriteAsJsonAsync(new { error = "max_connections_exceeded" }, cancellationToken: context.RequestAborted).ConfigureAwait(false);
+            await context.Response.WriteAsJsonAsync(new { error = "max_connections_exceeded" }, cancellationToken: context.RequestAborted);
             return;
         }
 
@@ -111,11 +111,11 @@ public sealed class HttpSseTransport
 
         try
         {
-            await foreach (var message in session.OutboundMessages(context.RequestAborted).ConfigureAwait(false))
+            await foreach (var message in session.OutboundMessages(context.RequestAborted))
             {
                 var formatted = message.ToWireFormat();
-                await context.Response.WriteAsync(formatted, context.RequestAborted).ConfigureAwait(false);
-                await context.Response.Body.FlushAsync(context.RequestAborted).ConfigureAwait(false);
+                await context.Response.WriteAsync(formatted, context.RequestAborted);
+                await context.Response.Body.FlushAsync(context.RequestAborted);
             }
         }
         catch (OperationCanceledException)
@@ -154,7 +154,7 @@ public sealed class HttpSseTransport
         {
             using var reader = new StreamReader(context.Request.Body);
             using var jsonReader = new JsonTextReader(reader);
-            payload = await JToken.ReadFromAsync(jsonReader, context.RequestAborted).ConfigureAwait(false);
+            payload = await JToken.ReadFromAsync(jsonReader, context.RequestAborted);
         }
         catch (JsonReaderException ex)
         {
@@ -183,7 +183,7 @@ public sealed class HttpSseTransport
         }
 
         session.Enqueue(ServerSentEvent.Acknowledged(envelope.Id));
-        await bridge.SubmitAsync(envelope, context.RequestAborted).ConfigureAwait(false);
+        await bridge.SubmitAsync(envelope, context.RequestAborted);
         return Results.Accepted();
     }
 

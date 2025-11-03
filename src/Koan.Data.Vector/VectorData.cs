@@ -23,12 +23,12 @@ public static class VectorData<TEntity>
         if (VectorWorkflow<TEntity>.IsAvailable())
         {
             var payload = CloneMetadata(metadata);
-            await VectorWorkflow<TEntity>.Save(entity, vector.ToArray(), payload, null, ct).ConfigureAwait(false);
+            await VectorWorkflow<TEntity>.Save(entity, vector.ToArray(), payload, null, ct);
             return;
         }
 
-        await Data<TEntity, string>.UpsertAsync(entity, ct).ConfigureAwait(false);
-        await Repo.UpsertAsync(entity.Id, vector.ToArray(), metadata, ct).ConfigureAwait(false);
+        await Data<TEntity, string>.UpsertAsync(entity, ct);
+        await Repo.UpsertAsync(entity.Id, vector.ToArray(), metadata, ct);
     }
 
     public static async Task<BatchResult> SaveManyWithVector(IEnumerable<VectorEntity> items, CancellationToken ct = default)
@@ -44,19 +44,19 @@ public static class VectorData<TEntity>
             }
 
             var mapped = list.Select(x => (x.Entity, x.Vector.ToArray(), (object?)CloneMetadata(x.Metadata))).ToList();
-            var result = await VectorWorkflow<TEntity>.SaveMany(mapped, null, ct).ConfigureAwait(false);
+            var result = await VectorWorkflow<TEntity>.SaveMany(mapped, null, ct);
             return new BatchResult(result.Documents, 0, 0);
         }
 
         var documents = list.Select(x => x.Entity).ToList();
-        var affected = await Data<TEntity, string>.UpsertManyAsync(documents, ct).ConfigureAwait(false);
+        var affected = await Data<TEntity, string>.UpsertManyAsync(documents, ct);
         if (list.Count == 0)
         {
             return new BatchResult(affected, 0, 0);
         }
 
     var vectors = list.Select(x => (x.Entity.Id, x.Vector.ToArray(), (object?)x.Metadata)).ToList();
-        await Repo.UpsertManyAsync(vectors, ct).ConfigureAwait(false);
+        await Repo.UpsertManyAsync(vectors, ct);
         return new BatchResult(affected, 0, 0);
     }
 

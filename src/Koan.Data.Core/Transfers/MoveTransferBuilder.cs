@@ -37,7 +37,7 @@ public sealed class MoveTransferBuilder<TEntity, TKey> : EntityTransferBuilderBa
         var totalProcessed = 0;
         var deletedCount = 0;
 
-        var items = await FetchEntitiesAsync(FromContext, cancellationToken).ConfigureAwait(false);
+        var items = await FetchEntitiesAsync(FromContext, cancellationToken);
         var readCount = items.Count;
         var afterCopyIds = _deleteStrategy == DeleteStrategy.AfterCopy ? new List<TKey>() : null;
 
@@ -47,7 +47,7 @@ public sealed class MoveTransferBuilder<TEntity, TKey> : EntityTransferBuilderBa
             var batch = chunk.ToList();
             using (var destScope = ToContext?.Apply())
             {
-                await Data<TEntity, TKey>.UpsertManyAsync(batch, cancellationToken).ConfigureAwait(false);
+                await Data<TEntity, TKey>.UpsertManyAsync(batch, cancellationToken);
             }
 
             totalProcessed += batch.Count;
@@ -74,7 +74,7 @@ public sealed class MoveTransferBuilder<TEntity, TKey> : EntityTransferBuilderBa
                 case DeleteStrategy.Batched:
                     using (var fromScope = FromContext?.Apply())
                     {
-                        deletedCount += await Data<TEntity, TKey>.DeleteManyAsync(ids, cancellationToken).ConfigureAwait(false);
+                        deletedCount += await Data<TEntity, TKey>.DeleteManyAsync(ids, cancellationToken);
                     }
                     break;
                 case DeleteStrategy.Synced:
@@ -82,7 +82,7 @@ public sealed class MoveTransferBuilder<TEntity, TKey> : EntityTransferBuilderBa
                     {
                         foreach (var id in ids)
                         {
-                            if (await Data<TEntity, TKey>.DeleteAsync(id, cancellationToken).ConfigureAwait(false))
+                            if (await Data<TEntity, TKey>.DeleteAsync(id, cancellationToken))
                             {
                                 deletedCount++;
                             }
@@ -95,7 +95,7 @@ public sealed class MoveTransferBuilder<TEntity, TKey> : EntityTransferBuilderBa
         if (_deleteStrategy == DeleteStrategy.AfterCopy && afterCopyIds is { Count: > 0 })
         {
             using var fromScope = FromContext?.Apply();
-            deletedCount += await Data<TEntity, TKey>.DeleteManyAsync(afterCopyIds, cancellationToken).ConfigureAwait(false);
+            deletedCount += await Data<TEntity, TKey>.DeleteManyAsync(afterCopyIds, cancellationToken);
         }
 
         EmitSummary(TransferKind.Move, totalProcessed, stopwatch, audit);

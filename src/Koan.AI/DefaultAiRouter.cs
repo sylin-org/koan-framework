@@ -53,7 +53,7 @@ internal sealed class DefaultAiRouter : IAiRouter
 
         try
         {
-            var response = await adapter.ChatAsync(request, ct).ConfigureAwait(false);
+            var response = await adapter.ChatAsync(request, ct);
 
             _logger?.LogInformation(
                 "AI route OK: {Adapter}/{Model} via {Source}:{Member}",
@@ -88,7 +88,7 @@ internal sealed class DefaultAiRouter : IAiRouter
         var chunkCount = 0;
         Exception? streamError = null;
 
-        await foreach (var chunk in adapter.StreamAsync(request, ct).ConfigureAwait(false))
+        await foreach (var chunk in adapter.StreamAsync(request, ct))
         {
             chunkCount++;
             yield return chunk with { AdapterId = adapter.Id };
@@ -117,7 +117,7 @@ internal sealed class DefaultAiRouter : IAiRouter
 
         try
         {
-            var response = await adapter.EmbedAsync(request, ct).ConfigureAwait(false);
+            var response = await adapter.EmbedAsync(request, ct);
 
             _logger?.LogInformation(
                 "AI route OK: {Adapter}/{Model} via {Source}:{Member} (embed {Count} inputs)",

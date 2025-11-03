@@ -120,7 +120,7 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
             _collectionName = desired;
         }
 
-        return await _provider.GetCollectionContextAsync(_collectionName, ct).ConfigureAwait(false);
+        return await _provider.GetCollectionContextAsync(_collectionName, ct);
     }
 
     public Task<TEntity?> GetAsync(TKey id, CancellationToken ct = default)
@@ -129,10 +129,10 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
             ct.ThrowIfCancellationRequested();
             using var act = CouchbaseTelemetry.Activity.StartActivity("couchbase.get");
             act?.SetTag("entity", typeof(TEntity).FullName);
-            var ctx = await ResolveCollectionAsync(ct).ConfigureAwait(false);
+            var ctx = await ResolveCollectionAsync(ct);
             try
             {
-                var result = await ctx.Collection.GetAsync(GetKey(id), new GetOptions().CancellationToken(ct)).ConfigureAwait(false);
+                var result = await ctx.Collection.GetAsync(GetKey(id), new GetOptions().CancellationToken(ct));
                 return result.ContentAs<TEntity>();
             }
             catch (DocumentNotFoundException)
@@ -141,9 +141,9 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
             }
             catch (global::Couchbase.Core.Exceptions.UnambiguousTimeoutException ex) when (IsCollectionNotFound(ex))
             {
-                await EnsureCollectionAsync(ctx, ct).ConfigureAwait(false);
+                await EnsureCollectionAsync(ctx, ct);
 
-                var result = await ctx.Collection.GetAsync(GetKey(id), new GetOptions().CancellationToken(ct)).ConfigureAwait(false);
+                var result = await ctx.Collection.GetAsync(GetKey(id), new GetOptions().CancellationToken(ct));
                 return result.ContentAs<TEntity>();
             }
         }, ct);
@@ -161,7 +161,7 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
                 return (IReadOnlyList<TEntity?>)Array.Empty<TEntity?>();
             }
 
-            var ctx = await ResolveCollectionAsync(ct).ConfigureAwait(false);
+            var ctx = await ResolveCollectionAsync(ct);
 
             // Build list of keys for batch get
             var keys = idList.Select(id => GetKey(id)).ToList();
@@ -170,7 +170,7 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
             {
                 // Couchbase supports batch get via GetAsync for multiple keys
                 var tasks = keys.Select(key => ctx.Collection.GetAsync(key, new GetOptions().CancellationToken(ct)));
-                var allResults = await Task.WhenAll(tasks).ConfigureAwait(false);
+                var allResults = await Task.WhenAll(tasks);
 
                 // Build dictionary for O(1) lookup
                 var entityMap = new Dictionary<TKey, TEntity>();
@@ -199,7 +199,7 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
                 {
                     try
                     {
-                        var result = await ctx.Collection.GetAsync(keys[i], new GetOptions().CancellationToken(ct)).ConfigureAwait(false);
+                        var result = await ctx.Collection.GetAsync(keys[i], new GetOptions().CancellationToken(ct));
                         results[i] = result.ContentAs<TEntity>();
                     }
                     catch (DocumentNotFoundException)
@@ -226,7 +226,7 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
             ct.ThrowIfCancellationRequested();
             using var act = CouchbaseTelemetry.Activity.StartActivity("couchbase.query.linq");
             act?.SetTag("entity", typeof(TEntity).FullName);
-            var ctx = await ResolveCollectionAsync(ct).ConfigureAwait(false);
+            var ctx = await ResolveCollectionAsync(ct);
             if (!CouchbaseLinqQueryTranslator.TryTranslate<TEntity, TKey>(predicate, _optimizationInfo, out var translation))
             {
                 throw new NotSupportedException($"Unable to translate expression '{predicate}' to N1QL for Couchbase.");
@@ -238,13 +238,13 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
                 Parameters = translation.Parameters.ToDictionary(static kvp => kvp.Key, static kvp => kvp.Value)
             };
 
-            return await ExecuteQueryAsync(ctx, statement, definition, options, ct).ConfigureAwait(false);
+            return await ExecuteQueryAsync(ctx, statement, definition, options, ct);
         }, ct);
 
     private async Task<IReadOnlyList<TEntity>> QueryInternalAsync(object? query, DataQueryOptions? options, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
-        var ctx = await ResolveCollectionAsync(ct).ConfigureAwait(false);
+        var ctx = await ResolveCollectionAsync(ct);
         var definition = query switch
         {
             CouchbaseQueryDefinition def => def,
@@ -255,7 +255,7 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
         var statement = definition?.Statement ??
             $"SELECT RAW doc FROM `{ctx.BucketName}`.`{ctx.ScopeName}`.`{ctx.CollectionName}` AS doc";
 
-        return await ExecuteQueryAsync(ctx, statement, definition, options, ct).ConfigureAwait(false);
+        return await ExecuteQueryAsync(ctx, statement, definition, options, ct);
     }
 
     public Task<CountResult> CountAsync(CountRequest<TEntity> request, CancellationToken ct = default)
@@ -264,7 +264,7 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
             ct.ThrowIfCancellationRequested();
             using var act = CouchbaseTelemetry.Activity.StartActivity("couchbase.count");
             act?.SetTag("entity", typeof(TEntity).FullName);
-            var ctx = await ResolveCollectionAsync(ct).ConfigureAwait(false);
+            var ctx = await ResolveCollectionAsync(ct);
 
             CouchbaseQueryDefinition? definition = null;
             string statement;
@@ -299,7 +299,7 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
                 statement = $"SELECT RAW COUNT(*) FROM ..";
             }
 
-            var result = await ExecuteScalarQueryAsync<long>(ctx, statement, definition, ct).ConfigureAwait(false);
+            var result = await ExecuteScalarQueryAsync<long>(ctx, statement, definition, ct);
             return CountResult.Exact(result);
         }, ct);
 
@@ -309,7 +309,7 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
             ct.ThrowIfCancellationRequested();
             using var act = CouchbaseTelemetry.Activity.StartActivity("couchbase.upsert");
             act?.SetTag("entity", typeof(TEntity).FullName);
-            var ctx = await ResolveCollectionAsync(ct).ConfigureAwait(false);
+            var ctx = await ResolveCollectionAsync(ct);
             PrepareEntityForStorage(model);
             var key = GetKey(model.Id);
             var options = new UpsertOptions().CancellationToken(ct);
@@ -320,12 +320,12 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
 
             try
             {
-                await ctx.Collection.UpsertAsync(key, model, options).ConfigureAwait(false);
+                await ctx.Collection.UpsertAsync(key, model, options);
             }
             catch (global::Couchbase.Core.Exceptions.UnambiguousTimeoutException ex) when (IsCollectionNotFound(ex))
             {
-                await EnsureCollectionAsync(ctx, ct).ConfigureAwait(false);
-                await ctx.Collection.UpsertAsync(key, model, options).ConfigureAwait(false);
+                await EnsureCollectionAsync(ctx, ct);
+                await ctx.Collection.UpsertAsync(key, model, options);
             }
 
             _logger?.LogDebug("Couchbase upsert {Entity} id={Id}", typeof(TEntity).Name, key);
@@ -338,7 +338,7 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
             ct.ThrowIfCancellationRequested();
             using var act = CouchbaseTelemetry.Activity.StartActivity("couchbase.delete");
             act?.SetTag("entity", typeof(TEntity).FullName);
-            var ctx = await ResolveCollectionAsync(ct).ConfigureAwait(false);
+            var ctx = await ResolveCollectionAsync(ct);
             try
             {
                 var options = new RemoveOptions().CancellationToken(ct);
@@ -346,7 +346,7 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
                 {
                     options.Durability(durability);
                 }
-                await ctx.Collection.RemoveAsync(GetKey(id), options).ConfigureAwait(false);
+                await ctx.Collection.RemoveAsync(GetKey(id), options);
                 return true;
             }
             catch (DocumentNotFoundException)
@@ -361,7 +361,7 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
             ct.ThrowIfCancellationRequested();
             using var act = CouchbaseTelemetry.Activity.StartActivity("couchbase.bulk.upsert");
             act?.SetTag("entity", typeof(TEntity).FullName);
-            var ctx = await ResolveCollectionAsync(ct).ConfigureAwait(false);
+            var ctx = await ResolveCollectionAsync(ct);
             var items = models as ICollection<TEntity> ?? models.ToArray();
             var upsertTasks = new List<Task>(items.Count);
             foreach (var model in items)
@@ -377,7 +377,7 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
                 upsertTasks.Add(ctx.Collection.UpsertAsync(key, model, options));
             }
 
-            await Task.WhenAll(upsertTasks).ConfigureAwait(false);
+            await Task.WhenAll(upsertTasks);
             _logger?.LogInformation("Couchbase bulk upsert {Entity} count={Count}", typeof(TEntity).Name, items.Count);
             return items.Count;
         }, ct);
@@ -388,7 +388,7 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
             ct.ThrowIfCancellationRequested();
             using var act = CouchbaseTelemetry.Activity.StartActivity("couchbase.bulk.delete");
             act?.SetTag("entity", typeof(TEntity).FullName);
-            var ctx = await ResolveCollectionAsync(ct).ConfigureAwait(false);
+            var ctx = await ResolveCollectionAsync(ct);
             var keys = ids as ICollection<TKey> ?? ids.ToArray();
             var tasks = new List<Task<bool>>(keys.Count);
             foreach (var id in keys)
@@ -397,7 +397,7 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
                 tasks.Add(RemoveAsync(ctx.Collection, GetKey(id), ct));
             }
 
-            var results = await Task.WhenAll(tasks).ConfigureAwait(false);
+            var results = await Task.WhenAll(tasks);
             var deleted = results.Count(static x => x);
             _logger?.LogInformation("Couchbase bulk delete {Entity} count={Count}", typeof(TEntity).Name, deleted);
             return deleted;
@@ -407,10 +407,10 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
         => ExecuteWithReadinessAsync(async () =>
         {
             ct.ThrowIfCancellationRequested();
-            var ctx = await ResolveCollectionAsync(ct).ConfigureAwait(false);
+            var ctx = await ResolveCollectionAsync(ct);
             var statement = $"DELETE FROM `{ctx.BucketName}`.`{ctx.ScopeName}`.`{ctx.CollectionName}` RETURNING META().id";
             var count = 0;
-            await foreach (var _ in ExecuteQueryAsync<dynamic>(ctx, statement, null, null, ct).ConfigureAwait(false))
+            await foreach (var _ in ExecuteQueryAsync<dynamic>(ctx, statement, null, null, ct))
             {
                 count++;
             }
@@ -421,10 +421,10 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
         => ExecuteWithReadinessAsync(async () =>
         {
             ct.ThrowIfCancellationRequested();
-            var ctx = await ResolveCollectionAsync(ct).ConfigureAwait(false);
+            var ctx = await ResolveCollectionAsync(ct);
             var statement = $"DELETE FROM `{ctx.BucketName}`.`{ctx.ScopeName}`.`{ctx.CollectionName}` RETURNING META().id";
             var count = 0L;
-            await foreach (var _ in ExecuteQueryAsync<dynamic>(ctx, statement, null, null, ct).ConfigureAwait(false))
+            await foreach (var _ in ExecuteQueryAsync<dynamic>(ctx, statement, null, null, ct))
             {
                 count++;
             }
@@ -438,14 +438,14 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
     public Task<TResult> ExecuteAsync<TResult>(Instruction instruction, CancellationToken ct = default)
         => ExecuteWithReadinessAsync(async () =>
         {
-            var ctx = await ResolveCollectionAsync(ct).ConfigureAwait(false);
+            var ctx = await ResolveCollectionAsync(ct);
             switch (instruction.Name)
             {
                 case DataInstructions.EnsureCreated:
-                    await EnsureCollectionAsync(ctx, ct).ConfigureAwait(false);
+                    await EnsureCollectionAsync(ctx, ct);
                     return (TResult)(object)true;
                 case DataInstructions.Clear:
-                    var deleted = await DeleteAllAsync(ct).ConfigureAwait(false);
+                    var deleted = await DeleteAllAsync(ct);
                     return (TResult)(object)deleted;
                 default:
                     throw new NotSupportedException($"Instruction '{instruction.Name}' not supported by Couchbase adapter.");
@@ -459,7 +459,7 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
         {
             try
             {
-                await manager.CreateScopeAsync(ctx.ScopeName).ConfigureAwait(false);
+                await manager.CreateScopeAsync(ctx.ScopeName);
                 _logger?.LogDebug("Created Couchbase scope: {Scope}", ctx.ScopeName);
             }
             catch (CouchbaseException ex) when (IsAlreadyExists(ex))
@@ -470,11 +470,11 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
 
         try
         {
-            await manager.CreateCollectionAsync(ctx.ScopeName, ctx.CollectionName, new CreateCollectionSettings()).ConfigureAwait(false);
+            await manager.CreateCollectionAsync(ctx.ScopeName, ctx.CollectionName, new CreateCollectionSettings());
             _logger?.LogInformation("Created Couchbase collection: {Collection} in scope {Scope}", ctx.CollectionName, ctx.ScopeName);
 
             // Wait for collection to be ready for N1QL queries
-            await Task.Delay(2000, ct).ConfigureAwait(false);
+            await Task.Delay(2000, ct);
             _logger?.LogDebug("Collection {Collection} ready for queries", ctx.CollectionName);
         }
         catch (CouchbaseException ex) when (IsAlreadyExists(ex))
@@ -490,8 +490,8 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
     {
         ct.ThrowIfCancellationRequested();
         var collectionName = StorageNameRegistry.GetOrCompute<TEntity, TKey>(_sp);
-        var ctx = await _provider.GetCollectionContextAsync(collectionName, ct).ConfigureAwait(false);
-        await EnsureCollectionAsync(ctx, ct).ConfigureAwait(false);
+        var ctx = await _provider.GetCollectionContextAsync(collectionName, ct);
+        await EnsureCollectionAsync(ctx, ct);
     }
 
     public void InvalidateHealth()
@@ -502,7 +502,7 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
     private async Task<IReadOnlyList<TEntity>> ExecuteQueryAsync(CouchbaseCollectionContext ctx, string statement, CouchbaseQueryDefinition? definition, DataQueryOptions? options, CancellationToken ct)
     {
         var rows = new List<TEntity>();
-        await foreach (var row in ExecuteQueryAsync<TEntity>(ctx, statement, definition, options, ct).ConfigureAwait(false))
+        await foreach (var row in ExecuteQueryAsync<TEntity>(ctx, statement, definition, options, ct))
         {
             rows.Add(row);
         }
@@ -511,7 +511,7 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
 
     private async Task<T> ExecuteScalarQueryAsync<T>(CouchbaseCollectionContext ctx, string statement, CouchbaseQueryDefinition? definition, CancellationToken ct)
     {
-        await foreach (var row in ExecuteQueryAsync<T>(ctx, statement, definition, null, ct).ConfigureAwait(false))
+        await foreach (var row in ExecuteQueryAsync<T>(ctx, statement, definition, null, ct))
         {
             return row;
         }
@@ -546,16 +546,16 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
         global::Couchbase.Query.IQueryResult<T> result;
         try
         {
-            result = await ctx.Cluster.QueryAsync<T>(finalStatement, queryOptions).ConfigureAwait(false);
+            result = await ctx.Cluster.QueryAsync<T>(finalStatement, queryOptions);
         }
         catch (global::Couchbase.Core.Exceptions.IndexFailureException ex) when (ex.Message.Contains("Keyspace not found"))
         {
             // Extract collection name from the error message or statement
             // Try to create the collection and retry the query once
-            await EnsureCollectionAsync(ctx, ct).ConfigureAwait(false);
+            await EnsureCollectionAsync(ctx, ct);
 
             // Retry the query after creating the collection
-            result = await ctx.Cluster.QueryAsync<T>(finalStatement, queryOptions).ConfigureAwait(false);
+            result = await ctx.Cluster.QueryAsync<T>(finalStatement, queryOptions);
         }
 
         await foreach (var row in result)
@@ -625,7 +625,7 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
             {
                 options.Durability(durability);
             }
-            await collection.RemoveAsync(key, options).ConfigureAwait(false);
+            await collection.RemoveAsync(key, options);
             return true;
         }
         catch (DocumentNotFoundException)
@@ -676,7 +676,7 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
         {
             if (options?.RequireAtomic == true)
             {
-                return await SaveAtomicAsync(ct).ConfigureAwait(false);
+                return await SaveAtomicAsync(ct);
             }
 
             var added = 0;
@@ -685,22 +685,22 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
 
             foreach (var entity in _upserts)
             {
-                await _repo.UpsertAsync(entity, ct).ConfigureAwait(false);
+                await _repo.UpsertAsync(entity, ct);
                 added++;
             }
 
             foreach (var (id, mutate) in _mutations)
             {
-                var current = await _repo.GetAsync(id, ct).ConfigureAwait(false);
+                var current = await _repo.GetAsync(id, ct);
                 if (current is null) continue;
                 mutate(current);
-                await _repo.UpsertAsync(current, ct).ConfigureAwait(false);
+                await _repo.UpsertAsync(current, ct);
                 updated++;
             }
 
             foreach (var id in _deletes)
             {
-                if (await _repo.DeleteAsync(id, ct).ConfigureAwait(false))
+                if (await _repo.DeleteAsync(id, ct))
                 {
                     deleted++;
                 }
@@ -712,7 +712,7 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
 
         private async Task<BatchResult> SaveAtomicAsync(CancellationToken ct)
         {
-            var ctx = await _repo.ResolveCollectionAsync(ct).ConfigureAwait(false);
+            var ctx = await _repo.ResolveCollectionAsync(ct);
             var added = 0;
             var updated = 0;
             var deleted = 0;
@@ -727,13 +727,13 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
                         var key = GetKey(entity.Id);
                         try
                         {
-                            var existing = await attempt.GetAsync(ctx.Collection, key).ConfigureAwait(false);
-                            await attempt.ReplaceAsync(existing, entity).ConfigureAwait(false);
+                            var existing = await attempt.GetAsync(ctx.Collection, key);
+                            await attempt.ReplaceAsync(existing, entity);
                             updated++;
                         }
                         catch (TransactionFailedException ex) when (ex.InnerException is DocumentNotFoundException)
                         {
-                            await attempt.InsertAsync(ctx.Collection, key, entity).ConfigureAwait(false);
+                            await attempt.InsertAsync(ctx.Collection, key, entity);
                             added++;
                         }
                     }
@@ -743,7 +743,7 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
                         try
                         {
                             var key = GetKey(id);
-                            var current = await attempt.GetAsync(ctx.Collection, key).ConfigureAwait(false);
+                            var current = await attempt.GetAsync(ctx.Collection, key);
                             var entity = current.ContentAs<TEntity>();
                             if (entity is null)
                             {
@@ -751,7 +751,7 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
                             }
                             mutate(entity);
                             _repo.PrepareEntityForStorage(entity);
-                            await attempt.ReplaceAsync(current, entity).ConfigureAwait(false);
+                            await attempt.ReplaceAsync(current, entity);
                             updated++;
                         }
                         catch (TransactionFailedException ex) when (ex.InnerException is DocumentNotFoundException)
@@ -765,8 +765,8 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
                         try
                         {
                             var key = GetKey(id);
-                            var current = await attempt.GetAsync(ctx.Collection, key).ConfigureAwait(false);
-                            await attempt.RemoveAsync(current).ConfigureAwait(false);
+                            var current = await attempt.GetAsync(ctx.Collection, key);
+                            await attempt.RemoveAsync(current);
                             deleted++;
                         }
                         catch (TransactionFailedException ex) when (ex.InnerException is DocumentNotFoundException)
@@ -774,7 +774,7 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
                             // ignore missing rows
                         }
                     }
-                }).ConfigureAwait(false);
+                });
             }
             catch (TransactionFailedException ex)
             {

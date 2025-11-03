@@ -5,6 +5,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
 using Koan.Core;
+using Koan.Core.Modules;
 using Koan.Core.Orchestration;
 using Koan.Secrets.Abstractions;
 using Koan.Secrets.Connector.Vault.Internal;
@@ -22,14 +23,11 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 
     public void Initialize(IServiceCollection services)
     {
-        services.AddOptions<VaultOptions>()
-            .BindConfiguration(VaultConstants.ConfigPath)
+        services.AddKoanOptions<VaultOptions, VaultOptionsConfigurator>(
+                VaultConstants.ConfigPath,
+                configuratorLifetime: ServiceLifetime.Singleton)
             .Validate(o => !o.Enabled || (o.Address is not null && !string.IsNullOrWhiteSpace(o.Token)),
-                "Vault enabled but Address/Token not configured")
-            .ValidateOnStart();
-
-        // Register orchestration-aware configuration
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<IConfigureOptions<VaultOptions>, VaultOptionsConfigurator>());
+                "Vault enabled but Address/Token not configured");
 
         services.AddHttpClient(VaultConstants.HttpClientName, (sp, client) =>
         {

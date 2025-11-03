@@ -46,7 +46,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
     {
         try
         {
-            return provider.IsAvailableAsync().ConfigureAwait(false).GetAwaiter().GetResult();
+            return provider.IsAvailableAsync().GetAwaiter().GetResult();
         }
         catch (Exception ex)
         {

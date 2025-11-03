@@ -16,7 +16,7 @@ public sealed class VaultHealthCheck(IHttpClientFactory httpClientFactory, IOpti
         {
             var client = httpClientFactory.CreateClient(VaultConstants.HttpClientName);
             using var req = new HttpRequestMessage(HttpMethod.Get, "v1/sys/health");
-            using var resp = await client.SendAsync(req, cancellationToken).ConfigureAwait(false);
+            using var resp = await client.SendAsync(req, cancellationToken);
             if (resp.StatusCode == HttpStatusCode.OK || resp.StatusCode == HttpStatusCode.TooManyRequests || resp.StatusCode == HttpStatusCode.ServiceUnavailable)
             {
                 // Vault returns 200/429/503 depending on sealed/standby; treat network success as healthy for reachability

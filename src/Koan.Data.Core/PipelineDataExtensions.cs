@@ -22,7 +22,7 @@ public static class PipelineDataExtensions
         if (action is null) throw new ArgumentNullException(nameof(action));
         return builder.AddStage(async (envelope, _) =>
         {
-            await action(envelope.Entity).ConfigureAwait(false);
+            await action(envelope.Entity);
         });
     }
 
@@ -55,7 +55,7 @@ public static class PipelineDataExtensions
 
             try
             {
-                await envelope.Entity.Save(ct).ConfigureAwait(false);
+                await envelope.Entity.Save(ct);
             }
             catch (Exception ex)
             {
@@ -78,7 +78,7 @@ public static class PipelineDataExtensions
 
             try
             {
-                await envelope.Entity.Save(ct).ConfigureAwait(false);
+                await envelope.Entity.Save(ct);
             }
             catch (Exception ex)
             {
@@ -96,7 +96,7 @@ public static class PipelineDataExtensions
         if (size <= 0) throw new ArgumentOutOfRangeException(nameof(size));
 
         var buffer = new List<TEntity>(size);
-        await foreach (var item in source.WithCancellation(cancellationToken).ConfigureAwait(false))
+        await foreach (var item in source.WithCancellation(cancellationToken))
         {
             buffer.Add(item);
             if (buffer.Count == size)

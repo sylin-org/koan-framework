@@ -38,7 +38,7 @@ internal sealed class CanonPerformanceMonitoringHostedService : IHostedService, 
             _cts = null;
         }
 
-        await _monitor.DisposeAsync().ConfigureAwait(false);
+        await _monitor.DisposeAsync();
     }
 
     public ValueTask DisposeAsync()

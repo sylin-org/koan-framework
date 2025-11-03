@@ -39,16 +39,16 @@ public sealed class VaultSecretProvider : ISecretProvider
         try
         {
             using var req = new HttpRequestMessage(HttpMethod.Get, path);
-            using var resp = await client.SendAsync(req, ct).ConfigureAwait(false);
+            using var resp = await client.SendAsync(req, ct);
             if (resp.StatusCode == HttpStatusCode.NotFound)
                 throw new SecretNotFoundException(id.ToString());
             if (resp.StatusCode == HttpStatusCode.Forbidden || resp.StatusCode == HttpStatusCode.Unauthorized)
                 throw new SecretUnauthorizedException(id.ToString());
             resp.EnsureSuccessStatusCode();
 
-            using var stream = await resp.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
+            using var stream = await resp.Content.ReadAsStreamAsync(ct);
             using var reader = new StreamReader(stream);
-            var json = await reader.ReadToEndAsync(ct).ConfigureAwait(false);
+            var json = await reader.ReadToEndAsync(ct);
             var rootToken = JToken.Parse(json);
             if (_options.UseKvV2)
             {

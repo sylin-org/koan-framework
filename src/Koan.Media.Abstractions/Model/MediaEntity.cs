@@ -22,7 +22,7 @@ public abstract class MediaEntity<TEntity> : Koan.Storage.Model.StorageEntity<TE
     public static async Task<TEntity> Upload(Stream content, string name, string? contentType = null, IReadOnlyDictionary<string, string>? tags = null, CancellationToken ct = default)
     {
         // Reuse StorageEntity onboarding and hydrate media metadata
-        var ent = await Onboard(name, content, contentType, ct).ConfigureAwait(false);
+        var ent = await Onboard(name, content, contentType, ct);
         // Allow setting tags on the instance for downstream routing/logic; provider sync is provider-specific and may be deferred
         if (ent is MediaEntity<TEntity> me && tags is not null)
         {
@@ -45,6 +45,6 @@ public abstract class MediaEntity<TEntity> : Koan.Storage.Model.StorageEntity<TE
         var container = inst.Container ?? attr?.Container ?? string.Empty;
         var svc = (Koan.Core.Hosting.App.AppHost.Current?.GetService(typeof(IStorageService)) as IStorageService)
                 ?? throw new InvalidOperationException("IStorageService not available");
-        return await svc.ReadAsync(profile, container, key, ct).ConfigureAwait(false);
+        return await svc.ReadAsync(profile, container, key, ct);
     }
 }

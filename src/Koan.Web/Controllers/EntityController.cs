@@ -19,9 +19,10 @@ using Koan.Web.Endpoints;
 using Koan.Web.Hooks;
 using Koan.Web.Infrastructure;
 using System.Net.Mime;
-// using Microsoft.Extensions.Options; // duplicate removed
 using Koan.Web.Options;
 using Koan.Data.Abstractions.Instructions;
+using Koan.Web.Queries;
+using Koan.Web.PatchOps;
 
 namespace Koan.Web.Controllers;
 
@@ -139,77 +140,8 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
 
     protected virtual QueryOptions BuildOptions()
     {
-        var query = HttpContext.Request.Query;
-        var defaults = EndpointOptions;
-
-        var opts = new QueryOptions
-        {
-            Page = 1,
-            PageSize = defaults.DefaultPageSize,
-            View = defaults.DefaultView
-        };
-
-        if (query.TryGetValue("q", out var vq))
-        {
-            opts.Q = vq.FirstOrDefault();
-        }
-
-        if (query.TryGetValue("page", out var vp) && int.TryParse(vp, out var page) && page > 0)
-        {
-            opts.Page = page;
-        }
-
-        var maxSize = defaults.MaxPageSize;
-        if (query.TryGetValue("pageSize", out var vps) && int.TryParse(vps, out var requested) && requested > 0)
-        {
-            opts.PageSize = Math.Min(requested, maxSize);
-        }
-        else if (query.TryGetValue("size", out var vs) && int.TryParse(vs, out var size) && size > 0)
-        {
-            opts.PageSize = Math.Min(size, maxSize);
-        }
-
-        if (query.TryGetValue("sort", out var vsort))
-        {
-            foreach (var spec in vsort.ToString().Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-            {
-                var desc = spec.StartsWith('-');
-                var field = desc ? spec[1..] : spec;
-                if (!string.IsNullOrWhiteSpace(field))
-                {
-                    opts.Sort.Add(new SortSpec(field, desc));
-                }
-            }
-        }
-
-        if (query.TryGetValue("dir", out var vdir) && opts.Sort.Count == 1)
-        {
-            var direction = vdir.ToString();
-            if (string.Equals(direction, "desc", StringComparison.OrdinalIgnoreCase))
-            {
-                opts.Sort[0] = new SortSpec(opts.Sort[0].Field, true);
-            }
-        }
-
-        if (query.TryGetValue("output", out var vout))
-        {
-            var shape = vout.ToString();
-            if (defaults.IsShapeAllowed(shape))
-            {
-                opts.Shape = shape;
-            }
-        }
-
-        if (query.TryGetValue("view", out var vview))
-        {
-            opts.View = vview.ToString();
-        }
-        else if (string.IsNullOrWhiteSpace(opts.View))
-        {
-            opts.View = defaults.DefaultView;
-        }
-
-        return opts;
+        // Delegate to static parser for pure query transformation
+        return EntityQueryParser.Parse(HttpContext.Request.Query, EndpointOptions);
     }
 
     protected virtual IQueryable<TEntity> ApplySort(IQueryable<TEntity> query, QueryOptions opts)
@@ -595,59 +527,20 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
 
     private Koan.Data.Abstractions.Instructions.PatchPayload<TKey> NormalizeFromJsonPatch(TKey id, JsonPatchDocument<TEntity> doc)
     {
-        var ops = doc.Operations.Select(o => new Koan.Data.Abstractions.Instructions.PatchOp(
-            o.op,
-            o.path,
-            o.from,
-            o.value is null ? null : Newtonsoft.Json.Linq.JToken.FromObject(o.value))
-        ).ToList();
-        return new Koan.Data.Abstractions.Instructions.PatchPayload<TKey>(id, null, null, "json-patch", ops, BuildPatchOptions());
+        // Delegate to static normalizer for pure patch transformation
+        return PatchNormalizer.NormalizeJsonPatch<TEntity, TKey>(id, doc, BuildPatchOptions());
     }
 
     private Koan.Data.Abstractions.Instructions.PatchPayload<TKey> NormalizeFromMergePatch(TKey id, Newtonsoft.Json.Linq.JToken body)
-        => NormalizeObjectToOps(id, body, kindHint: "merge-patch", mergeSemantics: true);
+    {
+        // Delegate to static normalizer for merge patch semantics
+        return PatchNormalizer.NormalizeMergePatch(id, body, BuildPatchOptions());
+    }
 
     private Koan.Data.Abstractions.Instructions.PatchPayload<TKey> NormalizeFromPartialJson(TKey id, Newtonsoft.Json.Linq.JToken body)
-        => NormalizeObjectToOps(id, body, kindHint: "partial-json", mergeSemantics: false);
-
-    private Koan.Data.Abstractions.Instructions.PatchPayload<TKey> NormalizeObjectToOps(TKey id, Newtonsoft.Json.Linq.JToken body, string kindHint, bool mergeSemantics)
     {
-        var ops = new List<Koan.Data.Abstractions.Instructions.PatchOp>();
-        void Walk(Newtonsoft.Json.Linq.JToken token, string basePath)
-        {
-            if (token is Newtonsoft.Json.Linq.JObject obj)
-            {
-                foreach (var p in obj.Properties())
-                {
-                    var path = basePath + "/" + p.Name;
-                    if (p.Value.Type == Newtonsoft.Json.Linq.JTokenType.Object)
-                    {
-                        Walk(p.Value, path);
-                    }
-                    else if (p.Value.Type == Newtonsoft.Json.Linq.JTokenType.Null)
-                    {
-                        if (mergeSemantics)
-                            ops.Add(new Koan.Data.Abstractions.Instructions.PatchOp("remove", path, null, null));
-                        else
-                            ops.Add(new Koan.Data.Abstractions.Instructions.PatchOp("replace", path, null, Newtonsoft.Json.Linq.JValue.CreateNull()));
-                    }
-                    else
-                    {
-                        ops.Add(new Koan.Data.Abstractions.Instructions.PatchOp("replace", path, null, p.Value.DeepClone()));
-                    }
-                }
-            }
-            else
-            {
-                // primitives/arrays at root -> replace entire document path
-                ops.Add(new Koan.Data.Abstractions.Instructions.PatchOp("replace", basePath, null, token.DeepClone()));
-            }
-        }
-
-        Walk(body, "");
-        // Ensure pointers start at root ('/prop')
-        ops = ops.Select(o => o with { Path = o.Path.StartsWith('/') ? o.Path : "/" + o.Path.TrimStart('/') }).ToList();
-        return new Koan.Data.Abstractions.Instructions.PatchPayload<TKey>(id, null, null, kindHint, ops, BuildPatchOptions());
+        // Delegate to static normalizer for partial JSON semantics
+        return PatchNormalizer.NormalizePartialJson(id, body, BuildPatchOptions());
     }
 
     private Koan.Data.Abstractions.Instructions.PatchOptions BuildPatchOptions()

@@ -79,7 +79,7 @@ public sealed class CanonRuntime : ICanonRuntime
 
         if (effectiveOptions.StageBehavior == CanonStageBehavior.StageOnly)
         {
-            var stage = await CreateStageAsync(context, cancellationToken).ConfigureAwait(false);
+            var stage = await CreateStageAsync(context, cancellationToken);
             var stageEvent = new CanonizationEvent
             {
                 Phase = CanonPipelinePhase.Intake,
@@ -90,8 +90,8 @@ public sealed class CanonRuntime : ICanonRuntime
                 Detail = $"stage:{stage.Id}"
             };
 
-            await NotifyBeforePhaseAsync(CanonPipelinePhase.Intake, context, observers, cancellationToken).ConfigureAwait(false);
-            await NotifyAfterPhaseAsync(CanonPipelinePhase.Intake, context, stageEvent, observers, cancellationToken).ConfigureAwait(false);
+            await NotifyBeforePhaseAsync(CanonPipelinePhase.Intake, context, observers, cancellationToken);
+            await NotifyAfterPhaseAsync(CanonPipelinePhase.Intake, context, stageEvent, observers, cancellationToken);
 
             AppendRecord(context, stageEvent, CanonizationOutcome.Parked);
             return new CanonizationResult<T>(entity, CanonizationOutcome.Parked, metadata.Clone(), new[] { stageEvent }, reprojectionTriggered: false, distributionSkipped: true);
@@ -100,7 +100,7 @@ public sealed class CanonRuntime : ICanonRuntime
         if (descriptor is null || !descriptor.HasSteps)
         {
             entity.Metadata = metadata.Clone();
-            var canonical = await _persistence.PersistCanonicalAsync(entity, cancellationToken).ConfigureAwait(false);
+            var canonical = await _persistence.PersistCanonicalAsync(entity, cancellationToken);
             var resultMetadata = canonical.Metadata.Clone();
             return new CanonizationResult<T>(canonical, CanonizationOutcome.Canonized, resultMetadata, Array.Empty<CanonizationEvent>(), effectiveOptions.ForceRebuild, effectiveOptions.SkipDistribution);
         }
@@ -115,12 +115,12 @@ public sealed class CanonRuntime : ICanonRuntime
                 cancellationToken.ThrowIfCancellationRequested();
                 currentPhase = phase;
 
-                await NotifyBeforePhaseAsync(phase, context, observers, cancellationToken).ConfigureAwait(false);
+                await NotifyBeforePhaseAsync(phase, context, observers, cancellationToken);
 
                 CanonizationEvent? overrideEvent = null;
                 foreach (var contributor in descriptor.GetContributors(phase))
                 {
-                    var evt = await contributor.ExecuteAsync(context, cancellationToken).ConfigureAwait(false);
+                    var evt = await contributor.ExecuteAsync(context, cancellationToken);
                     if (evt is not null)
                     {
                         overrideEvent = evt;
@@ -130,7 +130,7 @@ public sealed class CanonRuntime : ICanonRuntime
                 var phaseEvent = NormalizeEvent(overrideEvent, phase, context);
                 events.Add(phaseEvent);
 
-                await NotifyAfterPhaseAsync(phase, context, phaseEvent, observers, cancellationToken).ConfigureAwait(false);
+                await NotifyAfterPhaseAsync(phase, context, phaseEvent, observers, cancellationToken);
                 AppendRecord(context, phaseEvent, CanonizationOutcome.Canonized);
             }
 
@@ -140,19 +140,19 @@ public sealed class CanonRuntime : ICanonRuntime
                 entity.Metadata.AssignCanonicalId(entity.Id);
             }
 
-            var canonical = await _persistence.PersistCanonicalAsync(entity, cancellationToken).ConfigureAwait(false);
+            var canonical = await _persistence.PersistCanonicalAsync(entity, cancellationToken);
             var outcome = ResolveOutcome(context);
             var resultMetadata = context.Metadata.Clone();
             var reprojectionTriggered = effectiveOptions.ForceRebuild || (effectiveOptions.RequestedViews?.Length > 0);
 
-            await EmitAuditAsync(context, cancellationToken).ConfigureAwait(false);
+            await EmitAuditAsync(context, cancellationToken);
 
             return new CanonizationResult<T>(canonical, outcome, resultMetadata, events, reprojectionTriggered, effectiveOptions.SkipDistribution);
         }
         catch (Exception ex)
         {
             var phase = currentPhase ?? CanonPipelinePhase.Intake;
-            await NotifyErrorAsync(phase, context, ex, observers, cancellationToken).ConfigureAwait(false);
+            await NotifyErrorAsync(phase, context, ex, observers, cancellationToken);
             var errorEvent = BuildErrorEvent(phase, context, ex);
             AppendRecord(context, errorEvent, CanonizationOutcome.Failed);
             throw;
@@ -180,7 +180,7 @@ public sealed class CanonRuntime : ICanonRuntime
             entry.ArrivalToken ??= context.Entity.Id;
         }
 
-        await _auditSink.WriteAsync(entries, cancellationToken).ConfigureAwait(false);
+        await _auditSink.WriteAsync(entries, cancellationToken);
     }
 
     /// <inheritdoc />
@@ -192,7 +192,7 @@ public sealed class CanonRuntime : ICanonRuntime
             throw new ArgumentException("Canonical identifier must be provided.", nameof(canonicalId));
         }
 
-        var entity = await CanonEntity<T>.Get(canonicalId, cancellationToken).ConfigureAwait(false)
+        var entity = await CanonEntity<T>.Get(canonicalId, cancellationToken)
             ?? throw new InvalidOperationException($"Canonical entity '{typeof(T).Name}' with identifier '{canonicalId}' was not found.");
 
         var options = CanonizationOptions.Default.Copy();
@@ -205,7 +205,7 @@ public sealed class CanonRuntime : ICanonRuntime
             CorrelationId = Guid.NewGuid().ToString("n")
         };
 
-        await Canonize(entity, options, cancellationToken).ConfigureAwait(false);
+        await Canonize(entity, options, cancellationToken);
     }
 
     /// <inheritdoc />
@@ -346,7 +346,7 @@ public sealed class CanonRuntime : ICanonRuntime
         }
 
         stage.Metadata["runtime:stage-behavior"] = context.Options.StageBehavior.ToString();
-        stage = await _persistence.PersistStageAsync(stage, cancellationToken).ConfigureAwait(false);
+        stage = await _persistence.PersistStageAsync(stage, cancellationToken);
         context.AttachStage(stage);
         return stage;
     }
@@ -399,7 +399,7 @@ public sealed class CanonRuntime : ICanonRuntime
     {
         for (var i = 0; i < observers.Count; i++)
         {
-            await callback(observers[i]).ConfigureAwait(false);
+            await callback(observers[i]);
         }
     }
 

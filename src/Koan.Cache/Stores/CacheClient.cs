@@ -80,7 +80,7 @@ internal sealed class CacheClient : ICacheClient
     public async ValueTask<CacheFetchResult> GetAsync(CacheKey key, CacheEntryOptions options, CancellationToken ct)
     {
         var normalized = ApplyScope(options);
-        var result = await _store.FetchAsync(key, normalized, ct).ConfigureAwait(false);
+        var result = await _store.FetchAsync(key, normalized, ct);
         if (result.Hit)
         {
             _instrumentation.RecordHit(key.Value, _store.ProviderName);
@@ -95,7 +95,7 @@ internal sealed class CacheClient : ICacheClient
 
     public async ValueTask<T?> GetAsync<T>(CacheKey key, CacheEntryOptions options, CancellationToken ct)
     {
-        var (found, value) = await TryGetValueAsync<T>(key, options, ct).ConfigureAwait(false);
+        var (found, value) = await TryGetValueAsync<T>(key, options, ct);
         return found ? value : default;
     }
 
@@ -119,30 +119,30 @@ internal sealed class CacheClient : ICacheClient
     {
         if (value is null)
         {
-            await RemoveAsync(key, ct).ConfigureAwait(false);
+            await RemoveAsync(key, ct);
             return;
         }
 
         var normalized = ApplyScope(options);
         var serializer = ResolveSerializer(typeof(T), normalized.ContentKind);
-        var cacheValue = await serializer.SerializeAsync(value!, normalized, ct).ConfigureAwait(false);
-        await _store.SetAsync(key, cacheValue, normalized, ct).ConfigureAwait(false);
+        var cacheValue = await serializer.SerializeAsync(value!, normalized, ct);
+        await _store.SetAsync(key, cacheValue, normalized, ct);
         _instrumentation.RecordSet(key.Value, _store.ProviderName);
 
         if (normalized.ForcePublishInvalidation)
         {
-            await _store.PublishInvalidationAsync(key, normalized, ct).ConfigureAwait(false);
+            await _store.PublishInvalidationAsync(key, normalized, ct);
             _instrumentation.RecordInvalidation(key.Value, _store.ProviderName, "publish");
         }
     }
 
     public async ValueTask<bool> RemoveAsync(CacheKey key, CancellationToken ct)
     {
-        var success = await _store.RemoveAsync(key, ct).ConfigureAwait(false);
+        var success = await _store.RemoveAsync(key, ct);
         _instrumentation.RecordRemove(key.Value, _store.ProviderName, success);
         if (!success && _store.Capabilities.SupportsPubSubInvalidation)
         {
-            await _store.PublishInvalidationAsync(key, new CacheEntryOptions(), ct).ConfigureAwait(false);
+            await _store.PublishInvalidationAsync(key, new CacheEntryOptions(), ct);
             _instrumentation.RecordInvalidation(key.Value, _store.ProviderName, "missing");
         }
 
@@ -177,11 +177,11 @@ internal sealed class CacheClient : ICacheClient
         {
             ct.ThrowIfCancellationRequested();
 
-            await foreach (var entry in _store.EnumerateByTagAsync(tag, ct).ConfigureAwait(false))
+            await foreach (var entry in _store.EnumerateByTagAsync(tag, ct))
             {
                 if (entry.IsExpired(now))
                 {
-                    await RemoveAsync(entry.Key, ct).ConfigureAwait(false);
+                    await RemoveAsync(entry.Key, ct);
                     continue;
                 }
 
@@ -194,7 +194,7 @@ internal sealed class CacheClient : ICacheClient
         {
             ct.ThrowIfCancellationRequested();
 
-            if (await RemoveAsync(key, ct).ConfigureAwait(false))
+            if (await RemoveAsync(key, ct))
             {
                 removed++;
             }
@@ -225,11 +225,11 @@ internal sealed class CacheClient : ICacheClient
         {
             ct.ThrowIfCancellationRequested();
 
-            await foreach (var entry in _store.EnumerateByTagAsync(tag, ct).ConfigureAwait(false))
+            await foreach (var entry in _store.EnumerateByTagAsync(tag, ct))
             {
                 if (entry.IsExpired(now))
                 {
-                    await RemoveAsync(entry.Key, ct).ConfigureAwait(false);
+                    await RemoveAsync(entry.Key, ct);
                     continue;
                 }
 
@@ -242,14 +242,14 @@ internal sealed class CacheClient : ICacheClient
 
     internal async ValueTask<(bool Found, T? Value)> TryGetValueAsync<T>(CacheKey key, CacheEntryOptions options, CancellationToken ct)
     {
-        var result = await GetAsync(key, options, ct).ConfigureAwait(false);
+        var result = await GetAsync(key, options, ct);
         if (!result.Hit || result.Value is null)
         {
             return (false, default);
         }
 
         var serializer = ResolveSerializer(typeof(T), result.Options.ContentKind);
-        var value = await serializer.DeserializeAsync<T>(result.Value, ct).ConfigureAwait(false);
+        var value = await serializer.DeserializeAsync<T>(result.Value, ct);
         return (true, value);
     }
 
@@ -298,7 +298,7 @@ internal sealed class CacheClient : ICacheClient
 
     private async ValueTask<T?> ExecuteGetOrAddAsync<T>(CacheKey key, Func<CancellationToken, ValueTask<T?>> valueFactory, CacheEntryOptions options, CancellationToken ct)
     {
-        var (found, existing) = await TryGetValueAsync<T>(key, options, ct).ConfigureAwait(false);
+        var (found, existing) = await TryGetValueAsync<T>(key, options, ct);
         if (found)
         {
             return existing;
@@ -307,21 +307,21 @@ internal sealed class CacheClient : ICacheClient
         var timeout = options.SingleflightTimeout ?? _options.CurrentValue.DefaultSingleflightTimeout;
         return await _singleflight.RunAsync(key.Value, timeout, async innerCt =>
         {
-            var (innerFound, innerValue) = await TryGetValueAsync<T>(key, options, innerCt).ConfigureAwait(false);
+            var (innerFound, innerValue) = await TryGetValueAsync<T>(key, options, innerCt);
             if (innerFound)
             {
                 return innerValue;
             }
 
-            var created = await valueFactory(innerCt).ConfigureAwait(false);
+            var created = await valueFactory(innerCt);
             if (created is null)
             {
                 return default;
             }
 
-            await SetAsync(key, created, options, innerCt).ConfigureAwait(false);
+            await SetAsync(key, created, options, innerCt);
             return created;
-        }, ct).ConfigureAwait(false);
+        }, ct);
     }
 
     private static IReadOnlyList<string> NormalizeTags(IEnumerable<string> tags)

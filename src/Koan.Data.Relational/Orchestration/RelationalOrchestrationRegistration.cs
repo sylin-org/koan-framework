@@ -1,6 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Microsoft.Extensions.Options;
 using Koan.Core;
 using Koan.Core.Modules;
 
@@ -11,8 +10,9 @@ public static class RelationalOrchestrationRegistration
     public static IServiceCollection AddRelationalOrchestration(this IServiceCollection services)
     {
         // Standardize options path/validation; no config path yet (defaults + configurator apply)
-        services.AddKoanOptions<RelationalMaterializationOptions>();
-        services.TryAddEnumerable(ServiceDescriptor.Transient<IConfigureOptions<RelationalMaterializationOptions>, RelationalMaterializationOptionsConfigurator>());
+        services.AddKoanOptions<RelationalMaterializationOptions, RelationalMaterializationOptionsConfigurator>(
+            configPath: null,
+            configuratorLifetime: ServiceLifetime.Transient);
         services.TryAddSingleton<IRelationalSchemaOrchestrator, RelationalSchemaOrchestrator>();
         return services;
     }

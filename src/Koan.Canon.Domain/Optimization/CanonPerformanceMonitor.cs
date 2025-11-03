@@ -73,7 +73,7 @@ public sealed class CanonPerformanceMonitor : IAsyncDisposable
                     gcMemory / (1024.0 * 1024.0),
                     workingSet / (1024.0 * 1024.0));
 
-                await Task.Delay(_reportingInterval, cancellationToken).ConfigureAwait(false);
+                await Task.Delay(_reportingInterval, cancellationToken);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -82,7 +82,7 @@ public sealed class CanonPerformanceMonitor : IAsyncDisposable
             catch (Exception ex)
             {
                 _logger.LogError(ex, "[canon-monitor] monitoring loop error");
-                await Task.Delay(TimeSpan.FromSeconds(30), cancellationToken).ConfigureAwait(false);
+                await Task.Delay(TimeSpan.FromSeconds(30), cancellationToken);
             }
         }
 

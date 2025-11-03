@@ -100,7 +100,7 @@ public sealed class StdioTransport : BackgroundService
 
         try
         {
-            await runTask.ConfigureAwait(false);
+            await runTask;
         }
         finally
         {
@@ -110,7 +110,7 @@ public sealed class StdioTransport : BackgroundService
             {
                 try
                 {
-                    await cts.CancelAsync().ConfigureAwait(false);
+                    await cts.CancelAsync();
                 }
                 catch (ObjectDisposedException)
                 {
@@ -123,7 +123,7 @@ public sealed class StdioTransport : BackgroundService
             {
                 try
                 {
-                    await heartbeatTask.ConfigureAwait(false);
+                    await heartbeatTask;
                 }
                 catch (OperationCanceledException)
                 {
@@ -147,7 +147,7 @@ public sealed class StdioTransport : BackgroundService
         {
             try
             {
-                await cts.CancelAsync().ConfigureAwait(false);
+                await cts.CancelAsync();
             }
             catch (ObjectDisposedException)
             {
@@ -160,10 +160,10 @@ public sealed class StdioTransport : BackgroundService
             if (timeout > TimeSpan.Zero && !sessionTask.IsCompleted)
             {
                 var delayTask = Task.Delay(timeout, cancellationToken);
-                var completed = await Task.WhenAny(sessionTask, delayTask).ConfigureAwait(false);
+                var completed = await Task.WhenAny(sessionTask, delayTask);
                 if (completed == sessionTask)
                 {
-                    await sessionTask.ConfigureAwait(false);
+                    await sessionTask;
                 }
                 else
                 {
@@ -173,11 +173,11 @@ public sealed class StdioTransport : BackgroundService
             }
             else
             {
-                await sessionTask.ConfigureAwait(false);
+                await sessionTask;
             }
         }
 
-        await base.StopAsync(cancellationToken).ConfigureAwait(false);
+        await base.StopAsync(cancellationToken);
     }
 
     private async Task RunHeartbeatAsync(TimeSpan interval, ILogger transportLogger, CancellationToken cancellationToken, McpServerOptions options)
@@ -190,7 +190,7 @@ public sealed class StdioTransport : BackgroundService
         try
         {
             using var timer = new PeriodicTimer(interval);
-            while (await timer.WaitForNextTickAsync(cancellationToken).ConfigureAwait(false))
+            while (await timer.WaitForNextTickAsync(cancellationToken))
             {
                 _lastHeartbeatUtc = DateTimeOffset.UtcNow;
                 transportLogger.LogDebug("STDIO heartbeat {Timestamp:O}.", _lastHeartbeatUtc);
