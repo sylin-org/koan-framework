@@ -43,9 +43,6 @@ provides an opinionated, parallel-friendly structure for every suite.
     Cache/
       Unit/
         Koan.Tests.Cache.Unit/
-    S2/
-      Integration/
-        Koan.Tests.S2.Api/
 ```
 
 ## Adding a Suite
@@ -57,13 +54,6 @@ provides an opinionated, parallel-friendly structure for every suite.
    automatically register fixtures via `WithFixture`.
 
 ## Running suites
-
-            Integration/
-              Koan.Tests.S2.Api/
-        Samples/
-          Koan.Samples.McpService.Tests/
-          Koan.Samples.DocMind.Tests/
-          Koan.Samples.PantryPal.Tests/
 
 ```pwsh
 dotnet test Koan.sln
