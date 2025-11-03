@@ -29,7 +29,7 @@ public sealed class ChainSecretResolver : ISecretResolver
         {
             try
             {
-                var v = await p.GetAsync(id, ct).ConfigureAwait(false);
+                var v = await p.GetAsync(id, ct);
                 var ttl = v.Meta.Ttl ?? TimeSpan.FromMinutes(5);
                 _cache.Set(cacheKey, v, ttl);
                 return v;
@@ -56,7 +56,7 @@ public sealed class ChainSecretResolver : ISecretResolver
         {
             var token = match.Groups[1].Value;
             var id = SecretId.Parse(token);
-            var v = await GetAsync(id, ct).ConfigureAwait(false);
+            var v = await GetAsync(id, ct);
             map[token] = v.AsString();
         }
         var s = template;

@@ -38,7 +38,7 @@ public sealed class AiController : ControllerBase
         {
             try
             {
-                var list = await a.ListModelsAsync(ct).ConfigureAwait(false);
+                var list = await a.ListModelsAsync(ct);
                 results.AddRange(list);
             }
             catch { /* ignore unavailable adapter */ }
@@ -52,7 +52,7 @@ public sealed class AiController : ControllerBase
         var caps = new List<AiCapabilities>();
         foreach (var a in _registry.All)
         {
-            try { caps.Add(await a.GetCapabilitiesAsync(ct).ConfigureAwait(false)); }
+            try { caps.Add(await a.GetCapabilitiesAsync(ct)); }
             catch { /* ignore unavailable adapter */ }
         }
         return Ok(caps);
@@ -73,7 +73,7 @@ public sealed class AiController : ControllerBase
     [HttpPost(Constants.Routes.Chat)]
     public async Task<ActionResult<AiChatResponse>> Chat([FromBody] AiChatRequest request, CancellationToken ct)
     {
-        var res = await _ai.PromptAsync(request, ct).ConfigureAwait(false);
+        var res = await _ai.PromptAsync(request, ct);
         return Ok(res);
     }
 
@@ -98,7 +98,7 @@ public sealed class AiController : ControllerBase
     [HttpPost(Constants.Routes.Embeddings)]
     public async Task<ActionResult<AiEmbeddingsResponse>> Embeddings([FromBody] AiEmbeddingsRequest request, CancellationToken ct)
     {
-        var res = await _ai.EmbedAsync(request, ct).ConfigureAwait(false);
+        var res = await _ai.EmbedAsync(request, ct);
         return Ok(res);
     }
 
@@ -145,7 +145,7 @@ public sealed class AiController : ControllerBase
             }
         };
 
-        var result = await operation(manager, normalized, ct).ConfigureAwait(false);
+        var result = await operation(manager, normalized, ct);
         if (!result.Success)
         {
             return StatusCode(StatusCodes.Status502BadGateway, result);

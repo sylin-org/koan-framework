@@ -8,12 +8,12 @@ public static class AdapterReadinessExtensions
     {
         if (adapter is not IAdapterReadiness readiness)
         {
-            return await operation().ConfigureAwait(false);
+            return await operation();
         }
 
         if (adapter is IAdapterReadinessConfiguration configuration && configuration.EnableReadinessGating == false)
         {
-            return await operation().ConfigureAwait(false);
+            return await operation();
         }
 
         var policy = (adapter as IAdapterReadinessConfiguration)?.Policy ?? ReadinessPolicy.Hold;
@@ -26,7 +26,7 @@ public static class AdapterReadinessExtensions
                     break;
                 }
 
-                if (!await readiness.IsReadyAsync(ct).ConfigureAwait(false))
+                if (!await readiness.IsReadyAsync(ct))
                 {
                     throw new AdapterNotReadyException(adapter.GetType().Name, readiness.ReadinessState,
                         $"Adapter {adapter.GetType().Name} is not ready (State: {readiness.ReadinessState}).");
@@ -34,14 +34,14 @@ public static class AdapterReadinessExtensions
                 break;
             case ReadinessPolicy.Hold:
                 var timeout = (adapter as IAdapterReadinessConfiguration)?.Timeout;
-                await readiness.WaitForReadinessAsync(timeout, ct).ConfigureAwait(false);
+                await readiness.WaitForReadinessAsync(timeout, ct);
                 break;
             case ReadinessPolicy.Degrade:
                 break;
         }
 
         // Execute operation with potential schema auto-provisioning
-        return await ExecuteWithSchemaProvisioningAsync(adapter, operation, null, ct).ConfigureAwait(false);
+        return await ExecuteWithSchemaProvisioningAsync(adapter, operation, null, ct);
     }
 
     /// <summary>
@@ -58,12 +58,12 @@ public static class AdapterReadinessExtensions
     {
         if (adapter is not IAdapterReadiness readiness)
         {
-            return await ExecuteWithSchemaProvisioningAsync<T, TEntity>(adapter, operation, ct).ConfigureAwait(false);
+            return await ExecuteWithSchemaProvisioningAsync<T, TEntity>(adapter, operation, ct);
         }
 
         if (adapter is IAdapterReadinessConfiguration configuration && configuration.EnableReadinessGating == false)
         {
-            return await ExecuteWithSchemaProvisioningAsync<T, TEntity>(adapter, operation, ct).ConfigureAwait(false);
+            return await ExecuteWithSchemaProvisioningAsync<T, TEntity>(adapter, operation, ct);
         }
 
         var policy = (adapter as IAdapterReadinessConfiguration)?.Policy ?? ReadinessPolicy.Hold;
@@ -76,7 +76,7 @@ public static class AdapterReadinessExtensions
                     break;
                 }
 
-                if (!await readiness.IsReadyAsync(ct).ConfigureAwait(false))
+                if (!await readiness.IsReadyAsync(ct))
                 {
                     throw new AdapterNotReadyException(adapter.GetType().Name, readiness.ReadinessState,
                         $"Adapter {adapter.GetType().Name} is not ready (State: {readiness.ReadinessState}).");
@@ -84,20 +84,20 @@ public static class AdapterReadinessExtensions
                 break;
             case ReadinessPolicy.Hold:
                 var timeout = (adapter as IAdapterReadinessConfiguration)?.Timeout;
-                await readiness.WaitForReadinessAsync(timeout, ct).ConfigureAwait(false);
+                await readiness.WaitForReadinessAsync(timeout, ct);
                 break;
             case ReadinessPolicy.Degrade:
                 break;
         }
 
         // Execute operation with schema auto-provisioning for entity type
-        return await ExecuteWithSchemaProvisioningAsync<T, TEntity>(adapter, operation, ct).ConfigureAwait(false);
+        return await ExecuteWithSchemaProvisioningAsync<T, TEntity>(adapter, operation, ct);
     }
 
     private static async Task<T> ExecuteWithSchemaProvisioningAsync<T, TEntity>(object adapter, Func<Task<T>> operation, CancellationToken ct)
         where TEntity : class
     {
-        return await ExecuteWithSchemaProvisioningAsync(adapter, operation, typeof(TEntity), ct).ConfigureAwait(false);
+        return await ExecuteWithSchemaProvisioningAsync(adapter, operation, typeof(TEntity), ct);
     }
 
     private static async Task<T> ExecuteWithSchemaProvisioningAsync<T>(object adapter, Func<Task<T>> operation, Type? entityType, CancellationToken ct)
@@ -105,7 +105,7 @@ public static class AdapterReadinessExtensions
         try
         {
             // First attempt: Execute operation normally
-            return await operation().ConfigureAwait(false);
+            return await operation();
         }
         catch (Exception ex) when (entityType != null && IsSchemaRelatedFailure(ex))
         {
@@ -123,12 +123,12 @@ public static class AdapterReadinessExtensions
                         var task = (Task<bool>?)executeMethod.Invoke(adapter, new object[] { instruction, ct });
                         if (task != null)
                         {
-                            await task.ConfigureAwait(false);
+                            await task;
                         }
                     }
 
                     // Retry the operation after schema provisioning
-                    return await operation().ConfigureAwait(false);
+                    return await operation();
                 }
                 catch (Exception provisioningEx)
                 {
@@ -167,8 +167,8 @@ public static class AdapterReadinessExtensions
     {
         await adapter.WithReadinessAsync(async () =>
         {
-            await operation().ConfigureAwait(false);
+            await operation();
             return true;
-        }, ct).ConfigureAwait(false);
+        }, ct);
     }
 }

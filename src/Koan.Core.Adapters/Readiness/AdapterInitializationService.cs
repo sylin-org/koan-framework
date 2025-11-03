@@ -45,7 +45,7 @@ internal sealed class DefaultAdapterInitializationRetryPolicy : IAdapterInitiali
 
         try
         {
-            await action(timeoutCts.Token).ConfigureAwait(false);
+            await action(timeoutCts.Token);
         }
         catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested && !ct.IsCancellationRequested)
         {
@@ -115,7 +115,7 @@ internal sealed class AdapterInitializationService : IHostedService
 
             _logger.LogDebug("Starting initialization wave with {Count} adapters", snapshot.Length);
             var tasks = snapshot.Select(initializer => InitializeAsync(initializer, cancellationToken));
-            await Task.WhenAll(tasks).ConfigureAwait(false);
+            await Task.WhenAll(tasks);
         }
 
         _logger.LogInformation("Async adapter initialization completed");
@@ -159,7 +159,7 @@ internal sealed class AdapterInitializationService : IHostedService
         try
         {
             _logger.LogDebug("Initializing adapter {Adapter}", adapterType);
-            await policy.ExecuteAsync(ct => initializer.InitializeAsync(ct), cancellationToken).ConfigureAwait(false);
+            await policy.ExecuteAsync(ct => initializer.InitializeAsync(ct), cancellationToken);
             _logger.LogDebug("Adapter {Adapter} initialized", adapterType);
         }
         catch (Exception ex)

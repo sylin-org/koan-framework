@@ -19,13 +19,13 @@ internal sealed class EntityTransformerInvoker<TEntity, TShape> : IEntityTransfo
 
     public async Task<object?> ParseAsync(Stream body, string contentType, HttpContext httpContext)
     {
-        var entity = await _inner.ParseAsync(body, contentType, httpContext).ConfigureAwait(false);
+        var entity = await _inner.ParseAsync(body, contentType, httpContext);
         return entity;
     }
 
     public async Task<object> ParseManyAsync(Stream body, string contentType, HttpContext httpContext)
     {
-        var entities = await _inner.ParseManyAsync(body, contentType, httpContext).ConfigureAwait(false);
+        var entities = await _inner.ParseManyAsync(body, contentType, httpContext);
         return entities;
     }
 
@@ -43,6 +43,6 @@ internal sealed class EntityTransformerInvoker<TEntity, TShape> : IEntityTransfo
     {
         IEnumerable<TEntity> typed = models as IEnumerable<TEntity> ?? models.Cast<TEntity>().ToArray();
 
-        return await _inner.TransformManyAsync(typed, httpContext).ConfigureAwait(false);
+        return await _inner.TransformManyAsync(typed, httpContext);
     }
 }
