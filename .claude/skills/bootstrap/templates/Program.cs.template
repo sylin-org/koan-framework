@@ -1,0 +1,16 @@
+// Minimal Koan Framework Program.cs Template
+// This is ALL you need for a complete Koan application
+
+using Koan.Core;
+
+var builder = WebApplication.CreateBuilder(args);
+
+// ONE LINE - framework discovers and registers everything
+builder.Services.AddKoan();
+
+var app = builder.Build();
+
+// Framework auto-configures middleware based on referenced packages
+// No manual app.UseRouting(), app.UseAuthorization(), etc. needed
+
+app.Run();

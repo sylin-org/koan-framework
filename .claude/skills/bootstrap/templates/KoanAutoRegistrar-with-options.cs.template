@@ -1,0 +1,222 @@
+// KoanAutoRegistrar Template with Configuration Options Pattern
+// Demonstrates loading and binding configuration options
+
+using Koan.Core;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
+
+namespace MyApp.Initialization;
+
+/// <summary>
+/// Auto-registrar demonstrating options pattern integration.
+/// </summary>
+public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
+{
+    public string ModuleName => "MyApp";
+
+    public string? ModuleVersion =>
+        typeof(KoanAutoRegistrar).Assembly.GetName().Version?.ToString();
+
+    public void Initialize(IServiceCollection services)
+    {
+        // Build temporary service provider to access configuration
+        var sp = services.BuildServiceProvider();
+        var cfg = sp.GetRequiredService<IConfiguration>();
+        var env = sp.GetRequiredService<IHostEnvironment>();
+
+        // ====================================================================
+        // OPTIONS PATTERN: Bind configuration sections to strongly-typed options
+        // ====================================================================
+
+        // Register and validate email options
+        services.AddOptions<EmailOptions>()
+            .Bind(cfg.GetSection("Email"))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
+        // Register cache options with custom validation
+        services.AddOptions<CacheOptions>()
+            .Bind(cfg.GetSection("Cache"))
+            .Validate(opts =>
+            {
+                if (env.IsProduction() && string.IsNullOrEmpty(opts.RedisConnectionString))
+                {
+                    return false; // Redis required in production
+                }
+                return true;
+            }, "Redis connection string required in production")
+            .ValidateOnStart();
+
+        // ====================================================================
+        // CONDITIONAL REGISTRATION BASED ON CONFIGURATION
+        // ====================================================================
+
+        // Feature flags
+        if (cfg.GetValue<bool>("Features:EmailNotifications", defaultValue: true))
+        {
+            services.AddScoped<INotificationService, EmailNotificationService>();
+        }
+        else
+        {
+            services.AddScoped<INotificationService, NoOpNotificationService>();
+        }
+
+        // Provider selection from configuration
+        var cacheProvider = cfg.GetValue<string>("Cache:Provider", "memory");
+        switch (cacheProvider.ToLowerInvariant())
+        {
+            case "redis":
+                services.AddSingleton<ICacheService, RedisCacheService>();
+                break;
+            case "memory":
+                services.AddSingleton<ICacheService, InMemoryCacheService>();
+                break;
+            default:
+                throw new InvalidOperationException($"Unknown cache provider: {cacheProvider}");
+        }
+
+        // ====================================================================
+        // CONFIGURATION HELPER WITH FALLBACKS
+        // ====================================================================
+
+        // Read with fallback chain: config → env var → default
+        var apiKey = Configuration.Read(
+            cfg,
+            defaultValue: "dev-key-12345",
+            "ExternalService:ApiKey",      // Config path
+            "EXTERNAL_SERVICE_API_KEY"     // Environment variable
+        );
+
+        var apiUrl = Configuration.Read(
+            cfg,
+            defaultValue: "https://api.example.com",
+            "ExternalService:Url",
+            "EXTERNAL_SERVICE_URL"
+        );
+
+        // Register service with configuration
+        services.AddSingleton(new ExternalApiClient(apiUrl, apiKey));
+
+        // ====================================================================
+        // ENVIRONMENT-SPECIFIC SERVICES
+        // ====================================================================
+
+        if (KoanEnv.IsDevelopment)
+        {
+            services.AddScoped<ISeedService, DevelopmentSeedService>();
+            services.AddScoped<IEmailService, ConsoleEmailService>(); // Log to console
+        }
+
+        if (KoanEnv.IsProduction)
+        {
+            services.AddScoped<IEmailService, SendGridEmailService>(); // Real emails
+            services.AddSingleton<IMonitoringService, ApplicationInsightsMonitoring>();
+        }
+
+        // ====================================================================
+        // BACKGROUND SERVICES WITH OPTIONS
+        // ====================================================================
+
+        services.AddHostedService<CleanupWorker>();
+        services.AddHostedService<NotificationWorker>();
+
+        // Only start expensive background workers in production
+        if (!KoanEnv.IsDevelopment)
+        {
+            services.AddHostedService<AnalyticsAggregationWorker>();
+            services.AddHostedService<ReportGenerationWorker>();
+        }
+    }
+
+    public void Describe(BootReport report, IConfiguration cfg, IHostEnvironment env)
+    {
+        report.AddModule(ModuleName, ModuleVersion);
+        report.AddNote($"Environment: {env.EnvironmentName}");
+
+        // Report feature flags
+        var emailEnabled = cfg.GetValue<bool>("Features:EmailNotifications", true);
+        report.AddNote($"Email notifications: {(emailEnabled ? "enabled" : "disabled")}");
+
+        // Report provider selections
+        var cacheProvider = cfg.GetValue<string>("Cache:Provider", "memory");
+        report.AddNote($"Cache provider: {cacheProvider}");
+
+        // Validate configuration and report warnings
+        ValidateAndReportConfiguration(report, cfg, env);
+    }
+
+    private void ValidateAndReportConfiguration(
+        BootReport report,
+        IConfiguration cfg,
+        IHostEnvironment env)
+    {
+        // Email configuration
+        if (!cfg.GetSection("Email:Smtp").Exists())
+        {
+            report.AddWarning("Email SMTP configuration missing - using console fallback");
+        }
+
+        // Redis in production
+        if (env.IsProduction() &&
+            cfg.GetValue<string>("Cache:Provider") == "redis" &&
+            string.IsNullOrEmpty(cfg["Cache:Redis:ConnectionString"]))
+        {
+            report.AddWarning("Redis cache configured but connection string missing");
+        }
+
+        // API keys
+        var apiKey = cfg["ExternalService:ApiKey"];
+        if (string.IsNullOrEmpty(apiKey) || apiKey == "dev-key-12345")
+        {
+            if (env.IsProduction())
+            {
+                report.AddWarning("Production environment using default/missing API key");
+            }
+            else
+            {
+                report.AddNote("Using development API key");
+            }
+        }
+
+        // Database configuration
+        var dbAdapter = cfg["Koan:Data:Sources:Default:Adapter"];
+        report.AddNote($"Database adapter: {dbAdapter ?? "auto-detect"}");
+
+        // Container detection
+        if (KoanEnv.InContainer)
+        {
+            report.AddNote("Running in container environment");
+        }
+    }
+}
+
+// ============================================================================
+// CONFIGURATION OPTIONS CLASSES
+// ============================================================================
+
+/// <summary>
+/// Email service configuration options.
+/// Binds to "Email" section in appsettings.json.
+/// </summary>
+public class EmailOptions
+{
+    public string SmtpHost { get; set; } = "";
+    public int SmtpPort { get; set; } = 587;
+    public string Username { get; set; } = "";
+    public string Password { get; set; } = "";
+    public string FromAddress { get; set; } = "";
+    public string FromName { get; set; } = "";
+}
+
+/// <summary>
+/// Cache service configuration options.
+/// Binds to "Cache" section in appsettings.json.
+/// </summary>
+public class CacheOptions
+{
+    public string Provider { get; set; } = "memory";
+    public string? RedisConnectionString { get; set; }
+    public int DefaultTtlMinutes { get; set; } = 60;
+}
