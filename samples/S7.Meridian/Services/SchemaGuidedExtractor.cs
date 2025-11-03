@@ -71,7 +71,7 @@ public sealed class SchemaGuidedExtractor : ISchemaGuidedExtractor
         DocumentStyle? documentStyle = null;
         if (!string.IsNullOrWhiteSpace(document.DocumentStyleId))
         {
-            documentStyle = await DocumentStyle.Get(document.DocumentStyleId, ct).ConfigureAwait(false);
+            documentStyle = await DocumentStyle.Get(document.DocumentStyleId, ct);
         }
 
         // Build extraction context based on document style
@@ -82,7 +82,7 @@ public sealed class SchemaGuidedExtractor : ISchemaGuidedExtractor
         {
             // Use RAG to get focused context
             var passages = await RetrieveRelevantPassagesAsync(
-                document, batch, catalog, documentStyle.PassageRetrievalTopK, ct).ConfigureAwait(false);
+                document, batch, catalog, documentStyle.PassageRetrievalTopK, ct);
 
             if (passages.Count > 0)
             {
@@ -90,7 +90,7 @@ public sealed class SchemaGuidedExtractor : ISchemaGuidedExtractor
                 {
                     // Expand passages with surrounding context for dialogues
                     passages = await ExpandPassageContextAsync(
-                        passages, documentStyle.ContextWindowSize, ct).ConfigureAwait(false);
+                        passages, documentStyle.ContextWindowSize, ct);
                 }
 
                 extractionContext = BuildContextFromPassages(passages);
@@ -122,7 +122,7 @@ public sealed class SchemaGuidedExtractor : ISchemaGuidedExtractor
             documentStyle,
             usedPassageRetrieval);
 
-        var fields = await ExtractFieldsAsync(prompt, batch, catalog, pipelineId, document.Id, FieldSource.DocumentExtraction, ct).ConfigureAwait(false);
+        var fields = await ExtractFieldsAsync(prompt, batch, catalog, pipelineId, document.Id, FieldSource.DocumentExtraction, ct);
 
         _logger.LogInformation("Extracted {FieldCount}/{TotalFields} fields from document {DocumentId} for batch '{Batch}' (style: {Style}, RAG: {UsedRAG})",
             fields.Count, batch.FieldPaths.Count, document.Id, batch.CategoryName,
@@ -145,7 +145,7 @@ public sealed class SchemaGuidedExtractor : ISchemaGuidedExtractor
 
         var notesDocId = $"notes:{pipelineId}";
         var prompt = BuildNotesExtractionPrompt(notes, batch, catalog);
-        var fields = await ExtractFieldsAsync(prompt, batch, catalog, pipelineId, notesDocId, FieldSource.AuthoritativeNotes, ct).ConfigureAwait(false);
+        var fields = await ExtractFieldsAsync(prompt, batch, catalog, pipelineId, notesDocId, FieldSource.AuthoritativeNotes, ct);
 
         _logger.LogInformation("Extracted {FieldCount}/{TotalFields} fields from authoritative notes for batch '{Batch}'",
             fields.Count, batch.FieldPaths.Count, batch.CategoryName);
@@ -177,7 +177,7 @@ public sealed class SchemaGuidedExtractor : ISchemaGuidedExtractor
             _logger.LogDebug("Extracting batch '{Batch}' ({FieldCount} fields) using {Model}",
                 batch.CategoryName, batch.FieldPaths.Count, _options.Facts.ExtractionModel);
 
-            raw = await Ai.Chat(chatOptions, ct).ConfigureAwait(false);
+            raw = await Ai.Chat(chatOptions, ct);
 
             if (_logger.IsEnabled(LogLevel.Trace))
             {
@@ -525,7 +525,7 @@ public sealed class SchemaGuidedExtractor : ISchemaGuidedExtractor
         try
         {
             // Generate query embedding
-            var queryEmbedding = await Ai.Embed(query, ct).ConfigureAwait(false);
+            var queryEmbedding = await Ai.Embed(query, ct);
 
             // Search vector store
             var searchOptions = new VectorQueryOptions(
@@ -537,7 +537,7 @@ public sealed class SchemaGuidedExtractor : ISchemaGuidedExtractor
             var results = await VectorWorkflow<Passage>.Query(
                 searchOptions,
                 MeridianConstants.VectorProfile,
-                ct).ConfigureAwait(false);
+                ct);
 
             if (results.Matches.Count == 0)
             {
@@ -550,7 +550,7 @@ public sealed class SchemaGuidedExtractor : ISchemaGuidedExtractor
             var passages = new List<Passage>();
             foreach (var match in results.Matches)
             {
-                var passage = await Passage.Get(match.Id, ct).ConfigureAwait(false);
+                var passage = await Passage.Get(match.Id, ct);
                 if (passage != null)
                 {
                     passages.Add(passage);
@@ -596,7 +596,7 @@ public sealed class SchemaGuidedExtractor : ISchemaGuidedExtractor
                 p => p.SourceDocumentId == passage.SourceDocumentId &&
                      p.SequenceNumber >= passage.SequenceNumber - windowSize &&
                      p.SequenceNumber <= passage.SequenceNumber + windowSize,
-                ct).ConfigureAwait(false);
+                ct);
 
             foreach (var ctx in contextPassages)
             {
@@ -608,7 +608,7 @@ public sealed class SchemaGuidedExtractor : ISchemaGuidedExtractor
         var allPassages = new List<Passage>();
         foreach (var id in expandedIds)
         {
-            var passage = await Passage.Get(id, ct).ConfigureAwait(false);
+            var passage = await Passage.Get(id, ct);
             if (passage != null)
             {
                 allPassages.Add(passage);

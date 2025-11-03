@@ -44,7 +44,7 @@ public sealed class JobCoordinator : IJobCoordinator
         // Retry loop for optimistic concurrency
         for (int attempt = 0; attempt < MaxRetries; attempt++)
         {
-            var existing = await ProcessingJob.FindPendingAsync(pipelineId, ct).ConfigureAwait(false);
+            var existing = await ProcessingJob.FindPendingAsync(pipelineId, ct);
 
             if (existing is not null)
             {
@@ -63,7 +63,7 @@ public sealed class JobCoordinator : IJobCoordinator
                     try
                     {
                         // Save with version check
-                        var saved = await existing.Save(ct).ConfigureAwait(false);
+                        var saved = await existing.Save(ct);
                         _logger.LogInformation("Appended {Added} documents to existing job {JobId} for pipeline {PipelineId} (attempt {Attempt}).",
                             added, existing.Id, pipelineId, attempt + 1);
                         return saved;
@@ -107,7 +107,7 @@ public sealed class JobCoordinator : IJobCoordinator
                     HeartbeatAt = DateTime.UtcNow
                 };
 
-                await job.Save(ct).ConfigureAwait(false);
+                await job.Save(ct);
                 _logger.LogInformation("Scheduled job {JobId} for pipeline {PipelineId} with {DocumentCount} documents.",
                     job.Id, pipelineId, job.DocumentIds.Count);
                 return job;

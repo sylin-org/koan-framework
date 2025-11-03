@@ -26,15 +26,15 @@ services:
   translation-service:
     build:
       context: ../../..
-      dockerfile: src/Koan.Services.Translation.Container/Dockerfile
+      dockerfile: src/Services/Translation/Koan.Service.Translation.Container/Dockerfile
     image: koan-service-translation:dev
     environment:
       ASPNETCORE_URLS: "http://+:8080"
 
       # Service mesh configuration
-      Koan__Services__Translation__Port: "8080"
-      Koan__Services__Orchestrator__MulticastGroup: "239.255.42.1"
-      Koan__Services__Orchestrator__MulticastPort: "42001"
+      Koan__Service__Translation__Port: "8080"
+      Koan__Service__Orchestrator__MulticastGroup: "239.255.42.1"
+      Koan__Service__Orchestrator__MulticastPort: "42001"
 
       # AI configuration for translation
       Koan__Ai__Services__Ollama__0__BaseUrl: "http://ollama:11434"

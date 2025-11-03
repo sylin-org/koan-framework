@@ -38,7 +38,7 @@ public sealed class TemplateRenderer : ITemplateRenderer
 
     public async Task<string> RenderMarkdownAsync(Deliverable deliverable, CancellationToken ct)
     {
-        var pipeline = await DocumentPipeline.Get(deliverable.PipelineId, ct).ConfigureAwait(false);
+        var pipeline = await DocumentPipeline.Get(deliverable.PipelineId, ct);
         if (pipeline is null)
         {
             _logger.LogWarning("Pipeline {PipelineId} missing while rendering deliverable {DeliverableId}.", deliverable.PipelineId, deliverable.Id);
@@ -60,7 +60,7 @@ public sealed class TemplateRenderer : ITemplateRenderer
         var context = BuildTemplateContext(data);
 
         var renderer = _stubbleBuilder.Build();
-        var markdown = await renderer.RenderAsync(template, context).ConfigureAwait(false);
+        var markdown = await renderer.RenderAsync(template, context);
 
         if (data.Footnotes.Count > 0)
         {
@@ -98,13 +98,13 @@ public sealed class TemplateRenderer : ITemplateRenderer
     {
         try
         {
-            var markdown = await RenderMarkdownAsync(deliverable, ct).ConfigureAwait(false);
+            var markdown = await RenderMarkdownAsync(deliverable, ct);
             if (string.IsNullOrWhiteSpace(markdown))
             {
                 return Array.Empty<byte>();
             }
 
-            return await _pdfRenderer.RenderAsync(markdown, ct).ConfigureAwait(false);
+            return await _pdfRenderer.RenderAsync(markdown, ct);
         }
         catch (OperationCanceledException)
         {

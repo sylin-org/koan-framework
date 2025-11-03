@@ -33,7 +33,7 @@ public sealed class VisitPlanningService : IVisitPlanningService
             ? new HashSet<string>(request.ParticipantIds, StringComparer.OrdinalIgnoreCase)
             : null;
 
-        var allVisits = await ParticipantVisit.All(ct).ConfigureAwait(false);
+        var allVisits = await ParticipantVisit.All(ct);
 
         var query = allVisits.AsEnumerable().Where(v => v.TrialSiteId == request.TrialSiteId);
 
@@ -134,7 +134,7 @@ public sealed class VisitPlanningService : IVisitPlanningService
 
         if (adjustments.Count > 0)
         {
-            await ParticipantVisit.UpsertMany(visitList, ct).ConfigureAwait(false);
+            await ParticipantVisit.UpsertMany(visitList, ct);
         }
 
         var ai = Ai.TryResolve();
@@ -156,7 +156,7 @@ public sealed class VisitPlanningService : IVisitPlanningService
                         new AiMessage("user", prompt)
                     },
                     Options = new AiPromptOptions { MaxOutputTokens = 256 }
-                }, ct).ConfigureAwait(false);
+                }, ct);
 
                 if (!string.IsNullOrWhiteSpace(response.Text))
                 {

@@ -43,7 +43,7 @@ internal sealed class KoanAdminAuthorizationFilter : IAsyncAuthorizationFilter
         var policy = options.Authorization.Policy;
         if (!string.IsNullOrWhiteSpace(policy))
         {
-            var result = await _authorizationService.AuthorizeAsync(context.HttpContext.User, null, policy).ConfigureAwait(false);
+            var result = await _authorizationService.AuthorizeAsync(context.HttpContext.User, null, policy);
             if (!result.Succeeded)
             {
                 context.Result = new ForbidResult();

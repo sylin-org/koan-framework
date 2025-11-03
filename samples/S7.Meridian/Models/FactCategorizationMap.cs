@@ -57,7 +57,7 @@ public sealed class FactCategorizationMap : Entity<FactCategorizationMap>
         string catalogHash,
         CancellationToken ct = default)
     {
-        var results = await Query(m => m.CatalogHash == catalogHash, ct).ConfigureAwait(false);
+        var results = await Query(m => m.CatalogHash == catalogHash, ct);
         return results.FirstOrDefault();
     }
 
@@ -76,7 +76,7 @@ public sealed class FactCategorizationMap : Entity<FactCategorizationMap>
             CreatedAt = DateTime.UtcNow
         };
 
-        return await map.Save(ct).ConfigureAwait(false);
+        return await map.Save(ct);
     }
 }
 

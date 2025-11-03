@@ -57,7 +57,7 @@ public sealed class ProcessingJob : Entity<ProcessingJob>
     {
         var pending = await Query(j =>
             j.PipelineId == pipelineId &&
-            j.Status == JobStatus.Pending, ct).ConfigureAwait(false);
+            j.Status == JobStatus.Pending, ct);
 
         return pending
             .OrderByDescending(j => j.CreatedAt)
@@ -66,7 +66,7 @@ public sealed class ProcessingJob : Entity<ProcessingJob>
 
     public static async Task<(ProcessingJob? Job, bool Cancelled)> TryCancelPendingAsync(string jobId, CancellationToken ct)
     {
-        var job = await Get(jobId, ct).ConfigureAwait(false);
+        var job = await Get(jobId, ct);
         if (job is null)
         {
             return (null, false);
@@ -90,7 +90,7 @@ public sealed class ProcessingJob : Entity<ProcessingJob>
         job.HeartbeatAt = now;
         job.WorkerId = null;
         job.LastError ??= "Cancelled";
-        await job.Save(ct).ConfigureAwait(false);
+        await job.Save(ct);
 
         return (job, true);
     }
@@ -121,7 +121,7 @@ public sealed class ProcessingJob : Entity<ProcessingJob>
         job.ProcessedDocuments = 0;
         job.LastDocumentId = null;
         job.LastError = null;
-        await job.Save(ct).ConfigureAwait(false);
+        await job.Save(ct);
         return job;
     }
 
@@ -163,7 +163,7 @@ public sealed class ProcessingJob : Entity<ProcessingJob>
         }
 
         job.HeartbeatAt = DateTime.UtcNow;
-        await job.Save(ct).ConfigureAwait(false);
+        await job.Save(ct);
     }
 
     public bool MergeDocuments(IEnumerable<string> documentIds)

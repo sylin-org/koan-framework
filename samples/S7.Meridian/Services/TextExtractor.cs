@@ -40,9 +40,9 @@ public sealed class TextExtractor : ITextExtractor
 
     public async Task<TextExtractionResult> ExtractAsync(SourceDocument document, CancellationToken ct)
     {
-        await using var stream = await _storage.OpenReadAsync(document.StorageKey, ct).ConfigureAwait(false);
+        await using var stream = await _storage.OpenReadAsync(document.StorageKey, ct);
         await using var buffer = new MemoryStream();
-        await stream.CopyToAsync(buffer, ct).ConfigureAwait(false);
+        await stream.CopyToAsync(buffer, ct);
         buffer.Position = 0;
 
         var mediaType = document.MediaType?.ToLowerInvariant();
@@ -57,7 +57,7 @@ public sealed class TextExtractor : ITextExtractor
 
             if (ShouldFallbackToOcr(pdfResult))
             {
-                var ocrResult = await TryOcrAsync(buffer, ct).ConfigureAwait(false);
+                var ocrResult = await TryOcrAsync(buffer, ct);
                 if (ocrResult is not null)
                 {
                     _logger.LogInformation("OCR fallback succeeded for document {DocumentId}.", document.Id);
@@ -77,11 +77,11 @@ public sealed class TextExtractor : ITextExtractor
 
         if (mediaType is "text/plain" or "text/markdown")
         {
-            return await ExtractPlainTextAsync(buffer, ct).ConfigureAwait(false);
+            return await ExtractPlainTextAsync(buffer, ct);
         }
 
         _logger.LogWarning("Unknown media type {MediaType} for document {DocumentId}; falling back to plain text read.", mediaType, document.Id);
-        return await ExtractPlainTextAsync(buffer, ct).ConfigureAwait(false);
+        return await ExtractPlainTextAsync(buffer, ct);
     }
 
     private static TextExtractionResult ExtractFromPdf(Stream pdfStream)
@@ -110,7 +110,7 @@ public sealed class TextExtractor : ITextExtractor
     {
         stream.Position = 0;
         using var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true, leaveOpen: true);
-        var text = await reader.ReadToEndAsync(ct).ConfigureAwait(false);
+        var text = await reader.ReadToEndAsync(ct);
         return new TextExtractionResult
         {
             Text = text,
@@ -193,7 +193,7 @@ public sealed class TextExtractor : ITextExtractor
 
         try
         {
-            var result = await _ocrClient.ExtractAsync(pdfStream, ct).ConfigureAwait(false);
+            var result = await _ocrClient.ExtractAsync(pdfStream, ct);
             if (result is null)
             {
                 return null;

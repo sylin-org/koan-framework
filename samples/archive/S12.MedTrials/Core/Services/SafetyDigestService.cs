@@ -28,7 +28,7 @@ public sealed class SafetyDigestService : ISafetyDigestService
         var lookback = request.LookbackDays <= 0 ? 14 : request.LookbackDays;
         var since = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-lookback));
 
-        var allEvents = await AdverseEventReport.All(ct).ConfigureAwait(false);
+        var allEvents = await AdverseEventReport.All(ct);
 
         var query = allEvents.AsEnumerable();
         if (!string.IsNullOrWhiteSpace(request.TrialSiteId))
@@ -73,7 +73,7 @@ public sealed class SafetyDigestService : ISafetyDigestService
                         new AiMessage("user", prompt)
                     },
                     Options = new AiPromptOptions { MaxOutputTokens = 256 }
-                }, ct).ConfigureAwait(false);
+                }, ct);
 
                 if (!string.IsNullOrWhiteSpace(response.Text))
                 {

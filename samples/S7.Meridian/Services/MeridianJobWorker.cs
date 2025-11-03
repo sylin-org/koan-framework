@@ -60,11 +60,11 @@ public sealed class MeridianJobWorker : BackgroundService
                         job.Status = JobStatus.Pending;
                         _logger.LogInformation("Job {JobId} will retry (attempt {RetryCount} of 4).", job.Id, job.RetryCount + 1);
                     }
-                    await job.Save(stoppingToken).ConfigureAwait(false);
+                    await job.Save(stoppingToken);
 
                     try
                     {
-                        var pipeline = await DocumentPipeline.Get(job.PipelineId, stoppingToken).ConfigureAwait(false);
+                        var pipeline = await DocumentPipeline.Get(job.PipelineId, stoppingToken);
                         if (pipeline is not null)
                         {
                             pipeline.UpdatedAt = now;
@@ -78,7 +78,7 @@ public sealed class MeridianJobWorker : BackgroundService
                                 pipeline.Status = PipelineStatus.Queued;
                             }
 
-                            await pipeline.Save(stoppingToken).ConfigureAwait(false);
+                            await pipeline.Save(stoppingToken);
                         }
                     }
                     catch (Exception pipelineEx) when (!stoppingToken.IsCancellationRequested)

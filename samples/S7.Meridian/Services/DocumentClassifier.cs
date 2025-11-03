@@ -211,7 +211,7 @@ public sealed class DocumentClassifier : IDocumentClassifier
         float[] documentEmbedding;
         try
         {
-            documentEmbedding = await Ai.Embed(preview, ct).ConfigureAwait(false);
+            documentEmbedding = await Ai.Embed(preview, ct);
         }
         catch (Exception ex)
         {
@@ -224,7 +224,7 @@ public sealed class DocumentClassifier : IDocumentClassifier
 
         foreach (var type in types)
         {
-            var embedding = await GetTypeEmbeddingAsync(type, ct).ConfigureAwait(false);
+            var embedding = await GetTypeEmbeddingAsync(type, ct);
             if (embedding is null || embedding.Length == 0)
             {
                 continue;
@@ -278,7 +278,7 @@ public sealed class DocumentClassifier : IDocumentClassifier
 
         try
         {
-            var response = await Ai.Chat(chatOptions, ct).ConfigureAwait(false);
+            var response = await Ai.Chat(chatOptions, ct);
 
             // Check for empty response
             if (string.IsNullOrWhiteSpace(response))
@@ -471,7 +471,7 @@ public sealed class DocumentClassifier : IDocumentClassifier
                 builder.Append(" Signal phrases: ").Append(string.Join(", ", type.SignalPhrases));
             }
 
-            var newEmbedding = await Ai.Embed(builder.ToString(), ct).ConfigureAwait(false);
+            var newEmbedding = await Ai.Embed(builder.ToString(), ct);
             type.TypeEmbedding = newEmbedding;
             type.TypeEmbeddingVersion = type.Version;
             type.TypeEmbeddingComputedAt = DateTime.UtcNow;

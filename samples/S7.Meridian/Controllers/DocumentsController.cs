@@ -34,13 +34,13 @@ public sealed class DocumentsController : ControllerBase
     [HttpGet]
     public async Task<ActionResult<List<SourceDocument>>> GetDocuments(string pipelineId, CancellationToken ct)
     {
-        var pipeline = await DocumentPipeline.Get(pipelineId, ct).ConfigureAwait(false);
+        var pipeline = await DocumentPipeline.Get(pipelineId, ct);
         if (pipeline is null)
         {
             return NotFound();
         }
 
-        var documents = await pipeline.LoadDocumentsAsync(ct).ConfigureAwait(false);
+        var documents = await pipeline.LoadDocumentsAsync(ct);
         return Ok(documents);
     }
 
@@ -77,7 +77,7 @@ public sealed class DocumentsController : ControllerBase
             return BadRequest("At least one file is required.");
         }
 
-    var result = await _ingestion.IngestAsync(pipelineId, collected, force, typeHint, ct).ConfigureAwait(false);
+    var result = await _ingestion.IngestAsync(pipelineId, collected, force, typeHint, ct);
         var newIds = result.NewDocuments
             .Select(d => d.Id)
             .Where(id => !string.IsNullOrWhiteSpace(id))
@@ -138,7 +138,7 @@ public sealed class DocumentsController : ControllerBase
             return BadRequest("TypeId is required.");
         }
 
-        var pipeline = await DocumentPipeline.Get(pipelineId, ct).ConfigureAwait(false);
+        var pipeline = await DocumentPipeline.Get(pipelineId, ct);
         if (pipeline is null)
         {
             return NotFound();
@@ -149,7 +149,7 @@ public sealed class DocumentsController : ControllerBase
             return NotFound();
         }
 
-        var document = await SourceDocument.Get(documentId, ct).ConfigureAwait(false);
+        var document = await SourceDocument.Get(documentId, ct);
         if (document is null)
         {
             return NotFound();
@@ -169,7 +169,7 @@ public sealed class DocumentsController : ControllerBase
         document.Status = DocumentProcessingStatus.Pending;
         document.UpdatedAt = DateTime.UtcNow;
 
-        var saved = await document.Save(ct).ConfigureAwait(false);
+        var saved = await document.Save(ct);
 
         await _runLog.AppendAsync(new RunLog
         {
@@ -187,9 +187,9 @@ public sealed class DocumentsController : ControllerBase
                 ["confidence"] = saved.ClassificationConfidence.ToString("0.00", CultureInfo.InvariantCulture),
                 ["reason"] = saved.ClassificationReason ?? string.Empty
             }
-        }, ct).ConfigureAwait(false);
+        }, ct);
 
-        var job = await _jobs.ScheduleAsync(pipeline.Id!, new[] { saved.Id! }, ct).ConfigureAwait(false);
+        var job = await _jobs.ScheduleAsync(pipeline.Id!, new[] { saved.Id! }, ct);
 
         var response = new DocumentTypeOverrideResponse
         {

@@ -22,7 +22,7 @@ public sealed class ParticipantVisitsController : EntityController<ParticipantVi
     [HttpPost("plan-adjustments")]
     public async Task<ActionResult<VisitPlanningResult>> PlanAdjustments([FromBody] VisitPlanningRequest request, CancellationToken ct)
     {
-        var result = await _planner.PlanAsync(request, ct).ConfigureAwait(false);
+        var result = await _planner.PlanAsync(request, ct);
         return Ok(result);
     }
 }

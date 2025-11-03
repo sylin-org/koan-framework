@@ -47,7 +47,7 @@ public sealed class FactCategorizer : IFactCategorizer
     {
         // Check cache first
         var catalogHash = FactCategorizationMap.ComputeCatalogHash(catalog);
-        var cached = await FactCategorizationMap.GetByCatalogHashAsync(catalogHash, ct).ConfigureAwait(false);
+        var cached = await FactCategorizationMap.GetByCatalogHashAsync(catalogHash, ct);
 
         if (cached != null)
         {
@@ -75,7 +75,7 @@ public sealed class FactCategorizer : IFactCategorizer
         string raw;
         try
         {
-            raw = await Ai.Chat(chatOptions, ct).ConfigureAwait(false);
+            raw = await Ai.Chat(chatOptions, ct);
             _logger.LogDebug("LLM categorization response length: {Length} characters", raw.Length);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -95,7 +95,7 @@ public sealed class FactCategorizer : IFactCategorizer
         }
 
         // Save to cache
-        var map = await FactCategorizationMap.SaveWithHashAsync(catalogHash, batches, ct).ConfigureAwait(false);
+        var map = await FactCategorizationMap.SaveWithHashAsync(catalogHash, batches, ct);
 
         _logger.LogInformation("Generated {BatchCount} semantic batches for {FactCount} facts (hash: {Hash})",
             batches.Count, catalog.Facts.Count, catalogHash[..12]);

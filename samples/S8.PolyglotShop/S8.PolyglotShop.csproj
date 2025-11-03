@@ -13,9 +13,9 @@
     <ProjectReference Include="..\..\src\Koan.Data.Core\Koan.Data.Core.csproj" />
     <ProjectReference Include="..\..\src\Koan.Web\Koan.Web.csproj" />
 
-    <!-- Koan Services - Translation (in-process) -->
-    <ProjectReference Include="..\..\src\Koan.Services\Koan.Services.csproj" />
-    <ProjectReference Include="..\..\src\Koan.Services.Translation\Koan.Services.Translation.csproj" />
+    <!-- Koan ServiceMesh - Translation (in-process) -->
+    <ProjectReference Include="..\..\src\Koan.ServiceMesh\Koan.ServiceMesh.csproj" />
+    <ProjectReference Include="..\..\src\Services\Translation\Koan.Service.Translation\Koan.Service.Translation.csproj" />
 
     <!-- AI for Translation -->
     <ProjectReference Include="..\..\src\Koan.AI\Koan.AI.csproj" />

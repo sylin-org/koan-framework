@@ -86,7 +86,7 @@ public sealed class PipelineNotesController : ControllerBase
         if (request.ReProcess)
         {
             // Get all documents for this pipeline
-            var documents = await pipeline.LoadDocumentsAsync(ct).ConfigureAwait(false);
+            var documents = await pipeline.LoadDocumentsAsync(ct);
 
             var documentIds = documents
                 .Where(d => !d.IsVirtual)
@@ -135,7 +135,7 @@ public sealed class PipelineNotesController : ControllerBase
 
         if (reProcess)
         {
-            var documents = await pipeline.LoadDocumentsAsync(ct).ConfigureAwait(false);
+            var documents = await pipeline.LoadDocumentsAsync(ct);
 
             var documentIds = documents
                 .Where(d => !d.IsVirtual)

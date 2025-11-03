@@ -35,7 +35,7 @@ public sealed class AnalysisTypesController : EntityController<AnalysisType>
     {
         try
         {
-            var response = await _authoring.SuggestAsync(request, ct).ConfigureAwait(false);
+            var response = await _authoring.SuggestAsync(request, ct);
 
             if (response.Warnings?.Count > 0)
             {
@@ -63,7 +63,7 @@ public sealed class AnalysisTypesController : EntityController<AnalysisType>
     {
         try
         {
-            var response = await _authoring.SuggestAsync(request, ct).ConfigureAwait(false);
+            var response = await _authoring.SuggestAsync(request, ct);
             var draft = response.Draft;
 
             if (response.Warnings?.Count > 0)
@@ -97,7 +97,7 @@ public sealed class AnalysisTypesController : EntityController<AnalysisType>
                 entity.Description = "AI generated analysis type (no description provided).";
             }
 
-            var saved = await entity.Save(ct).ConfigureAwait(false);
+            var saved = await entity.Save(ct);
             _logger.LogInformation("AI-created analysis type '{Name}' with ID {Id}", saved.Name, saved.Id);
             return Ok(saved);
         }
@@ -120,7 +120,7 @@ public sealed class AnalysisTypesController : EntityController<AnalysisType>
     [HttpGet("codes")]
     public async Task<ActionResult> GetTypeCodesAsync(CancellationToken ct)
     {
-        var analysisTypes = await AnalysisType.All(ct).ConfigureAwait(false);
+        var analysisTypes = await AnalysisType.All(ct);
 
         var codes = analysisTypes
             .Where(t => !string.IsNullOrWhiteSpace(t.Code))

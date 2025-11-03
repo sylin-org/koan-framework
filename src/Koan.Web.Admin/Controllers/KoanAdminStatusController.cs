@@ -57,7 +57,7 @@ public sealed class KoanAdminStatusController : ControllerBase
             ? "Production hosts require sanitized runtime details. Set Koan:AllowMagicInProduction=true to view raw diagnostics."
             : null;
 
-        var manifest = await _manifest.BuildAsync(cancellationToken).ConfigureAwait(false);
+        var manifest = await _manifest.BuildAsync(cancellationToken);
         var summary = manifest.ToSummary();
         var health = manifest.Health;
 
@@ -129,7 +129,7 @@ public sealed class KoanAdminStatusController : ControllerBase
             return Forbid();
         }
 
-        var manifest = await _manifest.BuildAsync(cancellationToken).ConfigureAwait(false);
+        var manifest = await _manifest.BuildAsync(cancellationToken);
         return Ok(manifest);
     }
 
@@ -142,7 +142,7 @@ public sealed class KoanAdminStatusController : ControllerBase
             return NotFound();
         }
 
-        var health = await _manifest.GetHealthAsync(cancellationToken).ConfigureAwait(false);
+        var health = await _manifest.GetHealthAsync(cancellationToken);
         return Ok(health);
     }
 

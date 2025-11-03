@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <Description>Translation service for Koan Service. Supports auto-discovery and dual deployment (NuGet in-process or Docker container).</Description>
+    <PackageTags>$(CommonPackageTags);services;translation;ai</PackageTags>
+    <Version>0.1.0</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\Koan.ServiceMesh.Abstractions\Koan.ServiceMesh.Abstractions.csproj" />
+    <ProjectReference Include="..\..\..\Koan.ServiceMesh\Koan.ServiceMesh.csproj" />
+    <ProjectReference Include="..\..\..\Koan.AI\Koan.AI.csproj" />
+  </ItemGroup>
+
+</Project>

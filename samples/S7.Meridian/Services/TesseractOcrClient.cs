@@ -50,16 +50,16 @@ public sealed class TesseractOcrClient : IOcrClient
 
         try
         {
-            using var response = await _httpClient.PostAsync(endpoint, content, ct).ConfigureAwait(false);
+            using var response = await _httpClient.PostAsync(endpoint, content, ct);
             if (!response.IsSuccessStatusCode)
             {
                 _logger.LogWarning("Tesseract OCR request failed with status {StatusCode}.", response.StatusCode);
                 return null;
             }
 
-            await using var responseStream = await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
+            await using var responseStream = await response.Content.ReadAsStreamAsync(ct);
             var payload = await JsonSerializer.DeserializeAsync<OcrResponse>(responseStream, cancellationToken: ct)
-                .ConfigureAwait(false);
+                ;
 
             if (payload is null || string.IsNullOrWhiteSpace(payload.Text))
             {

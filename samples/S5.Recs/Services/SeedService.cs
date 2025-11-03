@@ -737,7 +737,7 @@ internal sealed class SeedService : ISeedService
                     ["searchText"] = BuildSearchText(media)  // Required for hybrid search
                 };
 
-                await VectorData<Media>.SaveWithVector(media, embedding, vectorMetadata, ct).ConfigureAwait(false);
+                await VectorData<Media>.SaveWithVector(media, embedding, vectorMetadata, ct);
                 Interlocked.Increment(ref stored);
             }
             catch (Exception ex)
@@ -776,7 +776,7 @@ internal sealed class SeedService : ISeedService
 
                                 try
                                 {
-                                    await VectorData<Media>.SaveWithVector(envelope.Entity, embedding, vectorMetadata, ct).ConfigureAwait(false);
+                                    await VectorData<Media>.SaveWithVector(envelope.Entity, embedding, vectorMetadata, ct);
                                     envelope.Metadata["vector:affected"] = 1;
                                     Interlocked.Add(ref stored, 1);
 

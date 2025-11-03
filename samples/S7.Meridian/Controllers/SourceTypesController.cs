@@ -34,7 +34,7 @@ public sealed class SourceTypesController : EntityController<SourceType>
     {
         try
         {
-            var response = await _authoring.SuggestAsync(request, ct).ConfigureAwait(false);
+            var response = await _authoring.SuggestAsync(request, ct);
             return Ok(response);
         }
         catch (ArgumentException ex)
@@ -51,7 +51,7 @@ public sealed class SourceTypesController : EntityController<SourceType>
     [HttpGet("codes")]
     public async Task<ActionResult> GetTypeCodesAsync(CancellationToken ct)
     {
-        var sourceTypes = await SourceType.All(ct).ConfigureAwait(false);
+        var sourceTypes = await SourceType.All(ct);
 
         var codes = sourceTypes
             .Where(t => !string.IsNullOrWhiteSpace(t.Code))

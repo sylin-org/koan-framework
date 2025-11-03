@@ -45,7 +45,7 @@ public sealed class DocumentStyleClassifier : IDocumentStyleClassifier
         CancellationToken ct = default)
     {
         // Get all available document styles for version checking
-        var allStyles = await DocumentStyle.All(ct).ConfigureAwait(false);
+        var allStyles = await DocumentStyle.All(ct);
         var styles = allStyles.ToList();
         if (styles.Count == 0)
         {
@@ -96,7 +96,7 @@ public sealed class DocumentStyleClassifier : IDocumentStyleClassifier
         string raw;
         try
         {
-            raw = await Ai.Chat(chatOptions, ct).ConfigureAwait(false);
+            raw = await Ai.Chat(chatOptions, ct);
             _logger.LogDebug("LLM document style classification response length: {Length} characters", raw.Length);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -117,7 +117,7 @@ public sealed class DocumentStyleClassifier : IDocumentStyleClassifier
         document.DocumentStyleReason = classification.Reasoning;
         document.DocumentStyleClassifiedAt = DateTime.UtcNow;
         document.UpdatedAt = DateTime.UtcNow;
-        await document.Save(ct).ConfigureAwait(false);
+        await document.Save(ct);
 
         _logger.LogInformation("Classified document {DocumentId} '{FileName}' as {Style} (confidence: {Confidence:F2})",
             document.Id, document.OriginalFileName, classification.StyleCode, classification.Confidence);

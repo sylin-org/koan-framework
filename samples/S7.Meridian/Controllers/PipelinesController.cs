@@ -46,13 +46,13 @@ public sealed class PipelinesController : EntityController<DocumentPipeline>
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetPipelineGraph(string pipelineId, CancellationToken ct = default)
     {
-        var pipeline = await DocumentPipeline.Get(pipelineId, ct).ConfigureAwait(false);
+        var pipeline = await DocumentPipeline.Get(pipelineId, ct);
         if (pipeline is null)
         {
             return NotFound();
         }
 
-        var documents = await pipeline.LoadDocumentsAsync(ct).ConfigureAwait(false);
+        var documents = await pipeline.LoadDocumentsAsync(ct);
 
         _logger.LogInformation(
             "GetPipelineGraph for {PipelineId}: Pipeline.DocumentIds={PipelineDocIds}, LoadedDocuments={LoadedCount}, LoadedIds=[{LoadedIds}], LoadedStatuses=[{Statuses}]",
@@ -62,26 +62,26 @@ public sealed class PipelinesController : EntityController<DocumentPipeline>
             string.Join(", ", documents.Select(d => d.Id)),
             string.Join(", ", documents.Select(d => $"{d.Id}:{d.Status}")));
 
-        var deliverable = await GetLatestDeliverableAsync(pipeline, ct).ConfigureAwait(false);
+        var deliverable = await GetLatestDeliverableAsync(pipeline, ct);
 
         JToken? canonical = null;
         if (deliverable is not null)
         {
-            var canonicalJson = await _renderer.RenderJsonAsync(deliverable, ct).ConfigureAwait(false);
+            var canonicalJson = await _renderer.RenderJsonAsync(deliverable, ct);
             canonical = TryParseCanonical(canonicalJson);
         }
 
         var analysisTypeName = string.Empty;
         if (!string.IsNullOrWhiteSpace(pipeline.AnalysisTypeId))
         {
-            var analysisType = await AnalysisType.Get(pipeline.AnalysisTypeId, ct).ConfigureAwait(false);
+            var analysisType = await AnalysisType.Get(pipeline.AnalysisTypeId, ct);
             analysisTypeName = analysisType?.Name ?? string.Empty;
         }
 
         var pipelineKey = pipeline.Id ?? pipelineId;
 
-        var jobSnapshots = await PipelineSnapshotMapper.LoadJobSnapshotsAsync(pipelineKey, ct).ConfigureAwait(false);
-        var runSnapshots = await PipelineSnapshotMapper.LoadRunLogSnapshotsAsync(pipelineKey, ct).ConfigureAwait(false);
+        var jobSnapshots = await PipelineSnapshotMapper.LoadJobSnapshotsAsync(pipelineKey, ct);
+        var runSnapshots = await PipelineSnapshotMapper.LoadRunLogSnapshotsAsync(pipelineKey, ct);
 
         var graph = new PipelineGraph
         {
@@ -194,13 +194,13 @@ public sealed class PipelinesController : EntityController<DocumentPipeline>
             return BadRequest("AnalysisTypeId is required.");
         }
 
-        var pipeline = await DocumentPipeline.Get(pipelineId, ct).ConfigureAwait(false);
+        var pipeline = await DocumentPipeline.Get(pipelineId, ct);
         if (pipeline is null)
         {
             return NotFound();
         }
 
-        var analysisType = await AnalysisType.Get(request.AnalysisTypeId, ct).ConfigureAwait(false);
+        var analysisType = await AnalysisType.Get(request.AnalysisTypeId, ct);
         if (analysisType is null)
         {
             return NotFound();
@@ -213,7 +213,7 @@ public sealed class PipelinesController : EntityController<DocumentPipeline>
         pipeline.Status = PipelineStatus.Pending;
         pipeline.UpdatedAt = DateTime.UtcNow;
 
-        await pipeline.Save(ct).ConfigureAwait(false);
+        await pipeline.Save(ct);
 
         await _runLog.AppendAsync(new RunLog
         {
@@ -230,13 +230,13 @@ public sealed class PipelinesController : EntityController<DocumentPipeline>
                 ["newVersion"] = pipeline.AnalysisTypeVersion.ToString(CultureInfo.InvariantCulture),
                 ["overrideReason"] = request.Reason ?? string.Empty
             }
-        }, ct).ConfigureAwait(false);
+        }, ct);
 
         var documents = pipeline.DocumentIds.Where(id => !string.IsNullOrWhiteSpace(id)).ToList();
         ProcessingJob? job = null;
         if (documents.Count > 0)
         {
-            job = await _jobs.ScheduleAsync(pipeline.Id!, documents, ct).ConfigureAwait(false);
+            job = await _jobs.ScheduleAsync(pipeline.Id!, documents, ct);
         }
 
         var response = new AnalysisTypeOverrideResponse
@@ -258,7 +258,7 @@ public sealed class PipelinesController : EntityController<DocumentPipeline>
 
         if (!string.IsNullOrWhiteSpace(pipeline.DeliverableId))
         {
-            var direct = await Deliverable.Get(pipeline.DeliverableId, ct).ConfigureAwait(false);
+            var direct = await Deliverable.Get(pipeline.DeliverableId, ct);
             Console.WriteLine($"[Meridian] Deliverable direct get pipeline={pipelineId} found={(direct is not null)} id={pipeline.DeliverableId}");
             if (direct is not null)
             {
@@ -271,13 +271,13 @@ public sealed class PipelinesController : EntityController<DocumentPipeline>
         // Mongo pushes GUID-string comparisons down as native UUIDs, so equality on string fields
         // may miss matches once SmartStringGuidSerializer converts values during persistence.
         // Materialize locally when the provider returns nothing; data volume here is tiny (per-pipeline snapshots).
-        var deliverables = await Deliverable.Query(d => d.PipelineId == pipelineId, ct).ConfigureAwait(false);
+        var deliverables = await Deliverable.Query(d => d.PipelineId == pipelineId, ct);
 
         Console.WriteLine($"[Meridian] Deliverable query results pipeline={pipelineId} count={deliverables.Count}");
 
         if (deliverables.Count == 0)
         {
-            var allDeliverables = await Deliverable.All(ct).ConfigureAwait(false);
+            var allDeliverables = await Deliverable.All(ct);
             Console.WriteLine($"[Meridian] Deliverable fallback: pipeline={pipelineId} deliverableId={pipeline.DeliverableId} allCount={allDeliverables.Count}");
             deliverables = allDeliverables
                 .Where(d => string.Equals(d.PipelineId, pipelineId, StringComparison.Ordinal))

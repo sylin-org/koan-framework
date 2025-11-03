@@ -68,10 +68,10 @@ public sealed class PandocPdfRenderer : IPdfRenderer
                 : pandoc.Endpoint.TrimStart('/');
 
             var request = new PandocRenderRequest(sanitized, ComputeHash(sanitized));
-            var response = await _client.PostAsJsonAsync(endpoint, request, ct).ConfigureAwait(false);
+            var response = await _client.PostAsJsonAsync(endpoint, request, ct);
             if (!response.IsSuccessStatusCode)
             {
-                var error = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+                var error = await response.Content.ReadAsStringAsync(ct);
                 _logger.LogWarning(
                     "Pandoc renderer returned {StatusCode} for endpoint {Endpoint}: {Error}",
                     response.StatusCode,
@@ -82,7 +82,7 @@ public sealed class PandocPdfRenderer : IPdfRenderer
 
             var payload = await response.Content
                 .ReadFromJsonAsync<PandocRenderResponse>(cancellationToken: ct)
-                .ConfigureAwait(false);
+                ;
 
             if (payload?.PdfBase64 is null)
             {

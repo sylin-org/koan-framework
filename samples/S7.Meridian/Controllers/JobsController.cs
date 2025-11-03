@@ -33,7 +33,7 @@ public sealed class JobsController : ControllerBase
     [HttpPost("{jobId}/cancel")]
     public async Task<ActionResult<ProcessingJob>> Cancel(string pipelineId, string jobId, CancellationToken ct)
     {
-        var (job, cancelled) = await ProcessingJob.TryCancelPendingAsync(jobId, ct).ConfigureAwait(false);
+        var (job, cancelled) = await ProcessingJob.TryCancelPendingAsync(jobId, ct);
         if (job is null || !string.Equals(job.PipelineId, pipelineId, StringComparison.Ordinal))
         {
             return NotFound();
@@ -53,12 +53,12 @@ public sealed class JobsController : ControllerBase
             return Conflict(new { error = reason });
         }
 
-        var pipeline = await DocumentPipeline.Get(pipelineId, ct).ConfigureAwait(false);
+        var pipeline = await DocumentPipeline.Get(pipelineId, ct);
         if (pipeline is not null)
         {
             pipeline.Status = PipelineStatus.Pending;
             pipeline.UpdatedAt = DateTime.UtcNow;
-            await pipeline.Save(ct).ConfigureAwait(false);
+            await pipeline.Save(ct);
         }
 
         return Accepted(job);

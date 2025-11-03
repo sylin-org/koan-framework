@@ -39,7 +39,7 @@ public sealed class FactCatalogBuilder : IFactCatalogBuilder
         var catalog = new FactCatalog();
 
         // Get active organization profile
-        var orgProfile = await OrganizationProfile.GetActiveAsync(ct).ConfigureAwait(false);
+        var orgProfile = await OrganizationProfile.GetActiveAsync(ct);
 
         // Add organization-wide facts
         if (orgProfile != null)

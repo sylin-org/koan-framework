@@ -141,7 +141,7 @@ public sealed class DocumentPipeline : Entity<DocumentPipeline>
             return new List<SourceDocument>();
         }
 
-        var loaded = await SourceDocument.Get(ids, ct).ConfigureAwait(false);
+        var loaded = await SourceDocument.Get(ids, ct);
         return loaded
             .Where(doc => doc is not null)
             .Select(doc => doc!)
@@ -165,7 +165,7 @@ public sealed class DocumentPipeline : Entity<DocumentPipeline>
             return new List<Passage>();
         }
 
-        var passages = await Passage.Query(p => ids.Contains(p.SourceDocumentId), ct).ConfigureAwait(false);
+        var passages = await Passage.Query(p => ids.Contains(p.SourceDocumentId), ct);
         return passages.ToList();
     }
 }

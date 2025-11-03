@@ -41,7 +41,7 @@ public sealed class PipelineRefreshController : ControllerBase
         _logger.LogInformation("Pipeline {PipelineId} refresh found {Count} documents in pipeline.DocumentIds: {DocumentIds}",
             pipelineId, docList.Count, string.Join(", ", docList));
 
-        var existing = await ProcessingJob.FindPendingAsync(pipelineId, ct).ConfigureAwait(false);
+        var existing = await ProcessingJob.FindPendingAsync(pipelineId, ct);
 
         if (docList.Count == 0)
         {
@@ -62,19 +62,19 @@ public sealed class PipelineRefreshController : ControllerBase
             {
                 var added = existing.DocumentIds.Count - before;
                 existing.HeartbeatAt = DateTime.UtcNow;
-                await existing.Save(ct).ConfigureAwait(false);
+                await existing.Save(ct);
                 _logger.LogInformation("Pipeline {PipelineId} refresh appended {Added} documents to pending job {JobId}.", pipelineId, added, existing.Id);
             }
             job = existing;
         }
         else
         {
-            job = await _jobs.ScheduleAsync(pipelineId, docList, ct).ConfigureAwait(false);
+            job = await _jobs.ScheduleAsync(pipelineId, docList, ct);
         }
 
         pipeline.Status = PipelineStatus.Queued;
         pipeline.UpdatedAt = DateTime.UtcNow;
-        await pipeline.Save(ct).ConfigureAwait(false);
+        await pipeline.Save(ct);
 
         return Accepted(new { jobId = job.Id, documentCount = job.DocumentIds.Count });
     }

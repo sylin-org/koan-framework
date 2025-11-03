@@ -76,7 +76,7 @@ public sealed class OrganizationProfile : Entity<OrganizationProfile>
     /// <summary>Gets the currently active OrganizationProfile, if any.</summary>
     public static async Task<OrganizationProfile?> GetActiveAsync(CancellationToken ct = default)
     {
-        var profiles = await Query(p => p.Active, ct).ConfigureAwait(false);
+        var profiles = await Query(p => p.Active, ct);
         return profiles.FirstOrDefault();
     }
 
@@ -87,18 +87,18 @@ public sealed class OrganizationProfile : Entity<OrganizationProfile>
     public async Task ActivateAsync(CancellationToken ct = default)
     {
         // Deactivate all other profiles
-        var allProfiles = await All(ct).ConfigureAwait(false);
+        var allProfiles = await All(ct);
         foreach (var profile in allProfiles.Where(p => p.Id != Id && p.Active))
         {
             profile.Active = false;
             profile.UpdatedAt = DateTime.UtcNow;
-            await profile.Save(ct).ConfigureAwait(false);
+            await profile.Save(ct);
         }
 
         // Activate this profile
         Active = true;
         UpdatedAt = DateTime.UtcNow;
-        await this.Save(ct).ConfigureAwait(false);
+        await this.Save(ct);
     }
 
     /// <summary>Deactivates this profile.</summary>
@@ -106,6 +106,6 @@ public sealed class OrganizationProfile : Entity<OrganizationProfile>
     {
         Active = false;
         UpdatedAt = DateTime.UtcNow;
-        await this.Save(ct).ConfigureAwait(false);
+        await this.Save(ct);
     }
 }
