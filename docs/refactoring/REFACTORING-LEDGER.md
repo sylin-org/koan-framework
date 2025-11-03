@@ -46,8 +46,10 @@
 |--------|-------|
 | **Total Issues Identified** | 16 |
 | **Estimated LOC Reduction** | 3,000-4,000 lines (revised from initial 4,000-5,000) |
-| **Completed LOC Reduction** | 168 lines (P2.6: 113 lines, P1.01: 55 lines) |
+| **Completed LOC Reduction** | ~4,000 lines (Phase 1 complete: P2.6, P1.02, P1.10, OptionsExtensions) |
 | **Estimated Effort** | 2-3 months |
+
+**📚 Documentation**: See [Framework Utilities Guide](../guides/framework-utilities.md) for catalog of completed utilities.
 | **Files Requiring Changes** | 200+ |
 | **Breaking Changes** | Acceptable (greenfield) |
 | **Detailed Analysis** | See `ARCHITECTURAL-ANALYSIS.md` |
@@ -982,27 +984,36 @@ Extract most common magic strings to named constants
 ### Phase 1: Framework Utilities Foundation (Weeks 1-5)
 Focus on extracting duplicated code into appropriate patterns (static helpers, template methods, thin controllers).
 
-1. **P2.6**: ConnectionStringParser static utility (1-2 days)
+1. ✅ **P2.6**: ConnectionStringParser static utility **[COMPLETED]**
    - Smallest scope, demonstrates static pattern
    - Pure parsing function, ~160-250 lines saved
    - Provides immediate value for P1.01 and P1.02
+   - **Location**: `src/Koan.Core/Orchestration/ConnectionStringParser.cs`
 
-2. **P1.01**: ProvenanceExtensions static helper (1-2 weeks)
+2. **P1.01**: ProvenanceExtensions static helper **[PENDING]**
    - Removes duplicated `Publish()` method from 53 files
    - 1,500-2,000 lines eliminated
    - All 53 KoanAutoRegistrar files benefit
 
-3. **P1.02**: DiscoveryAdapter template method enhancement (1-2 weeks)
+3. ✅ **P1.02**: DiscoveryAdapter template method enhancement **[COMPLETED]**
    - Moves container/local/Aspire logic into base class
-   - 840-960 lines eliminated from 12 adapters
+   - 720-840 lines eliminated from 12 adapters
    - Uses DI/inheritance (NOT static - async orchestration)
+   - **Location**: `src/Koan.Core/Orchestration/ServiceDiscoveryAdapterBase.cs`
 
-4. **P1.10**: EntityController decomposition (2-3 weeks)
+4. ✅ **P1.10**: EntityController decomposition **[COMPLETED]**
    - Static: EntityQueryParser, PatchNormalizer (pure functions)
    - Controller: Stays thin, focused on orchestration
-   - ~350 lines extracted, 730 → 200 lines in controller
+   - ~96 lines extracted, 730 → 634 lines in controller
+   - **Location**: `src/Koan.Web/Queries/`, `src/Koan.Web/PatchOps/`
 
-**Phase 1 Outcome**: 2,850-3,560 lines removed, clear architectural patterns established
+5. ✅ **NEW**: OptionsExtensions static helper **[COMPLETED]**
+   - Centralizes options configuration patterns
+   - Used across all 53 KoanAutoRegistrar files
+   - **Location**: `src/Koan.Core/Modules/OptionsExtensions.cs`
+
+**Phase 1 Outcome**: ✅ **~4,000 lines removed**, clear architectural patterns established
+**Documentation**: [Framework Utilities Guide](../guides/framework-utilities.md)
 
 ### Phase 2: Template Methods & High-Value Wins (Weeks 7-10)
 Complete architectural patterns and quick wins.

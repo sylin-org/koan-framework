@@ -46,6 +46,45 @@ Framework knowledge is provided through **Agent Skills** in `.claude/skills/` th
 - Custom ORM/DbContext usage instead of Entity<T>
 - Provider-specific code without capability detection
 
+## Framework Utilities
+
+**Before writing new helper methods**, check if Koan Framework already provides them:
+
+### Orchestration & Discovery
+- **ConnectionStringParser** (`Koan.Core.Orchestration`) - Parse/build connection strings for Postgres, SQL Server, MongoDB, Redis, SQLite
+- **ServiceDiscoveryAdapterBase** (`Koan.Core.Orchestration`) - Base class for discovery adapters with container/local/Aspire detection
+
+### Configuration & Options
+- **OptionsExtensions** (`Koan.Core.Modules`) - `AddKoanOptions<T>()`, `AddKoanOptionsWithValidation<T>()` for consistent options registration
+
+### Web API Utilities
+- **EntityQueryParser** (`Koan.Web.Queries`) - Parse filter, sort, pagination, field selection from query strings
+- **PatchNormalizer** (`Koan.Web.PatchOps`) - Normalize and validate JSON Patch operations
+- **EntityController<T>** (`Koan.Web.Controllers`) - Full REST API base controller with CRUD + Query + Patch
+
+### Common Patterns
+- **Guard Clauses** (`Koan.Core.Utilities.Guard`) - `Must.NotBeNull()`, `Be.Positive()`, `NotBe.Default()`
+- **Entity Static Methods** - `Todo.Get(id)`, `Todo.Query(x => ...)`, `todo.Save()`, `todo.Delete()`
+
+### Decision Framework: Static vs DI
+
+**Use static utility when**:
+- Pure function (no side effects)
+- Zero allocation on hot paths
+- Used across many assemblies
+- Testable through inputs only
+- Examples: parsing, validation, transformation
+
+**Use DI service when**:
+- Needs configuration at runtime
+- Has mutable state
+- Requires lifecycle management
+- Needs mocking in tests
+- Examples: repositories, HTTP clients, caches
+
+**Full Catalog**: [Framework Utilities Guide](docs/guides/framework-utilities.md)
+**Strategic READMEs**: Check directory READMEs for contextual utilities
+
 ## Skill Evolution Pattern
 
 **Proactively suggest new skill creation** when you detect:
