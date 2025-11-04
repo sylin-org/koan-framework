@@ -132,51 +132,75 @@ internal sealed class BandCacheService : IBandCacheService
 
         _logger?.LogInformation("Initializing cache with target {TargetSize} items", targetSize);
 
-        var upperBound = 1.0;  // Start from top scores
-        var lowerBound = upperBound - INITIAL_BAND_WIDTH;
-        var bandWidth = INITIAL_BAND_WIDTH;
-        var attempts = 0;
-        var allItems = new List<Recommendation>();
-
-        // Keep fetching bands until we have enough items or hit max attempts
-        while (allItems.Count < targetSize && attempts < MAX_BAND_ATTEMPTS)
+        // Strategy: For initialization, fetch a large pool WITHOUT score filtering
+        // This ensures we capture all available results regardless of score distribution
+        var initialQuery = query with
         {
-            _logger?.LogDebug("Fetching band [{Upper:F2}, {Lower:F2}] (attempt {Attempt}, collected {Count}/{Target})",
-                upperBound, lowerBound, attempts + 1, allItems.Count, targetSize);
+            TopK = Math.Max(targetSize * 2, 1000),  // Fetch 2x target or 1000, whichever is larger
+            Offset = null,
+            Limit = null,
+            ExcludeIds = null
+        };
 
-            var bandItems = await FetchScoreBandAsync(
-                query,
-                userId,
-                lowerBound,
-                upperBound,
-                DEFAULT_BAND_SIZE,
-                ct);
+        var (initialResults, degraded) = await _recsService.QueryAsync(initialQuery, userId, ct);
 
-            allItems.AddRange(bandItems);
+        if (degraded)
+        {
+            _logger?.LogWarning("Initial cache fetch degraded to fallback mode");
+        }
 
-            _logger?.LogDebug("Band returned {Count} items (total: {Total}/{Target})",
-                bandItems.Count, allItems.Count, targetSize);
+        var allItems = initialResults
+            .OrderByDescending(r => r.Score)
+            .ThenBy(r => r.Media.Id, StringComparer.Ordinal)
+            .Take(Math.Min(targetSize, CACHE_WINDOW_SIZE))  // Cap at window size
+            .ToList();
 
-            if (allItems.Count >= targetSize)
+        _logger?.LogInformation("Cache initialized with {Count} items from initial fetch (requested {Requested}, got {Total})",
+            allItems.Count, initialQuery.TopK, initialResults.Count);
+
+        // If we got fewer items than requested, try fetching more with score bands
+        var attempts = 1;
+        if (allItems.Count < targetSize && allItems.Count > 0)
+        {
+            _logger?.LogDebug("Initial fetch returned {Count} < {Target}, attempting band fetches", allItems.Count, targetSize);
+
+            var lowerScoreBound = allItems[^1].Score;  // Lowest score from initial fetch
+            var bandWidth = INITIAL_BAND_WIDTH;
+
+            while (allItems.Count < targetSize && attempts < MAX_BAND_ATTEMPTS)
             {
-                break;  // Success!
+                var upperBound = lowerScoreBound;
+                var lowerBound = upperBound - bandWidth;
+
+                _logger?.LogDebug("Fetching band [{Upper:F2}, {Lower:F2}] (attempt {Attempt}, collected {Count}/{Target})",
+                    upperBound, lowerBound, attempts + 1, allItems.Count, targetSize);
+
+                var bandItems = await FetchScoreBandAsync(
+                    query,
+                    userId,
+                    lowerBound,
+                    upperBound,
+                    DEFAULT_BAND_SIZE,
+                    ct);
+
+                if (bandItems.Count == 0)
+                {
+                    _logger?.LogDebug("Band returned 0 items, stopping fetch attempts");
+                    break;  // No more results available
+                }
+
+                allItems.AddRange(bandItems);
+                lowerScoreBound = lowerBound;
+
+                // Adaptive widening: if band was sparse, widen faster
+                if (bandItems.Count < pageSize / 2)
+                {
+                    bandWidth *= 1.5;
+                    _logger?.LogDebug("Sparse region detected, widening band to {Width:F3}", bandWidth);
+                }
+
+                attempts++;
             }
-
-            // Adaptive widening: if band was sparse, widen faster
-            if (bandItems.Count < pageSize / 2)
-            {
-                bandWidth *= 1.5;
-                _logger?.LogDebug("Sparse region detected, widening band to {Width:F3}", bandWidth);
-            }
-
-            // Move to next band
-            upperBound = lowerBound;
-            lowerBound -= bandWidth;
-
-            // Prevent negative bounds
-            if (lowerBound < -1.0) lowerBound = -1.0;
-
-            attempts++;
         }
 
         // If still underfilled, log warning
