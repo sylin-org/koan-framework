@@ -30,6 +30,12 @@ public interface IEmbeddingCache
     /// Returns dictionary keyed by contentHash.
     /// </summary>
     Task<Dictionary<string, CachedEmbedding>> GetAllAsync(string modelId, string entityTypeName, CancellationToken ct = default);
+
+    /// <summary>
+    /// Stream cached embeddings in pages for incremental processing.
+    /// Yields pages of (contentHash, embedding) dictionaries.
+    /// </summary>
+    IAsyncEnumerable<Dictionary<string, CachedEmbedding>> GetPaginatedAsync(string modelId, string entityTypeName, int pageSize = 1000, CancellationToken ct = default);
 }
 
 /// <summary>

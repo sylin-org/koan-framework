@@ -155,6 +155,87 @@ public sealed class EmbeddingCache : IEmbeddingCache
     }
 
     /// <summary>
+    /// Stream cached embeddings in pages for incremental processing.
+    /// Yields pages of (contentHash, embedding) pairs.
+    /// </summary>
+    public async IAsyncEnumerable<Dictionary<string, CachedEmbedding>> GetPaginatedAsync(
+        string modelId,
+        string entityTypeName,
+        int pageSize = 1000,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+    {
+        var safeEntityType = SanitizeForFileSystem(entityTypeName);
+        var safeModelId = SanitizeForFileSystem(modelId);
+        var modelDir = Path.Combine(_basePath, safeEntityType, safeModelId);
+
+        if (!Directory.Exists(modelDir))
+        {
+            yield break;
+        }
+
+        var files = Directory.GetFiles(modelDir, "*.json", SearchOption.AllDirectories);
+        var totalFiles = files.Length;
+
+        if (totalFiles == 0)
+        {
+            yield break;
+        }
+
+        _logger?.LogInformation("Streaming {Count} cached embeddings in pages of {PageSize}", totalFiles, pageSize);
+
+        var startTime = DateTimeOffset.UtcNow;
+        var processed = 0;
+
+        for (int i = 0; i < totalFiles; i += pageSize)
+        {
+            var pageFiles = files.Skip(i).Take(pageSize).ToArray();
+            var page = new Dictionary<string, CachedEmbedding>();
+
+            // Parallel load within page
+            var tasks = pageFiles.Select(async file =>
+            {
+                try
+                {
+                    var json = await File.ReadAllTextAsync(file, ct);
+                    return JsonSerializer.Deserialize<CachedEmbedding>(json);
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogWarning(ex, "Failed to read cache file: {FilePath}", file);
+                    return null;
+                }
+            });
+
+            var pageResults = await Task.WhenAll(tasks);
+
+            foreach (var cached in pageResults)
+            {
+                if (cached != null && !string.IsNullOrEmpty(cached.ContentHash))
+                {
+                    page[cached.ContentHash] = cached;
+                }
+            }
+
+            processed += pageFiles.Length;
+
+            // Calculate progress and ETA
+            var elapsed = DateTimeOffset.UtcNow - startTime;
+            var progressPercent = (double)processed / totalFiles * 100;
+            var itemsPerSecond = processed / Math.Max(1, elapsed.TotalSeconds);
+            var remaining = totalFiles - processed;
+            var etaSeconds = remaining / Math.Max(0.1, itemsPerSecond);
+            var eta = TimeSpan.FromSeconds(etaSeconds);
+
+            _logger?.LogInformation("Cache streaming progress: {Processed}/{Total} files ({Percent:F1}%) - ETA: {ETA} - Yielding {PageCount} embeddings",
+                processed, totalFiles, progressPercent, eta.ToString(@"mm\:ss"), page.Count);
+
+            yield return page;
+        }
+
+        _logger?.LogInformation("Cache streaming complete: {Total} files in {Elapsed:F1}s", totalFiles, (DateTimeOffset.UtcNow - startTime).TotalSeconds);
+    }
+
+    /// <summary>
     /// Bulk export all cached embeddings for a given model and entity type with pagination and progress.
     /// Returns dictionary keyed by contentHash.
     /// </summary>

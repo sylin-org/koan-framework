@@ -698,77 +698,62 @@ internal sealed class SeedService : ISeedService
 
         _logger?.LogDebug("Vector pipeline starting: {Count} items, model={Model}", itemsList.Count, modelId);
 
-        // Step 1: Bulk load cache (much faster than one-at-a-time lookups)
-        var cacheDict = await _embeddingCache.GetAllAsync(modelId, typeof(Media).FullName!, ct);
-        _logger?.LogInformation("Loaded {Count} embeddings from cache", cacheDict.Count);
-
-        // Step 2: Separate items into cached and uncached
-        var cachedItems = new List<(Media media, float[] embedding)>();
-        var uncachedItems = new List<Media>();
-
+        // Build lookup: contentHash -> Media
+        var mediaByHash = new Dictionary<string, Media>();
         foreach (var media in itemsList)
         {
-            var embeddingText = BuildEmbeddingText(media);
-            var contentHash = EmbeddingCache.ComputeContentHash(embeddingText);
-
-            if (cacheDict.TryGetValue(contentHash, out var cached))
-            {
-                cachedItems.Add((media, cached.Embedding));
-                Interlocked.Increment(ref _cacheHits);
-            }
-            else
-            {
-                uncachedItems.Add(media);
-                Interlocked.Increment(ref _cacheMisses);
-            }
+            var hash = EmbeddingCache.ComputeContentHash(BuildEmbeddingText(media));
+            mediaByHash[hash] = media;
         }
 
-        _logger?.LogInformation("Embedding cache: {CacheHits} hits, {CacheMisses} misses ({HitRate:P1} hit rate)",
-            cachedItems.Count, uncachedItems.Count,
-            itemsList.Count > 0 ? (double)cachedItems.Count / itemsList.Count : 0);
+        _logger?.LogInformation("Processing {Count} items: read 1000 cache files → write 1000 vectors → repeat", itemsList.Count);
 
-        // Step 3: Process cached items in batches (fast path - no AI calls)
-        var cachedProcessed = 0;
-        const int batchSize = 1000;
+        var cachedHashes = new HashSet<string>();
+        var totalProcessed = 0;
+        const int pageSize = 1000;
 
-        for (int i = 0; i < cachedItems.Count; i += batchSize)
+        // Read cache in pages, write vectors immediately
+        await foreach (var cachePage in _embeddingCache.GetPaginatedAsync(modelId, typeof(Media).FullName!, pageSize, ct))
         {
-            var batch = cachedItems.Skip(i).Take(batchSize).ToList();
+            var batchItems = new List<VectorData<Media>.VectorEntity>();
 
-            try
+            foreach (var (contentHash, cached) in cachePage)
             {
-                // Build batch items with metadata
-                var batchItems = batch.Select(item =>
+                if (mediaByHash.TryGetValue(contentHash, out var media))
                 {
-                    var vectorMetadata = BuildVectorMetadata(item.media);
-                    return new VectorData<Media>.VectorEntity(
-                        Entity: item.media,
-                        Vector: item.embedding,
-                        Metadata: vectorMetadata
-                    );
-                }).ToList();
-
-                // Batch upsert
-                var result = await VectorData<Media>.SaveManyWithVector(batchItems, ct);
-                var affected = result.Added + result.Updated;
-                Interlocked.Add(ref stored, affected);
-                cachedProcessed += batch.Count;
-
-                // Log progress every batch
-                if (cachedProcessed % 10000 == 0 || cachedProcessed == cachedItems.Count)
-                {
-                    _logger?.LogInformation("Vector pipeline progress: {Processed}/{Total} cached vectors upserted",
-                        cachedProcessed, cachedItems.Count);
+                    var metadata = BuildVectorMetadata(media);
+                    batchItems.Add(new VectorData<Media>.VectorEntity(media, cached.Embedding, Metadata: metadata));
+                    cachedHashes.Add(contentHash);
+                    Interlocked.Increment(ref _cacheHits);
                 }
             }
-            catch (Exception ex)
+
+            if (batchItems.Count > 0)
             {
-                _logger?.LogWarning(ex, "Vector pipeline (cached): batch upsert failed for batch starting at index {Index}", i);
-                Interlocked.Add(ref failures, batch.Count);
+                try
+                {
+                    var result = await VectorData<Media>.SaveManyWithVector(batchItems, ct);
+                    Interlocked.Add(ref stored, result.Added + result.Updated);
+                    totalProcessed += batchItems.Count;
+
+                    _logger?.LogInformation("Vector progress: {Processed} vectors saved to Weaviate", totalProcessed);
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogWarning(ex, "Batch save failed for {Count} vectors", batchItems.Count);
+                    Interlocked.Add(ref failures, batchItems.Count);
+                }
             }
         }
 
-        // Step 4: Process uncached items (slow path - requires AI calls)
+        // Identify uncached items
+        var uncachedItems = itemsList.Where(m => !cachedHashes.Contains(EmbeddingCache.ComputeContentHash(BuildEmbeddingText(m)))).ToList();
+        Interlocked.Add(ref _cacheMisses, uncachedItems.Count);
+
+        _logger?.LogInformation("Embedding cache: {CacheHits} hits, {CacheMisses} misses ({HitRate:P1}%)",
+            _cacheHits, uncachedItems.Count, itemsList.Count > 0 ? (double)_cacheHits / itemsList.Count * 100 : 0);
+
+        // Process uncached items (slow path - requires AI calls)
         if (uncachedItems.Count > 0)
         {
             await uncachedItems
@@ -831,7 +816,7 @@ internal sealed class SeedService : ISeedService
         }
 
         _logger?.LogInformation("Vector pipeline completed: {Stored} vectors stored ({Cached} from cache, {Generated} newly generated)",
-            stored, cachedItems.Count, uncachedItems.Count - failures);
+            stored, _cacheHits, uncachedItems.Count - failures);
 
         return stored;
     }
