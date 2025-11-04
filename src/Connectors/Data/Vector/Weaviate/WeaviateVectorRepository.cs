@@ -374,26 +374,28 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
     public async Task FlushAsync(CancellationToken ct = default)
     {
         using var _ = WeaviateTelemetry.Activity.StartActivity("vector.flush");
-        await EnsureSchemaAsync(ct);
+        var cls = ClassName;
 
-        // Use Weaviate's batch delete endpoint to clear all objects
-        var body = new
+        // Flush by deleting and recreating the schema (standard Weaviate pattern)
+        _logger?.LogInformation("Weaviate: flushing class {Class} (delete + recreate schema)", cls);
+
+        // Delete the class schema (removes all objects)
+        var deleteResp = await _http.DeleteAsync($"/v1/schema/{Uri.EscapeDataString(cls)}", ct);
+
+        if (!deleteResp.IsSuccessStatusCode && deleteResp.StatusCode != HttpStatusCode.NotFound)
         {
-            @class = ClassName,
-            where = new { @operator = "IsNotNull", path = new[] { "docId" } }
-        };
-
-        var req = new StringContent(JsonConvert.SerializeObject(body), System.Text.Encoding.UTF8, "application/json");
-        var resp = await _http.PostAsync("/v1/batch/objects/delete", req, ct);
-
-        if (!resp.IsSuccessStatusCode)
-        {
-            var txt = await resp.Content.ReadAsStringAsync(ct);
-            _logger?.LogError("Weaviate flush failed ({Status}): {Body}", (int)resp.StatusCode, txt);
-            throw new InvalidOperationException($"Weaviate flush failed: {(int)resp.StatusCode} {resp.ReasonPhrase} {txt}");
+            var txt = await deleteResp.Content.ReadAsStringAsync(ct);
+            _logger?.LogError("Weaviate schema delete failed ({Status}): {Body}", (int)deleteResp.StatusCode, txt);
+            throw new InvalidOperationException($"Weaviate flush failed: {(int)deleteResp.StatusCode} {deleteResp.ReasonPhrase} {txt}");
         }
 
-        _logger?.LogInformation("Weaviate: flushed all vectors for class {Class}", ClassName);
+        // Reset the schema ensured flag so EnsureSchemaAsync will recreate
+        _schemaEnsured = false;
+
+        // Recreate the schema
+        await EnsureSchemaAsync(ct);
+
+        _logger?.LogInformation("Weaviate: flushed all vectors for class {Class}", cls);
     }
 
     public async IAsyncEnumerable<VectorExportBatch<TKey>> ExportAllAsync(
