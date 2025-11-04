@@ -348,11 +348,12 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
     {
         // Responsibility: AdminController builds the list; SeedService just upserts vectors for the provided items.
         var all = Models.Media.All(HttpContext.RequestAborted).Result.ToList();
+        var limited = all.Take(req.Limit).ToList();
 
-        _logger.LogInformation("------------- Starting vector-only upsert for {Count} items (limit {Limit})", all.Count, req.Limit);
+        _logger.LogInformation("------------- Starting vector-only upsert for {Count} items (limit {Limit})", limited.Count, req.Limit);
 
-        var id = seeder.StartVectorUpsertAsync(all, HttpContext.RequestAborted).Result;
-        return Ok(new { jobId = id, count = all.Count });
+        var id = seeder.StartVectorUpsertAsync(limited, HttpContext.RequestAborted).Result;
+        return Ok(new { jobId = id, count = limited.Count });
     }
 
     // Minimal SSE for progress (poll-ish server push). Browsers: fetch('/admin/seed/sse/{jobId}').
@@ -580,19 +581,37 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
     }
 
     [HttpPost("flush/vectors")]
-    public async Task<IActionResult> FlushVectors(CancellationToken ct)
+    public async Task<IActionResult> FlushVectors([FromServices] Koan.Data.Vector.IVectorService? vectorService, CancellationToken ct)
     {
-        // Delete all vector data
-        var count = 0;
+        // Clear entire vector index (much faster than one-by-one deletion)
         if (Koan.Data.Vector.Vector<Models.Media>.IsAvailable)
         {
-            await foreach (var media in Models.Media.AllStream(1000, ct))
+            try
             {
-                await Koan.Data.Vector.Vector<Models.Media>.Delete(media.Id!, ct);
-                count++;
+                // Get count before clearing
+                var count = await Koan.Data.Vector.Vector<Models.Media>.Stats(ct);
+
+                // Clear the entire index using instruction with AllowDestructive flag
+                var repo = vectorService?.TryGetRepository<Models.Media, string>();
+                if (repo is Koan.Data.Abstractions.Instructions.IInstructionExecutor<Models.Media> executor)
+                {
+                    var instruction = new Koan.Data.Abstractions.Instructions.Instruction(
+                        Koan.Data.Vector.Abstractions.VectorInstructions.IndexClear,
+                        new Dictionary<string, object> { ["AllowDestructive"] = true }
+                    );
+                    await executor.ExecuteAsync<bool>(instruction, ct);
+                }
+
+                _logger.LogInformation("Flushed {Count} vectors from index", count);
+                return Ok(new { flushed = "vectors", count });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to flush vectors");
+                return StatusCode(500, new { error = ex.Message });
             }
         }
-        return Ok(new { flushed = "vectors", count });
+        return Ok(new { flushed = "vectors", count = 0, note = "Vector database not available" });
     }
 
     [HttpPost("flush/tags")]
