@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using S5.Recs.Infrastructure;
 using S5.Recs.Models;
+using S5.Recs.Services;
 
 namespace S5.Recs.Controllers;
 
@@ -9,6 +10,12 @@ namespace S5.Recs.Controllers;
 [Route(Constants.Routes.Library)]
 public class MediaLibraryController : ControllerBase
 {
+    private readonly IRecsService _recsService;
+
+    public MediaLibraryController(IRecsService recsService)
+    {
+        _recsService = recsService;
+    }
     // New: claim-based update (no userId in route)
     [Authorize]
     [HttpPut("by-me/{mediaId}")]
@@ -62,6 +69,20 @@ public class MediaLibraryController : ControllerBase
 
         entry.UpdatedAt = DateTimeOffset.UtcNow;
         await LibraryEntry.UpsertMany(new[] { entry }, ct);
+
+        // Rebuild user preference vector after library change (fire and forget)
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await _recsService.RebuildUserPrefVectorAsync(userId, CancellationToken.None);
+            }
+            catch
+            {
+                // Fire and forget - don't block response
+            }
+        }, CancellationToken.None);
+
         return Ok(entry);
     }
 
@@ -70,6 +91,20 @@ public class MediaLibraryController : ControllerBase
     {
         var id = LibraryEntry.MakeId(userId, mediaId);
         await LibraryEntry.Remove(id, ct);
+
+        // Rebuild user preference vector after library change (fire and forget)
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await _recsService.RebuildUserPrefVectorAsync(userId, CancellationToken.None);
+            }
+            catch
+            {
+                // Fire and forget - don't block response
+            }
+        }, CancellationToken.None);
+
         return NoContent();
     }
 

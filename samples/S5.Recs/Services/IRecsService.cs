@@ -17,4 +17,10 @@ public interface IRecsService
         CancellationToken ct);
 
     Task RateAsync(string userId, string mediaId, int rating, CancellationToken ct);
+
+    /// <summary>
+    /// Rebuilds and caches the user preference vector from their library.
+    /// Should be called whenever the user's library changes (add/remove/rate).
+    /// </summary>
+    Task RebuildUserPrefVectorAsync(string userId, CancellationToken ct = default);
 }

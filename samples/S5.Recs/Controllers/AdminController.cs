@@ -102,11 +102,11 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
     [HttpGet("recs-settings")]
     public IActionResult GetRecsSettings([FromServices] S5.Recs.Services.IRecommendationSettingsProvider provider)
     {
-        var (ptw, mpt, dw) = provider.GetEffective();
-        return Ok(new { preferTagsWeight = ptw, maxPreferredTags = mpt, diversityWeight = dw });
+        var (ptw, mpt, dw, ctpw) = provider.GetEffective();
+        return Ok(new { preferTagsWeight = ptw, maxPreferredTags = mpt, diversityWeight = dw, censoredTagsPenaltyWeight = ctpw });
     }
 
-    public record RecsSettingsRequest(double PreferTagsWeight, int MaxPreferredTags, double DiversityWeight);
+    public record RecsSettingsRequest(double PreferTagsWeight, int MaxPreferredTags, double DiversityWeight, double? CensoredTagsPenaltyWeight = null);
 
     [HttpPost("recs-settings")]
     public IActionResult SetRecsSettings([FromBody] RecsSettingsRequest req, [FromServices] S5.Recs.Services.IRecommendationSettingsProvider provider)
@@ -114,10 +114,18 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
         var ptw = Math.Clamp(req.PreferTagsWeight, 0, 1.0);
         var mpt = Math.Clamp(req.MaxPreferredTags, 1, 5);
         var dw = Math.Clamp(req.DiversityWeight, 0, 0.2);
-        var doc = new Models.SettingsDoc { Id = "recs:settings", PreferTagsWeight = ptw, MaxPreferredTags = mpt, DiversityWeight = dw, UpdatedAt = DateTimeOffset.UtcNow };
+        var ctpw = Math.Clamp(req.CensoredTagsPenaltyWeight ?? -0.7, -1.0, -0.1);
+        var doc = new Models.SettingsDoc {
+            Id = "recs:settings",
+            PreferTagsWeight = ptw,
+            MaxPreferredTags = mpt,
+            DiversityWeight = dw,
+            CensoredTagsPenaltyWeight = ctpw,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
         Models.SettingsDoc.UpsertMany(new[] { doc }, HttpContext.RequestAborted).GetAwaiter().GetResult();
         provider.InvalidateAsync(HttpContext.RequestAborted).GetAwaiter().GetResult();
-        return Ok(new { preferTagsWeight = ptw, maxPreferredTags = mpt, diversityWeight = dw });
+        return Ok(new { preferTagsWeight = ptw, maxPreferredTags = mpt, diversityWeight = dw, censoredTagsPenaltyWeight = ctpw });
     }
 
     [HttpGet("seed/status/{jobId}")]
