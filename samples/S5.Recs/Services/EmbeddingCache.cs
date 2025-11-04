@@ -190,7 +190,8 @@ public sealed class EmbeddingCache : IEmbeddingCache
             {
                 var pageFiles = files.Skip(i).Take(pageSize).ToArray();
 
-                foreach (var file in pageFiles)
+                // Parallel processing for much faster file I/O
+                var tasks = pageFiles.Select(async file =>
                 {
                     try
                     {
@@ -199,12 +200,24 @@ public sealed class EmbeddingCache : IEmbeddingCache
 
                         if (cached != null && !string.IsNullOrEmpty(cached.ContentHash))
                         {
-                            result[cached.ContentHash] = cached;
+                            return cached;
                         }
                     }
                     catch (Exception ex)
                     {
                         _logger?.LogWarning(ex, "Failed to read cached embedding file: {FilePath}", file);
+                    }
+                    return null;
+                });
+
+                var pageResults = await Task.WhenAll(tasks);
+
+                // Add to result dictionary (not thread-safe, so do sequentially)
+                foreach (var cached in pageResults)
+                {
+                    if (cached != null && !string.IsNullOrEmpty(cached.ContentHash))
+                    {
+                        result[cached.ContentHash] = cached;
                     }
                 }
 
