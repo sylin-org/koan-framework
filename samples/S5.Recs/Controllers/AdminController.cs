@@ -344,16 +344,22 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
     }
 
     [HttpPost("seed/vectors")] // vector-only upsert from existing docs
-    public IActionResult StartVectorOnly([FromBody] VectorOnlyRequest req)
+    public async Task<IActionResult> StartVectorOnly([FromBody] VectorOnlyRequest req)
     {
         // Responsibility: AdminController builds the list; SeedService just upserts vectors for the provided items.
-        var all = Models.Media.All(HttpContext.RequestAborted).Result.ToList();
+        // Use AllStream to bypass default page size limit of 50
+        var all = new List<Models.Media>();
+        await foreach (var media in Models.Media.AllStream(1000, HttpContext.RequestAborted))
+        {
+            all.Add(media);
+        }
+
         var items = req.Limit.HasValue ? all.Take(req.Limit.Value).ToList() : all;
 
         _logger.LogInformation("------------- Starting vector-only upsert for {Count} items (limit {Limit})",
             items.Count, req.Limit?.ToString() ?? "none (all)");
 
-        var id = seeder.StartVectorUpsertAsync(items, HttpContext.RequestAborted).Result;
+        var id = await seeder.StartVectorUpsertAsync(items, HttpContext.RequestAborted);
         return Ok(new { jobId = id, count = items.Count, limit = req.Limit });
     }
 
