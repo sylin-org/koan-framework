@@ -88,13 +88,24 @@ internal sealed class RecsService : IRecsService
         // Determine effective userId (override from auth context takes precedence)
         var userId = userIdOverride ?? query.UserId;
 
-        // Apply guardrails to topK
-        var topK = query.TopK;
-        if (topK <= 0) topK = 10;
-        if (topK > 100) topK = 100;
+        // Handle pagination: prefer Offset/Limit over legacy TopK
+        var offset = query.Offset ?? 0;
+        var limit = query.Limit ?? query.TopK;
 
-        _logger?.LogInformation("Multi-media query: text='{Text}' anchor='{Anchor}' mediaType='{MediaType}' topK={TopK}",
-            query.Text, query.AnchorMediaId, query.Filters?.MediaType, topK);
+        // Apply guardrails
+        // Note: When both Offset and Limit are null, this is likely a band fetch from BandCacheService
+        // In that case, allow larger limits (up to topK) for efficient band fetching
+        var isBandFetch = query.Offset == null && query.Limit == null;
+        if (offset < 0) offset = 0;
+        if (limit <= 0) limit = 20;
+        if (!isBandFetch && limit > 100) limit = 100;  // Only cap user-facing queries
+
+        // For vector search, we need to fetch offset + limit results, then skip offset
+        var topK = offset + limit;
+        if (topK > 10000) topK = 10000; // Safety limit for band fetches
+
+        _logger?.LogInformation("Multi-media query: text='{Text}' anchor='{Anchor}' mediaType='{MediaType}' offset={Offset} limit={Limit} (topK={TopK})",
+            query.Text, query.AnchorMediaId, query.Filters?.MediaType, offset, limit, topK);
 
         try
         {
@@ -194,13 +205,12 @@ internal sealed class RecsService : IRecsService
                         query.Filters?.ShowCensored ?? false,
                         ct);
 
-                    // Apply sorting and trim to requested topK
+                    // Apply sorting and apply offset/limit pagination
                     var sortedRecommendations = ApplySort(recommendations, query.Sort);
-                    var finalResults = sortedRecommendations.Take(topK).ToList();
+                    var finalResults = sortedRecommendations.Skip(offset).Take(limit).ToList();
 
-                    _logger?.LogInformation("Multi-media {SearchMode} query returned {Count} results",
-                        !string.IsNullOrWhiteSpace(query.Text) ? "hybrid" : "vector",
-                        finalResults.Count);
+                    var searchMode = !string.IsNullOrWhiteSpace(query.Text) ? "hybrid" : "vector";
+                    _logger?.LogInformation("Multi-media {SearchMode} query returned {Count} results (offset={Offset}, limit={Limit}, total={Total})", searchMode, finalResults.Count, offset, limit, sortedRecommendations.Count());
                     return (finalResults, false);
                 }
             }
@@ -250,9 +260,9 @@ internal sealed class RecsService : IRecsService
             }).ToList();
 
             var sortedFallback = ApplySort(fallbackRecommendations, query.Sort);
-            var finalFallback = sortedFallback.Take(topK).ToList();
+            var finalFallback = sortedFallback.Skip(offset).Take(limit).ToList();
 
-            _logger?.LogInformation("Multi-media database fallback returned {Count} results", finalFallback.Count);
+            _logger?.LogInformation("Multi-media database fallback returned {Count} results (offset={Offset}, limit={Limit}, total={Total})", finalFallback.Count, offset, limit, sortedFallback.Count());
             return (finalFallback, true);
         }
         catch (Exception ex)
@@ -265,7 +275,7 @@ internal sealed class RecsService : IRecsService
                 Media = media,
                 Score = media.Popularity,
                 Reasons = new[] { "demo" }
-            }).Take(topK).ToList();
+            }).Skip(offset).Take(limit).ToList();
 
             return (demoRecommendations, true);
         }

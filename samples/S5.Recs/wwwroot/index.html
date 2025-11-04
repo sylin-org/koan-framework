@@ -342,9 +342,24 @@
   <!-- Toasts -->
   <div id="toastContainer" class="fixed top-4 right-4 z-[100] space-y-2" aria-live="polite" role="status"></div>
 
-  <!-- More button -->
-  <div class="flex justify-center my-8">
-    <button id="moreBtn" class="hidden px-5 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg" onclick="loadMore()">More</button>
+  <!-- Infinite Scroll Sentinel & Loading States -->
+  <div class="flex flex-col items-center my-8 space-y-4">
+    <!-- Loading spinner (shown while fetching more) -->
+    <div id="loadingMoreState" class="hidden">
+      <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
+      <p class="text-gray-400 mt-2 text-sm">Loading more...</p>
+    </div>
+
+    <!-- Sentinel element for Intersection Observer -->
+    <div id="scrollSentinel" class="h-4 w-full"></div>
+
+    <!-- End of results message -->
+    <div id="endOfResults" class="hidden text-center py-4">
+      <div class="text-gray-500 text-sm">
+        <i class="fas fa-check-circle mr-2"></i>
+        You've reached the end
+      </div>
+    </div>
   </div>
 
   <!-- Page logic moved to /js/index.page.js -->

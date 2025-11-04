@@ -23,9 +23,11 @@ Directory.CreateDirectory(Path.Combine(builder.Environment.ContentRootPath, S5.R
 // AI, vector, and data adapters are auto-registered by their modules via Koan.Core discovery
 
 // Local services
+builder.Services.AddMemoryCache();  // For sliding window cache
 builder.Services.AddSingleton<IEmbeddingCache, EmbeddingCache>();
 builder.Services.AddSingleton<ISeedService, SeedService>();
 builder.Services.AddSingleton<IRecsService, RecsService>();
+builder.Services.AddSingleton<S5.Recs.Services.Pagination.IBandCacheService, S5.Recs.Services.Pagination.BandCacheService>();
 builder.Services.AddSingleton<IRecommendationSettingsProvider, RecommendationSettingsProvider>();
 builder.Services.AddSingleton<IRawCacheService, RawCacheService>();
 // Tag catalog options (censor list)
