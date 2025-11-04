@@ -1,3 +1,5 @@
+using Koan.Data.Abstractions;
+using Koan.Data.Core;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using S5.Recs.Infrastructure;
@@ -731,5 +733,189 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
         }
 
         return Ok(new { flushed = "media", count });
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // V2 Endpoints - Partition-Based Import Pipeline (ARCH-0069)
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    public record ImportRequestV2(string Source, string MediaType, int? Limit = null, bool Overwrite = false);
+
+    /// <summary>
+    /// V2: Queue import jobs using partition-based pipeline.
+    /// Returns immediately with job IDs for async progress tracking.
+    /// </summary>
+    [HttpPost("seed/v2/start")]
+    public async Task<IActionResult> StartImportV2(
+        [FromBody] ImportRequestV2 request,
+        [FromServices] Services.IImportOrchestrator orchestrator,
+        CancellationToken ct)
+    {
+        try
+        {
+            // Validate request
+            if (string.IsNullOrWhiteSpace(request.Source))
+            {
+                return BadRequest(new { error = "Source is required" });
+            }
+
+            if (string.IsNullOrWhiteSpace(request.MediaType))
+            {
+                return BadRequest(new { error = "MediaType is required. Specify a media type or 'all'" });
+            }
+
+            // Resolve media types
+            string[] mediaTypeIds;
+            if (request.MediaType.Equals("all", StringComparison.OrdinalIgnoreCase))
+            {
+                mediaTypeIds = new[] { "all" };
+            }
+            else
+            {
+                mediaTypeIds = new[] { request.MediaType };
+            }
+
+            // Queue import jobs
+            var options = new Services.ImportOptions(
+                Limit: request.Limit,
+                Overwrite: request.Overwrite
+            );
+
+            var jobIds = await orchestrator.QueueImportAsync(
+                request.Source,
+                mediaTypeIds,
+                options,
+                ct);
+
+            return Ok(new
+            {
+                jobIds = jobIds,
+                count = jobIds.Count,
+                message = $"Queued {jobIds.Count} import job(s). Use GET /admin/seed/v2/status to monitor progress."
+            });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to start import v2");
+            return StatusCode(500, new { error = "Failed to start import", details = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// V2: Get progress for import jobs.
+    /// Shows media counts in each partition stage and completion percentage.
+    /// </summary>
+    [HttpGet("seed/v2/status")]
+    public async Task<IActionResult> GetImportStatusV2(
+        [FromQuery] string[] jobIds,
+        [FromServices] Services.IImportOrchestrator orchestrator,
+        CancellationToken ct)
+    {
+        try
+        {
+            // If no job IDs provided, return recent jobs
+            if (jobIds == null || jobIds.Length == 0)
+            {
+                // Get recent jobs from both partitions
+                List<Models.ImportJob> active;
+                using (Koan.Data.Core.EntityContext.Partition("jobs-active"))
+                {
+                    active = (await Models.ImportJob.All(
+                        new DataQueryOptions { PageSize = 10, Sort = "-CreatedAt" },
+                        ct)).ToList();
+                }
+
+                // Also get completed jobs from default partition
+                var completed = (await Models.ImportJob.All(
+                    new DataQueryOptions { PageSize = 10, Sort = "-CreatedAt" },
+                    ct)).ToList();
+
+                var recentJobs = active.Concat(completed)
+                    .OrderByDescending(j => j.CreatedAt)
+                    .Take(10)
+                    .ToList();
+
+                jobIds = recentJobs.Select(j => j.JobId).ToArray();
+
+                if (jobIds.Length == 0)
+                {
+                    return Ok(new { jobs = Array.Empty<object>(), message = "No import jobs found" });
+                }
+            }
+
+            var progress = await orchestrator.GetProgressAsync(jobIds, ct);
+
+            return Ok(progress);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get import status v2");
+            return StatusCode(500, new { error = "Failed to get status", details = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// V2: Get detailed partition statistics for monitoring pipeline health.
+    /// </summary>
+    [HttpGet("seed/v2/partition-stats")]
+    public async Task<IActionResult> GetPartitionStats(CancellationToken ct)
+    {
+        try
+        {
+            int activeJobs, completedJobs;
+            int rawMedia, queuedMedia, liveMedia;
+
+            // Count jobs
+            using (Koan.Data.Core.EntityContext.Partition("jobs-active"))
+            {
+                activeJobs = (int)await Models.ImportJob.Count;
+            }
+
+            completedJobs = (int)await Models.ImportJob.Count;
+
+            // Count media by partition
+            using (Koan.Data.Core.EntityContext.Partition("import-raw"))
+            {
+                rawMedia = (int)await Models.Media.Count;
+            }
+
+            using (Koan.Data.Core.EntityContext.Partition("vectorization-queue"))
+            {
+                queuedMedia = (int)await Models.Media.Count;
+            }
+
+            liveMedia = (int)await Models.Media.Count.Where(m => m.VectorizedAt != null, ct: ct);
+
+            return Ok(new
+            {
+                jobs = new
+                {
+                    active = activeJobs,
+                    completed = completedJobs,
+                    total = activeJobs + completedJobs
+                },
+                media = new
+                {
+                    inRaw = rawMedia,
+                    inQueue = queuedMedia,
+                    live = liveMedia,
+                    total = rawMedia + queuedMedia + liveMedia
+                },
+                pipeline = new
+                {
+                    status = activeJobs > 0 ? "running" : "idle",
+                    bottleneck = queuedMedia > rawMedia * 2 ? "vectorization" : "none"
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get partition stats");
+            return StatusCode(500, new { error = "Failed to get stats", details = ex.Message });
+        }
     }
 }

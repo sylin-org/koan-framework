@@ -56,6 +56,41 @@ public sealed class Media : Entity<Media>
     public DateTimeOffset ImportedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
 
+    // ─────────────────────────────────────────────────────────────────
+    // Pipeline Metadata (ARCH-0069: Partition-Based Import Pipeline)
+    // ─────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// ID of the import job that imported this media item
+    /// </summary>
+    public string? ImportJobId { get; set; }
+
+    /// <summary>
+    /// SHA256 content signature for embedding cache lookup.
+    /// Computed from: Titles + Synopsis + Genres + Tags
+    /// </summary>
+    public string? ContentSignature { get; set; }
+
+    /// <summary>
+    /// When this media item passed validation and entered vectorization queue
+    /// </summary>
+    public DateTimeOffset? ValidatedAt { get; set; }
+
+    /// <summary>
+    /// When embedding was generated and stored in vector database
+    /// </summary>
+    public DateTimeOffset? VectorizedAt { get; set; }
+
+    /// <summary>
+    /// Error message from last processing attempt (validation or vectorization)
+    /// </summary>
+    public string? ProcessingError { get; set; }
+
+    /// <summary>
+    /// Number of times processing has been retried for this media item
+    /// </summary>
+    public int RetryCount { get; set; }
+
     /// <summary>
     /// Generates deterministic SHA512-based ID from provider information.
     /// </summary>
