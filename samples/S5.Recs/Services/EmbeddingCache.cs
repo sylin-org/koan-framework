@@ -155,6 +155,84 @@ public sealed class EmbeddingCache : IEmbeddingCache
     }
 
     /// <summary>
+    /// Bulk export all cached embeddings for a given model and entity type with pagination and progress.
+    /// Returns dictionary keyed by contentHash.
+    /// </summary>
+    public async Task<Dictionary<string, CachedEmbedding>> GetAllAsync(string modelId, string entityTypeName, CancellationToken ct = default)
+    {
+        var result = new Dictionary<string, CachedEmbedding>();
+        var safeEntityType = SanitizeForFileSystem(entityTypeName);
+        var safeModelId = SanitizeForFileSystem(modelId);
+        var modelDir = Path.Combine(_basePath, safeEntityType, safeModelId);
+
+        if (!Directory.Exists(modelDir))
+        {
+            return result;
+        }
+
+        try
+        {
+            var files = Directory.GetFiles(modelDir, "*.json", SearchOption.AllDirectories);
+            var totalFiles = files.Length;
+
+            if (totalFiles == 0)
+            {
+                return result;
+            }
+
+            _logger?.LogInformation("Bulk loading {Count} cached embeddings from {Path}", totalFiles, modelDir);
+
+            const int pageSize = 1000;
+            var startTime = DateTimeOffset.UtcNow;
+            var processed = 0;
+
+            for (int i = 0; i < totalFiles; i += pageSize)
+            {
+                var pageFiles = files.Skip(i).Take(pageSize).ToArray();
+
+                foreach (var file in pageFiles)
+                {
+                    try
+                    {
+                        var json = await File.ReadAllTextAsync(file, ct);
+                        var cached = JsonSerializer.Deserialize<CachedEmbedding>(json);
+
+                        if (cached != null && !string.IsNullOrEmpty(cached.ContentHash))
+                        {
+                            result[cached.ContentHash] = cached;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger?.LogWarning(ex, "Failed to read cached embedding file: {FilePath}", file);
+                    }
+                }
+
+                processed += pageFiles.Length;
+
+                // Calculate progress and ETA
+                var elapsed = DateTimeOffset.UtcNow - startTime;
+                var progressPercent = (double)processed / totalFiles * 100;
+                var itemsPerSecond = processed / Math.Max(1, elapsed.TotalSeconds);
+                var remaining = totalFiles - processed;
+                var etaSeconds = remaining / Math.Max(0.1, itemsPerSecond);
+                var eta = TimeSpan.FromSeconds(etaSeconds);
+
+                _logger?.LogInformation("Cache loading progress: {Processed}/{Total} files ({Percent:F1}%) - ETA: {ETA}",
+                    processed, totalFiles, progressPercent, eta.ToString(@"mm\:ss"));
+            }
+
+            _logger?.LogInformation("Bulk loaded {Count} cached embeddings in {Elapsed:F1}s", result.Count, (DateTimeOffset.UtcNow - startTime).TotalSeconds);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Failed to bulk load cached embeddings");
+        }
+
+        return result;
+    }
+
+    /// <summary>
     /// Compute SHA256 hash of content for cache key.
     /// </summary>
     public static string ComputeContentHash(string content)

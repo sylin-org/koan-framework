@@ -24,6 +24,12 @@ public interface IEmbeddingCache
     /// Get cache statistics (total count, size, etc.).
     /// </summary>
     Task<CacheStats> GetStatsAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// Bulk export all cached embeddings for a given model and entity type.
+    /// Returns dictionary keyed by contentHash.
+    /// </summary>
+    Task<Dictionary<string, CachedEmbedding>> GetAllAsync(string modelId, string entityTypeName, CancellationToken ct = default);
 }
 
 /// <summary>

@@ -698,7 +698,11 @@ internal sealed class SeedService : ISeedService
 
         _logger?.LogDebug("Vector pipeline starting: {Count} items, model={Model}", itemsList.Count, modelId);
 
-        // Step 1: Separate items into cached and uncached
+        // Step 1: Bulk load cache (much faster than one-at-a-time lookups)
+        var cacheDict = await _embeddingCache.GetAllAsync(modelId, typeof(Media).FullName!, ct);
+        _logger?.LogInformation("Loaded {Count} embeddings from cache", cacheDict.Count);
+
+        // Step 2: Separate items into cached and uncached
         var cachedItems = new List<(Media media, float[] embedding)>();
         var uncachedItems = new List<Media>();
 
@@ -706,9 +710,8 @@ internal sealed class SeedService : ISeedService
         {
             var embeddingText = BuildEmbeddingText(media);
             var contentHash = EmbeddingCache.ComputeContentHash(embeddingText);
-            var cached = await _embeddingCache.GetAsync(contentHash, modelId, typeof(Media).FullName!, ct);
 
-            if (cached != null)
+            if (cacheDict.TryGetValue(contentHash, out var cached))
             {
                 cachedItems.Add((media, cached.Embedding));
                 Interlocked.Increment(ref _cacheHits);
@@ -724,7 +727,7 @@ internal sealed class SeedService : ISeedService
             cachedItems.Count, uncachedItems.Count,
             itemsList.Count > 0 ? (double)cachedItems.Count / itemsList.Count : 0);
 
-        // Step 2: Process cached items in batches (fast path - no AI calls)
+        // Step 3: Process cached items in batches (fast path - no AI calls)
         var cachedProcessed = 0;
         const int batchSize = 1000;
 
@@ -765,7 +768,7 @@ internal sealed class SeedService : ISeedService
             }
         }
 
-        // Step 3: Process uncached items (slow path - requires AI calls)
+        // Step 4: Process uncached items (slow path - requires AI calls)
         if (uncachedItems.Count > 0)
         {
             await uncachedItems
