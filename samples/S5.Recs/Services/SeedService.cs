@@ -724,19 +724,44 @@ internal sealed class SeedService : ISeedService
             cachedItems.Count, uncachedItems.Count,
             itemsList.Count > 0 ? (double)cachedItems.Count / itemsList.Count : 0);
 
-        // Step 2: Process cached items (fast path - no AI calls)
-        foreach (var (media, embedding) in cachedItems)
+        // Step 2: Process cached items in batches (fast path - no AI calls)
+        var cachedProcessed = 0;
+        const int batchSize = 1000;
+
+        for (int i = 0; i < cachedItems.Count; i += batchSize)
         {
+            var batch = cachedItems.Skip(i).Take(batchSize).ToList();
+
             try
             {
-                var vectorMetadata = BuildVectorMetadata(media);
-                await VectorData<Media>.SaveWithVector(media, embedding, vectorMetadata, ct);
-                Interlocked.Increment(ref stored);
+                // Build batch items with metadata
+                var batchItems = batch.Select(item =>
+                {
+                    var vectorMetadata = BuildVectorMetadata(item.media);
+                    return new VectorData<Media>.VectorEntity(
+                        Entity: item.media,
+                        Vector: item.embedding,
+                        Metadata: vectorMetadata
+                    );
+                }).ToList();
+
+                // Batch upsert
+                var result = await VectorData<Media>.SaveManyWithVector(batchItems, ct);
+                var affected = result.Added + result.Updated;
+                Interlocked.Add(ref stored, affected);
+                cachedProcessed += batch.Count;
+
+                // Log progress every batch
+                if (cachedProcessed % 10000 == 0 || cachedProcessed == cachedItems.Count)
+                {
+                    _logger?.LogInformation("Vector pipeline progress: {Processed}/{Total} cached vectors upserted",
+                        cachedProcessed, cachedItems.Count);
+                }
             }
             catch (Exception ex)
             {
-                _logger?.LogWarning(ex, "Vector pipeline (cached): failed to save vector for media {Id}", media.Id);
-                Interlocked.Increment(ref failures);
+                _logger?.LogWarning(ex, "Vector pipeline (cached): batch upsert failed for batch starting at index {Index}", i);
+                Interlocked.Add(ref failures, batch.Count);
             }
         }
 
