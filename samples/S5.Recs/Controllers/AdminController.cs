@@ -582,9 +582,9 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
     }
 
     [HttpPost("flush/vectors")]
-    public async Task<IActionResult> FlushVectors([FromServices] Koan.Data.Vector.IVectorService? vectorService, CancellationToken ct)
+    public async Task<IActionResult> FlushVectors(CancellationToken ct)
     {
-        // Clear entire vector index (much faster than one-by-one deletion)
+        // Clear entire vector index using the Flush API
         if (Koan.Data.Vector.Vector<Models.Media>.IsAvailable)
         {
             try
@@ -592,16 +592,8 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
                 // Get count before clearing
                 var count = await Koan.Data.Vector.Vector<Models.Media>.Stats(ct);
 
-                // Clear the entire index using instruction with AllowDestructive flag
-                var repo = vectorService?.TryGetRepository<Models.Media, string>();
-                if (repo is Koan.Data.Abstractions.Instructions.IInstructionExecutor<Models.Media> executor)
-                {
-                    var instruction = new Koan.Data.Abstractions.Instructions.Instruction(
-                        Koan.Data.Vector.Abstractions.VectorInstructions.IndexClear,
-                        new Dictionary<string, object> { ["AllowDestructive"] = true }
-                    );
-                    await executor.ExecuteAsync<bool>(instruction, ct);
-                }
+                // Flush the entire index (handles AllowDestructive internally)
+                await Koan.Data.Vector.Vector<Models.Media>.Flush(ct);
 
                 _logger.LogInformation("Flushed {Count} vectors from index", count);
                 return Ok(new { flushed = "vectors", count });

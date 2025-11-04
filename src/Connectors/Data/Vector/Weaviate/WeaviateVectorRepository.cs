@@ -371,6 +371,31 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
         return new VectorQueryResult<TKey>(matches, ContinuationToken: null);
     }
 
+    public async Task FlushAsync(CancellationToken ct = default)
+    {
+        using var _ = WeaviateTelemetry.Activity.StartActivity("vector.flush");
+        await EnsureSchemaAsync(ct);
+
+        // Use Weaviate's batch delete endpoint to clear all objects
+        var body = new
+        {
+            @class = ClassName,
+            where = new { @operator = "IsNotNull", path = new[] { "docId" } }
+        };
+
+        var req = new StringContent(JsonConvert.SerializeObject(body), System.Text.Encoding.UTF8, "application/json");
+        var resp = await _http.PostAsync("/v1/batch/objects/delete", req, ct);
+
+        if (!resp.IsSuccessStatusCode)
+        {
+            var txt = await resp.Content.ReadAsStringAsync(ct);
+            _logger?.LogError("Weaviate flush failed ({Status}): {Body}", (int)resp.StatusCode, txt);
+            throw new InvalidOperationException($"Weaviate flush failed: {(int)resp.StatusCode} {resp.ReasonPhrase} {txt}");
+        }
+
+        _logger?.LogInformation("Weaviate: flushed all vectors for class {Class}", ClassName);
+    }
+
     public async IAsyncEnumerable<VectorExportBatch<TKey>> ExportAllAsync(
         int? batchSize = null,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
@@ -512,24 +537,13 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
                 }
             case VectorInstructions.IndexClear:
                 {
+                    // Backward compatibility: require AllowDestructive option for instruction-based clear
                     var allow = instruction.Options != null && instruction.Options.TryGetValue("AllowDestructive", out var v) && v is bool b && b;
                     if (!allow) throw new NotSupportedException("Destructive clear requires Options.AllowDestructive=true.");
-                    await EnsureSchemaAsync(ct);
-                    var body = new
-                    {
-                        @class = ClassName,
-                        where = new { @operator = "IsNotNull", path = new[] { "id" } }
-                    };
-                    var req = new StringContent(JsonConvert.SerializeObject(body), System.Text.Encoding.UTF8, "application/json");
-                    var resp = await _http.PostAsync("/v1/batch/objects/delete", req, ct);
-                    if (!resp.IsSuccessStatusCode)
-                    {
-                        var txt = await resp.Content.ReadAsStringAsync(ct);
-                        throw new InvalidOperationException($"Weaviate clear failed: {(int)resp.StatusCode} {resp.ReasonPhrase} {txt}");
-                    }
-                    // Return approximate deleted count if provided; else 0
-                    object ok = 0;
-                    return (TResult)ok;
+
+                    // Delegate to FlushAsync which implements the actual clear logic
+                    await FlushAsync(ct);
+                    return (TResult)(object)true;
                 }
             default:
                 throw new NotSupportedException($"Instruction '{instruction.Name}' not supported by Weaviate vector adapter.");

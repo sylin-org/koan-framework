@@ -50,6 +50,13 @@ public class Vector<TEntity> where TEntity : class, IEntity<string>
         throw new InvalidOperationException("Clear requires instruction support by the vector provider.");
     }
 
+    /// <summary>
+    /// Flush (clear) the entire vector index. This is a destructive operation that deletes all vectors.
+    /// Each adapter implements this according to its provider's capabilities.
+    /// </summary>
+    public static Task Flush(CancellationToken ct = default)
+        => Repo.FlushAsync(ct);
+
     public static async Task<bool> Rebuild(CancellationToken ct = default)
     {
         if (Repo is Koan.Data.Abstractions.Instructions.IInstructionExecutor<TEntity> exec)

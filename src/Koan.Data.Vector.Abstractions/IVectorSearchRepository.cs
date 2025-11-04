@@ -13,6 +13,20 @@ public interface IVectorSearchRepository<TEntity, TKey> where TEntity : IEntity<
     Task<VectorQueryResult<TKey>> SearchAsync(VectorQueryOptions options, CancellationToken ct = default);
 
     /// <summary>
+    /// Flush (clear) all vectors from the index. This is a destructive operation.
+    /// Each adapter implements this according to its provider's capabilities.
+    /// </summary>
+    Task FlushAsync(CancellationToken ct = default)
+    {
+        // Default implementation: throw NotSupportedException for providers without native support
+        throw new NotSupportedException(
+            $"Vector flush is not supported by this adapter. " +
+            $"Provider: {GetType().Name}. " +
+            $"Consider implementing FlushAsync or using DeleteManyAsync for manual cleanup."
+        );
+    }
+
+    /// <summary>
     /// Exports all stored vectors from the vector database in batches.
     /// Streams results to avoid materializing entire dataset in memory.
     /// Use for migration between providers, cache population, or backup operations.
