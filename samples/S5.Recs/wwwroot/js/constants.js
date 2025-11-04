@@ -74,7 +74,7 @@ window.S5Const = Object.freeze({
   }),
   ADMIN: Object.freeze({
     IMPORT_DEFAULT_LIMIT: 200,
-    VECTOR_UPSERT_LIMIT: 1000,
+    // VECTOR_UPSERT_LIMIT removed - vector rebuild now processes ALL items by default
     QUICK_ACTIONS_REFRESH_DELAY_MS: 1500,
     MAX_PREFERRED_TAGS_MIN: 1,
     MAX_PREFERRED_TAGS_MAX: 5,
