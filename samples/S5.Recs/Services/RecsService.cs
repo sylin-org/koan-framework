@@ -131,28 +131,18 @@ internal sealed class RecsService : IRecsService
                     // Alpha controls semantic (1.0) vs keyword (0.0) balance, defaults to 0.5 if not provided
                     var effectiveAlpha = !string.IsNullOrWhiteSpace(query.Text) ? (query.Alpha ?? 0.5) : (double?)null;
 
-                    // Oversample to account for post-filtering (censorship, library exclusion, etc.)
-                    // Estimate filter selectivity and fetch proportionally more candidates
-                    var hasFilters = (query.Filters?.Genres?.Length ?? 0) > 0
-                                     || query.Filters?.EpisodesMax.HasValue == true
-                                     || query.Filters?.RatingMin.HasValue == true
-                                     || query.Filters?.RatingMax.HasValue == true
-                                     || query.Filters?.YearMin.HasValue == true
-                                     || query.Filters?.YearMax.HasValue == true
-                                     || !(query.Filters?.ShowCensored ?? false)
-                                     || !string.IsNullOrWhiteSpace(userId); // Library exclusion
+                    // Build filter for push-down to vector database layer
+                    var vectorFilter = await BuildVectorFilter(query, ct);
 
-                    var oversampleMultiplier = hasFilters ? 5 : 2; // Fetch 5x if filters present, 2x otherwise
-                    var candidateTopK = topK * oversampleMultiplier;
-
-                    _logger?.LogInformation("Vector search: text={HasText}, alpha={Alpha}, requestedTopK={RequestedTopK}, candidateTopK={CandidateTopK}",
-                        !string.IsNullOrWhiteSpace(query.Text), effectiveAlpha, topK, candidateTopK);
+                    _logger?.LogInformation("Vector search: text={HasText}, alpha={Alpha}, topK={TopK}, hasFilters={HasFilters}",
+                        !string.IsNullOrWhiteSpace(query.Text), effectiveAlpha, topK, vectorFilter != null);
 
                     var vectorResults = await Vector<Media>.Search(
                         vector: queryVector,
                         text: query.Text,  // Enables hybrid search if provided
                         alpha: effectiveAlpha,
-                        topK: candidateTopK,  // Oversample for filtering
+                        topK: topK,
+                        filter: vectorFilter,  // Filter push-down at vector DB layer
                         ct: ct
                     );
 
@@ -165,8 +155,8 @@ internal sealed class RecsService : IRecsService
                         if (media != null) mediaItems.Add(media);
                     }
 
-                    // Apply filters
-                    var filteredMedia = await ApplyFilters(mediaItems, query, userId, ct);
+                    // Apply only library exclusion post-filter (requires DB query)
+                    var filteredMedia = await ApplyLibraryExclusion(mediaItems, userId, ct);
 
                     // Apply personalization and scoring
                     var recommendations = await ScoreAndPersonalize(
@@ -198,7 +188,7 @@ internal sealed class RecsService : IRecsService
         try
         {
             var allMedia = await Media.All(ct);
-            var filteredMedia = await ApplyFilters(allMedia, query, userId, ct);
+            var filteredMedia = await ApplyFiltersInMemory(allMedia, query, userId, ct);
 
             var fallbackRecommendations = filteredMedia.Select(media => new Recommendation
             {
@@ -351,7 +341,110 @@ internal sealed class RecsService : IRecsService
     }
 
 
-    private async Task<List<Media>> ApplyFilters(
+    /// <summary>
+    /// Builds VectorFilter for push-down filtering at the vector database layer.
+    /// Handles all metadata-based filters except user library exclusion.
+    /// </summary>
+    private async Task<Koan.Data.Abstractions.Vector.Filtering.VectorFilter?> BuildVectorFilter(
+        RecsQuery query,
+        CancellationToken ct)
+    {
+        var filters = new List<Koan.Data.Abstractions.Vector.Filtering.VectorFilter>();
+
+        // MediaType filter
+        if (!string.IsNullOrWhiteSpace(query.Filters?.MediaType))
+        {
+            filters.Add(Koan.Data.Abstractions.Vector.Filtering.VectorFilter.Eq("mediaTypeId", query.Filters.MediaType));
+        }
+
+        // Genre filter (must contain at least one of the specified genres)
+        if (query.Filters?.Genres is { Length: > 0 })
+        {
+            var genreFilters = query.Filters.Genres
+                .Select(g => Koan.Data.Abstractions.Vector.Filtering.VectorFilter.Contains("genres", g))
+                .ToArray();
+            filters.Add(Koan.Data.Abstractions.Vector.Filtering.VectorFilter.Or(genreFilters));
+        }
+
+        // Episodes filter (≤ max)
+        if (query.Filters?.EpisodesMax is int emax)
+        {
+            filters.Add(Koan.Data.Abstractions.Vector.Filtering.VectorFilter.Lte("episodes", emax));
+        }
+
+        // Rating filter (range)
+        if (query.Filters?.RatingMin.HasValue == true)
+        {
+            filters.Add(Koan.Data.Abstractions.Vector.Filtering.VectorFilter.Gte("rating", query.Filters.RatingMin.Value));
+        }
+        if (query.Filters?.RatingMax.HasValue == true)
+        {
+            filters.Add(Koan.Data.Abstractions.Vector.Filtering.VectorFilter.Lte("rating", query.Filters.RatingMax.Value));
+        }
+
+        // Year filter (range)
+        if (query.Filters?.YearMin.HasValue == true)
+        {
+            filters.Add(Koan.Data.Abstractions.Vector.Filtering.VectorFilter.Gte("year", query.Filters.YearMin.Value));
+        }
+        if (query.Filters?.YearMax.HasValue == true)
+        {
+            filters.Add(Koan.Data.Abstractions.Vector.Filtering.VectorFilter.Lte("year", query.Filters.YearMax.Value));
+        }
+
+        // Censored tags filter (exclude items with any censored tag)
+        if (!(query.Filters?.ShowCensored ?? false))
+        {
+            var censoredTags = await GetCensoredTags(ct);
+            if (censoredTags.Length > 0)
+            {
+                // For each censored tag, add NOT Contains filter
+                // Weaviate will exclude items whose genres OR tags arrays contain these values
+                var censorFilters = censoredTags.SelectMany(tag => new[]
+                {
+                    Koan.Data.Abstractions.Vector.Filtering.VectorFilter.Not(
+                        Koan.Data.Abstractions.Vector.Filtering.VectorFilter.Contains("genres", tag)
+                    ),
+                    Koan.Data.Abstractions.Vector.Filtering.VectorFilter.Not(
+                        Koan.Data.Abstractions.Vector.Filtering.VectorFilter.Contains("tags", tag)
+                    )
+                }).ToArray();
+                filters.AddRange(censorFilters);
+            }
+        }
+
+        // Combine all filters with AND
+        if (filters.Count == 0)
+            return null;
+        if (filters.Count == 1)
+            return filters[0];
+        return Koan.Data.Abstractions.Vector.Filtering.VectorFilter.And(filters.ToArray());
+    }
+
+    /// <summary>
+    /// Applies library exclusion post-filter (excludes items already in user's library).
+    /// This is the only filter applied post-vector-search since it requires a DB query.
+    /// </summary>
+    private async Task<List<Media>> ApplyLibraryExclusion(
+        IEnumerable<Media> media,
+        string? userId,
+        CancellationToken ct)
+    {
+        // Exclude items already in user's library
+        if (!string.IsNullOrWhiteSpace(userId))
+        {
+            var libraryEntries = (await LibraryEntry.All(ct)).Where(e => e.UserId == userId).ToList();
+            var excludeIds = libraryEntries.Select(e => e.MediaId).ToHashSet();
+            return media.Where(m => !excludeIds.Contains(m.Id!)).ToList();
+        }
+
+        return media.ToList();
+    }
+
+    /// <summary>
+    /// Applies all filters in-memory for fallback scenarios when vector search is not available.
+    /// </summary>
+    private async Task<List<Media>> ApplyFiltersInMemory(
         IEnumerable<Media> media,
         RecsQuery query,
         string? userId,
@@ -369,7 +462,7 @@ internal sealed class RecsService : IRecsService
             }
         }
 
-        // Media type filter - now accepts media type ID directly
+        // Media type filter
         if (!string.IsNullOrWhiteSpace(query.Filters?.MediaType))
         {
             filtered = filtered.Where(m => m.MediaTypeId == query.Filters.MediaType);
@@ -387,12 +480,12 @@ internal sealed class RecsService : IRecsService
             filtered = filtered.Where(m => m.Episodes is null || m.Episodes <= emax);
         }
 
-        // Rating filter (blended 80/20 score)
+        // Rating filter
         if (query.Filters?.RatingMin.HasValue == true || query.Filters?.RatingMax.HasValue == true)
         {
             filtered = filtered.Where(m => {
-                var rating = m.Rating; // Uses computed property: (AverageScore × 0.8) + Popularity
-                if (!rating.HasValue) return false; // Exclude items without ratings
+                var rating = m.Rating;
+                if (!rating.HasValue) return false;
 
                 if (query.Filters?.RatingMin.HasValue == true && rating.Value < query.Filters.RatingMin.Value)
                     return false;
@@ -406,8 +499,8 @@ internal sealed class RecsService : IRecsService
         if (query.Filters?.YearMin.HasValue == true || query.Filters?.YearMax.HasValue == true)
         {
             filtered = filtered.Where(m => {
-                var year = m.Year; // Uses computed property: StartDate?.Year
-                if (!year.HasValue) return false; // Exclude items without year
+                var year = m.Year;
+                if (!year.HasValue) return false;
 
                 if (query.Filters?.YearMin.HasValue == true && year.Value < query.Filters.YearMin.Value)
                     return false;
@@ -417,7 +510,7 @@ internal sealed class RecsService : IRecsService
             });
         }
 
-        // Exclude items already in user's library
+        // Library exclusion
         if (!string.IsNullOrWhiteSpace(userId))
         {
             var libraryEntries = (await LibraryEntry.All(ct)).Where(e => e.UserId == userId).ToList();

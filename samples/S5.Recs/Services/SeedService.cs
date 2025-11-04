@@ -729,14 +729,7 @@ internal sealed class SeedService : ISeedService
         {
             try
             {
-                var vectorMetadata = new Dictionary<string, object>
-                {
-                    ["title"] = media.Title,
-                    ["genres"] = media.Genres,
-                    ["popularity"] = media.Popularity,
-                    ["searchText"] = BuildSearchText(media)  // Required for hybrid search
-                };
-
+                var vectorMetadata = BuildVectorMetadata(media);
                 await VectorData<Media>.SaveWithVector(media, embedding, vectorMetadata, ct);
                 Interlocked.Increment(ref stored);
             }
@@ -757,13 +750,7 @@ internal sealed class SeedService : ISeedService
                     .OnSuccess(success => success
                         .Mutate(envelope =>
                         {
-                            envelope.Features["vector:metadata"] = new
-                            {
-                                title = envelope.Entity.Title,
-                                genres = envelope.Entity.Genres,
-                                popularity = envelope.Entity.Popularity,
-                                searchText = BuildSearchText(envelope.Entity)  // Required for hybrid search
-                            };
+                            envelope.Features["vector:metadata"] = BuildVectorMetadata(envelope.Entity);
                         })
                         .Do(async (envelope, ct) =>
                         {
@@ -854,5 +841,34 @@ internal sealed class SeedService : ISeedService
         if (m.Synonyms is { Length: > 0 }) titles.AddRange(m.Synonyms);
 
         return string.Join(" ", titles.Distinct());
+    }
+
+    /// <summary>
+    /// Builds vector metadata with all filterable properties for filter push-down.
+    /// </summary>
+    private Dictionary<string, object> BuildVectorMetadata(Media m)
+    {
+        var metadata = new Dictionary<string, object>
+        {
+            ["searchText"] = BuildSearchText(m)  // Required for hybrid search
+        };
+
+        // Add filterable properties (all optional to handle nulls gracefully)
+        if (m.Genres is { Length: > 0 })
+            metadata["genres"] = m.Genres;
+        if (m.Tags is { Length: > 0 })
+            metadata["tags"] = m.Tags;
+        if (m.Rating.HasValue)
+            metadata["rating"] = m.Rating.Value;
+        if (m.Year.HasValue)
+            metadata["year"] = m.Year.Value;
+        if (m.Episodes.HasValue)
+            metadata["episodes"] = m.Episodes.Value;
+        if (!string.IsNullOrWhiteSpace(m.MediaTypeId))
+            metadata["mediaTypeId"] = m.MediaTypeId;
+
+        metadata["popularity"] = m.Popularity;
+
+        return metadata;
     }
 }

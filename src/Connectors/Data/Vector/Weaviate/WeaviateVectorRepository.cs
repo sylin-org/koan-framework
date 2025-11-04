@@ -78,23 +78,34 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
             _schemaEnsured = true; return;
         }
         // Create class with manual vectors
+        var properties = new List<object>
+        {
+            new { name = "docId", dataType = new[] { "text" } },
+            new
+            {
+                name = "searchText",
+                dataType = new[] { "text" },
+                indexSearchable = true,      // Enable BM25 indexing
+                tokenization = "word"
+            }
+        };
+
+        // Add filterable properties for common recommendation system use cases
+        // These enable filter push-down at the vector database layer
+        properties.Add(new { name = "genres", dataType = new[] { "text[]" } });
+        properties.Add(new { name = "tags", dataType = new[] { "text[]" } });
+        properties.Add(new { name = "rating", dataType = new[] { "number" } });
+        properties.Add(new { name = "year", dataType = new[] { "int" } });
+        properties.Add(new { name = "episodes", dataType = new[] { "int" } });
+        properties.Add(new { name = "mediaTypeId", dataType = new[] { "text" } });
+        properties.Add(new { name = "popularity", dataType = new[] { "number" } });
+
         var body = new
         {
             @class = cls,
             vectorizer = "none",
             vectorIndexConfig = new { distance = _options.Metric },
-            // Minimal schema: store original document id for reverse mapping
-            properties = new object[]
-            {
-                new { name = "docId", dataType = new[] { "text" } },
-                new
-                {
-                    name = "searchText",
-                    dataType = new[] { "text" },
-                    indexSearchable = true,      // Enable BM25 indexing
-                    tokenization = "word"
-                }
-            }
+            properties = properties.ToArray()
         };
         var bodyJson = JsonConvert.SerializeObject(body, Formatting.Indented);
         _logger?.LogDebug("Weaviate: POST /v1/schema/classes for class {Class}. Schema body: {Body}", cls, bodyJson);
