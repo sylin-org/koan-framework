@@ -114,7 +114,38 @@
           alphaHint.textContent = 'Semantic';
         }
       };
-      alphaSlider.addEventListener('input', updateAlphaHint);
+
+      // Debounced re-query on alpha change
+      let alphaDebounceTimer = null;
+      alphaSlider.addEventListener('input', () => {
+        updateAlphaHint(); // Update UI immediately
+
+        // Only re-query if there's search text (alpha only affects hybrid search)
+        const searchText = Dom.val('globalSearch') || '';
+        if (searchText.trim().length > 0) {
+          if (alphaDebounceTimer) clearTimeout(alphaDebounceTimer);
+          alphaDebounceTimer = setTimeout(async () => {
+            // Re-run search with new alpha value
+            if (window.currentView === 'forYou' || window.currentView === 'freeBrowsing') {
+              window.currentRecsTopK = PAGE_SIZE;
+              const isFreeBrowsing = window.currentView === 'freeBrowsing';
+              const recs = await window.fetchRecommendations({
+                text: searchText,
+                topK: window.currentRecsTopK,
+                ignoreUserPreferences: isFreeBrowsing
+              });
+              window.mediaData = recs;
+              window.filteredData = [...window.mediaData];
+              if (typeof window.applySortAndFilters === 'function') {
+                window.applySortAndFilters();
+              } else {
+                displayMedia(window.filteredData);
+              }
+            }
+          }, (window.S5Const?.RECS?.ALPHA_DEBOUNCE_MS) ?? 300);
+        }
+      });
+
       updateAlphaHint(); // Initialize on page load
     }
 
@@ -522,6 +553,9 @@
     // Get alpha value for hybrid search (semantic vs keyword balance)
     const alpha = parseFloat(Dom.$('alphaSlider')?.value ?? '0.5');
 
+    // Get showCensored toggle state
+    const showCensored = document.getElementById('showCensoredToggle')?.checked || false;
+
     const body = {
       text: text || '',
       topK,
@@ -538,7 +572,8 @@
         ratingMin: ratingMin,
         ratingMax: ratingMax,
         yearMin: yearMin,
-        yearMax: yearMax
+        yearMax: yearMax,
+        showCensored: showCensored
       },
       userId
     };

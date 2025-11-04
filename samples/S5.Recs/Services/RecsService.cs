@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
+using S5.Recs.Controllers;
 using S5.Recs.Infrastructure;
 using S5.Recs.Models;
 using Koan.AI.Contracts;
@@ -76,40 +77,35 @@ internal sealed class RecsService : IRecsService
     }
 
     public async Task<(IReadOnlyList<Recommendation> items, bool degraded)> QueryAsync(
-        string? text,
-        string? anchorMediaId,
-        string[]? genres,
-        int? episodesMax,
-        bool spoilerSafe,
-        int topK,
-        string? userId,
-        string[]? preferTags,
-        double? preferWeight,
-        string? sort,
-        string? mediaTypeFilter,
-        double? ratingMin,
-        double? ratingMax,
-        int? yearMin,
-        int? yearMax,
-        double? alpha,
+        RecsQuery query,
+        string? userIdOverride,
         CancellationToken ct)
     {
-        // Guardrails
+        // Determine effective userId (override from auth context takes precedence)
+        var userId = userIdOverride ?? query.UserId;
+
+        // Apply guardrails to topK
+        var topK = query.TopK;
         if (topK <= 0) topK = 10;
         if (topK > 100) topK = 100;
 
         _logger?.LogInformation("Multi-media query: text='{Text}' anchor='{Anchor}' mediaType='{MediaType}' topK={TopK}",
-            text, anchorMediaId, mediaTypeFilter, topK);
+            query.Text, query.AnchorMediaId, query.Filters?.MediaType, topK);
 
         try
         {
-            if (!string.IsNullOrWhiteSpace(text)
-                || !string.IsNullOrWhiteSpace(anchorMediaId)
+            if (!string.IsNullOrWhiteSpace(query.Text)
+                || !string.IsNullOrWhiteSpace(query.AnchorMediaId)
                 || !string.IsNullOrWhiteSpace(userId)
-                || (preferTags is { Length: > 0 }))
+                || (query.Filters?.PreferTags is { Length: > 0 }))
             {
                 // ADR-0051: Build separate search intent and user preference vectors
-                var (searchVector, userPrefVector) = await BuildQueryVectors(text, anchorMediaId, userId, preferTags, ct);
+                var (searchVector, userPrefVector) = await BuildQueryVectors(
+                    query.Text,
+                    query.AnchorMediaId,
+                    userId,
+                    query.Filters?.PreferTags,
+                    ct);
 
                 // Determine query vector via blending (66% search intent, 34% user preferences)
                 const double SEARCH_INTENT_WEIGHT = 0.66;
@@ -133,13 +129,13 @@ internal sealed class RecsService : IRecsService
                 {
                     // ADR-0051: Use hybrid search with unified API
                     // Alpha controls semantic (1.0) vs keyword (0.0) balance, defaults to 0.5 if not provided
-                    var effectiveAlpha = !string.IsNullOrWhiteSpace(text) ? (alpha ?? 0.5) : (double?)null;
+                    var effectiveAlpha = !string.IsNullOrWhiteSpace(query.Text) ? (query.Alpha ?? 0.5) : (double?)null;
                     _logger?.LogInformation("Vector search: text={HasText}, alpha={Alpha}, topK={TopK}",
-                        !string.IsNullOrWhiteSpace(text), effectiveAlpha, topK);
+                        !string.IsNullOrWhiteSpace(query.Text), effectiveAlpha, topK);
 
                     var vectorResults = await Vector<Media>.Search(
                         vector: queryVector,
-                        text: text,  // Enables hybrid search if provided
+                        text: query.Text,  // Enables hybrid search if provided
                         alpha: effectiveAlpha,
                         topK: topK,
                         ct: ct
@@ -155,17 +151,24 @@ internal sealed class RecsService : IRecsService
                     }
 
                     // Apply filters
-                    var filteredMedia = await ApplyFilters(mediaItems, genres, episodesMax, mediaTypeFilter, userId, ratingMin, ratingMax, yearMin, yearMax, ct);
+                    var filteredMedia = await ApplyFilters(mediaItems, query, userId, ct);
 
                     // Apply personalization and scoring
-                    var recommendations = await ScoreAndPersonalize(filteredMedia, idToScore, userId, preferTags, preferWeight, spoilerSafe, ct);
+                    var recommendations = await ScoreAndPersonalize(
+                        filteredMedia,
+                        idToScore,
+                        userId,
+                        query.Filters?.PreferTags,
+                        query.Filters?.PreferWeight,
+                        query.Filters?.SpoilerSafe ?? true,
+                        ct);
 
                     // Apply sorting
-                    var sortedRecommendations = ApplySort(recommendations, sort);
+                    var sortedRecommendations = ApplySort(recommendations, query.Sort);
                     var finalResults = sortedRecommendations.Take(topK).ToList();
 
                     _logger?.LogInformation("Multi-media {SearchMode} query returned {Count} results",
-                        !string.IsNullOrWhiteSpace(text) ? "hybrid" : "vector",
+                        !string.IsNullOrWhiteSpace(query.Text) ? "hybrid" : "vector",
                         finalResults.Count);
                     return (finalResults, false);
                 }
@@ -180,7 +183,7 @@ internal sealed class RecsService : IRecsService
         try
         {
             var allMedia = await Media.All(ct);
-            var filteredMedia = await ApplyFilters(allMedia, genres, episodesMax, mediaTypeFilter, userId, ratingMin, ratingMax, yearMin, yearMax, ct);
+            var filteredMedia = await ApplyFilters(allMedia, query, userId, ct);
 
             var fallbackRecommendations = filteredMedia.Select(media => new Recommendation
             {
@@ -189,7 +192,7 @@ internal sealed class RecsService : IRecsService
                 Reasons = new[] { "popularity" }
             }).ToList();
 
-            var sortedFallback = ApplySort(fallbackRecommendations, sort);
+            var sortedFallback = ApplySort(fallbackRecommendations, query.Sort);
             var finalFallback = sortedFallback.Take(topK).ToList();
 
             _logger?.LogInformation("Multi-media database fallback returned {Count} results", finalFallback.Count);
@@ -335,68 +338,65 @@ internal sealed class RecsService : IRecsService
 
     private async Task<List<Media>> ApplyFilters(
         IEnumerable<Media> media,
-        string[]? genres,
-        int? episodesMax,
-        string? mediaTypeFilter,
+        RecsQuery query,
         string? userId,
-        double? ratingMin,
-        double? ratingMax,
-        int? yearMin,
-        int? yearMax,
         CancellationToken ct)
     {
         var filtered = media.AsEnumerable();
 
-        // Censor tags filter - load from config and database, then filter out media with censored tags
-        var censoredTags = await GetCensoredTags(ct);
-        if (censoredTags.Length > 0)
+        // Censor tags filter - only apply if showCensored is false
+        if (!(query.Filters?.ShowCensored ?? false))
         {
-            filtered = filtered.Where(m => !HasCensoredTags(m, censoredTags));
+            var censoredTags = await GetCensoredTags(ct);
+            if (censoredTags.Length > 0)
+            {
+                filtered = filtered.Where(m => !HasCensoredTags(m, censoredTags));
+            }
         }
 
         // Media type filter - now accepts media type ID directly
-        if (!string.IsNullOrWhiteSpace(mediaTypeFilter))
+        if (!string.IsNullOrWhiteSpace(query.Filters?.MediaType))
         {
-            filtered = filtered.Where(m => m.MediaTypeId == mediaTypeFilter);
+            filtered = filtered.Where(m => m.MediaTypeId == query.Filters.MediaType);
         }
 
         // Genre filter
-        if (genres is { Length: > 0 })
+        if (query.Filters?.Genres is { Length: > 0 })
         {
-            filtered = filtered.Where(m => (m.Genres ?? Array.Empty<string>()).Intersect(genres).Any());
+            filtered = filtered.Where(m => (m.Genres ?? Array.Empty<string>()).Intersect(query.Filters.Genres).Any());
         }
 
         // Episodes filter
-        if (episodesMax is int emax)
+        if (query.Filters?.EpisodesMax is int emax)
         {
             filtered = filtered.Where(m => m.Episodes is null || m.Episodes <= emax);
         }
 
         // Rating filter (blended 80/20 score)
-        if (ratingMin.HasValue || ratingMax.HasValue)
+        if (query.Filters?.RatingMin.HasValue == true || query.Filters?.RatingMax.HasValue == true)
         {
             filtered = filtered.Where(m => {
                 var rating = m.Rating; // Uses computed property: (AverageScore × 0.8) + Popularity
                 if (!rating.HasValue) return false; // Exclude items without ratings
 
-                if (ratingMin.HasValue && rating.Value < ratingMin.Value)
+                if (query.Filters?.RatingMin.HasValue == true && rating.Value < query.Filters.RatingMin.Value)
                     return false;
-                if (ratingMax.HasValue && rating.Value > ratingMax.Value)
+                if (query.Filters?.RatingMax.HasValue == true && rating.Value > query.Filters.RatingMax.Value)
                     return false;
                 return true;
             });
         }
 
         // Year filter
-        if (yearMin.HasValue || yearMax.HasValue)
+        if (query.Filters?.YearMin.HasValue == true || query.Filters?.YearMax.HasValue == true)
         {
             filtered = filtered.Where(m => {
                 var year = m.Year; // Uses computed property: StartDate?.Year
                 if (!year.HasValue) return false; // Exclude items without year
 
-                if (yearMin.HasValue && year.Value < yearMin.Value)
+                if (query.Filters?.YearMin.HasValue == true && year.Value < query.Filters.YearMin.Value)
                     return false;
-                if (yearMax.HasValue && year.Value > yearMax.Value)
+                if (query.Filters?.YearMax.HasValue == true && year.Value > query.Filters.YearMax.Value)
                     return false;
                 return true;
             });

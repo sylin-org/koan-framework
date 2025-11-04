@@ -244,7 +244,15 @@
               <button id="tagsSortAlphaBtn" class="px-2 py-1 text-xs text-gray-400 hover:text-white rounded transition-colors" type="button">A–Z</button>
             </div>
           </div>
-          <input id="tagsSearch" placeholder="Search tags..." class="bg-slate-800 text-white rounded px-3 py-2 border border-slate-700 text-sm w-full md:w-64" />
+          <div class="flex items-center gap-3">
+            <!-- Show Censored Toggle -->
+            <label class="flex items-center gap-2 cursor-pointer" title="Show tags that are normally filtered">
+              <input type="checkbox" id="showCensoredToggle" class="sr-only peer">
+              <div class="relative w-9 h-5 bg-slate-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-600"></div>
+              <span class="text-xs text-gray-400">Show All Tags</span>
+            </label>
+            <input id="tagsSearch" placeholder="Search tags..." class="bg-slate-800 text-white rounded px-3 py-2 border border-slate-700 text-sm w-full md:w-64" />
+          </div>
         </div>
   <div id="allTagsList" class="flex flex-wrap gap-2 max-h-48 overflow-y-auto scroll-dark"></div>
       </div>
