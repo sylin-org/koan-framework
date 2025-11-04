@@ -94,38 +94,53 @@ internal sealed class RecsService : IRecsService
 
         try
         {
-            if (!string.IsNullOrWhiteSpace(query.Text)
-                || !string.IsNullOrWhiteSpace(query.AnchorMediaId)
-                || !string.IsNullOrWhiteSpace(userId)
-                || (query.Filters?.PreferTags is { Length: > 0 }))
+            // Use vector search if available (even for browse queries without text/anchor)
+            if (Vector<Media>.IsAvailable)
             {
-                // ADR-0051: Build separate search intent and user preference vectors
-                var (searchVector, userPrefVector) = await BuildQueryVectors(
-                    query.Text,
-                    query.AnchorMediaId,
-                    userId,
-                    query.Filters?.PreferTags,
-                    ct);
-
-                // Determine query vector via blending (66% search intent, 34% user preferences)
-                const double SEARCH_INTENT_WEIGHT = 0.66;
                 float[]? queryVector = null;
 
-                if (searchVector != null && userPrefVector != null)
+                // Build query vectors if we have search intent or user preferences
+                if (!string.IsNullOrWhiteSpace(query.Text)
+                    || !string.IsNullOrWhiteSpace(query.AnchorMediaId)
+                    || !string.IsNullOrWhiteSpace(userId)
+                    || (query.Filters?.PreferTags is { Length: > 0 }))
                 {
-                    // Blend both vectors: prioritize search intent over learned preferences
-                    queryVector = BlendVectors(searchVector, userPrefVector, SEARCH_INTENT_WEIGHT);
-                }
-                else if (searchVector != null)
-                {
-                    queryVector = searchVector;
-                }
-                else if (userPrefVector != null)
-                {
-                    queryVector = userPrefVector;
+                    // ADR-0051: Build separate search intent and user preference vectors
+                    var (searchVector, userPrefVector) = await BuildQueryVectors(
+                        query.Text,
+                        query.AnchorMediaId,
+                        userId,
+                        query.Filters?.PreferTags,
+                        ct);
+
+                    // Determine query vector via blending (66% search intent, 34% user preferences)
+                    const double SEARCH_INTENT_WEIGHT = 0.66;
+
+                    if (searchVector != null && userPrefVector != null)
+                    {
+                        // Blend both vectors: prioritize search intent over learned preferences
+                        queryVector = BlendVectors(searchVector, userPrefVector, SEARCH_INTENT_WEIGHT);
+                    }
+                    else if (searchVector != null)
+                    {
+                        queryVector = searchVector;
+                    }
+                    else if (userPrefVector != null)
+                    {
+                        queryVector = userPrefVector;
+                    }
                 }
 
-                if (queryVector != null && queryVector.Length > 0 && Vector<Media>.IsAvailable)
+                // For browse queries without search intent, use a generic popularity-based query
+                // This ensures we use vector search with filters instead of falling back to database
+                if (queryVector == null)
+                {
+                    // Create a neutral query vector (all zeros) - filters will do the selection
+                    queryVector = new float[384]; // Match embedding dimension
+                    _logger?.LogDebug("Browse query: using filter-only vector search (no semantic query)");
+                }
+
+                if (queryVector != null && queryVector.Length > 0)
                 {
                     // ADR-0051: Use hybrid search with unified API
                     // Alpha controls semantic (1.0) vs keyword (0.0) balance, defaults to 0.5 if not provided
