@@ -130,14 +130,29 @@ internal sealed class RecsService : IRecsService
                     // ADR-0051: Use hybrid search with unified API
                     // Alpha controls semantic (1.0) vs keyword (0.0) balance, defaults to 0.5 if not provided
                     var effectiveAlpha = !string.IsNullOrWhiteSpace(query.Text) ? (query.Alpha ?? 0.5) : (double?)null;
-                    _logger?.LogInformation("Vector search: text={HasText}, alpha={Alpha}, topK={TopK}",
-                        !string.IsNullOrWhiteSpace(query.Text), effectiveAlpha, topK);
+
+                    // Oversample to account for post-filtering (censorship, library exclusion, etc.)
+                    // Estimate filter selectivity and fetch proportionally more candidates
+                    var hasFilters = (query.Filters?.Genres?.Length ?? 0) > 0
+                                     || query.Filters?.EpisodesMax.HasValue == true
+                                     || query.Filters?.RatingMin.HasValue == true
+                                     || query.Filters?.RatingMax.HasValue == true
+                                     || query.Filters?.YearMin.HasValue == true
+                                     || query.Filters?.YearMax.HasValue == true
+                                     || !(query.Filters?.ShowCensored ?? false)
+                                     || !string.IsNullOrWhiteSpace(userId); // Library exclusion
+
+                    var oversampleMultiplier = hasFilters ? 5 : 2; // Fetch 5x if filters present, 2x otherwise
+                    var candidateTopK = topK * oversampleMultiplier;
+
+                    _logger?.LogInformation("Vector search: text={HasText}, alpha={Alpha}, requestedTopK={RequestedTopK}, candidateTopK={CandidateTopK}",
+                        !string.IsNullOrWhiteSpace(query.Text), effectiveAlpha, topK, candidateTopK);
 
                     var vectorResults = await Vector<Media>.Search(
                         vector: queryVector,
                         text: query.Text,  // Enables hybrid search if provided
                         alpha: effectiveAlpha,
-                        topK: topK,
+                        topK: candidateTopK,  // Oversample for filtering
                         ct: ct
                     );
 
@@ -163,7 +178,7 @@ internal sealed class RecsService : IRecsService
                         query.Filters?.SpoilerSafe ?? true,
                         ct);
 
-                    // Apply sorting
+                    // Apply sorting and trim to requested topK
                     var sortedRecommendations = ApplySort(recommendations, query.Sort);
                     var finalResults = sortedRecommendations.Take(topK).ToList();
 
