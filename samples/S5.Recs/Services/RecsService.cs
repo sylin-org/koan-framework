@@ -187,6 +187,7 @@ internal sealed class RecsService : IRecsService
                         filteredMedia,
                         idToScore,
                         userId,
+                        query.Text,
                         query.Filters?.PreferTags,
                         query.Filters?.PreferWeight,
                         query.Filters?.SpoilerSafe ?? true,
@@ -225,12 +226,20 @@ internal sealed class RecsService : IRecsService
                 var score = media.Popularity;
                 var reasons = new List<string> { "popularity" };
 
+                // Title matching boost (same as vector path)
+                var titleBoost = CalculateTitleMatchBoost(media, query.Text);
+                score += titleBoost;
+
                 // Apply censor penalty if content has censored tags
                 if (censoredTags.Length > 0 && HasCensoredTags(media, censoredTags))
                 {
                     score *= censorPenaltyMultiplier;
                     reasons.Add($"censored_penalty:{censorPenaltyMultiplier:F2}");
                 }
+
+                if (titleBoost >= 2.0) reasons.Add("exact-title-match");
+                else if (titleBoost >= 1.0) reasons.Add("title-contains-match");
+                else if (titleBoost > 0) reasons.Add("fuzzy-title-match");
 
                 return new Recommendation
                 {
@@ -591,24 +600,27 @@ internal sealed class RecsService : IRecsService
             filters.Add(Koan.Data.Abstractions.Vector.Filtering.VectorFilter.Lte("episodes", emax));
         }
 
-        // Rating filter (range)
+        // Rating filter (range) - NOTE: Use RatingValue which matches the computed Rating property
         if (query.Filters?.RatingMin.HasValue == true)
         {
-            filters.Add(Koan.Data.Abstractions.Vector.Filtering.VectorFilter.Gte("rating", query.Filters.RatingMin.Value));
+            filters.Add(Koan.Data.Abstractions.Vector.Filtering.VectorFilter.Gte("ratingValue", query.Filters.RatingMin.Value));
         }
         if (query.Filters?.RatingMax.HasValue == true)
         {
-            filters.Add(Koan.Data.Abstractions.Vector.Filtering.VectorFilter.Lte("rating", query.Filters.RatingMax.Value));
+            filters.Add(Koan.Data.Abstractions.Vector.Filtering.VectorFilter.Lte("ratingValue", query.Filters.RatingMax.Value));
         }
 
-        // Year filter (range)
+        // Year filter (range) - NOTE: Year is computed property, filter on StartDateInt (numeric YYYYMMDD)
+        // Using numeric format for efficient integer comparison: 20230101, 20231231, etc.
         if (query.Filters?.YearMin.HasValue == true)
         {
-            filters.Add(Koan.Data.Abstractions.Vector.Filtering.VectorFilter.Gte("year", query.Filters.YearMin.Value));
+            var startDateMin = query.Filters.YearMin.Value * 10000 + 101; // YYYY0101
+            filters.Add(Koan.Data.Abstractions.Vector.Filtering.VectorFilter.Gte("startDateInt", startDateMin));
         }
         if (query.Filters?.YearMax.HasValue == true)
         {
-            filters.Add(Koan.Data.Abstractions.Vector.Filtering.VectorFilter.Lte("year", query.Filters.YearMax.Value));
+            var startDateMax = query.Filters.YearMax.Value * 10000 + 1231; // YYYY1231
+            filters.Add(Koan.Data.Abstractions.Vector.Filtering.VectorFilter.Lte("startDateInt", startDateMax));
         }
 
         // NOTE: Censored tag filtering moved to scoring phase (soft penalty instead of hard filter)
@@ -752,7 +764,7 @@ internal sealed class RecsService : IRecsService
         return false;
     }
 
-    private async Task<List<Recommendation>> ScoreAndPersonalize(List<Media> media, Dictionary<string, double> vectorScores, string? userId, string[]? preferTags, double? preferWeight, bool spoilerSafe, bool showCensored, CancellationToken ct)
+    private async Task<List<Recommendation>> ScoreAndPersonalize(List<Media> media, Dictionary<string, double> vectorScores, string? userId, string? text, string[]? preferTags, double? preferWeight, bool spoilerSafe, bool showCensored, CancellationToken ct)
     {
         UserProfileDoc? profile = null;
         if (!string.IsNullOrWhiteSpace(userId))
@@ -818,8 +830,11 @@ internal sealed class RecsService : IRecsService
                 spoilerPenalty = 0.3;
             }
 
+            // Title matching boost (exact → contains → fuzzy)
+            var titleBoost = CalculateTitleMatchBoost(m, text);
+
             // Combined score
-            var hybridScore = (0.4 * vectorScore) + (0.3 * popularityScore) + (0.2 * genreBoost) + (preferBoost * preferTagsWeight);
+            var hybridScore = (0.4 * vectorScore) + (0.3 * popularityScore) + (0.2 * genreBoost) + (preferBoost * preferTagsWeight) + titleBoost;
             hybridScore *= (1.0 - spoilerPenalty);
             hybridScore *= censorPenaltyFactor; // Apply censor penalty
 
@@ -827,6 +842,9 @@ internal sealed class RecsService : IRecsService
             if (genreBoost > 0) reasons.Add("personalized");
             if (preferBoost > 0) reasons.Add("preferred-tags");
             if (popularityScore > 0.8) reasons.Add("popular");
+            if (titleBoost >= 2.0) reasons.Add("exact-title-match");
+            else if (titleBoost >= 1.0) reasons.Add("title-contains-match");
+            else if (titleBoost > 0) reasons.Add("fuzzy-title-match");
             if (censorPenaltyFactor < 1.0) reasons.Add($"censored_penalty:{censorPenaltyMultiplier:F2}");
 
             return new Recommendation
@@ -846,6 +864,87 @@ internal sealed class RecsService : IRecsService
             "popular" => recommendations.OrderByDescending(r => r.Media?.Popularity ?? 0),
             "relevance" or _ => recommendations.OrderByDescending(r => r.Score)
         };
+    }
+
+    /// <summary>
+    /// Calculates title matching boost based on exact, contains, or fuzzy similarity.
+    /// Checks all title variants: Title, TitleEnglish, TitleRomaji, TitleNative, Synonyms.
+    /// Returns: 2.0 (exact), 1.0 (contains), 0.5 (fuzzy with distance ≤ 3), or 0.0 (no match)
+    /// </summary>
+    private static double CalculateTitleMatchBoost(Media media, string? queryText)
+    {
+        if (string.IsNullOrWhiteSpace(queryText)) return 0.0;
+
+        var normalized = queryText.Trim().ToLowerInvariant();
+
+        // Collect all title variants
+        var titles = new List<string>();
+        if (!string.IsNullOrWhiteSpace(media.Title)) titles.Add(media.Title);
+        if (!string.IsNullOrWhiteSpace(media.TitleEnglish)) titles.Add(media.TitleEnglish);
+        if (!string.IsNullOrWhiteSpace(media.TitleRomaji)) titles.Add(media.TitleRomaji);
+        if (!string.IsNullOrWhiteSpace(media.TitleNative)) titles.Add(media.TitleNative);
+        if (media.Synonyms != null) titles.AddRange(media.Synonyms);
+
+        var maxBoost = 0.0;
+
+        foreach (var title in titles)
+        {
+            if (string.IsNullOrWhiteSpace(title)) continue;
+
+            var titleLower = title.ToLowerInvariant();
+
+            // Exact match → massive boost
+            if (titleLower == normalized)
+            {
+                return 2.0;
+            }
+
+            // Contains match → strong boost
+            if (titleLower.Contains(normalized, StringComparison.Ordinal))
+            {
+                maxBoost = Math.Max(maxBoost, 1.0);
+                continue;
+            }
+
+            // Fuzzy match (Levenshtein distance ≤ 3) → moderate boost
+            var distance = LevenshteinDistance(titleLower, normalized);
+            if (distance <= 3)
+            {
+                maxBoost = Math.Max(maxBoost, 0.5);
+            }
+        }
+
+        return maxBoost;
+    }
+
+    /// <summary>
+    /// Calculates Levenshtein (edit) distance between two strings.
+    /// Used for fuzzy title matching.
+    /// </summary>
+    private static int LevenshteinDistance(string s, string t)
+    {
+        if (string.IsNullOrEmpty(s)) return t?.Length ?? 0;
+        if (string.IsNullOrEmpty(t)) return s.Length;
+
+        var d = new int[s.Length + 1, t.Length + 1];
+
+        for (var i = 0; i <= s.Length; i++)
+            d[i, 0] = i;
+        for (var j = 0; j <= t.Length; j++)
+            d[0, j] = j;
+
+        for (var j = 1; j <= t.Length; j++)
+        {
+            for (var i = 1; i <= s.Length; i++)
+            {
+                var cost = (s[i - 1] == t[j - 1]) ? 0 : 1;
+                d[i, j] = Math.Min(
+                    Math.Min(d[i - 1, j] + 1, d[i, j - 1] + 1),
+                    d[i - 1, j - 1] + cost);
+            }
+        }
+
+        return d[s.Length, t.Length];
     }
 
     private async Task UpdateUserPreferences(string userId, string mediaId, int rating, CancellationToken ct)

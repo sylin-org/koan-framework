@@ -51,6 +51,30 @@ public sealed class Media : Entity<Media>
     public DateOnly? EndDate { get; set; }
     public string? Status { get; set; }
 
+    /// <summary>
+    /// Numeric representation of StartDate in YYYYMMDD format for efficient filtering.
+    /// Example: 2023-12-31 becomes 20231231
+    /// </summary>
+    public int? StartDateInt => StartDate.HasValue
+        ? StartDate.Value.Year * 10000 + StartDate.Value.Month * 100 + StartDate.Value.Day
+        : null;
+
+    /// <summary>
+    /// Numeric representation of EndDate in YYYYMMDD format for efficient filtering.
+    /// Example: 2023-12-31 becomes 20231231
+    /// </summary>
+    public int? EndDateInt => EndDate.HasValue
+        ? EndDate.Value.Year * 10000 + EndDate.Value.Month * 100 + EndDate.Value.Day
+        : null;
+
+    /// <summary>
+    /// Stored rating value for efficient filtering (same as Rating computed property).
+    /// Blended rating: 80% AverageScore + 20% Popularity
+    /// </summary>
+    public double? RatingValue => AverageScore.HasValue
+        ? Math.Round((AverageScore.Value * 0.8) + Popularity, 2)
+        : null;
+
     // External references and metadata
     public Dictionary<string, string> ExternalIds { get; set; } = new();
     public DateTimeOffset ImportedAt { get; set; }

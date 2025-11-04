@@ -281,18 +281,19 @@ internal sealed class SeedService : ISeedService
         {
             try
             {
-                var embedded = await UpsertVectorsAsync(mediaItems, embeddingModel, ct);
+                // Use CancellationToken.None for long-running background job (don't cancel when HTTP request completes)
+                var embedded = await UpsertVectorsAsync(mediaItems, embeddingModel, CancellationToken.None);
                 _progress[jobId] = (count, count, embedded, 0, true, null);
                 _logger?.LogInformation("Vector-only job {JobId}: embedded and indexed {Embedded} vectors", jobId, embedded);
                 await File.WriteAllTextAsync(Path.Combine(_cacheDir, "manifest-vectors.json"),
-                    JsonConvert.SerializeObject(new { jobId, count, at = DateTimeOffset.UtcNow }), ct);
+                    JsonConvert.SerializeObject(new { jobId, count, at = DateTimeOffset.UtcNow }), CancellationToken.None);
             }
             catch (Exception ex)
             {
                 _progress[jobId] = (_progress[jobId].Fetched, _progress[jobId].Normalized, _progress[jobId].Embedded, _progress[jobId].Imported, true, ex.Message);
                 _logger?.LogError(ex, "Vector-only job {JobId} failed: {Error}", jobId, ex.Message);
             }
-        }, ct);
+        }, CancellationToken.None);
 
         return Task.FromResult(jobId);
     }
