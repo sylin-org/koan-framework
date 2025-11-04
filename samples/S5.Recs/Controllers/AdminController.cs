@@ -348,12 +348,13 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
     {
         // Responsibility: AdminController builds the list; SeedService just upserts vectors for the provided items.
         var all = Models.Media.All(HttpContext.RequestAborted).Result.ToList();
-        var limited = all.Take(req.Limit).ToList();
+        var items = req.Limit.HasValue ? all.Take(req.Limit.Value).ToList() : all;
 
-        _logger.LogInformation("------------- Starting vector-only upsert for {Count} items (limit {Limit})", limited.Count, req.Limit);
+        _logger.LogInformation("------------- Starting vector-only upsert for {Count} items (limit {Limit})",
+            items.Count, req.Limit?.ToString() ?? "none (all)");
 
-        var id = seeder.StartVectorUpsertAsync(limited, HttpContext.RequestAborted).Result;
-        return Ok(new { jobId = id, count = limited.Count });
+        var id = seeder.StartVectorUpsertAsync(items, HttpContext.RequestAborted).Result;
+        return Ok(new { jobId = id, count = items.Count, limit = req.Limit });
     }
 
     // Minimal SSE for progress (poll-ish server push). Browsers: fetch('/admin/seed/sse/{jobId}').

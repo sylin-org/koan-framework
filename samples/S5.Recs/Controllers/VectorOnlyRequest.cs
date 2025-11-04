@@ -1,3 +1,6 @@
 namespace S5.Recs.Controllers;
 
-public record VectorOnlyRequest(int Limit = 1000);
+/// <summary>
+/// Request for vector-only upsert. Limit = null means process all items.
+/// </summary>
+public record VectorOnlyRequest(int? Limit = null);
