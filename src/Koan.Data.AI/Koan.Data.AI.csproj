@@ -12,6 +12,7 @@
     <ProjectReference Include="..\Koan.Data.Core\Koan.Data.Core.csproj" />
     <ProjectReference Include="..\Koan.Data.Vector\Koan.Data.Vector.csproj" />
     <ProjectReference Include="..\Koan.AI.Contracts\Koan.AI.Contracts.csproj" />
+    <ProjectReference Include="..\Koan.AI\Koan.AI.csproj" />
     <ProjectReference Include="..\Koan.Core\Koan.Core.csproj" />
   </ItemGroup>
 
