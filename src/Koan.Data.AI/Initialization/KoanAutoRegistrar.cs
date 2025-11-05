@@ -5,6 +5,7 @@ using Microsoft.Extensions.Hosting;
 using Koan.Core;
 using Koan.Core.Hosting.Bootstrap;
 using Koan.Data.AI.Attributes;
+using Koan.Data.Core;  // For .Save() extension method
 
 namespace Koan.Data.AI.Initialization;
 
@@ -170,12 +171,12 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         // Compute current content signature
         var currentSignature = metadata.ComputeSignature(entity);
 
-        // Check if entity has ContentSignature property
-        var signatureProp = typeof(TEntity).GetProperty("ContentSignature");
-        var existingSignature = signatureProp?.GetValue(entity) as string;
+        // Load existing embedding state (if any)
+        var stateId = EmbeddingState<TEntity>.MakeId(entity.Id);
+        var state = await EmbeddingState<TEntity>.Get(stateId, ctx.CancellationToken);
 
         // Skip if signature unchanged (content hasn't changed)
-        if (existingSignature == currentSignature)
+        if (state != null && state.ContentSignature == currentSignature)
         {
             return;
         }
@@ -189,8 +190,26 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         // Synchronous embedding generation
         await GenerateAndStoreEmbedding(entity, metadata, currentSignature, ctx.CancellationToken);
 
-        // Update signature on entity
-        signatureProp?.SetValue(entity, currentSignature);
+        // Update or create embedding state
+        if (state == null)
+        {
+            state = new EmbeddingState<TEntity>
+            {
+                Id = stateId,
+                EntityId = entity.Id,
+                ContentSignature = currentSignature,
+                LastEmbeddedAt = DateTimeOffset.UtcNow,
+                Model = metadata.Model
+            };
+        }
+        else
+        {
+            state.ContentSignature = currentSignature;
+            state.LastEmbeddedAt = DateTimeOffset.UtcNow;
+            state.Model = metadata.Model;
+        }
+
+        await state.Save(ctx.CancellationToken);
     }
 
     /// <summary>
