@@ -76,10 +76,7 @@ public class ValidationWorker : BackgroundService
                     validationErrors.Add("No title provided");
                 }
 
-                if (string.IsNullOrEmpty(media.ContentSignature))
-                {
-                    validationErrors.Add("ContentSignature is null");
-                }
+                // ContentSignature validation removed - now tracked automatically by framework (ARCH-0070)
 
                 if (string.IsNullOrEmpty(media.MediaTypeId))
                 {

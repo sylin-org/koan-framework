@@ -135,8 +135,8 @@ public class ImportOrchestrator : IImportOrchestrator
                 inQueue = (int)await Media.Count.Where(m => m.ImportJobId == jobId, ct: ct);
             }
 
-            // Count completed (in default partition with VectorizedAt set)
-            completed = (int)await Media.Count.Where(m => m.ImportJobId == jobId && m.VectorizedAt != null, ct: ct);
+            // Count completed (in default partition - embeddings now automatic, ARCH-0070)
+            completed = (int)await Media.Count.Where(m => m.ImportJobId == jobId, ct: ct);
 
             // Calculate progress
             var total = inRaw + inQueue + completed;

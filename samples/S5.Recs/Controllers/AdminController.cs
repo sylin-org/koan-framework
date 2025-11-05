@@ -914,7 +914,8 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
                 queuedMedia = (int)await Models.Media.Count;
             }
 
-            liveMedia = (int)await Models.Media.Count.Where(m => m.VectorizedAt != null, ct: ct);
+            // All media in default partition is considered "live" (embeddings automatic, ARCH-0070)
+            liveMedia = (int)await Models.Media.Count;
 
             return Ok(new
             {

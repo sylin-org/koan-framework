@@ -68,7 +68,8 @@ builder.Services.AddSingleton<IMediaParserRegistry, MediaParserRegistry>();
 builder.Services.AddSingleton<IImportOrchestrator, ImportOrchestrator>();
 builder.Services.AddHostedService<S5.Recs.Services.Workers.ImportWorker>();
 builder.Services.AddHostedService<S5.Recs.Services.Workers.ValidationWorker>();
-builder.Services.AddHostedService<S5.Recs.Services.Workers.VectorizationWorker>();
+// VectorizationWorker obsolete - embeddings now generated automatically via [Embedding] attribute (ARCH-0070)
+//builder.Services.AddHostedService<S5.Recs.Services.Workers.VectorizationWorker>();
 builder.Services.AddHostedService<S5.Recs.Services.Workers.CatalogWorker>();
 
 // Couchbase adapter is auto-registered by its module via Koan.Core discovery
