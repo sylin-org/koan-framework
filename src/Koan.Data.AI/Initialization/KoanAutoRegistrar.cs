@@ -30,6 +30,14 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             RegisterEmbeddingHooks(entityType);
         }
 
+        // Register EmbeddingWorker as a hosted service (background worker)
+        services.AddHostedService<Workers.EmbeddingWorker>();
+
+        // Register EmbeddingWorkerOptions configuration
+        services.AddOptions<EmbeddingWorkerOptions>()
+            .BindConfiguration("Koan:Data:AI:EmbeddingWorker")
+            .ValidateDataAnnotations();
+
         // Track for boot report
         EmbeddingRegistry.RegisterTypes(embeddingTypes);
     }
