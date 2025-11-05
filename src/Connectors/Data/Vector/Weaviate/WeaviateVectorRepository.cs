@@ -311,6 +311,129 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
         return count;
     }
 
+    public async Task<float[]?> GetEmbeddingAsync(TKey id, CancellationToken ct = default)
+    {
+        using var _ = WeaviateTelemetry.Activity.StartActivity("vector.getEmbedding");
+
+        await EnsureSchemaAsync(ct);
+
+        var uuid = DeterministicGuidFromString(ClassName, id!.ToString()!);
+
+        // Query for the specific object with vector
+        var gql = new
+        {
+            query = $@"query {{
+                Get {{
+                    {ClassName}(where: {{ path: [""docId""], operator: Equal, valueText: ""{id!.ToString()}"" }}, limit: 1) {{
+                        _additional {{
+                            vector
+                        }}
+                    }}
+                }}
+            }}"
+        };
+
+        var req = new StringContent(JsonConvert.SerializeObject(gql), System.Text.Encoding.UTF8, "application/json");
+        var resp = await _http.PostAsync("/v1/graphql", req, ct);
+
+        if (!resp.IsSuccessStatusCode)
+        {
+            var body = await resp.Content.ReadAsStringAsync(ct);
+            throw new InvalidOperationException($"Weaviate GetEmbedding failed: {(int)resp.StatusCode} {resp.ReasonPhrase} {body}");
+        }
+
+        var json = await resp.Content.ReadAsStringAsync(ct);
+        var parsed = JObject.Parse(json);
+        var objects = parsed["data"]?["Get"]?[ClassName] as JArray;
+
+        if (objects == null || objects.Count == 0)
+        {
+            return null; // No vector found for this ID
+        }
+
+        var additional = objects[0]?["_additional"] as JObject;
+        var vectorArray = additional?["vector"] as JArray;
+
+        if (vectorArray != null)
+        {
+            return vectorArray.Select(v => (float)(double)v).ToArray();
+        }
+
+        return null;
+    }
+
+    public async Task<Dictionary<TKey, float[]>> GetEmbeddingsAsync(IEnumerable<TKey> ids, CancellationToken ct = default)
+    {
+        using var _ = WeaviateTelemetry.Activity.StartActivity("vector.getEmbeddings");
+
+        await EnsureSchemaAsync(ct);
+
+        var result = new Dictionary<TKey, float[]>();
+        var idsList = ids.ToList();
+
+        if (idsList.Count == 0)
+        {
+            return result;
+        }
+
+        // Build WHERE clause for multiple IDs using OR operator
+        var idConditions = idsList
+            .Select(id => $@"{{ path: [""docId""], operator: Equal, valueText: ""{id!.ToString()}"" }}")
+            .ToList();
+
+        var whereClause = idConditions.Count == 1
+            ? idConditions[0]
+            : $@"{{ operator: Or, operands: [{string.Join(", ", idConditions)}] }}";
+
+        var gql = new
+        {
+            query = $@"query {{
+                Get {{
+                    {ClassName}(where: {whereClause}, limit: {idsList.Count}) {{
+                        docId
+                        _additional {{
+                            vector
+                        }}
+                    }}
+                }}
+            }}"
+        };
+
+        var req = new StringContent(JsonConvert.SerializeObject(gql), System.Text.Encoding.UTF8, "application/json");
+        var resp = await _http.PostAsync("/v1/graphql", req, ct);
+
+        if (!resp.IsSuccessStatusCode)
+        {
+            var body = await resp.Content.ReadAsStringAsync(ct);
+            throw new InvalidOperationException($"Weaviate GetEmbeddings failed: {(int)resp.StatusCode} {resp.ReasonPhrase} {body}");
+        }
+
+        var json = await resp.Content.ReadAsStringAsync(ct);
+        var parsed = JObject.Parse(json);
+        var objects = parsed["data"]?["Get"]?[ClassName] as JArray;
+
+        if (objects == null)
+        {
+            return result;
+        }
+
+        foreach (var obj in objects.OfType<JObject>())
+        {
+            var docId = obj["docId"]?.Value<string>();
+            var additional = obj["_additional"] as JObject;
+            var vectorArray = additional?["vector"] as JArray;
+
+            if (docId != null && vectorArray != null)
+            {
+                var embedding = vectorArray.Select(v => (float)(double)v).ToArray();
+                TKey id = (TKey)Convert.ChangeType(docId, typeof(TKey));
+                result[id] = embedding;
+            }
+        }
+
+        return result;
+    }
+
     public async Task<VectorQueryResult<TKey>> SearchAsync(VectorQueryOptions options, CancellationToken ct = default)
     {
         using var _ = WeaviateTelemetry.Activity.StartActivity("vector.search");

@@ -11,10 +11,14 @@ namespace S5.Recs.Models;
 
 [Storage(Name = "Media")]
 [OptimizeStorage(OptimizationType = StorageOptimizationType.None, Reason = "Uses SHA512-based deterministic string IDs, not GUIDs")]
-[Embedding(Properties = new[] {
-    nameof(Title), nameof(TitleEnglish), nameof(TitleRomaji), nameof(TitleNative),
-    nameof(Synonyms), nameof(Synopsis), nameof(Genres), nameof(Tags)
-})]
+[Embedding(
+    Properties = new[] {
+        nameof(Title), nameof(TitleEnglish), nameof(TitleRomaji), nameof(TitleNative),
+        nameof(Synonyms), nameof(Synopsis), nameof(Genres), nameof(Tags)
+    },
+    Async = true,
+    RateLimitPerMinute = 60
+)]
 public sealed class Media : Entity<Media>
 {
     [Parent(typeof(MediaType))]

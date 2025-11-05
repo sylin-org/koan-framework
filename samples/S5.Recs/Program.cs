@@ -24,7 +24,7 @@ Directory.CreateDirectory(Path.Combine(builder.Environment.ContentRootPath, S5.R
 
 // Local services
 builder.Services.AddMemoryCache();  // For sliding window cache
-builder.Services.AddSingleton<IEmbeddingCache, EmbeddingCache>();
+// NOTE: IEmbeddingCache removed - embeddings now managed by framework via ARCH-0070
 builder.Services.AddSingleton<ISeedService, SeedService>();
 builder.Services.AddSingleton<IRecsService, RecsService>();
 builder.Services.AddSingleton<S5.Recs.Services.Pagination.IBandCacheService, S5.Recs.Services.Pagination.BandCacheService>();

@@ -71,6 +71,7 @@ public class Phase1_CoreInfrastructureTests
         // Arrange
         var doc = new TestDocument
         {
+            Id = "test-1",
             Title = "Test Title",
             Content = "Test content here",
             Tags = new[] { "tag1", "tag2" },
@@ -82,13 +83,14 @@ public class Phase1_CoreInfrastructureTests
         // Act
         var text = metadata.BuildEmbeddingText(doc);
 
-        // Assert
+        // Assert - Check that expected properties are present
+        // Note: Order depends on reflection order, so use Contains instead of exact match
         text.Should().Contain("Test Title");
         text.Should().Contain("Test content here");
-        text.Should().Contain("tag1");
-        text.Should().Contain("tag2");
-        text.Should().NotContain("should-not-appear");
-        text.Should().NotContain("42");
+        text.Should().Contain("tag1, tag2");
+        text.Should().Contain("test-1", "Id property is included by AllStrings policy");
+        text.Should().NotContain("should-not-appear", "InternalId has [EmbeddingIgnore]");
+        text.Should().NotContain("42", "ViewCount is int, not string");
     }
 
     [Fact]
@@ -213,6 +215,7 @@ public class Phase1_CoreInfrastructureTests
         // Arrange
         var doc = new TestDocument
         {
+            Id = "test-1",
             Title = "Title",
             Content = "Content",
             Tags = Array.Empty<string>()
@@ -225,5 +228,328 @@ public class Phase1_CoreInfrastructureTests
         // Assert
         text.Should().Contain("Title");
         text.Should().Contain("Content");
+        text.Should().NotContain("Tags", "empty arrays should be skipped, not added as property names");
     }
+
+    // ============================================================================
+    // EDGE CASE TESTS - Added based on QA Assessment recommendations
+    // ============================================================================
+
+    [Fact]
+    public void BuildEmbeddingText_UnicodeAndSpecialCharacters_PreservedCorrectly()
+    {
+        // Arrange
+        var doc = new TestDocument
+        {
+            Id = "test-1",
+            Title = "Test 🚀 Emoji",
+            Content = "Unicode: ñ, 中文, 🎨, café",
+            Tags = new[] { "日本語", "español" }
+        };
+        var metadata = EmbeddingMetadata.Get<TestDocument>();
+
+        // Act
+        var text = metadata.BuildEmbeddingText(doc);
+
+        // Assert
+        text.Should().Contain("🚀");
+        text.Should().Contain("中文");
+        text.Should().Contain("🎨");
+        text.Should().Contain("ñ");
+        text.Should().Contain("日本語");
+        text.Should().Contain("café");
+    }
+
+    [Fact]
+    public void BuildEmbeddingText_VeryLargeStrings_HandledWithoutException()
+    {
+        // Arrange - Create very large content (10KB)
+        var largeContent = new string('x', 10000);
+        var doc = new TestDocument
+        {
+            Id = "test-1",
+            Title = "Large Content Test",
+            Content = largeContent,
+            Tags = new[] { "large", "test" }
+        };
+        var metadata = EmbeddingMetadata.Get<TestDocument>();
+
+        // Act
+        var text = metadata.BuildEmbeddingText(doc);
+
+        // Assert
+        text.Length.Should().BeGreaterThan(10000, "large content should be preserved without exception");
+    }
+
+    [Fact]
+    public void BuildEmbeddingText_StringArrayWithNullElements_SkipsNulls()
+    {
+        // Arrange
+        var doc = new TestDocument
+        {
+            Id = "test-1",
+            Title = "Test",
+            Content = "Content",
+            Tags = new[] { "valid", null!, "also-valid" }
+        };
+        var metadata = EmbeddingMetadata.Get<TestDocument>();
+
+        // Act
+        var text = metadata.BuildEmbeddingText(doc);
+
+        // Assert
+        text.Should().Contain("valid");
+        text.Should().Contain("also-valid");
+        text.Should().NotContain("null");
+    }
+
+    [Fact]
+    public void BuildEmbeddingText_AllPropertiesNull_OnlyIncludesId()
+    {
+        // Arrange
+        var doc = new TestDocument
+        {
+            Id = "test-1",
+            Title = null!,
+            Content = null!,
+            Tags = null!
+        };
+        var metadata = EmbeddingMetadata.Get<TestDocument>();
+
+        // Act
+        var text = metadata.BuildEmbeddingText(doc);
+
+        // Assert
+        text.Should().Be("test-1", "when all other properties are null, only Id should be included");
+    }
+
+    [Fact]
+    public void BuildEmbeddingText_AllPropertiesWhitespace_OnlyIncludesId()
+    {
+        // Arrange
+        var doc = new TestDocument
+        {
+            Id = "test-1",
+            Title = "   ",
+            Content = "\t\n",
+            Tags = new[] { "  ", "\t" }
+        };
+        var metadata = EmbeddingMetadata.Get<TestDocument>();
+
+        // Act
+        var text = metadata.BuildEmbeddingText(doc);
+
+        // Assert
+        text.Should().Be("test-1", "whitespace-only properties should be skipped, leaving only Id");
+    }
+
+    [Fact]
+    public void EmbeddingMetadata_ExplicitPolicy_WithoutPropertiesOrTemplate_ThrowsInvalidOperationException()
+    {
+        // Arrange & Act
+        Action act = () => EmbeddingMetadata.Get<TestExplicitEntityWithoutProperties>();
+
+        // Assert
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*uses EmbeddingPolicy.Explicit*")
+            .WithMessage("*does not specify Properties or Template*");
+    }
+
+    [Fact]
+    public void ComputeSignature_EmptyContent_ProducesValidHash()
+    {
+        // Arrange
+        var doc = new TestDocument
+        {
+            Id = "test-1",
+            Title = null!,
+            Content = null!,
+            Tags = null!
+        };
+        var metadata = EmbeddingMetadata.Get<TestDocument>();
+
+        // Act
+        var signature = metadata.ComputeSignature(doc);
+
+        // Assert
+        signature.Should().NotBeNullOrEmpty();
+        signature.Should().HaveLength(64, "SHA256 hash should be 64 hex characters");
+    }
+
+    [Fact]
+    public void ComputeSignature_SpecialCharacters_ProducesConsistentHash()
+    {
+        // Arrange
+        var doc1 = new TestDocument
+        {
+            Id = "test-1",
+            Title = "Special: <>&\"'",
+            Content = "Symbols: !@#$%^&*()"
+        };
+        var doc2 = new TestDocument
+        {
+            Id = "test-1",
+            Title = "Special: <>&\"'",
+            Content = "Symbols: !@#$%^&*()"
+        };
+        var metadata = EmbeddingMetadata.Get<TestDocument>();
+
+        // Act
+        var sig1 = metadata.ComputeSignature(doc1);
+        var sig2 = metadata.ComputeSignature(doc2);
+
+        // Assert
+        sig1.Should().Be(sig2, "identical content with special chars should produce same hash");
+    }
+
+    [Fact]
+    public async Task EmbeddingMetadata_ConcurrentAccess_ReturnsSameCachedInstance()
+    {
+        // Arrange & Act
+        var tasks = Enumerable.Range(0, 100)
+            .Select(_ => Task.Run(() => EmbeddingMetadata.Get<TestDocument>()))
+            .ToArray();
+
+        await Task.WhenAll(tasks);
+        var results = tasks.Select(t => t.Result).ToList();
+
+        // Assert - Verify cache returns identical instance (reference equality) for thread safety
+        results.Should().OnlyContain(m => ReferenceEquals(m, results[0]),
+            "all concurrent calls should return the exact same cached instance");
+    }
+
+    // ============================================================================
+    // TEMPLATE EDGE CASE TESTS - Critical for production readiness
+    // ============================================================================
+
+    [Fact]
+    public void BuildEmbeddingText_TemplateWithNonExistentProperty_LeavesPlaceholder()
+    {
+        // Arrange
+        var entity = new TestTemplateWithBadProperty
+        {
+            Title = "Test Title",
+            Content = "Test Content"
+        };
+        var metadata = EmbeddingMetadata.Get<TestTemplateWithBadProperty>();
+
+        // Act
+        var text = metadata.BuildEmbeddingText(entity);
+
+        // Assert
+        text.Should().Be("Title: Test Title\nMissing: {NonExistentProp}\nContent: Test Content",
+            "non-existent properties leave placeholder in output - this helps identify configuration errors");
+        text.Should().Contain("{NonExistentProp}", "placeholder indicates missing property");
+    }
+
+    [Fact]
+    public void BuildEmbeddingText_TemplateWithPartiallyValidProperties_ProcessesValidOnes()
+    {
+        // Arrange
+        var entity = new TestTemplateMixedProperties
+        {
+            ValidProp = "Valid Value",
+            AnotherValid = "Another Value"
+        };
+        var metadata = EmbeddingMetadata.Get<TestTemplateMixedProperties>();
+
+        // Act
+        var text = metadata.BuildEmbeddingText(entity);
+
+        // Assert
+        text.Should().Be("Valid Value - {InvalidProp} - Another Value",
+            "valid properties replaced, invalid properties left as placeholders");
+        text.Should().Contain("Valid Value", "valid properties should be processed");
+        text.Should().Contain("Another Value", "valid properties should be processed");
+        text.Should().Contain("{InvalidProp}", "invalid property left as placeholder for debugging");
+    }
+
+    [Fact]
+    public void BuildEmbeddingText_TemplateWithNullPropertyValue_ReplacesWithEmptyString()
+    {
+        // Arrange
+        var entity = new TestTemplateWithNullable
+        {
+            RequiredField = "Present",
+            OptionalField = null
+        };
+        var metadata = EmbeddingMetadata.Get<TestTemplateWithNullable>();
+
+        // Act
+        var text = metadata.BuildEmbeddingText(entity);
+
+        // Assert
+        text.Should().Be("Required: Present, Optional: ",
+            "null values in template should be replaced with empty string");
+    }
+
+    [Fact]
+    public void EmbeddingMetadata_AllPublicPolicy_IncludesAllPublicProperties()
+    {
+        // Arrange & Act
+        var metadata = EmbeddingMetadata.Get<TestAllPublicEntity>();
+
+        // Assert
+        metadata.Policy.Should().Be(EmbeddingPolicy.AllPublic);
+        metadata.Properties.Should().Contain("StringProp", "AllPublic should include string properties");
+        metadata.Properties.Should().Contain("IntProp", "AllPublic should include int properties");
+        metadata.Properties.Should().Contain("BoolProp", "AllPublic should include bool properties");
+        metadata.Properties.Should().NotContain("IgnoredProp", "[EmbeddingIgnore] should exclude property");
+    }
+
+    [Fact]
+    public void BuildEmbeddingText_AllPublicPolicy_OnlyIncludesStringTypes()
+    {
+        // Arrange
+        var entity = new TestAllPublicEntity
+        {
+            Id = "test-id",
+            StringProp = "text",
+            IntProp = 42,
+            BoolProp = true
+        };
+        var metadata = EmbeddingMetadata.Get<TestAllPublicEntity>();
+
+        // Act
+        var text = metadata.BuildEmbeddingText(entity);
+
+        // Assert
+        text.Should().Contain("text", "string properties should be included");
+        text.Should().Contain("test-id", "Id is a string property");
+        text.Should().NotContain("42", "non-string properties are not included in non-template mode");
+        text.Should().NotContain("True", "non-string properties are not included in non-template mode");
+    }
+
+    [Fact]
+    public void BuildEmbeddingText_EmptyPropertiesArray_FallsBackToPolicy()
+    {
+        // Arrange - Entity with Properties = new string[0]
+        var metadata = EmbeddingMetadata.Get<TestEmptyPropertiesArray>();
+
+        var entity = new TestEmptyPropertiesArray
+        {
+            Id = "test-id",
+            Field1 = "Field 1 Value",
+            Field2 = "Field 2 Value"
+        };
+
+        // Act
+        var text = metadata.BuildEmbeddingText(entity);
+
+        // Assert
+        // Empty properties array is treated as "not specified" and falls back to AllStrings policy
+        text.Should().Contain("Field 1 Value", "empty properties array falls back to AllStrings policy");
+        text.Should().Contain("Field 2 Value", "empty properties array falls back to AllStrings policy");
+        text.Should().Contain("test-id", "Id is included by AllStrings policy");
+    }
+}
+
+/// <summary>
+/// Test entity with Explicit policy but no Properties or Template specified
+/// Used to test error handling
+/// </summary>
+[Koan.Data.AI.Attributes.Embedding(Policy = Koan.Data.AI.Attributes.EmbeddingPolicy.Explicit)]
+public class TestExplicitEntityWithoutProperties : Koan.Data.Core.Model.Entity<TestExplicitEntityWithoutProperties>
+{
+    public string Field { get; set; } = "";
 }
