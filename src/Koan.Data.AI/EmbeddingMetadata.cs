@@ -21,7 +21,7 @@ public class EmbeddingMetadata
     public bool Async { get; init; }
     public string? Model { get; init; }
     public int BatchSize { get; init; }
-    public int? RateLimitPerMinute { get; init; }
+    public int RateLimitPerMinute { get; init; }
 
     /// <summary>
     /// Gets cached metadata for the specified entity type.

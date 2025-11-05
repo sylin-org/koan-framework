@@ -47,8 +47,8 @@ public class EmbeddingAttribute : Attribute
 
     /// <summary>
     /// Rate limit per minute for this entity type (optional).
-    /// If null, uses global rate limit from configuration.
+    /// If 0, uses global rate limit from configuration.
     /// Only applies when Async = true.
     /// </summary>
-    public int? RateLimitPerMinute { get; set; }
+    public int RateLimitPerMinute { get; set; } = 0;
 }
