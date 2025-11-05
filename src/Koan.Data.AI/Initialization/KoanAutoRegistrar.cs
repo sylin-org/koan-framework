@@ -183,8 +183,9 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 
         if (metadata.Async)
         {
-            // TODO: Queue for background processing (Phase 3)
-            // For now, fall back to sync embedding
+            // Queue for background processing (Phase 3)
+            await QueueEmbeddingJobAsync(entity, metadata, currentSignature, ctx.CancellationToken);
+            return;
         }
 
         // Synchronous embedding generation
@@ -210,6 +211,69 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         }
 
         await state.Save(ctx.CancellationToken);
+    }
+
+    /// <summary>
+    /// Queues an embedding job for background processing.
+    /// </summary>
+    private static async ValueTask QueueEmbeddingJobAsync<TEntity>(
+        TEntity entity,
+        EmbeddingMetadata metadata,
+        string signature,
+        CancellationToken ct)
+        where TEntity : class, Koan.Data.Abstractions.IEntity<string>
+    {
+        // Build embedding text now (to capture current state)
+        var text = metadata.BuildEmbeddingText(entity);
+
+        // Check if job already exists for this entity
+        var jobId = EmbedJob<TEntity>.MakeId(entity.Id);
+        var existingJob = await EmbedJob<TEntity>.Get(jobId, ct);
+
+        if (existingJob != null)
+        {
+            // Update existing job with new content if signature changed
+            if (existingJob.ContentSignature != signature)
+            {
+                existingJob.ContentSignature = signature;
+                existingJob.EmbeddingText = text;
+                existingJob.Model = metadata.Model;
+
+                // Reset retry count if content changed
+                existingJob.RetryCount = 0;
+                existingJob.Error = null;
+
+                // If job was completed/failed, reset to pending
+                if (existingJob.Status != EmbedJobStatus.Pending &&
+                    existingJob.Status != EmbedJobStatus.Processing)
+                {
+                    existingJob.Status = EmbedJobStatus.Pending;
+                    existingJob.StartedAt = null;
+                    existingJob.CompletedAt = null;
+                }
+
+                await existingJob.Save(ct);
+            }
+            // If signature unchanged and job is pending/processing, do nothing
+            return;
+        }
+
+        // Create new job
+        var job = new EmbedJob<TEntity>
+        {
+            Id = jobId,
+            EntityId = entity.Id,
+            EntityType = typeof(TEntity).Name,
+            ContentSignature = signature,
+            EmbeddingText = text,
+            Status = EmbedJobStatus.Pending,
+            CreatedAt = DateTimeOffset.UtcNow,
+            Model = metadata.Model,
+            MaxRetries = 3, // TODO: Make configurable via EmbeddingWorkerOptions
+            Priority = 0
+        };
+
+        await job.Save(ct);
     }
 
     /// <summary>
