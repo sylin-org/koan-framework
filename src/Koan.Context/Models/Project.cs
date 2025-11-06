@@ -6,7 +6,7 @@ namespace Koan.Context.Models;
 /// <summary>
 /// Represents a code project being tracked by Koan Context
 /// </summary>
-public class Project : Entity<Project, Guid>
+public class Project : Entity<Project>
 {
     /// <summary>
     /// Display name for the project
@@ -59,6 +59,46 @@ public class Project : Entity<Project, Guid>
     public long IndexedBytes { get; set; }
 
     /// <summary>
+    /// Current indexing status
+    /// </summary>
+    public IndexingStatus Status { get; set; } = IndexingStatus.NotIndexed;
+
+    /// <summary>
+    /// Whether to monitor code file changes for automatic re-indexing
+    /// </summary>
+    public bool MonitorCodeChanges { get; set; } = true;
+
+    /// <summary>
+    /// Whether to monitor documentation file changes for automatic re-indexing
+    /// </summary>
+    public bool MonitorDocChanges { get; set; } = true;
+
+    /// <summary>
+    /// When indexing was started (for status tracking)
+    /// </summary>
+    public DateTime? IndexingStartedAt { get; set; }
+
+    /// <summary>
+    /// When indexing was completed (for status tracking)
+    /// </summary>
+    public DateTime? IndexingCompletedAt { get; set; }
+
+    /// <summary>
+    /// Error message if indexing failed
+    /// </summary>
+    public string? IndexingError { get; set; }
+
+    /// <summary>
+    /// Whether file monitoring is enabled for this project
+    /// </summary>
+    public bool IsMonitoringEnabled => MonitorCodeChanges || MonitorDocChanges;
+
+    /// <summary>
+    /// Derived property: folder name from RootPath
+    /// </summary>
+    public string FolderName => Path.GetFileName(RootPath) ?? Name;
+
+    /// <summary>
     /// Creates a new project instance
     /// </summary>
     /// <param name="name">Project name</param>
@@ -88,6 +128,21 @@ public class Project : Entity<Project, Guid>
     }
 
     /// <summary>
+    /// Creates a project from a directory path (auto-detect name from folder)
+    /// </summary>
+    public static Project CreateFromDirectory(string directoryPath)
+    {
+        if (!Directory.Exists(directoryPath))
+            throw new DirectoryNotFoundException($"Directory not found: {directoryPath}");
+
+        var folderName = Path.GetFileName(directoryPath);
+        if (string.IsNullOrWhiteSpace(folderName))
+            throw new ArgumentException("Could not determine folder name from path", nameof(directoryPath));
+
+        return Create(folderName, directoryPath);
+    }
+
+    /// <summary>
     /// Marks the project as indexed with current timestamp
     /// </summary>
     public void MarkIndexed(int documentCount, long indexedBytes)
@@ -96,6 +151,9 @@ public class Project : Entity<Project, Guid>
         UpdatedAt = DateTime.UtcNow;
         DocumentCount = documentCount;
         IndexedBytes = indexedBytes;
+        Status = IndexingStatus.Ready;
+        IndexingCompletedAt = DateTime.UtcNow;
+        IndexingError = null;
     }
 }
 
@@ -114,4 +172,25 @@ public enum ProjectType
     Ruby,
     Php,
     Generic
+}
+
+/// <summary>
+/// Project indexing status
+/// </summary>
+public enum IndexingStatus
+{
+    /// <summary>Project created but never indexed</summary>
+    NotIndexed = 0,
+
+    /// <summary>Initial indexing in progress (not queryable yet)</summary>
+    Indexing = 1,
+
+    /// <summary>Indexed and ready for queries</summary>
+    Ready = 2,
+
+    /// <summary>Incremental update in progress (still queryable)</summary>
+    Updating = 3,
+
+    /// <summary>Indexing failed</summary>
+    Failed = 4
 }

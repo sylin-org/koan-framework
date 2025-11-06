@@ -1,77 +1,139 @@
 using System.Text;
 using System.Text.RegularExpressions;
 using Koan.Data.Vector.Abstractions.Partition;
-using Guard = Koan.Core.Utilities.Guard;
+using Microsoft.Extensions.Logging;
 
 namespace Koan.Data.Vector.Connector.Weaviate.Partition;
 
 /// <summary>
-/// Maps partition identifiers to Weaviate class names using per-partition class strategy.
-/// Each partition gets its own class (e.g., "KoanDocument_project_a", "KoanDocument_project_b").
+/// Weaviate-specific partition mapping implementation
 /// </summary>
 /// <remarks>
-/// Weaviate class naming constraints:
-/// <list type="bullet">
-/// <item><description>Maximum length: 256 characters</description></item>
-/// <item><description>Must start with uppercase letter</description></item>
-/// <item><description>Can contain: letters, digits, underscores</description></item>
-/// <item><description>Case-sensitive</description></item>
-/// </list>
+/// Weaviate class naming requirements:
+/// - Must start with uppercase letter
+/// - Can contain: letters, numbers, underscores
+/// - Max length: 256 characters
+/// - Convention: PascalCase with underscores for separators
+///
+/// This mapper creates per-class-per-partition storage:
+/// - Base pattern: "Koan{EntityName}_{sanitizedPartitionId}"
+/// - Example: "KoanDocumentChunk_project_abc123"
 /// </remarks>
-internal sealed class WeaviatePartitionMapper : IVectorPartitionMapper
+public partial class WeaviatePartitionMapper : IVectorPartitionMapper
 {
+    private readonly ILogger<WeaviatePartitionMapper> _logger;
     private const int MaxClassNameLength = 256;
-    private const string BasePrefix = "KoanDocument";
+    private const string ClassPrefix = "Koan";
 
-    /// <inheritdoc />
-    public string MapStorageName<TEntity>(string partitionId) where TEntity : class
+    public WeaviatePartitionMapper(ILogger<WeaviatePartitionMapper> logger)
+    {
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    }
+
+    /// <inheritdoc/>
+    public string MapStorageName<T>(string partitionId)
     {
         if (string.IsNullOrWhiteSpace(partitionId))
-            throw new ArgumentException("Partition ID cannot be null or whitespace.", nameof(partitionId));
+        {
+            throw new ArgumentException("Partition ID cannot be null or whitespace", nameof(partitionId));
+        }
 
-        var sanitized = SanitizePartitionId(partitionId);
-        var className = $"{BasePrefix}_{sanitized}";
+        var baseName = GetBaseName<T>();
+        var sanitizedId = SanitizePartitionId(partitionId);
 
-        // Enforce Weaviate max length constraint
+        var className = $"{baseName}_{sanitizedId}";
+
+        // Ensure max length
         if (className.Length > MaxClassNameLength)
         {
-            // Truncate partition suffix to fit, keeping prefix intact
-            var maxSuffixLength = MaxClassNameLength - BasePrefix.Length - 1; // -1 for underscore
-            sanitized = sanitized.Substring(0, Math.Min(sanitized.Length, maxSuffixLength));
-            className = $"{BasePrefix}_{sanitized}";
+            var maxIdLength = MaxClassNameLength - baseName.Length - 1; // -1 for underscore
+            sanitizedId = sanitizedId.Substring(0, Math.Max(1, maxIdLength));
+            className = $"{baseName}_{sanitizedId}";
+
+            _logger.LogWarning(
+                "Class name truncated to {MaxLength} chars: {ClassName}",
+                MaxClassNameLength,
+                className);
         }
+
+        _logger.LogDebug(
+            "Mapped partition {PartitionId} to Weaviate class {ClassName}",
+            partitionId,
+            className);
 
         return className;
     }
 
-    /// <inheritdoc />
+    /// <inheritdoc/>
     public string SanitizePartitionId(string partitionId)
     {
         if (string.IsNullOrWhiteSpace(partitionId))
-            throw new ArgumentException("Partition ID cannot be null or whitespace.", nameof(partitionId));
+        {
+            return "default";
+        }
 
-        // 1. Convert to lowercase for consistency
-        var sanitized = partitionId.ToLowerInvariant();
+        // Replace invalid characters with underscores
+        var sanitized = InvalidCharRegex().Replace(partitionId, "_");
 
-        // 2. Replace invalid characters with underscores
-        // Weaviate classes can only contain: letters, digits, underscores
-        // Hyphens are NOT allowed in class names
-        sanitized = Regex.Replace(sanitized, @"[^a-z0-9_]", "_");
-
-        // 3. Remove leading/trailing underscores
+        // Remove leading/trailing underscores
         sanitized = sanitized.Trim('_');
 
-        // 4. Collapse multiple consecutive underscores to single
-        sanitized = Regex.Replace(sanitized, @"_+", "_");
+        // Collapse multiple consecutive underscores
+        sanitized = MultipleUnderscoresRegex().Replace(sanitized, "_");
 
-        // 5. Handle empty result (edge case: all-special-chars input)
-        if (string.IsNullOrWhiteSpace(sanitized))
+        // Ensure lowercase (Weaviate is case-sensitive)
+        sanitized = sanitized.ToLowerInvariant();
+
+        // Ensure non-empty
+        if (string.IsNullOrEmpty(sanitized))
         {
-            // Use hash as fallback for completely unsanitizable inputs
-            var hash = Math.Abs(partitionId.GetHashCode());
-            sanitized = $"partition_{hash}";
+            sanitized = "default";
         }
 
         return sanitized;
     }
+
+    /// <inheritdoc/>
+    public string GetBaseName<T>()
+    {
+        var entityType = typeof(T);
+        var typeName = entityType.Name;
+
+        // Remove generic type markers (e.g., Entity`1)
+        var backtickIndex = typeName.IndexOf('`');
+        if (backtickIndex > 0)
+        {
+            typeName = typeName.Substring(0, backtickIndex);
+        }
+
+        // Ensure PascalCase with Koan prefix
+        var baseName = $"{ClassPrefix}{typeName}";
+
+        // Sanitize to valid Weaviate class name
+        baseName = InvalidCharRegex().Replace(baseName, string.Empty);
+
+        // Ensure starts with uppercase
+        if (baseName.Length > 0 && char.IsLower(baseName[0]))
+        {
+            baseName = char.ToUpper(baseName[0]) + baseName.Substring(1);
+        }
+
+        return baseName;
+    }
+
+    /// <summary>
+    /// Regex for invalid Weaviate class name characters
+    /// </summary>
+    /// <remarks>
+    /// Weaviate allows: letters, numbers, underscores
+    /// This regex matches anything else (including hyphens)
+    /// </remarks>
+    [GeneratedRegex(@"[^a-zA-Z0-9_]")]
+    private static partial Regex InvalidCharRegex();
+
+    /// <summary>
+    /// Regex for multiple consecutive underscores
+    /// </summary>
+    [GeneratedRegex(@"_+")]
+    private static partial Regex MultipleUnderscoresRegex();
 }

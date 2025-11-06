@@ -14,13 +14,20 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Polly" Version="8.5.0" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Koan.Core\Koan.Core.csproj" />
+    <ProjectReference Include="..\Connectors\Data\Sqlite\Koan.Data.Connector.Sqlite.csproj" />
     <ProjectReference Include="..\Koan.Data.Core\Koan.Data.Core.csproj" />
     <ProjectReference Include="..\Koan.Web\Koan.Web.csproj" />
     <ProjectReference Include="..\Koan.Mcp\Koan.Mcp.csproj" />
     <ProjectReference Include="..\Koan.AI\Koan.AI.csproj" />
     <ProjectReference Include="..\Koan.Data.Vector\Koan.Data.Vector.csproj" />
     <ProjectReference Include="..\Connectors\Data\Vector\Weaviate\Koan.Data.Vector.Connector.Weaviate.csproj" />
+    <ProjectReference Include="..\Connectors\AI\Ollama\Koan.AI.Connector.Ollama.csproj" />
+    <ProjectReference Include="..\Koan.Orchestration.Aspire\Koan.Orchestration.Aspire.csproj" />
   </ItemGroup>
 
 </Project>
