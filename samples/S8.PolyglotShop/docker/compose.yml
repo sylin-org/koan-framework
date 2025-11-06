@@ -1,0 +1,54 @@
+name: koan-s8-polyglotshop
+services:
+  api:
+    build:
+      context: ../../..
+      dockerfile: samples/S8.PolyglotShop/Dockerfile
+    image: koan-s8-polyglotshop:dev
+    ports:
+      - "5080:5080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: "Development"
+      ASPNETCORE_URLS: "http://+:5080"
+
+      # Override container-specific endpoints (not auto-discoverable from inside container)
+      Koan__Ai__Services__Ollama__0__BaseUrl: "http://ollama:11434"
+    volumes:
+      - ../.Koan/Data:/app/data
+      - ../.Koan/cache:/app/cache
+    depends_on:
+      ollama:
+        condition: service_started
+      translation-service:
+        condition: service_started
+
+  # Translation service (containerized microservice)
+  translation-service:
+    build:
+      context: ../../..
+      dockerfile: src/Services/Translation/Koan.Service.Translation.Container/Dockerfile
+    image: koan-service-translation:dev
+    environment:
+      ASPNETCORE_URLS: "http://+:8080"
+
+      # Service mesh configuration
+      Koan__Service__Translation__Port: "8080"
+      Koan__Service__Orchestrator__MulticastGroup: "239.255.42.1"
+      Koan__Service__Orchestrator__MulticastPort: "42001"
+
+      # AI configuration for translation
+      Koan__Ai__Services__Ollama__0__BaseUrl: "http://ollama:11434"
+    depends_on:
+      ollama:
+        condition: service_started
+
+  # Ollama for AI-powered translation
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama-s8
+    volumes:
+      - ../.Koan/Data/ollama-models:/root/.ollama
+    ports:
+      - "5089:11434"
+
+volumes: {}

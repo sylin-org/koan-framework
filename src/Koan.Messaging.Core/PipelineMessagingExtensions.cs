@@ -27,7 +27,7 @@ public static class PipelineMessagingExtensions
 
             try
             {
-                await MessagingExtensions.Send(message, cancellationToken: ct).ConfigureAwait(false);
+                await MessagingExtensions.Send(message, cancellationToken: ct);
                 envelope.Features[PipelineFeatureKeys.Notification] = message;
             }
             catch (Exception ex)
@@ -51,7 +51,7 @@ public static class PipelineMessagingExtensions
 
             try
             {
-                await MessagingExtensions.Send(message, cancellationToken: ct).ConfigureAwait(false);
+                await MessagingExtensions.Send(message, cancellationToken: ct);
                 envelope.Features[PipelineFeatureKeys.Notification] = message;
             }
             catch (Exception ex)

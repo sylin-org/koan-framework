@@ -56,6 +56,16 @@ public sealed record AiChatOptions : AiOptionsBase
     public bool? Think { get; init; }
 
     /// <summary>
+    /// Request structured output format. Common values: "json", "text".
+    /// Provider support varies:
+    /// - Ollama: Maps to top-level "format" parameter (e.g., "json" enforces valid JSON output)
+    /// - OpenAI/LMStudio: Maps to "response_format": { "type": "json_object" }
+    /// - Anthropic: Gracefully ignored (relies on prompt engineering)
+    /// Use "json" to request JSON-formatted responses from compatible models.
+    /// </summary>
+    public string? ResponseFormat { get; init; }
+
+    /// <summary>
     /// Vendor-specific options (forwarded to adapter as-is)
     /// </summary>
     public IDictionary<string, object>? VendorOptions { get; init; }

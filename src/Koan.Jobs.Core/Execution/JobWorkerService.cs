@@ -36,7 +36,7 @@ internal sealed class JobWorkerService : KoanBackgroundServiceBase
         {
             try
             {
-                await _executor.ExecuteAsync(item, cancellationToken).ConfigureAwait(false);
+                await _executor.ExecuteAsync(item, cancellationToken);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {

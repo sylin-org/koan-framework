@@ -57,17 +57,28 @@ public static class MeridianConstants
         public const string AiSuggestSegment = "ai-suggest";
     }
 
+    public static class OrganizationProfiles
+    {
+        public const string Route = "api/organizationprofiles";
+    }
+
     public static class AnalysisTypeCatalog
     {
         public const string Route = "api/analysistypes";
         public const string AiSuggestSegment = "ai-suggest";
     }
 
+    public static class Headers
+    {
+        public const string AiWarnings = "X-Meridian-AI-Warnings";
+    }
+
     public static class SourceTypes
     {
+        public const string AuthoritativeNotes = "AuthoritativeNotes";
         public const string AuditedFinancial = "AuditedFinancial";
         public const string VendorPrescreen = "VendorPrescreen";
         public const string KnowledgeBase = "KnowledgeBase";
-        public const string Unclassified = "Unclassified";
+        public const string Unspecified = "019a2200-0000-7000-a000-000000000099"; // Catch-all for classification failures
     }
 }

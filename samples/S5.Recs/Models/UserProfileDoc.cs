@@ -10,7 +10,7 @@ namespace S5.Recs.Models;
 [Storage(Name = "UserProfiles")]
 public sealed class UserProfileDoc : Entity<UserProfileDoc>
 {
-    [Parent(typeof(UserDoc))]
+    // UserId is a simple string identifier, not a foreign key relationship
     public required string UserId { get; set; }
     public Dictionary<string, double> GenreWeights { get; set; } = new(StringComparer.OrdinalIgnoreCase);
     public float[]? PrefVector { get; set; }

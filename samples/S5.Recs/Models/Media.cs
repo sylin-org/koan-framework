@@ -1,5 +1,6 @@
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Annotations;
+using Koan.Data.AI.Attributes;
 using Koan.Data.Core.Model;
 using Koan.Data.Core.Optimization;
 using Koan.Data.Core.Relationships;
@@ -10,6 +11,14 @@ namespace S5.Recs.Models;
 
 [Storage(Name = "Media")]
 [OptimizeStorage(OptimizationType = StorageOptimizationType.None, Reason = "Uses SHA512-based deterministic string IDs, not GUIDs")]
+[Embedding(
+    Properties = new[] {
+        nameof(Title), nameof(TitleEnglish), nameof(TitleRomaji), nameof(TitleNative),
+        nameof(Synonyms), nameof(Synopsis), nameof(Genres), nameof(Tags)
+    },
+    Async = true,
+    RateLimitPerMinute = 60
+)]
 public sealed class Media : Entity<Media>
 {
     [Parent(typeof(MediaType))]
@@ -51,10 +60,61 @@ public sealed class Media : Entity<Media>
     public DateOnly? EndDate { get; set; }
     public string? Status { get; set; }
 
+    /// <summary>
+    /// Numeric representation of StartDate in YYYYMMDD format for efficient filtering.
+    /// Example: 2023-12-31 becomes 20231231
+    /// </summary>
+    public int? StartDateInt => StartDate.HasValue
+        ? StartDate.Value.Year * 10000 + StartDate.Value.Month * 100 + StartDate.Value.Day
+        : null;
+
+    /// <summary>
+    /// Numeric representation of EndDate in YYYYMMDD format for efficient filtering.
+    /// Example: 2023-12-31 becomes 20231231
+    /// </summary>
+    public int? EndDateInt => EndDate.HasValue
+        ? EndDate.Value.Year * 10000 + EndDate.Value.Month * 100 + EndDate.Value.Day
+        : null;
+
+    /// <summary>
+    /// Stored rating value for efficient filtering (same as Rating computed property).
+    /// Blended rating: 80% AverageScore + 20% Popularity
+    /// </summary>
+    public double? RatingValue => AverageScore.HasValue
+        ? Math.Round((AverageScore.Value * 0.8) + Popularity, 2)
+        : null;
+
     // External references and metadata
     public Dictionary<string, string> ExternalIds { get; set; } = new();
     public DateTimeOffset ImportedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
+
+    // ─────────────────────────────────────────────────────────────────
+    // Pipeline Metadata (ARCH-0069: Partition-Based Import Pipeline)
+    // ─────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// ID of the import job that imported this media item
+    /// </summary>
+    public string? ImportJobId { get; set; }
+
+    /// <summary>
+    /// When this media item passed validation and entered vectorization queue
+    /// </summary>
+    public DateTimeOffset? ValidatedAt { get; set; }
+
+    /// <summary>
+    /// Error message from last processing attempt (validation or vectorization)
+    /// </summary>
+    public string? ProcessingError { get; set; }
+
+    /// <summary>
+    /// Number of times processing has been retried for this media item
+    /// </summary>
+    public int RetryCount { get; set; }
+
+    // NOTE: ContentSignature and VectorizedAt are now tracked by framework-managed EmbeddingState<Media>
+    // These were removed as part of ARCH-0070: Attribute-Driven AI Embeddings
 
     /// <summary>
     /// Generates deterministic SHA512-based ID from provider information.

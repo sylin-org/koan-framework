@@ -58,7 +58,7 @@ public sealed class ProtocolDocumentService : IProtocolDocumentService
             if (Vector<ProtocolDocument>.IsAvailable)
             {
                 var payload = BuildEmbeddingPayload(document);
-                var vector = await Ai.Embed(payload, ct).ConfigureAwait(false);
+                var vector = await Ai.Embed(payload, ct);
 
                 if (vector.Length > 0)
                 {
@@ -69,7 +69,7 @@ public sealed class ProtocolDocumentService : IProtocolDocumentService
                         document.DocumentType,
                         document.TrialSiteId,
                         document.Tags
-                    }), ct).ConfigureAwait(false);
+                    }), ct);
                     document.LastEmbeddedAt = now;
                     document.VectorState = ProtocolVectorState.Indexed;
                     vectorized = true;
@@ -116,7 +116,7 @@ public sealed class ProtocolDocumentService : IProtocolDocumentService
             }
         }
 
-        await ProtocolDocument.UpsertMany(new[] { document }, ct).ConfigureAwait(false);
+        await ProtocolDocument.UpsertMany(new[] { document }, ct);
 
         return new ProtocolDocumentIngestionResult(
             document,
@@ -145,14 +145,14 @@ public sealed class ProtocolDocumentService : IProtocolDocumentService
         {
             try
             {
-                var vector = await Ai.Embed(request.Query, ct).ConfigureAwait(false);
+                var vector = await Ai.Embed(request.Query, ct);
 
                 if (vector.Length > 0)
                 {
-                    var vectorResult = await Vector<ProtocolDocument>.Search(vector, topK: request.TopK <= 0 ? 5 : Math.Min(request.TopK, 20), ct: ct).ConfigureAwait(false);
+                    var vectorResult = await Vector<ProtocolDocument>.Search(vector, topK: request.TopK <= 0 ? 5 : Math.Min(request.TopK, 20), ct: ct);
                     foreach (var match in vectorResult.Matches)
                     {
-                        var doc = await ProtocolDocument.Get(match.Id, ct).ConfigureAwait(false);
+                        var doc = await ProtocolDocument.Get(match.Id, ct);
                         if (doc is null) continue;
                         if (!string.IsNullOrWhiteSpace(request.TrialSiteId) && !string.Equals(doc.TrialSiteId, request.TrialSiteId, StringComparison.OrdinalIgnoreCase))
                         {
@@ -202,7 +202,7 @@ public sealed class ProtocolDocumentService : IProtocolDocumentService
 
         if (matches.Count == 0)
         {
-            var allDocs = await ProtocolDocument.All(ct).ConfigureAwait(false);
+            var allDocs = await ProtocolDocument.All(ct);
             var query = allDocs.AsEnumerable();
 
             if (!string.IsNullOrWhiteSpace(request.TrialSiteId))

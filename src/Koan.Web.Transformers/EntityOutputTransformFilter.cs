@@ -47,11 +47,11 @@ internal sealed class EntityOutputTransformFilter : IAsyncResultFilter
                 return;
             }
 
-            transformed = await selection.Invoker.TransformManyAsync(enumerable, context.HttpContext).ConfigureAwait(false);
+            transformed = await selection.Invoker.TransformManyAsync(enumerable, context.HttpContext);
         }
         else
         {
-            transformed = await selection.Invoker.TransformAsync(or.Value!, context.HttpContext).ConfigureAwait(false);
+            transformed = await selection.Invoker.TransformAsync(or.Value!, context.HttpContext);
         }
         // Set the negotiated content type so MVC doesn't re-serialize as JSON
         var result = new ObjectResult(transformed) { StatusCode = or.StatusCode };

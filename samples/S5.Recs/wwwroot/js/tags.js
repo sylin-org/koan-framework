@@ -5,7 +5,9 @@
   async function loadTags(){
     try{
       if(!(window.S5Api && typeof window.S5Api.getTags === 'function')) return;
-      const list = await window.S5Api.getTags('popularity') || [];
+      // Check if showCensored toggle is enabled
+      const showCensored = document.getElementById('showCensoredToggle')?.checked || false;
+      const list = await window.S5Api.getTags('popularity', showCensored) || [];
     // allTags expects shape: [{ tag, count }]
       window.allTags = Array.isArray(list) ? list : [];
   // Prefer chips: top N by popularity, but make sure selected are included even if not in top
@@ -119,6 +121,22 @@
     }
     if(popBtn) popBtn.addEventListener('click', () => setMode('popularity'));
     if(alphaBtn) alphaBtn.addEventListener('click', () => setMode('alpha'));
+
+    // Wire up showCensored toggle
+    const showCensoredToggle = document.getElementById('showCensoredToggle');
+    if(showCensoredToggle) {
+      showCensoredToggle.addEventListener('change', async () => {
+        // Reload tags when toggle changes
+        await loadTags();
+
+        // Also re-query media results to show/hide censored content
+        if (window.currentView === 'forYou' && window.loadAnimeData) {
+          await window.loadAnimeData();
+        } else if (window.currentView === 'freeBrowsing' && window.loadFreeBrowsingData) {
+          await window.loadFreeBrowsingData();
+        }
+      });
+    }
   });
 
   // Determine selected-tag visual style based on current Tag Boost weight

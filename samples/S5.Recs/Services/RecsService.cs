@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
+using S5.Recs.Controllers;
 using S5.Recs.Infrastructure;
 using S5.Recs.Models;
 using Koan.AI.Contracts;
@@ -10,6 +11,7 @@ using Koan.Data.Abstractions;
 using Koan.Data.Core;
 using Koan.Data.Vector;
 using Koan.Data.Vector.Abstractions;
+using Koan.Data.AI;
 
 namespace S5.Recs.Services;
 
@@ -19,6 +21,7 @@ internal sealed class RecsService : IRecsService
     private readonly IConfiguration _configuration;
     private readonly ILogger<RecsService>? _logger;
     private readonly IOptions<S5.Recs.Options.TagCatalogOptions>? _tagOptions;
+    private readonly IRecommendationSettingsProvider _settingsProvider;
 
     // Demo data for fallback scenarios
     private readonly List<Media> _demoMedia = new()
@@ -67,83 +70,114 @@ internal sealed class RecsService : IRecsService
         }
     };
 
-    public RecsService(IServiceProvider sp, IConfiguration configuration, ILogger<RecsService>? logger = null, IOptions<S5.Recs.Options.TagCatalogOptions>? tagOptions = null)
+    public RecsService(IServiceProvider sp, IConfiguration configuration, IRecommendationSettingsProvider settingsProvider, ILogger<RecsService>? logger = null, IOptions<S5.Recs.Options.TagCatalogOptions>? tagOptions = null)
     {
         _sp = sp;
         _configuration = configuration;
         _logger = logger;
         _tagOptions = tagOptions;
+        _settingsProvider = settingsProvider;
     }
 
     public async Task<(IReadOnlyList<Recommendation> items, bool degraded)> QueryAsync(
-        string? text,
-        string? anchorMediaId,
-        string[]? genres,
-        int? episodesMax,
-        bool spoilerSafe,
-        int topK,
-        string? userId,
-        string[]? preferTags,
-        double? preferWeight,
-        string? sort,
-        string? mediaTypeFilter,
-        double? ratingMin,
-        double? ratingMax,
-        int? yearMin,
-        int? yearMax,
-        double? alpha,
+        RecsQuery query,
+        string? userIdOverride,
         CancellationToken ct)
     {
-        // Guardrails
-        if (topK <= 0) topK = 10;
-        if (topK > 100) topK = 100;
+        // Determine effective userId (override from auth context takes precedence)
+        var userId = userIdOverride ?? query.UserId;
 
-        _logger?.LogInformation("Multi-media query: text='{Text}' anchor='{Anchor}' mediaType='{MediaType}' topK={TopK}",
-            text, anchorMediaId, mediaTypeFilter, topK);
+        // Handle pagination: prefer Offset/Limit over legacy TopK
+        var offset = query.Offset ?? 0;
+        var limit = query.Limit ?? query.TopK;
+
+        // Apply guardrails
+        // Note: When both Offset and Limit are null, this is likely a band fetch from BandCacheService
+        // In that case, allow larger limits (up to topK) for efficient band fetching
+        var isBandFetch = query.Offset == null && query.Limit == null;
+        if (offset < 0) offset = 0;
+        if (limit <= 0) limit = 20;
+        if (!isBandFetch && limit > 100) limit = 100;  // Only cap user-facing queries
+
+        // For vector search, we need to fetch offset + limit results, then skip offset
+        var topK = offset + limit;
+        if (topK > 10000) topK = 10000; // Safety limit for band fetches
+
+        _logger?.LogInformation("Multi-media query: text='{Text}' anchor='{Anchor}' mediaType='{MediaType}' offset={Offset} limit={Limit} (topK={TopK})",
+            query.Text, query.AnchorMediaId, query.Filters?.MediaType, offset, limit, topK);
 
         try
         {
-            if (!string.IsNullOrWhiteSpace(text)
-                || !string.IsNullOrWhiteSpace(anchorMediaId)
-                || !string.IsNullOrWhiteSpace(userId)
-                || (preferTags is { Length: > 0 }))
+            // Use vector search if available (even for browse queries without text/anchor)
+            if (Vector<Media>.IsAvailable)
             {
-                // ADR-0051: Build separate search intent and user preference vectors
-                var (searchVector, userPrefVector) = await BuildQueryVectors(text, anchorMediaId, userId, preferTags, ct);
-
-                // Determine query vector via blending (66% search intent, 34% user preferences)
-                const double SEARCH_INTENT_WEIGHT = 0.66;
                 float[]? queryVector = null;
 
-                if (searchVector != null && userPrefVector != null)
+                // Build query vectors if we have search intent or user preferences
+                _logger?.LogDebug("Checking vector query conditions: hasText={HasText}, hasAnchor={HasAnchor}, hasUserId={HasUserId}, hasTags={HasTags}",
+                    !string.IsNullOrWhiteSpace(query.Text),
+                    !string.IsNullOrWhiteSpace(query.AnchorMediaId),
+                    !string.IsNullOrWhiteSpace(userId),
+                    query.Filters?.PreferTags is { Length: > 0 });
+
+                if (!string.IsNullOrWhiteSpace(query.Text)
+                    || !string.IsNullOrWhiteSpace(query.AnchorMediaId)
+                    || !string.IsNullOrWhiteSpace(userId)
+                    || (query.Filters?.PreferTags is { Length: > 0 }))
                 {
-                    // Blend both vectors: prioritize search intent over learned preferences
-                    queryVector = BlendVectors(searchVector, userPrefVector, SEARCH_INTENT_WEIGHT);
-                }
-                else if (searchVector != null)
-                {
-                    queryVector = searchVector;
-                }
-                else if (userPrefVector != null)
-                {
-                    queryVector = userPrefVector;
+                    _logger?.LogDebug("Building query vectors for userId={UserId}", userId);
+                    // ADR-0051: Build separate search intent and user preference vectors
+                    var (searchVector, userPrefVector) = await BuildQueryVectors(
+                        query.Text,
+                        query.AnchorMediaId,
+                        userId,
+                        query.Filters?.PreferTags,
+                        ct);
+
+                    _logger?.LogDebug("BuildQueryVectors result: searchVector={SearchLen}, userPrefVector={UserLen}",
+                        searchVector?.Length ?? 0, userPrefVector?.Length ?? 0);
+
+                    // Determine query vector via blending (66% search intent, 34% user preferences)
+                    const double SEARCH_INTENT_WEIGHT = 0.66;
+
+                    if (searchVector != null && userPrefVector != null)
+                    {
+                        // Blend both vectors: prioritize search intent over learned preferences
+                        queryVector = BlendVectors(searchVector, userPrefVector, SEARCH_INTENT_WEIGHT);
+                    }
+                    else if (searchVector != null)
+                    {
+                        queryVector = searchVector;
+                    }
+                    else if (userPrefVector != null)
+                    {
+                        queryVector = userPrefVector;
+                    }
                 }
 
-                if (queryVector != null && queryVector.Length > 0 && Vector<Media>.IsAvailable)
+                // Only use vector search if we have a meaningful query vector
+                if (queryVector != null && queryVector.Length > 0)
                 {
                     // ADR-0051: Use hybrid search with unified API
                     // Alpha controls semantic (1.0) vs keyword (0.0) balance, defaults to 0.5 if not provided
-                    var effectiveAlpha = !string.IsNullOrWhiteSpace(text) ? (alpha ?? 0.5) : (double?)null;
-                    _logger?.LogInformation("Vector search: text={HasText}, alpha={Alpha}, topK={TopK}",
-                        !string.IsNullOrWhiteSpace(text), effectiveAlpha, topK);
+                    var effectiveAlpha = !string.IsNullOrWhiteSpace(query.Text) ? (query.Alpha ?? 0.5) : (double?)null;
+
+                    // Build filter for push-down to vector database layer
+                    var vectorFilter = await BuildVectorFilter(query, ct);
+
+                    _logger?.LogInformation("Vector search: text={HasText}, alpha={Alpha}, topK={TopK}, hasFilters={HasFilters}",
+                        !string.IsNullOrWhiteSpace(query.Text), effectiveAlpha, topK, vectorFilter != null);
 
                     var vectorResults = await Vector<Media>.Search(
                         vector: queryVector,
-                        text: text,  // Enables hybrid search if provided
+                        text: query.Text,  // Enables hybrid search if provided
                         alpha: effectiveAlpha,
                         topK: topK,
+                        filter: vectorFilter,  // Filter push-down at vector DB layer
                         ct: ct
                     );
+
+                    _logger?.LogDebug("Weaviate returned {Count} vector results before post-filtering", vectorResults.Matches.Count);
 
                     var idToScore = vectorResults.Matches.ToDictionary(m => m.Id, m => m.Score);
 
@@ -154,19 +188,28 @@ internal sealed class RecsService : IRecsService
                         if (media != null) mediaItems.Add(media);
                     }
 
-                    // Apply filters
-                    var filteredMedia = await ApplyFilters(mediaItems, genres, episodesMax, mediaTypeFilter, userId, ratingMin, ratingMax, yearMin, yearMax, ct);
+                    // Apply only library exclusion post-filter (requires DB query)
+                    var filteredMedia = await ApplyLibraryExclusion(mediaItems, userId, ct);
+                    _logger?.LogDebug("After library exclusion: {Count} items remain", filteredMedia.Count);
 
                     // Apply personalization and scoring
-                    var recommendations = await ScoreAndPersonalize(filteredMedia, idToScore, userId, preferTags, preferWeight, spoilerSafe, ct);
+                    var recommendations = await ScoreAndPersonalize(
+                        filteredMedia,
+                        idToScore,
+                        userId,
+                        query.Text,
+                        query.Filters?.PreferTags,
+                        query.Filters?.PreferWeight,
+                        query.Filters?.SpoilerSafe ?? true,
+                        query.Filters?.ShowCensored ?? false,
+                        ct);
 
-                    // Apply sorting
-                    var sortedRecommendations = ApplySort(recommendations, sort);
-                    var finalResults = sortedRecommendations.Take(topK).ToList();
+                    // Apply sorting and apply offset/limit pagination
+                    var sortedRecommendations = ApplySort(recommendations, query.Sort);
+                    var finalResults = sortedRecommendations.Skip(offset).Take(limit).ToList();
 
-                    _logger?.LogInformation("Multi-media {SearchMode} query returned {Count} results",
-                        !string.IsNullOrWhiteSpace(text) ? "hybrid" : "vector",
-                        finalResults.Count);
+                    var searchMode = !string.IsNullOrWhiteSpace(query.Text) ? "hybrid" : "vector";
+                    _logger?.LogInformation("Multi-media {SearchMode} query returned {Count} results (offset={Offset}, limit={Limit}, total={Total})", searchMode, finalResults.Count, offset, limit, sortedRecommendations.Count());
                     return (finalResults, false);
                 }
             }
@@ -180,19 +223,45 @@ internal sealed class RecsService : IRecsService
         try
         {
             var allMedia = await Media.All(ct);
-            var filteredMedia = await ApplyFilters(allMedia, genres, episodesMax, mediaTypeFilter, userId, ratingMin, ratingMax, yearMin, yearMax, ct);
+            var filteredMedia = await ApplyFiltersInMemory(allMedia, query, userId, ct);
 
-            var fallbackRecommendations = filteredMedia.Select(media => new Recommendation
+            // Apply censor penalty in fallback too (for consistency)
+            var censoredTags = (query.Filters?.ShowCensored ?? false) ? Array.Empty<string>() : await GetCensoredTags(ct);
+            var (_, _, _, censoredTagsPenaltyWeight) = _settingsProvider.GetEffective();
+            var censorPenaltyMultiplier = 1.0 + censoredTagsPenaltyWeight; // e.g., 1 + (-0.7) = 0.3
+
+            var fallbackRecommendations = filteredMedia.Select(media =>
             {
-                Media = media,
-                Score = media.Popularity,
-                Reasons = new[] { "popularity" }
+                var score = media.Popularity;
+                var reasons = new List<string> { "popularity" };
+
+                // Title matching boost (same as vector path)
+                var titleBoost = CalculateTitleMatchBoost(media, query.Text);
+                score += titleBoost;
+
+                // Apply censor penalty if content has censored tags
+                if (censoredTags.Length > 0 && HasCensoredTags(media, censoredTags))
+                {
+                    score *= censorPenaltyMultiplier;
+                    reasons.Add($"censored_penalty:{censorPenaltyMultiplier:F2}");
+                }
+
+                if (titleBoost >= 2.0) reasons.Add("exact-title-match");
+                else if (titleBoost >= 1.0) reasons.Add("title-contains-match");
+                else if (titleBoost > 0) reasons.Add("fuzzy-title-match");
+
+                return new Recommendation
+                {
+                    Media = media,
+                    Score = score,
+                    Reasons = reasons.ToArray()
+                };
             }).ToList();
 
-            var sortedFallback = ApplySort(fallbackRecommendations, sort);
-            var finalFallback = sortedFallback.Take(topK).ToList();
+            var sortedFallback = ApplySort(fallbackRecommendations, query.Sort);
+            var finalFallback = sortedFallback.Skip(offset).Take(limit).ToList();
 
-            _logger?.LogInformation("Multi-media database fallback returned {Count} results", finalFallback.Count);
+            _logger?.LogInformation("Multi-media database fallback returned {Count} results (offset={Offset}, limit={Limit}, total={Total})", finalFallback.Count, offset, limit, sortedFallback.Count());
             return (finalFallback, true);
         }
         catch (Exception ex)
@@ -205,7 +274,7 @@ internal sealed class RecsService : IRecsService
                 Media = media,
                 Score = media.Popularity,
                 Reasons = new[] { "demo" }
-            }).Take(topK).ToList();
+            }).Skip(offset).Take(limit).ToList();
 
             return (demoRecommendations, true);
         }
@@ -302,24 +371,44 @@ internal sealed class RecsService : IRecsService
                 searchVector = await Koan.AI.Ai.Embed(tagText, ct);
             }
 
-            // Build user preference vector
+            // Use cached user preference vector from profile
             if (!string.IsNullOrWhiteSpace(userId))
             {
+                _logger?.LogDebug("Looking up UserProfileDoc for userId={UserId}", userId);
                 var profile = await UserProfileDoc.Get(userId!, ct);
+                _logger?.LogDebug("UserProfileDoc lookup: found={Found}, prefVectorLen={Len}",
+                    profile != null, profile?.PrefVector?.Length ?? 0);
+
+                // Use cached PrefVector if valid
                 if (profile?.PrefVector is { Length: > 0 } pv)
                 {
-                    // Validate cached vector dimensions match current model expectations
-                    const int expectedDimensions = 384; // all-minilm expected dimensions
-                    if (pv.Length == expectedDimensions)
+                    // If we have a searchVector, validate dimensions match
+                    // Otherwise, accept any dimension (will be validated by vector provider)
+                    if (searchVector != null)
                     {
-                        userPrefVector = pv;
+                        _logger?.LogDebug("Validating PrefVector: length={PrefLen}, searchVector length={SearchLen}",
+                            pv.Length, searchVector.Length);
+                        if (pv.Length == searchVector.Length)
+                        {
+                            userPrefVector = pv;
+                            _logger?.LogDebug("Using cached PrefVector for user {UserId}", userId);
+                        }
+                        else
+                        {
+                            _logger?.LogWarning("PrefVector dimension mismatch: got {Got}, searchVector has {Expected}",
+                                pv.Length, searchVector.Length);
+                        }
                     }
                     else
                     {
-                        // Invalidate the cached profile vector by clearing it
-                        profile.PrefVector = null;
-                        await profile.Save();
+                        // No searchVector to compare against, use PrefVector as-is
+                        userPrefVector = pv;
+                        _logger?.LogDebug("Using cached PrefVector for user {UserId} (no searchVector for validation)", userId);
                     }
+                }
+                else
+                {
+                    _logger?.LogDebug("No valid PrefVector found for user {UserId}", userId);
                 }
             }
 
@@ -332,77 +421,311 @@ internal sealed class RecsService : IRecsService
         }
     }
 
+    /// <summary>
+    /// Rebuilds and caches the user preference vector from their library.
+    /// Should be called whenever the user's library changes (add/remove/rate).
+    /// Uses item vectors weighted by ratings (or default 0.8 for unrated items).
+    /// </summary>
+    public async Task RebuildUserPrefVectorAsync(string userId, CancellationToken ct = default)
+    {
+        try
+        {
+            // Get user's library
+            var libraryEntries = (await LibraryEntry.All(ct))
+                .Where(e => e.UserId == userId)
+                .ToList();
 
-    private async Task<List<Media>> ApplyFilters(
+            if (libraryEntries.Count == 0)
+            {
+                _logger?.LogDebug("User {UserId} has no library items, skipping PrefVector generation", userId);
+                return;
+            }
+
+            _logger?.LogDebug("Building PrefVector from {Count} library items for user {UserId}", libraryEntries.Count, userId);
+
+            // Build weighted sum of item vectors
+            float[]? prefVector = null;
+            var totalWeight = 0.0;
+            var successCount = 0;
+
+            // Retrieve embeddings for all library entries in batch
+            var mediaIds = libraryEntries.Select(e => e.MediaId).ToList();
+
+            try
+            {
+                _logger?.LogDebug("Retrieving {Count} embeddings from vector database for user {UserId}", mediaIds.Count, userId);
+
+                // Use batch GetEmbeddings for efficiency
+                var embeddings = await Vector<Media>.GetEmbeddings(mediaIds, ct);
+
+                _logger?.LogDebug("Retrieved {Retrieved}/{Total} embeddings for user {UserId}", embeddings.Count, mediaIds.Count, userId);
+
+                foreach (var entry in libraryEntries)
+                {
+                    try
+                    {
+                        // Check if embedding exists for this media item
+                        if (!embeddings.TryGetValue(entry.MediaId, out var vec))
+                        {
+                            _logger?.LogDebug("No embedding found for library item {MediaId}", entry.MediaId);
+                            continue;
+                        }
+
+                        // Determine weight: rating if exists, else default 0.8 (assume "liked")
+                        var weight = entry.Rating.HasValue
+                            ? entry.Rating.Value / 5.0  // Normalize 1-5 to 0.2-1.0
+                            : 0.8;  // Default: unrated = assumed 4/5 stars
+
+                        // Accumulate weighted vector
+                        if (prefVector == null)
+                        {
+                            prefVector = new float[vec.Length];
+                        }
+
+                        for (int i = 0; i < vec.Length; i++)
+                        {
+                            prefVector[i] += (float)(vec[i] * weight);
+                        }
+
+                        totalWeight += weight;
+                        successCount++;
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger?.LogWarning(ex, "Failed to process library item {MediaId} for PrefVector", entry.MediaId);
+                    }
+                }
+            }
+            catch (NotSupportedException ex)
+            {
+                _logger?.LogWarning(ex, "Vector retrieval not supported by current adapter. Library-based personalization disabled.");
+                // Continue without preference vector
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Failed to retrieve embeddings for user {UserId} library", userId);
+                // Continue without preference vector
+            }
+
+            if (prefVector == null || successCount == 0)
+            {
+                _logger?.LogDebug("No vectorized items found in user {UserId} library", userId);
+
+                // Clear PrefVector if library has no vectorized items
+                var profile = await UserProfileDoc.Get(userId, ct);
+                if (profile != null)
+                {
+                    profile.PrefVector = null;
+                    await profile.Save(ct);
+                }
+                return;
+            }
+
+            // Normalize by total weight (weighted average)
+            for (int i = 0; i < prefVector.Length; i++)
+            {
+                prefVector[i] /= (float)totalWeight;
+            }
+
+            // Normalize to unit vector for cosine similarity
+            var magnitude = Math.Sqrt(prefVector.Sum(x => (double)x * x));
+            if (magnitude > 1e-8)
+            {
+                for (int i = 0; i < prefVector.Length; i++)
+                    prefVector[i] /= (float)magnitude;
+            }
+
+            _logger?.LogInformation("Built PrefVector for user {UserId} from {SuccessCount}/{TotalCount} library items (total weight: {Weight:F2})",
+                userId, successCount, libraryEntries.Count, totalWeight);
+
+            // Save to user profile
+            var userProfile = await UserProfileDoc.Get(userId, ct);
+            if (userProfile == null)
+            {
+                userProfile = new UserProfileDoc
+                {
+                    Id = userId,
+                    UserId = userId,
+                    PrefVector = prefVector,
+                    UpdatedAt = DateTimeOffset.UtcNow
+                };
+                _logger?.LogDebug("Creating new UserProfileDoc for user {UserId}", userId);
+            }
+            else
+            {
+                userProfile.PrefVector = prefVector;
+                userProfile.UpdatedAt = DateTimeOffset.UtcNow;
+                _logger?.LogDebug("Updating existing UserProfileDoc for user {UserId}", userId);
+            }
+
+            await userProfile.Save(ct);
+            _logger?.LogInformation("Cached PrefVector for user {UserId} - saved successfully", userId);
+
+            // Verify save succeeded
+            var verification = await UserProfileDoc.Get(userId, ct);
+            if (verification == null)
+            {
+                _logger?.LogError("VERIFICATION FAILED: UserProfileDoc was not saved for user {UserId}", userId);
+            }
+            else
+            {
+                _logger?.LogDebug("Verification successful: UserProfileDoc exists with {VectorLength} dimensions", verification.PrefVector?.Length ?? 0);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Failed to rebuild PrefVector for user {UserId}", userId);
+        }
+    }
+
+    /// <summary>
+    /// Builds VectorFilter for push-down filtering at the vector database layer.
+    /// Handles all metadata-based filters except user library exclusion.
+    /// </summary>
+    private async Task<Koan.Data.Abstractions.Vector.Filtering.VectorFilter?> BuildVectorFilter(
+        RecsQuery query,
+        CancellationToken ct)
+    {
+        var filters = new List<Koan.Data.Abstractions.Vector.Filtering.VectorFilter>();
+
+        // MediaType filter
+        if (!string.IsNullOrWhiteSpace(query.Filters?.MediaType))
+        {
+            filters.Add(Koan.Data.Abstractions.Vector.Filtering.VectorFilter.Eq("mediaTypeId", query.Filters.MediaType));
+        }
+
+        // Genre filter (must contain at least one of the specified genres)
+        if (query.Filters?.Genres is { Length: > 0 })
+        {
+            var genreFilters = query.Filters.Genres
+                .Select(g => Koan.Data.Abstractions.Vector.Filtering.VectorFilter.Contains("genres", g))
+                .ToArray();
+            filters.Add(Koan.Data.Abstractions.Vector.Filtering.VectorFilter.Or(genreFilters));
+        }
+
+        // Episodes filter (≤ max)
+        if (query.Filters?.EpisodesMax is int emax)
+        {
+            filters.Add(Koan.Data.Abstractions.Vector.Filtering.VectorFilter.Lte("episodes", emax));
+        }
+
+        // Rating filter (range) - NOTE: Use RatingValue which matches the computed Rating property
+        if (query.Filters?.RatingMin.HasValue == true)
+        {
+            filters.Add(Koan.Data.Abstractions.Vector.Filtering.VectorFilter.Gte("ratingValue", query.Filters.RatingMin.Value));
+        }
+        if (query.Filters?.RatingMax.HasValue == true)
+        {
+            filters.Add(Koan.Data.Abstractions.Vector.Filtering.VectorFilter.Lte("ratingValue", query.Filters.RatingMax.Value));
+        }
+
+        // Year filter (range) - NOTE: Year is computed property, filter on StartDateInt (numeric YYYYMMDD)
+        // Using numeric format for efficient integer comparison: 20230101, 20231231, etc.
+        if (query.Filters?.YearMin.HasValue == true)
+        {
+            var startDateMin = query.Filters.YearMin.Value * 10000 + 101; // YYYY0101
+            filters.Add(Koan.Data.Abstractions.Vector.Filtering.VectorFilter.Gte("startDateInt", startDateMin));
+        }
+        if (query.Filters?.YearMax.HasValue == true)
+        {
+            var startDateMax = query.Filters.YearMax.Value * 10000 + 1231; // YYYY1231
+            filters.Add(Koan.Data.Abstractions.Vector.Filtering.VectorFilter.Lte("startDateInt", startDateMax));
+        }
+
+        // NOTE: Censored tag filtering moved to scoring phase (soft penalty instead of hard filter)
+        // This allows semantic similarity to work while still de-prioritizing censored content
+
+        // Combine all filters with AND
+        if (filters.Count == 0)
+            return null;
+        if (filters.Count == 1)
+            return filters[0];
+        return Koan.Data.Abstractions.Vector.Filtering.VectorFilter.And(filters.ToArray());
+    }
+
+    /// <summary>
+    /// Applies library exclusion post-filter (excludes items already in user's library).
+    /// This is the only filter applied post-vector-search since it requires a DB query.
+    /// </summary>
+    private async Task<List<Media>> ApplyLibraryExclusion(
         IEnumerable<Media> media,
-        string[]? genres,
-        int? episodesMax,
-        string? mediaTypeFilter,
         string? userId,
-        double? ratingMin,
-        double? ratingMax,
-        int? yearMin,
-        int? yearMax,
+        CancellationToken ct)
+    {
+        // Exclude items already in user's library
+        if (!string.IsNullOrWhiteSpace(userId))
+        {
+            var libraryEntries = (await LibraryEntry.All(ct)).Where(e => e.UserId == userId).ToList();
+            var excludeIds = libraryEntries.Select(e => e.MediaId).ToHashSet();
+            return media.Where(m => !excludeIds.Contains(m.Id!)).ToList();
+        }
+
+        return media.ToList();
+    }
+
+    /// <summary>
+    /// Applies all filters in-memory for fallback scenarios when vector search is not available.
+    /// </summary>
+    private async Task<List<Media>> ApplyFiltersInMemory(
+        IEnumerable<Media> media,
+        RecsQuery query,
+        string? userId,
         CancellationToken ct)
     {
         var filtered = media.AsEnumerable();
 
-        // Censor tags filter - load from config and database, then filter out media with censored tags
-        var censoredTags = await GetCensoredTags(ct);
-        if (censoredTags.Length > 0)
-        {
-            filtered = filtered.Where(m => !HasCensoredTags(m, censoredTags));
-        }
+        // NOTE: Censored tag filtering removed - now handled as soft penalty in scoring phase
+        // This allows fallback to work similarly to vector search (soft penalty vs hard filter)
 
-        // Media type filter - now accepts media type ID directly
-        if (!string.IsNullOrWhiteSpace(mediaTypeFilter))
+        // Media type filter
+        if (!string.IsNullOrWhiteSpace(query.Filters?.MediaType))
         {
-            filtered = filtered.Where(m => m.MediaTypeId == mediaTypeFilter);
+            filtered = filtered.Where(m => m.MediaTypeId == query.Filters.MediaType);
         }
 
         // Genre filter
-        if (genres is { Length: > 0 })
+        if (query.Filters?.Genres is { Length: > 0 })
         {
-            filtered = filtered.Where(m => (m.Genres ?? Array.Empty<string>()).Intersect(genres).Any());
+            filtered = filtered.Where(m => (m.Genres ?? Array.Empty<string>()).Intersect(query.Filters.Genres).Any());
         }
 
         // Episodes filter
-        if (episodesMax is int emax)
+        if (query.Filters?.EpisodesMax is int emax)
         {
             filtered = filtered.Where(m => m.Episodes is null || m.Episodes <= emax);
         }
 
-        // Rating filter (blended 80/20 score)
-        if (ratingMin.HasValue || ratingMax.HasValue)
+        // Rating filter
+        if (query.Filters?.RatingMin.HasValue == true || query.Filters?.RatingMax.HasValue == true)
         {
             filtered = filtered.Where(m => {
-                var rating = m.Rating; // Uses computed property: (AverageScore × 0.8) + Popularity
-                if (!rating.HasValue) return false; // Exclude items without ratings
+                var rating = m.Rating;
+                if (!rating.HasValue) return false;
 
-                if (ratingMin.HasValue && rating.Value < ratingMin.Value)
+                if (query.Filters?.RatingMin.HasValue == true && rating.Value < query.Filters.RatingMin.Value)
                     return false;
-                if (ratingMax.HasValue && rating.Value > ratingMax.Value)
+                if (query.Filters?.RatingMax.HasValue == true && rating.Value > query.Filters.RatingMax.Value)
                     return false;
                 return true;
             });
         }
 
         // Year filter
-        if (yearMin.HasValue || yearMax.HasValue)
+        if (query.Filters?.YearMin.HasValue == true || query.Filters?.YearMax.HasValue == true)
         {
             filtered = filtered.Where(m => {
-                var year = m.Year; // Uses computed property: StartDate?.Year
-                if (!year.HasValue) return false; // Exclude items without year
+                var year = m.Year;
+                if (!year.HasValue) return false;
 
-                if (yearMin.HasValue && year.Value < yearMin.Value)
+                if (query.Filters?.YearMin.HasValue == true && year.Value < query.Filters.YearMin.Value)
                     return false;
-                if (yearMax.HasValue && year.Value > yearMax.Value)
+                if (query.Filters?.YearMax.HasValue == true && year.Value > query.Filters.YearMax.Value)
                     return false;
                 return true;
             });
         }
 
-        // Exclude items already in user's library
+        // Library exclusion
         if (!string.IsNullOrWhiteSpace(userId))
         {
             var libraryEntries = (await LibraryEntry.All(ct)).Where(e => e.UserId == userId).ToList();
@@ -450,13 +773,18 @@ internal sealed class RecsService : IRecsService
         return false;
     }
 
-    private async Task<List<Recommendation>> ScoreAndPersonalize(List<Media> media, Dictionary<string, double> vectorScores, string? userId, string[]? preferTags, double? preferWeight, bool spoilerSafe, CancellationToken ct)
+    private async Task<List<Recommendation>> ScoreAndPersonalize(List<Media> media, Dictionary<string, double> vectorScores, string? userId, string? text, string[]? preferTags, double? preferWeight, bool spoilerSafe, bool showCensored, CancellationToken ct)
     {
         UserProfileDoc? profile = null;
         if (!string.IsNullOrWhiteSpace(userId))
         {
             profile = await UserProfileDoc.Get(userId, ct);
         }
+
+        // Load censored tags for soft penalty (only if showCensored is false)
+        var censoredTags = showCensored ? Array.Empty<string>() : await GetCensoredTags(ct);
+        var (_, _, _, censoredTagsPenaltyWeight) = _settingsProvider.GetEffective();
+        var censorPenaltyMultiplier = 1.0 + censoredTagsPenaltyWeight; // e.g., 1 + (-0.7) = 0.3 (70% reduction)
 
         var preferTagsWeight = Math.Clamp(preferWeight ?? 0.2, 0, 1.0);
         var preferTagsSet = new HashSet<string>((preferTags ?? Array.Empty<string>()).Take(3), StringComparer.OrdinalIgnoreCase);
@@ -497,6 +825,13 @@ internal sealed class RecsService : IRecsService
                 }
             }
 
+            // Censor penalty (soft ranking down instead of hard filter)
+            var censorPenaltyFactor = 1.0;
+            if (censoredTags.Length > 0 && HasCensoredTags(m, censoredTags))
+            {
+                censorPenaltyFactor = censorPenaltyMultiplier;
+            }
+
             // Spoiler penalty
             var spoilerPenalty = 0.0;
             if (spoilerSafe && m.Synopsis?.Contains("spoiler", StringComparison.OrdinalIgnoreCase) == true)
@@ -504,14 +839,22 @@ internal sealed class RecsService : IRecsService
                 spoilerPenalty = 0.3;
             }
 
+            // Title matching boost (exact → contains → fuzzy)
+            var titleBoost = CalculateTitleMatchBoost(m, text);
+
             // Combined score
-            var hybridScore = (0.4 * vectorScore) + (0.3 * popularityScore) + (0.2 * genreBoost) + (preferBoost * preferTagsWeight);
+            var hybridScore = (0.4 * vectorScore) + (0.3 * popularityScore) + (0.2 * genreBoost) + (preferBoost * preferTagsWeight) + titleBoost;
             hybridScore *= (1.0 - spoilerPenalty);
+            hybridScore *= censorPenaltyFactor; // Apply censor penalty
 
             var reasons = new List<string> { "vector" };
             if (genreBoost > 0) reasons.Add("personalized");
             if (preferBoost > 0) reasons.Add("preferred-tags");
             if (popularityScore > 0.8) reasons.Add("popular");
+            if (titleBoost >= 2.0) reasons.Add("exact-title-match");
+            else if (titleBoost >= 1.0) reasons.Add("title-contains-match");
+            else if (titleBoost > 0) reasons.Add("fuzzy-title-match");
+            if (censorPenaltyFactor < 1.0) reasons.Add($"censored_penalty:{censorPenaltyMultiplier:F2}");
 
             return new Recommendation
             {
@@ -530,6 +873,87 @@ internal sealed class RecsService : IRecsService
             "popular" => recommendations.OrderByDescending(r => r.Media?.Popularity ?? 0),
             "relevance" or _ => recommendations.OrderByDescending(r => r.Score)
         };
+    }
+
+    /// <summary>
+    /// Calculates title matching boost based on exact, contains, or fuzzy similarity.
+    /// Checks all title variants: Title, TitleEnglish, TitleRomaji, TitleNative, Synonyms.
+    /// Returns: 2.0 (exact), 1.0 (contains), 0.5 (fuzzy with distance ≤ 3), or 0.0 (no match)
+    /// </summary>
+    private static double CalculateTitleMatchBoost(Media media, string? queryText)
+    {
+        if (string.IsNullOrWhiteSpace(queryText)) return 0.0;
+
+        var normalized = queryText.Trim().ToLowerInvariant();
+
+        // Collect all title variants
+        var titles = new List<string>();
+        if (!string.IsNullOrWhiteSpace(media.Title)) titles.Add(media.Title);
+        if (!string.IsNullOrWhiteSpace(media.TitleEnglish)) titles.Add(media.TitleEnglish);
+        if (!string.IsNullOrWhiteSpace(media.TitleRomaji)) titles.Add(media.TitleRomaji);
+        if (!string.IsNullOrWhiteSpace(media.TitleNative)) titles.Add(media.TitleNative);
+        if (media.Synonyms != null) titles.AddRange(media.Synonyms);
+
+        var maxBoost = 0.0;
+
+        foreach (var title in titles)
+        {
+            if (string.IsNullOrWhiteSpace(title)) continue;
+
+            var titleLower = title.ToLowerInvariant();
+
+            // Exact match → massive boost
+            if (titleLower == normalized)
+            {
+                return 2.0;
+            }
+
+            // Contains match → strong boost
+            if (titleLower.Contains(normalized, StringComparison.Ordinal))
+            {
+                maxBoost = Math.Max(maxBoost, 1.0);
+                continue;
+            }
+
+            // Fuzzy match (Levenshtein distance ≤ 3) → moderate boost
+            var distance = LevenshteinDistance(titleLower, normalized);
+            if (distance <= 3)
+            {
+                maxBoost = Math.Max(maxBoost, 0.5);
+            }
+        }
+
+        return maxBoost;
+    }
+
+    /// <summary>
+    /// Calculates Levenshtein (edit) distance between two strings.
+    /// Used for fuzzy title matching.
+    /// </summary>
+    private static int LevenshteinDistance(string s, string t)
+    {
+        if (string.IsNullOrEmpty(s)) return t?.Length ?? 0;
+        if (string.IsNullOrEmpty(t)) return s.Length;
+
+        var d = new int[s.Length + 1, t.Length + 1];
+
+        for (var i = 0; i <= s.Length; i++)
+            d[i, 0] = i;
+        for (var j = 0; j <= t.Length; j++)
+            d[0, j] = j;
+
+        for (var j = 1; j <= t.Length; j++)
+        {
+            for (var i = 1; i <= s.Length; i++)
+            {
+                var cost = (s[i - 1] == t[j - 1]) ? 0 : 1;
+                d[i, j] = Math.Min(
+                    Math.Min(d[i - 1, j] + 1, d[i, j - 1] + 1),
+                    d[i - 1, j - 1] + cost);
+            }
+        }
+
+        return d[s.Length, t.Length];
     }
 
     private async Task UpdateUserPreferences(string userId, string mediaId, int rating, CancellationToken ct)

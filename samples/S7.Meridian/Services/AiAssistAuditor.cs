@@ -54,7 +54,7 @@ public sealed class AiAssistAuditor : IAiAssistAuditor
             CreatedAt = DateTime.UtcNow
         };
 
-        await evt.Save(ct).ConfigureAwait(false);
+        await evt.Save(ct);
         _logger.LogInformation("Recorded AI assist event for {EntityType} (name: {Name}).", evt.EntityType, evt.SuggestedEntityName);
     }
 

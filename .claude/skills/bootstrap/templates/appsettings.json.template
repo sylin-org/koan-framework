@@ -1,0 +1,75 @@
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning",
+      "Koan": "Information"
+    }
+  },
+  "AllowedHosts": "*",
+
+  "Koan": {
+    "Data": {
+      "Sources": {
+        "Default": {
+          "Adapter": "sqlite",
+          "ConnectionString": "Data Source=app.db"
+        },
+        "Analytics": {
+          "Adapter": "postgres",
+          "ConnectionString": "Host=localhost;Database=analytics;Username=koan;Password=dev"
+        }
+      }
+    },
+    "AI": {
+      "Providers": {
+        "Primary": {
+          "Type": "OpenAI",
+          "ApiKey": "{OPENAI_API_KEY}",
+          "Model": "gpt-4"
+        },
+        "Fallback": {
+          "Type": "Ollama",
+          "BaseUrl": "http://localhost:11434",
+          "Model": "llama2"
+        }
+      },
+      "Budget": {
+        "MaxTokensPerRequest": 2000,
+        "MaxRequestsPerMinute": 60,
+        "MaxCostPerDay": 50.0,
+        "AlertThreshold": 0.8
+      }
+    },
+    "Cache": {
+      "Provider": "redis",
+      "Redis": {
+        "ConnectionString": "localhost:6379"
+      },
+      "DefaultTtlMinutes": 60
+    }
+  },
+
+  "Features": {
+    "EmailNotifications": true,
+    "BackgroundJobs": true,
+    "Analytics": false
+  },
+
+  "Email": {
+    "Smtp": {
+      "Host": "smtp.example.com",
+      "Port": 587,
+      "Username": "user@example.com",
+      "Password": "{EMAIL_PASSWORD}",
+      "FromAddress": "noreply@example.com",
+      "FromName": "My App"
+    }
+  },
+
+  "ExternalService": {
+    "ApiKey": "{EXTERNAL_API_KEY}",
+    "Url": "https://api.example.com",
+    "TimeoutSeconds": 30
+  }
+}

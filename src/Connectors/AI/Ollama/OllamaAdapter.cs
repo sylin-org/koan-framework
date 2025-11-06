@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
@@ -28,6 +29,7 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
     IAdapterReadinessConfiguration,
     IAsyncAdapterInitializer
 {
+    private static readonly TimeSpan ConcurrencyWaitLogThreshold = TimeSpan.FromSeconds(1);
     private readonly HttpClient _http;
     private readonly OllamaOptions _options;
     private readonly string _defaultModel;
@@ -35,6 +37,7 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
     private readonly AdaptersReadinessOptions _readinessDefaults;
     private readonly ReadinessStateManager _stateManager = new();
     private readonly OllamaModelManager _modelManager;
+    private readonly SemaphoreSlim? _concurrencyLimiter;
     private readonly object _initGate = new();
     private Task? _initializationTask;
     private UnifiedServiceMetadata? _orchestrationContext;
@@ -81,6 +84,14 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
 
         _defaultModel = _options.DefaultModel ?? serviceDefault ?? "all-minilm";
         _modelManager = new OllamaModelManager(_http, Logger, AdapterId, Type);
+
+        if (_options.MaxConcurrentRequests > 0 && _options.MaxConcurrentRequests < int.MaxValue)
+        {
+            _concurrencyLimiter = new SemaphoreSlim(_options.MaxConcurrentRequests, _options.MaxConcurrentRequests);
+            Logger.LogInformation(
+                "Ollama adapter concurrency limited to {Limit} simultaneous requests",
+                _options.MaxConcurrentRequests);
+        }
 
         Logger.LogDebug("Ollama adapter: Configuration - BaseUrl={BaseUrl} DefaultModel={DefaultModel}",
             _options.BaseUrl ?? "(null)",
@@ -129,156 +140,243 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
         return _http;
     }
 
+    private async Task<SemaphoreReleaser?> AcquireConcurrencySlotAsync(CancellationToken ct)
+    {
+        if (_concurrencyLimiter is null)
+        {
+            return null;
+        }
+
+        var stopwatch = Stopwatch.StartNew();
+        await _concurrencyLimiter.WaitAsync(ct);
+        stopwatch.Stop();
+
+        if (stopwatch.Elapsed > ConcurrencyWaitLogThreshold && Logger.IsEnabled(LogLevel.Debug))
+        {
+            Logger.LogDebug(
+                "Ollama concurrency gating waited {Elapsed} before issuing request",
+                stopwatch.Elapsed);
+        }
+
+        return new SemaphoreReleaser(_concurrencyLimiter);
+    }
+
+    private sealed class SemaphoreReleaser : IDisposable
+    {
+        private readonly SemaphoreSlim _semaphore;
+        private bool _disposed;
+
+        public SemaphoreReleaser(SemaphoreSlim semaphore)
+        {
+            _semaphore = semaphore;
+        }
+
+        public void Dispose()
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            _semaphore.Release();
+            _disposed = true;
+        }
+    }
+
     public async Task<AiChatResponse> ChatAsync(AiChatRequest request, CancellationToken ct = default)
     {
-        // ADR-0015: Router handles member health selection - skip singleton readiness check
-        var http = GetHttpClientForRequest(request.InternalConnectionString);
-        var model = request.Model ?? _defaultModel;
-        if (string.IsNullOrWhiteSpace(model))
+        SemaphoreReleaser? lease = null;
+        try
         {
-            throw new InvalidOperationException("Ollama adapter requires a model name.");
+            lease = await AcquireConcurrencySlotAsync(ct);
+
+            // ADR-0015: Router handles member health selection - skip singleton readiness check
+            var http = GetHttpClientForRequest(request.InternalConnectionString);
+            var model = request.Model ?? _defaultModel;
+            if (string.IsNullOrWhiteSpace(model))
+            {
+                throw new InvalidOperationException("Ollama adapter requires a model name.");
+            }
+
+            var (prompt, imageBase64List) = BuildPromptWithImages(request);
+            var body = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["model"] = model,
+                ["prompt"] = prompt,
+                ["stream"] = false,
+                ["options"] = MapOptions(request.Options)
+            };
+
+            // Add images array for vision models (Ollama API format)
+            if (imageBase64List.Count > 0)
+            {
+                body["images"] = imageBase64List;
+                Logger.LogDebug("Ollama: Including {Count} image(s) in vision request", imageBase64List.Count);
+            }
+
+            if (request.Options?.Think is bool thinkFlag)
+            {
+                body["think"] = thinkFlag;
+            }
+
+            // Support structured output format (e.g., "json" for JSON-only responses)
+            if (!string.IsNullOrWhiteSpace(request.Options?.ResponseFormat))
+            {
+                body["format"] = request.Options.ResponseFormat;
+                Logger.LogDebug("Ollama: Using format={Format}", request.Options.ResponseFormat);
+            }
+
+            Logger.LogDebug("Ollama: POST {Path} model={Model}", "/api/generate", model);
+            var payload = JsonConvert.SerializeObject(body, new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore });
+            using var resp = await http.PostAsync("/api/generate", new StringContent(payload, Encoding.UTF8, "application/json"), ct);
+            if (!resp.IsSuccessStatusCode)
+            {
+                var text = await resp.Content.ReadAsStringAsync(ct);
+                Logger.LogWarning("Ollama: generate failed ({Status}) body={Body}", (int)resp.StatusCode, text);
+            }
+
+            resp.EnsureSuccessStatusCode();
+            var json = await resp.Content.ReadAsStringAsync(ct);
+            var doc = JsonConvert.DeserializeObject<OllamaGenerateResponse>(json)
+                      ?? throw new InvalidOperationException("Empty response from Ollama.");
+
+            return new AiChatResponse
+            {
+                Text = doc.response ?? string.Empty,
+                FinishReason = doc.done_reason,
+                Model = doc.model
+            };
         }
-
-        var (prompt, imageBase64List) = BuildPromptWithImages(request);
-        var body = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+        finally
         {
-            ["model"] = model,
-            ["prompt"] = prompt,
-            ["stream"] = false,
-            ["options"] = MapOptions(request.Options)
-        };
-
-        // Add images array for vision models (Ollama API format)
-        if (imageBase64List.Count > 0)
-        {
-            body["images"] = imageBase64List;
-            Logger.LogDebug("Ollama: Including {Count} image(s) in vision request", imageBase64List.Count);
+            lease?.Dispose();
         }
-
-        if (request.Options?.Think is bool thinkFlag)
-        {
-            body["think"] = thinkFlag;
-        }
-
-        Logger.LogDebug("Ollama: POST {Path} model={Model}", "/api/generate", model);
-        var payload = JsonConvert.SerializeObject(body, new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore });
-        using var resp = await http.PostAsync("/api/generate", new StringContent(payload, Encoding.UTF8, "application/json"), ct).ConfigureAwait(false);
-        if (!resp.IsSuccessStatusCode)
-        {
-            var text = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
-            Logger.LogWarning("Ollama: generate failed ({Status}) body={Body}", (int)resp.StatusCode, text);
-        }
-
-        resp.EnsureSuccessStatusCode();
-        var json = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
-        var doc = JsonConvert.DeserializeObject<OllamaGenerateResponse>(json)
-                  ?? throw new InvalidOperationException("Empty response from Ollama.");
-
-        return new AiChatResponse
-        {
-            Text = doc.response ?? string.Empty,
-            FinishReason = doc.done_reason,
-            Model = doc.model
-        };
     }
 
     public async IAsyncEnumerable<AiChatChunk> StreamAsync(
         AiChatRequest request,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
     {
-        await WaitForReadinessAsync(null, ct).ConfigureAwait(false);
-
-        var http = GetHttpClientForRequest(request.InternalConnectionString);
-        var model = request.Model ?? _defaultModel;
-        if (string.IsNullOrWhiteSpace(model))
+        SemaphoreReleaser? lease = null;
+        try
         {
-            throw new InvalidOperationException("Ollama adapter requires a model name.");
-        }
+            lease = await AcquireConcurrencySlotAsync(ct);
 
-        var (prompt, imageBase64List) = BuildPromptWithImages(request);
-        var streamBody = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
-        {
-            ["model"] = model,
-            ["prompt"] = prompt,
-            ["stream"] = true,
-            ["options"] = MapOptions(request.Options)
-        };
+            await WaitForReadinessAsync(null, ct);
 
-        // Add images array for vision models (Ollama API format)
-        if (imageBase64List.Count > 0)
-        {
-            streamBody["images"] = imageBase64List;
-            Logger.LogDebug("Ollama: Including {Count} image(s) in streaming vision request", imageBase64List.Count);
-        }
-
-        if (request.Options?.Think is bool thinkFlag)
-        {
-            streamBody["think"] = thinkFlag;
-        }
-
-        var body = JsonConvert.SerializeObject(streamBody, new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore });
-        using var httpReq = new HttpRequestMessage(HttpMethod.Post, "/api/generate")
-        {
-            Content = new StringContent(body, Encoding.UTF8, "application/json")
-        };
-
-        Logger.LogDebug("Ollama: STREAM {Path} model={Model}", "/api/generate", model);
-        using var resp = await http.SendAsync(httpReq, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
-        resp.EnsureSuccessStatusCode();
-
-        await foreach (var part in ReadJsonLinesAsync<OllamaGenerateResponse>(resp, ct).ConfigureAwait(false))
-        {
-            if (part is null)
+            var http = GetHttpClientForRequest(request.InternalConnectionString);
+            var model = request.Model ?? _defaultModel;
+            if (string.IsNullOrWhiteSpace(model))
             {
-                continue;
+                throw new InvalidOperationException("Ollama adapter requires a model name.");
             }
 
-            if (!string.IsNullOrEmpty(part.response))
+            var (prompt, imageBase64List) = BuildPromptWithImages(request);
+            var streamBody = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
             {
-                yield return new AiChatChunk { DeltaText = part.response };
+                ["model"] = model,
+                ["prompt"] = prompt,
+                ["stream"] = true,
+                ["options"] = MapOptions(request.Options)
+            };
+
+            // Add images array for vision models (Ollama API format)
+            if (imageBase64List.Count > 0)
+            {
+                streamBody["images"] = imageBase64List;
+                Logger.LogDebug("Ollama: Including {Count} image(s) in streaming vision request", imageBase64List.Count);
             }
+
+            if (request.Options?.Think is bool thinkFlag)
+            {
+                streamBody["think"] = thinkFlag;
+            }
+
+            // Support structured output format (e.g., "json" for JSON-only responses)
+            if (!string.IsNullOrWhiteSpace(request.Options?.ResponseFormat))
+            {
+                streamBody["format"] = request.Options.ResponseFormat;
+                Logger.LogDebug("Ollama: Using format={Format} for streaming", request.Options.ResponseFormat);
+            }
+
+            var body = JsonConvert.SerializeObject(streamBody, new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore });
+            using var httpReq = new HttpRequestMessage(HttpMethod.Post, "/api/generate")
+            {
+                Content = new StringContent(body, Encoding.UTF8, "application/json")
+            };
+
+            Logger.LogDebug("Ollama: STREAM {Path} model={Model}", "/api/generate", model);
+            using var resp = await http.SendAsync(httpReq, HttpCompletionOption.ResponseHeadersRead, ct);
+            resp.EnsureSuccessStatusCode();
+
+            await foreach (var part in ReadJsonLinesAsync<OllamaGenerateResponse>(resp, ct))
+            {
+                if (part is null)
+                {
+                    continue;
+                }
+
+                if (!string.IsNullOrEmpty(part.response))
+                {
+                    yield return new AiChatChunk { DeltaText = part.response };
+                }
+            }
+        }
+        finally
+        {
+            lease?.Dispose();
         }
     }
 
     public async Task<AiEmbeddingsResponse> EmbedAsync(AiEmbeddingsRequest request, CancellationToken ct = default)
     {
-        // ADR-0015: Router handles member health selection - skip singleton readiness check
-        var http = GetHttpClientForRequest(request.InternalConnectionString);
-        var model = request.Model ?? _defaultModel;
-        if (string.IsNullOrWhiteSpace(model))
+        SemaphoreReleaser? lease = null;
+        try
         {
-            throw new InvalidOperationException("Ollama adapter requires a model name.");
-        }
+            lease = await AcquireConcurrencySlotAsync(ct);
 
-        var vectors = new List<float[]>();
-        foreach (var input in request.Input)
-        {
-            var body = new { model, prompt = input };
-            var payload = JsonConvert.SerializeObject(body);
-
-            using var resp = await http.PostAsync("/api/embeddings", new StringContent(payload, Encoding.UTF8, "application/json"), ct).ConfigureAwait(false);
-            if (!resp.IsSuccessStatusCode)
+            // ADR-0015: Router handles member health selection - skip singleton readiness check
+            var http = GetHttpClientForRequest(request.InternalConnectionString);
+            var model = request.Model ?? _defaultModel;
+            if (string.IsNullOrWhiteSpace(model))
             {
-                var text = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
-                Logger.LogWarning("Ollama: embeddings failed ({Status}) body={Body}", (int)resp.StatusCode, text);
+                throw new InvalidOperationException("Ollama adapter requires a model name.");
             }
 
-            resp.EnsureSuccessStatusCode();
-            var json = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
-            var doc = JsonConvert.DeserializeObject<OllamaEmbeddingsResponse>(json)
-                      ?? throw new InvalidOperationException("Empty response from Ollama.");
+            var vectors = new List<float[]>();
+            foreach (var input in request.Input)
+            {
+                var body = new { model, prompt = input };
+                var payload = JsonConvert.SerializeObject(body);
 
-            vectors.Add(doc.embedding ?? Array.Empty<float>());
+                using var resp = await http.PostAsync("/api/embeddings", new StringContent(payload, Encoding.UTF8, "application/json"), ct);
+                if (!resp.IsSuccessStatusCode)
+                {
+                    var text = await resp.Content.ReadAsStringAsync(ct);
+                    Logger.LogWarning("Ollama: embeddings failed ({Status}) body={Body}", (int)resp.StatusCode, text);
+                }
+
+                resp.EnsureSuccessStatusCode();
+                var json = await resp.Content.ReadAsStringAsync(ct);
+                var doc = JsonConvert.DeserializeObject<OllamaEmbeddingsResponse>(json)
+                          ?? throw new InvalidOperationException("Empty response from Ollama.");
+
+                vectors.Add(doc.embedding ?? Array.Empty<float>());
+            }
+
+            var dimension = vectors.FirstOrDefault()?.Length ?? 0;
+            return new AiEmbeddingsResponse { Vectors = vectors, Model = model, Dimension = dimension };
         }
-
-        var dimension = vectors.FirstOrDefault()?.Length ?? 0;
-        return new AiEmbeddingsResponse { Vectors = vectors, Model = model, Dimension = dimension };
+        finally
+        {
+            lease?.Dispose();
+        }
     }
 
     public async Task<IReadOnlyList<AiModelDescriptor>> ListModelsAsync(CancellationToken ct = default)
         => await this.WithReadinessAsync(async () =>
         {
-            var doc = await FetchTagsAsync(ct).ConfigureAwait(false);
+            var doc = await FetchTagsAsync(ct);
             var models = new List<AiModelDescriptor>();
 
             foreach (var model in doc?.models ?? Enumerable.Empty<OllamaTag>())
@@ -293,7 +391,7 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
             }
 
             return (IReadOnlyList<AiModelDescriptor>)models;
-        }, ct).ConfigureAwait(false);
+        }, ct);
 
     public Task<AiCapabilities> GetCapabilitiesAsync(CancellationToken ct = default)
     {
@@ -358,7 +456,7 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
 
         try
         {
-            await _stateManager.WaitAsync(effective, ct).ConfigureAwait(false);
+            await _stateManager.WaitAsync(effective, ct);
         }
         catch (TimeoutException ex)
         {
@@ -398,7 +496,7 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
 
         try
         {
-            await WaitForReadinessAsync(ReadinessTimeout, cancellationToken).ConfigureAwait(false);
+            await WaitForReadinessAsync(ReadinessTimeout, cancellationToken);
             Logger.LogInformation("[{AdapterId}] Ollama connection established - FinalBaseUrl={BaseUrl}",
                 AdapterId, _http.BaseAddress);
         }
@@ -420,13 +518,13 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
         if (orchestrationContext.HasCapability("container_managed"))
         {
             Logger.LogInformation("[{AdapterId}] Container is orchestration-managed, waiting for readiness", AdapterId);
-            await WaitForContainerReadiness(cancellationToken).ConfigureAwait(false);
+            await WaitForContainerReadiness(cancellationToken);
         }
 
         _ = EnsureInitializationStarted();
         try
         {
-            await WaitForReadinessAsync(ReadinessTimeout, cancellationToken).ConfigureAwait(false);
+            await WaitForReadinessAsync(ReadinessTimeout, cancellationToken);
             Logger.LogInformation("[{AdapterId}] Ollama connection established using orchestration-aware initialization", AdapterId);
         }
         catch (AdapterNotReadyException ex)
@@ -440,7 +538,7 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
         try
         {
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-            using var response = await _http.GetAsync("/", cancellationToken).ConfigureAwait(false);
+            using var response = await _http.GetAsync("/", cancellationToken);
             stopwatch.Stop();
 
             var healthData = new Dictionary<string, object?>
@@ -461,7 +559,7 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
 
             try
             {
-                var models = await ListModelsAsync(cancellationToken).ConfigureAwait(false);
+                var models = await ListModelsAsync(cancellationToken);
                 healthData["available_models"] = models.Count;
                 healthData["model_list"] = models.Take(5).Select(m => m.Name).ToArray();
             }
@@ -550,11 +648,11 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
                 timeoutCts.CancelAfter(ReadinessTimeout);
             }
 
-            await TestConnectivityAsync(timeoutCts.Token).ConfigureAwait(false);
+            await TestConnectivityAsync(timeoutCts.Token);
             Logger.LogDebug("[{AdapterId}] InitializeReadiness: Connectivity test passed", AdapterId);
 
             // Ensure all required models are available (not just the default)
-            var allModelsReady = await EnsureRequiredModelsAvailabilityAsync(timeoutCts.Token).ConfigureAwait(false);
+            var allModelsReady = await EnsureRequiredModelsAvailabilityAsync(timeoutCts.Token);
             var newState = allModelsReady ? AdapterReadinessState.Ready : AdapterReadinessState.Degraded;
             _stateManager.TransitionTo(newState);
 
@@ -627,7 +725,7 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
                 Provenance = provenance
             };
 
-            var result = await _modelManager.EnsureInstalledAsync(request, ct).ConfigureAwait(false);
+            var result = await _modelManager.EnsureInstalledAsync(request, ct);
 
             if (!result.Success)
             {
@@ -681,7 +779,7 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
             Provenance = provenance
         };
 
-        var result = await _modelManager.EnsureInstalledAsync(request, ct).ConfigureAwait(false);
+        var result = await _modelManager.EnsureInstalledAsync(request, ct);
         if (!result.Success)
         {
             Logger.LogWarning("[{AdapterId}] Failed to ensure default model '{Model}' is available: {Message}", AdapterId, _defaultModel, result.Message);
@@ -696,15 +794,15 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
 
     private async Task<OllamaTagsResponse?> FetchTagsAsync(CancellationToken ct)
     {
-        using var resp = await _http.GetAsync("/api/tags", ct).ConfigureAwait(false);
+        using var resp = await _http.GetAsync("/api/tags", ct);
         if (!resp.IsSuccessStatusCode)
         {
-            var text = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+            var text = await resp.Content.ReadAsStringAsync(ct);
             Logger.LogWarning("Ollama: tags failed ({Status}) body={Body}", (int)resp.StatusCode, text);
             resp.EnsureSuccessStatusCode();
         }
 
-        var json = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+        var json = await resp.Content.ReadAsStringAsync(ct);
         return JsonConvert.DeserializeObject<OllamaTagsResponse>(json);
     }
 
@@ -900,11 +998,11 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
 
     private static async IAsyncEnumerable<T?> ReadJsonLinesAsync<T>(HttpResponseMessage resp, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
     {
-        await using var stream = await resp.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
+        await using var stream = await resp.Content.ReadAsStreamAsync(ct);
         using var reader = new StreamReader(stream, Encoding.UTF8);
         while (!ct.IsCancellationRequested)
         {
-            var line = await reader.ReadLineAsync().ConfigureAwait(false);
+            var line = await reader.ReadLineAsync();
             if (line is null) break; // EOF
             if (string.IsNullOrWhiteSpace(line))
             {
@@ -948,7 +1046,7 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
         Logger.LogDebug("[{AdapterId}] TestConnectivity: Testing connection to {BaseUrl}",
             AdapterId, _http.BaseAddress?.ToString() ?? "(null)");
 
-        using var response = await _http.GetAsync("/", cancellationToken).ConfigureAwait(false);
+        using var response = await _http.GetAsync("/", cancellationToken);
         response.EnsureSuccessStatusCode();
 
         Logger.LogDebug("[{AdapterId}] TestConnectivity: Success - Status={Status}", AdapterId, response.StatusCode);
@@ -963,7 +1061,7 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
         {
             try
             {
-                using var response = await _http.GetAsync("/", cancellationToken).ConfigureAwait(false);
+                using var response = await _http.GetAsync("/", cancellationToken);
                 if (response.IsSuccessStatusCode)
                 {
                     Logger.LogInformation("[{AdapterId}] Container is ready (attempt {Attempt})", AdapterId, i + 1);
@@ -973,7 +1071,7 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
             catch (Exception ex) when (i < maxRetries - 1)
             {
                 Logger.LogDebug(ex, "[{AdapterId}] Container not ready yet (attempt {Attempt}), retrying...", AdapterId, i + 1);
-                await Task.Delay(delayMs, cancellationToken).ConfigureAwait(false);
+                await Task.Delay(delayMs, cancellationToken);
             }
         }
 

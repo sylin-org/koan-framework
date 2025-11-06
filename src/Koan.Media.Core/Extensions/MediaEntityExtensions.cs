@@ -20,9 +20,9 @@ public static class MediaEntityExtensions
     {
         var (profile, container) = ResolveBinding<TEntity>(media.Container);
         if (ttl is { } t)
-            return await Storage().PresignReadAsync(profile, container!, media.Key, t, ct).ConfigureAwait(false);
+            return await Storage().PresignReadAsync(profile, container!, media.Key, t, ct);
         // MVP: presign required; later add a web route fallback
-        return await Storage().PresignReadAsync(profile, container!, media.Key, TimeSpan.FromMinutes(15), ct).ConfigureAwait(false);
+        return await Storage().PresignReadAsync(profile, container!, media.Key, TimeSpan.FromMinutes(15), ct);
     }
 
     // First-class static-like on model: TEntity.Url(id, ...)
@@ -30,7 +30,7 @@ public static class MediaEntityExtensions
         where TEntity : MediaEntity<TEntity>
     {
         var inst = MediaEntity<TEntity>.Get(key);
-        return await inst.Url(ttl, ct).ConfigureAwait(false);
+        return await inst.Url(ttl, ct);
     }
 
     private static (string Profile, string? Container) ResolveBinding<TEntity>(string? instanceContainer)

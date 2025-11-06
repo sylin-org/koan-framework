@@ -139,6 +139,8 @@ function parseHash() {
       return { view: 'framework', params: {} };
     case 'configuration':
       return { view: 'configuration', params: {} };
+    case 'mesh':
+      return { view: 'mesh', params: {} };
     case 'pillar':
       return { view: 'pillar', params: { pillar: rest[0] } };
     case 'module':
@@ -161,6 +163,7 @@ function updateNavHighlight(view) {
     'ops': 'ops',
     'framework': 'framework',
     'configuration': 'configuration',
+    'mesh': 'mesh',
     'pillar': 'dashboard',  // Pillar views don't highlight nav
     'module': 'dashboard'   // Module views don't highlight nav
   };
@@ -194,6 +197,9 @@ function switchView(view, params = {}) {
       break;
     case 'configuration':
       renderConfigurationView();
+      break;
+    case 'mesh':
+      renderMeshView();
       break;
     case 'pillar':
       if (params.pillar) {
@@ -1475,6 +1481,401 @@ function stopAutoRefresh() {
     clearInterval(refreshTimer);
     refreshTimer = null;
   }
+}
+
+// ========================================
+// Service Mesh View
+// ========================================
+
+async function fetchMeshData() {
+  try {
+    const response = await fetch('api/service-mesh');
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return await response.json();
+  } catch (error) {
+    console.error('Failed to fetch mesh data:', error);
+    return null;
+  }
+}
+
+async function renderMeshView() {
+  const meshData = await fetchMeshData();
+
+  if (!meshData || !meshData.enabled) {
+    renderMeshDisabled();
+    return;
+  }
+
+  renderMeshOverview(meshData);
+  renderMeshConfiguration(meshData);
+  renderMeshServices(meshData);
+}
+
+function renderMeshDisabled() {
+  const statsGrid = document.getElementById('mesh-stats-grid');
+  const servicesGrid = document.getElementById('services-grid');
+  const subtitle = document.getElementById('mesh-subtitle');
+
+  if (subtitle) {
+    subtitle.textContent = 'Service mesh not enabled';
+  }
+
+  if (statsGrid) {
+    statsGrid.innerHTML = '<div class="empty-state">Service Mesh is not enabled or no services are registered.</div>';
+  }
+
+  if (servicesGrid) {
+    servicesGrid.innerHTML = '';
+  }
+}
+
+function renderMeshOverview(meshData) {
+  const statsGrid = document.getElementById('mesh-stats-grid');
+  const subtitle = document.getElementById('mesh-subtitle');
+
+  if (!statsGrid) return;
+
+  if (subtitle) {
+    subtitle.textContent = `Orchestrator: ${meshData.orchestratorChannel || 'N/A'}`;
+  }
+
+  const healthyPercent = meshData.totalInstancesCount > 0
+    ? Math.round((meshData.healthyInstancesCount / meshData.totalInstancesCount) * 100)
+    : 0;
+
+  statsGrid.innerHTML = `
+    <div class="mesh-stat-card">
+      <div class="mesh-stat-icon">🕸️</div>
+      <div class="mesh-stat-content">
+        <div class="mesh-stat-value">${meshData.totalServicesCount}</div>
+        <div class="mesh-stat-label">Services</div>
+      </div>
+    </div>
+    <div class="mesh-stat-card">
+      <div class="mesh-stat-icon">📦</div>
+      <div class="mesh-stat-content">
+        <div class="mesh-stat-value">${meshData.totalInstancesCount}</div>
+        <div class="mesh-stat-label">Total Instances</div>
+      </div>
+    </div>
+    <div class="mesh-stat-card status-healthy">
+      <div class="mesh-stat-icon">✓</div>
+      <div class="mesh-stat-content">
+        <div class="mesh-stat-value">${meshData.healthyInstancesCount}</div>
+        <div class="mesh-stat-label">Healthy (${healthyPercent}%)</div>
+      </div>
+    </div>
+    <div class="mesh-stat-card status-degraded">
+      <div class="mesh-stat-icon">⚠</div>
+      <div class="mesh-stat-content">
+        <div class="mesh-stat-value">${meshData.degradedInstancesCount}</div>
+        <div class="mesh-stat-label">Degraded</div>
+      </div>
+    </div>
+    <div class="mesh-stat-card status-unhealthy">
+      <div class="mesh-stat-icon">✗</div>
+      <div class="mesh-stat-content">
+        <div class="mesh-stat-value">${meshData.unhealthyInstancesCount}</div>
+        <div class="mesh-stat-label">Unhealthy</div>
+      </div>
+    </div>
+  `;
+}
+
+function renderMeshConfiguration(meshData) {
+  // Find or create a configuration panel container
+  const servicesPanel = document.querySelector('.services-panel');
+  if (!servicesPanel) return;
+
+  // Check if config panel already exists
+  let configPanel = document.querySelector('.mesh-config-panel');
+  if (!configPanel) {
+    // Create and insert config panel before services panel
+    configPanel = document.createElement('section');
+    configPanel.className = 'panel mesh-config-panel';
+    servicesPanel.parentNode.insertBefore(configPanel, servicesPanel);
+  }
+
+  if (!meshData.configuration) {
+    configPanel.style.display = 'none';
+    return;
+  }
+
+  configPanel.style.display = 'block';
+  const config = meshData.configuration;
+
+  configPanel.innerHTML = `
+    <header class="panel-header">
+      <div>
+        <h3>Mesh Configuration</h3>
+        <p class="panel-subtitle">Orchestrator and heartbeat settings</p>
+      </div>
+    </header>
+    <div class="panel-body">
+      <div class="config-grid">
+        <div class="config-item">
+          <span class="config-label">Orchestrator Channel:</span>
+          <span class="config-value">${escapeHtml(config.orchestratorMulticastGroup)}:${config.orchestratorMulticastPort}</span>
+        </div>
+        <div class="config-item">
+          <span class="config-label">Heartbeat Interval:</span>
+          <span class="config-value">${escapeHtml(config.heartbeatInterval)}</span>
+        </div>
+        <div class="config-item">
+          <span class="config-label">Stale Threshold:</span>
+          <span class="config-value">${escapeHtml(config.staleThreshold)}</span>
+        </div>
+        ${config.selfInstanceId ? `
+        <div class="config-item">
+          <span class="config-label">Self Instance ID:</span>
+          <span class="config-value">${escapeHtml(config.selfInstanceId)}</span>
+        </div>
+        ` : ''}
+      </div>
+    </div>
+  `;
+}
+
+function renderMeshServices(meshData) {
+  // Find the services panel and replace it with grid of service cards
+  const servicesPanel = document.querySelector('.services-panel');
+  if (!servicesPanel) return;
+
+  if (!meshData.services || meshData.services.length === 0) {
+    servicesPanel.innerHTML = '<div class="empty-state">No services discovered</div>';
+    servicesPanel.style.padding = '2rem';
+    return;
+  }
+
+  // Create grid container directly (no section wrapper)
+  const servicesGrid = document.createElement('div');
+  servicesGrid.className = 'services-grid';
+  servicesGrid.innerHTML = meshData.services.map(service => `
+    <div class="service-card compact">
+      <div class="service-card-header">
+        <div class="service-title-group">
+          <h4 class="service-name">${escapeHtml(service.displayName)}</h4>
+          <span class="service-id">${escapeHtml(service.serviceId)}</span>
+        </div>
+        <div class="service-health-compact">
+          ${service.health.healthy > 0 ? `<span class="health-pill healthy" title="Healthy instances">${service.health.healthy}</span>` : ''}
+          ${service.health.degraded > 0 ? `<span class="health-pill degraded" title="Degraded instances">${service.health.degraded}</span>` : ''}
+          ${service.health.unhealthy > 0 ? `<span class="health-pill unhealthy" title="Unhealthy instances">${service.health.unhealthy}</span>` : ''}
+        </div>
+      </div>
+
+      <div class="service-card-body">
+        <!-- Quick Stats Row -->
+        <div class="service-quick-stats">
+          <div class="quick-stat">
+            <span class="stat-icon">📦</span>
+            <div class="stat-info">
+              <span class="stat-value">${service.instanceCount}</span>
+              <span class="stat-label">instances</span>
+            </div>
+          </div>
+          <div class="quick-stat">
+            <span class="stat-icon">🔗</span>
+            <div class="stat-info">
+              <span class="stat-value">${service.capacity.totalConnections}</span>
+              <span class="stat-label">connections</span>
+            </div>
+          </div>
+          <div class="quick-stat">
+            <span class="stat-icon">⚡</span>
+            <div class="stat-info">
+              <span class="stat-value">${service.capacity.capacityUtilizationPercent}%</span>
+              <span class="stat-label">utilization</span>
+            </div>
+          </div>
+          ${service.avgResponseTime ? `
+          <div class="quick-stat">
+            <span class="stat-icon">⏱️</span>
+            <div class="stat-info">
+              <span class="stat-value">${formatDuration(service.avgResponseTime)}</span>
+              <span class="stat-label">avg response</span>
+            </div>
+          </div>
+          ` : ''}
+        </div>
+
+        <!-- Health Bar -->
+        <div class="health-bar-compact">
+          ${service.health.healthy > 0 ? `<div class="health-segment healthy" style="width: ${service.health.healthyPercent}%" title="${service.health.healthy} healthy (${service.health.healthyPercent}%)"></div>` : ''}
+          ${service.health.degraded > 0 ? `<div class="health-segment degraded" style="width: ${service.health.degradedPercent}%" title="${service.health.degraded} degraded (${service.health.degradedPercent}%)"></div>` : ''}
+          ${service.health.unhealthy > 0 ? `<div class="health-segment unhealthy" style="width: ${service.health.unhealthyPercent}%" title="${service.health.unhealthy} unhealthy (${service.health.unhealthyPercent}%)"></div>` : ''}
+        </div>
+
+        <!-- Capabilities -->
+        ${service.capabilities && service.capabilities.length > 0 ? `
+        <div class="service-capabilities-compact">
+          ${service.capabilities.map(cap => `<span class="capability-tag">${escapeHtml(cap)}</span>`).join('')}
+        </div>
+        ` : ''}
+
+        <!-- Expandable Details -->
+        <details class="service-details-toggle">
+          <summary class="details-summary">
+            <span class="summary-text">Show ${service.instanceCount} instance${service.instanceCount !== 1 ? 's' : ''} & details</span>
+            <span class="summary-icon">▼</span>
+          </summary>
+          <div class="service-details-content">
+            <!-- Instances Compact List -->
+            <div class="instances-compact-list">
+              ${service.instances.map(instance => renderCompactInstance(instance)).join('')}
+            </div>
+
+            <!-- Config & Metrics Grid -->
+            <div class="details-grid">
+              <div class="detail-section">
+                <div class="detail-section-title">Capacity & Load</div>
+                <div class="detail-items">
+                  <div class="detail-item">
+                    <span class="detail-label">Available Capacity:</span>
+                    <span class="detail-value">${service.capacity.availableCapacity} / ${service.capacity.totalCapacity}</span>
+                  </div>
+                  <div class="detail-item">
+                    <span class="detail-label">Avg Load/Instance:</span>
+                    <span class="detail-value">${service.capacity.averageLoadPerInstance.toFixed(1)}</span>
+                  </div>
+                  <div class="detail-item">
+                    <span class="detail-label">Load Balancing:</span>
+                    <span class="detail-value">${escapeHtml(service.loadBalancing.policy)}</span>
+                  </div>
+                </div>
+              </div>
+
+              ${service.configuration ? `
+              <div class="detail-section">
+                <div class="detail-section-title">Configuration</div>
+                <div class="detail-items">
+                  <div class="detail-item">
+                    <span class="detail-label">Port:</span>
+                    <span class="detail-value">${service.configuration.port}</span>
+                  </div>
+                  <div class="detail-item">
+                    <span class="detail-label">Health Check:</span>
+                    <span class="detail-value">${escapeHtml(service.configuration.healthEndpoint)}</span>
+                  </div>
+                  ${service.configuration.containerImage ? `
+                  <div class="detail-item">
+                    <span class="detail-label">Image:</span>
+                    <span class="detail-value">${escapeHtml(service.configuration.containerImage)}${service.configuration.defaultTag ? ':' + escapeHtml(service.configuration.defaultTag) : ''}</span>
+                  </div>
+                  ` : ''}
+                </div>
+              </div>
+              ` : ''}
+            </div>
+          </div>
+        </details>
+      </div>
+    </div>
+  `).join('');
+
+  // Replace the panel with just the grid
+  servicesPanel.parentNode.replaceChild(servicesGrid, servicesPanel);
+}
+
+function renderCompactInstance(instance) {
+  const statusClass = instance.status.toLowerCase();
+  const statusIcon = instance.status === 'Healthy' ? '✓' :
+                     instance.status === 'Degraded' ? '⚠' : '✗';
+
+  const lastSeenDate = new Date(instance.lastSeen);
+  const formattedTimestamp = lastSeenDate.toLocaleString();
+
+  return `
+    <div class="instance-compact status-${statusClass}">
+      <div class="instance-compact-header">
+        <span class="instance-status-badge status-${statusClass}">${statusIcon}</span>
+        <span class="instance-id-short" title="${escapeHtml(instance.instanceId)}">${escapeHtml(instance.instanceId.substring(0, 8))}</span>
+        <span class="instance-mode-badge">${instance.deploymentMode === 'Container' ? '🐳' : '⚙️'}</span>
+      </div>
+      <div class="instance-compact-body">
+        <div class="instance-endpoint-compact">
+          <a href="${escapeHtml(instance.httpEndpoint)}" target="_blank" rel="noopener" class="endpoint-link">
+            ${escapeHtml(instance.httpEndpoint)}
+          </a>
+        </div>
+        <div class="instance-metrics-compact">
+          <span class="metric-compact" title="Active connections">🔗 ${instance.activeConnections}</span>
+          <span class="metric-compact" title="Average response time">⏱️ ${escapeHtml(instance.averageResponseTime)}</span>
+          <span class="metric-compact" title="Last seen: ${escapeHtml(formattedTimestamp)}">👁️ ${escapeHtml(instance.timeSinceLastSeen)}</span>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderServiceInstance(instance) {
+  const statusClass = instance.status.toLowerCase();
+  const statusIcon = instance.status === 'Healthy' ? '✓' :
+                     instance.status === 'Degraded' ? '⚠' : '✗';
+
+  // Format absolute timestamp
+  const lastSeenDate = new Date(instance.lastSeen);
+  const formattedTimestamp = lastSeenDate.toLocaleString();
+
+  return `
+    <div class="instance-row status-${statusClass}">
+      <div class="instance-main">
+        <div class="instance-status-icon">${statusIcon}</div>
+        <div class="instance-info">
+          <div class="instance-id">${escapeHtml(instance.instanceId)}</div>
+          <div class="instance-endpoint">
+            <a href="${escapeHtml(instance.httpEndpoint)}" target="_blank" rel="noopener">
+              ${escapeHtml(instance.httpEndpoint)}
+            </a>
+          </div>
+          ${instance.serviceChannelEndpoint ? `
+          <div class="instance-channel-endpoint">
+            <span class="endpoint-label">Service Channel:</span>
+            <span class="endpoint-value">${escapeHtml(instance.serviceChannelEndpoint)}</span>
+          </div>
+          ` : ''}
+        </div>
+      </div>
+      <div class="instance-stats">
+        <div class="instance-stat">
+          <span class="stat-label">Last Seen:</span>
+          <span class="stat-value" title="${escapeHtml(formattedTimestamp)}">${escapeHtml(instance.timeSinceLastSeen)}</span>
+        </div>
+        <div class="instance-stat">
+          <span class="stat-label">Connections:</span>
+          <span class="stat-value">${instance.activeConnections}</span>
+        </div>
+        <div class="instance-stat">
+          <span class="stat-label">Response:</span>
+          <span class="stat-value">${escapeHtml(instance.averageResponseTime)}</span>
+        </div>
+        <div class="instance-stat">
+          <span class="stat-label">Mode:</span>
+          <span class="stat-value">${escapeHtml(instance.deploymentMode)}</span>
+        </div>
+        ${instance.containerId ? `
+        <div class="instance-stat">
+          <span class="stat-label">Container:</span>
+          <span class="stat-value" title="${escapeHtml(instance.containerId)}">${escapeHtml(instance.containerId.substring(0, 12))}</span>
+        </div>
+        ` : ''}
+      </div>
+    </div>
+  `;
+}
+
+function formatDuration(timeSpan) {
+  // timeSpan is like { ticks: 123456, days: 0, hours: 0, ... }
+  if (!timeSpan) return 'N/A';
+
+  const totalMs = timeSpan.totalMilliseconds || 0;
+  if (totalMs < 1) return `${Math.round(totalMs * 1000)}μs`;
+  if (totalMs < 1000) return `${Math.round(totalMs)}ms`;
+  if (totalMs < 60000) return `${(totalMs / 1000).toFixed(2)}s`;
+
+  const minutes = Math.floor(totalMs / 60000);
+  const seconds = Math.round((totalMs % 60000) / 1000);
+  return `${minutes}m ${seconds}s`;
 }
 
 // ========================================

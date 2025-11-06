@@ -48,8 +48,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             ? ProvenanceModes.FromBootSource(BootSettingSource.Environment, usedDefault: false)
             : ProvenanceModes.FromConfigurationValue(enabledOption);
 
-        Publish(
-            module,
+        module.PublishConfigValue(
             TestProviderItems.Enabled,
             enabledOption,
             displayOverride: enabled ? "true" : "false",
@@ -80,8 +79,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             false);
         var tokenFormat = useJwtTokensOption.Value ? "JWT" : "Hash";
 
-        Publish(
-            module,
+        module.PublishConfigValue(
             TestProviderItems.TokenFormat,
             useJwtTokensOption,
             displayOverride: tokenFormat,
@@ -102,9 +100,9 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
                 $"{TestProviderOptions.SectionPath}:{nameof(TestProviderOptions.JwtExpirationMinutes)}",
                 60);
 
-            Publish(module, TestProviderItems.JwtIssuer, issuerOption);
-            Publish(module, TestProviderItems.JwtAudience, audienceOption);
-            Publish(module, TestProviderItems.JwtExpirationMinutes, expirationOption, displayOverride: $"{expirationOption.Value}min");
+            module.PublishConfigValue(TestProviderItems.JwtIssuer, issuerOption);
+            module.PublishConfigValue(TestProviderItems.JwtAudience, audienceOption);
+            module.PublishConfigValue(TestProviderItems.JwtExpirationMinutes, expirationOption, displayOverride: $"{expirationOption.Value}min");
         }
 
         var clientCredentialsOption = Koan.Core.Configuration.ReadWithSource(
@@ -112,8 +110,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             $"{TestProviderOptions.SectionPath}:{nameof(TestProviderOptions.EnableClientCredentials)}",
             false);
 
-        Publish(
-            module,
+        module.PublishConfigValue(
             TestProviderItems.ClientCredentials,
             clientCredentialsOption,
             displayOverride: clientCredentialsOption.Value ? "Enabled" : "Disabled",
@@ -128,8 +125,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             $"{TestProviderOptions.SectionPath}:{nameof(TestProviderOptions.RegisteredClients)}",
             clientCount == 0);
 
-        Publish(
-            module,
+        module.PublishConfigValue(
             TestProviderItems.RegisteredClients,
             registeredClientsValue,
             displayOverride: clientCount.ToString());
@@ -144,25 +140,6 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             $"{routeBase}/login.html",
             "Simulated OAuth login surface",
             capability: "auth.providers.test");
-    }
-
-    private static void Publish<T>(
-        ProvenanceModuleWriter module,
-        ProvenanceItem item,
-        ConfigurationValue<T> value,
-        object? displayOverride = null,
-        ProvenancePublicationMode? modeOverride = null,
-        bool? usedDefaultOverride = null,
-        string? sourceKeyOverride = null,
-        bool? sanitizeOverride = null)
-    {
-        module.AddSetting(
-            item,
-            modeOverride ?? ProvenanceModes.FromConfigurationValue(value),
-            displayOverride ?? value.Value,
-            sourceKey: sourceKeyOverride ?? value.ResolvedKey,
-            usedDefault: usedDefaultOverride ?? value.UsedDefault,
-            sanitizeOverride: sanitizeOverride);
     }
 }
 

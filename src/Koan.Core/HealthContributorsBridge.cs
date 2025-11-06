@@ -55,7 +55,7 @@ internal sealed class HealthContributorsBridge : IHostedService
     {
         try
         {
-            var report = await c.CheckAsync(ct).ConfigureAwait(false);
+            var report = await c.CheckAsync(ct);
             var status = report.State switch
             {
                 HealthState.Healthy => HealthStatus.Healthy,

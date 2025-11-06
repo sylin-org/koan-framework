@@ -50,6 +50,13 @@ public class Vector<TEntity> where TEntity : class, IEntity<string>
         throw new InvalidOperationException("Clear requires instruction support by the vector provider.");
     }
 
+    /// <summary>
+    /// Flush (clear) the entire vector index. This is a destructive operation that deletes all vectors.
+    /// Each adapter implements this according to its provider's capabilities.
+    /// </summary>
+    public static Task Flush(CancellationToken ct = default)
+        => Repo.FlushAsync(ct);
+
     public static async Task<bool> Rebuild(CancellationToken ct = default)
     {
         if (Repo is Koan.Data.Abstractions.Instructions.IInstructionExecutor<TEntity> exec)
@@ -66,6 +73,20 @@ public class Vector<TEntity> where TEntity : class, IEntity<string>
 
     public static VectorCapabilities GetCapabilities()
         => Repo is IVectorCapabilities caps ? caps.Capabilities : VectorCapabilities.None;
+
+    /// <summary>
+    /// Retrieves the embedding vector for a specific entity by ID.
+    /// Returns null if no vector exists for the given ID.
+    /// </summary>
+    public static Task<float[]?> GetEmbedding(string id, CancellationToken ct = default)
+        => Repo.GetEmbeddingAsync(id, ct);
+
+    /// <summary>
+    /// Retrieves embedding vectors for multiple entities by IDs.
+    /// Returns a dictionary mapping IDs to embeddings. Missing IDs are omitted.
+    /// </summary>
+    public static Task<Dictionary<string, float[]>> GetEmbeddings(IEnumerable<string> ids, CancellationToken ct = default)
+        => Repo.GetEmbeddingsAsync(ids, ct);
 
     // Search overloads
     public static Task<VectorQueryResult<string>> Search(VectorQueryOptions options, CancellationToken ct = default)

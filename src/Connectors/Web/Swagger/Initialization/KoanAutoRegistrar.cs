@@ -9,6 +9,7 @@ using Koan.Web.Connector.Swagger.Infrastructure;
 using Swashbuckle.AspNetCore.Swagger;
 using SwaggerItems = Koan.Web.Connector.Swagger.Infrastructure.SwaggerProvenanceItems;
 using ProvenanceModes = Koan.Core.Hosting.Bootstrap.ProvenancePublicationModeExtensions;
+using Koan.Web;
 
 namespace Koan.Web.Connector.Swagger.Initialization;
 
@@ -62,35 +63,27 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             module.AddNote("AllowMagicInProduction forced Swagger enabled");
         }
 
-        Publish(
-            module,
+        module.PublishConfigValue(
             SwaggerItems.Enabled,
             enabled,
             displayOverride: enabledEffective,
             usedDefaultOverride: magic.Value ? false : null);
 
-        Publish(module, SwaggerItems.RoutePrefix, routePrefix);
-        Publish(module, SwaggerItems.RequireAuthOutsideDevelopment, requireAuth);
-        Publish(module, SwaggerItems.IncludeXmlComments, includeXmlComments);
-    }
+        module.PublishConfigValue(SwaggerItems.RoutePrefix, routePrefix);
+        module.PublishConfigValue(SwaggerItems.RequireAuthOutsideDevelopment, requireAuth);
+        module.PublishConfigValue(SwaggerItems.IncludeXmlComments, includeXmlComments);
 
-    private static void Publish<T>(
-        ProvenanceModuleWriter module,
-        ProvenanceItem item,
-        ConfigurationValue<T> value,
-        object? displayOverride = null,
-        ProvenancePublicationMode? modeOverride = null,
-        bool? usedDefaultOverride = null,
-        string? sourceKeyOverride = null,
-        bool? sanitizeOverride = null)
-    {
-        module.AddSetting(
-            item,
-            modeOverride ?? ProvenanceModes.FromConfigurationValue(value),
-            displayOverride ?? value.Value,
-            sourceKey: sourceKeyOverride ?? value.ResolvedKey,
-            usedDefault: usedDefaultOverride ?? value.UsedDefault,
-            sanitizeOverride: sanitizeOverride);
+        // Report full Swagger URL for immediate discoverability
+        if (enabledEffective)
+        {
+            var swaggerUrl = KoanWeb.Urls.Build(routePrefix.Value ?? "swagger", cfg, env);
+            module.AddSetting(
+                SwaggerItems.SwaggerUrl,
+                ProvenancePublicationMode.Custom,
+                swaggerUrl,
+                sourceKey: "Resolved from ApplicationUrl and RoutePrefix",
+                usedDefault: false);
+        }
     }
 }
 

@@ -90,9 +90,9 @@
       const MF = (window.S5Const?.ENDPOINTS?.MEDIA_FORMATS) || '/api/media-formats';
       return (await get(`${MF}${qsp({ mediaType })}`)) || [];
     },
-    async getTags(sort){
+    async getTags(sort, showCensored){
       const T = (window.S5Const?.ENDPOINTS?.TAGS) || '/api/tags';
-      return (await get(`${T}${qsp({ sort })}`)) || [];
+      return (await get(`${T}${qsp({ sort, showCensored })}`)) || [];
     },
     async getGenres(sort){
       const G = (window.S5Const?.ENDPOINTS?.GENRES) || '/api/genres';

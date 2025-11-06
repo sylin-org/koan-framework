@@ -1,8 +1,11 @@
+using Koan.Data.Abstractions;
+using Koan.Data.Core;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using S5.Recs.Infrastructure;
 using S5.Recs.Services;
 using Koan.Data.Vector.Abstractions;
+using Koan.Data.AI;
 
 namespace S5.Recs.Controllers;
 
@@ -100,11 +103,11 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
     [HttpGet("recs-settings")]
     public IActionResult GetRecsSettings([FromServices] S5.Recs.Services.IRecommendationSettingsProvider provider)
     {
-        var (ptw, mpt, dw) = provider.GetEffective();
-        return Ok(new { preferTagsWeight = ptw, maxPreferredTags = mpt, diversityWeight = dw });
+        var (ptw, mpt, dw, ctpw) = provider.GetEffective();
+        return Ok(new { preferTagsWeight = ptw, maxPreferredTags = mpt, diversityWeight = dw, censoredTagsPenaltyWeight = ctpw });
     }
 
-    public record RecsSettingsRequest(double PreferTagsWeight, int MaxPreferredTags, double DiversityWeight);
+    public record RecsSettingsRequest(double PreferTagsWeight, int MaxPreferredTags, double DiversityWeight, double? CensoredTagsPenaltyWeight = null);
 
     [HttpPost("recs-settings")]
     public IActionResult SetRecsSettings([FromBody] RecsSettingsRequest req, [FromServices] S5.Recs.Services.IRecommendationSettingsProvider provider)
@@ -112,10 +115,18 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
         var ptw = Math.Clamp(req.PreferTagsWeight, 0, 1.0);
         var mpt = Math.Clamp(req.MaxPreferredTags, 1, 5);
         var dw = Math.Clamp(req.DiversityWeight, 0, 0.2);
-        var doc = new Models.SettingsDoc { Id = "recs:settings", PreferTagsWeight = ptw, MaxPreferredTags = mpt, DiversityWeight = dw, UpdatedAt = DateTimeOffset.UtcNow };
+        var ctpw = Math.Clamp(req.CensoredTagsPenaltyWeight ?? -0.7, -1.0, -0.1);
+        var doc = new Models.SettingsDoc {
+            Id = "recs:settings",
+            PreferTagsWeight = ptw,
+            MaxPreferredTags = mpt,
+            DiversityWeight = dw,
+            CensoredTagsPenaltyWeight = ctpw,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
         Models.SettingsDoc.UpsertMany(new[] { doc }, HttpContext.RequestAborted).GetAwaiter().GetResult();
         provider.InvalidateAsync(HttpContext.RequestAborted).GetAwaiter().GetResult();
-        return Ok(new { preferTagsWeight = ptw, maxPreferredTags = mpt, diversityWeight = dw });
+        return Ok(new { preferTagsWeight = ptw, maxPreferredTags = mpt, diversityWeight = dw, censoredTagsPenaltyWeight = ctpw });
     }
 
     [HttpGet("seed/status/{jobId}")]
@@ -342,15 +353,23 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
     }
 
     [HttpPost("seed/vectors")] // vector-only upsert from existing docs
-    public IActionResult StartVectorOnly([FromBody] VectorOnlyRequest req)
+    public async Task<IActionResult> StartVectorOnly([FromBody] VectorOnlyRequest req)
     {
         // Responsibility: AdminController builds the list; SeedService just upserts vectors for the provided items.
-        var all = Models.Media.All(HttpContext.RequestAborted).Result.ToList();
+        // Use AllStream to bypass default page size limit of 50
+        var all = new List<Models.Media>();
+        await foreach (var media in Models.Media.AllStream(1000, HttpContext.RequestAborted))
+        {
+            all.Add(media);
+        }
 
-        _logger.LogInformation("------------- Starting vector-only upsert for {Count} items (limit {Limit})", all.Count, req.Limit);
+        var items = req.Limit.HasValue ? all.Take(req.Limit.Value).ToList() : all;
 
-        var id = seeder.StartVectorUpsertAsync(all, HttpContext.RequestAborted).Result;
-        return Ok(new { jobId = id, count = all.Count });
+        _logger.LogInformation("------------- Starting vector-only upsert for {Count} items (limit {Limit})",
+            items.Count, req.Limit?.ToString() ?? "none (all)");
+
+        var id = await seeder.StartVectorUpsertAsync(items, HttpContext.RequestAborted);
+        return Ok(new { jobId = id, count = items.Count, limit = req.Limit });
     }
 
     // Minimal SSE for progress (poll-ish server push). Browsers: fetch('/admin/seed/sse/{jobId}').
@@ -580,17 +599,27 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
     [HttpPost("flush/vectors")]
     public async Task<IActionResult> FlushVectors(CancellationToken ct)
     {
-        // Delete all vector data
-        var count = 0;
+        // Clear entire vector index using the Flush API
         if (Koan.Data.Vector.Vector<Models.Media>.IsAvailable)
         {
-            await foreach (var media in Models.Media.AllStream(1000, ct))
+            try
             {
-                await Koan.Data.Vector.Vector<Models.Media>.Delete(media.Id!, ct);
-                count++;
+                // Get count before clearing
+                var count = await Koan.Data.Vector.Vector<Models.Media>.Stats(ct);
+
+                // Flush the entire index (handles AllowDestructive internally)
+                await Koan.Data.Vector.Vector<Models.Media>.Flush(ct);
+
+                _logger.LogInformation("Flushed {Count} vectors from index", count);
+                return Ok(new { flushed = "vectors", count });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to flush vectors");
+                return StatusCode(500, new { error = ex.Message });
             }
         }
-        return Ok(new { flushed = "vectors", count });
+        return Ok(new { flushed = "vectors", count = 0, note = "Vector database not available" });
     }
 
     [HttpPost("flush/tags")]
@@ -622,101 +651,71 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
     }
 
     [HttpPost("flush/embeddings")]
-    public async Task<IActionResult> FlushEmbeddingsCache([FromServices] Services.IEmbeddingCache embeddingCache, CancellationToken ct)
+    public async Task<IActionResult> FlushEmbeddingsCache(CancellationToken ct)
     {
-        var count = await embeddingCache.FlushAsync(ct);
-        return Ok(new { flushed = "embeddings-cache", count });
+        // Purge completed embed jobs older than 1 day
+        var count = await EmbedJobExtensions.PurgeCompleted<Models.Media>(TimeSpan.FromDays(1), ct);
+        return Ok(new { flushed = "embed-jobs", count });
     }
 
     [HttpGet("cache/embeddings/stats")]
-    public async Task<IActionResult> GetEmbeddingsCacheStats([FromServices] Services.IEmbeddingCache embeddingCache, CancellationToken ct)
+    public async Task<IActionResult> GetEmbeddingsCacheStats(CancellationToken ct)
     {
-        var stats = await embeddingCache.GetStatsAsync(ct);
+        var stats = await EmbedJobExtensions.GetStats<Models.Media>(ct);
         return Ok(stats);
     }
 
     [HttpPost("cache/embeddings/export")]
     public async Task<IActionResult> ExportEmbeddingsToCache(
-        [FromServices] Koan.Data.Vector.IVectorService vectorService,
-        [FromServices] Services.IEmbeddingCache embeddingCache,
-        [FromServices] Services.ISeedService seedService,
         [FromQuery] string? entityType,
         CancellationToken ct)
     {
+        // NOTE: This endpoint is obsolete with ARCH-0070 attribute-driven embeddings.
+        // The framework now manages embedding state automatically via EmbeddingState<T>.
+        // Keeping endpoint for backward compatibility but it now triggers batch re-embedding.
+
         try
         {
-            var modelId = "default"; // TODO: Get from configuration
+            _logger.LogInformation("Triggering batch re-embedding for Media entities...");
+
+            // Get all Media entities that need embedding
+            var allMedia = await Models.Media.All(ct);
             var count = 0;
-            var errors = 0;
 
-            _logger.LogInformation("Starting export of existing vectors to embedding cache...");
-
-            // Get vector repository from IVectorService
-            var vectorRepo = vectorService.TryGetRepository<Models.Media, string>();
-            if (vectorRepo == null)
+            foreach (var media in allMedia)
             {
-                _logger.LogError("Failed to resolve vector repository for Media entity");
-                return StatusCode(500, new { error = "Vector repository not available" });
-            }
+                // Save triggers automatic embedding via framework
+                await media.Save(ct);
+                count++;
 
-            _logger.LogInformation("Using vector repository: {Type}", vectorRepo.GetType().FullName);
-
-            await foreach (var batch in vectorRepo.ExportAllAsync(batchSize: 100, ct))
-            {
-                try
+                if (count % 100 == 0)
                 {
-                    // Load the media entity to reconstruct the embedding text for content hashing
-                    var media = await Models.Media.Get(batch.Id, ct);
-                    if (media == null)
-                    {
-                        _logger.LogWarning("Media {Id} not found in database, skipping cache export", batch.Id);
-                        errors++;
-                        continue;
-                    }
-
-                    // Use SeedService's BuildEmbeddingText to get consistent hash
-                    var embeddingText = seedService.BuildEmbeddingText(media);
-                    var contentHash = Services.EmbeddingCache.ComputeContentHash(embeddingText);
-
-                    // Cache the existing embedding
-                    await embeddingCache.SetAsync(contentHash, modelId, batch.Embedding, typeof(Models.Media).FullName!, ct);
-                    count++;
-
-                    if (count % 100 == 0)
-                    {
-                        _logger.LogInformation("Export progress: {Count} vectors cached...", count);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Error exporting vector {Id} to cache", batch.Id);
-                    errors++;
+                    _logger.LogInformation("Re-embedding progress: {Count} media items...", count);
                 }
             }
 
-            _logger.LogInformation("Vector export completed: {Count} vectors cached, {Errors} errors", count, errors);
+            _logger.LogInformation("Batch re-embedding completed: {Count} media items queued", count);
             return Ok(new
             {
-                operation = "export-embeddings-to-cache",
-                exported = count,
-                errors,
-                message = $"Exported {count} existing vectors to embedding cache for adapter portability"
+                operation = "batch-re-embed",
+                queued = count,
+                message = $"Queued {count} media items for re-embedding via framework worker"
             });
         }
         catch (NotSupportedException ex)
         {
-            _logger.LogWarning(ex, "Vector export not supported by current adapter");
+            _logger.LogWarning(ex, "Operation not supported");
             return BadRequest(new
             {
-                error = "Vector export not supported by current vector database adapter",
+                error = "Operation not supported",
                 details = ex.Message,
                 suggestion = "Use a vector adapter with native export capabilities"
             });
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to export vectors to cache");
-            return StatusCode(500, new { error = "Export failed", details = ex.Message });
+            _logger.LogError(ex, "Failed to trigger batch re-embedding");
+            return StatusCode(500, new { error = "Batch re-embedding failed", details = ex.Message });
         }
     }
 
@@ -731,5 +730,190 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
         }
 
         return Ok(new { flushed = "media", count });
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // V2 Endpoints - Partition-Based Import Pipeline (ARCH-0069)
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    public record ImportRequestV2(string Source, string MediaType, int? Limit = null, bool Overwrite = false);
+
+    /// <summary>
+    /// V2: Queue import jobs using partition-based pipeline.
+    /// Returns immediately with job IDs for async progress tracking.
+    /// </summary>
+    [HttpPost("seed/v2/start")]
+    public async Task<IActionResult> StartImportV2(
+        [FromBody] ImportRequestV2 request,
+        [FromServices] Services.IImportOrchestrator orchestrator,
+        CancellationToken ct)
+    {
+        try
+        {
+            // Validate request
+            if (string.IsNullOrWhiteSpace(request.Source))
+            {
+                return BadRequest(new { error = "Source is required" });
+            }
+
+            if (string.IsNullOrWhiteSpace(request.MediaType))
+            {
+                return BadRequest(new { error = "MediaType is required. Specify a media type or 'all'" });
+            }
+
+            // Resolve media types
+            string[] mediaTypeIds;
+            if (request.MediaType.Equals("all", StringComparison.OrdinalIgnoreCase))
+            {
+                mediaTypeIds = new[] { "all" };
+            }
+            else
+            {
+                mediaTypeIds = new[] { request.MediaType };
+            }
+
+            // Queue import jobs
+            var options = new Services.ImportOptions(
+                Limit: request.Limit,
+                Overwrite: request.Overwrite
+            );
+
+            var jobIds = await orchestrator.QueueImportAsync(
+                request.Source,
+                mediaTypeIds,
+                options,
+                ct);
+
+            return Ok(new
+            {
+                jobIds = jobIds,
+                count = jobIds.Count,
+                message = $"Queued {jobIds.Count} import job(s). Use GET /admin/seed/v2/status to monitor progress."
+            });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to start import v2");
+            return StatusCode(500, new { error = "Failed to start import", details = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// V2: Get progress for import jobs.
+    /// Shows media counts in each partition stage and completion percentage.
+    /// </summary>
+    [HttpGet("seed/v2/status")]
+    public async Task<IActionResult> GetImportStatusV2(
+        [FromQuery] string[] jobIds,
+        [FromServices] Services.IImportOrchestrator orchestrator,
+        CancellationToken ct)
+    {
+        try
+        {
+            // If no job IDs provided, return recent jobs
+            if (jobIds == null || jobIds.Length == 0)
+            {
+                // Get recent jobs from both partitions
+                List<Models.ImportJob> active;
+                using (Koan.Data.Core.EntityContext.Partition("jobs-active"))
+                {
+                    active = (await Models.ImportJob.All(
+                        new DataQueryOptions { PageSize = 10, Sort = "-CreatedAt" },
+                        ct)).ToList();
+                }
+
+                // Also get completed jobs from default partition
+                var completed = (await Models.ImportJob.All(
+                    new DataQueryOptions { PageSize = 10, Sort = "-CreatedAt" },
+                    ct)).ToList();
+
+                var recentJobs = active.Concat(completed)
+                    .OrderByDescending(j => j.CreatedAt)
+                    .Take(10)
+                    .ToList();
+
+                jobIds = recentJobs.Select(j => j.JobId).ToArray();
+
+                if (jobIds.Length == 0)
+                {
+                    return Ok(new { jobs = Array.Empty<object>(), message = "No import jobs found" });
+                }
+            }
+
+            var progress = await orchestrator.GetProgressAsync(jobIds, ct);
+
+            return Ok(progress);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get import status v2");
+            return StatusCode(500, new { error = "Failed to get status", details = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// V2: Get detailed partition statistics for monitoring pipeline health.
+    /// </summary>
+    [HttpGet("seed/v2/partition-stats")]
+    public async Task<IActionResult> GetPartitionStats(CancellationToken ct)
+    {
+        try
+        {
+            int activeJobs, completedJobs;
+            int rawMedia, queuedMedia, liveMedia;
+
+            // Count jobs
+            using (Koan.Data.Core.EntityContext.Partition("jobs-active"))
+            {
+                activeJobs = (int)await Models.ImportJob.Count;
+            }
+
+            completedJobs = (int)await Models.ImportJob.Count;
+
+            // Count media by partition
+            using (Koan.Data.Core.EntityContext.Partition("import-raw"))
+            {
+                rawMedia = (int)await Models.Media.Count;
+            }
+
+            using (Koan.Data.Core.EntityContext.Partition("vectorization-queue"))
+            {
+                queuedMedia = (int)await Models.Media.Count;
+            }
+
+            // All media in default partition is considered "live" (embeddings automatic, ARCH-0070)
+            liveMedia = (int)await Models.Media.Count;
+
+            return Ok(new
+            {
+                jobs = new
+                {
+                    active = activeJobs,
+                    completed = completedJobs,
+                    total = activeJobs + completedJobs
+                },
+                media = new
+                {
+                    inRaw = rawMedia,
+                    inQueue = queuedMedia,
+                    live = liveMedia,
+                    total = rawMedia + queuedMedia + liveMedia
+                },
+                pipeline = new
+                {
+                    status = activeJobs > 0 ? "running" : "idle",
+                    bottleneck = queuedMedia > rawMedia * 2 ? "vectorization" : "none"
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get partition stats");
+            return StatusCode(500, new { error = "Failed to get stats", details = ex.Message });
+        }
     }
 }

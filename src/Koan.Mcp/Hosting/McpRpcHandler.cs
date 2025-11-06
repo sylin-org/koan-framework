@@ -90,7 +90,7 @@ public sealed class McpRpcHandler
         // Handle code execution tool
         if (parameters.Name == "koan.code.execute")
         {
-            return await ExecuteCodeAsync(parameters.Arguments, cancellationToken).ConfigureAwait(false);
+            return await ExecuteCodeAsync(parameters.Arguments, cancellationToken);
         }
         // Handle code validation tool
         if (parameters.Name == "koan.code.validate")
@@ -99,7 +99,7 @@ public sealed class McpRpcHandler
         }
 
         // Handle traditional entity tools
-        var result = await _executor.ExecuteAsync(parameters.Name, parameters.Arguments, cancellationToken).ConfigureAwait(false);
+        var result = await _executor.ExecuteAsync(parameters.Name, parameters.Arguments, cancellationToken);
         return ToolsCallResult.FromExecution(parameters.Name, result);
     }
 
@@ -305,7 +305,7 @@ public sealed class McpRpcHandler
             var request = BuildExecutionRequest(arguments!, code);
 
             // Execute code via unified executor (bindings are created internally in implementation; we keep existing for side-effects if needed in future)
-            var result = await _codeExecutor.ExecuteAsync(request, cancellationToken).ConfigureAwait(false);
+            var result = await _codeExecutor.ExecuteAsync(request, cancellationToken);
 
             if (result.Success)
             {

@@ -3,7 +3,6 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using System.Text.RegularExpressions;
 using Koan.AI;
 using Koan.AI.Contracts.Options;
 using Koan.Data.Core;
@@ -11,6 +10,7 @@ using Koan.Samples.Meridian.Infrastructure;
 using Koan.Samples.Meridian.Models;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 namespace Koan.Samples.Meridian.Services;
@@ -32,9 +32,10 @@ public sealed class DocumentClassifier : IDocumentClassifier
     private sealed record SourceTypeSnapshot(
         int Version,
         DateTime UpdatedAt,
-        Regex[] FilenamePatterns,
-        string[] KeywordsLower,
+        string[] DescriptorHints,
+        string[] SignalPhrases,
         string[] MimeTypesLower,
+        bool SupportsManualSelection,
         int? ExpectedPageCountMin,
         int? ExpectedPageCountMax);
 
@@ -54,7 +55,22 @@ public sealed class DocumentClassifier : IDocumentClassifier
         var types = await SourceType.All(ct);
         if (types.Count == 0)
         {
-            return new ClassificationResult(MeridianConstants.SourceTypes.Unclassified, 0.0, ClassificationMethod.Manual, 1, "No source types configured.");
+            return new ClassificationResult(MeridianConstants.SourceTypes.Unspecified, 0.0, ClassificationMethod.Manual, 1, "No source types configured.");
+        }
+
+        if (document.ClassificationMethod == ClassificationMethod.Manual &&
+            !string.IsNullOrWhiteSpace(document.ClassifiedTypeId))
+        {
+            var manualTypeId = document.ClassifiedTypeId!;
+            var matched = types.FirstOrDefault(t => string.Equals(t.Id, manualTypeId, StringComparison.OrdinalIgnoreCase));
+            var version = document.ClassifiedTypeVersion ?? matched?.Version ?? 1;
+            var confidence = document.ClassificationConfidence > 0 ? document.ClassificationConfidence : 1.0;
+            var reason = string.IsNullOrWhiteSpace(document.ClassificationReason)
+                ? "User selected type"
+                : document.ClassificationReason!;
+
+            _logger.LogDebug("Document {DocumentId} honoring manual selection {TypeId}.", document.Id, manualTypeId);
+            return new ClassificationResult(manualTypeId, confidence, ClassificationMethod.Manual, version, reason);
         }
 
         var text = document.ExtractedText ?? string.Empty;
@@ -86,14 +102,20 @@ public sealed class DocumentClassifier : IDocumentClassifier
             return llm.Value;
         }
 
-        _logger.LogDebug("Document {DocumentId} remained unclassified after cascade.", document.Id);
-        return new ClassificationResult(MeridianConstants.SourceTypes.Unclassified, 0.0, ClassificationMethod.Heuristic, 1, "No classification strategy met confidence thresholds.");
+        _logger.LogWarning("Document {DocumentId} could not be classified - using Unspecified fallback type.", document.Id);
+        return new ClassificationResult(MeridianConstants.SourceTypes.Unspecified, 0.3, ClassificationMethod.Heuristic, 1, "Classification failed - using generic extraction strategy.");
     }
 
     private ClassificationResult? EvaluateHeuristics(SourceDocument document, string text, IReadOnlyList<SourceType> types)
     {
+        const double DescriptorWeight = 0.55;
+        const double SignalWeight = 0.25;
+        const double PageWeight = 0.15;
+        const double MimeWeight = 0.05;
+
         var best = default(ClassificationResult?);
-        var textLower = text.ToLowerInvariant();
+        var textLower = NormalizeContent(text);
+        var fileNameLower = NormalizeFileName(document.OriginalFileName);
         var mediaLower = document.MediaType?.ToLowerInvariant();
 
         foreach (var type in types)
@@ -103,47 +125,50 @@ public sealed class DocumentClassifier : IDocumentClassifier
             double maxScore = 0;
             var reasons = new List<string>();
 
-            if (snapshot.FilenamePatterns.Length > 0)
+            if (snapshot.DescriptorHints.Length > 0)
             {
-                maxScore += 0.3;
-                if (snapshot.FilenamePatterns.Any(pattern => pattern.IsMatch(document.OriginalFileName)))
+                maxScore += DescriptorWeight;
+                var descriptorHits = CountPhraseHits(snapshot.DescriptorHints, textLower, fileNameLower);
+                if (descriptorHits > 0)
                 {
-                    score += 0.3;
-                    reasons.Add("Filename pattern match");
+                    var ratio = descriptorHits / Math.Max(1.0, snapshot.DescriptorHints.Length);
+                    score += DescriptorWeight * Math.Min(1.0, ratio);
+                    reasons.Add($"Descriptor hints matched {descriptorHits}/{snapshot.DescriptorHints.Length}");
                 }
             }
 
-            if (snapshot.KeywordsLower.Length > 0 && textLower.Length > 0)
+            if (snapshot.SignalPhrases.Length > 0)
             {
-                maxScore += 0.3;
-                var matches = snapshot.KeywordsLower.Count(keyword => textLower.Contains(keyword));
-                if (matches > 0)
+                maxScore += SignalWeight;
+                var signalHits = CountPhraseHits(snapshot.SignalPhrases, textLower, fileNameLower);
+                if (signalHits > 0)
                 {
-                    score += 0.3 * (matches / Math.Max(1.0, snapshot.KeywordsLower.Length));
-                    reasons.Add($"Matched {matches} keyword(s)");
+                    var ratio = signalHits / Math.Max(1.0, snapshot.SignalPhrases.Length);
+                    score += SignalWeight * Math.Min(1.0, ratio);
+                    reasons.Add($"Signal phrases matched {signalHits}");
                 }
             }
 
             if (snapshot.ExpectedPageCountMin.HasValue || snapshot.ExpectedPageCountMax.HasValue)
             {
-                maxScore += 0.2;
+                maxScore += PageWeight;
                 var inRange =
                     (!snapshot.ExpectedPageCountMin.HasValue || document.PageCount >= snapshot.ExpectedPageCountMin.Value) &&
                     (!snapshot.ExpectedPageCountMax.HasValue || document.PageCount <= snapshot.ExpectedPageCountMax.Value);
                 if (inRange)
                 {
-                    score += 0.2;
+                    score += PageWeight;
                     reasons.Add("Page count within expected range");
                 }
             }
 
             if (snapshot.MimeTypesLower.Length > 0 && !string.IsNullOrWhiteSpace(mediaLower))
             {
-                maxScore += 0.2;
+                maxScore += MimeWeight;
                 if (snapshot.MimeTypesLower.Any(m => string.Equals(m, mediaLower, StringComparison.OrdinalIgnoreCase)))
                 {
-                    score += 0.2;
-                    reasons.Add("Mime type match");
+                    score += MimeWeight;
+                    reasons.Add("MIME type match");
                 }
             }
 
@@ -186,7 +211,7 @@ public sealed class DocumentClassifier : IDocumentClassifier
         float[] documentEmbedding;
         try
         {
-            documentEmbedding = await Ai.Embed(preview, ct).ConfigureAwait(false);
+            documentEmbedding = await Ai.Embed(preview, ct);
         }
         catch (Exception ex)
         {
@@ -199,7 +224,7 @@ public sealed class DocumentClassifier : IDocumentClassifier
 
         foreach (var type in types)
         {
-            var embedding = await GetTypeEmbeddingAsync(type, ct).ConfigureAwait(false);
+            var embedding = await GetTypeEmbeddingAsync(type, ct);
             if (embedding is null || embedding.Length == 0)
             {
                 continue;
@@ -253,8 +278,44 @@ public sealed class DocumentClassifier : IDocumentClassifier
 
         try
         {
-            var response = await Ai.Chat(chatOptions, ct).ConfigureAwait(false);
-            var json = JObject.Parse(response);
+            var response = await Ai.Chat(chatOptions, ct);
+
+            // Check for empty response
+            if (string.IsNullOrWhiteSpace(response))
+            {
+                _logger.LogWarning("LLM returned empty response for document {DocumentId} classification.", document.Id);
+                return null;
+            }
+
+            // Strip markdown code fences if present (some LLMs wrap JSON in ```json blocks)
+            var cleaned = response.Trim();
+            if (cleaned.StartsWith("```"))
+            {
+                // Find first newline after opening fence
+                var firstNewline = cleaned.IndexOf('\n');
+                if (firstNewline > 0)
+                {
+                    cleaned = cleaned.Substring(firstNewline + 1);
+                }
+
+                // Remove closing fence if present
+                if (cleaned.EndsWith("```"))
+                {
+                    cleaned = cleaned.Substring(0, cleaned.Length - 3);
+                }
+
+                cleaned = cleaned.Trim();
+            }
+
+            // Validate looks like JSON
+            if (!cleaned.StartsWith("{") && !cleaned.StartsWith("["))
+            {
+                _logger.LogWarning("LLM returned non-JSON response for document {DocumentId}: {Preview}",
+                    document.Id, cleaned.Length > 100 ? cleaned.Substring(0, 100) + "..." : cleaned);
+                return null;
+            }
+
+            var json = JObject.Parse(cleaned);
 
             var rawTypeId = json["typeId"]?.Value<string>()?.Trim();
             var confidence = json["confidence"]?.Value<double?>() ?? 0.5;
@@ -272,11 +333,80 @@ public sealed class DocumentClassifier : IDocumentClassifier
             matched ??= types.First();
             return new ClassificationResult(matched.Id, confidence, ClassificationMethod.Llm, matched.Version, reasoning);
         }
-        catch (Exception ex)
+        catch (JsonException ex)
         {
-            _logger.LogDebug(ex, "LLM classification failed for document {DocumentId}.", document.Id);
+            _logger.LogWarning(ex, "LLM returned invalid JSON for document {DocumentId} classification - will fallback to Unspecified type.", document.Id);
             return null;
         }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "LLM classification failed for document {DocumentId} - will fallback to Unspecified type.", document.Id);
+            return null;
+        }
+    }
+
+    private static string NormalizeContent(string content)
+    {
+        if (string.IsNullOrWhiteSpace(content))
+        {
+            return string.Empty;
+        }
+
+        return content.ToLowerInvariant();
+    }
+
+    private static string NormalizeFileName(string? fileName)
+    {
+        if (string.IsNullOrWhiteSpace(fileName))
+        {
+            return string.Empty;
+        }
+
+        var lowered = fileName.ToLowerInvariant();
+        return lowered
+            .Replace("_", " ", StringComparison.Ordinal)
+            .Replace("-", " ", StringComparison.Ordinal)
+            .Replace(".", " ", StringComparison.Ordinal);
+    }
+
+    private static string NormalizePhrase(string phrase)
+    {
+        if (string.IsNullOrWhiteSpace(phrase))
+        {
+            return string.Empty;
+        }
+
+        var tokens = phrase
+            .ToLowerInvariant()
+            .Split(new[] { ' ', '\t', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+
+        return string.Join(' ', tokens);
+    }
+
+    private static int CountPhraseHits(string[] phrases, string textLower, string fileNameLower)
+    {
+        if (phrases.Length == 0)
+        {
+            return 0;
+        }
+
+        var hits = 0;
+
+        foreach (var phrase in phrases)
+        {
+            if (phrase.Length == 0)
+            {
+                continue;
+            }
+
+            if ((textLower.Length > 0 && textLower.Contains(phrase, StringComparison.Ordinal)) ||
+                (fileNameLower.Length > 0 && fileNameLower.Contains(phrase, StringComparison.Ordinal)))
+            {
+                hits++;
+            }
+        }
+
+        return hits;
     }
 
     private SourceTypeSnapshot GetSnapshot(SourceType type)
@@ -291,24 +421,30 @@ public sealed class DocumentClassifier : IDocumentClassifier
 
     private static SourceTypeSnapshot CreateSnapshot(SourceType type)
     {
-        var patterns = type.FilenamePatterns
-            .Select(pattern => new Regex(pattern, RegexOptions.IgnoreCase | RegexOptions.Compiled))
+        var descriptors = type.DescriptorHints
+            .Select(NormalizePhrase)
+            .Where(value => value.Length > 0)
+            .Distinct(StringComparer.Ordinal)
             .ToArray();
 
-        var keywords = type.Keywords
-            .Select(keyword => keyword.ToLowerInvariant())
+        var signals = type.SignalPhrases
+            .Select(NormalizePhrase)
+            .Where(value => value.Length > 0)
+            .Distinct(StringComparer.Ordinal)
             .ToArray();
 
         var mimeTypes = type.MimeTypes
             .Select(m => m.ToLowerInvariant())
+            .Distinct(StringComparer.Ordinal)
             .ToArray();
 
         return new SourceTypeSnapshot(
             type.Version,
             type.UpdatedAt,
-            patterns,
-            keywords,
+            descriptors,
+            signals,
             mimeTypes,
+            type.SupportsManualSelection,
             type.ExpectedPageCountMin,
             type.ExpectedPageCountMax);
     }
@@ -330,12 +466,12 @@ public sealed class DocumentClassifier : IDocumentClassifier
         {
             var builder = new StringBuilder();
             builder.Append(type.Name).Append(". ").Append(type.Description);
-            if (type.Keywords.Count > 0)
+            if (type.SignalPhrases.Count > 0)
             {
-                builder.Append(" Keywords: ").Append(string.Join(", ", type.Keywords));
+                builder.Append(" Signal phrases: ").Append(string.Join(", ", type.SignalPhrases));
             }
 
-            var newEmbedding = await Ai.Embed(builder.ToString(), ct).ConfigureAwait(false);
+            var newEmbedding = await Ai.Embed(builder.ToString(), ct);
             type.TypeEmbedding = newEmbedding;
             type.TypeEmbeddingVersion = type.Version;
             type.TypeEmbeddingComputedAt = DateTime.UtcNow;

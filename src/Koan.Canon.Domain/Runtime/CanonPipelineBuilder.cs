@@ -48,7 +48,7 @@ public sealed class CanonPipelineBuilder<TModel>
 
         return AddContributor(new LambdaContributor(phase, async (context, cancellationToken) =>
         {
-            await step(context, cancellationToken).ConfigureAwait(false);
+            await step(context, cancellationToken);
 
             if (message is null)
             {

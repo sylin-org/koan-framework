@@ -71,7 +71,7 @@ internal sealed class MongoClientProvider : IAdapterReadiness, IAsyncAdapterInit
 
         try
         {
-            await _stateManager.WaitAsync(effective, ct).ConfigureAwait(false);
+            await _stateManager.WaitAsync(effective, ct);
         }
         catch (TimeoutException ex)
         {
@@ -101,7 +101,7 @@ internal sealed class MongoClientProvider : IAdapterReadiness, IAsyncAdapterInit
         try
         {
             var options = _options.CurrentValue;
-            await EnsureDatabaseAsync(options, ct).ConfigureAwait(false);
+            await EnsureDatabaseAsync(options, ct);
             _stateManager.TransitionTo(AdapterReadinessState.Ready);
         }
         catch (Exception ex)
@@ -115,7 +115,7 @@ internal sealed class MongoClientProvider : IAdapterReadiness, IAsyncAdapterInit
     public async Task<IMongoDatabase> GetDatabaseAsync(CancellationToken ct)
     {
         var options = _options.CurrentValue;
-        return await EnsureDatabaseAsync(options, ct).ConfigureAwait(false);
+        return await EnsureDatabaseAsync(options, ct);
     }
 
     private async Task<IMongoDatabase> EnsureDatabaseAsync(MongoOptions options, CancellationToken ct)
@@ -125,7 +125,7 @@ internal sealed class MongoClientProvider : IAdapterReadiness, IAsyncAdapterInit
             return _database;
         }
 
-        await _sync.WaitAsync(ct).ConfigureAwait(false);
+        await _sync.WaitAsync(ct);
         try
         {
             if (_database is null || !string.Equals(_databaseName, options.Database, StringComparison.Ordinal))
@@ -134,7 +134,7 @@ internal sealed class MongoClientProvider : IAdapterReadiness, IAsyncAdapterInit
                 _client = new MongoClient(options.ConnectionString);
                 _database = _client.GetDatabase(options.Database);
                 _databaseName = options.Database;
-                await _database.RunCommandAsync((Command<BsonDocument>)"{ ping: 1 }", cancellationToken: ct).ConfigureAwait(false);
+                await _database.RunCommandAsync((Command<BsonDocument>)"{ ping: 1 }", cancellationToken: ct);
                 if (_stateManager.State == AdapterReadinessState.Initializing)
                 {
                     _stateManager.TransitionTo(AdapterReadinessState.Ready);

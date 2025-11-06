@@ -121,7 +121,7 @@ public static class AggregateConfigsExtensions
                 if (moveNextResult is not ValueTask<bool> moveNextTask)
                     throw new InvalidOperationException($"MoveNextAsync did not return ValueTask<bool> for {entityType.Name}");
 
-                if (!await moveNextTask.ConfigureAwait(false))
+                if (!await moveNextTask)
                     break;
 
                 var current = currentProperty.GetValue(enumerator);
@@ -135,7 +135,7 @@ public static class AggregateConfigsExtensions
             switch (enumerator)
             {
                 case IAsyncDisposable asyncDisposable:
-                    await asyncDisposable.DisposeAsync().ConfigureAwait(false);
+                    await asyncDisposable.DisposeAsync();
                     break;
                 case IDisposable disposable:
                     disposable.Dispose();
@@ -160,9 +160,9 @@ public static class AggregateConfigsExtensions
         switch (invocationResult)
         {
             case Task<int> typedTask:
-                return await typedTask.ConfigureAwait(false);
+                return await typedTask;
             case Task genericTask:
-                await genericTask.ConfigureAwait(false);
+                await genericTask;
                 return 0;
             case null:
                 return 0;

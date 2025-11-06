@@ -31,8 +31,9 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar, IKoanAspireRegistrar
 
     public void Initialize(IServiceCollection services)
     {
-        services.AddKoanOptions<PostgresOptions>(Infrastructure.Constants.Configuration.Keys.Section);
-        services.AddSingleton<IConfigureOptions<PostgresOptions>, PostgresOptionsConfigurator>();
+        services.AddKoanOptions<PostgresOptions, PostgresOptionsConfigurator>(
+            Infrastructure.Constants.Configuration.Keys.Section,
+            configuratorLifetime: ServiceLifetime.Singleton);
         services.TryAddSingleton<IStorageNameResolver, DefaultStorageNameResolver>();
         services.TryAddEnumerable(new ServiceDescriptor(typeof(INamingDefaultsProvider), typeof(PostgresNamingDefaultsProvider), ServiceLifetime.Singleton));
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, PostgresHealthContributor>());
@@ -118,8 +119,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar, IKoanAspireRegistrar
             ? ProvenanceModes.FromBootSource(BootSettingSource.Auto, usedDefault: true)
             : ProvenanceModes.FromConfigurationValue(connection);
 
-        Publish(
-            module,
+        module.PublishConfigValue(
             PostgresItems.ConnectionString,
             connection,
             displayOverride: effectiveConnectionString,
@@ -127,28 +127,16 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar, IKoanAspireRegistrar
             usedDefaultOverride: connectionIsAuto ? true : connection.UsedDefault,
             sourceKeyOverride: connectionSourceKey);
 
-        Publish(
-            module,
+        module.PublishConfigValue(
             PostgresItems.SearchPath,
             searchPath,
             displayOverride: searchPath.Value ?? defaultOptions.SearchPath ?? "public");
 
-        Publish(module, PostgresItems.NamingStyle, namingStyle);
-        Publish(module, PostgresItems.Separator, separator);
-        Publish(module, PostgresItems.EnsureCreatedSupported, ensureCreated);
-        Publish(module, PostgresItems.DefaultPageSize, defaultPageSize);
-        Publish(module, PostgresItems.MaxPageSize, maxPageSize);
-    }
-
-    private static void Publish<T>(ProvenanceModuleWriter module, ProvenanceItem item, ConfigurationValue<T> value, object? displayOverride = null, ProvenancePublicationMode? modeOverride = null, bool? usedDefaultOverride = null, string? sourceKeyOverride = null, bool? sanitizeOverride = null)
-    {
-        module.AddSetting(
-            item,
-            modeOverride ?? ProvenanceModes.FromConfigurationValue(value),
-            displayOverride ?? value.Value,
-            sourceKey: sourceKeyOverride ?? value.ResolvedKey,
-            usedDefault: usedDefaultOverride ?? value.UsedDefault,
-            sanitizeOverride: sanitizeOverride);
+        module.PublishConfigValue(PostgresItems.NamingStyle, namingStyle);
+        module.PublishConfigValue(PostgresItems.Separator, separator);
+        module.PublishConfigValue(PostgresItems.EnsureCreatedSupported, ensureCreated);
+        module.PublishConfigValue(PostgresItems.DefaultPageSize, defaultPageSize);
+        module.PublishConfigValue(PostgresItems.MaxPageSize, maxPageSize);
     }
 
     private static string BuildPostgresFallback(PostgresOptions defaults)
@@ -163,18 +151,20 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar, IKoanAspireRegistrar
         var options = new PostgresOptions();
         new PostgresOptionsConfigurator(configuration).Configure(options);
 
-        // Parse connection string to extract database name, username, and password
-        var connectionParts = ParseConnectionString(options.ConnectionString);
+        // ARCH-0068: Use static ConnectionStringParser for unified parsing
+        var components = Koan.Core.Orchestration.ConnectionStringParser.Parse(
+            options.ConnectionString,
+            "postgres");
 
-        var postgres = builder.AddPostgres("postgres", port: connectionParts.Port)
+        var postgres = builder.AddPostgres("postgres", port: components.Port)
             .WithDataVolume()
-            .WithEnvironment("POSTGRES_DB", connectionParts.Database ?? "Koan")
-            .WithEnvironment("POSTGRES_USER", connectionParts.Username ?? "postgres");
+            .WithEnvironment("POSTGRES_DB", components.Database ?? "Koan")
+            .WithEnvironment("POSTGRES_USER", components.Username ?? "postgres");
 
         // Only set password if one is provided and not empty
-        if (!string.IsNullOrEmpty(connectionParts.Password))
+        if (!string.IsNullOrEmpty(components.Password))
         {
-            postgres.WithEnvironment("POSTGRES_PASSWORD", connectionParts.Password);
+            postgres.WithEnvironment("POSTGRES_PASSWORD", components.Password);
         }
 
         // TODO: Configure proper health check for PostgreSQL
@@ -198,49 +188,6 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar, IKoanAspireRegistrar
                !string.IsNullOrEmpty(configuration[Infrastructure.Constants.Configuration.Keys.ConnectionStringsPostgres]);
     }
 
-    private (string? Database, string? Username, string? Password, int Port) ParseConnectionString(string connectionString)
-    {
-        // Simple connection string parsing for PostgreSQL
-        // Format: "Host=localhost;Port=5432;Database=Koan;Username=postgres;Password=postgres"
-        var parts = connectionString.Split(';');
-        string? database = null;
-        string? username = null;
-        string? password = null;
-        int port = 5432;
-
-        foreach (var part in parts)
-        {
-            var keyValue = part.Split('=', 2);
-            if (keyValue.Length == 2)
-            {
-                var key = keyValue[0].Trim().ToLowerInvariant();
-                var value = keyValue[1].Trim();
-
-                switch (key)
-                {
-                    case "database":
-                        database = value;
-                        break;
-                    case "username":
-                    case "user id":
-                    case "userid":
-                    case "uid":
-                        username = value;
-                        break;
-                    case "password":
-                    case "pwd":
-                        password = value;
-                        break;
-                    case "port":
-                        if (int.TryParse(value, out var parsedPort))
-                            port = parsedPort;
-                        break;
-                }
-            }
-        }
-
-        return (database, username, password, port);
-    }
 }
 
 

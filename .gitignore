@@ -71,3 +71,6 @@ node_modules/
 
 # Koan framework cache and metadata
 **/.Koan/
+/samples/S7.Meridian/storage
+/samples/S7.Meridian/scripts/phase4.5/try-it-yourself/output
+nul

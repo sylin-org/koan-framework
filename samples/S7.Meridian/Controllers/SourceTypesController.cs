@@ -1,4 +1,7 @@
 using System;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using Koan.Samples.Meridian.Contracts;
 using Koan.Samples.Meridian.Infrastructure;
 using Koan.Samples.Meridian.Models;
@@ -31,7 +34,7 @@ public sealed class SourceTypesController : EntityController<SourceType>
     {
         try
         {
-            var response = await _authoring.SuggestAsync(request, ct).ConfigureAwait(false);
+            var response = await _authoring.SuggestAsync(request, ct);
             return Ok(response);
         }
         catch (ArgumentException ex)
@@ -39,5 +42,29 @@ public sealed class SourceTypesController : EntityController<SourceType>
             _logger.LogWarning(ex, "Invalid source type AI suggest request.");
             return BadRequest(new { error = ex.Message });
         }
+    }
+
+    /// <summary>
+    /// Gets available source type codes for file-only pipeline creation.
+    /// GET /api/sourcetypes/codes
+    /// </summary>
+    [HttpGet("codes")]
+    public async Task<ActionResult> GetTypeCodesAsync(CancellationToken ct)
+    {
+        var sourceTypes = await SourceType.All(ct);
+
+        var codes = sourceTypes
+            .Where(t => !string.IsNullOrWhiteSpace(t.Code))
+            .OrderBy(t => t.Code)
+            .Select(t => new
+            {
+                code = t.Code,
+                name = t.Name,
+                description = t.Description,
+                tags = t.Tags
+            })
+            .ToList();
+
+        return Ok(new { types = codes });
     }
 }

@@ -21,9 +21,13 @@ public sealed class PipelineProcessor : IPipelineProcessor
     private readonly ITextExtractor _textExtractor;
     private readonly IPassageChunker _chunker;
     private readonly IPassageIndexer _indexer;
-    private readonly IFieldExtractor _fieldExtractor;
+    private readonly IFactCatalogBuilder _catalogBuilder;
+    private readonly IFactCategorizer _categorizer;
+    private readonly ISchemaGuidedExtractor _extractor;
+    private readonly IFieldConflictResolver _conflictResolver;
     private readonly IDocumentMerger _merger;
     private readonly IDocumentClassifier _classifier;
+    private readonly IDocumentStyleClassifier _styleClassifier;
     private readonly IRunLogWriter _runLog;
     private readonly IIncrementalRefreshPlanner _refreshPlanner;
     private readonly MeridianOptions _options;
@@ -33,9 +37,13 @@ public sealed class PipelineProcessor : IPipelineProcessor
         ITextExtractor textExtractor,
         IPassageChunker chunker,
         IPassageIndexer indexer,
-        IFieldExtractor fieldExtractor,
+        IFactCatalogBuilder catalogBuilder,
+        IFactCategorizer categorizer,
+        ISchemaGuidedExtractor extractor,
+        IFieldConflictResolver conflictResolver,
         IDocumentMerger merger,
         IDocumentClassifier classifier,
+        IDocumentStyleClassifier styleClassifier,
         IRunLogWriter runLog,
         IIncrementalRefreshPlanner refreshPlanner,
         MeridianOptions options,
@@ -44,9 +52,13 @@ public sealed class PipelineProcessor : IPipelineProcessor
         _textExtractor = textExtractor;
         _chunker = chunker;
         _indexer = indexer;
-        _fieldExtractor = fieldExtractor;
+        _catalogBuilder = catalogBuilder;
+        _categorizer = categorizer;
+        _extractor = extractor;
+        _conflictResolver = conflictResolver;
         _merger = merger;
         _classifier = classifier;
+        _styleClassifier = styleClassifier;
         _runLog = runLog;
         _refreshPlanner = refreshPlanner;
         _options = options;
@@ -60,42 +72,32 @@ public sealed class PipelineProcessor : IPipelineProcessor
 
         job.TotalDocuments = job.DocumentIds.Count;
         job.ProcessedDocuments = 0;
-        job.Status = JobStatus.Processing;
-        job.HeartbeatAt = DateTime.UtcNow;
-        await job.Save(ct).ConfigureAwait(false);
-
-        pipeline.TotalDocuments = job.TotalDocuments;
-        pipeline.ProcessedDocuments = 0;
+        // Status already set to Processing by TryClaimAnyAsync, no need to save again
+        pipeline.AttachDocuments(job.DocumentIds);
         pipeline.Status = PipelineStatus.Processing;
-        pipeline.UpdatedAt = DateTime.UtcNow;
-        await pipeline.Save(ct).ConfigureAwait(false);
-
-        pipeline.Status = PipelineStatus.Processing;
-        pipeline.ProcessedDocuments = 0;
         pipeline.UpdatedAt = DateTime.UtcNow;
         await pipeline.Save(ct);
 
-        if (job.TotalDocuments == 0)
+        // STEP 1: Create virtual document from Authoritative Notes (if present)
+        string? virtualDocumentId = null;
+        if (!string.IsNullOrWhiteSpace(pipeline.AuthoritativeNotes))
         {
-            job.TotalDocuments = job.DocumentIds.Count;
+            virtualDocumentId = await CreateVirtualDocumentFromNotesAsync(pipeline, ct);
+            if (!string.IsNullOrWhiteSpace(virtualDocumentId))
+            {
+                pipeline.AttachDocument(virtualDocumentId);
+                pipeline.UpdatedAt = DateTime.UtcNow;
+                await pipeline.Save(ct);
+            }
+            _logger.LogInformation(
+                "Created virtual document {VirtualDocId} from Authoritative Notes for pipeline {PipelineId}",
+                virtualDocumentId,
+                pipeline.Id);
         }
-
-        job.ProcessedDocuments = Math.Min(job.ProcessedDocuments, job.TotalDocuments);
-        job.HeartbeatAt = DateTime.UtcNow;
-        job.LastDocumentId = null;
-        await job.Save(ct);
 
         var changedDocuments = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var passages = new List<Passage>();
         var processedCount = 0;
-
-        async Task PersistProgressAsync(string? documentId)
-        {
-            job.ProcessedDocuments = Math.Min(processedCount, job.TotalDocuments);
-            job.LastDocumentId = documentId;
-            job.HeartbeatAt = DateTime.UtcNow;
-            await job.Save(ct).ConfigureAwait(false);
-        }
 
         foreach (var documentId in job.DocumentIds)
         {
@@ -106,7 +108,10 @@ public sealed class PipelineProcessor : IPipelineProcessor
             {
                 _logger.LogWarning("Document {DocumentId} missing for pipeline {PipelineId}.", documentId, job.PipelineId);
                 processedCount++;
-                await PersistProgressAsync(documentId).ConfigureAwait(false);
+                job.ProcessedDocuments = processedCount;
+                job.LastDocumentId = documentId;
+                job.HeartbeatAt = DateTime.UtcNow;
+                await job.Save(ct);
                 continue;
             }
 
@@ -168,7 +173,10 @@ public sealed class PipelineProcessor : IPipelineProcessor
                 }, ct);
 
                 processedCount++;
-                await PersistProgressAsync(document.Id).ConfigureAwait(false);
+                job.ProcessedDocuments = processedCount;
+                job.LastDocumentId = document.Id;
+                job.HeartbeatAt = DateTime.UtcNow;
+                await job.Save(ct);
                 continue;
             }
 
@@ -183,54 +191,6 @@ public sealed class PipelineProcessor : IPipelineProcessor
             document.ClassificationMethod = classification.Method;
             document.ClassificationReason = classification.Reason;
 
-            var allowed = pipeline.RequiredSourceTypes is null ||
-                          pipeline.RequiredSourceTypes.Count == 0 ||
-                          pipeline.RequiredSourceTypes.Any(type =>
-                              string.Equals(type, classification.TypeId, StringComparison.OrdinalIgnoreCase));
-
-            if (!allowed)
-            {
-                var requiredList = pipeline.RequiredSourceTypes is { Count: > 0 }
-                    ? string.Join(", ", pipeline.RequiredSourceTypes)
-                    : "(unspecified)";
-                var exclusionReason = $"Classified as {classification.TypeId}, but analysis '{pipeline.AnalysisTypeId}' requires [{requiredList}].";
-
-                _logger.LogWarning("Document {DocumentId} classified as {TypeId} but pipeline {PipelineId} requires [{Required}]; excluding from run.",
-                    document.Id, classification.TypeId, pipeline.Id, requiredList);
-
-                document.Status = DocumentProcessingStatus.Failed;
-                document.ClassificationReason = exclusionReason;
-                document.UpdatedAt = classifyFinished;
-                await document.Save(ct);
-
-                var metadata = new Dictionary<string, string>
-                {
-                    ["typeId"] = classification.TypeId,
-                    ["confidence"] = classification.Confidence.ToString("0.00"),
-                    ["method"] = classification.Method.ToString(),
-                    ["allowed"] = "false",
-                    ["requiredSourceTypes"] = requiredList
-                };
-
-                await _runLog.AppendAsync(new RunLog
-                {
-                    PipelineId = pipeline.Id,
-                    Stage = "classify",
-                    DocumentId = document.Id,
-                    FieldPath = null,
-                    StartedAt = classifyStarted,
-                    FinishedAt = classifyFinished,
-                    Status = "excluded",
-                    ModelId = classification.Method.ToString(),
-                    ErrorMessage = exclusionReason,
-                    Metadata = metadata
-                }, ct);
-
-                processedCount++;
-                await PersistProgressAsync(document.Id).ConfigureAwait(false);
-                continue;
-            }
-
             document.Status = DocumentProcessingStatus.Classified;
             document.UpdatedAt = classifyFinished;
             await document.Save(ct);
@@ -242,8 +202,7 @@ public sealed class PipelineProcessor : IPipelineProcessor
                 ["typeId"] = classification.TypeId,
                 ["confidence"] = classification.Confidence.ToString("0.00"),
                 ["method"] = classification.Method.ToString(),
-                ["reason"] = classification.Reason,
-                ["allowed"] = "true"
+                ["reason"] = classification.Reason
             };
 
             await _runLog.AppendAsync(new RunLog
@@ -259,6 +218,28 @@ public sealed class PipelineProcessor : IPipelineProcessor
                 Metadata = allowedMetadata
             }, ct);
 
+            // Check if document type should skip processing (e.g., test files, non-documents)
+            var sourceType = await SourceType.Get(classification.TypeId, ct);
+            if (sourceType?.SkipProcessing == true)
+            {
+                _logger.LogInformation(
+                    "Document {DocumentId} classified as {TypeName} with SkipProcessing=true ({Reason}). Skipping chunking and extraction.",
+                    document.Id,
+                    sourceType.Name,
+                    classification.Reason);
+
+                document.Status = DocumentProcessingStatus.Indexed; // Mark as processed
+                document.UpdatedAt = DateTime.UtcNow;
+                await document.Save(ct);
+
+                processedCount++;
+                job.ProcessedDocuments = processedCount;
+                job.LastDocumentId = document.Id;
+                job.HeartbeatAt = DateTime.UtcNow;
+                await job.Save(ct);
+                continue; // Skip to next document
+            }
+
             var chunks = _chunker.Chunk(document, extraction.Text);
             foreach (var chunk in chunks)
             {
@@ -267,10 +248,13 @@ public sealed class PipelineProcessor : IPipelineProcessor
             }
 
             processedCount++;
-            await PersistProgressAsync(document.Id).ConfigureAwait(false);
+            job.ProcessedDocuments = processedCount;
+            job.LastDocumentId = document.Id;
+            job.HeartbeatAt = DateTime.UtcNow;
+            await job.Save(ct);
         }
 
-        await _indexer.IndexAsync(passages, ct);
+        await _indexer.IndexAsync(pipeline.Id, passages, ct);
 
         foreach (var docId in job.DocumentIds)
         {
@@ -288,13 +272,16 @@ public sealed class PipelineProcessor : IPipelineProcessor
             }
         }
 
-        pipeline.ProcessedDocuments = job.ProcessedDocuments;
-        pipeline.UpdatedAt = DateTime.UtcNow;
-        await pipeline.Save(ct);
-
-        var allPassages = await Passage.Query(p => p.PipelineId == pipeline.Id, ct);
-        var existingFields = (await ExtractedField.Query(e => e.PipelineId == pipeline.Id, ct).ConfigureAwait(false)).ToList();
-        var plan = await _refreshPlanner.PlanAsync(pipeline, changedDocuments, existingFields, ct).ConfigureAwait(false);
+        var allPassages = await pipeline.LoadPassagesAsync(ct);
+        var existingFields = (await ExtractedField.Query(e => e.PipelineId == pipeline.Id, ct))
+            .Where(field => string.Equals(field.PipelineId, pipeline.Id, StringComparison.Ordinal))
+            .Select(field =>
+            {
+                field.FieldPath = FieldPathCanonicalizer.Canonicalize(field.FieldPath);
+                return field;
+            })
+            .ToList();
+        var plan = await _refreshPlanner.PlanAsync(pipeline, changedDocuments, existingFields, ct);
 
         var planTimestamp = DateTime.UtcNow;
         var planMetadata = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
@@ -320,31 +307,129 @@ public sealed class PipelineProcessor : IPipelineProcessor
             FinishedAt = DateTime.UtcNow,
             Status = plan.Mode,
             Metadata = planMetadata
-        }, ct).ConfigureAwait(false);
+        }, ct);
 
         HashSet<string>? fieldFilter = null;
         if (!plan.RequiresFullExtraction && plan.FieldsToExtract.Count > 0)
         {
-            fieldFilter = plan.FieldsToExtract.ToHashSet(StringComparer.Ordinal);
+            fieldFilter = plan.FieldsToExtract
+                .Select(FieldPathCanonicalizer.Canonicalize)
+                .ToHashSet(StringComparer.Ordinal);
         }
 
         var freshExtractions = new List<ExtractedField>();
         if (plan.RequiresFullExtraction || (fieldFilter?.Count ?? 0) > 0)
         {
-            freshExtractions = await _fieldExtractor.ExtractAsync(pipeline, allPassages, _options, fieldFilter, ct).ConfigureAwait(false);
+            var analysisType = await AnalysisType.Get(pipeline.AnalysisTypeId, ct)
+                ?? throw new InvalidOperationException($"AnalysisType '{pipeline.AnalysisTypeId}' not found for pipeline {pipeline.Id}.");
+
+            // STAGE 1: Build complete fact catalog from org profile + analysis type
+            var factCatalog = await _catalogBuilder.BuildAsync(pipeline, analysisType, ct);
+
+            // STAGE 2: Semantic categorization of facts into contextual batches (cached)
+            var categorizationMap = await _categorizer.CategorizeAsync(factCatalog, analysisType, ct);
+
+            // STAGE 3: Targeted extraction per batch per document
+            var allExtractedFields = new List<ExtractedField>();
+
+            foreach (var docId in pipeline.DocumentIds.Distinct(StringComparer.Ordinal))
+            {
+                var document = await SourceDocument.Get(docId, ct);
+                if (document is null)
+                {
+                    _logger.LogWarning("Unable to load document {DocumentId} for fact extraction", docId);
+                    continue;
+                }
+
+                // STAGE 2.5: Document style classification (cached if already classified)
+                await _styleClassifier.ClassifyAsync(document, ct);
+
+                foreach (var batch in categorizationMap.Batches)
+                {
+                    // Apply field filter if specified
+                    var batchToExtract = batch;
+                    if (fieldFilter != null)
+                    {
+                        var filteredBatch = new SemanticBatch
+                        {
+                            BatchId = batch.BatchId,
+                            CategoryName = batch.CategoryName,
+                            CategoryDescription = batch.CategoryDescription,
+                            FieldPaths = batch.FieldPaths
+                                .Where(fp => fieldFilter.Contains(fp))
+                                .ToList()
+                        };
+
+                        if (filteredBatch.FieldPaths.Count == 0)
+                        {
+                            continue; // Skip batch if no fields match filter
+                        }
+
+                        batchToExtract = filteredBatch;
+                    }
+
+                    var batchFields = await _extractor.ExtractBatchAsync(
+                        document, batchToExtract, factCatalog, pipeline.Id, ct);
+                    allExtractedFields.AddRange(batchFields);
+                }
+            }
+
+            // STAGE 3.5: Extract from authoritative notes (privileged source)
+            if (!string.IsNullOrWhiteSpace(pipeline.AuthoritativeNotes))
+            {
+                _logger.LogInformation("Extracting from authoritative notes for pipeline {PipelineId}", pipeline.Id);
+
+                foreach (var batch in categorizationMap.Batches)
+                {
+                    // Apply field filter if specified
+                    var batchToExtract = batch;
+                    if (fieldFilter != null)
+                    {
+                        var filteredBatch = new SemanticBatch
+                        {
+                            BatchId = batch.BatchId,
+                            CategoryName = batch.CategoryName,
+                            CategoryDescription = batch.CategoryDescription,
+                            FieldPaths = batch.FieldPaths
+                                .Where(fp => fieldFilter.Contains(fp))
+                                .ToList()
+                        };
+
+                        if (filteredBatch.FieldPaths.Count == 0)
+                        {
+                            continue;
+                        }
+
+                        batchToExtract = filteredBatch;
+                    }
+
+                    var notesBatchFields = await _extractor.ExtractBatchFromNotesAsync(
+                        pipeline.AuthoritativeNotes, batchToExtract, factCatalog, pipeline.Id, ct);
+                    allExtractedFields.AddRange(notesBatchFields);
+                }
+            }
+
+            // STAGE 4: Conflict resolution (Notes precedence: 1, Documents precedence: 3)
+            freshExtractions = _conflictResolver.Resolve(allExtractedFields);
+
+            _logger.LogInformation(
+                "Schema-guided extraction complete: {TotalFields} fields extracted, {ResolvedFields} after conflict resolution",
+                allExtractedFields.Count, freshExtractions.Count);
         }
 
         var existingByField = existingFields.ToDictionary(e => e.FieldPath, StringComparer.Ordinal);
         var savedExtractions = new List<ExtractedField>();
         foreach (var extraction in freshExtractions)
         {
+            extraction.FieldPath = FieldPathCanonicalizer.Canonicalize(extraction.FieldPath);
+
             if (existingByField.TryGetValue(extraction.FieldPath, out var prior))
             {
                 extraction.Id = prior.Id;
             }
 
             extraction.UpdatedAt = DateTime.UtcNow;
-            var saved = await extraction.Save(ct).ConfigureAwait(false);
+            var saved = await extraction.Save(ct);
             existingByField[extraction.FieldPath] = saved;
             savedExtractions.Add(saved);
         }
@@ -398,27 +483,158 @@ public sealed class PipelineProcessor : IPipelineProcessor
                         ["reason"] = "no-new-extractions",
                         ["preservedFields"] = existingFields.Count.ToString(CultureInfo.InvariantCulture)
                     }
-                }, ct).ConfigureAwait(false);
+                }, ct);
             }
             else
             {
-                throw new InvalidOperationException("Incremental refresh produced no fields to merge.");
+                // Empty result is valid - log warning and complete successfully
+                _logger.LogWarning("Pipeline {PipelineId} has no fields to merge (no extractions, no existing fields). Completing as empty.", pipeline.Id);
+                mergeCandidates = new List<ExtractedField>();
             }
         }
 
         await _merger.MergeAsync(pipeline, mergeCandidates, ct);
 
+        // Update all documents with the extraction version to detect stale extractions on reuse
+        if (!string.IsNullOrWhiteSpace(pipeline.AnalysisTypeId))
+        {
+            var analysisType = await AnalysisType.Get(pipeline.AnalysisTypeId, ct);
+            if (analysisType != null)
+            {
+                foreach (var docId in pipeline.DocumentIds.Distinct(StringComparer.Ordinal))
+                {
+                    var document = await SourceDocument.Get(docId, ct);
+                    if (document != null && !document.IsVirtual)
+                    {
+                        document.LastExtractedAnalysisTypeVersion = analysisType.Version;
+                        document.UpdatedAt = DateTime.UtcNow;
+                        await document.Save(ct);
+                    }
+                }
+
+                _logger.LogInformation(
+                    "Updated {Count} documents with AnalysisType version {Version} for pipeline {PipelineId}",
+                    pipeline.DocumentIds.Count, analysisType.Version, pipeline.Id);
+            }
+        }
+
         var completedAt = DateTime.UtcNow;
         pipeline.Status = PipelineStatus.Completed;
-        pipeline.ProcessedDocuments = pipeline.TotalDocuments;
         pipeline.CompletedAt = completedAt;
         pipeline.UpdatedAt = completedAt;
-        await pipeline.Save(ct).ConfigureAwait(false);
+        await pipeline.Save(ct);
 
+        // Move completed job to archive partition to preserve history and prevent reprocessing
         job.Status = JobStatus.Completed;
         job.CompletedAt = completedAt;
         job.HeartbeatAt = completedAt;
         job.ProcessedDocuments = job.TotalDocuments;
-        await job.Save(ct).ConfigureAwait(false);
+
+        _logger.LogInformation("Archiving completed job {JobId} to completed-jobs partition", job.Id);
+        await job.Save("completed-jobs", ct);
+
+        // Remove from active jobs collection to prevent TryClaimAnyAsync from finding it
+        await job.Delete(ct);
+        _logger.LogInformation("Job {JobId} archived and removed from active queue", job.Id);
+    }
+
+    /// <summary>
+    /// Create a virtual document from Authoritative Notes to enable extraction via standard pipeline.
+    /// Virtual documents have precedence=1 (highest priority) to override all other sources.
+    /// </summary>
+    private async Task<string> CreateVirtualDocumentFromNotesAsync(
+        DocumentPipeline pipeline,
+        CancellationToken ct)
+    {
+        var notesContent = pipeline.AuthoritativeNotes ?? string.Empty;
+        var notesHash = TextExtractor.ComputeTextHash(notesContent);
+
+        // Check for existing virtual document attached to this pipeline
+        var existingVirtual = (await SourceDocument.Query(
+            d => d.IsVirtual && d.SourceType == MeridianConstants.SourceTypes.AuthoritativeNotes,
+            ct))
+            .FirstOrDefault(d => pipeline.DocumentIds.Contains(d.Id!));
+
+        if (existingVirtual != null)
+        {
+            // Update content if changed
+            if (existingVirtual.TextHash != notesHash)
+            {
+                _logger.LogInformation("Updating existing virtual document {DocId} with new notes (hash changed)", existingVirtual.Id);
+                existingVirtual.ExtractedText = notesContent;
+                existingVirtual.ContentHash = notesHash;
+                existingVirtual.TextHash = notesHash;
+                existingVirtual.Size = notesContent.Length;
+                existingVirtual.UpdatedAt = DateTime.UtcNow;
+                existingVirtual.ExtractedAt = DateTime.UtcNow;
+                await existingVirtual.Save(ct);
+
+                await _runLog.AppendAsync(new RunLog
+                {
+                    PipelineId = pipeline.Id,
+                    Stage = "virtual-document-update",
+                    DocumentId = existingVirtual.Id,
+                    FieldPath = null,
+                    StartedAt = DateTime.UtcNow,
+                    FinishedAt = DateTime.UtcNow,
+                    Status = "success",
+                    Metadata = new Dictionary<string, string>
+                    {
+                        ["source"] = "Authoritative Notes (Updated)",
+                        ["size"] = existingVirtual.Size.ToString()
+                    }
+                }, ct);
+            }
+            else
+            {
+                _logger.LogDebug("Reusing existing virtual document {DocId} (no changes)", existingVirtual.Id);
+            }
+
+            return existingVirtual.Id;
+        }
+
+        // Create new virtual document
+        var virtualDoc = new SourceDocument
+        {
+            OriginalFileName = "Authoritative Notes (User Override)",
+            StorageKey = $"virtual-notes-{pipeline.Id}", // No actual file storage
+            MediaType = "text/plain",
+            Size = notesContent.Length,
+            ContentHash = notesHash,
+            IsVirtual = true,
+            Precedence = 1, // Highest priority
+            SourceType = MeridianConstants.SourceTypes.AuthoritativeNotes,
+            ExtractedText = notesContent,
+            Status = DocumentProcessingStatus.Indexed, // Skip text extraction/classification
+            ExtractionConfidence = 1.0,
+            ExtractedAt = DateTime.UtcNow,
+            ClassificationConfidence = 1.0,
+            ClassificationMethod = ClassificationMethod.Manual,
+            ClassificationReason = "Virtual document from Authoritative Notes",
+            TextHash = notesHash,
+            PageCount = 1,
+            UploadedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+
+        var saved = await virtualDoc.Save(ct);
+
+        await _runLog.AppendAsync(new RunLog
+        {
+            PipelineId = pipeline.Id,
+            Stage = "virtual-document",
+            DocumentId = saved.Id,
+            FieldPath = null,
+            StartedAt = DateTime.UtcNow,
+            FinishedAt = DateTime.UtcNow,
+            Status = "success",
+            Metadata = new Dictionary<string, string>
+            {
+                ["source"] = "Authoritative Notes",
+                ["size"] = virtualDoc.Size.ToString()
+            }
+        }, ct);
+
+        return saved.Id;
     }
 }

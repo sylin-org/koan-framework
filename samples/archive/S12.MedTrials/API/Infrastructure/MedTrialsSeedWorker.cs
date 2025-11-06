@@ -57,7 +57,7 @@ public sealed class MedTrialsSeedWorker : IHostedService
                     UpdatedAt = now
                 }
             };
-            await TrialSite.UpsertMany(sites, cancellationToken).ConfigureAwait(false);
+            await TrialSite.UpsertMany(sites, cancellationToken);
 
             var visits = new List<ParticipantVisit>
             {
@@ -117,7 +117,7 @@ public sealed class MedTrialsSeedWorker : IHostedService
                     UpdatedAt = now
                 }
             };
-            await ParticipantVisit.UpsertMany(visits, cancellationToken).ConfigureAwait(false);
+            await ParticipantVisit.UpsertMany(visits, cancellationToken);
 
             var documents = new[]
             {
@@ -144,7 +144,7 @@ public sealed class MedTrialsSeedWorker : IHostedService
                     IngestedAt = now.AddDays(-1)
                 }
             };
-            await ProtocolDocument.UpsertMany(documents, cancellationToken).ConfigureAwait(false);
+            await ProtocolDocument.UpsertMany(documents, cancellationToken);
 
             var events = new[]
             {
@@ -171,7 +171,7 @@ public sealed class MedTrialsSeedWorker : IHostedService
                     UpdatedAt = now
                 }
             };
-            await AdverseEventReport.UpsertMany(events, cancellationToken).ConfigureAwait(false);
+            await AdverseEventReport.UpsertMany(events, cancellationToken);
 
             var notes = new[]
             {
@@ -186,7 +186,7 @@ public sealed class MedTrialsSeedWorker : IHostedService
                     Tags = new[] { "storage", "qa" }
                 }
             };
-            await MonitoringNote.UpsertMany(notes, cancellationToken).ConfigureAwait(false);
+            await MonitoringNote.UpsertMany(notes, cancellationToken);
 
             _logger?.LogInformation("Seeded S12.MedTrials sample data.");
         }

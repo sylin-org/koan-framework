@@ -57,7 +57,7 @@ public sealed class EndpointToolExecutor
         try
         {
             var translation = _requestTranslator.Translate(provider, registration, tool, arguments, cancellationToken);
-            var endpointResult = await InvokeServiceAsync(service, translation).ConfigureAwait(false);
+            var endpointResult = await InvokeServiceAsync(service, translation);
             return _responseTranslator.Translate(registration, tool, endpointResult);
         }
         catch (JsonException ex)
@@ -102,7 +102,7 @@ public sealed class EndpointToolExecutor
             throw new InvalidOperationException($"Invocation of {translation.MethodName} did not return a Task instance.");
         }
 
-        await task.ConfigureAwait(false);
+        await task;
         var resultProperty = task.GetType().GetProperty("Result");
         if (resultProperty?.GetValue(task) is not EntityEndpointResult result)
         {

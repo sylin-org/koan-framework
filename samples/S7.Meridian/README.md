@@ -13,12 +13,15 @@ A local-first document intelligence workbench that transforms mixed source files
 ## What This Sample Demonstrates
 
 ### 1. **Evidence-First Document Intelligence**
+
 - **Automated extraction**: Parse PDFs, extract structured data, cite every value
-- **Source classification**: Auto-detect document types (questionnaires, financial statements, etc.)
+- **Hint-driven classification**: AI descriptors recommend source types with optional user selection
 - **Multi-source aggregation**: Merge data from multiple files with conflict resolution
 - **Citation tracking**: Every extracted value links back to source page and text span
+- **Hands-off pipeline**: Upload triggers automatic type detection and fact cataloging; overrides via `PUT /documents/{id}/type` and `PUT /pipelines/{id}/analysisType` kick off reprocessing without manual prompts
 
 ### 2. **Koan Framework Patterns**
+
 - **Entity<T> first design**: All domain models use `Entity<T>` with auto GUID v7
 - **Canon Runtime pipelines**: Processing workflow as `CanonEntity<T>` with phase contributors
 - **EntityController<T>**: Auto-generated REST APIs with minimal custom code
@@ -26,30 +29,35 @@ A local-first document intelligence workbench that transforms mixed source files
 - **Content-addressed storage**: Files stored by SHA-512 hash (S6.SnapVault pattern)
 
 ### 3. **Local-First AI Integration**
+
 - **Ollama**: Local LLMs for extraction, classification, type generation
 - **Weaviate**: Hybrid vector search for passage retrieval
 - **Schema-driven extraction**: JSON Schema validation prevents hallucination
 - **Confidence scoring**: Every value has evidence-based confidence metrics
 
 ### 4. **Production-Ready Patterns**
+
 - **Background processing**: Hosted service with graceful shutdown
 - **Pipeline orchestration**: Canon phases (Validation → Enrichment)
 - **Error handling**: Retry logic, partial failures, recovery
 - **Observability**: Structured logging, metrics, phase tracking
 - **Versioned deliverables**: Each run snapshots hashed canonical data + evidence maps, rendering templated Markdown/JSON on demand
 - **Incremental refresh**: Targeted field re-extraction with job heartbeats and approval preservation
+- **Audit trail**: Run logs capture auto-classified vs. user-selected document types and analysis changes for each pipeline
 
 ---
 
 ## The Problem It Solves
 
 **Scenario**: You need to respond to an RFP or create a vendor assessment. You have:
+
 - 5 PDF documents (prescreen questionnaire, financial statements, compliance certs, references)
 - Each document has overlapping information (company name, revenue, employee count)
 - Different formats, different data quality, sometimes conflicting values
 - You need to produce a single, trustworthy deliverable with citations
 
 **Manual approach** (4-6 hours):
+
 1. Open each PDF
 2. Find relevant sections
 3. Copy values into template
@@ -59,6 +67,7 @@ A local-first document intelligence workbench that transforms mixed source files
 7. Format final document
 
 **Meridian approach** (10-15 minutes):
+
 1. Upload files → auto-classified
 2. Click "Process" → pipeline runs
 3. Review conflicts → select correct values with evidence
@@ -72,7 +81,7 @@ A local-first document intelligence workbench that transforms mixed source files
 
 - .NET 10 SDK
 - Docker Desktop (for MongoDB, Weaviate, Ollama, and OCR containers)
-- Optional: set `WEAVIATE_ENDPOINT` to reuse an existing Weaviate instance (defaults to the Koan test fixture)
+- Optional: set `WEAVIATE_ENDPOINT` to reuse an existing Weaviate instance (the compose stack exposes one at `http://localhost:5081`)
 - 16GB RAM minimum (for local LLMs)
 
 ### Run the Sample
@@ -93,8 +102,10 @@ docker compose -p koan-s7-meridian -f docker/compose.yml up -d --build
 ```
 
 The Windows script and the `docker compose` command both:
-- Build and start the full Meridian stack (MongoDB, Pandoc renderer, Tesseract OCR, ASP.NET API)
+
+- Build and start the full Meridian stack (MongoDB, Weaviate vector search, Pandoc renderer, Tesseract OCR, ASP.NET API)
 - Expose the API at `http://localhost:5080`
+- Expose Weaviate at `http://localhost:5081`
 - Make Swagger UI available at `http://localhost:5080/swagger/index.html`
 
 To stop everything:
@@ -138,7 +149,7 @@ dotnet test tests/Suites/Data/S7.Meridian/Koan.Data.S7.Meridian.Tests/ -c Releas
 
 1. **Choose deliverable type**: "Vendor Assessment"
 2. **Add context**: "Prioritize Q3 2024 data"
-3. **Upload files**: Drag one or many PDFs in a single request (auto-classified)
+3. **Upload files**: Drag one or many PDFs in a single request (pick a type or let hints decide)
 4. **Process**: Watch pipeline stages
 5. **Review**: Resolve conflicts with evidence drawer
 6. **Finalize**: Download PDF with citations
@@ -205,7 +216,7 @@ public class Passage : Entity<Passage>
 public class DeliverableField : Entity<DeliverableField>
 {
     public string RequestId { get; set; } = "";
-    public string FieldPath { get; set; } = ""; // e.g., "annualRevenue"
+    public string FieldPath { get; set; } = ""; // e.g., "$.annual_revenue"
     public JsonDocument SelectedValue { get; set; } = null!;
     public List<FieldCandidate> Candidates { get; set; } = new();
     public List<Citation> Citations { get; set; } = new();
@@ -214,7 +225,11 @@ public class DeliverableField : Entity<DeliverableField>
 }
 ```
 
+**Descriptor hints** live on each `SourceType` (`Discriminators.DescriptorHints` and `SignalPhrases`). They are short AI-authored summaries and canonical phrases that characterize the document. Authors tune them when curating source types; analysts can still pick a type manually when hints do not apply, and the pipeline leaves items untyped when no confident match is available.
+
 **Key Insight**: Rich value objects (not primitive obsession). `Citation`, `ClassificationResult`, `MergeRules` are strongly typed.
+
+> **Canonical field paths**: All values use snake_case JSONPath identifiers (for example, `$.financial_health.revenue`). Use `FieldPathCanonicalizer` to convert incoming paths before persistence or lookups.
 
 ---
 
@@ -451,6 +466,7 @@ public class ExtractEnrichmentContributor : ICanonPhaseContributor<AnalysisWorkf
 ```
 
 **Key Technique**: Pass the **field-specific JSON Schema** to the LLM. Prompt includes:
+
 - Field name and description
 - Expected type (string, number, date, enum, etc.)
 - Validation rules (min/max, pattern, required)
@@ -510,6 +526,7 @@ public class AggregateEnrichmentContributor : ICanonPhaseContributor<AnalysisWor
 ```
 
 **Merge Strategies**:
+
 - **Precedence**: First valid value wins (source type priority)
 - **LatestDate**: Most recent value (when sources have timestamps)
 - **Consensus**: Most common value (majority vote)
@@ -556,30 +573,35 @@ public class RenderEnrichmentContributor : ICanonPhaseContributor<AnalysisWorkfl
 ```
 
 **Template Example**:
+
 ```markdown
 # Vendor Assessment: {{companyName}}
 
 ## Executive Summary
+
 - **Annual Revenue**: {{annualRevenue}}
 - **Employees**: {{employeeCount}}
 - **Certification Status**: {{certificationStatus}}
 
 ## Financial Health
+
 Total revenue for {{fiscalYear}} was {{annualRevenue}}, representing
 {{growthRate}}% growth over previous year.
 
 ## Citations
+
 All data sourced from:
 {{#sources}}
+
 - {{filename}} (uploaded {{date}})
-{{/sources}}
+  {{/sources}}
 ```
 
 ---
 
 #### OCR Fallback Configuration
 
-Set `Meridian:Extraction:Ocr` to point the pipeline at the OCR sidecar. The compose stack exposes the service internally at `http://meridian-tesseract:8884/tesseract` (and maps it to `http://localhost:6060/tesseract` on the host).
+Set `Meridian:Extraction:Ocr` to point the pipeline at the OCR sidecar. The compose stack exposes the service internally at `http://meridian-tesseract:8884/tesseract` (and now maps it to `http://localhost:5084/tesseract` on the host).
 
 ```json
 {
@@ -607,7 +629,7 @@ Set `Meridian:Rendering:Pandoc` to the HTTP base address exposed by the Pandoc s
     "Rendering": {
       "Pandoc": {
         "Enabled": true,
-        "BaseUrl": "http://localhost:7070/",
+        "BaseUrl": "http://localhost:5083/", // external port standardized (internal still 7070)
         "Endpoint": "render",
         "TimeoutSeconds": 240,
         "SanitizeLatex": true
@@ -621,12 +643,12 @@ Set `Meridian:Rendering:Pandoc` to the HTTP base address exposed by the Pandoc s
 
 Deliverables now expose templated outputs directly:
 
-| Method | Route | Description |
-| ------ | ----- | ----------- |
-| `GET` | `/api/pipelines/{pipelineId}/deliverables/latest` | Returns the most recent persisted deliverable entity. |
-| `GET` | `/api/pipelines/{pipelineId}/deliverables/markdown` | Renders the latest deliverable markdown on demand using the current template + formatted payload. |
-| `GET` | `/api/pipelines/{pipelineId}/deliverables/json` | Returns the canonical JSON payload (`fields` section) for the latest deliverable. |
-| `GET` | `/api/pipelines/{pipelineId}/deliverables/pdf` | Streams a PDF rendered through the Pandoc sidecar using the current template. |
+| Method | Route                                               | Description                                                                                       |
+| ------ | --------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `GET`  | `/api/pipelines/{pipelineId}/deliverables/latest`   | Returns the most recent persisted deliverable entity.                                             |
+| `GET`  | `/api/pipelines/{pipelineId}/deliverables/markdown` | Renders the latest deliverable markdown on demand using the current template + formatted payload. |
+| `GET`  | `/api/pipelines/{pipelineId}/deliverables/json`     | Returns the canonical JSON payload (`fields` section) for the latest deliverable.                 |
+| `GET`  | `/api/pipelines/{pipelineId}/deliverables/pdf`      | Streams a PDF rendered through the Pandoc sidecar using the current template.                     |
 
 ### Run Log Telemetry
 
@@ -660,29 +682,46 @@ public async Task<string> SaveFileAsync(IFormFile file)
 ```
 
 **Benefits**:
+
 - Automatic deduplication (same file uploaded twice = single storage)
 - Immutable (hash never changes)
 - Verifiable (can verify integrity later)
 
 ---
 
-### 2. **Cascade Classification** (Heuristic → Vector → LLM)
+### 2. **Hint Cascade Classification** (Descriptor → Vector → LLM)
 
 ```csharp
 public async Task<ClassificationResult> ClassifyAsync(SourceFile file)
 {
     var text = await ExtractTextPreview(file); // First 2 pages
 
-    // Try 1: Exact heuristics (fast, cheap)
+    // Try 0: Honor explicit user selection when supplied
+    if (!string.IsNullOrWhiteSpace(file.SourceTypeId))
+    {
+        return new ClassificationResult {
+            SourceTypeId = file.SourceTypeId,
+            Confidence = 1.0,
+            Method = ClassificationMethod.Manual,
+            Rationale = "User selected type"
+        };
+    }
+
+    // Try 1: Descriptor hint overlap (fast, cheap)
     foreach (var sourceType in await SourceType.All())
     {
-        if (sourceType.Discriminators.RegexPatterns.Any(p => Regex.IsMatch(text, p)))
+        var score = _hintMatcher.Score(
+            text,
+            sourceType.Discriminators.DescriptorHints,
+            sourceType.Discriminators.SignalPhrases);
+
+        if (score >= 0.82)
         {
             return new ClassificationResult {
                 SourceTypeId = sourceType.Id,
-                Confidence = 0.95,
-                Method = ClassificationMethod.Heuristic,
-                Rationale = "Matched regex pattern"
+                Confidence = score,
+                Method = ClassificationMethod.Descriptor,
+                Rationale = "Matched descriptor hints"
             };
         }
     }
@@ -714,9 +753,12 @@ public async Task<ClassificationResult> ClassifyAsync(SourceFile file)
 ```
 
 **Design Rationale**:
-- Most files match heuristics (90%+) → fast
-- Vector similarity catches variations (5-8%) → medium cost
-- LLM only for ambiguous cases (2-5%) → expensive but accurate
+
+- Explicit user choice always wins when analysts know the type
+- Descriptor hints cover the majority of uploads (≈80%) → fast
+- Vector similarity catches variations (≈15%) → medium cost
+- LLM handles untyped or ambiguous cases (remainder) → expensive but accurate
+- Requests with no confident match remain untyped and surface for review
 
 ---
 
@@ -735,6 +777,7 @@ SourceFile.OriginalName = "Financial_2023.pdf"
 ```
 
 UI can show:
+
 - "3 sources support this value"
 - Click → evidence drawer with highlighted text
 - Hover → tooltip with page number and confidence
@@ -745,26 +788,32 @@ UI can show:
 
 ```typescript
 // Frontend conflict panel
-const conflicts = fields.filter(f =>
-    f.status === 'Conflict' ||
-    f.status === 'LowConfidence'
+const conflicts = fields.filter(
+  (f) => f.status === "Conflict" || f.status === "LowConfidence"
 );
 
 // Triage: Red (blocker) > Amber (conflict) > Yellow (low confidence)
-const blocker = conflicts.filter(f => !f.selectedValue);
-const conflicted = conflicts.filter(f => f.candidates.length > 1);
-const lowConf = conflicts.filter(f => f.confidence < 0.7);
+const blocker = conflicts.filter((f) => !f.selectedValue);
+const conflicted = conflicts.filter((f) => f.candidates.length > 1);
+const lowConf = conflicts.filter((f) => f.confidence < 0.7);
 
 return (
-    <ConflictsPanel>
-        {blocker.map(f => <BlockerCard field={f} />)}
-        {conflicted.map(f => <ConflictCard field={f} />)}
-        {lowConf.map(f => <LowConfidenceCard field={f} />)}
-    </ConflictsPanel>
+  <ConflictsPanel>
+    {blocker.map((f) => (
+      <BlockerCard field={f} />
+    ))}
+    {conflicted.map((f) => (
+      <ConflictCard field={f} />
+    ))}
+    {lowConf.map((f) => (
+      <LowConfidenceCard field={f} />
+    ))}
+  </ConflictsPanel>
 );
 ```
 
 **Each card offers**:
+
 - View evidence
 - Select alternative
 - Regenerate with different hints
@@ -777,9 +826,9 @@ return (
 ### Regression Coverage
 
 - `WeaviateConnectorSpec` (`tests/Suites/Data/Connector.Weaviate/Koan.Data.Connector.Weaviate.Tests/Specs/WeaviateConnectorSpec.cs`) exercises vector CRUD, hybrid ranking, and profile binding.
-    Run it with the connector suite command in Quick Start whenever the profile changes.
+  Run it with the connector suite command in Quick Start whenever the profile changes.
 - `MeridianVectorWorkflowSpec` (planned for `tests/Suites/Data/S7.Meridian/Koan.Data.S7.Meridian.Tests/`) will compose the connector fixture with Meridian batching.
-    That regression guards the `meridian:evidence` profile end-to-end.
+  That regression guards the `meridian:evidence` profile end-to-end.
 
 ### Unit Tests
 
@@ -877,7 +926,7 @@ public class PipelineIntegrationTests : IAsyncLifetime
   "Koan": {
     "Data": {
       "Provider": "MongoDB",
-      "ConnectionString": "mongodb://localhost:27017",
+      "ConnectionString": "mongodb://localhost:5082", // host-mapped port (container still 27017)
       "DatabaseName": "meridian"
     },
     "Storage": {
@@ -987,22 +1036,26 @@ S7.Meridian/
 After exploring S7.Meridian, you'll understand:
 
 1. **Entity-First Architecture**
+
    - Modeling complex domains with `Entity<T>`
    - Rich value objects vs primitive obsession
    - Navigation patterns between entities
 
 2. **Canon Runtime Mastery**
+
    - When to use Canon (multi-stage pipelines)
    - Phase contributors (validation, enrichment)
    - Orchestration and retry logic
 
 3. **AI Integration Patterns**
+
    - Schema-driven extraction (preventing hallucination)
    - Vector search for passage retrieval
    - Confidence scoring and evidence tracking
    - Local-first LLM deployment
 
 4. **Document Intelligence Techniques**
+
    - Auto-classification cascades
    - Content-addressed storage
    - Citation chains for trust
@@ -1043,10 +1096,18 @@ This sample can be extended with:
 
 ## Documentation
 
+### Core Documentation
+
 - **README.md** (this file) - Tutorial and getting started
+- **`docs/UX-SPECIFICATION.md`** ✅ CANONICAL - Official user experience specification
 - **ARCHITECTURE.md** - Deep technical dive, design decisions
-- **DESIGN.md** - UX/UI guidelines, component specs
-- **ADRs** (future) - Architectural decision records
+- **MERIDIAN_EXPLAINED.md** - Narrative guide to RAG architecture and document intelligence
+- **`docs/AUTHORITATIVE-NOTES-PROPOSAL.md`** - Complete technical specification for notes override feature
+- **`docs/GETTING_STARTED.md`** - Developer onboarding guide
+
+### Historical Reference
+
+- **`docs/ux-archive/`** - Superseded UX explorations (historical reference only)
 
 ---
 
@@ -1075,4 +1136,3 @@ See main repository CONTRIBUTING.md for details.
 **Status**: Proposed (Week 1-6 implementation plan)
 **Complexity**: ⭐⭐ Intermediate
 **Key Capabilities**: AI integration, Canon pipelines, document intelligence, evidence tracking
-

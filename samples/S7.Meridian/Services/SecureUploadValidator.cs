@@ -49,7 +49,7 @@ public sealed class SecureUploadValidator : ISecureUploadValidator
 
         await using var stream = file.OpenReadStream();
         var buffer = new byte[4];
-        var read = await stream.ReadAsync(buffer.AsMemory(0, buffer.Length), ct).ConfigureAwait(false);
+        var read = await stream.ReadAsync(buffer.AsMemory(0, buffer.Length), ct);
         if (read < buffer.Length)
         {
             throw new InvalidOperationException("Unable to inspect uploaded file.");

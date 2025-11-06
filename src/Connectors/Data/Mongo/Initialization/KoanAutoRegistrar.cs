@@ -171,8 +171,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             ? ProvenanceModes.FromBootSource(BootSettingSource.Auto, usedDefault: true)
             : ProvenanceModes.FromConfigurationValue(connection);
 
-        Publish(
-            module,
+        module.PublishConfigValue(
             MongoItems.ConnectionString,
             connection,
             displayOverride: effectiveConnectionString,
@@ -180,7 +179,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             usedDefaultOverride: connectionIsAuto ? true : connection.UsedDefault,
             sourceKeyOverride: connectionSourceKey);
 
-        Publish(module, MongoItems.Database, database, database.Value ?? defaultOptions.Database);
+        module.PublishConfigValue(MongoItems.Database, database, database.Value ?? defaultOptions.Database);
 
         module.AddSetting(
             MongoItems.EnsureCreatedSupported,
@@ -189,20 +188,9 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             usedDefault: true,
             sanitizeOverride: false);
 
-        Publish(module, MongoItems.DefaultPageSize, defaultPageSize);
+        module.PublishConfigValue(MongoItems.DefaultPageSize, defaultPageSize);
 
-        Publish(module, MongoItems.MaxPageSize, maxPageSize);
-    }
-
-    private static void Publish<T>(Koan.Core.Provenance.ProvenanceModuleWriter module, ProvenanceItem item, Koan.Core.ConfigurationValue<T> value, object? displayOverride = null, ProvenancePublicationMode? modeOverride = null, bool? usedDefaultOverride = null, string? sourceKeyOverride = null, bool? sanitizeOverride = null)
-    {
-        module.AddSetting(
-            item,
-            modeOverride ?? ProvenanceModes.FromConfigurationValue(value),
-            displayOverride ?? value.Value,
-            sourceKey: sourceKeyOverride ?? value.ResolvedKey,
-            usedDefault: usedDefaultOverride ?? value.UsedDefault,
-            sanitizeOverride: sanitizeOverride);
+        module.PublishConfigValue(MongoItems.MaxPageSize, maxPageSize);
     }
 
     private static string ResolveConnectionStringForReporting(
@@ -277,15 +265,16 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             return fallback;
         }
 
-        var auth = string.IsNullOrWhiteSpace(username)
-            ? string.Empty
-            : $"{username}:{password ?? string.Empty}@";
+        // ARCH-0068: Use static ConnectionStringParser for unified connection string building
+        var components = new Koan.Core.Orchestration.ConnectionStringComponents(
+            Host: "localhost",
+            Port: 27017,
+            Database: string.IsNullOrWhiteSpace(database) ? defaults.Database : database,
+            Username: username,
+            Password: password,
+            Parameters: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase));
 
-        var databaseSegment = string.IsNullOrWhiteSpace(database)
-            ? defaults.Database
-            : database!;
-
-        return $"mongodb://{auth}localhost:27017/{databaseSegment}";
+        return Koan.Core.Orchestration.ConnectionStringParser.Build(components, "mongodb");
     }
 
     private static string[] DiscoverAvailableDataProviders()

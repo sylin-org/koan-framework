@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>S8.PolyglotShop</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Koan Framework - Core -->
+    <ProjectReference Include="..\..\src\Koan.Core\Koan.Core.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Data.Core\Koan.Data.Core.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Web\Koan.Web.csproj" />
+
+    <!-- Koan ServiceMesh - Translation (in-process) -->
+    <ProjectReference Include="..\..\src\Koan.ServiceMesh\Koan.ServiceMesh.csproj" />
+    <ProjectReference Include="..\..\src\Services\Translation\Koan.Service.Translation\Koan.Service.Translation.csproj" />
+
+    <!-- AI for Translation -->
+    <ProjectReference Include="..\..\src\Koan.AI\Koan.AI.csproj" />
+    <ProjectReference Include="..\..\src\Connectors\AI\Ollama\Koan.AI.Connector.Ollama.csproj" />
+
+    <!-- Data Provider for sample data -->
+    <ProjectReference Include="..\..\src\Connectors\Data\Json\Koan.Data.Connector.Json.csproj" />
+
+    <ProjectReference Include="..\..\src\Connectors\Web\Swagger\Koan.Web.Connector.Swagger.csproj" />
+
+    <ProjectReference Include="..\..\src\Koan.Web.Extensions\Koan.Web.Extensions.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Admin\Koan.Admin.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Web.Admin\Koan.Web.Admin.csproj" />
+
+    <ProjectReference Include="..\..\src\Connectors\Web\Auth\Test\Koan.Web.Auth.Connector.Test.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Web.Auth.Services\Koan.Web.Auth.Services.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Web.Auth\Koan.Web.Auth.csproj" />
+
+  </ItemGroup>
+
+</Project>

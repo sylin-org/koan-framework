@@ -81,12 +81,12 @@ internal sealed class CachedRepository<TEntity, TKey> :
     {
         if (_entityPolicy.Strategy is CacheStrategy.NoCache or CacheStrategy.SetOnly or CacheStrategy.Invalidate)
         {
-            return await _inner.GetAsync(id, ct).ConfigureAwait(false);
+            return await _inner.GetAsync(id, ct);
         }
 
         if (!TryBuildEntityKey(null, id, out var key))
         {
-            return await _inner.GetAsync(id, ct).ConfigureAwait(false);
+            return await _inner.GetAsync(id, ct);
         }
 
         var options = _entityPolicy.ToOptions();
@@ -95,23 +95,23 @@ internal sealed class CachedRepository<TEntity, TKey> :
             case CacheStrategy.GetOrSet:
                 return await _cacheClient.GetOrAddAsync<TEntity>(key, async innerCt =>
                 {
-                    var value = await _inner.GetAsync(id, innerCt).ConfigureAwait(false);
+                    var value = await _inner.GetAsync(id, innerCt);
                     return value;
-                }, options, ct).ConfigureAwait(false);
+                }, options, ct);
 
             case CacheStrategy.GetOnly:
                 {
-                    var cached = await _cacheClient.GetAsync<TEntity>(key, options, ct).ConfigureAwait(false);
+                    var cached = await _cacheClient.GetAsync<TEntity>(key, options, ct);
                     if (cached is not null)
                     {
                         return cached;
                     }
 
-                    return await _inner.GetAsync(id, ct).ConfigureAwait(false);
+                    return await _inner.GetAsync(id, ct);
                 }
 
             default:
-                return await _inner.GetAsync(id, ct).ConfigureAwait(false);
+                return await _inner.GetAsync(id, ct);
         }
     }
 
@@ -207,25 +207,25 @@ internal sealed class CachedRepository<TEntity, TKey> :
 
     public async Task<TEntity> UpsertAsync(TEntity model, CancellationToken ct = default)
     {
-        var result = await _inner.UpsertAsync(model, ct).ConfigureAwait(false);
-        await HandleWriteAsync(result, ct).ConfigureAwait(false);
+        var result = await _inner.UpsertAsync(model, ct);
+        await HandleWriteAsync(result, ct);
         return result;
     }
 
     public async Task<int> UpsertManyAsync(IEnumerable<TEntity> models, CancellationToken ct = default)
     {
         var materialized = models as IList<TEntity> ?? models.ToList();
-        var updated = await _inner.UpsertManyAsync(materialized, ct).ConfigureAwait(false);
-        await HandleWriteAsync(materialized, ct).ConfigureAwait(false);
+        var updated = await _inner.UpsertManyAsync(materialized, ct);
+        await HandleWriteAsync(materialized, ct);
         return updated;
     }
 
     public async Task<bool> DeleteAsync(TKey id, CancellationToken ct = default)
     {
-        var deleted = await _inner.DeleteAsync(id, ct).ConfigureAwait(false);
+        var deleted = await _inner.DeleteAsync(id, ct);
         if (deleted)
         {
-            await RemoveAsync(id, ct).ConfigureAwait(false);
+            await RemoveAsync(id, ct);
         }
 
         return deleted;
@@ -234,12 +234,12 @@ internal sealed class CachedRepository<TEntity, TKey> :
     public async Task<int> DeleteManyAsync(IEnumerable<TKey> ids, CancellationToken ct = default)
     {
         var materialized = ids as IList<TKey> ?? ids.ToList();
-        var count = await _inner.DeleteManyAsync(materialized, ct).ConfigureAwait(false);
+        var count = await _inner.DeleteManyAsync(materialized, ct);
         if (count > 0)
         {
             foreach (var id in materialized)
             {
-                await RemoveAsync(id, ct).ConfigureAwait(false);
+                await RemoveAsync(id, ct);
             }
         }
 
@@ -248,7 +248,7 @@ internal sealed class CachedRepository<TEntity, TKey> :
 
     public async Task<int> DeleteAllAsync(CancellationToken ct = default)
     {
-        var count = await _inner.DeleteAllAsync(ct).ConfigureAwait(false);
+        var count = await _inner.DeleteAllAsync(ct);
         if (count > 0)
         {
             _logger.LogDebug("DeleteAll detected for {Entity}. Cached entries cannot be enumerated automatically; downstream policies should prefer tag-based invalidation.", _entityName);
@@ -259,7 +259,7 @@ internal sealed class CachedRepository<TEntity, TKey> :
 
     public async Task<long> RemoveAllAsync(RemoveStrategy strategy, CancellationToken ct = default)
     {
-        var removed = await _inner.RemoveAllAsync(strategy, ct).ConfigureAwait(false);
+        var removed = await _inner.RemoveAllAsync(strategy, ct);
         if (removed > 0)
         {
             _logger.LogDebug("RemoveAll({Strategy}) invoked for {Entity}; cached entries should be invalidated via tags.", strategy, _entityName);
@@ -286,7 +286,7 @@ internal sealed class CachedRepository<TEntity, TKey> :
             throw new NotSupportedException($"Repository for {_entityName} does not support instruction execution.");
         }
 
-        return await _instructionExecutor.ExecuteAsync<TResult>(instruction, ct).ConfigureAwait(false);
+        return await _instructionExecutor.ExecuteAsync<TResult>(instruction, ct);
     }
 
     public Task EnsureHealthyAsync(CancellationToken ct)
@@ -308,7 +308,7 @@ internal sealed class CachedRepository<TEntity, TKey> :
     {
         foreach (var entity in entities)
         {
-            await HandleWriteAsync(entity, ct).ConfigureAwait(false);
+            await HandleWriteAsync(entity, ct);
         }
     }
 
@@ -330,11 +330,11 @@ internal sealed class CachedRepository<TEntity, TKey> :
             case CacheStrategy.GetOrSet:
             case CacheStrategy.SetOnly:
                 var options = _entityPolicy.ToOptions();
-                await _cacheClient.SetAsync(key.Value, entity, options, ct).ConfigureAwait(false);
+                await _cacheClient.SetAsync(key.Value, entity, options, ct);
                 break;
             case CacheStrategy.GetOnly:
             case CacheStrategy.Invalidate:
-                await _cacheClient.RemoveAsync(key.Value, ct).ConfigureAwait(false);
+                await _cacheClient.RemoveAsync(key.Value, ct);
                 break;
         }
     }
@@ -351,7 +351,7 @@ internal sealed class CachedRepository<TEntity, TKey> :
             return;
         }
 
-        await _cacheClient.RemoveAsync(key, ct).ConfigureAwait(false);
+        await _cacheClient.RemoveAsync(key, ct);
     }
 
     private CacheKey? ResolveKey(TEntity entity)
@@ -456,21 +456,21 @@ internal sealed class CachedRepository<TEntity, TKey> :
 
         public async Task<BatchResult> SaveAsync(BatchOptions? options = null, CancellationToken ct = default)
         {
-            var result = await _inner.SaveAsync(options, ct).ConfigureAwait(false);
+            var result = await _inner.SaveAsync(options, ct);
 
             foreach (var entity in _upserts)
             {
-                await _outer.HandleWriteAsync(entity, ct).ConfigureAwait(false);
+                await _outer.HandleWriteAsync(entity, ct);
             }
 
             foreach (var id in _deletes)
             {
-                await _outer.RemoveAsync(id, ct).ConfigureAwait(false);
+                await _outer.RemoveAsync(id, ct);
             }
 
             foreach (var id in _mutations)
             {
-                await _outer.RemoveAsync(id, ct).ConfigureAwait(false);
+                await _outer.RemoveAsync(id, ct);
             }
 
             _upserts.Clear();

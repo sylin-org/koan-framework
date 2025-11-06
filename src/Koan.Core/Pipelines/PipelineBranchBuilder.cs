@@ -45,7 +45,7 @@ public sealed class PipelineBranchBuilder<TEntity>
             var stages = envelope.IsFaulted ? failure : success;
             foreach (var stage in stages)
             {
-                await stage(envelope, ct).ConfigureAwait(false);
+                await stage(envelope, ct);
                 if (envelope.IsCompleted)
                 {
                     break;

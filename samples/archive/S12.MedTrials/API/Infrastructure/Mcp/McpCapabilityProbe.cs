@@ -32,16 +32,16 @@ internal sealed class McpCapabilityProbe : BackgroundService
             var options = _options.CurrentValue;
             if (!options.Enabled)
             {
-                await Task.Delay(TimeSpan.FromSeconds(30), stoppingToken).ConfigureAwait(false);
+                await Task.Delay(TimeSpan.FromSeconds(30), stoppingToken);
                 continue;
             }
 
-            await ProbeAsync(options, stoppingToken).ConfigureAwait(false);
+            await ProbeAsync(options, stoppingToken);
 
             var delay = options.GetProbeInterval();
             try
             {
-                await Task.Delay(delay, stoppingToken).ConfigureAwait(false);
+                await Task.Delay(delay, stoppingToken);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
@@ -63,7 +63,7 @@ internal sealed class McpCapabilityProbe : BackgroundService
         {
             var client = _httpClientFactory.CreateClient(McpHttpClientNames.McpBridge);
             var requestUri = new Uri(baseUri, "capabilities");
-            using var response = await client.GetAsync(requestUri, ct).ConfigureAwait(false);
+            using var response = await client.GetAsync(requestUri, ct);
             response.EnsureSuccessStatusCode();
 
             if (!options.LogCapabilities)
@@ -72,7 +72,7 @@ internal sealed class McpCapabilityProbe : BackgroundService
                 return;
             }
 
-            var document = await response.Content.ReadFromJsonAsync<McpCapabilityDocument>(cancellationToken: ct).ConfigureAwait(false);
+            var document = await response.Content.ReadFromJsonAsync<McpCapabilityDocument>(cancellationToken: ct);
             if (document is null)
             {
                 _logger.LogWarning("MCP capability probe returned no document from {Endpoint}.", requestUri);

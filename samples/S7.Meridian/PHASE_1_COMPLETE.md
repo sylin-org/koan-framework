@@ -12,19 +12,19 @@
 
 ### ✅ All Tasks Completed (10/10)
 
-| Task | Status | Description |
-|------|--------|-------------|
-| SETUP-1 | ✅ | Ollama Configuration (granite3.3:8b verified) |
-| Task 1.1 | ✅ | Embedding Cache (SHA-256, file-based) |
-| Task 1.2 | ✅ | PassageIndexer with Caching |
-| Task 1.3 | ✅ | RAG Query Builder (camelCase → natural language) |
-| Task 1.4 | ✅ | Hybrid Vector Search (BM25 + semantic) |
-| Task 1.5 | ✅ | MMR Diversity Filter (λ=0.7) |
-| Task 1.6 | ✅ | Token Budget Management (2000 tokens/field) |
-| Task 1.7 | ✅ | LLM-Based Extraction (with confidence scoring) |
-| Task 1.8 | ✅ | Text Span Localization (3 strategies) |
-| Task 1.9 | ✅ | Pipeline Integration (end-to-end wiring) |
-| Task 1.E2E | ✅ | Automated end-to-end integration harness |
+| Task       | Status | Description                                      |
+| ---------- | ------ | ------------------------------------------------ |
+| SETUP-1    | ✅     | Ollama Configuration (granite3.3:8b verified)    |
+| Task 1.1   | ✅     | Embedding Cache (SHA-256, file-based)            |
+| Task 1.2   | ✅     | PassageIndexer with Caching                      |
+| Task 1.3   | ✅     | RAG Query Builder (camelCase → natural language) |
+| Task 1.4   | ✅     | Hybrid Vector Search (BM25 + semantic)           |
+| Task 1.5   | ✅     | MMR Diversity Filter (λ=0.7)                     |
+| Task 1.6   | ✅     | Token Budget Management (2000 tokens/field)      |
+| Task 1.7   | ✅     | LLM-Based Extraction (with confidence scoring)   |
+| Task 1.8   | ✅     | Text Span Localization (3 strategies)            |
+| Task 1.9   | ✅     | Pipeline Integration (end-to-end wiring)         |
+| Task 1.E2E | ✅     | Automated end-to-end integration harness         |
 
 ### 🏗️ Build Status
 
@@ -40,6 +40,7 @@
 ## 📁 Files Created/Modified
 
 ### New Files (5)
+
 ```
 ✅ Services/IEmbeddingCache.cs          Interface for embedding cache
 ✅ Services/EmbeddingCache.cs           File-based cache implementation
@@ -50,8 +51,10 @@
 ```
 
 ### Modified Files (6)
+
 ```
-✅ Services/FieldExtractor.cs           Gutted → Full RAG implementation (600+ lines)
+✅ Services/DocumentFactExtractor.cs    Fact catalog extraction (supersedes legacy FieldExtractor)
+✅ Services/FieldFactMatcher.cs         Deterministic taxonomy alignment for deliverable fields
 ✅ Services/PassageIndexer.cs           Added embedding cache integration
 ✅ Services/PipelineProcessor.cs        Added MeridianOptions injection
 ✅ Initialization/KoanAutoRegistrar.cs  Registered cache + options
@@ -64,6 +67,7 @@
 ## 🎯 What Works Now
 
 ### Core RAG Pipeline
+
 ```
 1. Upload Document → 2. Extract Text → 3. Chunk into Passages
     ↓
@@ -84,6 +88,7 @@
 ### Technical Highlights
 
 #### 1. Embedding Cache (>80% hit rate on second run)
+
 ```csharp
 var contentHash = EmbeddingCache.ComputeContentHash(passage.Text);
 var cached = await _cache.GetAsync(contentHash, "granite3.3:8b", "Passage", ct);
@@ -98,6 +103,7 @@ if (cached != null) {
 ```
 
 #### 2. Hybrid Vector Search
+
 ```csharp
 var results = await VectorWorkflow<Passage>.Query(
     new VectorQueryOptions(
@@ -111,6 +117,7 @@ var results = await VectorWorkflow<Passage>.Query(
 ```
 
 #### 3. LLM-Based Extraction with Confidence
+
 ```csharp
 var chatOptions = new AiChatOptions {
     Message = BuildExtractionPrompt(passages, fieldPath, fieldSchema),
@@ -124,6 +131,7 @@ var response = await Ai.Chat(chatOptions, ct);
 ```
 
 #### 4. Evidence Tracking
+
 ```csharp
 var extraction = new ExtractedField {
     FieldPath = "$.revenue",
@@ -148,7 +156,7 @@ var extraction = new ExtractedField {
 bash samples/S7.Meridian/verify-setup.sh
 
 # 2. Start MongoDB (if needed)
-docker run -d -p 27017:27017 --name meridian-mongo mongo:latest
+docker run -d -p 5082:27017 --name meridian-mongo mongo:latest  # External port aligned to 5080-5089 range
 
 # 3. Verify Ollama
 ollama list | grep granite3.3
@@ -162,6 +170,7 @@ dotnet run
 ### Manual End-to-End Test
 
 See **TESTING.md** for complete step-by-step guide including:
+
 - Creating a pipeline with JSON schema
 - Uploading test document
 - Processing and extraction
@@ -171,6 +180,7 @@ See **TESTING.md** for complete step-by-step guide including:
 ### Expected Results
 
 **First Run (Cache Miss):**
+
 ```
 [INF] Embedding cache: 0 hits, 10 misses (10 total)
 [INF] Extracted field $.revenue: "47.2" (confidence: 92%)
@@ -178,6 +188,7 @@ See **TESTING.md** for complete step-by-step guide including:
 ```
 
 **Second Run (Cache Hit):**
+
 ```
 [INF] Embedding cache: 10 hits, 0 misses (10 total)
 [INF] Extracted field $.revenue: "47.2" (confidence: 92%)
@@ -187,29 +198,32 @@ See **TESTING.md** for complete step-by-step guide including:
 
 ## 📈 Performance Characteristics
 
-| Metric | Target | Expected |
-|--------|--------|----------|
-| Cache Hit Rate (2nd run) | >80% | ~100% |
-| Extraction Confidence | >70% | 85-95% |
-| Processing Time (1-page doc) | <30s | 15-25s |
-| Memory Usage | <500MB | ~300MB |
-| Token Budget Compliance | 100% | 100% |
+| Metric                       | Target | Expected |
+| ---------------------------- | ------ | -------- |
+| Cache Hit Rate (2nd run)     | >80%   | ~100%    |
+| Extraction Confidence        | >70%   | 85-95%   |
+| Processing Time (1-page doc) | <30s   | 15-25s   |
+| Memory Usage                 | <500MB | ~300MB   |
+| Token Budget Compliance      | 100%   | 100%     |
 
 ---
 
 ## 🚀 Next Steps
 
 ### Immediate Actions
+
 1. ✅ **Test the system** following TESTING.md
 2. ✅ **Verify cache performance** (should see >80% hit rate on re-processing)
 3. ✅ **Review extraction quality** (confidence scores, evidence spans)
 
 ### Phase 2: Merge Policies
+
 **Estimated Effort**: 2-3 days
 
 Current state: Uses temporary `highestConfidence` merge policy
 
 Next implementation:
+
 - Intelligent merge strategies:
   - `highestConfidence` (current)
   - `mostRecent` (prefer newer extractions)
@@ -220,19 +234,25 @@ Next implementation:
 - Normalized value comparison
 
 ### Phase 3: Document Classification
+
 **Estimated Effort**: 1-2 days
+
 - Multi-label classification
 - Confidence thresholding
 - Classification-aware field routing
 
 ### Phase 4: Production Features
+
 **Estimated Effort**: 2-3 days
+
 - Field overrides (manual corrections)
 - Incremental refresh (only new documents)
 - Quality metrics dashboard
 
 ### Phase 5: Production Hardening
+
 **Estimated Effort**: 1-2 days
+
 - Error recovery and retries
 - Performance monitoring
 - Production deployment guide
@@ -244,12 +264,11 @@ Next implementation:
 ### Key Implementation Files
 
 ```
-Services/FieldExtractor.cs:68-82      BuildRAGQuery (camelCase conversion)
-Services/FieldExtractor.cs:89-122     RetrievePassages (hybrid search)
-Services/FieldExtractor.cs:147-204    ApplyMMR (diversity filter)
-Services/FieldExtractor.cs:253-285    BuildExtractionPrompt (LLM prompt)
-Services/FieldExtractor.cs:411-487    ExtractFromPassages (full pipeline)
-Services/FieldExtractor.cs:492-521    LocateSpanInPassage (evidence)
+Services/DocumentFactExtractor.cs:140-236  Build fact prompts + constraints
+Services/DocumentFactExtractor.cs:262-410  Parse taxonomy-aligned facts with anchors
+Services/FieldFactMatcher.cs:92-210        Match facts to deliverable schema fields
+Services/FieldFactMatcher.cs:402-520       Order candidates + build collection extractions
+Services/FieldFactMatcher.cs:615-694       Controlled synthesis fallback
 Services/EmbeddingCache.cs:25-30      ComputeContentHash (SHA-256)
 Services/PassageIndexer.cs:53-75      Cache-aware embedding
 ```
@@ -303,4 +322,4 @@ Services/PassageIndexer.cs:53-75      Cache-aware embedding
 
 ---
 
-*For questions or issues, refer to TESTING.md troubleshooting section or review the implementation in Services/FieldExtractor.cs*
+_For questions or issues, refer to TESTING.md troubleshooting section or review the implementations in Services/DocumentFactExtractor.cs and Services/FieldFactMatcher.cs_

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Koan.Samples.Meridian.Infrastructure;
 using Koan.Samples.Meridian.Models;
 using Koan.Web.Hooks;
 using Microsoft.Extensions.Logging;
@@ -54,9 +55,6 @@ public sealed class DocumentPipelineAnalysisTypeHook : IModelHook<DocumentPipeli
         model.AnalysisTags = analysisType.Tags is { Count: > 0 }
             ? new List<string>(analysisType.Tags)
             : new List<string>();
-        model.RequiredSourceTypes = analysisType.RequiredSourceTypes is { Count: > 0 }
-            ? new List<string>(analysisType.RequiredSourceTypes)
-            : new List<string>();
 
         // DeliverableType (optional but preferred)
         DeliverableType? deliverableType = null;
@@ -90,16 +88,22 @@ public sealed class DocumentPipelineAnalysisTypeHook : IModelHook<DocumentPipeli
                 model.SchemaJson = deliverableType.JsonSchema;
             }
         }
-        else if (analysisChanged && string.IsNullOrWhiteSpace(model.SchemaJson) && !string.IsNullOrWhiteSpace(analysisType.OutputTemplate))
+        else if (analysisChanged && string.IsNullOrWhiteSpace(model.SchemaJson))
         {
-            // Fallback schema placeholder remains "{}" unless provided elsewhere.
+            // Use schema from AnalysisType if available
+            if (!string.IsNullOrWhiteSpace(analysisType.JsonSchema))
+            {
+                model.SchemaJson = analysisType.JsonSchema;
+            }
         }
+
+        model.SchemaJson = FieldPathCanonicalizer.CanonicalizeJsonSchema(model.SchemaJson);
 
         if (deliverableType is not null && (deliverableChanged || string.IsNullOrWhiteSpace(model.TemplateMarkdown)))
         {
             if (!string.IsNullOrWhiteSpace(deliverableType.TemplateMd))
             {
-                model.TemplateMarkdown = deliverableType.TemplateMd;
+                model.TemplateMarkdown = FieldPathCanonicalizer.CanonicalizeTemplatePlaceholders(deliverableType.TemplateMd);
             }
         }
         else if (analysisChanged || string.IsNullOrWhiteSpace(model.TemplateMarkdown))
@@ -111,13 +115,17 @@ public sealed class DocumentPipelineAnalysisTypeHook : IModelHook<DocumentPipeli
             }
             else
             {
-                model.TemplateMarkdown = template;
+                model.TemplateMarkdown = FieldPathCanonicalizer.CanonicalizeTemplatePlaceholders(template);
             }
         }
 
         if (string.IsNullOrWhiteSpace(model.TemplateMarkdown))
         {
             model.TemplateMarkdown = "# Meridian Deliverable\n";
+        }
+        else
+        {
+            model.TemplateMarkdown = FieldPathCanonicalizer.CanonicalizeTemplatePlaceholders(model.TemplateMarkdown);
         }
 
         model.UpdatedAt = DateTime.UtcNow;

@@ -52,7 +52,7 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
         // Prefer instruction executor path when source points to an entity and no explicit connection override is set
         if (_connectionString is null && TryGetEntityType(out var entityType) && TryInvokeExecutor<int>(entityType!, InstructionSql.NonQuery(sql, parameters), out var execTask))
         {
-            return await execTask.ConfigureAwait(false);
+            return await execTask;
         }
         await using var ctx = await OpenAsync(ct);
         await using var cmd = CreateCommand(ctx.Connection, sql, ToDictionary(parameters), ctx.Transaction);
@@ -64,7 +64,7 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
     {
         if (_connectionString is null && TryGetEntityType(out var entityType) && TryInvokeExecutor<T?>(entityType!, InstructionSql.Scalar(sql, parameters), out var execTask))
         {
-            return await execTask.ConfigureAwait(false);
+            return await execTask;
         }
         await using var ctx = await OpenAsync(ct);
         await using var cmd = CreateCommand(ctx.Connection, sql, ToDictionary(parameters), ctx.Transaction);
@@ -90,7 +90,7 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
                     var taskObj = gm.Invoke(null, new object?[] { data, instruction, ct }) as Task<object>;
                     if (taskObj is not null)
                     {
-                        var result = await taskObj.ConfigureAwait(false);
+                        var result = await taskObj;
                         if (result is System.Collections.IEnumerable seq && result is not string)
                         {
                             var list = new List<object>();

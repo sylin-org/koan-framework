@@ -589,7 +589,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         var dataOptions = BuildDataQueryOptions(request, options);
         var absoluteMax = request.AbsoluteMaxRecords > 0 ? request.AbsoluteMaxRecords : (int?)null;
 
-        var result = await Data<TEntity, TKey>.QueryWithCount(queryPayload, dataOptions, cancellationToken, absoluteMax).ConfigureAwait(false);
+        var result = await Data<TEntity, TKey>.QueryWithCount(queryPayload, dataOptions, cancellationToken, absoluteMax);
 
         return new RepositoryQueryResult(result.Items, result.TotalCount, result.RepositoryHandledPagination, result.ExceededSafetyLimit);
     }

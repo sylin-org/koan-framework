@@ -70,29 +70,10 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
                 Constants.Configuration.Keys.ApiKey,
                 Constants.Discovery.EnvKey);
 
-        Publish(module, LMStudioProvenanceItems.ConnectionString, connection);
-        Publish(module, LMStudioProvenanceItems.BaseUrl, baseUrl, displayOverride: ResolveDisplayBase(cfg, connection, baseUrl, defaults));
-        Publish(module, LMStudioProvenanceItems.DefaultModel, defaultModel);
-        Publish(module, LMStudioProvenanceItems.ApiKey, apiKey, sanitizeOverride: true);
-    }
-
-    private static void Publish<T>(
-        ProvenanceModuleWriter module,
-        ProvenanceItem item,
-        ConfigurationValue<T> value,
-        object? displayOverride = null,
-        ProvenancePublicationMode? modeOverride = null,
-        bool? usedDefaultOverride = null,
-        string? sourceKeyOverride = null,
-        bool? sanitizeOverride = null)
-    {
-        module.AddSetting(
-            item,
-            modeOverride ?? ProvenanceModes.FromConfigurationValue(value),
-            displayOverride ?? value.Value,
-            sourceKey: sourceKeyOverride ?? value.ResolvedKey,
-            usedDefault: usedDefaultOverride ?? value.UsedDefault,
-            sanitizeOverride: sanitizeOverride);
+        module.PublishConfigValue(LMStudioProvenanceItems.ConnectionString, connection);
+        module.PublishConfigValue(LMStudioProvenanceItems.BaseUrl, baseUrl, displayOverride: ResolveDisplayBase(cfg, connection, baseUrl, defaults));
+        module.PublishConfigValue(LMStudioProvenanceItems.DefaultModel, defaultModel);
+        module.PublishConfigValue(LMStudioProvenanceItems.ApiKey, apiKey, sanitizeOverride: true);
     }
 
     private static object ResolveDisplayBase(

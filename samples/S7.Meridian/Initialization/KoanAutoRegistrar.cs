@@ -23,7 +23,8 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         services.AddOptions<MeridianOptions>()
             .BindConfiguration("Meridian")
             .ValidateDataAnnotations()
-            .ValidateOnStart();
+            .ValidateOnStart()
+            .PostConfigure(options => options.NormalizeFieldPaths());
 
         services.AddSingleton(sp => sp.GetRequiredService<IOptions<MeridianOptions>>().Value);
 
@@ -65,18 +66,26 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         services.AddSingleton<IEmbeddingCache, EmbeddingCache>();
         services.AddSingleton<ISecureUploadValidator, SecureUploadValidator>();
         services.AddSingleton<IPassageIndexer, PassageIndexer>();
-        services.AddSingleton<IFieldExtractor, FieldExtractor>();
+        services.AddSingleton<INotesExtractionService, NotesExtractionService>();
         services.AddSingleton<IIncrementalRefreshPlanner, IncrementalRefreshPlanner>();
         services.AddSingleton<IDocumentClassifier, DocumentClassifier>();
+        services.AddSingleton<IFactCatalogBuilder, FactCatalogBuilder>();
+        services.AddSingleton<IFactCategorizer, FactCategorizer>();
+        services.AddSingleton<ISchemaGuidedExtractor, SchemaGuidedExtractor>();
+        services.AddSingleton<IFieldConflictResolver, FieldConflictResolver>();
+        services.AddSingleton<IDocumentStyleClassifier, DocumentStyleClassifier>();
         services.AddSingleton<IRunLogWriter, RunLogWriter>();
         services.AddSingleton<ITemplateRenderer, TemplateRenderer>();
         services.AddSingleton<IAiAssistAuditor, AiAssistAuditor>();
         services.AddSingleton<ISourceTypeAuthoringService, SourceTypeAuthoringService>();
         services.AddSingleton<IAnalysisTypeAuthoringService, AnalysisTypeAuthoringService>();
+        services.AddSingleton<IModelHook<AnalysisType>, AnalysisTypeCanonicalizationHook>();
+        services.AddSingleton<IModelHook<DeliverableType>, DeliverableTypeCanonicalizationHook>();
         services.AddSingleton<IModelHook<DocumentPipeline>, DocumentPipelineAnalysisTypeHook>();
         services.AddSingleton<IDocumentMerger, DocumentMerger>();
         services.AddSingleton<IPipelineProcessor, PipelineProcessor>();
-        services.AddHostedService<ClassificationSeedService>();
+        services.AddSingleton<ITypeCodeResolver, TypeCodeResolver>();
+        services.AddSingleton<IPipelineBootstrapService, PipelineBootstrapService>();
         services.AddHostedService<MeridianJobWorker>();
     }
 

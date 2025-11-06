@@ -42,10 +42,10 @@ public abstract partial class Entity<TEntity, TKey>
             => CountInternal(new[] { tag }, ct);
 
         public async ValueTask<bool> Any(CancellationToken ct = default)
-            => await CountInternal(Array.Empty<string>(), ct).ConfigureAwait(false) > 0;
+            => await CountInternal(Array.Empty<string>(), ct) > 0;
 
         public async ValueTask<bool> Any(IEnumerable<string> tags, CancellationToken ct = default)
-            => await CountInternal(tags, ct).ConfigureAwait(false) > 0;
+            => await CountInternal(tags, ct) > 0;
 
         private static ValueTask<long> FlushInternal(IEnumerable<string>? tags, CancellationToken ct)
         {

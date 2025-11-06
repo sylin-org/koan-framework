@@ -2,11 +2,12 @@
 using Koan.Core;
 using Koan.Core.Hosting.App;
 using Koan.Web.Extensions;
+using Koan.Web.Hosting;
 using Microsoft.AspNetCore.Builder;
 
 var builder = WebApplication.CreateBuilder(args);
 
-LoggingConfiguration.Configure(builder);
+builder.ConfigureSampleLogging();
 
 // one line does everything - auto-registration magic!
 // finds all entities, controllers, and services automatically
@@ -21,7 +22,10 @@ AppHost.Current ??= app.Services;
 await GardenSeederRunner.EnsureSampleDataAsync(app);
 
 // wire up startup/shutdown hooks (browser launcher, etc.)
-ApplicationLifecycle.Configure(app);
+app.ConfigureSampleLifecycle(
+    sampleName: "Garden Cooperative slice",
+    startupMessage: "Garden Cooperative slice is listening on {Addresses}. Close the window or press Ctrl+C to stop.",
+    shutdownMessage: "Shutting down Garden Cooperative slice – see you at dawn.");
 
 // go!
 await app.RunAsync();

@@ -1,0 +1,290 @@
+# Koan Framework - Enterprise-Grade Service Architecture
+
+## Introduction
+
+The Koan Framework represents a paradigm shift in enterprise application development, combining the elegance of Entity-First patterns with the power of distributed service meshes. This document explores the architectural decisions, implementation patterns, and operational considerations that make Koan Framework uniquely suited for modern cloud-native applications.
+
+## Core Principles
+
+### 1. Entity-First Development
+
+At the heart of Koan Framework lies the Entity-First pattern, which fundamentally reimagines how developers interact with data persistence. Rather than forcing developers to work through repositories, data contexts, or ORM abstractions, Koan Framework allows direct interaction with entities:
+
+```csharp
+var user = await User.Get(userId);
+user.Name = "Updated Name";
+await user.Save();
+```
+
+This approach provides several advantages:
+- Reduced cognitive overhead for developers
+- Consistent API surface regardless of storage backend
+- Automatic provider selection and optimization
+- Built-in support for GUID v7 identifiers
+
+### 2. Multi-Provider Transparency
+
+One of Koan Framework's most powerful features is its ability to provide a unified API across radically different storage technologies. The same entity code can work seamlessly with:
+
+- SQL databases (PostgreSQL, SQL Server, MySQL)
+- NoSQL stores (MongoDB, Redis, Cassandra)
+- Vector databases (Weaviate, Pinecone, Qdrant)
+- JSON file storage for development scenarios
+
+This transparency extends beyond simple CRUD operations to include sophisticated query capabilities, with automatic pushdown optimization when the underlying provider supports it, and graceful fallback to in-memory filtering when it doesn't.
+
+### 3. Service Mesh Architecture
+
+Koan Services introduces a three-tier communication model that balances performance, reliability, and ease of use:
+
+**Tier 1: Orchestrator Channel**
+- UDP multicast for service discovery
+- Lightweight heartbeat protocol
+- Automatic instance tracking
+- Health monitoring
+
+**Tier 2: Service-Specific Channels**
+- Dedicated communication paths per service
+- Custom protocol support
+- Optimized for high-throughput scenarios
+- Optional pub/sub capabilities
+
+**Tier 3: HTTP Endpoints**
+- RESTful API compatibility
+- Standard tooling support
+- Human-readable protocols
+- Integration with existing infrastructure
+
+### 4. Auto-Registration and Discovery
+
+The framework's auto-registration system eliminates boilerplate configuration code. Simply adding a package reference automatically enables its functionality:
+
+```csharp
+// This is all you need
+services.AddKoan();
+```
+
+The framework scans assemblies for implementations of `IKoanAutoRegistrar` and automatically configures:
+- Service registrations
+- Provider elections
+- Configuration hierarchies
+- Capability detection
+
+## Translation Service Architecture
+
+The Translation Service exemplifies Koan Framework patterns in a real-world scenario. Let's examine its implementation in detail:
+
+### Service Definition
+
+```csharp
+[KoanService(
+    "translation",
+    DisplayName = "Translation Service",
+    Description = "AI-powered translation service",
+    Port = 8080,
+    HeartbeatIntervalSeconds = 30,
+    StaleThresholdSeconds = 120)]
+public class TranslationService
+{
+    // Implementation
+}
+```
+
+The `[KoanService]` attribute provides all necessary metadata for service mesh integration. The framework automatically:
+- Registers the service with the mesh
+- Starts heartbeat broadcasts
+- Configures HTTP endpoints
+- Enables health monitoring
+
+### Capability Declaration
+
+```csharp
+[KoanCapability("translate")]
+public async Task<TranslationResult> Translate(
+    TranslationOptions options,
+    CancellationToken ct = default)
+{
+    // Implementation
+}
+```
+
+Capabilities are auto-discovered and published to the service mesh. Client code can invoke capabilities through the ServiceExecutor without knowing whether the service is in-process or remote.
+
+### Separation of Concerns
+
+The Translation Service demonstrates proper SoC by:
+
+1. **Business Logic in Service Layer**
+   - Input validation (text length, format)
+   - Language detection and normalization
+   - Translation strategy decisions
+   - Error handling and retry logic
+
+2. **Presentation Logic in Controller**
+   - HTTP request/response handling
+   - Basic input validation (null checks)
+   - Routing to service layer
+   - Status code mapping
+
+3. **Client Presentation**
+   - User interface rendering
+   - User input collection
+   - Display of results
+   - No business rule enforcement
+
+## Performance Considerations
+
+### Provider Capability Detection
+
+The framework provides `QueryCaps` for runtime capability detection:
+
+```csharp
+var caps = Data<Todo, string>.QueryCaps;
+if (caps.Capabilities.HasFlag(QueryCapabilities.LinqQueries))
+{
+    // Use optimized query path
+}
+else
+{
+    // Fallback to in-memory filtering
+}
+```
+
+This enables applications to adapt their query strategies based on provider capabilities, maximizing performance while maintaining correctness.
+
+### Streaming for Large Datasets
+
+```csharp
+await foreach (var entity in Todo.AllStream(batchSize: 1000))
+{
+    // Process in manageable chunks
+    // Avoids loading entire dataset into memory
+}
+```
+
+### Vector Export for Migration
+
+```csharp
+await foreach (var batch in vectorRepo.ExportAllAsync(batchSize: 100, ct))
+{
+    // Cache embeddings to avoid regeneration
+    var hash = ComputeContentHash(embeddingText);
+    await cache.SetAsync(hash, modelId, batch.Embedding, ct);
+}
+```
+
+This pattern enables zero-cost migration between vector database providers without calling expensive AI embedding APIs again.
+
+## Deployment Patterns
+
+### Dual Deployment Model
+
+Koan Services supports two deployment approaches:
+
+1. **In-Process (NuGet Package)**
+   - Fastest performance (no network overhead)
+   - Shared memory and resources
+   - Simplified deployment
+   - Best for monolithic starts or rapid prototyping
+
+2. **Containerized (Docker)**
+   - Independent scaling
+   - Fault isolation
+   - Polyglot implementations
+   - Cloud-native deployment
+
+The ServiceExecutor automatically routes to in-process implementations when available, falling back to remote instances seamlessly.
+
+### Container Orchestration
+
+```yaml
+services:
+  translation-service:
+    image: koan/service-translation:latest
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - Koan__AI__Provider=ollama
+      - Koan__AI__Ollama__BaseUrl=http://ollama:11434
+    networks:
+      - koan-mesh
+```
+
+The framework integrates with standard container orchestration platforms while adding its own service mesh capabilities for enhanced discovery and load balancing.
+
+## Configuration Hierarchy
+
+Koan Framework implements a sophisticated configuration hierarchy:
+
+1. **Default Values** (lowest priority)
+2. **appsettings.json**
+3. **appsettings.{Environment}.json**
+4. **Environment Variables**
+5. **Command-Line Arguments** (highest priority)
+
+Configuration is type-safe and supports complex object graphs:
+
+```csharp
+services.Configure<TranslationOptions>(
+    Configuration.GetSection("Koan:Services:Translation"));
+```
+
+## Monitoring and Observability
+
+### Boot Reports
+
+The framework generates structured boot reports showing:
+- Module versions
+- Configuration sources
+- Provider elections
+- Capability discoveries
+- Service registrations
+
+### Logging Integration
+
+```csharp
+_logger.LogInformation(
+    "Koan:services:execute {Service}.{Capability} completed in {Ms}ms",
+    serviceId,
+    capability,
+    sw.ElapsedMilliseconds);
+```
+
+Structured logging enables powerful querying and analysis in log aggregation systems.
+
+### Health Checks
+
+```csharp
+services.AddKoan()
+    .WithHealthChecks()
+    .WithReadinessProbes()
+    .WithLivenessProbes();
+```
+
+## Best Practices
+
+### Entity Design
+
+1. Use Entity<T> for auto-GUID v7 generation
+2. Use Entity<T,K> only when required by external systems
+3. Keep entities focused on domain concepts
+4. Avoid circular relationships without lazy loading
+
+### Service Design
+
+1. One service per bounded context
+2. Design for idempotency
+3. Implement proper cancellation token handling
+4. Use structured logging consistently
+
+### Testing
+
+1. Use JSON provider for unit tests
+2. Test provider transparency with multiple backends
+3. Mock ServiceExecutor for isolated controller tests
+4. Integration tests with real containers
+
+## Conclusion
+
+The Koan Framework provides a comprehensive foundation for building modern enterprise applications. By combining Entity-First development, multi-provider transparency, and sophisticated service mesh capabilities, it enables developers to focus on business logic while the framework handles infrastructure concerns.
+
+The Translation Service demonstrates these principles in action, showing how proper separation of concerns, service-oriented architecture, and framework patterns combine to create maintainable, scalable applications ready for cloud-native deployment.

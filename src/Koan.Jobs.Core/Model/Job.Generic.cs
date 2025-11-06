@@ -46,7 +46,7 @@ public abstract partial class Job<TJob, TContext, TResult> : Job
         while (true)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var snapshot = await Refresh(cancellationToken).ConfigureAwait(false);
+            var snapshot = await Refresh(cancellationToken);
             if (snapshot.Status == JobStatus.Completed)
             {
                 return snapshot.Result ?? default!;
@@ -61,13 +61,13 @@ public abstract partial class Job<TJob, TContext, TResult> : Job
             if (DateTimeOffset.UtcNow >= deadline)
                 throw new TimeoutException($"Job {Id} did not complete within {waitTimeout}");
 
-            await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken).ConfigureAwait(false);
+            await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
         }
     }
 
     public async Task<TJob> Refresh(CancellationToken cancellationToken = default)
     {
-        var refreshed = await JobEnvironment.Coordinator.Refresh<TJob, TContext, TResult>(Id, cancellationToken).ConfigureAwait(false);
+        var refreshed = await JobEnvironment.Coordinator.Refresh<TJob, TContext, TResult>(Id, cancellationToken);
         return refreshed ?? (TJob)this;
     }
 

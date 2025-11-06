@@ -12,7 +12,8 @@
   let currentLayout = 'grid';
   let libraryByMediaId = {};
   const PAGE_SIZE = (window.S5Config && window.S5Config.PAGE_SIZE) || 100;
-  let currentRecsTopK = PAGE_SIZE;
+  let currentRecsOffset = 0;  // Track offset for offset/limit pagination
+  let currentRecsTopK = PAGE_SIZE;  // Deprecated: kept for compatibility
   let currentLibraryPage = 1;
   let selectedPreferredTags = window.selectedPreferredTags || [];
   let currentMediaType = 'all';
@@ -21,6 +22,12 @@
     maxPreferredTags: (window.S5Const?.RECS?.DEFAULT_MAX_PREFERRED_TAGS) ?? 3,
     diversityWeight: (window.S5Const?.RECS?.DEFAULT_DIVERSITY_WEIGHT) ?? 0.1
   };
+
+  // Infinite scroll state
+  let isLoadingMore = false;
+  let hasMoreResults = true;
+  let scrollObserver = null;
+  let currentSearchQuery = ''; // Track current search for infinite scroll
 
   // Expose for other modules relying on globals
   Object.assign(window, {
@@ -47,6 +54,8 @@
   // Populate Media Type toggles from backend catalog
   populateMediaTypes();
   setupEventListeners();
+  // Initialize infinite scroll
+  initInfiniteScroll();
   });
 
   function setupEventListeners(){
@@ -114,7 +123,38 @@
           alphaHint.textContent = 'Semantic';
         }
       };
-      alphaSlider.addEventListener('input', updateAlphaHint);
+
+      // Debounced re-query on alpha change
+      let alphaDebounceTimer = null;
+      alphaSlider.addEventListener('input', () => {
+        updateAlphaHint(); // Update UI immediately
+
+        // Only re-query if there's search text (alpha only affects hybrid search)
+        const searchText = Dom.val('globalSearch') || '';
+        if (searchText.trim().length > 0) {
+          if (alphaDebounceTimer) clearTimeout(alphaDebounceTimer);
+          alphaDebounceTimer = setTimeout(async () => {
+            // Re-run search with new alpha value
+            if (window.currentView === 'forYou' || window.currentView === 'freeBrowsing') {
+              window.currentRecsTopK = PAGE_SIZE;
+              const isFreeBrowsing = window.currentView === 'freeBrowsing';
+              const recs = await window.fetchRecommendations({
+                text: searchText,
+                topK: window.currentRecsTopK,
+                ignoreUserPreferences: isFreeBrowsing
+              });
+              window.mediaData = recs;
+              window.filteredData = [...window.mediaData];
+              if (typeof window.applySortAndFilters === 'function') {
+                window.applySortAndFilters();
+              } else {
+                displayMedia(window.filteredData);
+              }
+            }
+          }, (window.S5Const?.RECS?.ALPHA_DEBOUNCE_MS) ?? 300);
+        }
+      });
+
       updateAlphaHint(); // Initialize on page load
     }
 
@@ -197,6 +237,64 @@
         setMediaType(mediaType);
       });
     }
+  }
+
+  function initInfiniteScroll(){
+    const sentinel = Dom.$('scrollSentinel');
+    if (!sentinel) {
+      console.warn('[S5] Scroll sentinel not found, infinite scroll disabled');
+      return;
+    }
+
+    // Create Intersection Observer with threshold
+    scrollObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        // When sentinel becomes visible and we're not already loading
+        if (entry.isIntersecting && !isLoadingMore && hasMoreResults) {
+          console.log('[S5] Infinite scroll triggered');
+          window.loadMore();
+        }
+      });
+    }, {
+      root: null, // viewport
+      rootMargin: '200px', // trigger 200px before sentinel is visible
+      threshold: 0.1 // trigger when 10% of sentinel is visible
+    });
+
+    scrollObserver.observe(sentinel);
+    console.log('[S5] Infinite scroll initialized');
+  }
+
+  function updateInfiniteScrollUI(){
+    const loadingMore = Dom.$('loadingMoreState');
+    const endOfResults = Dom.$('endOfResults');
+    const sentinel = Dom.$('scrollSentinel');
+
+    if (!loadingMore || !endOfResults || !sentinel) return;
+
+    if (isLoadingMore) {
+      loadingMore.classList.remove('hidden');
+      endOfResults.classList.add('hidden');
+      sentinel.classList.remove('hidden');
+    } else if (!hasMoreResults) {
+      loadingMore.classList.add('hidden');
+      endOfResults.classList.remove('hidden');
+      sentinel.classList.add('hidden');
+    } else {
+      loadingMore.classList.add('hidden');
+      endOfResults.classList.add('hidden');
+      sentinel.classList.remove('hidden');
+    }
+  }
+
+  function resetInfiniteScroll(){
+    isLoadingMore = false;
+    hasMoreResults = true;
+    currentRecsOffset = 0;
+    window.currentRecsTopK = PAGE_SIZE;
+    window.currentLibraryPage = 1;
+    currentSearchQuery = '';
+    updateInfiniteScrollUI();
   }
 
   async function ensureAuthState(){
@@ -384,10 +482,10 @@
   async function applyMediaTypeFilter(){
     // For recommendation views, we need to re-fetch with the media type filter
     if(window.currentView === 'forYou'){
-      window.currentRecsTopK = PAGE_SIZE;
+      resetInfiniteScroll();
       await window.loadAnimeData();
     } else if(window.currentView === 'freeBrowsing'){
-      window.currentRecsTopK = PAGE_SIZE;
+      resetInfiniteScroll();
       await window.loadFreeBrowsingData();
     } else {
       // For library view, apply client-side filtering
@@ -448,6 +546,10 @@
     }
     window.currentView = source;
     console.log('[S5] setViewSource →', source);
+
+    // Reset infinite scroll state when changing views
+    resetInfiniteScroll();
+
     // Toggle button styles
     const ids = ['forYouBtn','freeBrowsingBtn','libraryBtn'];
     ids.forEach(id => {
@@ -466,34 +568,68 @@
 
   // Data loading
   window.loadAnimeData = async function(){
-  if(!window.currentUserId){ console.warn('[S5] loadAnimeData: no userId'); displayMedia([]); return; }
+  if(!window.currentUserId){ console.warn('[S5] loadAnimeData: no userId'); displayMedia([]); hasMoreResults = false; updateInfiniteScrollUI(); return; }
     try{
-      console.log('[S5] loadAnimeData → recs query', { userId: window.currentUserId, topK: window.currentRecsTopK });
-      const recs = await fetchRecommendations({ text: '', topK: window.currentRecsTopK });
-  window.mediaData = recs; window.filteredData = [...window.mediaData];
-  // Apply current sort selection after loading
-  if (typeof window.applySortAndFilters === 'function') { window.applySortAndFilters(); }
-  else { displayMedia(window.filteredData); }
-      const btn = Dom.$('moreBtn'); if(btn){ if(window.filteredData.length >= window.currentRecsTopK) btn.classList.remove('hidden'); else btn.classList.add('hidden'); }
-      console.log('[S5] loadAnimeData → results', window.filteredData.length);
-    }catch{ displayMedia([]); Dom.$('moreBtn')?.classList.add('hidden'); showToast('Failed to load recommendations', 'error'); }
+      console.log('[S5] loadAnimeData → recs query', { userId: window.currentUserId, offset: currentRecsOffset, limit: PAGE_SIZE });
+      const recs = await fetchRecommendations({ text: '', offset: currentRecsOffset, limit: PAGE_SIZE });
+
+      // For infinite scroll: append items if offset > 0, otherwise replace
+      if (currentRecsOffset > 0) {
+        // We're loading more - append new items
+        window.mediaData.push(...recs);
+        console.log('[S5] loadAnimeData → appended', recs.length, 'new items (total:', window.mediaData.length, ')');
+      } else {
+        // Initial load - replace everything
+        window.mediaData = recs;
+        console.log('[S5] loadAnimeData → initial load', window.mediaData.length, 'items');
+      }
+
+      window.filteredData = [...window.mediaData];
+
+      // Check if we have more results (if we got full PAGE_SIZE, there might be more)
+      hasMoreResults = recs.length >= PAGE_SIZE;
+
+      // Apply current sort selection after loading
+      if (typeof window.applySortAndFilters === 'function') { window.applySortAndFilters(); }
+      else { displayMedia(window.filteredData); }
+
+      updateInfiniteScrollUI();
+      console.log('[S5] loadAnimeData → total results', window.filteredData.length, 'hasMore:', hasMoreResults);
+    }catch{ displayMedia([]); hasMoreResults = false; updateInfiniteScrollUI(); showToast('Failed to load recommendations', 'error'); }
   };
 
   window.loadFreeBrowsingData = async function(){
     try{
-  console.log('[S5] loadFreeBrowsingData → recs query', { topK: window.currentRecsTopK, ignoreUserPreferences: true });
-  const recs = await fetchRecommendations({ text: '', topK: window.currentRecsTopK, ignoreUserPreferences: true });
-  window.mediaData = recs; window.filteredData = [...window.mediaData];
+  console.log('[S5] loadFreeBrowsingData → recs query', { offset: currentRecsOffset, limit: PAGE_SIZE, ignoreUserPreferences: true });
+  const recs = await fetchRecommendations({ text: '', offset: currentRecsOffset, limit: PAGE_SIZE, ignoreUserPreferences: true });
+
+  // For infinite scroll: append items if offset > 0, otherwise replace
+  if (currentRecsOffset > 0) {
+    // We're loading more - append new items
+    window.mediaData.push(...recs);
+    console.log('[S5] loadFreeBrowsingData → appended', recs.length, 'new items (total:', window.mediaData.length, ')');
+  } else {
+    // Initial load - replace everything
+    window.mediaData = recs;
+    console.log('[S5] loadFreeBrowsingData → initial load', window.mediaData.length, 'items');
+  }
+
+  window.filteredData = [...window.mediaData];
+
+  // Check if we have more results (if we got full PAGE_SIZE, there might be more)
+  hasMoreResults = recs.length >= PAGE_SIZE;
+
   // Apply current sort selection after loading
   if (typeof window.applySortAndFilters === 'function') { window.applySortAndFilters(); }
   else { displayMedia(window.filteredData); }
-      const btn = Dom.$('moreBtn'); if(btn){ if(window.filteredData.length >= window.currentRecsTopK) btn.classList.remove('hidden'); else btn.classList.add('hidden'); }
-  console.log('[S5] loadFreeBrowsingData → results', window.filteredData.length);
-    }catch{ displayMedia([]); Dom.$('moreBtn')?.classList.add('hidden'); showToast('Failed to load content', 'error'); }
+
+  updateInfiniteScrollUI();
+  console.log('[S5] loadFreeBrowsingData → total results', window.filteredData.length, 'hasMore:', hasMoreResults);
+    }catch{ displayMedia([]); hasMoreResults = false; updateInfiniteScrollUI(); showToast('Failed to load content', 'error'); }
   };
 
-  window.fetchRecommendations = async function({ text, topK = PAGE_SIZE, ignoreUserPreferences = false }){
-  console.log('[S5] fetchRecommendations', { text, topK, ignoreUserPreferences });
+  window.fetchRecommendations = async function({ text, offset = 0, limit = PAGE_SIZE, topK = PAGE_SIZE, ignoreUserPreferences = false }){
+  console.log('[S5] fetchRecommendations', { text, offset, limit, ignoreUserPreferences });
     const weight = parseFloat(Dom.$('preferWeight')?.value || String((window.S5Const?.RECS?.DEFAULT_PREFER_WEIGHT) ?? 0.2));
     const genre = Dom.val('genreFilter') || '';
     const episodeSel = Dom.val('episodeFilter') || '';
@@ -522,9 +658,14 @@
     // Get alpha value for hybrid search (semantic vs keyword balance)
     const alpha = parseFloat(Dom.$('alphaSlider')?.value ?? '0.5');
 
+    // Get showCensored toggle state
+    const showCensored = document.getElementById('showCensoredToggle')?.checked || false;
+
     const body = {
       text: text || '',
-      topK,
+      offset,
+      limit,
+      topK,  // Keep for backward compatibility
       sort,
       alpha: text ? alpha : null, // Only include alpha when there's search text (hybrid mode)
       filters: {
@@ -538,7 +679,8 @@
         ratingMin: ratingMin,
         ratingMax: ratingMax,
         yearMin: yearMin,
-        yearMax: yearMax
+        yearMax: yearMax,
+        showCensored: showCensored
       },
       userId
     };
@@ -646,10 +788,8 @@
   window.handleGlobalSearch = async function(e){
     const query = e.target.value;
     if(!query || query.trim().length===0){
-      if(window.currentView==='forYou' || window.currentView==='freeBrowsing'){
-        window.currentRecsTopK = PAGE_SIZE;
-      }
-      Dom.$('moreBtn')?.classList.add('hidden');
+      // Reset infinite scroll state when clearing search
+      resetInfiniteScroll();
 
       // Update filter chips to remove search
       if (window.S5Filters && S5Filters.updateFilterChips) {
@@ -675,13 +815,24 @@
       return;
     }
     try{
-      window.currentRecsTopK = PAGE_SIZE;
+      // Reset infinite scroll for new search
+      resetInfiniteScroll();
+
       const isFreeBrowsing = window.currentView === 'freeBrowsing';
-      const recs = await window.fetchRecommendations({ text: query, topK: window.currentRecsTopK, ignoreUserPreferences: isFreeBrowsing });
-  window.mediaData = recs; window.filteredData = [...window.mediaData];
-  if (typeof window.applySortAndFilters === 'function') { window.applySortAndFilters(); } else { displayMedia(window.filteredData); }
-      const btn = Dom.$('moreBtn'); if(btn){ if(window.filteredData.length >= window.currentRecsTopK) btn.classList.remove('hidden'); else btn.classList.add('hidden'); }
-    }catch{ Dom.$('moreBtn')?.classList.add('hidden'); showToast('Search failed', 'error'); }
+      const recs = await window.fetchRecommendations({ text: query, offset: 0, limit: PAGE_SIZE, ignoreUserPreferences: isFreeBrowsing });
+
+      // New search - replace everything (infinite scroll will handle loading more)
+      window.mediaData = recs;
+      window.filteredData = [...window.mediaData];
+
+      // Check if we have more results
+      hasMoreResults = recs.length >= PAGE_SIZE;
+      updateInfiniteScrollUI();
+
+      console.log('[S5] handleGlobalSearch → new search', window.mediaData.length, 'items, hasMore:', hasMoreResults);
+
+      if (typeof window.applySortAndFilters === 'function') { window.applySortAndFilters(); } else { displayMedia(window.filteredData); }
+    }catch{ hasMoreResults = false; updateInfiniteScrollUI(); showToast('Search failed', 'error'); }
   }
   window.applyFilters = async function(){
     // Note: For recommendation views (forYou/freeBrowsing), filters are applied on the BACKEND
@@ -698,11 +849,11 @@
 
     // For recommendation views, re-fetch from backend with new filters
     if (window.currentView === 'forYou') {
-      window.currentRecsTopK = PAGE_SIZE;
+      resetInfiniteScroll();
       await window.loadAnimeData();
       return;
     } else if (window.currentView === 'freeBrowsing') {
-      window.currentRecsTopK = PAGE_SIZE;
+      resetInfiniteScroll();
       await window.loadFreeBrowsingData();
       return;
     }
@@ -1141,29 +1292,48 @@
     try{ const data = await (window.S5Api && window.S5Api.getLibrary ? window.S5Api.getLibrary(window.currentUserId, { status:'watched', sort:'updatedAt', page:1, pageSize:(window.S5Const?.LIBRARY?.WATCHLIST_PAGE_SIZE) ?? 100 }) : null) || { items: [] }; const ids = (data.items||[]).map(e=>e.mediaId).filter(Boolean); if(ids.length===0){ displayMedia([]); return; } const arr = await (window.S5Api && window.S5Api.getMediaByIds ? window.S5Api.getMediaByIds(ids) : null) || []; const mapped = arr.map(a => mapItemToMedia({ media: a, score: a.popularity || ((window.S5Const?.RATING?.DEFAULT_POPULARITY_SCORE) ?? 0.7) })); displayMedia(mapped); }catch{ displayMedia([]); showToast('Failed to load watchlist', 'error'); }
   }
   async function loadLibrary(){
-    if(!window.currentUserId){ displayMedia([]); return; }
+    if(!window.currentUserId){ displayMedia([]); hasMoreResults = false; updateInfiniteScrollUI(); return; }
   console.log('[S5] loadLibrary: page', window.currentLibraryPage);
-  try{ const data = await (window.S5Api && window.S5Api.getLibrary ? window.S5Api.getLibrary(window.currentUserId, { sort:'updatedAt', page: window.currentLibraryPage, pageSize: PAGE_SIZE }) : null) || { items: [] }; const ids = (data.items||[]).map(e=>e.mediaId).filter(Boolean); if(window.currentLibraryPage===1 && ids.length===0){ displayMedia([]); Dom.$('moreBtn')?.classList.add('hidden'); return; } const arr = await (window.S5Api && window.S5Api.getMediaByIds ? window.S5Api.getMediaByIds(ids) : null) || []; const mapped = arr.map(a => mapItemToMedia({ media: a, score: a.popularity || ((window.S5Const?.RATING?.DEFAULT_POPULARITY_SCORE) ?? 0.7) })); if(window.currentLibraryPage===1){ window.mediaData = mapped; } else { const seen = new Set(window.mediaData.map(x=>x.id)); for(const m of mapped){ if(!seen.has(m.id)) window.mediaData.push(m); } } window.filteredData = [...window.mediaData]; for(const e of (data.items||[])){ window.libraryByMediaId[e.mediaId] = { favorite: !!e.favorite, watched: !!e.watched, dropped: !!e.dropped, rating: e.rating ?? null, updatedAt: e.updatedAt }; } if (typeof window.applySortAndFilters === 'function') { window.applySortAndFilters(); } else { displayMedia(window.filteredData); } const btn = Dom.$('moreBtn'); if(btn){ if((data.items||[]).length === PAGE_SIZE) btn.classList.remove('hidden'); else btn.classList.add('hidden'); } }catch{ displayMedia([]); showToast('Failed to load library', 'error'); }
-  console.log('[S5] loadLibrary: done, items', (window.filteredData||[]).length);
+  try{ const data = await (window.S5Api && window.S5Api.getLibrary ? window.S5Api.getLibrary(window.currentUserId, { sort:'updatedAt', page: window.currentLibraryPage, pageSize: PAGE_SIZE }) : null) || { items: [] }; const ids = (data.items||[]).map(e=>e.mediaId).filter(Boolean); if(window.currentLibraryPage===1 && ids.length===0){ displayMedia([]); hasMoreResults = false; updateInfiniteScrollUI(); return; } const arr = await (window.S5Api && window.S5Api.getMediaByIds ? window.S5Api.getMediaByIds(ids) : null) || []; const mapped = arr.map(a => mapItemToMedia({ media: a, score: a.popularity || ((window.S5Const?.RATING?.DEFAULT_POPULARITY_SCORE) ?? 0.7) })); if(window.currentLibraryPage===1){ window.mediaData = mapped; } else { const seen = new Set(window.mediaData.map(x=>x.id)); for(const m of mapped){ if(!seen.has(m.id)) window.mediaData.push(m); } } window.filteredData = [...window.mediaData]; for(const e of (data.items||[])){ window.libraryByMediaId[e.mediaId] = { favorite: !!e.favorite, watched: !!e.watched, dropped: !!e.dropped, rating: e.rating ?? null, updatedAt: e.updatedAt }; } if (typeof window.applySortAndFilters === 'function') { window.applySortAndFilters(); } else { displayMedia(window.filteredData); }
+
+  // Check if we have more results (library uses actual pagination)
+  hasMoreResults = (data.items||[]).length === PAGE_SIZE;
+  updateInfiniteScrollUI();
+  }catch{ displayMedia([]); hasMoreResults = false; updateInfiniteScrollUI(); showToast('Failed to load library', 'error'); }
+  console.log('[S5] loadLibrary: done, items', (window.filteredData||[]).length, 'hasMore:', hasMoreResults);
     const tp = (window.S5Const?.TEXT?.RESULTS_PREFIX) || 'Showing ';
     const ts = (window.S5Const?.TEXT?.RESULTS_SUFFIX) || ' results';
     Dom.text('resultCount', `${tp}${window.filteredData.length}${ts}`);
   }
   window.loadLibrary = loadLibrary;
 
-  window.loadMore = async function(){ 
-    if(window.currentView==='forYou'){ 
-      const inc = (window.S5Config && window.S5Config.MORE_INCREMENT) || PAGE_SIZE; 
-      window.currentRecsTopK += inc; 
-      await window.loadAnimeData(); 
-    } else if(window.currentView==='freeBrowsing'){ 
-      const inc = (window.S5Config && window.S5Config.MORE_INCREMENT) || PAGE_SIZE; 
-      window.currentRecsTopK += inc; 
-      await window.loadFreeBrowsingData(); 
-    } else { 
-      window.currentLibraryPage += 1; 
-      await loadLibrary(); 
-    } 
+  window.loadMore = async function(){
+    // Prevent concurrent loads
+    if (isLoadingMore || !hasMoreResults) {
+      console.log('[S5] loadMore: already loading or no more results');
+      return;
+    }
+
+    isLoadingMore = true;
+    updateInfiniteScrollUI();
+
+    try {
+      if(window.currentView==='forYou'){
+        // Increment offset by PAGE_SIZE for next page
+        currentRecsOffset += PAGE_SIZE;
+        await window.loadAnimeData();
+      } else if(window.currentView==='freeBrowsing'){
+        // Increment offset by PAGE_SIZE for next page
+        currentRecsOffset += PAGE_SIZE;
+        await window.loadFreeBrowsingData();
+      } else {
+        window.currentLibraryPage += 1;
+        await loadLibrary();
+      }
+    } finally {
+      isLoadingMore = false;
+      updateInfiniteScrollUI();
+    }
   };
 
   window.removeCardFromForYou = function(mediaId){ 

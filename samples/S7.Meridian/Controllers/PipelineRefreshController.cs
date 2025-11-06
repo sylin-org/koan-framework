@@ -5,7 +5,9 @@ using System.Threading.Tasks;
 using Koan.Data.Core;
 using Koan.Samples.Meridian.Infrastructure;
 using Koan.Samples.Meridian.Models;
+using Koan.Samples.Meridian.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 
 namespace Koan.Samples.Meridian.Controllers;
 
@@ -13,6 +15,15 @@ namespace Koan.Samples.Meridian.Controllers;
 [Route(MeridianConstants.PipelineRefresh.Route)]
 public sealed class PipelineRefreshController : ControllerBase
 {
+    private readonly IJobCoordinator _jobs;
+    private readonly ILogger<PipelineRefreshController> _logger;
+
+    public PipelineRefreshController(IJobCoordinator jobs, ILogger<PipelineRefreshController> logger)
+    {
+        _jobs = jobs;
+        _logger = logger;
+    }
+
     [HttpPost]
     public async Task<ActionResult> RefreshAsync(string pipelineId, CancellationToken ct)
     {
@@ -22,26 +33,49 @@ public sealed class PipelineRefreshController : ControllerBase
             return NotFound();
         }
 
-        var documents = await SourceDocument.Query(d => d.PipelineId == pipelineId, ct);
-        var docList = documents.Select(d => d.Id).Where(id => !string.IsNullOrWhiteSpace(id)).ToList();
+        var docList = pipeline.DocumentIds
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+
+        _logger.LogInformation("Pipeline {PipelineId} refresh found {Count} documents in pipeline.DocumentIds: {DocumentIds}",
+            pipelineId, docList.Count, string.Join(", ", docList));
+
+        var existing = await ProcessingJob.FindPendingAsync(pipelineId, ct);
+
         if (docList.Count == 0)
         {
+            if (existing is not null)
+            {
+                _logger.LogDebug("Pipeline {PipelineId} refresh reuse; no new documents but pending job {JobId} exists.", pipelineId, existing.Id);
+                return Accepted(new { jobId = existing.Id, documentCount = existing.DocumentIds.Count });
+            }
+
             return BadRequest(new { error = "No documents available for refresh." });
         }
 
-        var job = new ProcessingJob
+        ProcessingJob job;
+        if (existing is not null)
         {
-            PipelineId = pipelineId,
-            DocumentIds = docList,
-            Status = JobStatus.Pending,
-            CreatedAt = DateTime.UtcNow
-        };
-        await job.Save(ct);
+            var before = existing.DocumentIds.Count;
+            if (existing.MergeDocuments(docList))
+            {
+                var added = existing.DocumentIds.Count - before;
+                existing.HeartbeatAt = DateTime.UtcNow;
+                await existing.Save(ct);
+                _logger.LogInformation("Pipeline {PipelineId} refresh appended {Added} documents to pending job {JobId}.", pipelineId, added, existing.Id);
+            }
+            job = existing;
+        }
+        else
+        {
+            job = await _jobs.ScheduleAsync(pipelineId, docList, ct);
+        }
 
         pipeline.Status = PipelineStatus.Queued;
         pipeline.UpdatedAt = DateTime.UtcNow;
         await pipeline.Save(ct);
 
-        return Accepted(new { jobId = job.Id, documentCount = docList.Count });
+        return Accepted(new { jobId = job.Id, documentCount = job.DocumentIds.Count });
     }
 }

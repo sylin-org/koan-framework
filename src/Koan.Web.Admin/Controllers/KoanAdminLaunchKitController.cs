@@ -35,7 +35,7 @@ public sealed class KoanAdminLaunchKitController : ControllerBase
             return result;
         }
 
-        var metadata = await _launchKit.GetMetadataAsync(cancellationToken).ConfigureAwait(false);
+        var metadata = await _launchKit.GetMetadataAsync(cancellationToken);
         return Ok(metadata);
     }
 
@@ -50,7 +50,7 @@ public sealed class KoanAdminLaunchKitController : ControllerBase
         }
 
         var archive = await _launchKit.GenerateArchiveAsync(request ?? new KoanAdminLaunchKitRequest(null, null, null, null, null, null, null), cancellationToken)
-            .ConfigureAwait(false);
+            ;
 
         return File(archive.Content, archive.ContentType, archive.FileName);
     }

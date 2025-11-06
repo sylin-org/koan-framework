@@ -3,10 +3,6 @@ using System.Collections.Generic;
 
 namespace Koan.Samples.Meridian.Infrastructure;
 
-/// <summary>
-/// Externalized configuration for Meridian pipeline processing.
-/// Binds from appsettings.json: Meridian:Retrieval, Meridian:Extraction, etc.
-/// </summary>
 public sealed class MeridianOptions
 {
     public RetrievalOptions Retrieval { get; set; } = new();
@@ -15,8 +11,18 @@ public sealed class MeridianOptions
     public ClassificationOptions Classification { get; set; } = new();
     public ConfidenceOptions Confidence { get; set; } = new();
     public RenderingOptions Rendering { get; set; } = new();
+    public FactCatalogOptions Facts { get; set; } = new();
+
+    public void NormalizeFieldPaths()
+    {
+        Merge.NormalizeFieldPaths();
+    }
 }
 
+/// <summary>
+/// Externalized configuration for Meridian pipeline processing.
+/// Binds from appsettings.json: Meridian:Retrieval, Meridian:Extraction, etc.
+/// </summary>
 public sealed class RetrievalOptions
 {
     /// <summary>Number of passages to retrieve from vector search (default: 12).</summary>
@@ -28,8 +34,8 @@ public sealed class RetrievalOptions
     /// <summary>MMR diversity parameter: higher = more diverse passages (default: 0.7).</summary>
     public double MmrLambda { get; set; } = 0.7;
 
-    /// <summary>Maximum tokens to send to LLM per field extraction (default: 2000).</summary>
-    public int MaxTokensPerField { get; set; } = 2000;
+    /// <summary>Maximum tokens to send to LLM per field extraction (0 = unlimited).</summary>
+    public int MaxTokensPerField { get; set; } = 0;
 }
 
 public sealed class ExtractionOptions
@@ -84,6 +90,15 @@ public sealed class MergeOptions
 
     /// <summary>Field-specific merge policies keyed by JSON path (e.g., $.revenue).</summary>
     public Dictionary<string, MergePolicyOptions> Policies { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+
+    public void NormalizeFieldPaths()
+    {
+        FieldPathCanonicalizer.CanonicalizeKeys(Policies);
+        foreach (var policy in Policies.Values)
+        {
+            policy.NormalizeFieldPaths();
+        }
+    }
 }
 
 public sealed class MergePolicyOptions
@@ -105,6 +120,14 @@ public sealed class MergePolicyOptions
 
     /// <summary>Strategy for collection merges (union, intersection, concat).</summary>
     public string? CollectionStrategy { get; set; }
+
+    public void NormalizeFieldPaths()
+    {
+        if (!string.IsNullOrWhiteSpace(LatestByFieldPath))
+        {
+            LatestByFieldPath = FieldPathCanonicalizer.Canonicalize(LatestByFieldPath);
+        }
+    }
 }
 
 public sealed class ClassificationOptions
@@ -120,27 +143,6 @@ public sealed class ClassificationOptions
 
     /// <summary>Model identifier to use for LLM classification fallback (null = default AI model).</summary>
     public string? LlmModel { get; set; }
-
-    /// <summary>Classification types available to the cascade.</summary>
-    public List<SourceTypeOptions> Types { get; set; } = new();
-}
-
-public sealed class SourceTypeOptions
-{
-    public string Id { get; set; } = string.Empty;
-    public string Name { get; set; } = string.Empty;
-    public string Description { get; set; } = string.Empty;
-    public int Version { get; set; } = 1;
-    public List<string> Tags { get; set; } = new();
-    public List<string> Descriptors { get; set; } = new();
-    public List<string> FilenamePatterns { get; set; } = new();
-    public List<string> Keywords { get; set; } = new();
-    public int? ExpectedPageCountMin { get; set; }
-    public int? ExpectedPageCountMax { get; set; }
-    public List<string> MimeTypes { get; set; } = new();
-    public Dictionary<string, string> FieldQueries { get; set; } = new(StringComparer.OrdinalIgnoreCase);
-    public string Instructions { get; set; } = string.Empty;
-    public string OutputTemplate { get; set; } = string.Empty;
 }
 
 public sealed class ConfidenceOptions
@@ -187,4 +189,35 @@ public sealed class PandocOptions
 
     /// <summary>Whether to strip dangerous LaTeX commands before rendering.</summary>
     public bool SanitizeLatex { get; set; } = true;
+}
+
+public sealed class FactCatalogOptions
+{
+    /// <summary>Model used for fact extraction (null = reuse extraction model).</summary>
+    public string? ExtractionModel { get; set; }
+        = null;
+
+    /// <summary>Model used for fact-to-field matching (null = reuse extraction model).</summary>
+    public string? MatchingModel { get; set; }
+        = null;
+
+    /// <summary>Temperature for fact extraction prompts.</summary>
+    public double ExtractionTemperature { get; set; }
+        = 0.0;
+
+    /// <summary>Temperature for field matching prompts.</summary>
+    public double MatchingTemperature { get; set; }
+        = 0.1;
+
+    /// <summary>Maximum facts produced per document.</summary>
+    public int MaxFactsPerDocument { get; set; }
+        = 48;
+
+    /// <summary>Maximum fact candidates sent to the matcher per field.</summary>
+    public int MaxCandidatesPerField { get; set; }
+        = 12;
+
+    /// <summary>Confidence threshold below which we flag a match for review.</summary>
+    public double ReviewThreshold { get; set; }
+        = 0.6;
 }

@@ -23,7 +23,7 @@ internal sealed class StartupProbeService : Microsoft.Extensions.Hosting.IHosted
                 {
                     try
                     {
-                        var report = await c.CheckAsync(cancellationToken).ConfigureAwait(false);
+                        var report = await c.CheckAsync(cancellationToken);
                         _log?.LogDebug("StartupProbe: {Name} -> {State} ({Msg})", c.Name, report.State, report.Description);
                         var status = report.State switch
                         {

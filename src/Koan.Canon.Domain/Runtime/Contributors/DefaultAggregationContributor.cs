@@ -47,9 +47,9 @@ internal sealed class DefaultAggregationContributor<TModel> : ICanonPipelineCont
         context.SetItem(ArrivalTokenContextKey, arrivalToken);
 
         var aggregationKey = BuildAggregationKey(context.Entity);
-        var indexLookup = await LoadIndexesAsync(context, aggregationKey, cancellationToken).ConfigureAwait(false);
+        var indexLookup = await LoadIndexesAsync(context, aggregationKey, cancellationToken);
 
-        var canonicalId = await EnsureCanonicalIdAsync(context, indexLookup, cancellationToken).ConfigureAwait(false);
+        var canonicalId = await EnsureCanonicalIdAsync(context, indexLookup, cancellationToken);
         var attributes = BuildIndexAttributes(context, arrivalToken);
 
         foreach (var entry in indexLookup)
@@ -62,7 +62,7 @@ internal sealed class DefaultAggregationContributor<TModel> : ICanonPipelineCont
             };
 
             index.Update(canonicalId, context.Metadata.Origin, attributes);
-            await context.Persistence.UpsertIndexAsync(index, cancellationToken).ConfigureAwait(false);
+            await context.Persistence.UpsertIndexAsync(index, cancellationToken);
         }
 
         return null;
@@ -96,7 +96,7 @@ internal sealed class DefaultAggregationContributor<TModel> : ICanonPipelineCont
         }
 
         context.Metadata.AssignCanonicalId(canonicalId);
-        await AttachExistingSnapshotAsync(context, canonicalId, cancellationToken).ConfigureAwait(false);
+        await AttachExistingSnapshotAsync(context, canonicalId, cancellationToken);
 
         if (candidateIds.Count > 1)
         {
@@ -148,7 +148,7 @@ internal sealed class DefaultAggregationContributor<TModel> : ICanonPipelineCont
 
         try
         {
-            existing = await CanonEntity<TModel>.Get(canonicalId, cancellationToken).ConfigureAwait(false);
+            existing = await CanonEntity<TModel>.Get(canonicalId, cancellationToken);
         }
         catch (InvalidOperationException ex) when (IsAppHostUnavailable(ex))
         {
@@ -226,13 +226,13 @@ internal sealed class DefaultAggregationContributor<TModel> : ICanonPipelineCont
 
         foreach (var token in aggregationKey.Tokens)
         {
-            var index = await context.Persistence.GetIndexAsync(_entityType, token, cancellationToken).ConfigureAwait(false);
+            var index = await context.Persistence.GetIndexAsync(_entityType, token, cancellationToken);
             lookup[token] = index;
         }
 
         if (!string.IsNullOrWhiteSpace(aggregationKey.CompositeKey) && !lookup.ContainsKey(aggregationKey.CompositeKey!))
         {
-            var composite = await context.Persistence.GetIndexAsync(_entityType, aggregationKey.CompositeKey!, cancellationToken).ConfigureAwait(false);
+            var composite = await context.Persistence.GetIndexAsync(_entityType, aggregationKey.CompositeKey!, cancellationToken);
             lookup[aggregationKey.CompositeKey!] = composite;
         }
 

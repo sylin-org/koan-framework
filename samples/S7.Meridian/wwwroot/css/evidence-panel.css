@@ -1,0 +1,349 @@
+/**
+ * Meridian Evidence Panel Styles
+ * Inspired by SnapVault's lightbox-panel.css
+ * Responsive panel for detailed evidence and source viewing
+ */
+
+/* ==================== Panel Base ==================== */
+.evidence-panel {
+  position: fixed;
+  background: rgba(255, 255, 255, 0.98);
+  backdrop-filter: blur(10px);
+  color: var(--color-text-primary);
+  display: flex;
+  flex-direction: column;
+  transition: transform var(--transition-slow);
+  z-index: var(--z-fixed);
+  overflow: hidden;
+  box-shadow: var(--shadow-xl);
+}
+
+/* ==================== Desktop (>1200px): Side Panel ==================== */
+@media (min-width: 1200px) {
+  .evidence-panel {
+    top: 60px; /* Below header */
+    right: 0;
+    width: 0;
+    height: calc(100vh - 60px - 32px); /* Minus header and status bar */
+    opacity: 0;
+    transition: width var(--transition-slow),
+                opacity var(--transition-slow);
+    border-left: 1px solid var(--color-border-subtle);
+  }
+
+  .evidence-panel.open {
+    width: 420px;
+    opacity: 1;
+  }
+}
+
+/* ==================== Tablet (768-1200px): Overlay ==================== */
+@media (min-width: 768px) and (max-width: 1199px) {
+  .evidence-panel {
+    top: 60px;
+    right: 0;
+    width: 360px;
+    height: calc(100vh - 60px);
+    transform: translateX(100%);
+  }
+
+  .evidence-panel.open {
+    transform: translateX(0);
+  }
+}
+
+/* ==================== Mobile (<768px): Bottom Sheet ==================== */
+@media (max-width: 767px) {
+  .evidence-panel {
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 70vh;
+    max-height: 70vh;
+    transform: translateY(100%);
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  }
+
+  .evidence-panel.open {
+    transform: translateY(0);
+  }
+}
+
+/* ==================== Panel Header ==================== */
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--spacing-4) var(--spacing-5);
+  border-bottom: 1px solid var(--color-border-subtle);
+  flex-shrink: 0;
+}
+
+.panel-header h2 {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0;
+  color: var(--color-text-primary);
+}
+
+.btn-close-panel {
+  color: var(--color-text-tertiary);
+  padding: var(--spacing-2);
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
+}
+
+.btn-close-panel:hover {
+  background-color: var(--color-bg-tertiary);
+  color: var(--color-text-primary);
+}
+
+/* ==================== Panel Content (Scrollable) ==================== */
+.panel-content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* ==================== Panel Sections ==================== */
+.panel-section {
+  padding: var(--spacing-5);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.panel-section:last-child {
+  border-bottom: none;
+}
+
+.panel-section h3 {
+  font-size: 14px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-tertiary);
+  margin: 0 0 var(--spacing-3) 0;
+}
+
+/* ==================== Evidence Details ==================== */
+.evidence-detail-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  margin-bottom: var(--spacing-4);
+}
+
+.evidence-source-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-1);
+  padding: var(--spacing-1) var(--spacing-2);
+  background-color: var(--color-blue-bg);
+  color: var(--color-blue);
+  font-size: var(--font-size-small);
+  font-weight: 500;
+  border-radius: var(--radius-md);
+  margin-bottom: var(--spacing-3);
+}
+
+.evidence-source-badge[data-source="notes"] {
+  background-color: var(--color-gold-bg);
+  color: var(--color-gold);
+}
+
+.evidence-meta-grid {
+  display: grid;
+  gap: 0;
+  margin-bottom: var(--spacing-4);
+}
+
+.evidence-meta-item {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: var(--spacing-3);
+  padding: var(--spacing-2) 0;
+  border-bottom: 1px solid var(--color-border-subtle);
+  align-items: baseline;
+}
+
+.evidence-meta-item:last-child {
+  border-bottom: none;
+}
+
+.evidence-meta-label {
+  font-size: var(--font-size-small);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-tertiary);
+  flex-shrink: 0;
+}
+
+.evidence-meta-value {
+  font-size: var(--font-size-small);
+  color: var(--color-text-primary);
+  word-break: break-word;
+}
+
+/* ==================== Source Passage Display ==================== */
+.source-passage-container {
+  margin-top: var(--spacing-4);
+}
+
+.source-passage {
+  padding: var(--spacing-4);
+  background-color: var(--color-bg-secondary);
+  border-left: 4px solid var(--color-blue);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-body);
+  line-height: 1.6;
+  font-style: italic;
+  color: var(--color-text-secondary);
+}
+
+.source-passage mark {
+  background-color: rgba(245, 158, 11, 0.3);
+  color: var(--color-text-primary);
+  padding: 2px 4px;
+  border-radius: 2px;
+}
+
+.source-document-ref {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  margin-top: var(--spacing-2);
+  padding: var(--spacing-2) var(--spacing-3);
+  background-color: var(--color-bg-tertiary);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-small);
+  color: var(--color-text-tertiary);
+}
+
+/* ==================== Alternative Sources List ==================== */
+.alternatives-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3);
+}
+
+.alternative-source-item {
+  padding: var(--spacing-3);
+  background-color: var(--color-bg-secondary);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  transition: all var(--transition-fast);
+}
+
+.alternative-source-item:hover {
+  border-color: var(--color-border-medium);
+  box-shadow: var(--shadow-sm);
+}
+
+.alternative-source-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--spacing-2);
+}
+
+.alternative-source-ref {
+  font-size: var(--font-size-small);
+  font-weight: 500;
+  color: var(--color-text-primary);
+}
+
+.alternative-source-passage {
+  font-size: var(--font-size-small);
+  line-height: 1.5;
+  font-style: italic;
+  color: var(--color-text-secondary);
+}
+
+.btn-use-source {
+  margin-top: var(--spacing-2);
+  padding: var(--spacing-2) var(--spacing-3);
+  background-color: var(--color-blue-bg);
+  color: var(--color-blue);
+  font-size: var(--font-size-small);
+  font-weight: 500;
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
+}
+
+.btn-use-source:hover {
+  background-color: var(--color-blue);
+  color: white;
+}
+
+/* ==================== Panel Actions ==================== */
+.panel-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
+}
+
+.panel-action-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  padding: var(--spacing-3);
+  background-color: var(--color-bg-secondary);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-small);
+  transition: all var(--transition-fast);
+  text-align: left;
+  width: 100%;
+}
+
+.panel-action-btn:hover {
+  background-color: var(--color-bg-tertiary);
+  border-color: var(--color-border-medium);
+}
+
+.panel-action-btn .icon {
+  color: var(--color-text-tertiary);
+}
+
+.panel-action-label {
+  flex: 1;
+}
+
+/* ==================== Drag Handle (Mobile) ==================== */
+.drag-handle {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .drag-handle {
+    display: block;
+    width: 48px;
+    height: 4px;
+    background: var(--color-gray-300);
+    border-radius: var(--radius-full);
+    margin: var(--spacing-3) auto var(--spacing-2);
+    cursor: grab;
+    flex-shrink: 0;
+    touch-action: none;
+  }
+
+  .drag-handle:active {
+    cursor: grabbing;
+    background: var(--color-gray-400);
+  }
+}
+
+/* ==================== Accessibility ==================== */
+@media (prefers-reduced-motion: reduce) {
+  .evidence-panel {
+    transition: none;
+  }
+}
+
+@media (prefers-contrast: high) {
+  .evidence-panel {
+    background: white;
+    border: 2px solid var(--color-border-dark);
+  }
+}

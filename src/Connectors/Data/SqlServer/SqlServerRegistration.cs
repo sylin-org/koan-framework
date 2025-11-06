@@ -14,8 +14,9 @@ public static class SqlServerRegistration
 {
     public static IServiceCollection AddSqlServerAdapter(this IServiceCollection services, Action<SqlServerOptions>? configure = null)
     {
-        services.AddKoanOptions<SqlServerOptions>(Infrastructure.Constants.Configuration.Keys.Section);
-        services.TryAddEnumerable(ServiceDescriptor.Transient<IConfigureOptions<SqlServerOptions>, SqlServerOptionsConfigurator>());
+        services.AddKoanOptions<SqlServerOptions, SqlServerOptionsConfigurator>(
+            Infrastructure.Constants.Configuration.Keys.Section,
+            configuratorLifetime: ServiceLifetime.Transient);
         if (configure is not null) services.Configure(configure);
         services.AddRelationalOrchestration();
         // Bridge SQL Server provider options into the relational materialization pipeline

@@ -47,7 +47,7 @@ public class CanonEntitiesController<TModel> : EntityController<TModel>
         }
 
         var options = BuildOptionsFromRequest();
-        var result = await _runtime.Canonize(model, options, ct).ConfigureAwait(false);
+        var result = await _runtime.Canonize(model, options, ct);
         return Ok(CanonizationResponse<TModel>.FromResult(result));
     }
 
@@ -69,7 +69,7 @@ public class CanonEntitiesController<TModel> : EntityController<TModel>
         var responses = new List<CanonizationResponse<TModel>>(list.Count);
         foreach (var model in list)
         {
-            var result = await _runtime.Canonize(model, options, ct).ConfigureAwait(false);
+            var result = await _runtime.Canonize(model, options, ct);
             responses.Add(CanonizationResponse<TModel>.FromResult(result));
         }
 

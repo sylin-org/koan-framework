@@ -161,7 +161,7 @@ internal sealed class OllamaDiscoveryAdapter : ServiceDiscoveryAdapterBase
     }
 
     /// <summary>Ollama-specific environment variable handling</summary>
-    private IEnumerable<DiscoveryCandidate> GetEnvironmentCandidates()
+    protected override IEnumerable<DiscoveryCandidate> GetEnvironmentCandidates()
     {
         var candidates = new List<DiscoveryCandidate>();
 

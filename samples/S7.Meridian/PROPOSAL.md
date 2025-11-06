@@ -1,8 +1,8 @@
-# S7.Meridian - Comprehensive Architectural Proposal (REVISED)
+﻿# S7.Meridian - Comprehensive Architectural Proposal (REVISED)
 
 **Evidence-Backed Narrative Document Generation System for Koan Framework**
 
-*Realigned after expert architectural review incorporating text-first RAG, durable processing, and narrative output*
+_Realigned after expert architectural review incorporating text-first RAG, durable processing, and narrative output_
 
 ---
 
@@ -11,6 +11,7 @@
 **Meridian** is an **evidence-backed narrative document generator** that transforms unstructured source documents (PDFs) into **finished narrative deliverables** with full citation provenance. Unlike generic document processing, Meridian produces **enterprise-ready reports** (Architecture Reviews, Vendor Assessments, RFP Responses) with every claim traceable to source passages.
 
 **Core Value Proposition:**
+
 - Upload vendor RFPs, financial statements, technical specifications
 - Define target deliverable schema + Markdown template
 - System extracts structured data via **text-first RAG** with passage-level citations
@@ -18,12 +19,14 @@
 - Renders **narrative Markdown/PDF** with evidence footnotes
 
 **Target Use Cases:**
+
 1. **Enterprise Architecture Review**: Extract technical capabilities from 20+ vendor docs → 15-page markdown report
 2. **Vendor Due Diligence**: Merge financial/compliance data from audits, contracts, questionnaires → executive summary PDF
 3. **RFP Response Assembly**: Aggregate past project descriptions, certifications, case studies → proposal document
 4. **Compliance Audit Report**: Extract regulatory requirements from standards + map to current controls → gap analysis
 
 **Key Differentiators:**
+
 - **Narrative Output**: Markdown/PDF reports, not JSON dumps
 - **Passage-Level Citations**: Every extracted value links to source text span
 - **Text-First RAG**: Embeddings + hybrid search (BM25 + vector), vision optional
@@ -56,6 +59,7 @@ Output:
 ```
 
 **JSON as Canonical, Templates as Views:**
+
 - Single source of truth: validated JSON (immutable)
 - Templates: Mustache markdown files (versionable, reusable)
 - Rendering: JSON + template → Markdown → Pandoc → PDF
@@ -63,6 +67,7 @@ Output:
 **2. Text-First RAG, Vision Optional**
 
 Traditional approach (my original proposal):
+
 ```
 PDF → Vision LLM → Extract all fields
 Problems:
@@ -72,6 +77,7 @@ Problems:
 ```
 
 Meridian approach (corrected):
+
 ```
 PDF → Text extraction (PdfPig/Tesseract)
     → Chunk into passages (semantic boundaries)
@@ -88,6 +94,7 @@ Vision fallback:
 ```
 
 **Why Text-First:**
+
 - **Performance**: <1s per field vs 5-30s per page
 - **Citation Granularity**: Passage/sentence-level vs page-level
 - **Enterprise Reality**: 90%+ of business docs are text-based PDFs
@@ -97,6 +104,7 @@ Vision fallback:
 **3. Evidence Over Inference (Enhanced)**
 
 Every extracted value MUST include:
+
 ```json
 {
   "fieldPath": "$.annualRevenue",
@@ -114,6 +122,7 @@ Every extracted value MUST include:
 ```
 
 **Passage-Level Citations Enable:**
+
 - Highlighting exact text in evidence drawer
 - PDF annotation export (future)
 - Confidence scoring based on text quality
@@ -121,6 +130,7 @@ Every extracted value MUST include:
 **4. Durable Processing, Not Fire-and-Forget**
 
 Anti-pattern (my original proposal):
+
 ```csharp
 // Upload controller
 _ = Task.Run(async () =>
@@ -135,6 +145,7 @@ _ = Task.Run(async () =>
 ```
 
 Meridian approach (corrected):
+
 ```csharp
 // Mongo-backed job queue
 public class ProcessingJob : Entity<ProcessingJob>
@@ -178,6 +189,7 @@ public class JobWorker : BackgroundService
 ```
 
 **Benefits:**
+
 - **Crash-safe**: Job state persisted in Mongo
 - **Resumable**: Restart from last checkpoint
 - **Observable**: Query job history, metrics
@@ -186,6 +198,7 @@ public class JobWorker : BackgroundService
 **5. Incremental Refresh, Preserve Approvals**
 
 User scenario:
+
 ```
 Day 1: Upload 10 docs, review 50 fields, approve all
 Day 2: Upload 11th doc with newer revenue data
@@ -195,6 +208,7 @@ Meridian: Reprocess ONLY impacted fields, preserve approvals if evidence unchang
 ```
 
 Implementation:
+
 ```csharp
 public async Task RefreshAnalysis(string pipelineId, CancellationToken ct)
 {
@@ -225,6 +239,7 @@ public async Task RefreshAnalysis(string pipelineId, CancellationToken ct)
 **6. Rich Merge Policies, Not Simple Enums**
 
 Anti-pattern (my original proposal):
+
 ```csharp
 public enum MergeRule
 {
@@ -235,6 +250,7 @@ public enum MergeRule
 ```
 
 Meridian approach (corrected):
+
 ```json
 {
   "annualRevenue": {
@@ -252,6 +268,7 @@ Meridian approach (corrected):
 ```
 
 **Precedence Example:**
+
 ```
 Field: annualRevenue
 
@@ -273,11 +290,13 @@ Audit trail:
 **7. Bias vs Override: Clear Semantics**
 
 Anti-pattern (my original proposal):
+
 ```csharp
 public string? AnalysisNotes { get; set; } // Opaque behavior
 ```
 
 Meridian approach (corrected):
+
 ```csharp
 public class AnalysisContext
 {
@@ -301,6 +320,7 @@ public class FieldOverride
 ```
 
 **UI Distinction:**
+
 ```
 ┌─────────────────────────────────────┐
 │ Bias Notes (influences AI):         │
@@ -322,6 +342,7 @@ public class FieldOverride
 Anti-pattern: Only show "Processing... 45%" progress
 
 Meridian metrics:
+
 ```csharp
 public class PipelineQualityMetrics
 {
@@ -345,6 +366,7 @@ public class PipelineQualityMetrics
 ```
 
 **Dashboard Display:**
+
 ```
 ┌──────────────────────────────────────────────┐
 │ Pipeline Quality Report                      │
@@ -390,11 +412,13 @@ var hits = await VectorWorkflow<Passage>.Query(
 ```
 
 **Profiles & Defaults:**
+
 - Zero-config: `VectorWorkflow<Passage>.Save(...)` binds to the active provider and default profile declared in `Koan:Data:Vector:Profiles` (`TopK = 10`, `Alpha = 0.5` unless overridden).
 - Named profiles: `VectorProfiles.Register(cfg => cfg.For<Passage>("meridian:evidence").TopK(12).Alpha(0.55).EmitMetrics());` wires scoped knobs at startup; global overrides land in configuration (`Koan:Data:Vector:Profiles:meridian:evidence`).
 - Progressive ergonomics: builder knobs (`.VectorName(...)`, `.EmitMetrics()`, `.WithMetadata(...)`) mirror Koan scheduling/task DSL patterns without bespoke factories.
 
 **DX Guardrails:**
+
 - `VectorWorkflow<T>.IsAvailable("meridian:evidence")` mirrors existing `Vector<T>.IsAvailable` checks for graceful degradation when no repository is elected.
 - `VectorWorkflowOptions` centralizes profile knobs; registry updates are additive and logged (`DATA-0085` captures the module split + workflow registry contract).
 - Hybrid search defaults derive from profile settings—operators tweak YAML/JSON or registrar code without redeploying Meridian modules.
@@ -421,6 +445,7 @@ Storage         PdfPig/          Vector WF       Per-field       Precedence     
 ### Core Entities (Revised)
 
 #### 1. DocumentPipeline (Enhanced with Version Pinning)
+
 ```csharp
 /// <summary>
 /// Orchestrates the document intelligence workflow for a specific deliverable.
@@ -465,6 +490,7 @@ public enum PipelineStatus
 ```
 
 #### 2. SourceDocument (Enhanced with Classification Versioning)
+
 ```csharp
 /// <summary>
 /// Uploaded PDF with content-addressed storage and passage index.
@@ -507,6 +533,7 @@ public enum ClassificationMethod
 ```
 
 #### 3. Passage (NEW - Vector Workflow Backed)
+
 ```csharp
 /// <summary>
 /// Chunked text segment from source document, indexed through Koan's vector workflow facade.
@@ -555,6 +582,7 @@ public class Passage : Entity<Passage>
 ```
 
 #### 4. ExtractedField (Enhanced with Typed JSON)
+
 ```csharp
 /// <summary>
 /// Single field extraction with passage-level evidence.
@@ -647,6 +675,7 @@ public class TextSpan
 ```
 
 #### 5. Deliverable (Enhanced with Hash Pinning)
+
 ```csharp
 /// <summary>
 /// Final document with merged data + rendered narrative output.
@@ -695,6 +724,7 @@ public class MergeDecision
 ```
 
 #### 6. SourceType (Enhanced with Versioning)
+
 ```csharp
 /// <summary>
 /// Defines a source document type with extraction schema.
@@ -763,6 +793,7 @@ public class SourceType : Entity<SourceType>
 ```
 
 #### 7. DeliverableType (Enhanced with Versioning)
+
 ```csharp
 /// <summary>
 /// Defines a deliverable with schema, merge rules, and narrative template.
@@ -833,6 +864,7 @@ public enum CollectionMerge
 ```
 
 #### 8. ProcessingJob (NEW - Durable Queue)
+
 ```csharp
 /// <summary>
 /// Durable job queue entry for crash-safe background processing.
@@ -872,6 +904,7 @@ public enum JobStatus
 ```
 
 #### 9. RunLog (NEW - First-Class Observability)
+
 ```csharp
 /// <summary>
 /// Detailed execution trace for each processing stage.
@@ -923,6 +956,7 @@ public interface IRunLogWriter
 ### Phase 1: Upload & Text Extraction
 
 **Upload Controller (Enqueue Job, Don't Process Inline)**
+
 ```csharp
 [ApiController]
 [Route("api/pipelines/{pipelineId}/documents")]
@@ -966,6 +1000,7 @@ public class DocumentUploadController : ControllerBase
 ```
 
 **Background Worker (Durable Processing)**
+
 ```csharp
 public class DocumentProcessingWorker : BackgroundService
 {
@@ -1077,6 +1112,7 @@ public class DocumentProcessingWorker : BackgroundService
 ```
 
 **Text Extraction Service (Hybrid: Native + OCR)**
+
 ```csharp
 public class TextExtractor : ITextExtractor
 {
@@ -1238,6 +1274,7 @@ public class TextExtractionResult
 ```
 
 **Passage Chunking Service**
+
 ```csharp
 public class PassageChunker : IPassageChunker
 {
@@ -1403,16 +1440,20 @@ public class PassageChunker : IPassageChunker
 ```
 
 **Document Classification Service (Cascade Pattern)**
+
 - Stage 1: Heuristic rules (filename patterns, keywords, MIME type, page counts) - accept when confidence ≥0.9.
 - Stage 2: Vector similarity (embed preview, compare to cached SourceType vectors) - accept when cosine similarity ≥0.75.
 - Stage 3: LLM fallback (prompt with SourceType catalog, parse {typeId, confidence, reasoning}) - default to confidence 0.3 if parsing fails.
 - Persist ClassifiedTypeId, ClassifiedTypeVersion, ClassificationConfidence, ClassificationMethod, and reasoning.
+
 ## Usage Scenario Story Scripts
 
 ### Scenario A - Enterprise Architecture Review (Script: scripts/phase4.5/ScenarioA-EnterpriseArchitecture.ps1)
+
 **Story**: Arcadia Systems is preparing an enterprise architecture review for Synapse Analytics. The operator asks the AI assistants to design SourceTypes for meeting notes, customer bulletins, vendor questionnaires, and cybersecurity assessments, then composes an Enterprise Architecture Review AnalysisType. Four textual documents capture CIO Dana Wright's steering committee notes, a customer bulletin, a vendor prescreen questionnaire, and a cybersecurity risk assessment. The pipeline must weave these narratives into a single deliverable that surfaces the fictional company names, dates, and action items.
 
 **Flow**:
+
 1. Use `/api/sourcetypes/ai-suggest` to generate SourceTypes for each document class, persisting the drafts via `POST /api/sourcetypes`.
 2. Call `/api/analysistypes/ai-suggest` to create the "Enterprise Architecture Review" AnalysisType with Markdown template and required source tags.
 3. Create a pipeline referencing the AnalysisType, supplying JSON schema fragments for revenue, staffing, notes, and security findings.
@@ -1420,15 +1461,19 @@ public class PassageChunker : IPassageChunker
 5. Retrieve the deliverable Markdown and confirm the output references Arcadia, Synapse Analytics, the steering committee decisions, and security remediation timelines.
 
 **Desirability**:
+
 - Proves the AI-assisted authoring experience yields high-signal templates without manual scaffolding.
 - Exercises a full cross-source narrative, validating that story details propagate into the rendered deliverable.
 
 **Feasibility**:
+
 - Backed by `SourceTypeAuthoringService` and `AnalysisTypeAuthoringService` hitting the local Ollama instance.
 - Scenario script orchestrates only public REST APIs (`EntityController<T>` CRUD + `ai-suggest`) and requires no privileged operations.
 
 ### Scenario B - Single-Field Manual Override (Script: scripts/phase4.5/ScenarioB-ManualOverride.ps1)
+
 **Flow**:
+
 1. Generate SourceTypes and an AnalysisType via AI assists, then create a lightweight pipeline.
 2. Upload two documents to produce a baseline deliverable.
 3. Apply a revenue override through `POST /api/pipelines/{id}/fields/{fieldPath}/override` with reviewer metadata.
@@ -1440,7 +1485,9 @@ public class PassageChunker : IPassageChunker
 **Feasibility**: Uses the new `PipelineOverridesController`; data model already supports override metadata, so no additional infrastructure is needed.
 
 ### Scenario C - Targeted Incremental Refresh (Script: scripts/phase4.5/ScenarioC-TargetedRefresh.ps1)
+
 **Flow**:
+
 1. Baseline the pipeline with two documents, recording the initial deliverable.
 2. Upload an addendum document that changes revenue and staffing projections.
 3. Trigger the refresh planner (`POST /api/pipelines/{id}/refresh`).
@@ -1452,7 +1499,9 @@ public class PassageChunker : IPassageChunker
 **Feasibility**: Leverages `PipelineRefreshController`; planner hooks are already wired in `PipelineProcessor`.
 
 ### Scenario D - Override Persistence Through Refresh (Script: scripts/phase4.5/ScenarioD-OverridePersistence.ps1)
+
 **Flow**:
+
 1. Create the baseline pipeline and apply a revenue override.
 2. Upload a new vendor update document introducing conflicting revenue.
 3. Invoke the refresh API and wait for completion.
@@ -1463,7 +1512,9 @@ public class PassageChunker : IPassageChunker
 **Feasibility**: Built on the override model plus refresh workflow, no extra dependencies required.
 
 ### Scenario E - Override Reversion (Script: scripts/phase4.5/ScenarioE-OverrideReversion.ps1)
+
 **Flow**:
+
 1. Apply a staffing override after baseline processing.
 2. Remove the override using the DELETE endpoint.
 3. Run the refresh planner to recompute the field using AI evidence.
@@ -1476,6 +1527,7 @@ public class PassageChunker : IPassageChunker
 ### Source & Analysis Type Authoring (Phase 4.5)
 
 #### SourceType Enhancements
+
 - **Model** (`SourceType : Entity<SourceType>`)
   - `Name`, `Description`, `Version`
   - `Tags[]`, `Descriptors[]`
@@ -1492,11 +1544,11 @@ public class PassageChunker : IPassageChunker
 - **Contract**: Classifier refuses to run if referenced SourceType missing.
 
 #### AnalysisType Catalog
+
 - **Model** (`AnalysisType : Entity<AnalysisType>`)
   - `Name`, `Description`, `Version`
   - `Tags[]`, `Descriptors[]`
   - `Instructions` (synthesis prompt), `OutputTemplate`
-  - `RequiredSourceTypes[]` (optional gating)
 - **Controller**: `AnalysisTypesController : EntityController<AnalysisType>`
 - **AI Assist**: `POST /api/analysistypes/ai-suggest`
   - Request: analysis brief (goal, audience, inputs).
@@ -1509,6 +1561,7 @@ public class PassageChunker : IPassageChunker
 Open items: template seeding, UX confirmation flow, prompt hardening, unit/integration tests for AI assist endpoints.
 
 **Security Hygiene & Upload Validation**
+
 ```csharp
 public class SecureUploadValidator
 {
@@ -1655,6 +1708,7 @@ public async Task<IActionResult> Upload(
 ```
 
 **Passage Indexing Service (Vector Workflow with Idempotent Save)**
+
 ```csharp
 public interface IPipelineAlertService
 {
@@ -1794,6 +1848,7 @@ public class PassageIndexer : IPassageIndexer
 ### Phase 2: Field Extraction (Text-First RAG)
 
 **Field Extraction Service**
+
 ```csharp
 public class FieldExtractor : IFieldExtractor
 {
@@ -2477,6 +2532,7 @@ public class ExtractionResult
 ### Phase 3: Merge & Conflict Resolution (Enhanced)
 
 **Merge Service with Rich Policies**
+
 ```csharp
 public class DocumentMerger : IDocumentMerger
 {
@@ -3071,6 +3127,7 @@ public static class MergeTransforms
 ### Phase 4: Narrative Rendering (NEW)
 
 **Template Rendering Service**
+
 ```csharp
 public class TemplateRenderer : ITemplateRenderer
 {
@@ -3221,6 +3278,7 @@ public class TemplateRenderer : ITemplateRenderer
 ```
 
 **Example Template (Mustache Markdown)**
+
 ```markdown
 # {{companyName}} Enterprise Architecture Review
 
@@ -3246,8 +3304,9 @@ public class TemplateRenderer : ITemplateRenderer
 ## Technical Capabilities
 
 {{#certifications}}
+
 - {{name}} (expires: {{expirationDate}})
-{{/certifications}}
+  {{/certifications}}
 
 ## Risk Assessment
 
@@ -3260,17 +3319,18 @@ public class TemplateRenderer : ITemplateRenderer
 ## Citations
 
 ¹ Annual Revenue
-   Source: {{_evidence.annualRevenue.source}}, p.{{_evidence.annualRevenue.page}}
-   "{{_evidence.annualRevenue.text}}"
-   (Confidence: {{_evidence.annualRevenue.confidence}})
+Source: {{_evidence.annualRevenue.source}}, p.{{_evidence.annualRevenue.page}}
+"{{_evidence.annualRevenue.text}}"
+(Confidence: {{_evidence.annualRevenue.confidence}})
 
 ² Net Income
-   Source: {{_evidence.netIncome.source}}, p.{{_evidence.netIncome.page}}
-   "{{_evidence.netIncome.text}}"
-   (Confidence: {{_evidence.netIncome.confidence}})
+Source: {{_evidence.netIncome.source}}, p.{{_evidence.netIncome.page}}
+"{{_evidence.netIncome.text}}"
+(Confidence: {{_evidence.netIncome.confidence}})
 ```
 
 **Render Controller**
+
 ```csharp
 [Route("api/pipelines/{pipelineId}/deliverable")]
 public class DeliverableController : ControllerBase
@@ -3337,6 +3397,7 @@ public class DeliverableController : ControllerBase
 ### Phase 5: Incremental Refresh
 
 **Refresh Analysis Service**
+
 ```csharp
 public class RefreshService : IRefreshService
 {
@@ -3608,6 +3669,7 @@ public class RefreshService : IRefreshService
 ## Quality Metrics & Observability
 
 **Metrics Collection**
+
 ```csharp
 public class QualityMetricsCollector : IQualityMetricsCollector
 {
@@ -3670,6 +3732,7 @@ public class QualityMetricsCollector : IQualityMetricsCollector
 ## API Design (Custom Controllers)
 
 **Pipeline Controller**
+
 ```csharp
 [Route("api/pipelines")]
 public class PipelineController : ControllerBase
@@ -3723,12 +3786,14 @@ public class PipelineController : ControllerBase
 ## What NOT to Build (YAGNI)
 
 **Removed from Original Proposal:**
+
 1. ❌ **Canon Workflow Integration** - Linear processing, not approval workflow
 2. ❌ **Vision-Primary Extraction** - Text-first RAG is faster, cheaper, more accurate
 3. ❌ **Task.Run Background Jobs** - Replaced with durable queue
 4. ❌ **Simple Enum Merge Rules** - Replaced with rich policy DSL
 
 **Still Out of Scope (Unchanged):**
+
 1. ❌ Multi-tenant SaaS
 2. ❌ PDF editing/annotation
 3. ❌ Real-time collaboration
@@ -3741,6 +3806,7 @@ public class PipelineController : ControllerBase
 ### 1. Field Query Templates with Synonyms
 
 **Global Synonym Pack** (auto-applied to field queries):
+
 ```csharp
 public static class FieldSynonyms
 {
@@ -3958,31 +4024,32 @@ public async Task<IActionResult> GetMergeDecision(
 ```
 
 **UI Display:**
+
 ```html
 <div class="merge-decision-card">
-    <h4>Annual Revenue: $47.2M</h4>
-    <span class="badge badge-info">Precedence Rule Applied</span>
+  <h4>Annual Revenue: $47.2M</h4>
+  <span class="badge badge-info">Precedence Rule Applied</span>
 
-    <p class="explanation">
-        Applied precedence rule: VendorPrescreen > AuditedFinancial > KnowledgeBase.
-        Chose $47.2M from VendorPrescreen despite Contract having 0.88 confidence.
-    </p>
+  <p class="explanation">
+    Applied precedence rule: VendorPrescreen > AuditedFinancial > KnowledgeBase.
+    Chose $47.2M from VendorPrescreen despite Contract having 0.88 confidence.
+  </p>
 
-    <details>
-        <summary>View all candidates (2 rejected)</summary>
-        <ul>
-            <li class="rejected">
-                <strong>Contract.pdf</strong> (page 5): $45.0M
-                <span class="confidence medium">88% confidence</span>
-                <em>Rejected: lower precedence</em>
-            </li>
-            <li class="rejected">
-                <strong>KnowledgeBase.pdf</strong> (page 12): $42.0M
-                <span class="confidence high">92% confidence</span>
-                <em>Rejected: lower precedence</em>
-            </li>
-        </ul>
-    </details>
+  <details>
+    <summary>View all candidates (2 rejected)</summary>
+    <ul>
+      <li class="rejected">
+        <strong>Contract.pdf</strong> (page 5): $45.0M
+        <span class="confidence medium">88% confidence</span>
+        <em>Rejected: lower precedence</em>
+      </li>
+      <li class="rejected">
+        <strong>KnowledgeBase.pdf</strong> (page 12): $42.0M
+        <span class="confidence high">92% confidence</span>
+        <em>Rejected: lower precedence</em>
+      </li>
+    </ul>
+  </details>
 </div>
 ```
 
@@ -4005,6 +4072,7 @@ See updated `BuildExtractionPrompt()` method: prepends security notice, sanitize
 **Problem**: Mustache→Pandoc→xelatex pipeline vulnerable to template injection.
 
 **Solution**:
+
 - Templates must come from trusted read-only path (`/app/templates/`)
 - Sanitize markdown before Pandoc (block `\input`, `\include`, `\write18`)
 - Cache PDFs by `(dataHash, templateHash)` for byte-stable outputs
@@ -4033,6 +4101,7 @@ See updated `BuildExtractionPrompt()` method: prepends security notice, sanitize
 **Problem**: Retrieval parameters hardcoded.
 
 **Solution**: Externalize to `appsettings.json`:
+
 ```json
 {
   "Meridian": {
@@ -4050,6 +4119,7 @@ See updated `BuildExtractionPrompt()` method: prepends security notice, sanitize
 ### Fix 10: Additional Day-1 Transforms
 
 Added to `MergeTransforms` registry:
+
 - **dedupeFuzzy**: Levenshtein distance-based deduplication for collections
 - **stringToEnum**: Common mappings (yes→true, active→Active, etc.)
 - **numberRounding**: Round to 2 significant figures for display
@@ -4069,6 +4139,7 @@ API returns inline one-liner: "Source: VendorPrescreen (highest precedence)" ins
 ### Nit 4: Per-Pipeline Limits
 
 Security validator enforces:
+
 - Max 100 files per pipeline
 - Max 5,000 pages per pipeline
 
@@ -4106,9 +4177,11 @@ await TestPipeline.For<MeridianVectorWorkflowSpec>(_output, "vector_roundtrip")
 ## Acceptance Criteria for MVP
 
 ### 1. Required Fields Coverage
+
 **Target**: ≥90% of required fields populated
 
 **Test**:
+
 ```csharp
 [Test]
 public async Task ProcessingPipeline_WithMixedPdfs_Populates90PercentRequiredFields()
@@ -4137,9 +4210,11 @@ public async Task ProcessingPipeline_WithMixedPdfs_Populates90PercentRequiredFie
 ```
 
 ### 2. Citation Coverage
+
 **Target**: ≥80% of scalar fields have ≥1 citation
 
 **Test**:
+
 ```csharp
 [Test]
 public async Task ExtractedFields_HaveCitationCoverage_Above80Percent()
@@ -4164,9 +4239,11 @@ public async Task ExtractedFields_HaveCitationCoverage_Above80Percent()
 ```
 
 ### 3. Refresh Preserves Unchanged Approvals
+
 **Target**: 100% of unchanged fields retain approval
 
 **Test**:
+
 ```csharp
 [Test]
 public async Task RefreshAnalysis_PreservesApprovals_WhenEvidenceUnchanged()
@@ -4195,9 +4272,11 @@ public async Task RefreshAnalysis_PreservesApprovals_WhenEvidenceUnchanged()
 ```
 
 ### 4. Merge Decisions Are Reproducible
+
 **Target**: Same inputs + policies → same selected values + same explanations
 
 **Test**:
+
 ```csharp
 [Test]
 public async Task MergeDecisions_AreReproducible_WithSameInputs()
@@ -4231,9 +4310,11 @@ public async Task MergeDecisions_AreReproducible_WithSameInputs()
 ```
 
 ### 5. Rendered Outputs Are Byte-Stable
+
 **Target**: Same data + template → identical Markdown/PDF
 
 **Test**:
+
 ```csharp
 [Test]
 public async Task RenderedOutputs_AreByteStable_WithSameDataAndTemplate()
@@ -4259,9 +4340,11 @@ public async Task RenderedOutputs_AreByteStable_WithSameDataAndTemplate()
 ```
 
 ### 6. Citations Resolve to Same Page Excerpt
+
 **Target**: All citations link to correct page + show same excerpt
 
 **Test**:
+
 ```csharp
 [Test]
 public async Task Citations_ResolveToCorrectPageExcerpt()
@@ -4347,6 +4430,7 @@ private async Task<ProcessingJob?> ClaimNextJobAtomic(CancellationToken ct)
 ```
 
 **Indexes Required**:
+
 ```javascript
 // MongoDB shell
 db.processingJobs.createIndex({ status: 1, workerId: 1, createdAt: 1 });
@@ -4562,13 +4646,14 @@ private async Task ApplyTransform(ExtractedField field, MergePolicy policy, Merg
 ```
 
 **UI Display**:
+
 ```html
 <div class="merge-decision-details">
-    <p>Transform applied: normalizeToUSD</p>
-    <ul>
-        <li>Rate source: ECB Reference Rates 2025-10-20</li>
-        <li>EUR → USD: 1.11 (applied to €43M → $47.7M)</li>
-    </ul>
+  <p>Transform applied: normalizeToUSD</p>
+  <ul>
+    <li>Rate source: ECB Reference Rates 2025-10-20</li>
+    <li>EUR → USD: 1.11 (applied to €43M → $47.7M)</li>
+  </ul>
 </div>
 ```
 
@@ -4602,7 +4687,8 @@ VOLUME /app/templates
 ```
 
 **Deployment Requirements (README.md)**:
-```markdown
+
+````markdown
 ## PDF Rendering Dependencies
 
 Meridian requires specific versions for byte-stable PDF outputs:
@@ -4612,11 +4698,14 @@ Meridian requires specific versions for byte-stable PDF outputs:
 - **Fonts**: DejaVu Sans, Liberation Sans
 
 ### Docker (recommended)
+
 ```bash
 docker-compose up -d  # Uses pinned image from Dockerfile
 ```
+````
 
 ### Local Development (Ubuntu/Debian)
+
 ```bash
 sudo apt-get install \
     pandoc=3.1.11-1 \
@@ -4625,18 +4714,22 @@ sudo apt-get install \
 ```
 
 ### Verification
+
 ```bash
 pandoc --version  # Should show 3.1.11
 xelatex --version # Should show TeX Live 2024
 ```
 
 ### Security: Disable Shell-Escape
+
 Ensure `/etc/texmf/texmf.d/95-no-shell-escape.cnf` contains:
+
 ```
 shell_escape = f
 ```
 
 Then run: `sudo update-texmf`
+
 ```
 
 ### 6. Go/No-Go Checklist
@@ -4811,3 +4904,4 @@ Then run: `sudo update-texmf`
 **Total Lines**: 4400+ (production-locked specification with full implementation details)
 
 
+```

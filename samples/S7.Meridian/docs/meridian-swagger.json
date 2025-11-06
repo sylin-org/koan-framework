@@ -1,0 +1,4114 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "Koan API",
+    "version": "v1"
+  },
+  "paths": {
+    "/api/analysistypes/ai-suggest": {
+      "post": {
+        "tags": [
+          "AnalysisTypes"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json-patch+json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnalysisTypeAiSuggestRequest"
+              }
+            },
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnalysisTypeAiSuggestRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnalysisTypeAiSuggestRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnalysisTypeAiSuggestRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Koan-Trace-Id": {
+                "description": "Trace correlation id for this response.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalysisTypeAiSuggestResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalysisTypeAiSuggestResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalysisTypeAiSuggestResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/analysistypes": {
+      "get": {
+        "tags": [
+          "AnalysisTypes"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Koan-Trace-Id": {
+                "description": "Trace correlation id for this response.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Koan-InMemory-Paging": {
+                "description": "true when in-memory pagination fallback occurred.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "AnalysisTypes"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json-patch+json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnalysisType"
+              }
+            },
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnalysisType"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnalysisType"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnalysisType"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Koan-Trace-Id": {
+                "description": "Trace correlation id for this response.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "AnalysisTypes"
+        ],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Koan-Trace-Id": {
+                "description": "Trace correlation id for this response.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/analysistypes/query": {
+      "post": {
+        "tags": [
+          "AnalysisTypes"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json-patch+json": {
+              "schema": { }
+            },
+            "application/json": {
+              "schema": { }
+            },
+            "text/json": {
+              "schema": { }
+            },
+            "application/*+json": {
+              "schema": { }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Koan-Trace-Id": {
+                "description": "Trace correlation id for this response.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/analysistypes/new": {
+      "get": {
+        "tags": [
+          "AnalysisTypes"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Koan-Trace-Id": {
+                "description": "Trace correlation id for this response.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Koan-InMemory-Paging": {
+                "description": "true when in-memory pagination fallback occurred.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/analysistypes/{id}": {
+      "get": {
+        "tags": [
+          "AnalysisTypes"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Koan-Trace-Id": {
+                "description": "Trace correlation id for this response.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Koan-InMemory-Paging": {
+                "description": "true when in-memory pagination fallback occurred.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "AnalysisTypes"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Koan-Trace-Id": {
+                "description": "Trace correlation id for this response.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "AnalysisTypes"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json-patch+json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Operation"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Koan-Trace-Id": {
+                "description": "Trace correlation id for this response.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/analysistypes/bulk": {
+      "post": {
+        "tags": [
+          "AnalysisTypes"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json-patch+json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/AnalysisType"
+                }
+              }
+            },
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/AnalysisType"
+                }
+              }
+            },
+            "text/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/AnalysisType"
+                }
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/AnalysisType"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Koan-Trace-Id": {
+                "description": "Trace correlation id for this response.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "AnalysisTypes"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json-patch+json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "text/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Koan-Trace-Id": {
+                "description": "Trace correlation id for this response.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/analysistypes/all": {
+      "delete": {
+        "tags": [
+          "AnalysisTypes"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Koan-Trace-Id": {
+                "description": "Trace correlation id for this response.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/pipelines/{pipelineId}/deliverables/latest": {
+      "get": {
+        "tags": [
+          "Deliverables"
+        ],
+        "parameters": [
+          {
+            "name": "pipelineId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Koan-Trace-Id": {
+                "description": "Trace correlation id for this response.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Koan-InMemory-Paging": {
+                "description": "true when in-memory pagination fallback occurred.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Deliverable"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Deliverable"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Deliverable"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/pipelines/{pipelineId}/deliverables/markdown": {
+      "get": {
+        "tags": [
+          "Deliverables"
+        ],
+        "parameters": [
+          {
+            "name": "pipelineId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Koan-Trace-Id": {
+                "description": "Trace correlation id for this response.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Koan-InMemory-Paging": {
+                "description": "true when in-memory pagination fallback occurred.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/pipelines/{pipelineId}/deliverables/json": {
+      "get": {
+        "tags": [
+          "Deliverables"
+        ],
+        "parameters": [
+          {
+            "name": "pipelineId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Koan-Trace-Id": {
+                "description": "Trace correlation id for this response.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Koan-InMemory-Paging": {
+                "description": "true when in-memory pagination fallback occurred.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/pipelines/{pipelineId}/deliverables/pdf": {
+      "get": {
+        "tags": [
+          "Deliverables"
+        ],
+        "parameters": [
+          {
+            "name": "pipelineId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Koan-Trace-Id": {
+                "description": "Trace correlation id for this response.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Koan-InMemory-Paging": {
+                "description": "true when in-memory pagination fallback occurred.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deliverabletypes": {
+      "get": {
+        "tags": [
+          "DeliverableTypes"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Koan-Trace-Id": {
+                "description": "Trace correlation id for this response.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Koan-InMemory-Paging": {
+                "description": "true when in-memory pagination fallback occurred.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "DeliverableTypes"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json-patch+json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeliverableType"
+              }
+            },
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeliverableType"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeliverableType"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeliverableType"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Koan-Trace-Id": {
+                "description": "Trace correlation id for this response.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "DeliverableTypes"
+        ],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Koan-Trace-Id": {
+                "description": "Trace correlation id for this response.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deliverabletypes/query": {
+      "post": {
+        "tags": [
+          "DeliverableTypes"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json-patch+json": {
+              "schema": { }
+            },
+            "application/json": {
+              "schema": { }
+            },
+            "text/json": {
+              "schema": { }
+            },
+            "application/*+json": {
+              "schema": { }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Koan-Trace-Id": {
+                "description": "Trace correlation id for this response.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deliverabletypes/new": {
+      "get": {
+        "tags": [
+          "DeliverableTypes"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Koan-Trace-Id": {
+                "description": "Trace correlation id for this response.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Koan-InMemory-Paging": {
+                "description": "true when in-memory pagination fallback occurred.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deliverabletypes/{id}": {
+      "get": {
+        "tags": [
+          "DeliverableTypes"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Koan-Trace-Id": {
+                "description": "Trace correlation id for this response.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Koan-InMemory-Paging": {
+                "description": "true when in-memory pagination fallback occurred.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "DeliverableTypes"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Koan-Trace-Id": {
+                "description": "Trace correlation id for this response.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "DeliverableTypes"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json-patch+json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Operation"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Koan-Trace-Id": {
+                "description": "Trace correlation id for this response.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deliverabletypes/bulk": {
+      "post": {
+        "tags": [
+          "DeliverableTypes"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json-patch+json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/DeliverableType"
+                }
+              }
+            },
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/DeliverableType"
+                }
+              }
+            },
+            "text/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/DeliverableType"
+                }
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/DeliverableType"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Koan-Trace-Id": {
+                "description": "Trace correlation id for this response.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "DeliverableTypes"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json-patch+json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "text/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Koan-Trace-Id": {
+                "description": "Trace correlation id for this response.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/deliverabletypes/all": {
+      "delete": {
+        "tags": [
+          "DeliverableTypes"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Koan-Trace-Id": {
+                "description": "Trace correlation id for this response.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/pipelines/{pipelineId}/documents": {
+      "post": {
+        "tags": [
+          "Documents"
+        ],
+        "parameters": [
+          {
+            "name": "pipelineId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "files": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "binary"
+                    }
+                  }
+                }
+              },
+              "encoding": {
+                "files": {
+                  "style": "form"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Koan-Trace-Id": {
+                "description": "Trace correlation id for this response.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentIngestionResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentIngestionResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentIngestionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/Example/upload": {
+      "post": {
+        "tags": [
+          "Example"
+        ],
+        "summary": "Example: Upload a file and immediately trigger translation",
+        "parameters": [
+          {
+            "name": "targetLanguage",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "default": "pt-BR"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "fileName": {
+                    "type": "string"
+                  }
+                }
+              },
+              "encoding": {
+                "fileName": {
+                  "style": "form"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Koan-Trace-Id": {
+                "description": "Trace correlation id for this response.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/Example/cleanup": {
+      "post": {
+        "tags": [
+          "Example"
+        ],
+        "summary": "Example: Manually trigger data cleanup",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Koan-Trace-Id": {
+                "description": "Trace correlation id for this response.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/Example/services/{serviceName}/status": {
+      "get": {
+        "tags": [
+          "Example"
+        ],
+        "summary": "Example: Get service status",
+        "parameters": [
+          {
+            "name": "serviceName",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Koan-Trace-Id": {
+                "description": "Trace correlation id for this response.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Koan-InMemory-Paging": {
+                "description": "true when in-memory pagination fallback occurred.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "tags": [
+          "Health"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Koan-Trace-Id": {
+                "description": "Trace correlation id for this response.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Koan-InMemory-Paging": {
+                "description": "true when in-memory pagination fallback occurred.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health/live": {
+      "get": {
+        "tags": [
+          "Health"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Koan-Trace-Id": {
+                "description": "Trace correlation id for this response.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Koan-InMemory-Paging": {
+                "description": "true when in-memory pagination fallback occurred.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "tags": [
+          "Health"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Koan-Trace-Id": {
+                "description": "Trace correlation id for this response.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Koan-InMemory-Paging": {
+                "description": "true when in-memory pagination fallback occurred.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/pipelines/{pipelineId}/jobs/{jobId}": {
+      "get": {
+        "tags": [
+          "Jobs"
+        ],
+        "parameters": [
+          {
+            "name": "pipelineId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "jobId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Koan-Trace-Id": {
+                "description": "Trace correlation id for this response.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Koan-InMemory-Paging": {
+                "description": "true when in-memory pagination fallback occurred.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProcessingJob"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProcessingJob"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProcessingJob"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/pipelines/{pipelineId}/jobs/{jobId}/cancel": {
+      "post": {
+        "tags": [
+          "Jobs"
+        ],
+        "parameters": [
+          {
+            "name": "pipelineId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "jobId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Koan-Trace-Id": {
+                "description": "Trace correlation id for this response.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProcessingJob"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProcessingJob"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProcessingJob"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/pipelines/{pipelineId}/notes": {
+      "get": {
+        "tags": [
+          "PipelineNotes"
+        ],
+        "parameters": [
+          {
+            "name": "pipelineId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Koan-Trace-Id": {
+                "description": "Trace correlation id for this response.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Koan-InMemory-Paging": {
+                "description": "true when in-memory pagination fallback occurred.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotesResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotesResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotesResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "headers": {
+              "Koan-Trace-Id": {
+                "description": "Trace correlation id for this response.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Koan-InMemory-Paging": {
+                "description": "true when in-memory pagination fallback occurred.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "PipelineNotes"
+        ],
+        "parameters": [
+          {
+            "name": "pipelineId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json-patch+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateNotesRequest"
+              }
+            },
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateNotesRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateNotesRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateNotesRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Koan-Trace-Id": {
+                "description": "Trace correlation id for this response.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateNotesResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateNotesResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateNotesResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "headers": {
+              "Koan-Trace-Id": {
+                "description": "Trace correlation id for this response.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "headers": {
+              "Koan-Trace-Id": {
+                "description": "Trace correlation id for this response.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "PipelineNotes"
+        ],
+        "parameters": [
+          {
+            "name": "pipelineId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "reProcess",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content",
+            "headers": {
+              "Koan-Trace-Id": {
+                "description": "Trace correlation id for this response.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "headers": {
+              "Koan-Trace-Id": {
+                "description": "Trace correlation id for this response.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/pipelines/{pipelineId}/fields/{fieldPath}/override": {
+      "post": {
+        "tags": [
+          "PipelineOverrides"
+        ],
+        "parameters": [
+          {
+            "name": "pipelineId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "fieldPath",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json-patch+json": {
+              "schema": {
+                "$ref": "#/components/schemas/FieldOverrideRequest"
+              }
+            },
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FieldOverrideRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FieldOverrideRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/FieldOverrideRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Koan-Trace-Id": {
+                "description": "Trace correlation id for this response.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExtractedField"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExtractedField"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExtractedField"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "PipelineOverrides"
+        ],
+        "parameters": [
+          {
+            "name": "pipelineId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "fieldPath",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Koan-Trace-Id": {
+                "description": "Trace correlation id for this response.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/pipelines/{pipelineId}/quality": {
+      "get": {
+        "tags": [
+          "PipelineQuality"
+        ],
+        "parameters": [
+          {
+            "name": "pipelineId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Koan-Trace-Id": {
+                "description": "Trace correlation id for this response.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Koan-InMemory-Paging": {
+                "description": "true when in-memory pagination fallback occurred.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/PipelineQualitySnapshot"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PipelineQualitySnapshot"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PipelineQualitySnapshot"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/pipelines/{pipelineId}/quality/history": {
+      "get": {
+        "tags": [
+          "PipelineQuality"
+        ],
+        "parameters": [
+          {
+            "name": "pipelineId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "take",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 10
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Koan-Trace-Id": {
+                "description": "Trace correlation id for this response.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Koan-InMemory-Paging": {
+                "description": "true when in-memory pagination fallback occurred.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PipelineQualitySnapshot"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PipelineQualitySnapshot"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PipelineQualitySnapshot"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/pipelines/{pipelineId}/refresh": {
+      "post": {
+        "tags": [
+          "PipelineRefresh"
+        ],
+        "parameters": [
+          {
+            "name": "pipelineId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Koan-Trace-Id": {
+                "description": "Trace correlation id for this response.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/pipelines": {
+      "get": {
+        "tags": [
+          "Pipelines"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Koan-Trace-Id": {
+                "description": "Trace correlation id for this response.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Koan-InMemory-Paging": {
+                "description": "true when in-memory pagination fallback occurred.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Pipelines"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json-patch+json": {
+              "schema": {
+                "$ref": "#/components/schemas/DocumentPipeline"
+              }
+            },
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DocumentPipeline"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DocumentPipeline"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/DocumentPipeline"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Koan-Trace-Id": {
+                "description": "Trace correlation id for this response.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Pipelines"
+        ],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Koan-Trace-Id": {
+                "description": "Trace correlation id for this response.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/pipelines/query": {
+      "post": {
+        "tags": [
+          "Pipelines"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json-patch+json": {
+              "schema": { }
+            },
+            "application/json": {
+              "schema": { }
+            },
+            "text/json": {
+              "schema": { }
+            },
+            "application/*+json": {
+              "schema": { }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Koan-Trace-Id": {
+                "description": "Trace correlation id for this response.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/pipelines/new": {
+      "get": {
+        "tags": [
+          "Pipelines"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Koan-Trace-Id": {
+                "description": "Trace correlation id for this response.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Koan-InMemory-Paging": {
+                "description": "true when in-memory pagination fallback occurred.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/pipelines/{id}": {
+      "get": {
+        "tags": [
+          "Pipelines"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Koan-Trace-Id": {
+                "description": "Trace correlation id for this response.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Koan-InMemory-Paging": {
+                "description": "true when in-memory pagination fallback occurred.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Pipelines"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Koan-Trace-Id": {
+                "description": "Trace correlation id for this response.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Pipelines"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json-patch+json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Operation"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Koan-Trace-Id": {
+                "description": "Trace correlation id for this response.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/pipelines/bulk": {
+      "post": {
+        "tags": [
+          "Pipelines"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json-patch+json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/DocumentPipeline"
+                }
+              }
+            },
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/DocumentPipeline"
+                }
+              }
+            },
+            "text/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/DocumentPipeline"
+                }
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/DocumentPipeline"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Koan-Trace-Id": {
+                "description": "Trace correlation id for this response.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Pipelines"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json-patch+json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "text/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Koan-Trace-Id": {
+                "description": "Trace correlation id for this response.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/pipelines/all": {
+      "delete": {
+        "tags": [
+          "Pipelines"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Koan-Trace-Id": {
+                "description": "Trace correlation id for this response.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sourcetypes/ai-suggest": {
+      "post": {
+        "tags": [
+          "SourceTypes"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json-patch+json": {
+              "schema": {
+                "$ref": "#/components/schemas/SourceTypeAiSuggestRequest"
+              }
+            },
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SourceTypeAiSuggestRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SourceTypeAiSuggestRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/SourceTypeAiSuggestRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Koan-Trace-Id": {
+                "description": "Trace correlation id for this response.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceTypeAiSuggestResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceTypeAiSuggestResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceTypeAiSuggestResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sourcetypes": {
+      "get": {
+        "tags": [
+          "SourceTypes"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Koan-Trace-Id": {
+                "description": "Trace correlation id for this response.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Koan-InMemory-Paging": {
+                "description": "true when in-memory pagination fallback occurred.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "SourceTypes"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json-patch+json": {
+              "schema": {
+                "$ref": "#/components/schemas/SourceType"
+              }
+            },
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SourceType"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SourceType"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/SourceType"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Koan-Trace-Id": {
+                "description": "Trace correlation id for this response.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "SourceTypes"
+        ],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Koan-Trace-Id": {
+                "description": "Trace correlation id for this response.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sourcetypes/query": {
+      "post": {
+        "tags": [
+          "SourceTypes"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json-patch+json": {
+              "schema": { }
+            },
+            "application/json": {
+              "schema": { }
+            },
+            "text/json": {
+              "schema": { }
+            },
+            "application/*+json": {
+              "schema": { }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Koan-Trace-Id": {
+                "description": "Trace correlation id for this response.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sourcetypes/new": {
+      "get": {
+        "tags": [
+          "SourceTypes"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Koan-Trace-Id": {
+                "description": "Trace correlation id for this response.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Koan-InMemory-Paging": {
+                "description": "true when in-memory pagination fallback occurred.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sourcetypes/{id}": {
+      "get": {
+        "tags": [
+          "SourceTypes"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Koan-Trace-Id": {
+                "description": "Trace correlation id for this response.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Koan-InMemory-Paging": {
+                "description": "true when in-memory pagination fallback occurred.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "SourceTypes"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Koan-Trace-Id": {
+                "description": "Trace correlation id for this response.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "SourceTypes"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json-patch+json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Operation"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Koan-Trace-Id": {
+                "description": "Trace correlation id for this response.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sourcetypes/bulk": {
+      "post": {
+        "tags": [
+          "SourceTypes"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json-patch+json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/SourceType"
+                }
+              }
+            },
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/SourceType"
+                }
+              }
+            },
+            "text/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/SourceType"
+                }
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/SourceType"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Koan-Trace-Id": {
+                "description": "Trace correlation id for this response.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "SourceTypes"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json-patch+json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "text/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Koan-Trace-Id": {
+                "description": "Trace correlation id for this response.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sourcetypes/all": {
+      "delete": {
+        "tags": [
+          "SourceTypes"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Koan-Trace-Id": {
+                "description": "Trace correlation id for this response.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/.well-known/Koan/observability": {
+      "get": {
+        "tags": [
+          "WellKnown"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Koan-Trace-Id": {
+                "description": "Trace correlation id for this response.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Koan-InMemory-Paging": {
+                "description": "true when in-memory pagination fallback occurred.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/.well-known/Koan/scheduling": {
+      "get": {
+        "tags": [
+          "WellKnown"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Koan-Trace-Id": {
+                "description": "Trace correlation id for this response.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Koan-InMemory-Paging": {
+                "description": "true when in-memory pagination fallback occurred.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/.well-known/Koan/aggregates": {
+      "get": {
+        "tags": [
+          "WellKnown"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "Koan-Trace-Id": {
+                "description": "Trace correlation id for this response.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Koan-InMemory-Paging": {
+                "description": "true when in-memory pagination fallback occurred.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AnalysisType": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Gets or sets the entity ID. Automatically generates a GUID v7 value on first access if not already set.\r\nThis promotes auto-safe ID patterns while allowing explicit override when needed.",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "descriptors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "instructions": {
+            "type": "string",
+            "nullable": true
+          },
+          "outputTemplate": {
+            "type": "string",
+            "nullable": true
+          },
+          "jsonSchema": {
+            "type": "string",
+            "nullable": true
+          },
+          "requiredSourceTypes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "AnalysisTypeAiSuggestRequest": {
+        "type": "object",
+        "properties": {
+          "goal": {
+            "type": "string",
+            "nullable": true
+          },
+          "audience": {
+            "type": "string",
+            "nullable": true
+          },
+          "includedSourceTypes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "additionalContext": {
+            "type": "string",
+            "nullable": true
+          },
+          "model": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "AnalysisTypeAiSuggestResponse": {
+        "type": "object",
+        "properties": {
+          "draft": {
+            "$ref": "#/components/schemas/AnalysisTypeDraft"
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "AnalysisTypeDraft": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "descriptors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "instructions": {
+            "type": "string",
+            "nullable": true
+          },
+          "outputTemplate": {
+            "type": "string",
+            "nullable": true
+          },
+          "outputSchemaJson": {
+            "type": "string",
+            "nullable": true
+          },
+          "requiredSourceTypes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "Deliverable": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Gets or sets the entity ID. Automatically generates a GUID v7 value on first access if not already set.\r\nThis promotes auto-safe ID patterns while allowing explicit override when needed.",
+            "nullable": true
+          },
+          "pipelineId": {
+            "type": "string",
+            "nullable": true
+          },
+          "deliverableTypeId": {
+            "type": "string",
+            "nullable": true
+          },
+          "deliverableTypeVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "dataHash": {
+            "type": "string",
+            "nullable": true
+          },
+          "templateMdHash": {
+            "type": "string",
+            "nullable": true
+          },
+          "dataJson": {
+            "type": "string",
+            "nullable": true
+          },
+          "renderedMarkdown": {
+            "type": "string",
+            "nullable": true
+          },
+          "renderedPdfKey": {
+            "type": "string",
+            "nullable": true
+          },
+          "mergeDecisions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DeliverableMergeDecision"
+            },
+            "nullable": true
+          },
+          "sourceDocumentIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "finalizedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "finalizedBy": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "DeliverableMergeDecision": {
+        "type": "object",
+        "properties": {
+          "fieldPath": {
+            "type": "string",
+            "nullable": true
+          },
+          "strategy": {
+            "type": "string",
+            "nullable": true
+          },
+          "explanation": {
+            "type": "string",
+            "nullable": true
+          },
+          "acceptedExtractionId": {
+            "type": "string",
+            "nullable": true
+          },
+          "rejectedExtractionIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "supportingExtractionIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "collectionProvenance": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "DeliverableType": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Gets or sets the entity ID. Automatically generates a GUID v7 value on first access if not already set.\r\nThis promotes auto-safe ID patterns while allowing explicit override when needed.",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "jsonSchema": {
+            "type": "string",
+            "nullable": true
+          },
+          "sourceMappings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SourceTypeMapping"
+            },
+            "nullable": true
+          },
+          "fieldMergePolicies": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/MergePolicy"
+            },
+            "nullable": true
+          },
+          "templateMd": {
+            "type": "string",
+            "nullable": true
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "DocumentIngestionResponse": {
+        "type": "object",
+        "properties": {
+          "documentId": {
+            "type": "string",
+            "nullable": true
+          },
+          "documentIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "jobId": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "DocumentPipeline": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Gets or sets the entity ID. Automatically generates a GUID v7 value on first access if not already set.\r\nThis promotes auto-safe ID patterns while allowing explicit override when needed.",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "deliverableTypeId": {
+            "type": "string",
+            "nullable": true
+          },
+          "deliverableTypeVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "sourceTypeVersions": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "nullable": true
+          },
+          "schemaJson": {
+            "type": "string",
+            "nullable": true
+          },
+          "templateMarkdown": {
+            "type": "string",
+            "nullable": true
+          },
+          "analysisTypeId": {
+            "type": "string",
+            "nullable": true
+          },
+          "analysisTypeVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "analysisInstructions": {
+            "type": "string",
+            "nullable": true
+          },
+          "analysisTags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "requiredSourceTypes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "biasNotes": {
+            "type": "string",
+            "nullable": true
+          },
+          "authoritativeNotes": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "$ref": "#/components/schemas/PipelineStatus"
+          },
+          "totalDocuments": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "processedDocuments": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "deliverableId": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "completedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "quality": {
+            "$ref": "#/components/schemas/PipelineQualityMetrics"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ExtractedField": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Gets or sets the entity ID. Automatically generates a GUID v7 value on first access if not already set.\r\nThis promotes auto-safe ID patterns while allowing explicit override when needed.",
+            "nullable": true
+          },
+          "pipelineId": {
+            "type": "string",
+            "nullable": true
+          },
+          "fieldPath": {
+            "type": "string",
+            "nullable": true
+          },
+          "valueJson": {
+            "type": "string",
+            "nullable": true
+          },
+          "confidence": {
+            "type": "number",
+            "format": "double"
+          },
+          "sourceDocumentId": {
+            "type": "string",
+            "nullable": true
+          },
+          "passageId": {
+            "type": "string",
+            "nullable": true
+          },
+          "source": {
+            "$ref": "#/components/schemas/FieldSource"
+          },
+          "precedence": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "evidence": {
+            "$ref": "#/components/schemas/TextSpanEvidence"
+          },
+          "userApproved": {
+            "type": "boolean"
+          },
+          "approvedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "approvedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "overridden": {
+            "type": "boolean"
+          },
+          "overrideValueJson": {
+            "type": "string",
+            "nullable": true
+          },
+          "overrideReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "overriddenBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "overriddenAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "mergeStrategy": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "FieldOverrideRequest": {
+        "type": "object",
+        "properties": {
+          "value": { },
+          "reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "reviewer": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "FieldSource": {
+        "enum": [
+          1,
+          2,
+          3,
+          999
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
+      "JobStatus": {
+        "enum": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
+      "MergePolicy": {
+        "type": "object",
+        "properties": {
+          "strategy": {
+            "type": "string",
+            "nullable": true
+          },
+          "sourcePrecedence": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "latestByFieldPath": {
+            "type": "string",
+            "nullable": true
+          },
+          "consensusMinimumSources": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "transform": {
+            "type": "string",
+            "nullable": true
+          },
+          "collectionStrategy": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "NotesResponse": {
+        "type": "object",
+        "properties": {
+          "pipelineId": {
+            "type": "string",
+            "nullable": true
+          },
+          "authoritativeNotes": {
+            "type": "string",
+            "nullable": true
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "Operation": {
+        "type": "object",
+        "properties": {
+          "operationType": {
+            "$ref": "#/components/schemas/OperationType"
+          },
+          "path": {
+            "type": "string",
+            "nullable": true
+          },
+          "op": {
+            "type": "string",
+            "nullable": true
+          },
+          "from": {
+            "type": "string",
+            "nullable": true
+          },
+          "value": {
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "OperationType": {
+        "enum": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
+      "PipelineQualityMetrics": {
+        "type": "object",
+        "properties": {
+          "citationCoverage": {
+            "type": "number",
+            "format": "double"
+          },
+          "highConfidence": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "mediumConfidence": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "lowConfidence": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totalConflicts": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "autoResolved": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "manualReviewNeeded": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "notesSourced": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "extractionP95": {
+            "type": "string",
+            "format": "date-span"
+          },
+          "mergeP95": {
+            "type": "string",
+            "format": "date-span"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PipelineQualitySnapshot": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Gets or sets the entity ID. Automatically generates a GUID v7 value on first access if not already set.\r\nThis promotes auto-safe ID patterns while allowing explicit override when needed.",
+            "nullable": true
+          },
+          "pipelineId": {
+            "type": "string",
+            "nullable": true
+          },
+          "deliverableVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "citationCoverage": {
+            "type": "number",
+            "format": "double"
+          },
+          "highConfidence": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "mediumConfidence": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "lowConfidence": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totalConflicts": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "autoResolved": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "manualReviewNeeded": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "notesSourced": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "extractionP95": {
+            "type": "string",
+            "format": "date-span"
+          },
+          "mergeP95": {
+            "type": "string",
+            "format": "date-span"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PipelineStatus": {
+        "enum": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
+      "ProblemDetails": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "nullable": true
+          },
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "detail": {
+            "type": "string",
+            "nullable": true
+          },
+          "instance": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": { }
+      },
+      "ProcessingJob": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Gets or sets the entity ID. Automatically generates a GUID v7 value on first access if not already set.\r\nThis promotes auto-safe ID patterns while allowing explicit override when needed.",
+            "nullable": true
+          },
+          "pipelineId": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "$ref": "#/components/schemas/JobStatus"
+          },
+          "retryCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "workerId": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "claimedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "heartbeatAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "completedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "lastError": {
+            "type": "string",
+            "nullable": true
+          },
+          "documentIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "fieldPaths": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "totalDocuments": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "processedDocuments": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "lastDocumentId": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "SourceType": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Gets or sets the entity ID. Automatically generates a GUID v7 value on first access if not already set.\r\nThis promotes auto-safe ID patterns while allowing explicit override when needed.",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "descriptorHints": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "signalPhrases": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "supportsManualSelection": {
+            "type": "boolean"
+          },
+          "expectedPageCountMin": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "expectedPageCountMax": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "mimeTypes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "fieldQueries": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "instructions": {
+            "type": "string",
+            "nullable": true
+          },
+          "outputTemplate": {
+            "type": "string",
+            "nullable": true
+          },
+          "typeEmbedding": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "format": "float"
+            },
+            "nullable": true
+          },
+          "typeEmbeddingVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "typeEmbeddingHash": {
+            "type": "string",
+            "nullable": true
+          },
+          "typeEmbeddingComputedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "instructionsUpdatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "outputTemplateUpdatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "SourceTypeAiSuggestRequest": {
+        "type": "object",
+        "properties": {
+          "seedText": {
+            "type": "string",
+            "nullable": true
+          },
+          "documentName": {
+            "type": "string",
+            "nullable": true
+          },
+          "additionalContext": {
+            "type": "string",
+            "nullable": true
+          },
+          "targetFields": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "desiredTags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "model": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "SourceTypeAiSuggestResponse": {
+        "type": "object",
+        "properties": {
+          "draft": {
+            "$ref": "#/components/schemas/SourceTypeDraft"
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "SourceTypeDraft": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "descriptorHints": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "signalPhrases": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "mimeTypes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "supportsManualSelection": {
+            "type": "boolean"
+          },
+          "expectedPageCountMin": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "expectedPageCountMax": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "fieldQueries": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "instructions": {
+            "type": "string",
+            "nullable": true
+          },
+          "outputTemplate": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "SourceTypeMapping": {
+        "type": "object",
+        "properties": {
+          "sourceTypeId": {
+            "type": "string",
+            "nullable": true
+          },
+          "fieldMappings": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "TextSpan": {
+        "type": "object",
+        "properties": {
+          "start": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "end": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "TextSpanEvidence": {
+        "type": "object",
+        "properties": {
+          "passageId": {
+            "type": "string",
+            "nullable": true
+          },
+          "sourceDocumentId": {
+            "type": "string",
+            "nullable": true
+          },
+          "originalText": {
+            "type": "string",
+            "nullable": true
+          },
+          "span": {
+            "$ref": "#/components/schemas/TextSpan"
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "section": {
+            "type": "string",
+            "nullable": true
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "nullable": true
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "UpdateNotesRequest": {
+        "type": "object",
+        "properties": {
+          "authoritativeNotes": {
+            "type": "string",
+            "nullable": true
+          },
+          "reProcess": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "UpdateNotesResponse": {
+        "type": "object",
+        "properties": {
+          "pipelineId": {
+            "type": "string",
+            "nullable": true
+          },
+          "authoritativeNotes": {
+            "type": "string",
+            "nullable": true
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "reProcessScheduled": {
+            "type": "boolean"
+          },
+          "jobId": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "Example",
+      "description": "Example controller showing how to trigger background services using the fluent API"
+    }
+  ]
+}

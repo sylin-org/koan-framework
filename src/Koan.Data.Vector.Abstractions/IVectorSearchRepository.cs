@@ -9,8 +9,50 @@ public interface IVectorSearchRepository<TEntity, TKey> where TEntity : IEntity<
     Task<bool> DeleteAsync(TKey id, CancellationToken ct = default);
     Task<int> DeleteManyAsync(IEnumerable<TKey> ids, CancellationToken ct = default);
 
+    /// <summary>
+    /// Retrieves the embedding vector for a specific entity by ID.
+    /// Returns null if no vector exists for the given ID.
+    /// </summary>
+    Task<float[]?> GetEmbeddingAsync(TKey id, CancellationToken ct = default)
+    {
+        // Default implementation: not supported
+        throw new NotSupportedException(
+            $"GetEmbeddingAsync is not supported by this adapter. " +
+            $"Provider: {GetType().Name}. " +
+            $"Consider implementing GetEmbeddingAsync for ID-based vector retrieval."
+        );
+    }
+
+    /// <summary>
+    /// Retrieves embedding vectors for multiple entities by IDs.
+    /// Returns a dictionary mapping IDs to embeddings. Missing IDs are omitted.
+    /// </summary>
+    Task<Dictionary<TKey, float[]>> GetEmbeddingsAsync(IEnumerable<TKey> ids, CancellationToken ct = default)
+    {
+        // Default implementation: not supported
+        throw new NotSupportedException(
+            $"GetEmbeddingsAsync is not supported by this adapter. " +
+            $"Provider: {GetType().Name}. " +
+            $"Consider implementing GetEmbeddingsAsync for batch vector retrieval."
+        );
+    }
+
     Task VectorEnsureCreatedAsync(CancellationToken ct = default) => Task.CompletedTask; // optional convenience
     Task<VectorQueryResult<TKey>> SearchAsync(VectorQueryOptions options, CancellationToken ct = default);
+
+    /// <summary>
+    /// Flush (clear) all vectors from the index. This is a destructive operation.
+    /// Each adapter implements this according to its provider's capabilities.
+    /// </summary>
+    Task FlushAsync(CancellationToken ct = default)
+    {
+        // Default implementation: throw NotSupportedException for providers without native support
+        throw new NotSupportedException(
+            $"Vector flush is not supported by this adapter. " +
+            $"Provider: {GetType().Name}. " +
+            $"Consider implementing FlushAsync or using DeleteManyAsync for manual cleanup."
+        );
+    }
 
     /// <summary>
     /// Exports all stored vectors from the vector database in batches.

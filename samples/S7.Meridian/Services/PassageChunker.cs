@@ -32,7 +32,6 @@ public sealed class PassageChunker : IPassageChunker
 
             var passage = new Passage
             {
-                PipelineId = document.PipelineId,
                 SourceDocumentId = document.Id,
                 SequenceNumber = sequence++,
                 Text = normalized,

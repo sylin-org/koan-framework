@@ -21,7 +21,7 @@ public static class Singleflight
         var task = lazy.Value;
         try
         {
-            await task.ConfigureAwait(false);
+            await task;
         }
         finally
         {
@@ -39,7 +39,7 @@ public static class Singleflight
         {
             try
             {
-                var result = await work(kct).ConfigureAwait(false);
+                var result = await work(kct);
                 tcs.TrySetResult(result);
             }
             catch (OperationCanceledException oce)

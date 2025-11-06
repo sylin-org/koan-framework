@@ -20,21 +20,21 @@ internal sealed class RoleBootstrapHostedService(
         {
             var opt = options.CurrentValue;
             // 1) Initial seed when empty
-            var existingRoles = await roles.All(cancellationToken).ConfigureAwait(false);
-            var existingAliases = await aliases.All(cancellationToken).ConfigureAwait(false);
-            var existingBindings = await bindings.All(cancellationToken).ConfigureAwait(false);
+            var existingRoles = await roles.All(cancellationToken);
+            var existingAliases = await aliases.All(cancellationToken);
+            var existingBindings = await bindings.All(cancellationToken);
             if (existingRoles.Count == 0 && existingAliases.Count == 0 && existingBindings.Count == 0)
             {
                 if (!EnvironmentIsProduction() || opt.AllowSeedingInProduction)
                 {
                     if (opt.Roles.Count > 0)
-                        await roles.UpsertMany(opt.Roles.Select(r => new SeedRoleDto(r.Id, r.Display, r.Description)), cancellationToken).ConfigureAwait(false);
+                        await roles.UpsertMany(opt.Roles.Select(r => new SeedRoleDto(r.Id, r.Display, r.Description)), cancellationToken);
                     if (opt.Aliases.Map.Count > 0)
-                        await aliases.UpsertMany(opt.Aliases.Map.Select(kv => new SeedAliasDto(kv.Key, kv.Value)), cancellationToken).ConfigureAwait(false);
+                        await aliases.UpsertMany(opt.Aliases.Map.Select(kv => new SeedAliasDto(kv.Key, kv.Value)), cancellationToken);
                     if (opt.PolicyBindings.Count > 0)
-                        await bindings.UpsertMany(opt.PolicyBindings.Select(p => new SeedBindingDto(p.Id, p.Requirement)), cancellationToken).ConfigureAwait(false);
+                        await bindings.UpsertMany(opt.PolicyBindings.Select(p => new SeedBindingDto(p.Id, p.Requirement)), cancellationToken);
 
-                    await snapshot.ReloadAsync(cancellationToken).ConfigureAwait(false);
+                    await snapshot.ReloadAsync(cancellationToken);
                     logger.LogInformation("Koan.Web.Auth.Roles: initial seed applied from configuration template.");
                 }
                 else

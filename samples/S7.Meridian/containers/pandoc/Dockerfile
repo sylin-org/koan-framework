@@ -5,8 +5,10 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
     pandoc \
     texlive-xetex \
+    texlive-latex-recommended \
     texlive-fonts-recommended \
     fonts-dejavu \
+    lmodern \
     && rm -rf /var/lib/apt/lists/*
 
 # Disable LaTeX shell escape

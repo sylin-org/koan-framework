@@ -1,0 +1,188 @@
+/**
+ * Breadcrumb Navigation Styles
+ *
+ * Design Pattern: Contextual navigation
+ * Features: Back button + hierarchy trail
+ */
+
+/* ==================== Breadcrumb Container ==================== */
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-3);
+  padding: 0;
+}
+
+/* ==================== Back Button ==================== */
+.breadcrumb-back-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-md);
+  color: var(--color-text-secondary);
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.breadcrumb-back-btn:hover {
+  background-color: var(--color-bg-secondary);
+  color: var(--color-text-primary);
+}
+
+.breadcrumb-back-btn:active {
+  transform: scale(0.95);
+}
+
+.breadcrumb-back-btn:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+}
+
+/* ==================== Breadcrumb List ==================== */
+.breadcrumb-list {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--spacing-2);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.breadcrumb-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+}
+
+/* ==================== Breadcrumb Links ==================== */
+.breadcrumb-link {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  padding: var(--spacing-1) var(--spacing-2);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  text-decoration: none;
+  transition: all var(--transition-fast);
+}
+
+.breadcrumb-link:hover {
+  background-color: var(--color-bg-secondary);
+  color: var(--color-text-primary);
+}
+
+.breadcrumb-link:active {
+  transform: scale(0.98);
+}
+
+.breadcrumb-link:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+}
+
+/* ==================== Current Page ==================== */
+.breadcrumb-current-text {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  padding: var(--spacing-1) var(--spacing-2);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+}
+
+.breadcrumb-item.breadcrumb-current {
+  color: var(--color-text-primary);
+}
+
+/* ==================== Icons ==================== */
+.breadcrumb-icon {
+  flex-shrink: 0;
+  color: currentColor;
+}
+
+.breadcrumb-separator {
+  flex-shrink: 0;
+  color: var(--color-text-tertiary);
+}
+
+/* ==================== Mobile: Compact Mode ==================== */
+@media (max-width: 768px) {
+  .breadcrumb-list.mobile-compact .breadcrumb-item.mobile-hidden {
+    display: none;
+  }
+
+  /* Show only last 2 items on mobile */
+  .breadcrumb-list.mobile-compact .breadcrumb-item:nth-last-child(-n+2) {
+    display: flex;
+  }
+
+  /* Add ellipsis indicator if items are hidden */
+  .breadcrumb-list.mobile-compact .breadcrumb-item:not(.mobile-hidden):first-child::before {
+    content: '...';
+    color: var(--color-text-tertiary);
+    padding: 0 var(--spacing-2);
+    font-size: var(--font-size-sm);
+  }
+
+  .breadcrumb-list.mobile-compact .breadcrumb-item:first-child::before {
+    display: none; /* Don't show ellipsis if first item is visible */
+  }
+}
+
+/* ==================== Truncate Long Labels ==================== */
+.breadcrumb-link span,
+.breadcrumb-current-text span {
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+  .breadcrumb-link span,
+  .breadcrumb-current-text span {
+    max-width: 120px;
+  }
+}
+
+/* ==================== Accessibility ==================== */
+.breadcrumb[aria-label] {
+  /* Semantic HTML for screen readers */
+}
+
+.breadcrumb-current-text {
+  /* aria-current="page" will be added by component */
+}
+
+/* ==================== High Contrast Mode ==================== */
+@media (prefers-contrast: high) {
+  .breadcrumb-link {
+    border: 1px solid transparent;
+  }
+
+  .breadcrumb-link:hover,
+  .breadcrumb-link:focus-visible {
+    border-color: currentColor;
+  }
+
+  .breadcrumb-current-text {
+    border-bottom: 2px solid currentColor;
+  }
+}
+
+/* ==================== Reduced Motion ==================== */
+@media (prefers-reduced-motion: reduce) {
+  .breadcrumb-link,
+  .breadcrumb-back-btn {
+    transition: none;
+  }
+}

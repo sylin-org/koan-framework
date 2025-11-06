@@ -13,8 +13,9 @@ public static class SqliteRegistration
 {
     public static IServiceCollection AddSqliteAdapter(this IServiceCollection services, Action<SqliteOptions>? configure = null)
     {
-        services.AddKoanOptions<SqliteOptions>(Infrastructure.Constants.Configuration.Keys.Section);
-        services.TryAddEnumerable(ServiceDescriptor.Transient<IConfigureOptions<SqliteOptions>, SqliteOptionsConfigurator>());
+        services.AddKoanOptions<SqliteOptions, SqliteOptionsConfigurator>(
+            Infrastructure.Constants.Configuration.Keys.Section,
+            configuratorLifetime: ServiceLifetime.Transient);
         if (configure is not null) services.Configure(configure);
         services.AddRelationalOrchestration();
         // Register bridge AFTER orchestrator so options pipeline is complete and test delegates win

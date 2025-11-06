@@ -27,7 +27,7 @@ public sealed class JsonCacheSerializer : ICacheSerializer
 
     public async ValueTask<object?> DeserializeAsync(CacheValue value, Type returnType, CancellationToken ct)
     {
-        var result = await DeserializeInternalAsync<object?>(value, returnType, ct).ConfigureAwait(false);
+        var result = await DeserializeInternalAsync<object?>(value, returnType, ct);
         return result;
     }
 

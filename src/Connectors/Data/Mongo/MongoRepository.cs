@@ -113,7 +113,7 @@ internal sealed class MongoRepository<TEntity, TKey> :
         var collectionKey = BuildCollectionKey();
         var schemaLock = GetSchemaLock(collectionKey);
 
-        await schemaLock.WaitAsync(ct).ConfigureAwait(false);
+        await schemaLock.WaitAsync(ct);
         try
         {
             if (_healthyCache.TryGetValue(collectionKey, out var cached) && cached)
@@ -121,16 +121,16 @@ internal sealed class MongoRepository<TEntity, TKey> :
                 return;
             }
 
-            var database = await _provider.GetDatabaseAsync(ct).ConfigureAwait(false);
-            if (!await CollectionExistsAsync(database, collectionName, ct).ConfigureAwait(false))
+            var database = await _provider.GetDatabaseAsync(ct);
+            if (!await CollectionExistsAsync(database, collectionName, ct))
             {
-                await database.CreateCollectionAsync(collectionName, cancellationToken: ct).ConfigureAwait(false);
+                await database.CreateCollectionAsync(collectionName, cancellationToken: ct);
             }
 
             _collection = database.GetCollection<TEntity>(collectionName);
             _collectionName = collectionName;
 
-            await EnsureIndexesAsync(_collection, ct).ConfigureAwait(false);
+            await EnsureIndexesAsync(_collection, ct);
             _healthyCache[collectionKey] = true;
         }
         catch (Exception ex)
@@ -163,10 +163,10 @@ internal sealed class MongoRepository<TEntity, TKey> :
         var key = BuildCollectionKey();
         if (!_healthyCache.TryGetValue(key, out var healthy) || !healthy)
         {
-            await EnsureHealthyAsync(ct).ConfigureAwait(false);
+            await EnsureHealthyAsync(ct);
         }
 
-        return await GetCollectionCoreAsync(ct).ConfigureAwait(false);
+        return await GetCollectionCoreAsync(ct);
     }
 
     private async Task<IMongoCollection<TEntity>> GetCollectionCoreAsync(CancellationToken ct)
@@ -177,7 +177,7 @@ internal sealed class MongoRepository<TEntity, TKey> :
             return _collection;
         }
 
-        var database = await _provider.GetDatabaseAsync(ct).ConfigureAwait(false);
+        var database = await _provider.GetDatabaseAsync(ct);
         _collection = database.GetCollection<TEntity>(desired);
         _collectionName = desired;
         return _collection;
@@ -278,7 +278,7 @@ internal sealed class MongoRepository<TEntity, TKey> :
 
         try
         {
-            await collection.Indexes.CreateManyAsync(models, cancellationToken: ct).ConfigureAwait(false);
+            await collection.Indexes.CreateManyAsync(models, cancellationToken: ct);
             _indexCache[indexKey] = true;
         }
         catch (MongoCommandException ex) when (ex.CodeName is "IndexOptionsConflict" or "IndexKeySpecsConflict" or "IndexAlreadyExists")
@@ -296,8 +296,8 @@ internal sealed class MongoRepository<TEntity, TKey> :
     {
         var filter = new BsonDocument("name", collectionName);
         var options = new ListCollectionNamesOptions { Filter = filter };
-        using var cursor = await database.ListCollectionNamesAsync(options, ct).ConfigureAwait(false);
-        return await cursor.AnyAsync(ct).ConfigureAwait(false);
+        using var cursor = await database.ListCollectionNamesAsync(options, ct);
+        return await cursor.AnyAsync(ct);
     }
 
 
@@ -307,9 +307,9 @@ internal sealed class MongoRepository<TEntity, TKey> :
             ct.ThrowIfCancellationRequested();
             using var activity = MongoTelemetry.Activity.StartActivity("mongo.get");
             activity?.SetTag("entity", typeof(TEntity).FullName);
-            var collection = await GetCollectionAsync(ct).ConfigureAwait(false);
+            var collection = await GetCollectionAsync(ct);
             var filter = Builders<TEntity>.Filter.Eq(x => x.Id, id);
-            var result = await collection.Find(filter).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+            var result = await collection.Find(filter).FirstOrDefaultAsync(ct);
             return result;
         }, ct);
 
@@ -327,9 +327,9 @@ internal sealed class MongoRepository<TEntity, TKey> :
                 return (IReadOnlyList<TEntity?>)Array.Empty<TEntity?>();
             }
 
-            var collection = await GetCollectionAsync(ct).ConfigureAwait(false);
+            var collection = await GetCollectionAsync(ct);
             var filter = Builders<TEntity>.Filter.In(x => x.Id, idList);
-            var found = await collection.Find(filter).ToListAsync(ct).ConfigureAwait(false);
+            var found = await collection.Find(filter).ToListAsync(ct);
 
             // Build dictionary for O(1) lookup
             var entityMap = found.ToDictionary(e => e.Id);
@@ -350,8 +350,13 @@ internal sealed class MongoRepository<TEntity, TKey> :
             ct.ThrowIfCancellationRequested();
             using var activity = MongoTelemetry.Activity.StartActivity("mongo.query.all");
             activity?.SetTag("entity", typeof(TEntity).FullName);
-            var collection = await GetCollectionAsync(ct).ConfigureAwait(false);
-            var results = await collection.Find(Builders<TEntity>.Filter.Empty).ToListAsync(ct).ConfigureAwait(false);
+            var collection = await GetCollectionAsync(ct);
+
+            IFindFluent<TEntity, TEntity> cursor = query is Expression<Func<TEntity, bool>> predicate
+                ? FindWithPredicate(collection, predicate)
+                : collection.Find(Builders<TEntity>.Filter.Empty);
+
+            var results = await cursor.ToListAsync(ct);
             return (IReadOnlyList<TEntity>)results;
         }, ct);
 
@@ -360,14 +365,16 @@ internal sealed class MongoRepository<TEntity, TKey> :
         {
             ct.ThrowIfCancellationRequested();
             var (defaultPageSize, maxPageSize) = _options.CurrentValue.GetPagingGuardrails();
-            var collection = await GetCollectionAsync(ct).ConfigureAwait(false);
+            var collection = await GetCollectionAsync(ct);
 
-            // Use centralized query extension for paging
-            var cursor = collection.Find(Builders<TEntity>.Filter.Empty)
-                .ApplyPaging(options, defaultPageSize, maxPageSize,
-                    (c, skip, take) => c.Skip(skip).Limit(take));
+            IFindFluent<TEntity, TEntity> cursor = query is Expression<Func<TEntity, bool>> predicate
+                ? FindWithPredicate(collection, predicate)
+                : collection.Find(Builders<TEntity>.Filter.Empty);
 
-            var results = await cursor.ToListAsync(ct).ConfigureAwait(false);
+            cursor = cursor.ApplyPaging(options, defaultPageSize, maxPageSize,
+                (c, skip, take) => c.Skip(skip).Limit(take));
+
+            var results = await cursor.ToListAsync(ct);
             return (IReadOnlyList<TEntity>)results;
         }, ct);
 
@@ -381,14 +388,13 @@ internal sealed class MongoRepository<TEntity, TKey> :
             using var activity = MongoTelemetry.Activity.StartActivity("mongo.query.linq");
             activity?.SetTag("entity", typeof(TEntity).FullName);
             var (defaultPageSize, maxPageSize) = _options.CurrentValue.GetPagingGuardrails();
-            var collection = await GetCollectionAsync(ct).ConfigureAwait(false);
+            var collection = await GetCollectionAsync(ct);
 
-            // Use centralized query extension for paging
-            var cursor = collection.Find(predicate)
+            var cursor = FindWithPredicate(collection, predicate)
                 .ApplyPaging(options, defaultPageSize, maxPageSize,
                     (c, skip, take) => c.Skip(skip).Limit(take));
 
-            var results = await cursor.ToListAsync(ct).ConfigureAwait(false);
+            var results = await cursor.ToListAsync(ct);
             return (IReadOnlyList<TEntity>)results;
         }, ct);
 
@@ -398,23 +404,29 @@ internal sealed class MongoRepository<TEntity, TKey> :
             ct.ThrowIfCancellationRequested();
             using var activity = MongoTelemetry.Activity.StartActivity("mongo.count");
             activity?.SetTag("entity", typeof(TEntity).FullName);
-            var collection = await GetCollectionAsync(ct).ConfigureAwait(false);
+            var collection = await GetCollectionAsync(ct);
 
             if (request.Strategy == CountStrategy.Fast && request.Predicate is null && request.RawQuery is null && request.ProviderQuery is null)
             {
-                var estimate = await collection.EstimatedDocumentCountAsync(cancellationToken: ct).ConfigureAwait(false);
+                var estimate = await collection.EstimatedDocumentCountAsync(cancellationToken: ct);
                 return CountResult.Estimate((long)estimate);
             }
 
             if (request.Predicate is not null)
             {
-                var count = await collection.CountDocumentsAsync(request.Predicate, cancellationToken: ct).ConfigureAwait(false);
+                if (TryBuildGuidFilter(request.Predicate, out var optimizedFilter))
+                {
+                    var optimizedCount = await collection.CountDocumentsAsync(optimizedFilter, cancellationToken: ct);
+                    return CountResult.Exact((long)optimizedCount);
+                }
+
+                var count = await collection.CountDocumentsAsync(request.Predicate, cancellationToken: ct);
                 return CountResult.Exact((long)count);
             }
 
             if (request.ProviderQuery is FilterDefinition<TEntity> filter)
             {
-                var count = await collection.CountDocumentsAsync(filter, cancellationToken: ct).ConfigureAwait(false);
+                var count = await collection.CountDocumentsAsync(filter, cancellationToken: ct);
                 return CountResult.Exact((long)count);
             }
 
@@ -423,7 +435,7 @@ internal sealed class MongoRepository<TEntity, TKey> :
                 throw new NotSupportedException("Mongo adapter does not support string-based count queries. Use LINQ or provider filters.");
             }
 
-            var total = await collection.CountDocumentsAsync(Builders<TEntity>.Filter.Empty, cancellationToken: ct).ConfigureAwait(false);
+            var total = await collection.CountDocumentsAsync(Builders<TEntity>.Filter.Empty, cancellationToken: ct);
             return CountResult.Exact((long)total);
         }, ct);
 
@@ -433,9 +445,9 @@ internal sealed class MongoRepository<TEntity, TKey> :
             ct.ThrowIfCancellationRequested();
             using var activity = MongoTelemetry.Activity.StartActivity("mongo.upsert");
             activity?.SetTag("entity", typeof(TEntity).FullName);
-            var collection = await GetCollectionAsync(ct).ConfigureAwait(false);
+            var collection = await GetCollectionAsync(ct);
             var filter = Builders<TEntity>.Filter.Eq(x => x.Id, model.Id);
-            await collection.ReplaceOneAsync(filter, model, new ReplaceOptions { IsUpsert = true }, ct).ConfigureAwait(false);
+            await collection.ReplaceOneAsync(filter, model, new ReplaceOptions { IsUpsert = true }, ct);
             //_logger?.LogDebug("Mongo upsert {Entity} id={Id}", typeof(TEntity).Name, model.Id);
             return model;
         }, ct);
@@ -446,9 +458,9 @@ internal sealed class MongoRepository<TEntity, TKey> :
             ct.ThrowIfCancellationRequested();
             using var activity = MongoTelemetry.Activity.StartActivity("mongo.delete");
             activity?.SetTag("entity", typeof(TEntity).FullName);
-            var collection = await GetCollectionAsync(ct).ConfigureAwait(false);
+            var collection = await GetCollectionAsync(ct);
             var filter = Builders<TEntity>.Filter.Eq(x => x.Id, id);
-            var result = await collection.DeleteOneAsync(filter, ct).ConfigureAwait(false);
+            var result = await collection.DeleteOneAsync(filter, ct);
             var deleted = result.DeletedCount > 0;
             //_logger?.LogDebug("Mongo delete {Entity} id={Id} deleted={Deleted}", typeof(TEntity).Name, id, deleted);
             return deleted;
@@ -460,7 +472,7 @@ internal sealed class MongoRepository<TEntity, TKey> :
             ct.ThrowIfCancellationRequested();
             using var activity = MongoTelemetry.Activity.StartActivity("mongo.bulk.upsert");
             activity?.SetTag("entity", typeof(TEntity).FullName);
-            var collection = await GetCollectionAsync(ct).ConfigureAwait(false);
+            var collection = await GetCollectionAsync(ct);
             var writes = models
                 .Select(model => new ReplaceOneModel<TEntity>(Builders<TEntity>.Filter.Eq(x => x.Id, model.Id), model)
                 {
@@ -473,7 +485,7 @@ internal sealed class MongoRepository<TEntity, TKey> :
                 return 0;
             }
 
-            var result = await collection.BulkWriteAsync(writes, cancellationToken: ct).ConfigureAwait(false);
+            var result = await collection.BulkWriteAsync(writes, cancellationToken: ct);
             var count = (int)(result.ModifiedCount + result.Upserts.Count);
             //_logger?.LogDebug("Mongo bulk upsert {Entity} count={Count}", typeof(TEntity).Name, count);
             return count;
@@ -485,7 +497,7 @@ internal sealed class MongoRepository<TEntity, TKey> :
             ct.ThrowIfCancellationRequested();
             using var activity = MongoTelemetry.Activity.StartActivity("mongo.bulk.delete");
             activity?.SetTag("entity", typeof(TEntity).FullName);
-            var collection = await GetCollectionAsync(ct).ConfigureAwait(false);
+            var collection = await GetCollectionAsync(ct);
             var keys = ids as ICollection<TKey> ?? ids.ToArray();
             if (keys.Count == 0)
             {
@@ -493,7 +505,7 @@ internal sealed class MongoRepository<TEntity, TKey> :
             }
 
             var filter = Builders<TEntity>.Filter.In(x => x.Id, keys);
-            var result = await collection.DeleteManyAsync(filter, ct).ConfigureAwait(false);
+            var result = await collection.DeleteManyAsync(filter, ct);
             var count = (int)result.DeletedCount;
             //_logger?.LogDebug("Mongo bulk delete {Entity} count={Count}", typeof(TEntity).Name, count);
             return count;
@@ -503,8 +515,8 @@ internal sealed class MongoRepository<TEntity, TKey> :
         => ExecuteWithReadinessAsync(async () =>
         {
             ct.ThrowIfCancellationRequested();
-            var collection = await GetCollectionAsync(ct).ConfigureAwait(false);
-            var result = await collection.DeleteManyAsync(Builders<TEntity>.Filter.Empty, ct).ConfigureAwait(false);
+            var collection = await GetCollectionAsync(ct);
+            var result = await collection.DeleteManyAsync(Builders<TEntity>.Filter.Empty, ct);
             return (int)result.DeletedCount;
         }, ct);
 
@@ -512,7 +524,7 @@ internal sealed class MongoRepository<TEntity, TKey> :
         => ExecuteWithReadinessAsync(async () =>
         {
             ct.ThrowIfCancellationRequested();
-            var collection = await GetCollectionAsync(ct).ConfigureAwait(false);
+            var collection = await GetCollectionAsync(ct);
 
             // Resolve Optimized strategy based on provider capabilities
             var effectiveStrategy = strategy == RemoveStrategy.Optimized
@@ -523,20 +535,20 @@ internal sealed class MongoRepository<TEntity, TKey> :
             {
                 // Fast path: drop collection and recreate (loses indexes briefly)
                 var database = GetDatabase(collection);
-                var estimatedCount = await collection.EstimatedDocumentCountAsync(cancellationToken: ct).ConfigureAwait(false);
+                var estimatedCount = await collection.EstimatedDocumentCountAsync(cancellationToken: ct);
 
-                await database.DropCollectionAsync(_collectionName, ct).ConfigureAwait(false);
-                await database.CreateCollectionAsync(_collectionName, cancellationToken: ct).ConfigureAwait(false);
+                await database.DropCollectionAsync(_collectionName, ct);
+                await database.CreateCollectionAsync(_collectionName, cancellationToken: ct);
 
                 // Recreate collection reference and indexes
                 _collection = database.GetCollection<TEntity>(_collectionName);
-                await EnsureIndexesAsync(_collection, ct).ConfigureAwait(false);
+                await EnsureIndexesAsync(_collection, ct);
 
                 return estimatedCount;
             }
 
             // Safe path: deleteMany (fires hooks if registered)
-            var result = await collection.DeleteManyAsync(Builders<TEntity>.Filter.Empty, ct).ConfigureAwait(false);
+            var result = await collection.DeleteManyAsync(Builders<TEntity>.Filter.Empty, ct);
             return result.DeletedCount;
         }, ct);
 
@@ -550,16 +562,16 @@ internal sealed class MongoRepository<TEntity, TKey> :
             {
                 case DataInstructions.EnsureCreated:
                     {
-                        var collection = await GetCollectionAsync(ct).ConfigureAwait(false);
+                        var collection = await GetCollectionAsync(ct);
                         var database = GetDatabase(collection);
 
                         try
                         {
-                            var existing = await database.ListCollectionNamesAsync(cancellationToken: ct).ConfigureAwait(false);
-                            var names = await existing.ToListAsync(ct).ConfigureAwait(false);
+                            var existing = await database.ListCollectionNamesAsync(cancellationToken: ct);
+                            var names = await existing.ToListAsync(ct);
                             if (!names.Contains(_collectionName, StringComparer.Ordinal))
                             {
-                                await database.CreateCollectionAsync(_collectionName, cancellationToken: ct).ConfigureAwait(false);
+                                await database.CreateCollectionAsync(_collectionName, cancellationToken: ct);
                                 _logger?.LogDebug("Mongo ensureCreated created collection {Name}", _collectionName);
                             }
                         }
@@ -573,7 +585,7 @@ internal sealed class MongoRepository<TEntity, TKey> :
                     }
                 case DataInstructions.Clear:
                     {
-                        var deleted = await DeleteAllAsync(ct).ConfigureAwait(false);
+                        var deleted = await DeleteAllAsync(ct);
                         object result = deleted;
                         return (TResult)result;
                     }
@@ -600,6 +612,162 @@ internal sealed class MongoRepository<TEntity, TKey> :
 
             throw new InvalidOperationException("Unable to obtain Mongo database from collection.");
         }
+    }
+
+    private IFindFluent<TEntity, TEntity> FindWithPredicate(IMongoCollection<TEntity> collection, Expression<Func<TEntity, bool>> predicate)
+    {
+        if (TryBuildGuidFilter(predicate, out var optimizedFilter))
+        {
+            return collection.Find(optimizedFilter);
+        }
+
+        return collection.Find(predicate);
+    }
+
+    private bool TryBuildGuidFilter(Expression<Func<TEntity, bool>> predicate, out FilterDefinition<TEntity> filter)
+    {
+        filter = Builders<TEntity>.Filter.Empty;
+        if (predicate is null || predicate.Parameters.Count == 0)
+        {
+            return false;
+        }
+
+        return TryBuildGuidFilter(predicate.Parameters[0], predicate.Body, out filter);
+    }
+
+    private bool TryBuildGuidFilter(ParameterExpression parameter, Expression expression, out FilterDefinition<TEntity> filter)
+    {
+        filter = Builders<TEntity>.Filter.Empty;
+        expression = StripConvert(expression);
+
+        if (expression is BinaryExpression binary)
+        {
+            switch (binary.NodeType)
+            {
+                case ExpressionType.Equal:
+                    if (TryExtractComparison(parameter, binary.Left, binary.Right, out var fieldName, out var value) ||
+                        TryExtractComparison(parameter, binary.Right, binary.Left, out fieldName, out value))
+                    {
+                        if (value is string str && Guid.TryParse(str, out var guid))
+                        {
+                            var elementName = MapFieldName(fieldName);
+                            filter = Builders<TEntity>.Filter.Eq(elementName, new BsonBinaryData(guid, GuidRepresentation.Standard));
+                            return true;
+                        }
+                    }
+                    break;
+                case ExpressionType.AndAlso:
+                    if (TryBuildGuidFilter(parameter, binary.Left, out var left) && TryBuildGuidFilter(parameter, binary.Right, out var right))
+                    {
+                        filter = Builders<TEntity>.Filter.And(left, right);
+                        return true;
+                    }
+                    break;
+                case ExpressionType.OrElse:
+                    if (TryBuildGuidFilter(parameter, binary.Left, out var leftOr) && TryBuildGuidFilter(parameter, binary.Right, out var rightOr))
+                    {
+                        filter = Builders<TEntity>.Filter.Or(leftOr, rightOr);
+                        return true;
+                    }
+                    break;
+            }
+        }
+
+        return false;
+    }
+
+    private bool TryExtractComparison(ParameterExpression parameter, Expression fieldExpression, Expression valueExpression, out string fieldName, out object? value)
+    {
+        fieldName = string.Empty;
+        value = null;
+
+        var candidate = StripConvert(fieldExpression) as MemberExpression;
+        if (candidate is null)
+        {
+            return false;
+        }
+
+        if (candidate.Expression is null)
+        {
+            return false;
+        }
+
+        var owner = StripConvert(candidate.Expression);
+        if (owner != parameter)
+        {
+            return false;
+        }
+
+        fieldName = candidate.Member.Name;
+        return TryEvaluateExpression(valueExpression, out value);
+    }
+
+    private static Expression StripConvert(Expression expression)
+    {
+        while (expression.NodeType is ExpressionType.Convert or ExpressionType.ConvertChecked)
+        {
+            expression = ((UnaryExpression)expression).Operand;
+        }
+
+        return expression;
+    }
+
+    private bool TryEvaluateExpression(Expression expression, out object? value)
+    {
+        expression = StripConvert(expression);
+
+        try
+        {
+            var lambda = Expression.Lambda(expression);
+            value = lambda.Compile().DynamicInvoke();
+            return true;
+        }
+        catch
+        {
+            value = null;
+            return false;
+        }
+    }
+
+    private string MapFieldName(string propertyName)
+    {
+        if (string.IsNullOrWhiteSpace(propertyName))
+        {
+            return propertyName;
+        }
+
+        if (!string.IsNullOrWhiteSpace(_optimizationInfo.IdPropertyName) &&
+            string.Equals(propertyName, _optimizationInfo.IdPropertyName, StringComparison.Ordinal))
+        {
+            return "_id";
+        }
+
+        if (string.Equals(propertyName, "Id", StringComparison.OrdinalIgnoreCase))
+        {
+            return "_id";
+        }
+
+        return ToCamelCase(propertyName);
+    }
+
+    private static string ToCamelCase(string value)
+    {
+        if (string.IsNullOrEmpty(value))
+        {
+            return value;
+        }
+
+        if (!char.IsUpper(value[0]))
+        {
+            return value;
+        }
+
+        if (value.Length == 1)
+        {
+            return value.ToLowerInvariant();
+        }
+
+        return char.ToLowerInvariant(value[0]) + value.Substring(1);
     }
 
     private sealed class MongoBatch : IBatchSet<TEntity, TKey>
@@ -645,7 +813,7 @@ internal sealed class MongoRepository<TEntity, TKey> :
             {
                 foreach (var (id, mutate) in _mutations)
                 {
-                    var current = await _repo.GetAsync(id, ct).ConfigureAwait(false);
+                    var current = await _repo.GetAsync(id, ct);
                     if (current is not null)
                     {
                         mutate(current);
@@ -662,7 +830,7 @@ internal sealed class MongoRepository<TEntity, TKey> :
 
             return await _repo.ExecuteWithinReadinessAsync(async () =>
             {
-                var collection = await _repo.GetCollectionAsync(ct).ConfigureAwait(false);
+                var collection = await _repo.GetCollectionAsync(ct);
 
                 if (options?.RequireAtomic == true)
                 {
@@ -672,7 +840,7 @@ internal sealed class MongoRepository<TEntity, TKey> :
 
                     try
                     {
-                        session = await client.StartSessionAsync(cancellationToken: ct).ConfigureAwait(false);
+                        session = await client.StartSessionAsync(cancellationToken: ct);
                         try
                         {
                             session.StartTransaction();
@@ -683,8 +851,8 @@ internal sealed class MongoRepository<TEntity, TKey> :
                             throw new NotSupportedException("MongoDB deployment does not support transactions; cannot honor RequireAtomic=true.", ex);
                         }
 
-                        var result = await collection.BulkWriteAsync(session, _operations, cancellationToken: ct).ConfigureAwait(false);
-                        await session.CommitTransactionAsync(ct).ConfigureAwait(false);
+                        var result = await collection.BulkWriteAsync(session, _operations, cancellationToken: ct);
+                        await session.CommitTransactionAsync(ct);
                         return new BatchResult(result.Upserts.Count, (int)result.ModifiedCount, (int)result.DeletedCount);
                     }
                     catch
@@ -693,7 +861,7 @@ internal sealed class MongoRepository<TEntity, TKey> :
                         {
                             try
                             {
-                                await session.AbortTransactionAsync(ct).ConfigureAwait(false);
+                                await session.AbortTransactionAsync(ct);
                             }
                             catch
                             {
@@ -708,10 +876,10 @@ internal sealed class MongoRepository<TEntity, TKey> :
                 }
                 else
                 {
-                    var result = await collection.BulkWriteAsync(_operations, cancellationToken: ct).ConfigureAwait(false);
+                    var result = await collection.BulkWriteAsync(_operations, cancellationToken: ct);
                     return new BatchResult(result.Upserts.Count, (int)result.ModifiedCount, (int)result.DeletedCount);
                 }
-            }, ct).ConfigureAwait(false);
+            }, ct);
         }
     }
 }

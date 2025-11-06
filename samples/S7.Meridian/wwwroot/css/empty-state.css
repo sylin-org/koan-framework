@@ -1,0 +1,160 @@
+/**
+ * Empty State Styles
+ *
+ * Design Pattern: Guidance over blank screens
+ * Features: Contextual messages, clear CTAs
+ */
+
+/* ==================== Empty State Container ==================== */
+.empty-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-16) var(--spacing-8);
+  min-height: 400px;
+}
+
+.empty-state-compact {
+  min-height: 300px;
+  padding: var(--spacing-12) var(--spacing-6);
+}
+
+.empty-state-content {
+  max-width: 500px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-4);
+}
+
+/* ==================== Icon ==================== */
+.empty-state-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 96px;
+  height: 96px;
+  border-radius: var(--radius-2xl);
+  background-color: var(--color-bg-secondary);
+  color: var(--color-text-tertiary);
+  margin-bottom: var(--spacing-2);
+}
+
+.empty-state-compact .empty-state-icon {
+  width: 72px;
+  height: 72px;
+}
+
+.empty-state-icon.onboarding {
+  background-color: var(--color-primary-50);
+  color: var(--color-primary-600);
+}
+
+.empty-state-icon.search {
+  background-color: var(--color-gray-100);
+  color: var(--color-gray-500);
+}
+
+.empty-state-icon.error {
+  background-color: var(--color-danger-50);
+  color: var(--color-danger-600);
+}
+
+/* ==================== Text Content ==================== */
+.empty-state-title {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  margin: 0;
+  line-height: var(--line-height-tight);
+}
+
+.empty-state-compact .empty-state-title {
+  font-size: var(--font-size-lg);
+}
+
+.empty-state-description {
+  font-size: var(--font-size-base);
+  color: var(--color-text-secondary);
+  margin: 0;
+  line-height: var(--line-height-relaxed);
+  max-width: 400px;
+}
+
+.empty-state-compact .empty-state-description {
+  font-size: var(--font-size-sm);
+}
+
+/* ==================== Actions ==================== */
+.empty-state-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-3);
+  margin-top: var(--spacing-2);
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+/* ==================== Responsive ==================== */
+@media (max-width: 768px) {
+  .empty-state {
+    padding: var(--spacing-12) var(--spacing-4);
+    min-height: 300px;
+  }
+
+  .empty-state-compact {
+    min-height: 250px;
+    padding: var(--spacing-8) var(--spacing-4);
+  }
+
+  .empty-state-icon {
+    width: 72px;
+    height: 72px;
+  }
+
+  .empty-state-compact .empty-state-icon {
+    width: 56px;
+    height: 56px;
+  }
+
+  .empty-state-title {
+    font-size: var(--font-size-lg);
+  }
+
+  .empty-state-description {
+    font-size: var(--font-size-sm);
+  }
+
+  .empty-state-actions {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .empty-state-actions .btn {
+    width: 100%;
+  }
+}
+
+/* ==================== Animation ==================== */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.empty-state-content {
+  animation: fadeInUp var(--transition-slow) ease-out;
+}
+
+/* ==================== Reduced Motion ==================== */
+@media (prefers-reduced-motion: reduce) {
+  .empty-state-content {
+    animation: none;
+  }
+}

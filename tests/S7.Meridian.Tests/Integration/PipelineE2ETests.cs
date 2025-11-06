@@ -56,8 +56,7 @@ public sealed class PipelineE2ETests
                 Name = "Test Analysis",
                 Description = "Integration test analysis",
                 Instructions = "Summarize financial metrics with supporting context.",
-                OutputTemplate = "# Test Report\n\nRevenue: {{revenue}}\nEmployees: {{employees}}",
-                RequiredSourceTypes = new List<string> { MeridianConstants.SourceTypes.AuditedFinancial }
+                OutputTemplate = "# Test Report\n\nRevenue: {{revenue}}\nEmployees: {{employees}}"
             };
             await analysisType.Save(ct);
 
@@ -83,7 +82,6 @@ public sealed class PipelineE2ETests
 
             var document = new SourceDocument
             {
-                PipelineId = pipeline.Id,
                 OriginalFileName = "financials.txt",
                 StorageKey = storageKey,
                 SourceType = MeridianConstants.SourceTypes.AuditedFinancial,
@@ -94,6 +92,10 @@ public sealed class PipelineE2ETests
                 UpdatedAt = DateTime.UtcNow
             };
             await document.Save(ct);
+
+            pipeline.AttachDocument(document.Id);
+            pipeline.UpdatedAt = DateTime.UtcNow;
+            await pipeline.Save(ct);
 
             var job = new ProcessingJob
             {
@@ -151,7 +153,10 @@ public sealed class PipelineE2ETests
         var configurationValues = new Dictionary<string, string?>
         {
             ["Koan:Environment"] = "Test",
-            ["Koan:Data:Provider"] = "Memory",
+            ["Koan:Data:Sources:Default:Adapter"] = "memory",
+            ["Koan:Data:Vector:EnableWorkflows"] = "false",
+            ["Koan:BackgroundServices:Enabled"] = "false",
+            ["Logging:EventLog:LogLevel:Default"] = "None",
             ["Meridian:Retrieval:TopK"] = "8",
             ["Meridian:Retrieval:Alpha"] = "0.5",
             ["Meridian:Retrieval:MmrLambda"] = "0.7",

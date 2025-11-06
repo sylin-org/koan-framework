@@ -35,9 +35,14 @@ public sealed class OllamaOptions : IAdapterOptions
     public int ModelDownloadTimeoutMinutes { get; set; } = 10;
 
     /// <summary>
-    /// Timeout for AI inference requests (in seconds). Default is 180 seconds (3 minutes) to accommodate vision models.
+    /// Timeout for AI inference requests (in seconds). Default is 600 seconds (10 minutes) to accommodate long-running multi-document prompts.
     /// </summary>
-    public int RequestTimeoutSeconds { get; set; } = 180;
+    public int RequestTimeoutSeconds { get; set; } = 600;
+
+    /// <summary>
+    /// Maximum number of concurrent requests allowed against a single Ollama endpoint. Set to 0 to disable throttling.
+    /// </summary>
+    public int MaxConcurrentRequests { get; set; } = 3;
 
     /// <summary>
     /// Whether auto-discovery is enabled

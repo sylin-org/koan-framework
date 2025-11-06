@@ -42,6 +42,8 @@
       href: AI-0015-canonical-source-member-architecture.md
     - name: AI-0016 LM Studio adapter for Koan AI
       href: AI-0016-lm-studio-adapter.md
+    - name: AI-0017 Fact-catalog-first extraction for Meridian
+      href: AI-0017-fact-catalog-extraction.md
 - name: Architecture (ARCH)
   items:
     - name: ARCH-0001 Rename generic parameter to TEntity

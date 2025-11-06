@@ -10,5 +10,6 @@ public record Filters(
     double? RatingMin = null,
     double? RatingMax = null,
     int? YearMin = null,
-    int? YearMax = null
+    int? YearMax = null,
+    bool ShowCensored = false
 );

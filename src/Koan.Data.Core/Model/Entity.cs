@@ -217,7 +217,7 @@ namespace Koan.Data.Core.Model
                     (payload, token) => Data<TEntity, TKey>.UpsertManyAsync(payload, token),
                     (entity, token) => LoadPriorSnapshotAsync(entity, token),
                     ct)
-                .ConfigureAwait(false);
+                ;
         }
 
         public static async Task<int> UpsertMany(IEnumerable<TEntity> models, string partition, CancellationToken ct = default)
@@ -231,7 +231,7 @@ namespace Koan.Data.Core.Model
                 (payload, token) => Data<TEntity, TKey>.UpsertManyAsync(payload, partition, token),
                 (entity, token) => LoadPriorSnapshotAsync(entity, token, partition),
                 ct)
-            .ConfigureAwait(false);
+            ;
         }
 
         // Removal helpers
@@ -259,10 +259,10 @@ namespace Koan.Data.Core.Model
             var list = ids as IReadOnlyList<TKey> ?? ids.ToList();
             if (!EntityEventRegistry<TEntity, TKey>.HasRemovePipeline)
             {
-                return await Data<TEntity, TKey>.DeleteManyAsync(list, ct).ConfigureAwait(false);
+                return await Data<TEntity, TKey>.DeleteManyAsync(list, ct);
             }
 
-            var entities = await LoadEntitiesAsync(list, null, ct).ConfigureAwait(false);
+            var entities = await LoadEntitiesAsync(list, null, ct);
             if (entities.Count == 0)
             {
                 return 0;
@@ -272,7 +272,7 @@ namespace Koan.Data.Core.Model
                     entities,
                     (payload, token) => Data<TEntity, TKey>.DeleteManyAsync(ExtractKeys(payload), token),
                     ct)
-                .ConfigureAwait(false);
+                ;
         }
 
         public static Task<int> Remove(IEnumerable<TKey> ids, DataQueryOptions? options, CancellationToken ct = default)
@@ -305,10 +305,10 @@ namespace Koan.Data.Core.Model
             var list = ids as IReadOnlyList<TKey> ?? ids.ToList();
             if (!EntityEventRegistry<TEntity, TKey>.HasRemovePipeline)
             {
-                return await Data<TEntity, TKey>.DeleteManyAsync(list, partition, ct).ConfigureAwait(false);
+                return await Data<TEntity, TKey>.DeleteManyAsync(list, partition, ct);
             }
 
-            var entities = await LoadEntitiesAsync(list, partition, ct).ConfigureAwait(false);
+            var entities = await LoadEntitiesAsync(list, partition, ct);
             if (entities.Count == 0)
             {
                 return 0;
@@ -318,7 +318,7 @@ namespace Koan.Data.Core.Model
                     entities,
                     (payload, token) => Data<TEntity, TKey>.DeleteManyAsync(ExtractKeys(payload), partition, token),
                     ct)
-                .ConfigureAwait(false);
+                ;
         }
 
         private static ValueTask<TEntity?> LoadPriorSnapshotAsync(TEntity entity, CancellationToken cancellationToken, string? partition = null)
@@ -342,8 +342,8 @@ namespace Koan.Data.Core.Model
             foreach (var id in ids)
             {
                 var entity = partition is null
-                    ? await Data<TEntity, TKey>.GetAsync(id, cancellationToken).ConfigureAwait(false)
-                    : await Data<TEntity, TKey>.GetAsync(id, partition, cancellationToken).ConfigureAwait(false);
+                    ? await Data<TEntity, TKey>.GetAsync(id, cancellationToken)
+                    : await Data<TEntity, TKey>.GetAsync(id, partition, cancellationToken);
 
                 if (entity != null)
                 {
@@ -364,10 +364,10 @@ namespace Koan.Data.Core.Model
 
         public static async Task<int> Remove(string query, CancellationToken ct = default)
         {
-            var items = await Data<TEntity, TKey>.Query(query, ct).ConfigureAwait(false);
+            var items = await Data<TEntity, TKey>.Query(query, ct);
             if (!EntityEventRegistry<TEntity, TKey>.HasRemovePipeline)
             {
-                return await Data<TEntity, TKey>.DeleteManyAsync(items.Select(e => e.Id), ct).ConfigureAwait(false);
+                return await Data<TEntity, TKey>.DeleteManyAsync(items.Select(e => e.Id), ct);
             }
 
             if (items.Count == 0)
@@ -379,15 +379,15 @@ namespace Koan.Data.Core.Model
                     items,
                     (payload, token) => Data<TEntity, TKey>.DeleteManyAsync(ExtractKeys(payload), token),
                     ct)
-                .ConfigureAwait(false);
+                ;
         }
 
         public static async Task<int> Remove(string query, string partition, CancellationToken ct = default)
         {
-            var items = await Data<TEntity, TKey>.Query(query, partition, ct).ConfigureAwait(false);
+            var items = await Data<TEntity, TKey>.Query(query, partition, ct);
             if (!EntityEventRegistry<TEntity, TKey>.HasRemovePipeline)
             {
-                return await Data<TEntity, TKey>.DeleteManyAsync(items.Select(e => e.Id), partition, ct).ConfigureAwait(false);
+                return await Data<TEntity, TKey>.DeleteManyAsync(items.Select(e => e.Id), partition, ct);
             }
 
             if (items.Count == 0)
@@ -399,7 +399,7 @@ namespace Koan.Data.Core.Model
                     items,
                     (payload, token) => Data<TEntity, TKey>.DeleteManyAsync(ExtractKeys(payload), partition, token),
                     ct)
-                .ConfigureAwait(false);
+                ;
         }
 
         /// <summary>
@@ -749,7 +749,7 @@ namespace Koan.Data.Core.Model
             if (method == null) return null;
 
             var task = (Task)method.Invoke(null, new object[] { parentId, ct })!;
-            await task.ConfigureAwait(false);
+            await task;
 
             var resultProperty = task.GetType().GetProperty("Result");
             return resultProperty?.GetValue(task);
@@ -764,7 +764,7 @@ namespace Koan.Data.Core.Model
             if (allMethod == null) return new List<object>().AsReadOnly();
 
             var task = (Task)allMethod.Invoke(null, new object[] { ct })!;
-            await task.ConfigureAwait(false);
+            await task;
 
             var resultProperty = task.GetType().GetProperty("Result");
             var allResults = (System.Collections.IEnumerable?)resultProperty?.GetValue(task);
@@ -831,7 +831,7 @@ namespace Koan.Data.Core.Model
             if (allMethod == null) return new List<object>().AsReadOnly();
 
             var task = (Task)allMethod.Invoke(null, new object[] { ct })!;
-            await task.ConfigureAwait(false);
+            await task;
 
             var resultProperty = task.GetType().GetProperty("Result");
             var allResults = (System.Collections.IEnumerable?)resultProperty?.GetValue(task);

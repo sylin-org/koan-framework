@@ -38,7 +38,7 @@ public static class PipelineAiExtensions
                 var request = new AiEmbeddingsRequest { Model = options.Model };
                 request.Input.Add(text);
 
-                var response = await Ai.Embed(request, ct).ConfigureAwait(false);
+                var response = await Ai.Embed(request, ct);
                 var vector = response.Vectors.FirstOrDefault();
                 if (vector is null)
                 {

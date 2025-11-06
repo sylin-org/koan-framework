@@ -23,9 +23,11 @@ Directory.CreateDirectory(Path.Combine(builder.Environment.ContentRootPath, S5.R
 // AI, vector, and data adapters are auto-registered by their modules via Koan.Core discovery
 
 // Local services
-builder.Services.AddSingleton<IEmbeddingCache, EmbeddingCache>();
+builder.Services.AddMemoryCache();  // For sliding window cache
+// NOTE: IEmbeddingCache removed - embeddings now managed by framework via ARCH-0070
 builder.Services.AddSingleton<ISeedService, SeedService>();
 builder.Services.AddSingleton<IRecsService, RecsService>();
+builder.Services.AddSingleton<S5.Recs.Services.Pagination.IBandCacheService, S5.Recs.Services.Pagination.BandCacheService>();
 builder.Services.AddSingleton<IRecommendationSettingsProvider, RecommendationSettingsProvider>();
 builder.Services.AddSingleton<IRawCacheService, RawCacheService>();
 // Tag catalog options (censor list)
@@ -59,6 +61,16 @@ foreach (var t in parserTypes)
 
 // Register parser registry
 builder.Services.AddSingleton<IMediaParserRegistry, MediaParserRegistry>();
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ARCH-0069: Partition-Based Import Pipeline Workers
+// ═══════════════════════════════════════════════════════════════════════════
+builder.Services.AddSingleton<IImportOrchestrator, ImportOrchestrator>();
+builder.Services.AddHostedService<S5.Recs.Services.Workers.ImportWorker>();
+builder.Services.AddHostedService<S5.Recs.Services.Workers.ValidationWorker>();
+// VectorizationWorker obsolete - embeddings now generated automatically via [Embedding] attribute (ARCH-0070)
+//builder.Services.AddHostedService<S5.Recs.Services.Workers.VectorizationWorker>();
+builder.Services.AddHostedService<S5.Recs.Services.Workers.CatalogWorker>();
 
 // Couchbase adapter is auto-registered by its module via Koan.Core discovery
 

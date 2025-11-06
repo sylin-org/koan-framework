@@ -8,7 +8,7 @@ namespace Koan.Samples.Meridian.Services;
 
 public interface IPassageIndexer
 {
-    Task IndexAsync(List<Passage> passages, CancellationToken ct);
+    Task IndexAsync(string pipelineId, List<Passage> passages, CancellationToken ct);
 }
 
 public sealed class PassageIndexer : IPassageIndexer
@@ -28,7 +28,7 @@ public sealed class PassageIndexer : IPassageIndexer
         _cache = cache;
     }
 
-    public async Task IndexAsync(List<Passage> passages, CancellationToken ct)
+    public async Task IndexAsync(string pipelineId, List<Passage> passages, CancellationToken ct)
     {
         if (passages.Count == 0)
         {
@@ -38,7 +38,7 @@ public sealed class PassageIndexer : IPassageIndexer
         if (!VectorWorkflow<Passage>.IsAvailable(MeridianConstants.VectorProfile))
         {
             _logger.LogWarning("Vector workflow {Profile} unavailable; skipping indexing.", MeridianConstants.VectorProfile);
-            await _alerts.PublishWarning(passages[0].PipelineId, "vector-unavailable", $"Vector profile '{MeridianConstants.VectorProfile}' unavailable; retrieval falls back to lexical search.", ct);
+            await _alerts.PublishWarning(pipelineId, "vector-unavailable", $"Vector profile '{MeridianConstants.VectorProfile}' unavailable; retrieval falls back to lexical search.", ct);
             return;
         }
 
@@ -79,7 +79,25 @@ public sealed class PassageIndexer : IPassageIndexer
 
         if (payload.Count > 0)
         {
+            _logger.LogDebug("Attempting to upsert {Count} passages to Weaviate (profile: {Profile})",
+                payload.Count, MeridianConstants.VectorProfile);
+
             var result = await VectorWorkflow<Passage>.SaveMany(payload, MeridianConstants.VectorProfile, ct);
+
+            _logger.LogInformation("Weaviate SaveMany result: Documents={Docs}, Vectors={Vecs}, Payload={PayloadCount}",
+                result.Documents, result.Vectors, payload.Count);
+
+            if (result.Documents == 0)
+            {
+                _logger.LogWarning("Weaviate returned 0 documents! Expected {Expected}, got {Actual}. Vectors={Vecs}",
+                    payload.Count, result.Documents, result.Vectors);
+            }
+            else if (result.Documents < payload.Count)
+            {
+                _logger.LogWarning("Partial Weaviate upsert: {Actual}/{Expected} documents saved",
+                    result.Documents, payload.Count);
+            }
+
             _logger.LogInformation("Upserted {Count} passages into vector profile {Profile}.", result.Documents, MeridianConstants.VectorProfile);
         }
     }
@@ -87,7 +105,7 @@ public sealed class PassageIndexer : IPassageIndexer
     private static Dictionary<string, object?> BuildMetadata(Passage passage)
         => new()
         {
-            ["pipelineId"] = passage.PipelineId,
+            ["docId"] = passage.Id, // Required for VectorWorkflow to map Weaviate results back to entity IDs
             ["sourceDocumentId"] = passage.SourceDocumentId,
             ["sequenceNumber"] = passage.SequenceNumber,
             ["section"] = passage.Section

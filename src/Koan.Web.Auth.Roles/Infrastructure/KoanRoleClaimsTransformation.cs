@@ -25,7 +25,7 @@ public sealed class KoanRoleClaimsTransformation : IClaimsTransformation
     if (principal?.Identity?.IsAuthenticated != true) return principal ?? new ClaimsPrincipal();
 
         var currentStamp = principal.FindFirst(RoleClaimConstants.KoanRoleVersion)?.Value;
-        var result = await _service.ComputeAsync(principal).ConfigureAwait(false);
+        var result = await _service.ComputeAsync(principal);
         if (currentStamp == result.Stamp)
             return principal; // already enriched for this stamp
 

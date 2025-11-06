@@ -72,7 +72,7 @@ public sealed class ResizeOperator : IMediaOperator
         Image image;
         try
         {
-            image = await Image.LoadAsync(source, ct).ConfigureAwait(false);
+            image = await Image.LoadAsync(source, ct);
         }
         catch (Exception ex)
         {
@@ -99,7 +99,7 @@ public sealed class ResizeOperator : IMediaOperator
         image.Mutate(x => x.Resize(resizeOptions));
 
         // Preserve source format; quality handled by typeConverter when converting
-        await image.SaveAsPngAsync(destination, cancellationToken: ct).ConfigureAwait(false);
+        await image.SaveAsPngAsync(destination, cancellationToken: ct);
         return ("image/png", destination.CanSeek ? destination.Length : 0);
     }
 

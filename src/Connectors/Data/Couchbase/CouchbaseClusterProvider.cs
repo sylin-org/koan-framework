@@ -99,7 +99,7 @@ internal sealed class CouchbaseClusterProvider : IAsyncDisposable, IAdapterReadi
 
         try
         {
-            await _stateManager.WaitAsync(effectiveTimeout, ct).ConfigureAwait(false);
+            await _stateManager.WaitAsync(effectiveTimeout, ct);
         }
         catch (TimeoutException ex)
         {
@@ -142,7 +142,7 @@ internal sealed class CouchbaseClusterProvider : IAsyncDisposable, IAdapterReadi
             var auth = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{username}:{password}"));
             checkClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", auth);
 
-            var response = await checkClient.GetAsync($"{baseUrl}/pools/default", ct).ConfigureAwait(false);
+            var response = await checkClient.GetAsync($"{baseUrl}/pools/default", ct);
 
             // If 401 Unauthorized, cluster exists but our credentials are wrong (uninitialized or different creds)
             if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
@@ -154,7 +154,7 @@ internal sealed class CouchbaseClusterProvider : IAsyncDisposable, IAdapterReadi
             if (response.IsSuccessStatusCode)
             {
                 // Test if we can access the buckets endpoint - only works if properly initialized
-                var bucketResponse = await checkClient.GetAsync($"{baseUrl}/pools/default/buckets", ct).ConfigureAwait(false);
+                var bucketResponse = await checkClient.GetAsync($"{baseUrl}/pools/default/buckets", ct);
                 return bucketResponse.IsSuccessStatusCode;
             }
 
@@ -186,11 +186,11 @@ internal sealed class CouchbaseClusterProvider : IAsyncDisposable, IAdapterReadi
 
         // Use a fresh HttpClient instance for cluster initialization to avoid auth header contamination
         using var initClient = new HttpClient();
-        var response = await initClient.PostAsync($"{baseUrl}/clusterInit", initData, ct).ConfigureAwait(false);
+        var response = await initClient.PostAsync($"{baseUrl}/clusterInit", initData, ct);
 
         if (!response.IsSuccessStatusCode)
         {
-            var error = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+            var error = await response.Content.ReadAsStringAsync(ct);
             _logger?.LogWarning("Cluster initialization failed with status {StatusCode}: {Error}", response.StatusCode, error);
 
             // If cluster already exists, this is actually success
@@ -218,27 +218,27 @@ internal sealed class CouchbaseClusterProvider : IAsyncDisposable, IAdapterReadi
             {
                 // Try to connect to Couchbase web console using clean client
                 using var healthClient = new HttpClient();
-                var response = await healthClient.GetAsync($"{baseUrl}/ui/index.html", ct).ConfigureAwait(false);
+                var response = await healthClient.GetAsync($"{baseUrl}/ui/index.html", ct);
 
                 if (response.IsSuccessStatusCode)
                 {
                     _logger?.LogDebug("Couchbase web console is ready");
 
                     // Check if cluster is already initialized
-                    if (await IsClusterInitializedAsync(baseUrl, username, password, ct).ConfigureAwait(false))
+                    if (await IsClusterInitializedAsync(baseUrl, username, password, ct))
                     {
                         _logger?.LogDebug("Couchbase cluster is already initialized");
                         return true;
                     }
 
                     // Initialize cluster
-                    await InitializeClusterAsync(baseUrl, username, password, ct).ConfigureAwait(false);
+                    await InitializeClusterAsync(baseUrl, username, password, ct);
 
                     // Ensure bucket exists
-                    await EnsureBucketExistsAsync(baseUrl, username, password, bucketName, ct).ConfigureAwait(false);
+                    await EnsureBucketExistsAsync(baseUrl, username, password, bucketName, ct);
 
                     // Wait for N1QL service to become query-ready
-                    await WaitForN1QLServiceReadinessAsync(baseUrl, username, password, ct).ConfigureAwait(false);
+                    await WaitForN1QLServiceReadinessAsync(baseUrl, username, password, ct);
 
                     return true;
                 }
@@ -250,7 +250,7 @@ internal sealed class CouchbaseClusterProvider : IAsyncDisposable, IAdapterReadi
 
             if (i < maxRetries - 1) // Don't wait on the last iteration
             {
-                await Task.Delay(delayMs, ct).ConfigureAwait(false);
+                await Task.Delay(delayMs, ct);
             }
         }
 
@@ -267,7 +267,7 @@ internal sealed class CouchbaseClusterProvider : IAsyncDisposable, IAdapterReadi
             var auth = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{username}:{password}"));
             _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", auth);
 
-            var response = await _httpClient.GetAsync($"{baseUrl}/pools/default/buckets/{bucketName}", ct).ConfigureAwait(false);
+            var response = await _httpClient.GetAsync($"{baseUrl}/pools/default/buckets/{bucketName}", ct);
 
             if (response.IsSuccessStatusCode)
             {
@@ -287,11 +287,11 @@ internal sealed class CouchbaseClusterProvider : IAsyncDisposable, IAdapterReadi
                 new KeyValuePair<string, string>("flushEnabled", "0")
             });
 
-            var bucketResponse = await _httpClient.PostAsync($"{baseUrl}/pools/default/buckets", bucketData, ct).ConfigureAwait(false);
+            var bucketResponse = await _httpClient.PostAsync($"{baseUrl}/pools/default/buckets", bucketData, ct);
 
             if (!bucketResponse.IsSuccessStatusCode)
             {
-                var error = await bucketResponse.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+                var error = await bucketResponse.Content.ReadAsStringAsync(ct);
                 _logger?.LogWarning("Bucket creation failed with status {StatusCode}: {Error}", bucketResponse.StatusCode, error);
 
                 // If bucket already exists, this is success
@@ -307,18 +307,18 @@ internal sealed class CouchbaseClusterProvider : IAsyncDisposable, IAdapterReadi
                 _logger?.LogInformation("Bucket {BucketName} created successfully", bucketName);
 
                 // Wait for bucket to be fully ready before continuing
-                await Task.Delay(2000, ct).ConfigureAwait(false);
+                await Task.Delay(2000, ct);
 
                 // Verify bucket is accessible
                 for (int i = 0; i < 5; i++)
                 {
-                    var verifyResponse = await _httpClient.GetAsync($"{baseUrl}/pools/default/buckets/{bucketName}", ct).ConfigureAwait(false);
+                    var verifyResponse = await _httpClient.GetAsync($"{baseUrl}/pools/default/buckets/{bucketName}", ct);
                     if (verifyResponse.IsSuccessStatusCode)
                     {
                         _logger?.LogDebug("Bucket {BucketName} verified accessible", bucketName);
                         break;
                     }
-                    if (i < 4) await Task.Delay(1000, ct).ConfigureAwait(false);
+                    if (i < 4) await Task.Delay(1000, ct);
                 }
             }
         }
@@ -337,14 +337,14 @@ internal sealed class CouchbaseClusterProvider : IAsyncDisposable, IAdapterReadi
     public async ValueTask<CouchbaseCollectionContext> GetCollectionContextAsync(string collectionName, CancellationToken ct)
     {
         var options = _options.CurrentValue;
-        var cluster = await EnsureClusterAsync(options, ct).ConfigureAwait(false);
-        var bucket = await EnsureBucketAsync(cluster, options, ct).ConfigureAwait(false);
+        var cluster = await EnsureClusterAsync(options, ct);
+        var bucket = await EnsureBucketAsync(cluster, options, ct);
         var scopeName = string.IsNullOrWhiteSpace(options.Scope) ? "_default" : options.Scope!;
-        var scope = await GetScopeAsync(bucket, scopeName).ConfigureAwait(false);
+        var scope = await GetScopeAsync(bucket, scopeName);
         var finalCollection = string.IsNullOrWhiteSpace(collectionName)
             ? (!string.IsNullOrWhiteSpace(options.Collection) ? options.Collection! : "_default")
             : collectionName;
-        var collection = await GetCollectionAsync(scope, scopeName, finalCollection).ConfigureAwait(false);
+        var collection = await GetCollectionAsync(scope, scopeName, finalCollection);
         if (_stateManager.State == AdapterReadinessState.Initializing)
         {
             _stateManager.TransitionTo(AdapterReadinessState.Ready);
@@ -359,7 +359,7 @@ internal sealed class CouchbaseClusterProvider : IAsyncDisposable, IAdapterReadi
             return _cluster;
         }
 
-        await _sync.WaitAsync(ct).ConfigureAwait(false);
+        await _sync.WaitAsync(ct);
         try
         {
             if (_cluster is null)
@@ -387,7 +387,7 @@ internal sealed class CouchbaseClusterProvider : IAsyncDisposable, IAdapterReadi
                 }
 
                 // Wait for Couchbase to be ready and check if cluster needs initialization
-                if (!await WaitForCouchbaseAndCheckInitializationAsync(baseUrl, username, password, options.Bucket, ct).ConfigureAwait(false))
+                if (!await WaitForCouchbaseAndCheckInitializationAsync(baseUrl, username, password, options.Bucket, ct))
                 {
                     _logger?.LogDebug("Couchbase cluster initialization was not needed or failed gracefully");
                 }
@@ -399,10 +399,10 @@ internal sealed class CouchbaseClusterProvider : IAsyncDisposable, IAdapterReadi
                 };
 
                 _logger?.LogDebug("Connecting to Couchbase cluster at {ConnectionString}", Redaction.DeIdentify(options.ConnectionString));
-                _cluster = await Cluster.ConnectAsync(options.ConnectionString, clusterOptions).ConfigureAwait(false);
+                _cluster = await Cluster.ConnectAsync(options.ConnectionString, clusterOptions);
 
                 _logger?.LogDebug("Waiting for Couchbase cluster to finish bootstrapping");
-                await _cluster.WaitUntilReadyAsync(TimeSpan.FromSeconds(30)).ConfigureAwait(false);
+                await _cluster.WaitUntilReadyAsync(TimeSpan.FromSeconds(30));
                 _logger?.LogDebug("Couchbase cluster bootstrap completed");
             }
         }
@@ -421,7 +421,7 @@ internal sealed class CouchbaseClusterProvider : IAsyncDisposable, IAdapterReadi
             return _bucket;
         }
 
-        await _sync.WaitAsync(ct).ConfigureAwait(false);
+        await _sync.WaitAsync(ct);
         try
         {
             if (_bucket is null || !string.Equals(_bucketName, options.Bucket, StringComparison.OrdinalIgnoreCase))
@@ -436,10 +436,10 @@ internal sealed class CouchbaseClusterProvider : IAsyncDisposable, IAdapterReadi
                 {
                     try
                     {
-                        _bucket = await cluster.BucketAsync(options.Bucket).ConfigureAwait(false);
+                        _bucket = await cluster.BucketAsync(options.Bucket);
 
                         // Wait for bucket to be ready before proceeding
-                        await _bucket.WaitUntilReadyAsync(TimeSpan.FromSeconds(10)).ConfigureAwait(false);
+                        await _bucket.WaitUntilReadyAsync(TimeSpan.FromSeconds(10));
 
                         _bucketName = options.Bucket;
                         _scopes.Clear();
@@ -456,7 +456,7 @@ internal sealed class CouchbaseClusterProvider : IAsyncDisposable, IAdapterReadi
                     {
                         var delay = baseDelayMs * (int)Math.Pow(2, attempt);
                         _logger?.LogDebug(ex, "Bucket access attempt {Attempt}/{MaxRetries} failed, retrying in {Delay}ms", attempt + 1, maxRetries, delay);
-                        await Task.Delay(delay, ct).ConfigureAwait(false);
+                        await Task.Delay(delay, ct);
                     }
                 }
             }
@@ -483,7 +483,7 @@ internal sealed class CouchbaseClusterProvider : IAsyncDisposable, IAdapterReadi
         }
         else
         {
-            scope = await bucket.ScopeAsync(scopeName).ConfigureAwait(false);
+            scope = await bucket.ScopeAsync(scopeName);
         }
 
         _scopes[scopeName] = scope;
@@ -507,17 +507,17 @@ internal sealed class CouchbaseClusterProvider : IAsyncDisposable, IAdapterReadi
         {
             try
             {
-                collection = await scope.CollectionAsync(collectionName).ConfigureAwait(false);
+                collection = await scope.CollectionAsync(collectionName);
             }
             catch (Exception ex)
             {
                 _logger?.LogDebug(ex, "Collection {CollectionName} not found, attempting to create it", collectionName);
 
                 // Try to create the collection if it doesn't exist
-                await EnsureCollectionExistsAsync(scope, scopeName, collectionName).ConfigureAwait(false);
+                await EnsureCollectionExistsAsync(scope, scopeName, collectionName);
 
                 // Now try to get it again
-                collection = await scope.CollectionAsync(collectionName).ConfigureAwait(false);
+                collection = await scope.CollectionAsync(collectionName);
             }
         }
 
@@ -538,7 +538,7 @@ internal sealed class CouchbaseClusterProvider : IAsyncDisposable, IAdapterReadi
             {
                 try
                 {
-                    await collectionManager.CreateScopeAsync(scopeName).ConfigureAwait(false);
+                    await collectionManager.CreateScopeAsync(scopeName);
                 }
                 catch (global::Couchbase.CouchbaseException ex) when (IsAlreadyExists(ex))
                 {
@@ -548,7 +548,7 @@ internal sealed class CouchbaseClusterProvider : IAsyncDisposable, IAdapterReadi
 
             // Create the collection
             var settings = new CreateCollectionSettings();
-            await collectionManager.CreateCollectionAsync(scopeName, collectionName, settings).ConfigureAwait(false);
+            await collectionManager.CreateCollectionAsync(scopeName, collectionName, settings);
             _logger?.LogInformation("Created Couchbase collection {ScopeName}.{CollectionName}", scopeName, collectionName);
         }
         catch (global::Couchbase.CouchbaseException ex) when (IsAlreadyExists(ex))
@@ -591,11 +591,11 @@ internal sealed class CouchbaseClusterProvider : IAsyncDisposable, IAdapterReadi
                     new KeyValuePair<string, string>("statement", "SELECT 1 AS test")
                 });
 
-                var response = await queryClient.PostAsync($"{baseUrl}/query/service", queryData, ct).ConfigureAwait(false);
+                var response = await queryClient.PostAsync($"{baseUrl}/query/service", queryData, ct);
 
                 if (response.IsSuccessStatusCode)
                 {
-                    var responseContent = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+                    var responseContent = await response.Content.ReadAsStringAsync(ct);
                     if (responseContent.Contains("\"test\":1") || responseContent.Contains("\"status\":\"success\""))
                     {
                         _logger?.LogInformation("N1QL query service is ready and responding");
@@ -610,7 +610,7 @@ internal sealed class CouchbaseClusterProvider : IAsyncDisposable, IAdapterReadi
 
             if (i < maxRetries - 1) // Don't wait on the last iteration
             {
-                await Task.Delay(delayMs, ct).ConfigureAwait(false);
+                await Task.Delay(delayMs, ct);
             }
         }
 
@@ -627,7 +627,7 @@ internal sealed class CouchbaseClusterProvider : IAsyncDisposable, IAdapterReadi
         {
             var options = _options.CurrentValue;
             var collectionName = options.Collection ?? string.Empty;
-            await GetCollectionContextAsync(collectionName, ct).ConfigureAwait(false);
+            await GetCollectionContextAsync(collectionName, ct);
 
             if (_stateManager.State == AdapterReadinessState.Degraded)
             {
@@ -650,7 +650,7 @@ internal sealed class CouchbaseClusterProvider : IAsyncDisposable, IAdapterReadi
     {
         if (_cluster is IAsyncDisposable asyncDisposable)
         {
-            await asyncDisposable.DisposeAsync().ConfigureAwait(false);
+            await asyncDisposable.DisposeAsync();
         }
         else
         {

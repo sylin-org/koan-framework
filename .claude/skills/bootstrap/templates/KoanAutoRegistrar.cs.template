@@ -1,0 +1,81 @@
+// KoanAutoRegistrar Template for Application-Specific Services
+// Place in: /Initialization/KoanAutoRegistrar.cs
+// Framework auto-discovers and executes this at startup
+
+using Koan.Core;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
+
+namespace MyApp.Initialization;
+
+/// <summary>
+/// Auto-registrar for application-specific services.
+/// Framework discovers this via IKoanAutoRegistrar interface.
+/// </summary>
+public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
+{
+    /// <summary>
+    /// Module name displayed in boot reports and logs.
+    /// </summary>
+    public string ModuleName => "MyApp";
+
+    /// <summary>
+    /// Module version from assembly metadata.
+    /// </summary>
+    public string? ModuleVersion =>
+        typeof(KoanAutoRegistrar).Assembly.GetName().Version?.ToString();
+
+    /// <summary>
+    /// Register application-specific services.
+    /// Called automatically by framework during startup.
+    /// </summary>
+    public void Initialize(IServiceCollection services)
+    {
+        // Register business logic services
+        services.AddScoped<ITodoService, TodoService>();
+        services.AddScoped<IEmailService, EmailService>();
+
+        // Register background services
+        services.AddHostedService<CleanupWorker>();
+        services.AddHostedService<NotificationWorker>();
+
+        // Register infrastructure services
+        services.AddSingleton<ICacheService, RedisCacheService>();
+        services.AddScoped<IStorageService, LocalStorageService>();
+
+        // Environment-specific registration
+        if (KoanEnv.IsDevelopment)
+        {
+            services.AddScoped<ISeedService, DevelopmentSeedService>();
+        }
+
+        if (KoanEnv.IsProduction)
+        {
+            services.AddScoped<IMonitoringService, ApplicationInsightsMonitoring>();
+        }
+    }
+
+    /// <summary>
+    /// Add information to boot report.
+    /// Visible in logs and diagnostics.
+    /// </summary>
+    public void Describe(BootReport report, IConfiguration cfg, IHostEnvironment env)
+    {
+        report.AddModule(ModuleName, ModuleVersion);
+        report.AddNote("Application services registered");
+        report.AddNote($"Environment: {env.EnvironmentName}");
+        report.AddNote("Services: TodoService, EmailService, CleanupWorker");
+
+        // Add warnings for missing configuration
+        if (!cfg.GetSection("Email:Smtp").Exists())
+        {
+            report.AddWarning("Email configuration missing - notifications disabled");
+        }
+
+        if (!cfg.GetSection("Cache:Redis").Exists() && env.IsProduction())
+        {
+            report.AddWarning("Redis configuration missing in production environment");
+        }
+    }
+}

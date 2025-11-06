@@ -74,7 +74,7 @@ public sealed class LMStudioOrchestrationEvaluator : BaseOrchestrationEvaluator
         {
             Logger?.LogDebug("[LMStudio] Validating host {Host}", hostResult.HostEndpoint);
             var baseUrl = EnsureHttpUrl(hostResult.HostEndpoint!);
-            return await TryLmStudioConnectionAsync(baseUrl).ConfigureAwait(false);
+            return await TryLmStudioConnectionAsync(baseUrl);
         }
         catch (Exception ex)
         {
@@ -112,7 +112,7 @@ public sealed class LMStudioOrchestrationEvaluator : BaseOrchestrationEvaluator
             {
                 $"koan-lmstudio-{context.SessionId}:/data"
             }
-        }).ConfigureAwait(false);
+        });
     }
 
     private async Task<bool> TryLmStudioConnectionAsync(string baseUrl)

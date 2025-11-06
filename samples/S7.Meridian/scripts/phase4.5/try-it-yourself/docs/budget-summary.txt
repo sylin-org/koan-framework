@@ -1,0 +1,39 @@
+Budget Summary Report
+Enterprise Architecture Modernization Initiative
+Fiscal Year 2026
+
+Total Approved Budget: ,250,000
+
+Breakdown by Category:
+
+1. Professional Services: ,000
+   - External consultants and architects
+   - Vendor implementation services
+   - Training and knowledge transfer
+
+2. Infrastructure: ,000
+   - Cloud infrastructure costs
+   - Licensing and subscriptions
+   - Hardware for hybrid components
+
+3. Internal Resources: ,000
+   - Internal team allocation
+   - Overtime and extended hours
+   - Cross-training programs
+
+4. Contingency: ,000
+   - Risk mitigation reserve
+   - Scope change buffer
+   - Emergency support allocation
+
+Current Expenditure: 
+Remaining Budget: ,250,000
+
+Payment Schedule:
+- Q1 2026: ,500 (25%)
+- Q2 2026: ,500 (25%)
+- Q3 2026: ,500 (25%)
+- Q4 2026: ,500 (25%)
+
+CFO Approval: Required by 2025-11-15
+Finance Contact: Amanda Martinez, amartinez@company.example

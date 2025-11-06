@@ -35,7 +35,7 @@ public readonly struct CacheTagSet
             return false;
         }
 
-        var count = await _client.CountTagsAsync(_tags, ct).ConfigureAwait(false);
+        var count = await _client.CountTagsAsync(_tags, ct);
         return count > 0;
     }
 

@@ -28,7 +28,7 @@ public sealed class CopyTransferBuilder<TEntity, TKey> : EntityTransferBuilderBa
         var batchCounter = 0;
         var totalProcessed = 0;
 
-        var items = await FetchEntitiesAsync(FromContext, cancellationToken).ConfigureAwait(false);
+        var items = await FetchEntitiesAsync(FromContext, cancellationToken);
         var readCount = items.Count;
 
         var progress = await UpsertBatchesAsync(
@@ -40,7 +40,7 @@ public sealed class CopyTransferBuilder<TEntity, TKey> : EntityTransferBuilderBa
             audit,
             cancellationToken,
             batchCounter,
-            totalProcessed).ConfigureAwait(false);
+            totalProcessed);
 
         var copied = progress.Copied;
         batchCounter = progress.BatchCounter;

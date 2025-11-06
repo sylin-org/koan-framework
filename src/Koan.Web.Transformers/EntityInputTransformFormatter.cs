@@ -72,12 +72,12 @@ internal sealed class EntityInputTransformFormatter : InputFormatter
         var body = http.Request.Body;
         if (isMany)
         {
-            var entities = await selection.Invoker.ParseManyAsync(body, contentType, http).ConfigureAwait(false);
+            var entities = await selection.Invoker.ParseManyAsync(body, contentType, http);
             return await InputFormatterResult.SuccessAsync(entities);
         }
         else
         {
-            var entity = await selection.Invoker.ParseAsync(body, contentType, http).ConfigureAwait(false);
+            var entity = await selection.Invoker.ParseAsync(body, contentType, http);
             return await InputFormatterResult.SuccessAsync(entity);
         }
     }

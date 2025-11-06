@@ -78,7 +78,7 @@ internal sealed class LMStudioDiscoveryService : IHostedService
                 for (var i = 0; i < explicitUrls.Length; i++)
                 {
                     var url = explicitUrls[i];
-                    var caps = await GetCapabilitiesAsync(url, defaultModel, cancellationToken).ConfigureAwait(false);
+                    var caps = await GetCapabilitiesAsync(url, defaultModel, cancellationToken);
                     members.Add(new AiMemberDefinition
                     {
                         Name = $"lmstudio::explicit-{i + 1}",
@@ -93,7 +93,7 @@ internal sealed class LMStudioDiscoveryService : IHostedService
             else
             {
                 KoanLog.BootInfo(_logger, LogActions.Discovery, "discovery-mode");
-                var discovered = await DiscoverInstances(defaultModel, cancellationToken).ConfigureAwait(false);
+                var discovered = await DiscoverInstances(defaultModel, cancellationToken);
                 members.AddRange(discovered);
                 KoanLog.BootInfo(_logger, LogActions.Discovery, "discovered", ("count", discovered.Count));
 
@@ -103,7 +103,7 @@ internal sealed class LMStudioDiscoveryService : IHostedService
                     for (var i = 0; i < additionalUrls.Length; i++)
                     {
                         var url = additionalUrls[i];
-                        var caps = await GetCapabilitiesAsync(url, defaultModel, cancellationToken).ConfigureAwait(false);
+                        var caps = await GetCapabilitiesAsync(url, defaultModel, cancellationToken);
                         members.Add(new AiMemberDefinition
                         {
                             Name = $"lmstudio::additional-{i + 1}",
@@ -222,9 +222,9 @@ internal sealed class LMStudioDiscoveryService : IHostedService
 
         foreach (var (name, url, order) in candidates)
         {
-            if (await IsHealthy(url, ct).ConfigureAwait(false))
+            if (await IsHealthy(url, ct))
             {
-                var caps = await GetCapabilitiesAsync(url, defaultModel, ct).ConfigureAwait(false);
+                var caps = await GetCapabilitiesAsync(url, defaultModel, ct);
                 results.Add(new AiMemberDefinition
                 {
                     Name = name,
@@ -251,7 +251,7 @@ internal sealed class LMStudioDiscoveryService : IHostedService
         try
         {
             using var httpClient = new HttpClient { Timeout = TimeSpan.FromMilliseconds(750) };
-            var response = await httpClient.GetAsync(new Uri(new Uri(baseUrl.TrimEnd('/')), Constants.Discovery.ModelsPath), ct).ConfigureAwait(false);
+            var response = await httpClient.GetAsync(new Uri(new Uri(baseUrl.TrimEnd('/')), Constants.Discovery.ModelsPath), ct);
             return response.IsSuccessStatusCode;
         }
         catch

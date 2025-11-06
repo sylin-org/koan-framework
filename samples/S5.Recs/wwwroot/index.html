@@ -244,7 +244,15 @@
               <button id="tagsSortAlphaBtn" class="px-2 py-1 text-xs text-gray-400 hover:text-white rounded transition-colors" type="button">A–Z</button>
             </div>
           </div>
-          <input id="tagsSearch" placeholder="Search tags..." class="bg-slate-800 text-white rounded px-3 py-2 border border-slate-700 text-sm w-full md:w-64" />
+          <div class="flex items-center gap-3">
+            <!-- Show Censored Toggle -->
+            <label class="flex items-center gap-2 cursor-pointer" title="Show tags that are normally filtered">
+              <input type="checkbox" id="showCensoredToggle" class="sr-only peer">
+              <div class="relative w-9 h-5 bg-slate-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-600"></div>
+              <span class="text-xs text-gray-400">Show All Tags</span>
+            </label>
+            <input id="tagsSearch" placeholder="Search tags..." class="bg-slate-800 text-white rounded px-3 py-2 border border-slate-700 text-sm w-full md:w-64" />
+          </div>
         </div>
   <div id="allTagsList" class="flex flex-wrap gap-2 max-h-48 overflow-y-auto scroll-dark"></div>
       </div>
@@ -334,9 +342,24 @@
   <!-- Toasts -->
   <div id="toastContainer" class="fixed top-4 right-4 z-[100] space-y-2" aria-live="polite" role="status"></div>
 
-  <!-- More button -->
-  <div class="flex justify-center my-8">
-    <button id="moreBtn" class="hidden px-5 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg" onclick="loadMore()">More</button>
+  <!-- Infinite Scroll Sentinel & Loading States -->
+  <div class="flex flex-col items-center my-8 space-y-4">
+    <!-- Loading spinner (shown while fetching more) -->
+    <div id="loadingMoreState" class="hidden">
+      <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
+      <p class="text-gray-400 mt-2 text-sm">Loading more...</p>
+    </div>
+
+    <!-- Sentinel element for Intersection Observer -->
+    <div id="scrollSentinel" class="h-4 w-full"></div>
+
+    <!-- End of results message -->
+    <div id="endOfResults" class="hidden text-center py-4">
+      <div class="text-gray-500 text-sm">
+        <i class="fas fa-check-circle mr-2"></i>
+        You've reached the end
+      </div>
+    </div>
   </div>
 
   <!-- Page logic moved to /js/index.page.js -->

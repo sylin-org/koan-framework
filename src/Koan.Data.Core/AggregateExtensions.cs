@@ -93,7 +93,7 @@ public static class AggregateExtensions
     public static async Task<TKey> UpsertId<TEntity, TKey>(this TEntity model, CancellationToken ct = default)
         where TEntity : class, IEntity<TKey>
         where TKey : notnull
-        => (await Model.Entity<TEntity, TKey>.UpsertAsync(model, ct).ConfigureAwait(false)).Id;
+        => (await Model.Entity<TEntity, TKey>.UpsertAsync(model, ct)).Id;
 
     // Convenience for string key: UpsertId()
     /// <summary>
@@ -116,7 +116,7 @@ public static class AggregateExtensions
         var repo = getRepo.MakeGenericMethod(aggType, keyType).Invoke(data, System.Array.Empty<object>())!;
         var upsert = repo.GetType().GetMethod("UpsertAsync")!;
         var task = (Task)upsert.Invoke(repo, new object[] { model, ct })!;
-        await task.ConfigureAwait(false);
+        await task;
         var resultProp = task.GetType().GetProperty("Result");
         return resultProp?.GetValue(task);
     }
@@ -136,7 +136,7 @@ public static class AggregateExtensions
         var repo = getRepo.MakeGenericMethod(aggType, keyType).Invoke(data, System.Array.Empty<object>())!;
         var del = repo.GetType().GetMethod("DeleteAsync")!;
         var task = (Task)del.Invoke(repo, new object[] { id, ct })!;
-        await task.ConfigureAwait(false);
+        await task;
         var resultProp = task.GetType().GetProperty("Result");
         return resultProp is not null && resultProp.GetValue(task) is bool b && b;
     }
@@ -229,13 +229,13 @@ public static class AggregateExtensions
         where TEntity : class, IEntity<TKey>
         where TKey : notnull
     {
-        var existing = await Data<TEntity, TKey>.All(ct).ConfigureAwait(false);
+        var existing = await Data<TEntity, TKey>.All(ct);
         if (existing.Count > 0)
         {
             var ids = existing.Select(e => e.Id);
-            await Data<TEntity, TKey>.DeleteManyAsync(ids, ct).ConfigureAwait(false);
+            await Data<TEntity, TKey>.DeleteManyAsync(ids, ct);
         }
-        return await Data<TEntity, TKey>.UpsertManyAsync(models, ct).ConfigureAwait(false);
+        return await Data<TEntity, TKey>.UpsertManyAsync(models, ct);
     }
 
     // String-key convenience delegates to generic

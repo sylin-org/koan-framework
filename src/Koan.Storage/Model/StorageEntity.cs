@@ -44,21 +44,21 @@ public abstract class StorageEntity<TEntity> : Entity<TEntity>, IStorageObject
     public static async Task<TEntity> CreateTextFile(string name, string content, string? contentType = "text/plain; charset=utf-8", CancellationToken ct = default)
     {
         var (profile, container) = ResolveBinding();
-        var obj = await Storage().CreateTextFile(name, content, contentType, profile, container, ct).ConfigureAwait(false);
+        var obj = await Storage().CreateTextFile(name, content, contentType, profile, container, ct);
         return From(obj);
     }
 
     public static async Task<TEntity> Create<TDoc>(string name, TDoc value, JsonSerializerSettings? options = null, string contentType = "application/json; charset=utf-8", CancellationToken ct = default)
     {
         var (profile, container) = ResolveBinding();
-        var obj = await Storage().CreateJson(name, value, options, profile, container, contentType, ct).ConfigureAwait(false);
+        var obj = await Storage().CreateJson(name, value, options, profile, container, contentType, ct);
         return From(obj);
     }
 
     public static async Task<TEntity> Create(string name, ReadOnlyMemory<byte> bytes, string? contentType = "application/octet-stream", CancellationToken ct = default)
     {
         var (profile, container) = ResolveBinding();
-        var obj = await Storage().Create(name, bytes, contentType, profile, container, ct).ConfigureAwait(false);
+        var obj = await Storage().Create(name, bytes, contentType, profile, container, ct);
         return From(obj);
     }
 
@@ -69,7 +69,7 @@ public abstract class StorageEntity<TEntity> : Entity<TEntity>, IStorageObject
     public static async Task<TEntity> Onboard(string name, Stream content, string? contentType = null, CancellationToken ct = default)
     {
         var (profile, container) = ResolveBinding();
-        var obj = await Storage().Onboard(name, content, contentType, profile, container, ct).ConfigureAwait(false);
+        var obj = await Storage().Onboard(name, content, contentType, profile, container, ct);
         return From(obj);
     }
 
@@ -77,44 +77,44 @@ public abstract class StorageEntity<TEntity> : Entity<TEntity>, IStorageObject
     public async Task<string> ReadAllText(Encoding? encoding = null, CancellationToken ct = default)
     {
         var (profile, container) = InstanceBinding();
-        return await Storage().ReadAllText(profile, container, Key, encoding, ct).ConfigureAwait(false);
+        return await Storage().ReadAllText(profile, container, Key, encoding, ct);
     }
 
     public async Task<byte[]> ReadAllBytes(CancellationToken ct = default)
     {
         var (profile, container) = InstanceBinding();
-        return await Storage().ReadAllBytes(profile, container, Key, ct).ConfigureAwait(false);
+        return await Storage().ReadAllBytes(profile, container, Key, ct);
     }
 
     public async Task<string> ReadRangeAsString(long from, long to, Encoding? encoding = null, CancellationToken ct = default)
     {
         var (profile, container) = InstanceBinding();
-        return await Storage().ReadRangeAsString(profile, container, Key, from, to, encoding, ct).ConfigureAwait(false);
+        return await Storage().ReadRangeAsString(profile, container, Key, from, to, encoding, ct);
     }
 
     // Stream-based reads (DX helpers)
     public async Task<Stream> OpenRead(CancellationToken ct = default)
     {
         var (profile, container) = InstanceBinding();
-        return await Storage().ReadAsync(profile, container, Key, ct).ConfigureAwait(false);
+        return await Storage().ReadAsync(profile, container, Key, ct);
     }
 
     public async Task<(Stream Stream, long? Length)> OpenReadRange(long? from = null, long? to = null, CancellationToken ct = default)
     {
         var (profile, container) = InstanceBinding();
-        return await Storage().ReadRangeAsync(profile, container, Key, from, to, ct).ConfigureAwait(false);
+        return await Storage().ReadRangeAsync(profile, container, Key, from, to, ct);
     }
 
     public async Task<ObjectStat?> Head(CancellationToken ct = default)
     {
         var (profile, container) = InstanceBinding();
-        return await Storage().HeadAsync(profile, container, Key, ct).ConfigureAwait(false);
+        return await Storage().HeadAsync(profile, container, Key, ct);
     }
 
     public async Task<bool> Delete(CancellationToken ct = default)
     {
         var (profile, container) = InstanceBinding();
-        return await Storage().DeleteAsync(profile, container, Key, ct).ConfigureAwait(false);
+        return await Storage().DeleteAsync(profile, container, Key, ct);
     }
 
     public async Task<TTarget> CopyTo<TTarget>(CancellationToken ct = default)
@@ -125,7 +125,7 @@ public abstract class StorageEntity<TEntity> : Entity<TEntity>, IStorageObject
             ? ("", "")
             : InstanceBinding();
         var (targetProfile, targetContainer) = ResolveBindingFor<TTarget>();
-        var obj = await Storage().TransferToProfileAsync(sourceProfile, sourceContainer, Key, targetProfile, targetContainer, deleteSource: false, ct).ConfigureAwait(false);
+        var obj = await Storage().TransferToProfileAsync(sourceProfile, sourceContainer, Key, targetProfile, targetContainer, deleteSource: false, ct);
         return To<TTarget>(obj);
     }
 
@@ -136,7 +136,7 @@ public abstract class StorageEntity<TEntity> : Entity<TEntity>, IStorageObject
             ? ("", "")
             : InstanceBinding();
         var (targetProfile, targetContainer) = ResolveBindingFor<TTarget>();
-        var obj = await Storage().TransferToProfileAsync(sourceProfile, sourceContainer, Key, targetProfile, targetContainer, deleteSource: true, ct).ConfigureAwait(false);
+        var obj = await Storage().TransferToProfileAsync(sourceProfile, sourceContainer, Key, targetProfile, targetContainer, deleteSource: true, ct);
         return To<TTarget>(obj);
     }
 

@@ -78,9 +78,9 @@ public sealed class HttpSseRpcBridge : IAsyncDisposable
     {
         try
         {
-            await foreach (var envelope in _requests.Reader.ReadAllAsync(_cts.Token).ConfigureAwait(false))
+            await foreach (var envelope in _requests.Reader.ReadAllAsync(_cts.Token))
             {
-                await DispatchAsync(envelope, _cts.Token).ConfigureAwait(false);
+                await DispatchAsync(envelope, _cts.Token);
             }
         }
         catch (OperationCanceledException)
@@ -109,10 +109,10 @@ public sealed class HttpSseRpcBridge : IAsyncDisposable
             switch (envelope.Method)
             {
                 case "tools/list":
-                    await HandleToolsListAsync(envelope, cancellationToken).ConfigureAwait(false);
+                    await HandleToolsListAsync(envelope, cancellationToken);
                     break;
                 case "tools/call":
-                    await HandleToolsCallAsync(envelope, cancellationToken).ConfigureAwait(false);
+                    await HandleToolsCallAsync(envelope, cancellationToken);
                     break;
                 case "ping":
                     var pong = new JObject { ["jsonrpc"] = "2.0", ["id"] = CloneId(envelope.Id), ["result"] = "pong" };
@@ -136,7 +136,7 @@ public sealed class HttpSseRpcBridge : IAsyncDisposable
 
     private async Task HandleToolsListAsync(JsonRpcEnvelope envelope, CancellationToken cancellationToken)
     {
-        var response = await _handler.ListToolsAsync(cancellationToken).ConfigureAwait(false);
+        var response = await _handler.ListToolsAsync(cancellationToken);
         var filtered = response.Tools
             .Where(tool => _registry.TryGetTool(tool.Name, out var registration, out var definition) && HasAccess(registration, definition))
             .ToArray();
@@ -204,7 +204,7 @@ public sealed class HttpSseRpcBridge : IAsyncDisposable
             Arguments = arguments
         };
 
-        var result = await _handler.CallToolAsync(callParams, cancellationToken).ConfigureAwait(false);
+        var result = await _handler.CallToolAsync(callParams, cancellationToken);
         var node = JToken.FromObject(result, JsonSerializer.Create(SerializerSettings));
         if (node is null)
         {
@@ -322,7 +322,7 @@ public sealed class HttpSseRpcBridge : IAsyncDisposable
 
         try
         {
-            await _processingTask.ConfigureAwait(false);
+            await _processingTask;
         }
         catch (OperationCanceledException)
         {

@@ -110,7 +110,7 @@ public sealed class JintCodeExecutor : Koan.Mcp.CodeExecution.ICodeExecutor
                         engine.Invoke("run");
                 }
 
-            }, cancellationToken).ConfigureAwait(false);
+            }, cancellationToken);
 
             sw.Stop();
 

@@ -499,6 +499,19 @@ public class OllamaAdapter : IAiAdapter {
 }
 ```
 
+#### Concurrency Guard (2025-10 Update)
+
+**Inputs:** Ollama inference requests dispatched through Koan adapters.  
+**Outputs:** Queued execution once available slots free up; upstream callers receive responses without local service saturation.  
+**Failure Modes:** Calls cancel if the client token is cancelled while queued; requests still surface HTTP errors from Ollama when executed.  
+**Policy:** `Koan:Ai:Provider:Ollama:MaxConcurrentRequests` (or `Koan:Ai:Ollama:MaxConcurrentRequests`) limits in-flight calls per adapter instance; defaults to `3`. Set to `0` to disable throttling.
+
+- **Edge: cancellation while waiting** — limiter releases immediately; caller observes the original cancellation token.  
+- **Edge: streaming enumerators** — semaphore slot is held for the entire stream lifespan to avoid interleaving server responses.  
+- **Edge: embedding batches** — batching inside a single request reuses one slot; parallel embedding calls still queue.
+
+This guard keeps local Ollama instances from timing out under burst load while preserving deterministic throughput. Telemetry logs a debug entry if waits exceed one second, aiding diagnosis of contention hot spots.
+
 ## Developer API
 
 ### Capability-First Static Methods

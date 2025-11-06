@@ -85,18 +85,18 @@ public abstract class EntityTransferBuilderBase<TEntity, TKey, TBuilder>
         {
             try
             {
-                materialized = await Data<TEntity, TKey>.Query(Predicate, cancellationToken).ConfigureAwait(false);
+                materialized = await Data<TEntity, TKey>.Query(Predicate, cancellationToken);
             }
             catch (NotSupportedException)
             {
-                var all = await Data<TEntity, TKey>.All(cancellationToken).ConfigureAwait(false);
+                var all = await Data<TEntity, TKey>.All(cancellationToken);
                 materialized = all.AsQueryable().Where(Predicate).ToList();
                 AddWarning("Repository does not support LINQ queries natively; predicate evaluated client-side.");
             }
         }
         else
         {
-            materialized = await Data<TEntity, TKey>.All(cancellationToken).ConfigureAwait(false);
+            materialized = await Data<TEntity, TKey>.All(cancellationToken);
         }
 
         var list = materialized.ToList();
@@ -139,7 +139,7 @@ public abstract class EntityTransferBuilderBase<TEntity, TKey, TBuilder>
             cancellationToken.ThrowIfCancellationRequested();
             var materialized = chunk.ToList();
             using var scope = destination?.Apply();
-            await Data<TEntity, TKey>.UpsertManyAsync(materialized, cancellationToken).ConfigureAwait(false);
+            await Data<TEntity, TKey>.UpsertManyAsync(materialized, cancellationToken);
 
             copied += materialized.Count;
             totalProcessed += materialized.Count;

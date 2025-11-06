@@ -28,8 +28,9 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
     public void Initialize(IServiceCollection services)
     {
         Log.BootDebug(LogActions.Init, "loaded", ("module", ModuleName));
-        services.AddKoanOptions<SqliteOptions>(Infrastructure.Constants.Configuration.Keys.Section);
-        services.AddSingleton<IConfigureOptions<SqliteOptions>, SqliteOptionsConfigurator>();
+        services.AddKoanOptions<SqliteOptions, SqliteOptionsConfigurator>(
+            Infrastructure.Constants.Configuration.Keys.Section,
+            configuratorLifetime: ServiceLifetime.Singleton);
         services.TryAddSingleton<IStorageNameResolver, DefaultStorageNameResolver>();
         services.TryAddEnumerable(new ServiceDescriptor(typeof(INamingDefaultsProvider), typeof(SqliteNamingDefaultsProvider), ServiceLifetime.Singleton));
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, SqliteHealthContributor>());
@@ -119,8 +120,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             ? ProvenanceModes.FromBootSource(BootSettingSource.Auto, usedDefault: true)
             : ProvenanceModes.FromConfigurationValue(connection);
 
-        Publish(
-            module,
+        module.PublishConfigValue(
             SqliteItems.ConnectionString,
             connection,
             displayOverride: displayConnection,
@@ -129,22 +129,11 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             sourceKeyOverride: connection.ResolvedKey ?? Infrastructure.Constants.Configuration.Keys.ConnectionString,
             sanitizeOverride: connectionIsAuto ? false : null);
 
-        Publish(module, SqliteItems.NamingStyle, namingStyle);
-        Publish(module, SqliteItems.Separator, separator);
-        Publish(module, SqliteItems.EnsureCreatedSupported, ensureCreated);
-        Publish(module, SqliteItems.DefaultPageSize, defaultPageSize);
-        Publish(module, SqliteItems.MaxPageSize, maxPageSize);
-    }
-
-    private static void Publish<T>(ProvenanceModuleWriter module, ProvenanceItem item, Koan.Core.ConfigurationValue<T> value, object? displayOverride = null, ProvenancePublicationMode? modeOverride = null, bool? usedDefaultOverride = null, string? sourceKeyOverride = null, bool? sanitizeOverride = null)
-    {
-        module.AddSetting(
-            item,
-            modeOverride ?? ProvenanceModes.FromConfigurationValue(value),
-            displayOverride ?? value.Value,
-            sourceKey: sourceKeyOverride ?? value.ResolvedKey,
-            usedDefault: usedDefaultOverride ?? value.UsedDefault,
-            sanitizeOverride: sanitizeOverride);
+        module.PublishConfigValue(SqliteItems.NamingStyle, namingStyle);
+        module.PublishConfigValue(SqliteItems.Separator, separator);
+        module.PublishConfigValue(SqliteItems.EnsureCreatedSupported, ensureCreated);
+        module.PublishConfigValue(SqliteItems.DefaultPageSize, defaultPageSize);
+        module.PublishConfigValue(SqliteItems.MaxPageSize, maxPageSize);
     }
 
     private static class LogActions

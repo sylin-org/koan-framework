@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Concurrent;
 using System.Text;
 using FluentAssertions;
@@ -60,9 +61,9 @@ public sealed class MergePoliciesTests
 
             var passages = new Dictionary<string, Passage>
             {
-                ["fin"] = await CreatePassageAsync(pipeline.Id, financial.Id, "Annual revenue reached $47.2M last year.", 12, "Financials", ct),
-                ["vendor"] = await CreatePassageAsync(pipeline.Id, vendor.Id, "Revenue reported at $39.5M from vendor questionnaire.", 4, "Financial Overview", ct),
-                ["kb"] = await CreatePassageAsync(pipeline.Id, knowledge.Id, "Estimated revenue of $40M across divisions.", 2, "Summary", ct)
+                ["fin"] = await CreatePassageAsync(financial.Id, "Annual revenue reached $47.2M last year.", 12, "Financials", ct),
+                ["vendor"] = await CreatePassageAsync(vendor.Id, "Revenue reported at $39.5M from vendor questionnaire.", 4, "Financial Overview", ct),
+                ["kb"] = await CreatePassageAsync(knowledge.Id, "Estimated revenue of $40M across divisions.", 2, "Summary", ct)
             };
 
             var extractions = new List<ExtractedField>
@@ -143,7 +144,10 @@ public sealed class MergePoliciesTests
         var configurationValues = new Dictionary<string, string?>
         {
             ["Koan:Environment"] = "Test",
-            ["Koan:Data:Provider"] = "Memory",
+            ["Koan:Data:Sources:Default:Adapter"] = "memory",
+            ["Koan:Data:Vector:EnableWorkflows"] = "false",
+            ["Koan:BackgroundServices:Enabled"] = "false",
+            ["Logging:EventLog:LogLevel:Default"] = "None",
             ["Meridian:Merge:EnableCitations"] = "true",
             ["Meridian:Merge:EnableExplainability"] = "true",
             ["Meridian:Merge:EnableNormalizedComparison"] = "true",
@@ -190,7 +194,6 @@ public sealed class MergePoliciesTests
     {
         var document = new SourceDocument
         {
-            PipelineId = pipelineId,
             OriginalFileName = fileName,
             StorageKey = $"fake/{Guid.NewGuid():N}",
             SourceType = sourceType,
@@ -199,14 +202,22 @@ public sealed class MergePoliciesTests
             UpdatedAt = updatedAt
         };
 
-        return await document.Save(ct);
+        var saved = await document.Save(ct);
+
+        var pipeline = await DocumentPipeline.Get(pipelineId, ct)
+            ?? throw new InvalidOperationException($"Pipeline {pipelineId} not found during test setup.");
+
+        pipeline.AttachDocument(saved.Id);
+        pipeline.UpdatedAt = updatedAt;
+        await pipeline.Save(ct);
+
+        return saved;
     }
 
-    private static async Task<Passage> CreatePassageAsync(string pipelineId, string sourceDocumentId, string text, int page, string section, CancellationToken ct)
+    private static async Task<Passage> CreatePassageAsync(string sourceDocumentId, string text, int page, string section, CancellationToken ct)
     {
         var passage = new Passage
         {
-            PipelineId = pipelineId,
             SourceDocumentId = sourceDocumentId,
             SequenceNumber = 1,
             Text = text,

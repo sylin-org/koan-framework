@@ -104,8 +104,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             ? ProvenanceModes.FromBootSource(BootSettingSource.Auto, usedDefault: true)
             : ProvenanceModes.FromConfigurationValue(connection);
 
-        Publish(
-            module,
+        module.PublishConfigValue(
             SqlServerItems.ConnectionString,
             connection,
             displayOverride: effectiveConnectionString,
@@ -113,22 +112,11 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             usedDefaultOverride: connectionIsAuto ? true : connection.UsedDefault,
             sourceKeyOverride: connectionSourceKey);
 
-        Publish(module, SqlServerItems.NamingStyle, namingStyle);
-        Publish(module, SqlServerItems.Separator, separator);
-        Publish(module, SqlServerItems.EnsureCreatedSupported, ensureCreated);
-        Publish(module, SqlServerItems.DefaultPageSize, defaultPageSize);
-        Publish(module, SqlServerItems.MaxPageSize, maxPageSize);
-    }
-
-    private static void Publish<T>(ProvenanceModuleWriter module, ProvenanceItem item, ConfigurationValue<T> value, object? displayOverride = null, ProvenancePublicationMode? modeOverride = null, bool? usedDefaultOverride = null, string? sourceKeyOverride = null, bool? sanitizeOverride = null)
-    {
-        module.AddSetting(
-            item,
-            modeOverride ?? ProvenanceModes.FromConfigurationValue(value),
-            displayOverride ?? value.Value,
-            sourceKey: sourceKeyOverride ?? value.ResolvedKey,
-            usedDefault: usedDefaultOverride ?? value.UsedDefault,
-            sanitizeOverride: sanitizeOverride);
+        module.PublishConfigValue(SqlServerItems.NamingStyle, namingStyle);
+        module.PublishConfigValue(SqlServerItems.Separator, separator);
+        module.PublishConfigValue(SqlServerItems.EnsureCreatedSupported, ensureCreated);
+        module.PublishConfigValue(SqlServerItems.DefaultPageSize, defaultPageSize);
+        module.PublishConfigValue(SqlServerItems.MaxPageSize, maxPageSize);
     }
 
     private static string BuildSqlServerFallback()

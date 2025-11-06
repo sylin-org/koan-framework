@@ -12,7 +12,9 @@ internal static class KoanAdminUiAssetProvider
 
     public static bool TryGetAsset(string? path, out string content, out string contentType)
     {
+        Console.WriteLine($"[DEBUG] TryGetAsset: path='{path}'");
         var normalized = Normalize(path);
+        Console.WriteLine($"[DEBUG] TryGetAsset: normalized='{normalized}'");
         if (normalized is null)
         {
             content = string.Empty;
@@ -21,7 +23,15 @@ internal static class KoanAdminUiAssetProvider
         }
 
         var resourceName = ResourcePrefix + normalized.Replace('/', '.');
+        Console.WriteLine($"[DEBUG] TryGetAsset: resourceName='{resourceName}'");
+        Console.WriteLine($"[DEBUG] TryGetAsset: Available resources:");
+        foreach (var res in Assembly.GetManifestResourceNames())
+        {
+            Console.WriteLine($"[DEBUG]   - {res}");
+        }
+
         using var stream = Assembly.GetManifestResourceStream(resourceName);
+        Console.WriteLine($"[DEBUG] TryGetAsset: stream is {(stream == null ? "null" : "not null")}");
         if (stream is null)
         {
             content = string.Empty;

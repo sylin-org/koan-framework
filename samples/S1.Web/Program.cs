@@ -1,12 +1,12 @@
 using Koan.Core;
 using Koan.Core.Hosting.App;
 using Koan.Web.Extensions;
-using S1.Web.Hosting;
+using Koan.Web.Hosting;
 using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
-LoggingConfiguration.Configure(builder);
+builder.ConfigureSampleLogging();
 
 // Framework bootstrap
 builder.Services.AddKoan()
@@ -60,7 +60,10 @@ if (app.Environment.IsDevelopment())
     try { Directory.CreateDirectory(dataPath); } catch { /* best effort */ }
 }
 
-ApplicationLifecycle.Configure(app);
+app.ConfigureSampleLifecycle(
+    sampleName: "S1 Web relationship demo",
+    startupMessage: "S1 Web relationship demo running on {Addresses}. Close the window or press Ctrl+C to stop.",
+    shutdownMessage: "S1 Web relationship demo shutting down.");
 
 await app.RunAsync();
 

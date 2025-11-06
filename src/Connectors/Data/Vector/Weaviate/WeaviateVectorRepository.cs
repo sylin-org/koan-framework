@@ -78,23 +78,34 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
             _schemaEnsured = true; return;
         }
         // Create class with manual vectors
+        var properties = new List<object>
+        {
+            new { name = "docId", dataType = new[] { "text" } },
+            new
+            {
+                name = "searchText",
+                dataType = new[] { "text" },
+                indexSearchable = true,      // Enable BM25 indexing
+                tokenization = "word"
+            }
+        };
+
+        // Add filterable properties for common recommendation system use cases
+        // These enable filter push-down at the vector database layer
+        properties.Add(new { name = "genres", dataType = new[] { "text[]" } });
+        properties.Add(new { name = "tags", dataType = new[] { "text[]" } });
+        properties.Add(new { name = "rating", dataType = new[] { "number" } });
+        properties.Add(new { name = "year", dataType = new[] { "int" } });
+        properties.Add(new { name = "episodes", dataType = new[] { "int" } });
+        properties.Add(new { name = "mediaTypeId", dataType = new[] { "text" } });
+        properties.Add(new { name = "popularity", dataType = new[] { "number" } });
+
         var body = new
         {
             @class = cls,
             vectorizer = "none",
             vectorIndexConfig = new { distance = _options.Metric },
-            // Minimal schema: store original document id for reverse mapping
-            properties = new object[]
-            {
-                new { name = "docId", dataType = new[] { "text" } },
-                new
-                {
-                    name = "searchText",
-                    dataType = new[] { "text" },
-                    indexSearchable = true,      // Enable BM25 indexing
-                    tokenization = "word"
-                }
-            }
+            properties = properties.ToArray()
         };
         var bodyJson = JsonConvert.SerializeObject(body, Formatting.Indented);
         _logger?.LogDebug("Weaviate: POST /v1/schema/classes for class {Class}. Schema body: {Body}", cls, bodyJson);
@@ -300,6 +311,129 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
         return count;
     }
 
+    public async Task<float[]?> GetEmbeddingAsync(TKey id, CancellationToken ct = default)
+    {
+        using var _ = WeaviateTelemetry.Activity.StartActivity("vector.getEmbedding");
+
+        await EnsureSchemaAsync(ct);
+
+        var uuid = DeterministicGuidFromString(ClassName, id!.ToString()!);
+
+        // Query for the specific object with vector
+        var gql = new
+        {
+            query = $@"query {{
+                Get {{
+                    {ClassName}(where: {{ path: [""docId""], operator: Equal, valueText: ""{id!.ToString()}"" }}, limit: 1) {{
+                        _additional {{
+                            vector
+                        }}
+                    }}
+                }}
+            }}"
+        };
+
+        var req = new StringContent(JsonConvert.SerializeObject(gql), System.Text.Encoding.UTF8, "application/json");
+        var resp = await _http.PostAsync("/v1/graphql", req, ct);
+
+        if (!resp.IsSuccessStatusCode)
+        {
+            var body = await resp.Content.ReadAsStringAsync(ct);
+            throw new InvalidOperationException($"Weaviate GetEmbedding failed: {(int)resp.StatusCode} {resp.ReasonPhrase} {body}");
+        }
+
+        var json = await resp.Content.ReadAsStringAsync(ct);
+        var parsed = JObject.Parse(json);
+        var objects = parsed["data"]?["Get"]?[ClassName] as JArray;
+
+        if (objects == null || objects.Count == 0)
+        {
+            return null; // No vector found for this ID
+        }
+
+        var additional = objects[0]?["_additional"] as JObject;
+        var vectorArray = additional?["vector"] as JArray;
+
+        if (vectorArray != null)
+        {
+            return vectorArray.Select(v => (float)(double)v).ToArray();
+        }
+
+        return null;
+    }
+
+    public async Task<Dictionary<TKey, float[]>> GetEmbeddingsAsync(IEnumerable<TKey> ids, CancellationToken ct = default)
+    {
+        using var _ = WeaviateTelemetry.Activity.StartActivity("vector.getEmbeddings");
+
+        await EnsureSchemaAsync(ct);
+
+        var result = new Dictionary<TKey, float[]>();
+        var idsList = ids.ToList();
+
+        if (idsList.Count == 0)
+        {
+            return result;
+        }
+
+        // Build WHERE clause for multiple IDs using OR operator
+        var idConditions = idsList
+            .Select(id => $@"{{ path: [""docId""], operator: Equal, valueText: ""{id!.ToString()}"" }}")
+            .ToList();
+
+        var whereClause = idConditions.Count == 1
+            ? idConditions[0]
+            : $@"{{ operator: Or, operands: [{string.Join(", ", idConditions)}] }}";
+
+        var gql = new
+        {
+            query = $@"query {{
+                Get {{
+                    {ClassName}(where: {whereClause}, limit: {idsList.Count}) {{
+                        docId
+                        _additional {{
+                            vector
+                        }}
+                    }}
+                }}
+            }}"
+        };
+
+        var req = new StringContent(JsonConvert.SerializeObject(gql), System.Text.Encoding.UTF8, "application/json");
+        var resp = await _http.PostAsync("/v1/graphql", req, ct);
+
+        if (!resp.IsSuccessStatusCode)
+        {
+            var body = await resp.Content.ReadAsStringAsync(ct);
+            throw new InvalidOperationException($"Weaviate GetEmbeddings failed: {(int)resp.StatusCode} {resp.ReasonPhrase} {body}");
+        }
+
+        var json = await resp.Content.ReadAsStringAsync(ct);
+        var parsed = JObject.Parse(json);
+        var objects = parsed["data"]?["Get"]?[ClassName] as JArray;
+
+        if (objects == null)
+        {
+            return result;
+        }
+
+        foreach (var obj in objects.OfType<JObject>())
+        {
+            var docId = obj["docId"]?.Value<string>();
+            var additional = obj["_additional"] as JObject;
+            var vectorArray = additional?["vector"] as JArray;
+
+            if (docId != null && vectorArray != null)
+            {
+                var embedding = vectorArray.Select(v => (float)(double)v).ToArray();
+                TKey id = (TKey)Convert.ChangeType(docId, typeof(TKey));
+                result[id] = embedding;
+            }
+        }
+
+        return result;
+    }
+
     public async Task<VectorQueryResult<TKey>> SearchAsync(VectorQueryOptions options, CancellationToken ct = default)
     {
         using var _ = WeaviateTelemetry.Activity.StartActivity("vector.search");
@@ -358,6 +492,33 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
         var json = await resp.Content.ReadAsStringAsync(ct);
         var matches = ParseGraphQlIds(json);
         return new VectorQueryResult<TKey>(matches, ContinuationToken: null);
+    }
+
+    public async Task FlushAsync(CancellationToken ct = default)
+    {
+        using var _ = WeaviateTelemetry.Activity.StartActivity("vector.flush");
+        var cls = ClassName;
+
+        // Flush by deleting and recreating the schema (standard Weaviate pattern)
+        _logger?.LogInformation("Weaviate: flushing class {Class} (delete + recreate schema)", cls);
+
+        // Delete the class schema (removes all objects)
+        var deleteResp = await _http.DeleteAsync($"/v1/schema/{Uri.EscapeDataString(cls)}", ct);
+
+        if (!deleteResp.IsSuccessStatusCode && deleteResp.StatusCode != HttpStatusCode.NotFound)
+        {
+            var txt = await deleteResp.Content.ReadAsStringAsync(ct);
+            _logger?.LogError("Weaviate schema delete failed ({Status}): {Body}", (int)deleteResp.StatusCode, txt);
+            throw new InvalidOperationException($"Weaviate flush failed: {(int)deleteResp.StatusCode} {deleteResp.ReasonPhrase} {txt}");
+        }
+
+        // Reset the schema ensured flag so EnsureSchemaAsync will recreate
+        _schemaEnsured = false;
+
+        // Recreate the schema
+        await EnsureSchemaAsync(ct);
+
+        _logger?.LogInformation("Weaviate: flushed all vectors for class {Class}", cls);
     }
 
     public async IAsyncEnumerable<VectorExportBatch<TKey>> ExportAllAsync(
@@ -501,24 +662,13 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
                 }
             case VectorInstructions.IndexClear:
                 {
+                    // Backward compatibility: require AllowDestructive option for instruction-based clear
                     var allow = instruction.Options != null && instruction.Options.TryGetValue("AllowDestructive", out var v) && v is bool b && b;
                     if (!allow) throw new NotSupportedException("Destructive clear requires Options.AllowDestructive=true.");
-                    await EnsureSchemaAsync(ct);
-                    var body = new
-                    {
-                        @class = ClassName,
-                        where = new { @operator = "IsNotNull", path = new[] { "id" } }
-                    };
-                    var req = new StringContent(JsonConvert.SerializeObject(body), System.Text.Encoding.UTF8, "application/json");
-                    var resp = await _http.PostAsync("/v1/batch/objects/delete", req, ct);
-                    if (!resp.IsSuccessStatusCode)
-                    {
-                        var txt = await resp.Content.ReadAsStringAsync(ct);
-                        throw new InvalidOperationException($"Weaviate clear failed: {(int)resp.StatusCode} {resp.ReasonPhrase} {txt}");
-                    }
-                    // Return approximate deleted count if provided; else 0
-                    object ok = 0;
-                    return (TResult)ok;
+
+                    // Delegate to FlushAsync which implements the actual clear logic
+                    await FlushAsync(ct);
+                    return (TResult)(object)true;
                 }
             default:
                 throw new NotSupportedException($"Instruction '{instruction.Name}' not supported by Weaviate vector adapter.");

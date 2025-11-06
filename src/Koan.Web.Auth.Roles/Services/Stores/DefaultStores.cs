@@ -10,7 +10,7 @@ public sealed class DefaultRoleStore : IRoleStore
     public DefaultRoleStore(ILogger<DefaultRoleStore> logger) => _logger = logger;
 
     public async Task<IReadOnlyList<IKoanAuthRole>> All(CancellationToken ct = default)
-        => (await Role.All(ct).ConfigureAwait(false)).Cast<IKoanAuthRole>().ToArray();
+        => (await Role.All(ct)).Cast<IKoanAuthRole>().ToArray();
 
     public async Task UpsertMany(IEnumerable<IKoanAuthRole> items, CancellationToken ct = default)
     {
@@ -21,7 +21,7 @@ public sealed class DefaultRoleStore : IRoleStore
             Description = x.Description,
             RowVersion = x.RowVersion
         }).ToArray();
-        _ = await Role.UpsertMany(mapped, ct).ConfigureAwait(false);
+        _ = await Role.UpsertMany(mapped, ct);
     }
 
     public Task<bool> Delete(string id, CancellationToken ct = default)
@@ -34,7 +34,7 @@ public sealed class DefaultRoleAliasStore : IRoleAliasStore
     public DefaultRoleAliasStore(ILogger<DefaultRoleAliasStore> logger) => _logger = logger;
 
     public async Task<IReadOnlyList<IKoanAuthRoleAlias>> All(CancellationToken ct = default)
-        => (await RoleAlias.All(ct).ConfigureAwait(false)).Cast<IKoanAuthRoleAlias>().ToArray();
+        => (await RoleAlias.All(ct)).Cast<IKoanAuthRoleAlias>().ToArray();
 
     public async Task UpsertMany(IEnumerable<IKoanAuthRoleAlias> items, CancellationToken ct = default)
     {
@@ -44,7 +44,7 @@ public sealed class DefaultRoleAliasStore : IRoleAliasStore
             TargetRole = x.TargetRole,
             RowVersion = x.RowVersion
         }).ToArray();
-        _ = await RoleAlias.UpsertMany(mapped, ct).ConfigureAwait(false);
+        _ = await RoleAlias.UpsertMany(mapped, ct);
     }
 
     public Task<bool> Delete(string id, CancellationToken ct = default)
@@ -57,7 +57,7 @@ public sealed class DefaultRolePolicyBindingStore : IRolePolicyBindingStore
     public DefaultRolePolicyBindingStore(ILogger<DefaultRolePolicyBindingStore> logger) => _logger = logger;
 
     public async Task<IReadOnlyList<IKoanAuthRolePolicyBinding>> All(CancellationToken ct = default)
-        => (await RolePolicyBinding.All(ct).ConfigureAwait(false)).Cast<IKoanAuthRolePolicyBinding>().ToArray();
+        => (await RolePolicyBinding.All(ct)).Cast<IKoanAuthRolePolicyBinding>().ToArray();
 
     public async Task UpsertMany(IEnumerable<IKoanAuthRolePolicyBinding> items, CancellationToken ct = default)
     {
@@ -67,7 +67,7 @@ public sealed class DefaultRolePolicyBindingStore : IRolePolicyBindingStore
             Requirement = x.Requirement,
             RowVersion = x.RowVersion
         }).ToArray();
-        _ = await RolePolicyBinding.UpsertMany(mapped, ct).ConfigureAwait(false);
+        _ = await RolePolicyBinding.UpsertMany(mapped, ct);
     }
 
     public Task<bool> Delete(string id, CancellationToken ct = default)

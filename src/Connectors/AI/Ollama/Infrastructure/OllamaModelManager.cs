@@ -29,10 +29,10 @@ internal sealed class OllamaModelManager : IAiModelManager
     }
 
     public async Task<AiModelOperationResult> EnsureInstalledAsync(AiModelOperationRequest request, CancellationToken ct = default)
-        => await PullModelAsync(request, skipIfPresent: true, successMessage: "Model installed.", ct).ConfigureAwait(false);
+        => await PullModelAsync(request, skipIfPresent: true, successMessage: "Model installed.", ct);
 
     public async Task<AiModelOperationResult> RefreshAsync(AiModelOperationRequest request, CancellationToken ct = default)
-        => await PullModelAsync(request, skipIfPresent: false, successMessage: "Model refreshed.", ct).ConfigureAwait(false);
+        => await PullModelAsync(request, skipIfPresent: false, successMessage: "Model refreshed.", ct);
 
     public async Task<AiModelOperationResult> FlushAsync(AiModelOperationRequest request, CancellationToken ct = default)
     {
@@ -45,7 +45,7 @@ internal sealed class OllamaModelManager : IAiModelManager
 
         try
         {
-            if (!await ModelExistsAsync(identifier, ct).ConfigureAwait(false))
+            if (!await ModelExistsAsync(identifier, ct))
             {
                 return AiModelOperationResult.Succeeded(CreateDescriptor(identifier), performed: false, message: $"Model '{identifier}' was already absent.");
             }
@@ -55,10 +55,10 @@ internal sealed class OllamaModelManager : IAiModelManager
                 Content = new StringContent(JsonConvert.SerializeObject(new { name = identifier }), Encoding.UTF8, "application/json")
             };
 
-            using var response = await _http.SendAsync(httpRequest, ct).ConfigureAwait(false);
+            using var response = await _http.SendAsync(httpRequest, ct);
             if (!response.IsSuccessStatusCode)
             {
-                var body = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+                var body = await response.Content.ReadAsStringAsync(ct);
                 throw new InvalidOperationException($"Delete request for '{identifier}' failed with status {(int)response.StatusCode}: {body}");
             }
 
@@ -76,7 +76,7 @@ internal sealed class OllamaModelManager : IAiModelManager
     {
         try
         {
-            var names = await FetchModelNamesAsync(ct).ConfigureAwait(false);
+            var names = await FetchModelNamesAsync(ct);
             return names.Select(CreateDescriptor).ToList();
         }
         catch (Exception ex)
@@ -102,7 +102,7 @@ internal sealed class OllamaModelManager : IAiModelManager
 
         try
         {
-            if (skipIfPresent && await ModelExistsAsync(identifier, ct).ConfigureAwait(false))
+            if (skipIfPresent && await ModelExistsAsync(identifier, ct))
             {
                 return AiModelOperationResult.Succeeded(CreateDescriptor(identifier), performed: false, message: $"Model '{identifier}' already present.");
             }
@@ -122,10 +122,10 @@ internal sealed class OllamaModelManager : IAiModelManager
             }
 
             using var content = new StringContent(JsonConvert.SerializeObject(payload), Encoding.UTF8, "application/json");
-            using var response = await _http.PostAsync("/api/pull", content, ct).ConfigureAwait(false);
+            using var response = await _http.PostAsync("/api/pull", content, ct);
             if (!response.IsSuccessStatusCode)
             {
-                var body = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+                var body = await response.Content.ReadAsStringAsync(ct);
                 throw new InvalidOperationException($"Pull request for '{identifier}' failed with status {(int)response.StatusCode}: {body}");
             }
 
@@ -141,14 +141,14 @@ internal sealed class OllamaModelManager : IAiModelManager
 
     private async Task<bool> ModelExistsAsync(string identifier, CancellationToken ct)
     {
-        var models = await FetchModelNamesAsync(ct).ConfigureAwait(false);
+        var models = await FetchModelNamesAsync(ct);
         return models.Any(name => MatchesModel(name, identifier));
     }
 
     private async Task<IReadOnlyList<string>> FetchModelNamesAsync(CancellationToken ct)
     {
-        using var response = await _http.GetAsync("/api/tags", ct).ConfigureAwait(false);
-        var body = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+        using var response = await _http.GetAsync("/api/tags", ct);
+        var body = await response.Content.ReadAsStringAsync(ct);
         if (!response.IsSuccessStatusCode)
         {
             throw new InvalidOperationException($"Tags request failed with status {(int)response.StatusCode}: {body}");

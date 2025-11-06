@@ -34,12 +34,12 @@ public static class Data<TEntity, TKey>
 
         try
         {
-            var result = await repo.CountAsync(request, ct).ConfigureAwait(false);
+            var result = await repo.CountAsync(request, ct);
             return new CountOutcome(result.Value, result.IsEstimate);
         }
         catch (NotSupportedException)
         {
-            var fallbackItems = await LoadItemsForFallbackAsync(repo, request, ct).ConfigureAwait(false);
+            var fallbackItems = await LoadItemsForFallbackAsync(repo, request, ct);
             return new CountOutcome(fallbackItems.Count, false);
         }
     }
@@ -61,20 +61,20 @@ public static class Data<TEntity, TKey>
 
         if (repo is IDataRepositoryWithOptions<TEntity, TKey> repoWithOptions && options is not null)
         {
-            return await repoWithOptions.QueryAsync(payload, options, ct).ConfigureAwait(false);
+            return await repoWithOptions.QueryAsync(payload, options, ct);
         }
 
         if (request.Predicate is not null && repo is ILinqQueryRepository<TEntity, TKey> linq)
         {
-            return await linq.QueryAsync(request.Predicate, ct).ConfigureAwait(false);
+            return await linq.QueryAsync(request.Predicate, ct);
         }
 
         if (request.RawQuery is not null && repo is IStringQueryRepository<TEntity, TKey> str)
         {
-            return await str.QueryAsync(request.RawQuery, ct).ConfigureAwait(false);
+            return await str.QueryAsync(request.RawQuery, ct);
         }
 
-        return await repo.QueryAsync(payload, ct).ConfigureAwait(false);
+        return await repo.QueryAsync(payload, ct);
     }
     public static Task<TEntity?> GetAsync(TKey id, CancellationToken ct = default) => Repo.GetAsync(id, ct);
     public static Task<IReadOnlyList<TEntity?>> GetManyAsync(IEnumerable<TKey> ids, CancellationToken ct = default) => Repo.GetManyAsync(ids, ct);
@@ -86,7 +86,7 @@ public static class Data<TEntity, TKey>
     public static async Task<IReadOnlyList<TEntity>> All(DataQueryOptions? options, CancellationToken ct = default)
     {
         Expression<Func<TEntity, bool>>? predicate = null;
-        var result = await QueryWithCount(predicate, options, ct).ConfigureAwait(false);
+        var result = await QueryWithCount(predicate, options, ct);
         return result.Items;
     }
 
@@ -129,7 +129,7 @@ public static class Data<TEntity, TKey>
 
         if (!hasPagination && absoluteMaxRecords.HasValue)
         {
-            var outcome = await CountInternalAsync(query, countStrategy, providedOptions, ct).ConfigureAwait(false);
+            var outcome = await CountInternalAsync(query, countStrategy, providedOptions, ct);
             if (outcome.Count > absoluteMaxRecords.Value)
             {
                 return new QueryResult<TEntity>
@@ -149,7 +149,7 @@ public static class Data<TEntity, TKey>
 
         if (hasPagination && repo is IPagedRepository<TEntity, TKey> pagedRepo)
         {
-            var repoResult = await pagedRepo.QueryPageAsync(query, normalizedOptions, ct).ConfigureAwait(false);
+            var repoResult = await pagedRepo.QueryPageAsync(query, normalizedOptions, ct);
             return new QueryResult<TEntity>
             {
                 Items = repoResult.Items,
@@ -167,18 +167,18 @@ public static class Data<TEntity, TKey>
 
         if (repo is IDataRepositoryWithOptions<TEntity, TKey> repoWithOptions)
         {
-            items = await repoWithOptions.QueryAsync(query, normalizedOptions, ct).ConfigureAwait(false);
+            items = await repoWithOptions.QueryAsync(query, normalizedOptions, ct);
             repositoryHandledPagination = hasPagination;
         }
         else
         {
-            items = await repo.QueryAsync(query, ct).ConfigureAwait(false);
+            items = await repo.QueryAsync(query, ct);
         }
 
         CountOutcome? countOutcome = precomputedCount;
         if (!countOutcome.HasValue && (hasPagination || absoluteMaxRecords.HasValue))
         {
-            countOutcome = await CountInternalAsync(query, countStrategy, providedOptions, ct).ConfigureAwait(false);
+            countOutcome = await CountInternalAsync(query, countStrategy, providedOptions, ct);
         }
 
         var totalCount = countOutcome?.Count ?? items.Count;
@@ -236,7 +236,7 @@ public static class Data<TEntity, TKey>
     public static async Task<IReadOnlyList<TEntity>> Query(Expression<Func<TEntity, bool>> predicate, DataQueryOptions? options, CancellationToken ct = default)
     {
         if (predicate is null) throw new ArgumentNullException(nameof(predicate));
-        var result = await QueryWithCount(predicate, options, ct).ConfigureAwait(false);
+        var result = await QueryWithCount(predicate, options, ct);
         return result.Items;
     }
 
@@ -246,7 +246,7 @@ public static class Data<TEntity, TKey>
     public static async Task<IReadOnlyList<TEntity>> Query(string query, DataQueryOptions? options, CancellationToken ct = default)
     {
         if (query is null) throw new ArgumentNullException(nameof(query));
-        var result = await QueryWithCount(query, options, ct).ConfigureAwait(false);
+        var result = await QueryWithCount(query, options, ct);
         return result.Items;
     }
     public static Task<long> CountAsync(CancellationToken ct = default)
@@ -272,7 +272,7 @@ public static class Data<TEntity, TKey>
 
     public static async Task<long> CountAsync(object? query, CountStrategy strategy, DataQueryOptions? options, CancellationToken ct)
     {
-        var outcome = await CountInternalAsync(query, strategy, options, ct).ConfigureAwait(false);
+        var outcome = await CountInternalAsync(query, strategy, options, ct);
         return outcome.Count;
     }
 
@@ -321,19 +321,19 @@ public static class Data<TEntity, TKey>
         {
             try
             {
-                var result = await exec.ExecuteAsync<TEntity?>(new Koan.Data.Abstractions.Instructions.Instruction(Koan.Data.Abstractions.Instructions.DataInstructions.Patch, request), ct).ConfigureAwait(false);
+                var result = await exec.ExecuteAsync<TEntity?>(new Koan.Data.Abstractions.Instructions.Instruction(Koan.Data.Abstractions.Instructions.DataInstructions.Patch, request), ct);
                 return result;
             }
             catch (NotSupportedException) { /* fall back */ }
         }
 
-        var current = await repo.GetAsync(request.Id, ct).ConfigureAwait(false);
+        var current = await repo.GetAsync(request.Id, ct);
         if (current is null) return null;
         var m = mergeNulls ?? MergePatchNullPolicy.SetDefault;
         var p = partialNulls ?? PartialJsonNullPolicy.SetNull;
         var applicator = Koan.Data.Core.Patch.PatchApplicators.Create<TEntity, TKey>(request.Kind, request.Payload!, m, p);
         applicator.Apply(current);
-        return await repo.UpsertAsync(current, ct).ConfigureAwait(false);
+        return await repo.UpsertAsync(current, ct);
     }
 
     /// <summary>
@@ -349,16 +349,16 @@ public static class Data<TEntity, TKey>
         {
             try
             {
-                var result = await exec.ExecuteAsync<TEntity?>(new Koan.Data.Abstractions.Instructions.Instruction(Koan.Data.Abstractions.Instructions.DataInstructions.Patch, payload), ct).ConfigureAwait(false);
+                var result = await exec.ExecuteAsync<TEntity?>(new Koan.Data.Abstractions.Instructions.Instruction(Koan.Data.Abstractions.Instructions.DataInstructions.Patch, payload), ct);
                 if (result is not null) return result;
             }
             catch (NotSupportedException) { /* fallback */ }
         }
 
-        var current = await repo.GetAsync(payload.Id, ct).ConfigureAwait(false);
+        var current = await repo.GetAsync(payload.Id, ct);
         if (current is null) return null;
         Koan.Data.Core.Patch.PatchOpsExecutor.Apply<TEntity, TKey>(current, payload);
-        return await repo.UpsertAsync(current, ct).ConfigureAwait(false);
+        return await repo.UpsertAsync(current, ct);
     }
 
     public static Task<TEntity> UpsertAsync(TEntity model, CancellationToken ct = default) => Repo.UpsertAsync(model, ct);
@@ -369,7 +369,7 @@ public static class Data<TEntity, TKey>
     public static async IAsyncEnumerable<TEntity> AllStream(int? batchSize = null, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
     {
         // Internal streaming operation - no pagination constraints should apply
-        var all = await Repo.QueryAsync(null, ct).ConfigureAwait(false);
+        var all = await Repo.QueryAsync(null, ct);
         foreach (var item in all) yield return item;
     }
 
@@ -383,7 +383,7 @@ public static class Data<TEntity, TKey>
             {
                 ct.ThrowIfCancellationRequested();
                 var opts = new DataQueryOptions(page, size);
-                var batch = await srepoOpts.QueryAsync(query, opts, ct).ConfigureAwait(false);
+                var batch = await srepoOpts.QueryAsync(query, opts, ct);
                 if (batch.Count == 0) yield break;
                 foreach (var item in batch) yield return item;
                 if (batch.Count < size) yield break;
@@ -392,7 +392,7 @@ public static class Data<TEntity, TKey>
         }
         else if (Repo is IStringQueryRepository<TEntity, TKey> srepo)
         {
-            var all = await srepo.QueryAsync(query, ct).ConfigureAwait(false);
+            var all = await srepo.QueryAsync(query, ct);
             foreach (var item in all) yield return item;
         }
         else
@@ -406,9 +406,9 @@ public static class Data<TEntity, TKey>
     {
         if (size <= 0) throw new System.ArgumentOutOfRangeException(nameof(size));
         if (Repo is IDataRepositoryWithOptions<TEntity, TKey> repoOpts)
-            return await repoOpts.QueryAsync(null, new DataQueryOptions(1, size), ct).ConfigureAwait(false);
+            return await repoOpts.QueryAsync(null, new DataQueryOptions(1, size), ct);
         // Fallback: materialize and take
-        var all = await Repo.QueryAsync(null, ct).ConfigureAwait(false);
+        var all = await Repo.QueryAsync(null, ct);
         return all.Take(size).ToList();
     }
 
@@ -417,9 +417,9 @@ public static class Data<TEntity, TKey>
         if (page <= 0) throw new System.ArgumentOutOfRangeException(nameof(page));
         if (size <= 0) throw new System.ArgumentOutOfRangeException(nameof(size));
         if (Repo is IDataRepositoryWithOptions<TEntity, TKey> repoOpts)
-            return await repoOpts.QueryAsync(null, new DataQueryOptions(page, size), ct).ConfigureAwait(false);
+            return await repoOpts.QueryAsync(null, new DataQueryOptions(page, size), ct);
         // Fallback: materialize and page in-memory
-        var all = await Repo.QueryAsync(null, ct).ConfigureAwait(false);
+        var all = await Repo.QueryAsync(null, ct);
         return all.Skip((page - 1) * size).Take(size).ToList();
     }
 
@@ -467,16 +467,16 @@ public static class Data<TEntity, TKey>
         using var _ = WithPartition(partition);
         if (Repo is ILinqQueryRepository<TEntity, TKey> linq)
         {
-            var items = await linq.QueryAsync(predicate, ct).ConfigureAwait(false);
+            var items = await linq.QueryAsync(predicate, ct);
             var ids = items.Select(e => e.Id);
-            return await Repo.DeleteManyAsync(ids, ct).ConfigureAwait(false);
+            return await Repo.DeleteManyAsync(ids, ct);
         }
         else
         {
-            var all = await Repo.QueryAsync(null, ct).ConfigureAwait(false);
+            var all = await Repo.QueryAsync(null, ct);
             var filtered = all.AsQueryable().Where(predicate).ToList();
             var ids = filtered.Select(e => e.Id);
-            return await Repo.DeleteManyAsync(ids, ct).ConfigureAwait(false);
+            return await Repo.DeleteManyAsync(ids, ct);
         }
     }
 
@@ -541,8 +541,8 @@ public static class Data<TEntity, TKey>
         if (string.Equals(fromPartition, toPartition, StringComparison.Ordinal)) return 0;
         using var _from = WithPartition(fromPartition);
         var source = predicate is null
-            ? await Repo.QueryAsync(null, ct).ConfigureAwait(false)
-            : await (Repo as ILinqQueryRepository<TEntity, TKey>)!.QueryAsync(predicate, ct).ConfigureAwait(false);
+            ? await Repo.QueryAsync(null, ct)
+            : await (Repo as ILinqQueryRepository<TEntity, TKey>)!.QueryAsync(predicate, ct);
         if (source.Count == 0) return 0;
         var total = 0;
         foreach (var chunk in source.Chunk(Math.Max(1, batchSize)))
@@ -550,7 +550,7 @@ public static class Data<TEntity, TKey>
             ct.ThrowIfCancellationRequested();
             var items = map is null ? chunk : chunk.Select(map).ToArray();
             using var _to = WithPartition(toPartition);
-            total += await Repo.UpsertManyAsync(items, ct).ConfigureAwait(false);
+            total += await Repo.UpsertManyAsync(items, ct);
         }
         return total;
     }
@@ -566,8 +566,8 @@ public static class Data<TEntity, TKey>
         if (string.Equals(fromPartition, toPartition, StringComparison.Ordinal)) return 0;
         using var _from = WithPartition(fromPartition);
         var source = predicate is null
-            ? await Repo.QueryAsync(null, ct).ConfigureAwait(false)
-            : await (Repo as ILinqQueryRepository<TEntity, TKey>)!.QueryAsync(predicate, ct).ConfigureAwait(false);
+            ? await Repo.QueryAsync(null, ct)
+            : await (Repo as ILinqQueryRepository<TEntity, TKey>)!.QueryAsync(predicate, ct);
         if (source.Count == 0) return 0;
         var total = 0;
         foreach (var chunk in source.Chunk(Math.Max(1, batchSize)))
@@ -576,11 +576,11 @@ public static class Data<TEntity, TKey>
             var items = map is null ? chunk : chunk.Select(map).ToArray();
             // Upsert into target partition
             using var _to = WithPartition(toPartition);
-            total += await Repo.UpsertManyAsync(items, ct).ConfigureAwait(false);
+            total += await Repo.UpsertManyAsync(items, ct);
             // Delete the moved ids from source partition
             using var _back = WithPartition(fromPartition);
             var ids = items.Select(e => e.Id);
-            await Repo.DeleteManyAsync(ids, ct).ConfigureAwait(false);
+            await Repo.DeleteManyAsync(ids, ct);
         }
         return total;
     }
@@ -591,12 +591,12 @@ public static class Data<TEntity, TKey>
         int batchSize = 500,
         CancellationToken ct = default)
     {
-        await ClearPartition(targetPartition, ct).ConfigureAwait(false);
+        await ClearPartition(targetPartition, ct);
         var total = 0;
         foreach (var chunk in items.Chunk(Math.Max(1, batchSize)))
         {
             using var _ = WithPartition(targetPartition);
-            total += await Repo.UpsertManyAsync(chunk, ct).ConfigureAwait(false);
+            total += await Repo.UpsertManyAsync(chunk, ct);
         }
         return total;
     }

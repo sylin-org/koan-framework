@@ -12,6 +12,10 @@ if not exist "storage" (
   mkdir "storage"
 )
 
+if not exist "storage\weaviate" (
+  mkdir "storage\weaviate"
+)
+
 where docker >nul 2>nul || (
   echo Docker is required but not found in PATH.
   popd & exit /b 1

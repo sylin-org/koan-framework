@@ -1,4 +1,7 @@
 using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using Koan.Data.Core.Model;
 using Newtonsoft.Json.Linq;
 using Newtonsoft.Json.Schema;
@@ -23,7 +26,7 @@ public sealed class DocumentPipeline : Entity<DocumentPipeline>
         = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>JSON schema describing the target deliverable.</summary>
-    public string SchemaJson { get; set; } = "{}";
+    public string SchemaJson { get; set; } = string.Empty;
 
     /// <summary>Markdown template rendered with the merged field payload.</summary>
     public string TemplateMarkdown { get; set; } = "# Meridian Deliverable\n";
@@ -40,21 +43,24 @@ public sealed class DocumentPipeline : Entity<DocumentPipeline>
     /// <summary>Tags inherited from the AnalysisType (useful for filtering and telemetry).</summary>
     public List<string> AnalysisTags { get; set; } = new();
 
-    /// <summary>Source types required for this analysis. Empty list means no restriction.</summary>
-    public List<string> RequiredSourceTypes { get; set; } = new();
-
     /// <summary>Optional operator guidance that biases retrieval, not final values.</summary>
     public string? BiasNotes { get; set; }
+        = null;
+
+    /// <summary>List of document identifiers attached to this pipeline.</summary>
+    public List<string> DocumentIds { get; set; } = new();
+
+    /// <summary>
+    /// Authoritative notes containing user-provided data that MUST override any
+    /// information extracted from documents. AI will interpret free-text format
+    /// and map to field names using fuzzy matching.
+    /// </summary>
+    public string? AuthoritativeNotes { get; set; }
         = null;
 
     /// <summary>Current pipeline status for orchestrators and dashboards.</summary>
     public PipelineStatus Status { get; set; }
         = PipelineStatus.Pending;
-
-    public int TotalDocuments { get; set; }
-        = 0;
-    public int ProcessedDocuments { get; set; }
-        = 0;
 
     public string? DeliverableId { get; set; }
         = null;
@@ -80,6 +86,87 @@ public sealed class DocumentPipeline : Entity<DocumentPipeline>
         {
             return null;
         }
+    }
+
+    public void AttachDocument(string? documentId)
+    {
+        if (string.IsNullOrWhiteSpace(documentId))
+        {
+            return;
+        }
+
+        if (!DocumentIds.Any(existing => string.Equals(existing, documentId, StringComparison.Ordinal)))
+        {
+            DocumentIds.Add(documentId);
+        }
+    }
+
+    public void AttachDocuments(IEnumerable<string>? documentIds)
+    {
+        if (documentIds is null)
+        {
+            return;
+        }
+
+        foreach (var id in documentIds)
+        {
+            AttachDocument(id);
+        }
+    }
+
+    public void RemoveDocument(string? documentId)
+    {
+        if (string.IsNullOrWhiteSpace(documentId))
+        {
+            return;
+        }
+
+        DocumentIds.RemoveAll(id => string.Equals(id, documentId, StringComparison.Ordinal));
+    }
+
+    public async Task<List<SourceDocument>> LoadDocumentsAsync(CancellationToken ct = default)
+    {
+        if (DocumentIds.Count == 0)
+        {
+            return new List<SourceDocument>();
+        }
+
+        var ids = DocumentIds
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+
+        if (ids.Count == 0)
+        {
+            return new List<SourceDocument>();
+        }
+
+        var loaded = await SourceDocument.Get(ids, ct);
+        return loaded
+            .Where(doc => doc is not null)
+            .Select(doc => doc!)
+            .ToList();
+    }
+
+    public async Task<List<Passage>> LoadPassagesAsync(CancellationToken ct = default)
+    {
+        if (DocumentIds.Count == 0)
+        {
+            return new List<Passage>();
+        }
+
+        var ids = DocumentIds
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+
+        if (ids.Count == 0)
+        {
+            return new List<Passage>();
+        }
+
+        var passages = await Passage.Query(p => ids.Contains(p.SourceDocumentId), ct);
+        return passages.ToList();
     }
 }
 
@@ -114,6 +201,10 @@ public sealed class PipelineQualityMetrics
         = 0;
 
     public int ManualReviewNeeded { get; set; }
+        = 0;
+
+    /// <summary>Number of fields sourced from Authoritative Notes (user override).</summary>
+    public int NotesSourced { get; set; }
         = 0;
 
     public TimeSpan ExtractionP95 { get; set; }

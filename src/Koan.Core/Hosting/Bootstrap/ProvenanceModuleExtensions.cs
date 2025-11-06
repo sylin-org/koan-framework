@@ -114,6 +114,38 @@ public static class ProvenanceModuleExtensions
         });
     }
 
+    /// <summary>
+    /// Publishes a configuration value to provenance with automatic mode resolution.
+    /// ARCH-0068: Static helper pattern to eliminate 11 duplicated Publish() methods across connectors.
+    /// </summary>
+    /// <remarks>
+    /// This extension method replaces the private Publish() helper that was duplicated in:
+    /// - Data connectors (Postgres, MongoDB, Redis, SQLite, SQL Server)
+    /// - AI connectors (Ollama, LMStudio)
+    /// - Infrastructure (Data.Backup, Core.Adapters, Web.Auth.Test, Swagger)
+    /// </remarks>
+    public static void PublishConfigValue<T>(
+        this ProvenanceModuleWriter module,
+        ProvenanceItem item,
+        ConfigurationValue<T> value,
+        object? displayOverride = null,
+        ProvenancePublicationMode? modeOverride = null,
+        bool? usedDefaultOverride = null,
+        string? sourceKeyOverride = null,
+        bool? sanitizeOverride = null)
+    {
+        ArgumentNullException.ThrowIfNull(module);
+        ArgumentNullException.ThrowIfNull(item);
+
+        module.AddSetting(
+            item,
+            modeOverride ?? ProvenancePublicationModeExtensions.FromConfigurationValue(value),
+            displayOverride ?? value.Value,
+            sourceKey: sourceKeyOverride ?? value.ResolvedKey,
+            usedDefault: usedDefaultOverride ?? value.UsedDefault,
+            sanitizeOverride: sanitizeOverride);
+    }
+
     private static ProvenanceSettingSource MapSource(BootSettingSource source)
         => source switch
         {

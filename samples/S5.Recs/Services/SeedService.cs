@@ -18,6 +18,7 @@ using System.Net.Http.Headers;
 using System.Text.RegularExpressions;
 using System.Threading;
 using Newtonsoft.Json;
+using Koan.Data.AI;
 
 namespace S5.Recs.Services;
 
@@ -29,7 +30,6 @@ internal sealed class SeedService : ISeedService
     private readonly IServiceProvider _sp;
     private readonly ILogger<SeedService>? _logger;
     private readonly IReadOnlyDictionary<string, IMediaProvider> _providers;
-    private readonly IEmbeddingCache _embeddingCache;
     private static readonly object _importLock = new object();
     private static volatile bool _importInProgress = false;
     private int _cacheHits = 0;
@@ -37,10 +37,9 @@ internal sealed class SeedService : ISeedService
 
     public bool IsImportInProgress => _importInProgress;
 
-    public SeedService(IServiceProvider sp, IEmbeddingCache embeddingCache, ILogger<SeedService>? logger = null)
+    public SeedService(IServiceProvider sp, ILogger<SeedService>? logger = null)
     {
         _sp = sp;
-        _embeddingCache = embeddingCache;
         _logger = logger;
         // Discover providers via DI
         var provs = (IEnumerable<IMediaProvider>?)_sp.GetService(typeof(IEnumerable<IMediaProvider>)) ?? Array.Empty<IMediaProvider>();
@@ -281,18 +280,19 @@ internal sealed class SeedService : ISeedService
         {
             try
             {
-                var embedded = await UpsertVectorsAsync(mediaItems, embeddingModel, ct);
+                // Use CancellationToken.None for long-running background job (don't cancel when HTTP request completes)
+                var embedded = await UpsertVectorsAsync(mediaItems, embeddingModel, CancellationToken.None);
                 _progress[jobId] = (count, count, embedded, 0, true, null);
                 _logger?.LogInformation("Vector-only job {JobId}: embedded and indexed {Embedded} vectors", jobId, embedded);
                 await File.WriteAllTextAsync(Path.Combine(_cacheDir, "manifest-vectors.json"),
-                    JsonConvert.SerializeObject(new { jobId, count, at = DateTimeOffset.UtcNow }), ct);
+                    JsonConvert.SerializeObject(new { jobId, count, at = DateTimeOffset.UtcNow }), CancellationToken.None);
             }
             catch (Exception ex)
             {
                 _progress[jobId] = (_progress[jobId].Fetched, _progress[jobId].Normalized, _progress[jobId].Embedded, _progress[jobId].Imported, true, ex.Message);
                 _logger?.LogError(ex, "Vector-only job {JobId} failed: {Error}", jobId, ex.Message);
             }
-        }, ct);
+        }, CancellationToken.None);
 
         return Task.FromResult(jobId);
     }
@@ -698,72 +698,34 @@ internal sealed class SeedService : ISeedService
 
         _logger?.LogDebug("Vector pipeline starting: {Count} items, model={Model}", itemsList.Count, modelId);
 
-        // Step 1: Separate items into cached and uncached
-        var cachedItems = new List<(Media media, float[] embedding)>();
-        var uncachedItems = new List<Media>();
-
+        // Build lookup: contentHash -> Media
+        var metadata = EmbeddingMetadata.Get<Media>();
+        var mediaByHash = new Dictionary<string, Media>();
         foreach (var media in itemsList)
         {
-            var embeddingText = BuildEmbeddingText(media);
-            var contentHash = EmbeddingCache.ComputeContentHash(embeddingText);
-            var cached = await _embeddingCache.GetAsync(contentHash, modelId, typeof(Media).FullName!, ct);
-
-            if (cached != null)
-            {
-                cachedItems.Add((media, cached.Embedding));
-                Interlocked.Increment(ref _cacheHits);
-            }
-            else
-            {
-                uncachedItems.Add(media);
-                Interlocked.Increment(ref _cacheMisses);
-            }
+            var signature = metadata.ComputeSignature(media);
+            mediaByHash[signature] = media;
         }
 
-        _logger?.LogInformation("Embedding cache: {CacheHits} hits, {CacheMisses} misses ({HitRate:P1} hit rate)",
-            cachedItems.Count, uncachedItems.Count,
-            itemsList.Count > 0 ? (double)cachedItems.Count / itemsList.Count : 0);
+        // NOTE: With ARCH-0070, embedding cache is obsolete. Framework manages embeddings via EmbeddingState<T>.
+        // All items will be processed through AI embedding pipeline.
 
-        // Step 2: Process cached items (fast path - no AI calls)
-        foreach (var (media, embedding) in cachedItems)
-        {
-            try
-            {
-                var vectorMetadata = new Dictionary<string, object>
-                {
-                    ["title"] = media.Title,
-                    ["genres"] = media.Genres,
-                    ["popularity"] = media.Popularity,
-                    ["searchText"] = BuildSearchText(media)  // Required for hybrid search
-                };
+        _logger?.LogInformation("Processing {Count} items through AI embedding pipeline", itemsList.Count);
 
-                await VectorData<Media>.SaveWithVector(media, embedding, vectorMetadata, ct).ConfigureAwait(false);
-                Interlocked.Increment(ref stored);
-            }
-            catch (Exception ex)
-            {
-                _logger?.LogWarning(ex, "Vector pipeline (cached): failed to save vector for media {Id}", media.Id);
-                Interlocked.Increment(ref failures);
-            }
-        }
+        var uncachedItems = itemsList.ToList();
+        Interlocked.Add(ref _cacheMisses, uncachedItems.Count);
 
-        // Step 3: Process uncached items (slow path - requires AI calls)
+        // Process uncached items (slow path - requires AI calls)
         if (uncachedItems.Count > 0)
         {
             await uncachedItems
                 .ToAsyncEnumerable()
-                .Tokenize(m => BuildEmbeddingText(m), model != null ? new AiTokenizeOptions { Model = model } : new AiTokenizeOptions())
+                .Tokenize(m => metadata.BuildEmbeddingText(m), model != null ? new AiTokenizeOptions { Model = model } : new AiTokenizeOptions())
                 .Branch(branch => branch
                     .OnSuccess(success => success
                         .Mutate(envelope =>
                         {
-                            envelope.Features["vector:metadata"] = new
-                            {
-                                title = envelope.Entity.Title,
-                                genres = envelope.Entity.Genres,
-                                popularity = envelope.Entity.Popularity,
-                                searchText = BuildSearchText(envelope.Entity)  // Required for hybrid search
-                            };
+                            envelope.Features["vector:metadata"] = BuildVectorMetadata(envelope.Entity);
                         })
                         .Do(async (envelope, ct) =>
                         {
@@ -776,14 +738,12 @@ internal sealed class SeedService : ISeedService
 
                                 try
                                 {
-                                    await VectorData<Media>.SaveWithVector(envelope.Entity, embedding, vectorMetadata, ct).ConfigureAwait(false);
+                                    await VectorData<Media>.SaveWithVector(envelope.Entity, embedding, vectorMetadata, ct);
                                     envelope.Metadata["vector:affected"] = 1;
                                     Interlocked.Add(ref stored, 1);
 
-                                    // Cache the embedding for future use
-                                    var embeddingText = BuildEmbeddingText(envelope.Entity);
-                                    var contentHash = EmbeddingCache.ComputeContentHash(embeddingText);
-                                    await _embeddingCache.SetAsync(contentHash, modelId, embedding, typeof(Media).FullName!, ct);
+                                    // NOTE: With ARCH-0070, embeddings are managed by framework via EmbeddingState<T>
+                                    // No need to manually cache embeddings anymore
                                 }
                                 catch (InvalidOperationException)
                                 {
@@ -816,7 +776,7 @@ internal sealed class SeedService : ISeedService
         }
 
         _logger?.LogInformation("Vector pipeline completed: {Stored} vectors stored ({Cached} from cache, {Generated} newly generated)",
-            stored, cachedItems.Count, uncachedItems.Count - failures);
+            stored, _cacheHits, uncachedItems.Count - failures);
 
         return stored;
     }
@@ -854,5 +814,34 @@ internal sealed class SeedService : ISeedService
         if (m.Synonyms is { Length: > 0 }) titles.AddRange(m.Synonyms);
 
         return string.Join(" ", titles.Distinct());
+    }
+
+    /// <summary>
+    /// Builds vector metadata with all filterable properties for filter push-down.
+    /// </summary>
+    private Dictionary<string, object> BuildVectorMetadata(Media m)
+    {
+        var metadata = new Dictionary<string, object>
+        {
+            ["searchText"] = BuildSearchText(m)  // Required for hybrid search
+        };
+
+        // Add filterable properties (all optional to handle nulls gracefully)
+        if (m.Genres is { Length: > 0 })
+            metadata["genres"] = m.Genres;
+        if (m.Tags is { Length: > 0 })
+            metadata["tags"] = m.Tags;
+        if (m.Rating.HasValue)
+            metadata["rating"] = m.Rating.Value;
+        if (m.Year.HasValue)
+            metadata["year"] = m.Year.Value;
+        if (m.Episodes.HasValue)
+            metadata["episodes"] = m.Episodes.Value;
+        if (!string.IsNullOrWhiteSpace(m.MediaTypeId))
+            metadata["mediaTypeId"] = m.MediaTypeId;
+
+        metadata["popularity"] = m.Popularity;
+
+        return metadata;
     }
 }

@@ -70,7 +70,7 @@ public static class StorageServiceHelpers
         await using var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read,
             bufferSize: 64 * 1024,
             options: FileOptions.Asynchronous | FileOptions.SequentialScan);
-        return await svc.PutAsync(profile, container, key.ToStorageKey(), fs, contentType, ct).ConfigureAwait(false);
+        return await svc.PutAsync(profile, container, key.ToStorageKey(), fs, contentType, ct);
     }
 
     public static async Task<StorageObject> OnboardUrl(this IStorageService svc, Uri uri, string? key = null, string? contentType = null, HttpClient? http = null, string profile = "", string container = "", long? maxBytes = null, CancellationToken ct = default)
@@ -82,12 +82,12 @@ public static class StorageServiceHelpers
         http ??= new HttpClient();
         try
         {
-            using var resp = await http.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
+            using var resp = await http.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead, ct);
             resp.EnsureSuccessStatusCode();
-            var stream = await resp.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
+            var stream = await resp.Content.ReadAsStreamAsync(ct);
             var limited = maxBytes.HasValue ? new LimitedStream(stream, maxBytes.Value) : stream;
             contentType ??= resp.Content.Headers.ContentType?.ToString() ?? GuessContentTypeInternal(key!) ?? "application/octet-stream";
-            return await svc.PutAsync(profile, container, key!.ToStorageKey(), limited, contentType, ct).ConfigureAwait(false);
+            return await svc.PutAsync(profile, container, key!.ToStorageKey(), limited, contentType, ct);
         }
         finally
         {
@@ -102,25 +102,25 @@ public static class StorageServiceHelpers
     public static async Task<string> ReadAllText(this IStorageService svc, string profile, string container, string key, Encoding? encoding = null, CancellationToken ct = default)
     {
         encoding ??= Encoding.UTF8;
-        await using var s = await svc.ReadAsync(profile, container, key, ct).ConfigureAwait(false);
+        await using var s = await svc.ReadAsync(profile, container, key, ct);
         using var sr = new StreamReader(s, encoding, detectEncodingFromByteOrderMarks: true);
-        return await sr.ReadToEndAsync(ct).ConfigureAwait(false);
+        return await sr.ReadToEndAsync(ct);
     }
 
     public static async Task<byte[]> ReadAllBytes(this IStorageService svc, string profile, string container, string key, CancellationToken ct = default)
     {
-        await using var s = await svc.ReadAsync(profile, container, key, ct).ConfigureAwait(false);
+        await using var s = await svc.ReadAsync(profile, container, key, ct);
         using var ms = new MemoryStream();
-        await s.CopyToAsync(ms, ct).ConfigureAwait(false);
+        await s.CopyToAsync(ms, ct);
         return ms.ToArray();
     }
 
     public static async Task<string> ReadRangeAsString(this IStorageService svc, string profile, string container, string key, long from, long to, Encoding? encoding = null, CancellationToken ct = default)
     {
         encoding ??= Encoding.UTF8;
-        var (stream, _) = await svc.ReadRangeAsync(profile, container, key, from, to, ct).ConfigureAwait(false);
+        var (stream, _) = await svc.ReadRangeAsync(profile, container, key, from, to, ct);
         using var sr = new StreamReader(stream, encoding, detectEncodingFromByteOrderMarks: true);
-        return await sr.ReadToEndAsync(ct).ConfigureAwait(false);
+        return await sr.ReadToEndAsync(ct);
     }
 
     // Lifecycle utilities
@@ -129,7 +129,7 @@ public static class StorageServiceHelpers
 
     public static async Task EnsureDeleted(this IStorageService svc, string profile, string container, string key, CancellationToken ct = default)
     {
-        _ = await svc.DeleteAsync(profile, container, key, ct).ConfigureAwait(false);
+        _ = await svc.DeleteAsync(profile, container, key, ct);
     }
 
     // Routing sugar
@@ -201,7 +201,7 @@ public static class StorageServiceHelpers
         {
             if (_remaining <= 0) throw new IOException("Maximum allowed bytes exceeded.");
             var toRead = (int)Math.Min(buffer.Length, _remaining);
-            var read = await _inner.ReadAsync(buffer.Slice(0, toRead), cancellationToken).ConfigureAwait(false);
+            var read = await _inner.ReadAsync(buffer.Slice(0, toRead), cancellationToken);
             _remaining -= read;
             return read;
         }

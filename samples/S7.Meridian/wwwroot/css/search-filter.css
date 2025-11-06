@@ -1,0 +1,551 @@
+/**
+ * Search Filter Styles
+ *
+ * Design Pattern: Unified search/filter component
+ * Features: Search with debounce, filter dropdowns, sort controls
+ */
+
+/* ==================== Search Filter Container ==================== */
+.search-filter {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3);
+  padding: var(--spacing-4);
+  background-color: var(--color-bg-secondary);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  margin-bottom: var(--spacing-6);
+}
+
+.search-filter-compact {
+  padding: var(--spacing-3);
+}
+
+.search-filter-main {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-3);
+  flex-wrap: wrap;
+}
+
+/* ==================== Search Input ==================== */
+.search-filter-search {
+  flex: 1;
+  min-width: 250px;
+}
+
+.search-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.search-icon {
+  position: absolute;
+  left: var(--spacing-3);
+  color: var(--color-text-tertiary);
+  pointer-events: none;
+  flex-shrink: 0;
+}
+
+.search-input {
+  width: 100%;
+  height: 40px;
+  padding: 0 var(--spacing-10) 0 var(--spacing-10);
+  border: 1px solid var(--color-border-medium);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-base);
+  color: var(--color-text-primary);
+  background-color: var(--color-bg-canvas);
+  transition: all var(--transition-fast);
+}
+
+.search-input:hover {
+  border-color: var(--color-border-dark);
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: var(--color-primary-600);
+  box-shadow: 0 0 0 3px var(--color-primary-100);
+}
+
+.search-input::placeholder {
+  color: var(--color-text-tertiary);
+}
+
+.search-clear-btn {
+  position: absolute;
+  right: var(--spacing-2);
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+}
+
+.search-clear-btn:hover {
+  color: var(--color-text-primary);
+  background-color: var(--color-bg-hover);
+}
+
+.search-clear-btn:active {
+  transform: scale(0.95);
+}
+
+/* ==================== Filter Dropdowns ==================== */
+.search-filter-filters {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  flex-wrap: wrap;
+}
+
+.filter-dropdown {
+  position: relative;
+}
+
+.filter-dropdown-trigger {
+  height: 40px;
+  padding: 0 var(--spacing-3);
+  border: 1px solid var(--color-border-medium);
+  border-radius: var(--radius-md);
+  background-color: var(--color-bg-canvas);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+}
+
+.filter-dropdown-trigger:hover {
+  border-color: var(--color-border-dark);
+  color: var(--color-text-primary);
+}
+
+.filter-dropdown.active .filter-dropdown-trigger {
+  border-color: var(--color-primary-600);
+  background-color: var(--color-primary-50);
+  color: var(--color-primary-700);
+}
+
+.filter-dropdown-trigger:focus-visible {
+  outline: 2px solid var(--color-primary-600);
+  outline-offset: 2px;
+}
+
+.filter-label {
+  flex: 1;
+}
+
+.filter-arrow {
+  flex-shrink: 0;
+  transition: transform var(--transition-fast);
+}
+
+.filter-dropdown-trigger[aria-expanded="true"] .filter-arrow {
+  transform: rotate(180deg);
+}
+
+.filter-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 200px;
+  max-height: 300px;
+  overflow-y: auto;
+  background-color: var(--color-bg-secondary);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  z-index: 100;
+  display: none;
+  opacity: 0;
+  transform: translateY(-8px);
+  transition: opacity var(--transition-fast), transform var(--transition-fast);
+}
+
+.filter-dropdown-menu.open {
+  display: block;
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.filter-option {
+  width: 100%;
+  padding: var(--spacing-3) var(--spacing-4);
+  border: none;
+  background: none;
+  text-align: left;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-primary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-2);
+  transition: background-color var(--transition-fast);
+}
+
+.filter-option:hover {
+  background-color: var(--color-bg-hover);
+}
+
+.filter-option.active {
+  color: var(--color-primary-600);
+  background-color: var(--color-primary-50);
+}
+
+.filter-option:focus-visible {
+  outline: 2px solid var(--color-primary-600);
+  outline-offset: -2px;
+}
+
+.filter-option .check-icon {
+  flex-shrink: 0;
+  color: var(--color-primary-600);
+}
+
+/* ==================== Sort Controls ==================== */
+.search-filter-sort {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+}
+
+.sort-dropdown {
+  position: relative;
+}
+
+.sort-dropdown-trigger {
+  height: 40px;
+  padding: 0 var(--spacing-3);
+  border: 1px solid var(--color-border-medium);
+  border-radius: var(--radius-md);
+  background-color: var(--color-bg-canvas);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+}
+
+.sort-dropdown-trigger:hover {
+  border-color: var(--color-border-dark);
+  color: var(--color-text-primary);
+}
+
+.sort-dropdown-trigger:focus-visible {
+  outline: 2px solid var(--color-primary-600);
+  outline-offset: 2px;
+}
+
+.sort-arrow {
+  flex-shrink: 0;
+  transition: transform var(--transition-fast);
+}
+
+.sort-dropdown-trigger[aria-expanded="true"] .sort-arrow {
+  transform: rotate(180deg);
+}
+
+.sort-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 180px;
+  max-height: 250px;
+  overflow-y: auto;
+  background-color: var(--color-bg-secondary);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  z-index: 100;
+  display: none;
+  opacity: 0;
+  transform: translateY(-8px);
+  transition: opacity var(--transition-fast), transform var(--transition-fast);
+}
+
+.sort-dropdown-menu.open {
+  display: block;
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.sort-option {
+  width: 100%;
+  padding: var(--spacing-3) var(--spacing-4);
+  border: none;
+  background: none;
+  text-align: left;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-primary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-2);
+  transition: background-color var(--transition-fast);
+}
+
+.sort-option:hover {
+  background-color: var(--color-bg-hover);
+}
+
+.sort-option.active {
+  color: var(--color-primary-600);
+  background-color: var(--color-primary-50);
+}
+
+.sort-option:focus-visible {
+  outline: 2px solid var(--color-primary-600);
+  outline-offset: -2px;
+}
+
+.sort-option .check-icon {
+  flex-shrink: 0;
+  color: var(--color-primary-600);
+}
+
+.sort-direction-btn {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid var(--color-border-medium);
+  border-radius: var(--radius-md);
+  background-color: var(--color-bg-canvas);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.sort-direction-btn:hover {
+  border-color: var(--color-border-dark);
+  color: var(--color-text-primary);
+}
+
+.sort-direction-btn:active {
+  transform: scale(0.95);
+}
+
+.sort-direction-btn:focus-visible {
+  outline: 2px solid var(--color-primary-600);
+  outline-offset: 2px;
+}
+
+/* ==================== Clear All Button ==================== */
+.search-filter-clear-btn {
+  height: 40px;
+  padding: 0 var(--spacing-3);
+  border: 1px solid var(--color-border-medium);
+  border-radius: var(--radius-md);
+  background-color: var(--color-bg-canvas);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+  margin-left: auto;
+}
+
+.search-filter-clear-btn:hover {
+  border-color: var(--color-danger-600);
+  background-color: var(--color-danger-50);
+  color: var(--color-danger-700);
+}
+
+.search-filter-clear-btn:active {
+  transform: scale(0.98);
+}
+
+.search-filter-clear-btn:focus-visible {
+  outline: 2px solid var(--color-danger-600);
+  outline-offset: 2px;
+}
+
+/* ==================== Active Filter Tags ==================== */
+.search-filter-tags {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  flex-wrap: wrap;
+  padding-top: var(--spacing-2);
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.filter-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  padding: var(--spacing-1) var(--spacing-2);
+  background-color: var(--color-primary-100);
+  color: var(--color-primary-800);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  animation: slideIn var(--transition-base) ease-out;
+}
+
+.filter-tag-label {
+  line-height: 1.5;
+}
+
+.filter-tag-remove {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--color-primary-700);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+}
+
+.filter-tag-remove:hover {
+  background-color: var(--color-primary-200);
+  color: var(--color-primary-900);
+}
+
+.filter-tag-remove:active {
+  transform: scale(0.9);
+}
+
+.filter-tag-remove:focus-visible {
+  outline: 2px solid var(--color-primary-600);
+  outline-offset: 1px;
+}
+
+/* ==================== Animations ==================== */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* ==================== Responsive Design ==================== */
+@media (max-width: 768px) {
+  .search-filter-main {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .search-filter-search {
+    min-width: 100%;
+  }
+
+  .search-filter-filters {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .filter-dropdown-trigger,
+  .sort-dropdown-trigger {
+    width: 100%;
+  }
+
+  .filter-dropdown-menu,
+  .sort-dropdown-menu {
+    left: 0;
+    right: 0;
+    min-width: 100%;
+  }
+
+  .search-filter-sort {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .sort-dropdown {
+    flex: 1;
+  }
+
+  .sort-direction-btn {
+    width: 100%;
+  }
+
+  .search-filter-clear-btn {
+    margin-left: 0;
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .search-filter {
+    padding: var(--spacing-3);
+  }
+
+  .search-input {
+    height: 36px;
+    font-size: var(--font-size-sm);
+  }
+
+  .filter-dropdown-trigger,
+  .sort-dropdown-trigger,
+  .sort-direction-btn,
+  .search-filter-clear-btn {
+    height: 36px;
+    font-size: var(--font-size-sm);
+  }
+}
+
+/* ==================== Accessibility ==================== */
+@media (prefers-reduced-motion: reduce) {
+  .filter-dropdown-menu,
+  .sort-dropdown-menu,
+  .filter-arrow,
+  .sort-arrow,
+  .filter-tag {
+    transition: none;
+    animation: none;
+  }
+
+  .filter-tag {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* ==================== Dark Mode (Future) ==================== */
+@media (prefers-color-scheme: dark) {
+  /* Dark mode styles can be added here in the future */
+}
+
+/* ==================== Print Styles ==================== */
+@media print {
+  .search-filter {
+    display: none;
+  }
+}

@@ -40,12 +40,12 @@ public sealed class PipelineBuilder<TEntity> : IPipelineStageBuilder<TEntity, Pi
     /// </summary>
     public async Task ExecuteAsync(CancellationToken cancellationToken = default)
     {
-        await foreach (var entity in _source.WithCancellation(cancellationToken).ConfigureAwait(false))
+        await foreach (var entity in _source.WithCancellation(cancellationToken))
         {
             var envelope = new PipelineEnvelope<TEntity>(entity);
             foreach (var stage in _stages)
             {
-                await stage(envelope, cancellationToken).ConfigureAwait(false);
+                await stage(envelope, cancellationToken);
                 if (envelope.IsCompleted)
                 {
                     break;

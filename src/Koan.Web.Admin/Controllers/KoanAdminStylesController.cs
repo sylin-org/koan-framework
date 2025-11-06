@@ -34,7 +34,7 @@ public sealed class KoanAdminStylesController : ControllerBase
             return NotFound();
         }
 
-        var manifest = await _manifest.BuildAsync(cancellationToken).ConfigureAwait(false);
+        var manifest = await _manifest.BuildAsync(cancellationToken);
         var styles = KoanAdminModuleStyleResolver.ResolveAll(manifest.Modules);
         var css = KoanAdminModuleStyleResolver.BuildStylesheet(styles);
 

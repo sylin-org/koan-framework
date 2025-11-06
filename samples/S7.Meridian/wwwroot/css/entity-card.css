@@ -1,0 +1,372 @@
+/**
+ * Entity Card Styles
+ *
+ * Design Pattern: Standardized card component for all entity types
+ * Features: Consistent layout, hover states, action buttons, bulk selection
+ * Used by: AnalysisTypesManager, SourceTypesManager, and future entity lists
+ */
+
+/* ==================== Card Container ==================== */
+.entity-card {
+  position: relative;
+  background-color: var(--color-bg-secondary);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-4);
+  transition: all var(--transition-base);
+  cursor: pointer;
+}
+
+.entity-card:hover {
+  border-color: var(--color-border-medium);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+
+.entity-card:focus-within {
+  outline: 2px solid var(--color-primary-600);
+  outline-offset: 2px;
+}
+
+.entity-card.selected {
+  border-color: var(--color-primary-600);
+  background-color: rgba(91, 159, 255, 0.1);
+  box-shadow: var(--shadow-md);
+}
+
+.entity-card.compact {
+  padding: var(--spacing-4);
+  gap: var(--spacing-3);
+}
+
+/* ==================== Card Selection Checkbox ==================== */
+.entity-card-select {
+  position: absolute;
+  top: var(--spacing-3);
+  left: var(--spacing-3);
+  z-index: 10;
+}
+
+.entity-card-select-checkbox {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--color-border-medium);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  appearance: none;
+  background-color: var(--color-bg-canvas);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.entity-card-select-checkbox:hover {
+  border-color: var(--color-primary-600);
+}
+
+.entity-card-select-checkbox:checked {
+  background-color: var(--color-primary-600);
+  border-color: var(--color-primary-600);
+}
+
+.entity-card-select-checkbox:checked::after {
+  content: '';
+  width: 10px;
+  height: 6px;
+  border: solid white;
+  border-width: 0 0 2px 2px;
+  transform: rotate(-45deg);
+  margin-bottom: 2px;
+}
+
+.entity-card-select-checkbox:focus-visible {
+  outline: 2px solid var(--color-primary-600);
+  outline-offset: 2px;
+}
+
+/* ==================== Card Content ==================== */
+.entity-card-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3);
+  flex: 1;
+}
+
+.entity-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--spacing-3);
+}
+
+.entity-card-title {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  margin: 0;
+  line-height: var(--line-height-tight);
+  word-break: break-word;
+}
+
+.entity-card.compact .entity-card-title {
+  font-size: var(--font-size-base);
+}
+
+/* ==================== Card Badge ==================== */
+.entity-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--spacing-1) var(--spacing-2);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  flex-shrink: 0;
+}
+
+.entity-badge.badge-analysis {
+  background-color: rgba(91, 159, 255, 0.15);
+  color: var(--color-blue);
+  border: 1px solid rgba(91, 159, 255, 0.3);
+}
+
+.entity-badge.badge-source {
+  background-color: rgba(168, 85, 247, 0.15);
+  color: #A855F7;
+  border: 1px solid rgba(168, 85, 247, 0.3);
+}
+
+.entity-badge.badge-document {
+  background-color: rgba(74, 222, 128, 0.15);
+  color: var(--color-green);
+  border: 1px solid rgba(74, 222, 128, 0.3);
+}
+
+.entity-badge.badge-insight {
+  background-color: rgba(251, 191, 36, 0.15);
+  color: var(--color-amber);
+  border: 1px solid rgba(251, 191, 36, 0.3);
+}
+
+.entity-badge.badge-pipeline {
+  background-color: rgba(99, 102, 241, 0.15);
+  color: #6366F1;
+  border: 1px solid rgba(99, 102, 241, 0.3);
+}
+
+/* ==================== Card Description ==================== */
+.entity-card-description {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  line-height: var(--line-height-relaxed);
+  margin: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.entity-card.compact .entity-card-description {
+  -webkit-line-clamp: 2;
+  font-size: var(--font-size-xs);
+}
+
+/* ==================== Card Tags ==================== */
+.entity-card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-2);
+  align-items: center;
+}
+
+.entity-card-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--spacing-1) var(--spacing-2);
+  background-color: var(--color-bg-secondary);
+  color: var(--color-text-secondary);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  border: 1px solid var(--color-border-subtle);
+}
+
+.entity-card-tag-more {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+  font-weight: var(--font-weight-medium);
+}
+
+/* ==================== Card Metadata ==================== */
+.entity-card-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-4);
+  flex-wrap: wrap;
+  padding-top: var(--spacing-2);
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.entity-card-meta-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-1);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+}
+
+.entity-card-meta-item svg {
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+/* ==================== Card Actions ==================== */
+.entity-card-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  padding-top: var(--spacing-3);
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.entity-card-action-btn {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid var(--color-border-medium);
+  border-radius: var(--radius-md);
+  background-color: var(--color-bg-canvas);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.entity-card-action-btn:hover {
+  background-color: var(--color-bg-hover);
+  border-color: var(--color-border-dark);
+  color: var(--color-text-primary);
+}
+
+.entity-card-action-btn:active {
+  transform: scale(0.95);
+}
+
+.entity-card-action-btn:focus-visible {
+  outline: 2px solid var(--color-primary-600);
+  outline-offset: 2px;
+}
+
+.entity-card-action-btn.action-primary {
+  background-color: var(--color-primary-600);
+  border-color: var(--color-primary-600);
+  color: white;
+}
+
+.entity-card-action-btn.action-primary:hover {
+  background-color: var(--color-primary-700);
+  border-color: var(--color-primary-700);
+}
+
+.entity-card-action-btn.action-danger {
+  color: var(--color-danger-600);
+}
+
+.entity-card-action-btn.action-danger:hover {
+  background-color: var(--color-danger-50);
+  border-color: var(--color-danger-600);
+  color: var(--color-danger-700);
+}
+
+/* ==================== Card States ==================== */
+.entity-card.disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.entity-card.loading {
+  position: relative;
+  pointer-events: none;
+}
+
+.entity-card.loading::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(10, 10, 10, 0.8);
+  border-radius: var(--radius-lg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ==================== Responsive Design ==================== */
+@media (max-width: 768px) {
+  .entity-card {
+    padding: var(--spacing-4);
+  }
+
+  .entity-card-title {
+    font-size: var(--font-size-base);
+  }
+
+  .entity-card-description {
+    font-size: var(--font-size-xs);
+    -webkit-line-clamp: 2;
+  }
+
+  .entity-card-actions {
+    flex-wrap: wrap;
+  }
+
+  .entity-card-action-btn {
+    flex: 1;
+    min-width: 36px;
+  }
+}
+
+/* ==================== Accessibility ==================== */
+@media (prefers-reduced-motion: reduce) {
+  .entity-card,
+  .entity-card-action-btn,
+  .entity-card-select-checkbox {
+    transition: none;
+  }
+
+  .entity-card:hover {
+    transform: none;
+  }
+}
+
+/* ==================== Dark Mode (Future) ==================== */
+@media (prefers-color-scheme: dark) {
+  .entity-card-select-checkbox:checked::after {
+    border-color: var(--color-bg-canvas);
+  }
+}
+
+/* ==================== Print Styles ==================== */
+@media print {
+  .entity-card-select,
+  .entity-card-actions {
+    display: none;
+  }
+
+  .entity-card {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}

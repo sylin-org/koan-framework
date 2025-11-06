@@ -81,7 +81,7 @@ internal sealed class EntitySchemaGuard<TEntity, TKey>
 
             try
             {
-                await contributor.EnsureHealthyAsync(token).ConfigureAwait(false);
+                await contributor.EnsureHealthyAsync(token);
                 _states[storageKey] = new ProvisionState(true, DateTime.UtcNow, null);
                 KoanLog.DataDebug(_logger, LogActions.SchemaEnsure, "healthy",
                     ("entity", typeof(TEntity).FullName ?? typeof(TEntity).Name),
@@ -99,7 +99,7 @@ internal sealed class EntitySchemaGuard<TEntity, TKey>
                     ("error", ex.Message));
                 throw;
             }
-        }, ct).ConfigureAwait(false);
+        }, ct);
     }
 
     /// <summary>

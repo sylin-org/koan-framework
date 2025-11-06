@@ -179,12 +179,12 @@ internal sealed class PostgresRepository<
                 var orch = (IRelationalSchemaOrchestrator)_sp.GetRequiredService(typeof(IRelationalSchemaOrchestrator));
                 var ddl = new PgDdlExecutor(conn, _options.SearchPath);
                 var feats = new PostgresStoreFeatures();
-                var report = (IDictionary<string, object?>)await orch.ValidateAsync<TEntity, TKey>(ddl, feats, runCt).ConfigureAwait(false);
+                var report = (IDictionary<string, object?>)await orch.ValidateAsync<TEntity, TKey>(ddl, feats, runCt);
                 var ddlAllowed = report.TryGetValue("DdlAllowed", out var da) && da is bool allowed && allowed;
                 var tableExists = report.TryGetValue("TableExists", out var te) && te is bool exists && exists;
                 if (ddlAllowed)
                 {
-                    await orch.EnsureCreatedAsync<TEntity, TKey>(ddl, feats, runCt).ConfigureAwait(false);
+                    await orch.EnsureCreatedAsync<TEntity, TKey>(ddl, feats, runCt);
                     _healthyCache[cacheKey] = true;
                     return;
                 }
@@ -208,11 +208,11 @@ internal sealed class PostgresRepository<
         ct.ThrowIfCancellationRequested();
         var table = TableName;
         await using var conn = new NpgsqlConnection(_options.ConnectionString);
-        await conn.OpenAsync(ct).ConfigureAwait(false);
+        await conn.OpenAsync(ct);
         var cacheKey = BuildCacheKey(conn, table);
         try
         {
-            await EnsureOrchestratedAsync(conn, cacheKey, ct).ConfigureAwait(false);
+            await EnsureOrchestratedAsync(conn, cacheKey, ct);
         }
         catch (Exception ex)
         {
