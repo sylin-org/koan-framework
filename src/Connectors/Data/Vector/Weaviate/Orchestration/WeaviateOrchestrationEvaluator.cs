@@ -27,9 +27,9 @@ public class WeaviateOrchestrationEvaluator : BaseOrchestrationEvaluator
 
     protected override bool IsServiceEnabled(IConfiguration configuration)
     {
-        // Weaviate is typically enabled when vector data adapters reference it or when explicitly configured
-        // Conservative approach - only enable if explicitly configured
-        return HasExplicitConfiguration(configuration);
+        // Weaviate is enabled when package is referenced (Reference = Intent principle)
+        // The orchestration evaluator will determine whether to provision or use external based on configuration
+        return true;
     }
 
     protected override bool HasExplicitConfiguration(IConfiguration configuration)
