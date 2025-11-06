@@ -3,125 +3,341 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Koan Context</title>
+    <title>Koan Context - Semantic Code Search</title>
     <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 2rem;
-            background: #f5f5f5;
-        }
-        .container {
-            background: white;
-            padding: 2rem;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        h1 {
-            color: #333;
-            margin-bottom: 0.5rem;
-        }
-        .subtitle {
-            color: #666;
-            margin-bottom: 2rem;
-        }
-        .status {
-            display: inline-block;
-            padding: 0.25rem 0.75rem;
-            background: #e8f5e9;
-            color: #2e7d32;
-            border-radius: 4px;
-            font-size: 0.875rem;
-        }
-        .section {
-            margin: 2rem 0;
-        }
-        .section h2 {
-            color: #555;
-            font-size: 1.25rem;
-            margin-bottom: 1rem;
-        }
-        .endpoint {
-            display: flex;
-            justify-content: space-between;
-            padding: 0.75rem;
-            background: #f9f9f9;
-            border-left: 3px solid #2196f3;
-            margin-bottom: 0.5rem;
-            border-radius: 4px;
-        }
-        .endpoint code {
-            color: #1976d2;
-        }
-        .placeholder {
-            padding: 2rem;
-            background: #fff9e6;
-            border: 2px dashed #ffc107;
-            border-radius: 4px;
-            text-align: center;
-            color: #f57c00;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; color: #333; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        header { background: #2c3e50; color: white; padding: 20px 0; margin-bottom: 30px; }
+        header h1 { font-size: 28px; font-weight: 600; }
+        header p { opacity: 0.9; margin-top: 5px; }
+        .tabs { display: flex; gap: 10px; margin-bottom: 30px; border-bottom: 2px solid #ddd; }
+        .tab { padding: 12px 24px; background: none; border: none; cursor: pointer; font-size: 16px; color: #666; border-bottom: 3px solid transparent; transition: all 0.2s; }
+        .tab.active { color: #3498db; border-bottom-color: #3498db; font-weight: 600; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; animation: fadeIn 0.3s; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        /* Projects Tab */
+        .project-actions { display: flex; gap: 15px; margin-bottom: 20px; }
+        .btn { padding: 12px 24px; background: #3498db; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600; transition: background 0.2s; }
+        .btn:hover { background: #2980b9; }
+        .btn-secondary { background: #95a5a6; }
+        .btn-secondary:hover { background: #7f8c8d; }
+        .btn-danger { background: #e74c3c; }
+        .btn-danger:hover { background: #c0392b; }
+        .projects-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 20px; }
+        .project-card { background: white; border-radius: 8px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); transition: transform 0.2s, box-shadow 0.2s; }
+        .project-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+        .project-card h3 { font-size: 18px; margin-bottom: 10px; color: #2c3e50; }
+        .project-card .path { font-family: 'Courier New', monospace; font-size: 12px; color: #7f8c8d; margin-bottom: 15px; word-break: break-all; }
+        .project-card .meta { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; }
+        .badge { padding: 4px 8px; background: #ecf0f1; border-radius: 4px; font-size: 11px; font-weight: 600; text-transform: uppercase; }
+        .badge.active { background: #2ecc71; color: white; }
+        .badge.indexed { background: #3498db; color: white; }
+        .project-actions-btn { display: flex; gap: 10px; }
+        .btn-small { padding: 8px 16px; font-size: 13px; }
+
+        /* Search Tab */
+        .search-box { background: white; border-radius: 8px; padding: 25px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 30px; }
+        .search-box h2 { margin-bottom: 20px; color: #2c3e50; }
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; margin-bottom: 8px; font-weight: 600; color: #555; }
+        select, input[type="text"], input[type="range"] { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; }
+        input[type="range"] { padding: 0; }
+        .slider-labels { display: flex; justify-content: space-between; font-size: 12px; color: #7f8c8d; margin-top: 5px; }
+        .search-results { background: white; border-radius: 8px; padding: 25px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .result-item { border-bottom: 1px solid #ecf0f1; padding: 20px 0; }
+        .result-item:last-child { border-bottom: none; }
+        .result-item h4 { color: #2c3e50; margin-bottom: 10px; font-size: 16px; }
+        .result-text { margin: 10px 0; line-height: 1.6; color: #555; white-space: pre-wrap; font-size: 14px; background: #f8f9fa; padding: 15px; border-radius: 6px; max-height: 200px; overflow-y: auto; }
+        .result-meta { display: flex; gap: 15px; flex-wrap: wrap; margin-top: 10px; }
+        .result-meta-item { font-size: 12px; color: #7f8c8d; }
+        .result-meta-item strong { color: #555; }
+        .score { background: #3498db; color: white; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+
+        /* Modal */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; }
+        .modal.active { display: flex; align-items: center; justify-content: center; animation: fadeIn 0.2s; }
+        .modal-content { background: white; border-radius: 8px; padding: 30px; max-width: 500px; width: 90%; box-shadow: 0 10px 40px rgba(0,0,0,0.3); }
+        .modal-content h2 { margin-bottom: 20px; }
+        .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+
+        .loading { text-align: center; padding: 40px; color: #7f8c8d; }
+        .error { background: #e74c3c; color: white; padding: 15px; border-radius: 6px; margin-bottom: 20px; }
+        .success { background: #2ecc71; color: white; padding: 15px; border-radius: 6px; margin-bottom: 20px; }
+        .empty { text-align: center; padding: 60px; color: #95a5a6; }
     </style>
 </head>
 <body>
+    <header>
+        <div class="container">
+            <h1>Koan Context</h1>
+            <p>Semantic code search powered by vector embeddings</p>
+        </div>
+    </header>
+
     <div class="container">
-        <h1>Koan Context</h1>
-        <div class="subtitle">
-            Local-first code indexing and retrieval service
-            <span class="status">● Active</span>
+        <div class="tabs">
+            <button class="tab active" data-tab="projects">Projects</button>
+            <button class="tab" data-tab="search">Search</button>
         </div>
 
-        <div class="section">
-            <h2>Available Endpoints</h2>
-            <div class="endpoint">
-                <span>Health Check</span>
-                <code>GET /health</code>
+        <!-- Projects Tab -->
+        <div class="tab-content active" id="projects">
+            <div class="project-actions">
+                <button class="btn" onclick="showCreateProjectModal()">+ New Project</button>
+                <button class="btn btn-secondary" onclick="loadProjects()">Refresh</button>
             </div>
-            <div class="endpoint">
-                <span>Projects API</span>
-                <code>GET /api/projects</code>
-            </div>
-            <div class="endpoint">
-                <span>MCP Tools (SSE)</span>
-                <code>GET /mcp/sse</code>
-            </div>
-            <div class="endpoint">
-                <span>MCP Tools List</span>
-                <code>GET /mcp/tools/list</code>
-            </div>
+            <div id="projects-list" class="projects-grid"></div>
         </div>
 
-        <div class="section">
-            <h2>Web UI</h2>
-            <div class="placeholder">
-                <p><strong>Coming Soon</strong></p>
-                <p>Project management and semantic search interface will be implemented in Milestone 6</p>
+        <!-- Search Tab -->
+        <div class="tab-content" id="search">
+            <div class="search-box">
+                <h2>Semantic Search</h2>
+                <div class="form-group">
+                    <label for="searchProject">Select Project</label>
+                    <select id="searchProject">
+                        <option value="">Loading projects...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="searchQuery">Search Query</label>
+                    <input type="text" id="searchQuery" placeholder="Enter your search query...">
+                </div>
+                <div class="form-group">
+                    <label for="alphaSlider">Search Mode (Alpha: <span id="alphaValue">0.7</span>)</label>
+                    <input type="range" id="alphaSlider" min="0" max="1" step="0.1" value="0.7">
+                    <div class="slider-labels">
+                        <span>Keyword (BM25)</span>
+                        <span>Hybrid</span>
+                        <span>Semantic (Vector)</span>
+                    </div>
+                </div>
+                <button class="btn" onclick="performSearch()">Search</button>
             </div>
+            <div id="search-results"></div>
         </div>
+    </div>
 
-        <div class="section">
-            <h2>Quick Start</h2>
-            <ol>
-                <li>Ensure Weaviate is running on port 27501 (auto-provisioned on first vector operation)</li>
-                <li>Configure embedding provider in appsettings.json (default: Ollama with all-minilm)</li>
-                <li>Use MCP endpoints from Claude Desktop or Cline</li>
-                <li>Access REST API at <code>http://localhost:27500/api/projects</code></li>
-            </ol>
+    <!-- Create Project Modal -->
+    <div class="modal" id="createProjectModal">
+        <div class="modal-content">
+            <h2>Create New Project</h2>
+            <div class="form-group">
+                <label for="projectName">Project Name</label>
+                <input type="text" id="projectName" placeholder="My Project">
+            </div>
+            <div class="form-group">
+                <label for="projectPath">Root Path</label>
+                <input type="text" id="projectPath" placeholder="/path/to/project">
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="hideCreateProjectModal()">Cancel</button>
+                <button class="btn" onclick="createProject()">Create & Index</button>
+            </div>
         </div>
     </div>
 
     <script>
-        // Verify health endpoint
-        fetch('/health')
-            .then(response => {
-                if (response.ok) {
-                    console.log('✅ Health check passed');
-                } else {
-                    console.warn('⚠️ Health check failed');
-                }
-            })
-            .catch(err => console.error('Health check error:', err));
+        const API_BASE = '/api';
+        let projects = [];
+
+        // Tab switching
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                tab.classList.add('active');
+                document.getElementById(tab.dataset.tab).classList.add('active');
+            });
+        });
+
+        // Alpha slider
+        document.getElementById('alphaSlider').addEventListener('input', (e) => {
+            document.getElementById('alphaValue').textContent = e.target.value;
+        });
+
+        // Load projects on page load
+        window.addEventListener('load', () => {
+            loadProjects();
+        });
+
+        async function loadProjects() {
+            try {
+                const response = await fetch(`${API_BASE}/projects`);
+                projects = await response.json();
+                renderProjects(projects);
+                updateSearchProjectDropdown();
+            } catch (error) {
+                console.error('Failed to load projects:', error);
+                document.getElementById('projects-list').innerHTML = '<div class="error">Failed to load projects</div>';
+            }
+        }
+
+        function renderProjects(projects) {
+            const list = document.getElementById('projects-list');
+            if (projects.length === 0) {
+                list.innerHTML = '<div class="empty"><h3>No projects yet</h3><p>Create your first project to get started!</p></div>';
+                return;
+            }
+            list.innerHTML = projects.map(p => `
+                <div class="project-card">
+                    <h3>${p.name}</h3>
+                    <div class="path">${p.rootPath}</div>
+                    <div class="meta">
+                        <span class="badge ${p.isActive ? 'active' : ''}">
+                            ${p.isActive ? 'Active' : 'Inactive'}
+                        </span>
+                        ${p.documentCount > 0 ? `<span class="badge indexed">${p.documentCount} docs</span>` : ''}
+                    </div>
+                    <div class="project-actions-btn">
+                        <button class="btn btn-small" onclick="indexProject('${p.id}')">Index</button>
+                        <button class="btn btn-small btn-secondary" onclick="viewProject('${p.id}')">View</button>
+                        <button class="btn btn-small btn-danger" onclick="deleteProject('${p.id}')">Delete</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function updateSearchProjectDropdown() {
+            const select = document.getElementById('searchProject');
+            if (projects.length === 0) {
+                select.innerHTML = '<option value="">No projects available</option>';
+                return;
+            }
+            select.innerHTML = projects.map(p =>
+                `<option value="${p.id}">${p.name} (${p.documentCount || 0} docs)</option>`
+            ).join('');
+        }
+
+        function showCreateProjectModal() {
+            document.getElementById('createProjectModal').classList.add('active');
+        }
+
+        function hideCreateProjectModal() {
+            document.getElementById('createProjectModal').classList.remove('active');
+        }
+
+        async function createProject() {
+            const name = document.getElementById('projectName').value;
+            const path = document.getElementById('projectPath').value;
+
+            if (!name || !path) {
+                alert('Please fill in all fields');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/projects/create`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, rootPath: path, projectType: 0 })
+                });
+
+                if (!response.ok) throw new Error('Failed to create project');
+
+                const project = await response.json();
+                hideCreateProjectModal();
+                loadProjects();
+
+                // Auto-trigger indexing
+                indexProject(project.id);
+            } catch (error) {
+                alert('Failed to create project: ' + error.message);
+            }
+        }
+
+        async function indexProject(id) {
+            if (!confirm('Start indexing? This may take several minutes.')) return;
+
+            try {
+                const response = await fetch(`${API_BASE}/projects/${id}/index`, { method: 'POST' });
+                if (!response.ok) throw new Error('Indexing failed');
+
+                const result = await response.json();
+                alert(`Indexing complete!\\n\\nFiles: ${result.filesProcessed}\\nChunks: ${result.chunksCreated}\\nVectors: ${result.vectorsSaved}`);
+                loadProjects();
+            } catch (error) {
+                alert('Indexing failed: ' + error.message);
+            }
+        }
+
+        async function deleteProject(id) {
+            if (!confirm('Delete this project? This cannot be undone.')) return;
+
+            try {
+                const response = await fetch(`${API_BASE}/projects/${id}`, { method: 'DELETE' });
+                if (!response.ok) throw new Error('Failed to delete');
+                loadProjects();
+            } catch (error) {
+                alert('Failed to delete project: ' + error.message);
+            }
+        }
+
+        function viewProject(id) {
+            const project = projects.find(p => p.id === id);
+            if (project) {
+                alert(`Project: ${project.name}\\nPath: ${project.rootPath}\\nDocuments: ${project.documentCount || 0}\\nIndexed: ${project.indexedBytes || 0} bytes`);
+            }
+        }
+
+        async function performSearch() {
+            const projectId = document.getElementById('searchProject').value;
+            const query = document.getElementById('searchQuery').value;
+            const alpha = parseFloat(document.getElementById('alphaSlider').value);
+
+            if (!projectId || !query) {
+                alert('Please select a project and enter a search query');
+                return;
+            }
+
+            const resultsDiv = document.getElementById('search-results');
+            resultsDiv.innerHTML = '<div class="loading">Searching...</div>';
+
+            try {
+                const response = await fetch(`${API_BASE}/search`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ projectId, query, alpha, topK: 10 })
+                });
+
+                if (!response.ok) throw new Error('Search failed');
+
+                const result = await response.json();
+                renderSearchResults(result);
+            } catch (error) {
+                resultsDiv.innerHTML = '<div class="error">Search failed: ' + error.message + '</div>';
+            }
+        }
+
+        function renderSearchResults(result) {
+            const resultsDiv = document.getElementById('search-results');
+
+            if (!result.chunks || result.chunks.length === 0) {
+                resultsDiv.innerHTML = '<div class="empty"><h3>No results found</h3><p>Try adjusting your query or search mode.</p></div>';
+                return;
+            }
+
+            resultsDiv.innerHTML = `
+                <div class="search-results">
+                    <h2>Results (${result.totalCount} found in ${Math.round(result.duration.totalMilliseconds)}ms)</h2>
+                    ${result.chunks.map((chunk, i) => `
+                        <div class="result-item">
+                            <h4>${i + 1}. ${chunk.title || chunk.filePath}</h4>
+                            <div class="result-text">${chunk.text}</div>
+                            <div class="result-meta">
+                                <span class="result-meta-item"><strong>File:</strong> ${chunk.filePath}</span>
+                                ${chunk.commitSha ? `<span class="result-meta-item"><strong>Commit:</strong> ${chunk.commitSha.substring(0, 7)}</span>` : ''}
+                                ${chunk.language ? `<span class="result-meta-item"><strong>Lang:</strong> ${chunk.language}</span>` : ''}
+                                <span class="score">${(chunk.score * 100).toFixed(1)}% match</span>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
     </script>
 </body>
 </html>
