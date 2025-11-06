@@ -114,14 +114,14 @@ internal sealed class SqliteOptionsConfigurator : AdapterOptionsConfigurator<Sql
             {
                 KoanLog.ConfigInfo(logger, LogActions.Discovery, "disabled",
                     ("reason", "config"));
-                return BuildSqliteConnectionString("Data/Koan.sqlite");
+                return BuildSqliteConnectionString(".koan/data/Koan.sqlite");
             }
 
             if (_discoveryCoordinator == null)
             {
                 KoanLog.ConfigWarning(logger, LogActions.Discovery, LogOutcomeValues.Fallback,
                     ("reason", "no-coordinator"));
-                return BuildSqliteConnectionString("Data/Koan.sqlite");
+                return BuildSqliteConnectionString(".koan/data/Koan.sqlite");
             }
 
             // Create discovery context with SQLite-specific parameters
@@ -146,14 +146,14 @@ internal sealed class SqliteOptionsConfigurator : AdapterOptionsConfigurator<Sql
             {
                 KoanLog.ConfigWarning(logger, LogActions.Discovery, LogOutcomeValues.Fallback,
                     ("reason", "no-candidate"));
-                return BuildSqliteConnectionString("Data/Koan.sqlite");
+                return BuildSqliteConnectionString(".koan/data/Koan.sqlite");
             }
         }
         catch (Exception ex)
         {
             KoanLog.ConfigError(logger, LogActions.Discovery, "exception",
                 ("error", ex.Message));
-            return BuildSqliteConnectionString("Data/Koan.sqlite");
+            return BuildSqliteConnectionString(".koan/data/Koan.sqlite");
         }
     }
 
