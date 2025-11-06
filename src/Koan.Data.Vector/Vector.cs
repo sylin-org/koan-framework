@@ -19,6 +19,24 @@ public class Vector<TEntity> where TEntity : class, IEntity<string>
 
     public static bool IsAvailable => TryRepo is not null;
 
+    /// <summary>
+    /// Scopes all Vector&lt;TEntity&gt; operations to the specified partition.
+    /// Convenience method that delegates to EntityContext.Partition().
+    /// Consistent with Data&lt;T&gt;.WithPartition() pattern (DATA-0077).
+    /// </summary>
+    /// <param name="partition">Partition identifier (e.g., "project-abc", "tenant-123")</param>
+    /// <returns>Disposable scope - use with 'using' statement</returns>
+    /// <example>
+    /// <code>
+    /// using (Vector&lt;Document&gt;.WithPartition("project-koan"))
+    /// {
+    ///     await Vector&lt;Document&gt;.Save(items);  // Scoped to project-koan partition
+    /// }
+    /// </code>
+    /// </example>
+    public static IDisposable WithPartition(string partition)
+        => Koan.Data.Core.EntityContext.Partition(partition);
+
     // Save a single vector point; convenience overload
     public static Task Save(string id, float[] embedding, object? metadata = null, CancellationToken ct = default)
         => Repo.UpsertAsync(id, embedding, metadata, ct);

@@ -37,6 +37,7 @@ public static class ServiceCollectionExtensions
         services.TryAddSingleton<Configuration.IDataConnectionResolver, Configuration.DefaultDataConnectionResolver>();
         // Provide a default storage name resolver so naming works even without adapter-specific registration (e.g., JSON adapter)
         services.TryAddSingleton<Koan.Data.Abstractions.Naming.IStorageNameResolver, Koan.Data.Abstractions.Naming.DefaultStorageNameResolver>();
+        // Note: Partition context provided by EntityContext (static, no DI needed) - see DATA-0077
         services.AddKoanOptions<Options.DirectOptions>(Infrastructure.Constants.Configuration.Direct.Section);
         // Vector defaults now live in Koan.Data.Vector; apps should call AddKoanDataVector() to enable vector features.
         services.AddKoanOptions<DataRuntimeOptions>();

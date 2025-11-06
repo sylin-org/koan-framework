@@ -14,4 +14,9 @@ public enum VectorCapabilities
     BulkDelete = 1 << 7,
     AtomicBatch = 1 << 8,
     ScoreNormalization = 1 << 9,
+    /// <summary>
+    /// Provider can dynamically create collections/classes at runtime for partition isolation.
+    /// Required for partition-aware vector operations via <see cref="Koan.Data.Abstractions.Partition.IPartitionContextProvider"/>.
+    /// </summary>
+    DynamicCollections = 1 << 10,
 }

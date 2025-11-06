@@ -23,7 +23,7 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
     private volatile bool _schemaEnsured;
     private volatile int _discoveredDimension = -1; // -1 means not discovered yet
 
-    public VectorCapabilities Capabilities => VectorCapabilities.Knn | VectorCapabilities.Filters | VectorCapabilities.BulkUpsert | VectorCapabilities.BulkDelete | VectorCapabilities.Hybrid;
+    public VectorCapabilities Capabilities => VectorCapabilities.Knn | VectorCapabilities.Filters | VectorCapabilities.BulkUpsert | VectorCapabilities.BulkDelete | VectorCapabilities.Hybrid | VectorCapabilities.DynamicCollections;
 
     public WeaviateVectorRepository(IHttpClientFactory httpFactory, IOptions<WeaviateOptions> options, IServiceProvider sp)
     {
@@ -40,6 +40,22 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
     {
         get
         {
+            // Check for partition context (ARCH-0071, uses EntityContext from DATA-0077)
+            var partition = Koan.Data.Core.EntityContext.Current?.Partition;
+
+            if (!string.IsNullOrWhiteSpace(partition))
+            {
+                // Partition-aware: use IVectorPartitionMapper to generate partition-specific class name
+                var mapper = _sp.GetService<Koan.Data.Vector.Abstractions.Partition.IVectorPartitionMapper>();
+                if (mapper != null)
+                {
+                    return mapper.MapStorageName<TEntity>(partition);
+                }
+                // Fallback if mapper not registered (shouldn't happen in normal operation)
+                _logger?.LogWarning("Partition '{Partition}' set but IVectorPartitionMapper not found. Falling back to default class name.", partition);
+            }
+
+            // No partition: use standard naming resolution
             // Vector repository must use "weaviate" provider naming, not the entity's default DATA provider
             var providers = _sp.GetServices<Koan.Data.Abstractions.Naming.INamingDefaultsProvider>();
             var weaviateProvider = providers.FirstOrDefault(p => string.Equals(p.Provider, "weaviate", StringComparison.OrdinalIgnoreCase));
