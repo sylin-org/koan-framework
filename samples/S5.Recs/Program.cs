@@ -24,7 +24,7 @@ Directory.CreateDirectory(Path.Combine(builder.Environment.ContentRootPath, S5.R
 
 // Local services
 builder.Services.AddMemoryCache();  // For sliding window cache
-builder.Services.AddSingleton<IEmbeddingCache, EmbeddingCache>();
+// NOTE: IEmbeddingCache removed - embeddings now managed by framework via ARCH-0070
 builder.Services.AddSingleton<ISeedService, SeedService>();
 builder.Services.AddSingleton<IRecsService, RecsService>();
 builder.Services.AddSingleton<S5.Recs.Services.Pagination.IBandCacheService, S5.Recs.Services.Pagination.BandCacheService>();
@@ -68,7 +68,8 @@ builder.Services.AddSingleton<IMediaParserRegistry, MediaParserRegistry>();
 builder.Services.AddSingleton<IImportOrchestrator, ImportOrchestrator>();
 builder.Services.AddHostedService<S5.Recs.Services.Workers.ImportWorker>();
 builder.Services.AddHostedService<S5.Recs.Services.Workers.ValidationWorker>();
-builder.Services.AddHostedService<S5.Recs.Services.Workers.VectorizationWorker>();
+// VectorizationWorker obsolete - embeddings now generated automatically via [Embedding] attribute (ARCH-0070)
+//builder.Services.AddHostedService<S5.Recs.Services.Workers.VectorizationWorker>();
 builder.Services.AddHostedService<S5.Recs.Services.Workers.CatalogWorker>();
 
 // Couchbase adapter is auto-registered by its module via Koan.Core discovery

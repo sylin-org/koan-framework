@@ -11,6 +11,7 @@ using Koan.Data.Abstractions;
 using Koan.Data.Core;
 using Koan.Data.Vector;
 using Koan.Data.Vector.Abstractions;
+using Koan.Data.AI;
 
 namespace S5.Recs.Services;
 
@@ -20,7 +21,6 @@ internal sealed class RecsService : IRecsService
     private readonly IConfiguration _configuration;
     private readonly ILogger<RecsService>? _logger;
     private readonly IOptions<S5.Recs.Options.TagCatalogOptions>? _tagOptions;
-    private readonly IEmbeddingCache _embeddingCache;
     private readonly IRecommendationSettingsProvider _settingsProvider;
 
     // Demo data for fallback scenarios
@@ -70,13 +70,12 @@ internal sealed class RecsService : IRecsService
         }
     };
 
-    public RecsService(IServiceProvider sp, IConfiguration configuration, IEmbeddingCache embeddingCache, IRecommendationSettingsProvider settingsProvider, ILogger<RecsService>? logger = null, IOptions<S5.Recs.Options.TagCatalogOptions>? tagOptions = null)
+    public RecsService(IServiceProvider sp, IConfiguration configuration, IRecommendationSettingsProvider settingsProvider, ILogger<RecsService>? logger = null, IOptions<S5.Recs.Options.TagCatalogOptions>? tagOptions = null)
     {
         _sp = sp;
         _configuration = configuration;
         _logger = logger;
         _tagOptions = tagOptions;
-        _embeddingCache = embeddingCache;
         _settingsProvider = settingsProvider;
     }
 
@@ -449,63 +448,63 @@ internal sealed class RecsService : IRecsService
             var totalWeight = 0.0;
             var successCount = 0;
 
-            foreach (var entry in libraryEntries)
+            // Retrieve embeddings for all library entries in batch
+            var mediaIds = libraryEntries.Select(e => e.MediaId).ToList();
+
+            try
             {
-                try
+                _logger?.LogDebug("Retrieving {Count} embeddings from vector database for user {UserId}", mediaIds.Count, userId);
+
+                // Use batch GetEmbeddings for efficiency
+                var embeddings = await Vector<Media>.GetEmbeddings(mediaIds, ct);
+
+                _logger?.LogDebug("Retrieved {Retrieved}/{Total} embeddings for user {UserId}", embeddings.Count, mediaIds.Count, userId);
+
+                foreach (var entry in libraryEntries)
                 {
-                    var media = await Media.Get(entry.MediaId, ct);
-                    if (media == null) continue;
-
-                    // Build embedding text (MUST match SeedService.BuildEmbeddingText exactly!)
-                    var titles = new List<string>();
-                    if (!string.IsNullOrWhiteSpace(media.Title)) titles.Add(media.Title);
-                    if (!string.IsNullOrWhiteSpace(media.TitleEnglish) && media.TitleEnglish != media.Title) titles.Add(media.TitleEnglish!);
-                    if (!string.IsNullOrWhiteSpace(media.TitleRomaji) && media.TitleRomaji != media.Title) titles.Add(media.TitleRomaji!);
-                    if (!string.IsNullOrWhiteSpace(media.TitleNative) && media.TitleNative != media.Title) titles.Add(media.TitleNative!);
-                    if (media.Synonyms is { Length: > 0 }) titles.AddRange(media.Synonyms);
-
-                    var tags = new List<string>();
-                    if (media.Genres is { Length: > 0 }) tags.AddRange(media.Genres);
-                    if (media.Tags is { Length: > 0 }) tags.AddRange(media.Tags);
-
-                    var textBlend = $"{string.Join(" / ", titles.Distinct())}\n\n{media.Synopsis}\n\nTags: {string.Join(", ", tags.Distinct())}".Trim();
-                    var contentHash = EmbeddingCache.ComputeContentHash(textBlend);
-
-                    // Try to get cached embedding (use "default" to match SeedService)
-                    var modelId = "default";
-                    var cached = await _embeddingCache.GetAsync(contentHash, modelId, typeof(Media).FullName!, ct);
-
-                    if (cached == null || cached.Embedding == null || cached.Embedding.Length == 0)
+                    try
                     {
-                        _logger?.LogDebug("Skipping library item {MediaId} - no cached embedding found", entry.MediaId);
-                        continue;
+                        // Check if embedding exists for this media item
+                        if (!embeddings.TryGetValue(entry.MediaId, out var vec))
+                        {
+                            _logger?.LogDebug("No embedding found for library item {MediaId}", entry.MediaId);
+                            continue;
+                        }
+
+                        // Determine weight: rating if exists, else default 0.8 (assume "liked")
+                        var weight = entry.Rating.HasValue
+                            ? entry.Rating.Value / 5.0  // Normalize 1-5 to 0.2-1.0
+                            : 0.8;  // Default: unrated = assumed 4/5 stars
+
+                        // Accumulate weighted vector
+                        if (prefVector == null)
+                        {
+                            prefVector = new float[vec.Length];
+                        }
+
+                        for (int i = 0; i < vec.Length; i++)
+                        {
+                            prefVector[i] += (float)(vec[i] * weight);
+                        }
+
+                        totalWeight += weight;
+                        successCount++;
                     }
-
-                    var vec = cached.Embedding;
-
-                    // Determine weight: rating if exists, else default 0.8 (assume "liked")
-                    var weight = entry.Rating.HasValue
-                        ? entry.Rating.Value / 5.0  // Normalize 1-5 to 0.2-1.0
-                        : 0.8;  // Default: unrated = assumed 4/5 stars
-
-                    // Accumulate weighted vector
-                    if (prefVector == null)
+                    catch (Exception ex)
                     {
-                        prefVector = new float[vec.Length];
+                        _logger?.LogWarning(ex, "Failed to process library item {MediaId} for PrefVector", entry.MediaId);
                     }
-
-                    for (int i = 0; i < vec.Length; i++)
-                    {
-                        prefVector[i] += (float)(vec[i] * weight);
-                    }
-
-                    totalWeight += weight;
-                    successCount++;
                 }
-                catch (Exception ex)
-                {
-                    _logger?.LogWarning(ex, "Failed to process library item {MediaId} for PrefVector", entry.MediaId);
-                }
+            }
+            catch (NotSupportedException ex)
+            {
+                _logger?.LogWarning(ex, "Vector retrieval not supported by current adapter. Library-based personalization disabled.");
+                // Continue without preference vector
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Failed to retrieve embeddings for user {UserId} library", userId);
+                // Continue without preference vector
             }
 
             if (prefVector == null || successCount == 0)

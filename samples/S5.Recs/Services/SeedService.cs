@@ -18,6 +18,7 @@ using System.Net.Http.Headers;
 using System.Text.RegularExpressions;
 using System.Threading;
 using Newtonsoft.Json;
+using Koan.Data.AI;
 
 namespace S5.Recs.Services;
 
@@ -29,7 +30,6 @@ internal sealed class SeedService : ISeedService
     private readonly IServiceProvider _sp;
     private readonly ILogger<SeedService>? _logger;
     private readonly IReadOnlyDictionary<string, IMediaProvider> _providers;
-    private readonly IEmbeddingCache _embeddingCache;
     private static readonly object _importLock = new object();
     private static volatile bool _importInProgress = false;
     private int _cacheHits = 0;
@@ -37,10 +37,9 @@ internal sealed class SeedService : ISeedService
 
     public bool IsImportInProgress => _importInProgress;
 
-    public SeedService(IServiceProvider sp, IEmbeddingCache embeddingCache, ILogger<SeedService>? logger = null)
+    public SeedService(IServiceProvider sp, ILogger<SeedService>? logger = null)
     {
         _sp = sp;
-        _embeddingCache = embeddingCache;
         _logger = logger;
         // Discover providers via DI
         var provs = (IEnumerable<IMediaProvider>?)_sp.GetService(typeof(IEnumerable<IMediaProvider>)) ?? Array.Empty<IMediaProvider>();
@@ -700,66 +699,28 @@ internal sealed class SeedService : ISeedService
         _logger?.LogDebug("Vector pipeline starting: {Count} items, model={Model}", itemsList.Count, modelId);
 
         // Build lookup: contentHash -> Media
+        var metadata = EmbeddingMetadata.Get<Media>();
         var mediaByHash = new Dictionary<string, Media>();
         foreach (var media in itemsList)
         {
-            var hash = EmbeddingCache.ComputeContentHash(BuildEmbeddingText(media));
-            mediaByHash[hash] = media;
+            var signature = metadata.ComputeSignature(media);
+            mediaByHash[signature] = media;
         }
 
-        _logger?.LogInformation("Processing {Count} items: read 1000 cache files → write 1000 vectors → repeat", itemsList.Count);
+        // NOTE: With ARCH-0070, embedding cache is obsolete. Framework manages embeddings via EmbeddingState<T>.
+        // All items will be processed through AI embedding pipeline.
 
-        var cachedHashes = new HashSet<string>();
-        var totalProcessed = 0;
-        const int pageSize = 1000;
+        _logger?.LogInformation("Processing {Count} items through AI embedding pipeline", itemsList.Count);
 
-        // Read cache in pages, write vectors immediately
-        await foreach (var cachePage in _embeddingCache.GetPaginatedAsync(modelId, typeof(Media).FullName!, pageSize, ct))
-        {
-            var batchItems = new List<VectorData<Media>.VectorEntity>();
-
-            foreach (var (contentHash, cached) in cachePage)
-            {
-                if (mediaByHash.TryGetValue(contentHash, out var media))
-                {
-                    var metadata = BuildVectorMetadata(media);
-                    batchItems.Add(new VectorData<Media>.VectorEntity(media, cached.Embedding, Metadata: metadata));
-                    cachedHashes.Add(contentHash);
-                    Interlocked.Increment(ref _cacheHits);
-                }
-            }
-
-            if (batchItems.Count > 0)
-            {
-                try
-                {
-                    var result = await VectorData<Media>.SaveManyWithVector(batchItems, ct);
-                    Interlocked.Add(ref stored, result.Added + result.Updated);
-                    totalProcessed += batchItems.Count;
-
-                    _logger?.LogInformation("Vector progress: {Processed} vectors saved to Weaviate", totalProcessed);
-                }
-                catch (Exception ex)
-                {
-                    _logger?.LogWarning(ex, "Batch save failed for {Count} vectors", batchItems.Count);
-                    Interlocked.Add(ref failures, batchItems.Count);
-                }
-            }
-        }
-
-        // Identify uncached items
-        var uncachedItems = itemsList.Where(m => !cachedHashes.Contains(EmbeddingCache.ComputeContentHash(BuildEmbeddingText(m)))).ToList();
+        var uncachedItems = itemsList.ToList();
         Interlocked.Add(ref _cacheMisses, uncachedItems.Count);
-
-        _logger?.LogInformation("Embedding cache: {CacheHits} hits, {CacheMisses} misses ({HitRate:P1}%)",
-            _cacheHits, uncachedItems.Count, itemsList.Count > 0 ? (double)_cacheHits / itemsList.Count * 100 : 0);
 
         // Process uncached items (slow path - requires AI calls)
         if (uncachedItems.Count > 0)
         {
             await uncachedItems
                 .ToAsyncEnumerable()
-                .Tokenize(m => BuildEmbeddingText(m), model != null ? new AiTokenizeOptions { Model = model } : new AiTokenizeOptions())
+                .Tokenize(m => metadata.BuildEmbeddingText(m), model != null ? new AiTokenizeOptions { Model = model } : new AiTokenizeOptions())
                 .Branch(branch => branch
                     .OnSuccess(success => success
                         .Mutate(envelope =>
@@ -781,10 +742,8 @@ internal sealed class SeedService : ISeedService
                                     envelope.Metadata["vector:affected"] = 1;
                                     Interlocked.Add(ref stored, 1);
 
-                                    // Cache the embedding for future use
-                                    var embeddingText = BuildEmbeddingText(envelope.Entity);
-                                    var contentHash = EmbeddingCache.ComputeContentHash(embeddingText);
-                                    await _embeddingCache.SetAsync(contentHash, modelId, embedding, typeof(Media).FullName!, ct);
+                                    // NOTE: With ARCH-0070, embeddings are managed by framework via EmbeddingState<T>
+                                    // No need to manually cache embeddings anymore
                                 }
                                 catch (InvalidOperationException)
                                 {

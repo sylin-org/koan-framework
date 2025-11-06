@@ -29,10 +29,11 @@ public class CatalogWorker : BackgroundService
         {
             try
             {
-                // Query default partition for newly vectorized media
+                // Query default partition for newly processed media
+                // Note: VectorizedAt removed (ARCH-0070) - embeddings now automatic
                 var cutoff = _lastProcessed;
                 var newMedia = (await Media.Query(
-                    m => m.VectorizedAt != null && m.VectorizedAt > cutoff,
+                    m => m.ImportedAt > cutoff,  // Changed from VectorizedAt to ImportedAt
                     stoppingToken)).ToList();
 
                 if (newMedia.Any())

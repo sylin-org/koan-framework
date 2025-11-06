@@ -1,5 +1,6 @@
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Annotations;
+using Koan.Data.AI.Attributes;
 using Koan.Data.Core.Model;
 using Koan.Data.Core.Optimization;
 using Koan.Data.Core.Relationships;
@@ -10,6 +11,14 @@ namespace S5.Recs.Models;
 
 [Storage(Name = "Media")]
 [OptimizeStorage(OptimizationType = StorageOptimizationType.None, Reason = "Uses SHA512-based deterministic string IDs, not GUIDs")]
+[Embedding(
+    Properties = new[] {
+        nameof(Title), nameof(TitleEnglish), nameof(TitleRomaji), nameof(TitleNative),
+        nameof(Synonyms), nameof(Synopsis), nameof(Genres), nameof(Tags)
+    },
+    Async = true,
+    RateLimitPerMinute = 60
+)]
 public sealed class Media : Entity<Media>
 {
     [Parent(typeof(MediaType))]
@@ -90,20 +99,9 @@ public sealed class Media : Entity<Media>
     public string? ImportJobId { get; set; }
 
     /// <summary>
-    /// SHA256 content signature for embedding cache lookup.
-    /// Computed from: Titles + Synopsis + Genres + Tags
-    /// </summary>
-    public string? ContentSignature { get; set; }
-
-    /// <summary>
     /// When this media item passed validation and entered vectorization queue
     /// </summary>
     public DateTimeOffset? ValidatedAt { get; set; }
-
-    /// <summary>
-    /// When embedding was generated and stored in vector database
-    /// </summary>
-    public DateTimeOffset? VectorizedAt { get; set; }
 
     /// <summary>
     /// Error message from last processing attempt (validation or vectorization)
@@ -114,6 +112,9 @@ public sealed class Media : Entity<Media>
     /// Number of times processing has been retried for this media item
     /// </summary>
     public int RetryCount { get; set; }
+
+    // NOTE: ContentSignature and VectorizedAt are now tracked by framework-managed EmbeddingState<Media>
+    // These were removed as part of ARCH-0070: Attribute-Driven AI Embeddings
 
     /// <summary>
     /// Generates deterministic SHA512-based ID from provider information.

@@ -109,7 +109,7 @@ public class ImportWorker : BackgroundService
                 foreach (var media in batch)
                 {
                     media.ImportJobId = job.JobId;
-                    media.ContentSignature = EmbeddingUtilities.ComputeContentSignature(media);
+                    // ContentSignature now tracked automatically by EmbeddingState<Media> (ARCH-0070)
                     media.ImportedAt = DateTimeOffset.UtcNow;
                 }
 

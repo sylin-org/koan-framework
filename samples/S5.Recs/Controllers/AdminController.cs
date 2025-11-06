@@ -5,6 +5,7 @@ using Microsoft.Extensions.Options;
 using S5.Recs.Infrastructure;
 using S5.Recs.Services;
 using Koan.Data.Vector.Abstractions;
+using Koan.Data.AI;
 
 namespace S5.Recs.Controllers;
 
@@ -650,101 +651,71 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
     }
 
     [HttpPost("flush/embeddings")]
-    public async Task<IActionResult> FlushEmbeddingsCache([FromServices] Services.IEmbeddingCache embeddingCache, CancellationToken ct)
+    public async Task<IActionResult> FlushEmbeddingsCache(CancellationToken ct)
     {
-        var count = await embeddingCache.FlushAsync(ct);
-        return Ok(new { flushed = "embeddings-cache", count });
+        // Purge completed embed jobs older than 1 day
+        var count = await EmbedJobExtensions.PurgeCompleted<Models.Media>(TimeSpan.FromDays(1), ct);
+        return Ok(new { flushed = "embed-jobs", count });
     }
 
     [HttpGet("cache/embeddings/stats")]
-    public async Task<IActionResult> GetEmbeddingsCacheStats([FromServices] Services.IEmbeddingCache embeddingCache, CancellationToken ct)
+    public async Task<IActionResult> GetEmbeddingsCacheStats(CancellationToken ct)
     {
-        var stats = await embeddingCache.GetStatsAsync(ct);
+        var stats = await EmbedJobExtensions.GetStats<Models.Media>(ct);
         return Ok(stats);
     }
 
     [HttpPost("cache/embeddings/export")]
     public async Task<IActionResult> ExportEmbeddingsToCache(
-        [FromServices] Koan.Data.Vector.IVectorService vectorService,
-        [FromServices] Services.IEmbeddingCache embeddingCache,
-        [FromServices] Services.ISeedService seedService,
         [FromQuery] string? entityType,
         CancellationToken ct)
     {
+        // NOTE: This endpoint is obsolete with ARCH-0070 attribute-driven embeddings.
+        // The framework now manages embedding state automatically via EmbeddingState<T>.
+        // Keeping endpoint for backward compatibility but it now triggers batch re-embedding.
+
         try
         {
-            var modelId = "default"; // TODO: Get from configuration
+            _logger.LogInformation("Triggering batch re-embedding for Media entities...");
+
+            // Get all Media entities that need embedding
+            var allMedia = await Models.Media.All(ct);
             var count = 0;
-            var errors = 0;
 
-            _logger.LogInformation("Starting export of existing vectors to embedding cache...");
-
-            // Get vector repository from IVectorService
-            var vectorRepo = vectorService.TryGetRepository<Models.Media, string>();
-            if (vectorRepo == null)
+            foreach (var media in allMedia)
             {
-                _logger.LogError("Failed to resolve vector repository for Media entity");
-                return StatusCode(500, new { error = "Vector repository not available" });
-            }
+                // Save triggers automatic embedding via framework
+                await media.Save(ct);
+                count++;
 
-            _logger.LogInformation("Using vector repository: {Type}", vectorRepo.GetType().FullName);
-
-            await foreach (var batch in vectorRepo.ExportAllAsync(batchSize: 100, ct))
-            {
-                try
+                if (count % 100 == 0)
                 {
-                    // Load the media entity to reconstruct the embedding text for content hashing
-                    var media = await Models.Media.Get(batch.Id, ct);
-                    if (media == null)
-                    {
-                        _logger.LogWarning("Media {Id} not found in database, skipping cache export", batch.Id);
-                        errors++;
-                        continue;
-                    }
-
-                    // Use SeedService's BuildEmbeddingText to get consistent hash
-                    var embeddingText = seedService.BuildEmbeddingText(media);
-                    var contentHash = Services.EmbeddingCache.ComputeContentHash(embeddingText);
-
-                    // Cache the existing embedding
-                    await embeddingCache.SetAsync(contentHash, modelId, batch.Embedding, typeof(Models.Media).FullName!, ct);
-                    count++;
-
-                    if (count % 100 == 0)
-                    {
-                        _logger.LogInformation("Export progress: {Count} vectors cached...", count);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Error exporting vector {Id} to cache", batch.Id);
-                    errors++;
+                    _logger.LogInformation("Re-embedding progress: {Count} media items...", count);
                 }
             }
 
-            _logger.LogInformation("Vector export completed: {Count} vectors cached, {Errors} errors", count, errors);
+            _logger.LogInformation("Batch re-embedding completed: {Count} media items queued", count);
             return Ok(new
             {
-                operation = "export-embeddings-to-cache",
-                exported = count,
-                errors,
-                message = $"Exported {count} existing vectors to embedding cache for adapter portability"
+                operation = "batch-re-embed",
+                queued = count,
+                message = $"Queued {count} media items for re-embedding via framework worker"
             });
         }
         catch (NotSupportedException ex)
         {
-            _logger.LogWarning(ex, "Vector export not supported by current adapter");
+            _logger.LogWarning(ex, "Operation not supported");
             return BadRequest(new
             {
-                error = "Vector export not supported by current vector database adapter",
+                error = "Operation not supported",
                 details = ex.Message,
                 suggestion = "Use a vector adapter with native export capabilities"
             });
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to export vectors to cache");
-            return StatusCode(500, new { error = "Export failed", details = ex.Message });
+            _logger.LogError(ex, "Failed to trigger batch re-embedding");
+            return StatusCode(500, new { error = "Batch re-embedding failed", details = ex.Message });
         }
     }
 
@@ -914,7 +885,8 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
                 queuedMedia = (int)await Models.Media.Count;
             }
 
-            liveMedia = (int)await Models.Media.Count.Where(m => m.VectorizedAt != null, ct: ct);
+            // All media in default partition is considered "live" (embeddings automatic, ARCH-0070)
+            liveMedia = (int)await Models.Media.Count;
 
             return Ok(new
             {
