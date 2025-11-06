@@ -13,9 +13,10 @@ public static class QueryExtensions
     /// <summary>
     /// Converts Page/PageSize options to Skip/Take values for provider-specific queries.
     /// Handles null values and enforces maximum page size limits.
+    /// DefaultPageSize is only used when pagination IS active but PageSize isn't specified.
     /// </summary>
     /// <param name="options">The data query options containing page and page size</param>
-    /// <param name="defaultPageSize">Default page size when not specified</param>
+    /// <param name="defaultPageSize">Default page size when pagination is active but PageSize not specified</param>
     /// <param name="maxPageSize">Maximum allowed page size to prevent resource exhaustion</param>
     /// <returns>Skip and Take values for use with provider queries</returns>
     public static (int Skip, int Take) ToSkipTake(
@@ -23,11 +24,20 @@ public static class QueryExtensions
         int defaultPageSize = 20,
         int maxPageSize = 1000)
     {
-        if (options?.Page is null or <= 0 || options.PageSize is null or <= 0)
-            return (0, defaultPageSize);
+        // Check if pagination is active
+        var hasPagination = options?.HasPagination ?? false;
 
-        var safePageSize = Math.Min(options.PageSize.Value, maxPageSize);
-        var skip = (options.Page.Value - 1) * safePageSize;
+        if (!hasPagination)
+        {
+            // No pagination - return full result set without applying default page size
+            return (0, int.MaxValue);
+        }
+
+        // Pagination is active - apply defaults and limits
+        var pageSize = options?.PageSize ?? defaultPageSize;
+        var safePageSize = Math.Min(pageSize, maxPageSize);
+        var page = options?.Page ?? 1;
+        var skip = (page - 1) * safePageSize;
         return (skip, safePageSize);
     }
 

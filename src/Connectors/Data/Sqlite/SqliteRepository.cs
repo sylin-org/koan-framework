@@ -1458,7 +1458,16 @@ internal sealed class SqliteRepository<TEntity, TKey> :
 
     private (int offset, int limit) ComputeSkipTake(DataQueryOptions? options)
     {
-        // Default page index is 1-based
+        // Check if pagination is active
+        var hasPagination = options?.HasPagination ?? false;
+
+        if (!hasPagination)
+        {
+            // No pagination - return full result set without applying default page size
+            return (0, int.MaxValue);
+        }
+
+        // Pagination is active - apply defaults and limits
         var page = options?.Page is int p && p > 0 ? p : 1;
         var sizeReq = options?.PageSize;
         var size = sizeReq is int ps && ps > 0 ? ps : _defaultPageSize;
