@@ -2,13 +2,16 @@
 // Console app that exposes Web API, Web UI, and MCP endpoints
 // Pattern: follows g1c1.gardencoop with MCP integration
 
+using Koan.Context.Services;
 using Koan.Core;
 using Koan.Core.Hosting.App;
 using Koan.Mcp.Extensions;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -19,6 +22,20 @@ builder.Logging.SetMinimumLevel(LogLevel.Information);
 // ✅ ONE LINE AUTO-REGISTRATION
 // Discovers: entities, controllers, MCP tools, vector adapters, orchestration evaluators
 builder.Services.AddKoan();
+
+// ✅ REGISTER FILE MONITORING & PROJECT RESOLUTION SERVICES
+builder.Services.Configure<FileMonitoringOptions>(
+    builder.Configuration.GetSection("Koan:Context:FileMonitoring"));
+builder.Services.Configure<ProjectResolutionOptions>(
+    builder.Configuration.GetSection("Koan:Context:ProjectResolution"));
+
+builder.Services.AddSingleton<ProjectResolver>();
+builder.Services.AddSingleton<IncrementalIndexingService>();
+builder.Services.AddHostedService<JobRecoveryService>();
+builder.Services.AddHostedService<FileMonitoringService>();
+builder.Services.AddSingleton<FileMonitoringService>(sp =>
+    (FileMonitoringService)sp.GetServices<IHostedService>()
+        .First(s => s is FileMonitoringService));
 
 // Build app
 var app = builder.Build();
