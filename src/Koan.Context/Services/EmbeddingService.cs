@@ -71,7 +71,6 @@ public class EmbeddingService : IEmbeddingService
         // Check cache first
         if (_cache.TryGetValue<float[]>(cacheKey, out var cachedEmbedding))
         {
-            _logger.LogDebug("Embedding cache hit for key: {CacheKey}", cacheKey);
             return cachedEmbedding!;
         }
 
@@ -104,7 +103,6 @@ public class EmbeddingService : IEmbeddingService
             };
 
             _cache.Set(cacheKey, embedding, cacheOptions);
-            _logger.LogDebug("Cached embedding for key: {CacheKey}", cacheKey);
 
             return embedding;
         }

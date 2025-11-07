@@ -73,11 +73,6 @@ public class ChunkingService : IChunkingService
             // Handle sections larger than max tokens - split them
             if (sectionTokens > TargetTokensMax)
             {
-                _logger.LogDebug(
-                    "Section exceeds max tokens ({Tokens} > {Max}), will split at sentence boundaries",
-                    sectionTokens,
-                    TargetTokensMax);
-
                 // Yield current chunk first if it has content
                 if (currentTokens > 0)
                 {
@@ -182,11 +177,6 @@ public class ChunkingService : IChunkingService
             yield return chunk;
             chunksYielded++;
         }
-
-        _logger.LogInformation(
-            "Chunked {FilePath}: {ChunkCount} chunks created",
-            Path.GetFileName(document.FilePath),
-            chunksYielded);
     }
 
     /// <summary>

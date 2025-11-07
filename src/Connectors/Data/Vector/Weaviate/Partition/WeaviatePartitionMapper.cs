@@ -56,11 +56,6 @@ public partial class WeaviatePartitionMapper : IVectorPartitionMapper
                 className);
         }
 
-        _logger.LogDebug(
-            "Mapped partition {PartitionId} to Weaviate class {ClassName}",
-            partitionId,
-            className);
-
         return className;
     }
 

@@ -6,6 +6,7 @@ using Koan.Context.Services;
 using Koan.Core;
 using Koan.Core.Hosting.App;
 using Koan.Mcp.Extensions;
+using Koan.Web.Hosting;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -16,8 +17,7 @@ using Microsoft.Extensions.Options;
 var builder = WebApplication.CreateBuilder(args);
 
 // Configure logging
-builder.Logging.AddConsole();
-builder.Logging.SetMinimumLevel(LogLevel.Information);
+builder.ConfigureSampleLogging();
 
 // ✅ ONE LINE AUTO-REGISTRATION
 // Discovers: entities, controllers, MCP tools, vector adapters, orchestration evaluators
@@ -66,13 +66,6 @@ else if (app.Urls.Count == 0)
     app.Urls.Add("http://localhost:27500");
 }
 
-// Startup message
-app.Logger.LogInformation("Koan Context is starting on port 27500...");
-app.Logger.LogInformation("MCP endpoints: http://localhost:27500/mcp/sse");
-app.Logger.LogInformation("Web UI: http://localhost:27500");
-app.Logger.LogInformation("API: http://localhost:27500/api/projects");
-app.Logger.LogInformation("MCP Health: http://localhost:27500/mcp/health");
-
 // ✅ WEAVIATE AUTO-PROVISIONING
 // If Koan.Data.Vector.Connector.Weaviate is referenced:
 // - WeaviateOrchestrationEvaluator auto-registers
@@ -81,6 +74,13 @@ app.Logger.LogInformation("MCP Health: http://localhost:27500/mcp/health");
 // - Endpoint: http://localhost:27501 (mapped from container's 8080)
 // - Volume: koan-weaviate-data (persistent)
 // - Configuration via appsettings.json or auto-detected
+
+// Configure sample lifecycle with browser launch
+app.ConfigureSampleLifecycle(
+    sampleName: "Koan Context",
+    startupMessage: "Koan Context is listening on {Addresses}. MCP: http://localhost:27500/mcp/sse | API: http://localhost:27500/api/projects",
+    shutdownMessage: "Koan Context shutting down.",
+    launchBrowser: true);
 
 // Run app
 await app.RunAsync();

@@ -118,11 +118,6 @@ internal sealed class DefaultAiRouter : IAiRouter
         try
         {
             var response = await adapter.EmbedAsync(request, ct);
-
-            _logger?.LogInformation(
-                "AI route OK: {Adapter}/{Model} via {Source}:{Member} (embed {Count} inputs)",
-                adapter.Id, effectiveModel ?? "(default)", source.Name, member.Name, request.Input?.Count ?? 0);
-
             return response;
         }
         catch (Exception ex)

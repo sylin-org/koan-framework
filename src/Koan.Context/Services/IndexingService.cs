@@ -339,14 +339,7 @@ public class IndexingService : IIndexingService
                             docChunk.EndLine = provenance.EndLine;
 
                             // Save to relational store
-                            var activePartition = EntityContext.Current?.Partition;
-                            _logger.LogDebug("TRACE: About to save DocumentChunk {ChunkId} for file {FilePath}. Partition={Partition}",
-                                docChunk.Id, docChunk.FilePath, activePartition);
-
                             var savedChunk = await docChunk.Save(effectiveCt);
-
-                            _logger.LogDebug("TRACE: Saved DocumentChunk {ChunkId}. Returned ID={ReturnedId}",
-                                docChunk.Id, savedChunk?.Id ?? "(null)");
 
                             // Add to vector batch
                             batch.Add((
@@ -376,8 +369,6 @@ public class IndexingService : IIndexingService
                                 await SaveVectorBatchAsync(batch, effectiveCt);
                                 vectorsSaved += batch.Count;
                                 batch.Clear();
-
-                                _logger.LogDebug("Saved batch of {Count} vectors", BatchSize);
                             }
                         }
 
@@ -654,13 +645,9 @@ public class IndexingService : IIndexingService
     {
         await _retryPolicy.ExecuteAsync(async () =>
         {
-            _logger.LogDebug("Saving batch of {Count} vectors to partition-aware storage", batch.Count);
-
             // Use Vector<DocumentChunk> to save embeddings
             // The partition context is already set by the outer scope
             await Vector<DocumentChunk>.Save(batch, cancellationToken);
-
-            _logger.LogDebug("Successfully saved batch of {Count} vectors", batch.Count);
         });
     }
 

@@ -44,10 +44,26 @@ public class ProjectResolver
             return await ResolveProjectByPathAsync(workingDirectory, autoCreate, cancellationToken);
         }
 
-        // Priority 3: Transport context (stdio MCP only - future enhancement)
-        // This would require MCP transport to inject working directory into request
+        // Priority 3: Transport context (HTTP headers from MCP client)
+        if (httpContext != null)
+        {
+            // Check for working directory in HTTP headers
+            // Claude Code and other MCP clients may send context via custom headers
+            var headerKeys = new[] { "X-Working-Directory", "X-Claude-Working-Directory", "X-MCP-Working-Directory" };
 
-        _logger.LogWarning("No project context found - no libraryId or workingDirectory provided");
+            foreach (var headerKey in headerKeys)
+            {
+                if (httpContext.Request.Headers.TryGetValue(headerKey, out var headerValue) &&
+                    !string.IsNullOrWhiteSpace(headerValue.ToString()))
+                {
+                    var contextPath = headerValue.ToString();
+                    _logger.LogDebug("Resolving project by HTTP header {Header}: {Path}", headerKey, contextPath);
+                    return await ResolveProjectByPathAsync(contextPath, autoCreate, cancellationToken);
+                }
+            }
+        }
+
+        _logger.LogWarning("No project context found - no libraryId, workingDirectory, or HTTP context headers provided");
         return null;
     }
 
