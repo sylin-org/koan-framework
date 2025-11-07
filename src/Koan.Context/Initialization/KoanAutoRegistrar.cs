@@ -39,6 +39,11 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         services.AddScoped<IIndexingService, IndexingService>();
         services.AddScoped<IRetrievalService, RetrievalService>();
 
+        // Register Phase 1 AI-first services
+        services.AddSingleton<ITokenCountingService, TokenCountingService>();
+        services.AddSingleton<IContinuationTokenService, ContinuationTokenService>();
+        services.AddSingleton<ISourceUrlGenerator, SourceUrlGenerator>();
+
         // Add memory cache if not already registered
         services.AddMemoryCache();
     }

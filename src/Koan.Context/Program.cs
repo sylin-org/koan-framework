@@ -30,8 +30,9 @@ builder.Services.Configure<ProjectResolutionOptions>(
     builder.Configuration.GetSection("Koan:Context:ProjectResolution"));
 
 builder.Services.AddSingleton<ProjectResolver>();
+builder.Services.AddSingleton<ITokenCountingService, TokenCountingService>();
 builder.Services.AddSingleton<IncrementalIndexingService>();
-builder.Services.AddHostedService<JobRecoveryService>();
+builder.Services.AddSingleton<IndexingCoordinator>();
 builder.Services.AddHostedService<FileMonitoringService>();
 builder.Services.AddSingleton<FileMonitoringService>(sp =>
     (FileMonitoringService)sp.GetServices<IHostedService>()

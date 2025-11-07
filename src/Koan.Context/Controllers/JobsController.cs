@@ -1,4 +1,6 @@
 using Koan.Context.Models;
+using Koan.Data.Abstractions;
+using Koan.Data.Core;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 
@@ -261,7 +263,7 @@ public class JobsController : ControllerBase
             }
 
             job.Cancel();
-            await IndexingJob.UpsertAsync(job, cancellationToken);
+            await job.Save(cancellationToken);
 
             _logger.LogInformation("Job {JobId} cancelled for project {ProjectId}", jobId, job.ProjectId);
 

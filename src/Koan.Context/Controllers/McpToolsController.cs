@@ -116,20 +116,40 @@ public class McpToolsController : ControllerBase
 
         try
         {
-            // Resolve project context (with auto-create)
-            var project = await _projectResolver.ResolveProjectAsync(
-                request.LibraryId,
-                request.WorkingDirectory,
-                HttpContext,
-                autoCreate: true,
-                cancellationToken);
+            Project? project = null;
+
+            if (!string.IsNullOrWhiteSpace(request.LibraryId))
+            {
+                project = await _projectResolver.ResolveProjectAsync(
+                    request.LibraryId,
+                    workingDirectory: null,
+                    httpContext: HttpContext,
+                    autoCreate: true,
+                    cancellationToken);
+            }
+            else if (!string.IsNullOrWhiteSpace(request.PathContext))
+            {
+                project = await _projectResolver.ResolveProjectByPathAsync(
+                    request.PathContext,
+                    autoCreate: true,
+                    cancellationToken);
+            }
+            else if (!string.IsNullOrWhiteSpace(request.WorkingDirectory))
+            {
+                project = await _projectResolver.ResolveProjectAsync(
+                    libraryId: null,
+                    workingDirectory: request.WorkingDirectory,
+                    httpContext: HttpContext,
+                    autoCreate: true,
+                    cancellationToken);
+            }
 
             if (project == null)
             {
                 return BadRequest(new
                 {
                     error = "Could not resolve project from context",
-                    hint = "Provide either libraryId or workingDirectory"
+                    hint = "Provide either libraryId, pathContext, or workingDirectory"
                 });
             }
 
@@ -137,7 +157,6 @@ public class McpToolsController : ControllerBase
             switch (project.Status)
             {
                 case IndexingStatus.NotIndexed:
-                case IndexingStatus.Indexing:
                     // Start indexing in background
                     project.Status = IndexingStatus.Indexing;
                     project.IndexingStartedAt = DateTime.UtcNow;
@@ -164,6 +183,19 @@ public class McpToolsController : ControllerBase
                         estimatedDuration = "2-5 minutes",
                         statusUrl = $"/api/projects/{project.Id}/status",
                         retryAfter = 120
+                    });
+
+                case IndexingStatus.Indexing:
+                    // Already indexing - return 409 Conflict
+                    return Conflict(new
+                    {
+                        status = "conflict",
+                        message = $"Project '{project.Name}' is already being indexed. " +
+                                  "To cancel the current job and restart, use the /api/projects/{project.Id}/reindex endpoint with force=true parameter.",
+                        projectId = project.Id,
+                        projectName = project.Name,
+                        statusUrl = $"/api/projects/{project.Id}/status",
+                        hint = "Use POST /api/projects/{project.Id}/reindex?force=true to force restart indexing"
                     });
 
                 case IndexingStatus.Updating:
@@ -193,12 +225,11 @@ public class McpToolsController : ControllerBase
 
             // Perform semantic search
             var searchOptions = new SearchOptions(
+                MaxTokens: request.Tokens ?? 5000,
                 Alpha: request.Alpha ?? 0.7f,
-                TopK: request.TopK ?? 10,
-                OffsetStart: request.Offset,
-                OffsetEnd: request.Offset.HasValue && request.TopK.HasValue
-                    ? request.Offset.Value + request.TopK.Value
-                    : null);
+                ContinuationToken: request.ContinuationToken,
+                IncludeInsights: request.IncludeInsights ?? true,
+                IncludeReasoning: request.IncludeReasoning ?? true);
 
             var result = await _retrieval.SearchAsync(
                 project.Id,
@@ -208,19 +239,15 @@ public class McpToolsController : ControllerBase
 
             _logger.LogInformation(
                 "Found {ResultCount} results in library {LibraryName}",
-                result.TotalCount,
+                result.Chunks.Count,
                 project.Name);
 
             var response = new GetLibraryDocsResponse(
                 LibraryId: project.Id,
                 LibraryName: project.Name,
                 Query: request.Query,
-                Results: result.Chunks,
-                TotalResults: result.TotalCount,
-                Duration: result.Duration,
-                Offset: request.Offset ?? 0,
-                Limit: request.TopK ?? 10,
-                HasMore: result.TotalCount > (request.Offset ?? 0) + result.Chunks.Count,
+                Result: result,
+                HasMore: !string.IsNullOrWhiteSpace(result.ContinuationToken),
                 IndexingStatus: project.Status.ToString());
 
             return Ok(response);
@@ -351,10 +378,13 @@ public record LibraryMatch(
 public record GetLibraryDocsRequest(
     string Query,
     string? LibraryId = null,
+    string? PathContext = null,
     string? WorkingDirectory = null,
     float? Alpha = null,
-    int? TopK = null,
-    int? Offset = null,
+    int? Tokens = null,
+    string? ContinuationToken = null,
+    bool? IncludeInsights = null,
+    bool? IncludeReasoning = null,
     string[]? Categories = null);
 
 /// <summary>
@@ -364,10 +394,6 @@ public record GetLibraryDocsResponse(
     string LibraryId,
     string LibraryName,
     string Query,
-    IReadOnlyList<SearchResultChunk> Results,
-    int TotalResults,
-    TimeSpan Duration,
-    int Offset,
-    int Limit,
+    SearchResult Result,
     bool HasMore,
     string IndexingStatus);

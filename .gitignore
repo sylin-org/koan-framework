@@ -69,8 +69,9 @@ node_modules/
 /.sora
 /tests.old
 
-# Koan framework cache and metadata
+# Koan framework cache and metadata (case-sensitive for Linux/Mac)
 **/.Koan/
+**/.koan/
 /samples/S7.Meridian/storage
 /samples/S7.Meridian/scripts/phase4.5/try-it-yourself/output
 nul

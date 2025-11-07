@@ -30,6 +30,7 @@ public class IndexingServiceSpec
     private readonly IndexingService _service;
 
     private readonly Guid _testProjectId = Guid.NewGuid();
+    private readonly string _testProjectIdString;
     private readonly float[] _testEmbedding = Enumerable.Range(0, 384).Select(i => (float)i / 384).ToArray();
 
     public IndexingServiceSpec()
@@ -39,6 +40,8 @@ public class IndexingServiceSpec
         _chunkingMock = new Mock<IChunkingService>();
         _embeddingMock = new Mock<IEmbeddingService>();
         _loggerMock = new Mock<ILogger<IndexingService>>();
+
+        _testProjectIdString = _testProjectId.ToString();
 
         _service = new IndexingService(
             _discoveryMock.Object,
@@ -117,7 +120,7 @@ public class IndexingServiceSpec
         SetupSuccessfulPipeline(fileCount: 3, chunksPerFile: 5);
 
         // Act
-        var result = await _service.IndexProjectAsync(_testProjectId);
+    var result = await _service.IndexProjectAsync(_testProjectIdString);
 
         // Assert
         result.FilesProcessed.Should().Be(3);
@@ -150,7 +153,7 @@ public class IndexingServiceSpec
             .Returns(AsyncEnumerable.Empty<ChunkedContent>());
 
         // Act
-        await _service.IndexProjectAsync(_testProjectId);
+    await _service.IndexProjectAsync(_testProjectIdString);
 
         // Assert
         callOrder.Should().ContainInOrder("discover", "extract", "chunk");
@@ -175,10 +178,10 @@ public class IndexingServiceSpec
             .ReturnsAsync(_testEmbedding);
 
         // Act
-        await _service.IndexProjectAsync(_testProjectId);
+    await _service.IndexProjectAsync(_testProjectIdString);
 
         // Assert
-        capturedPartition.Should().Be(_testProjectId.ToString());
+    capturedPartition.Should().Be(_testProjectIdString);
     }
 
     [Fact(Skip = "Requires EntityContext validation logic")]
@@ -201,7 +204,7 @@ public class IndexingServiceSpec
         var progress = new Progress<IndexingProgress>(p => progressReports.Add(p));
 
         // Act
-        await _service.IndexProjectAsync(_testProjectId, progress);
+    await _service.IndexProjectAsync(_testProjectIdString, progress);
 
         // Assert
         progressReports.Should().NotBeEmpty();
@@ -219,7 +222,7 @@ public class IndexingServiceSpec
         var progress = new Progress<IndexingProgress>(p => progressReports.Add(p));
 
         // Act
-        await _service.IndexProjectAsync(_testProjectId, progress);
+    await _service.IndexProjectAsync(_testProjectIdString, progress);
 
         // Assert
         progressReports.Should().Contain(p => !string.IsNullOrEmpty(p.CurrentFile));
@@ -236,7 +239,7 @@ public class IndexingServiceSpec
         SetupSuccessfulPipeline(fileCount: 1, chunksPerFile: 150);
 
         // Act
-        var result = await _service.IndexProjectAsync(_testProjectId);
+    var result = await _service.IndexProjectAsync(_testProjectIdString);
 
         // Assert
         // Verify Vector<T>.Save was called twice (100 + 50)
@@ -265,7 +268,7 @@ public class IndexingServiceSpec
             .ThrowsAsync(new IOException("File access denied"));
 
         // Act
-        var result = await _service.IndexProjectAsync(_testProjectId);
+    var result = await _service.IndexProjectAsync(_testProjectIdString);
 
         // Assert
         result.FilesProcessed.Should().Be(2, "should skip failing file and continue");
@@ -283,7 +286,7 @@ public class IndexingServiceSpec
             .ThrowsAsync(new InvalidOperationException("Test error"));
 
         // Act
-        var result = await _service.IndexProjectAsync(_testProjectId);
+    var result = await _service.IndexProjectAsync(_testProjectIdString);
 
         // Assert
         result.Errors.Should().NotBeEmpty();
@@ -302,7 +305,7 @@ public class IndexingServiceSpec
         // Act & Assert
         await Assert.ThrowsAsync<InvalidOperationException>(async () =>
         {
-            await _service.IndexProjectAsync(nonExistentProjectId);
+            await _service.IndexProjectAsync(nonExistentProjectId.ToString());
         });
     }
 
@@ -321,7 +324,7 @@ public class IndexingServiceSpec
         // Act & Assert
         await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
         {
-            await _service.IndexProjectAsync(_testProjectId, cancellationToken: cts.Token);
+            await _service.IndexProjectAsync(_testProjectIdString, cancellationToken: cts.Token);
         });
     }
 
@@ -347,7 +350,7 @@ public class IndexingServiceSpec
         // Act & Assert
         await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
         {
-            await _service.IndexProjectAsync(_testProjectId, cancellationToken: cts.Token);
+            await _service.IndexProjectAsync(_testProjectIdString, cancellationToken: cts.Token);
         });
 
         processedFiles.Should().Be(5, "should stop after cancellation");
@@ -366,7 +369,7 @@ public class IndexingServiceSpec
         // Act (will fail due to Project entity, but we can verify the call)
         try
         {
-            await _service.IndexProjectAsync(_testProjectId);
+            await _service.IndexProjectAsync(_testProjectIdString);
         }
         catch
         {
@@ -401,7 +404,7 @@ public class IndexingServiceSpec
         // Act
         try
         {
-            await _service.IndexProjectAsync(_testProjectId);
+            await _service.IndexProjectAsync(_testProjectIdString);
         }
         catch
         {
@@ -423,7 +426,7 @@ public class IndexingServiceSpec
         SetupSuccessfulPipeline();
 
         // Act
-        await _service.IndexProjectAsync(_testProjectId);
+    await _service.IndexProjectAsync(_testProjectIdString);
 
         // Assert
         _loggerMock.Verify(x => x.Log(

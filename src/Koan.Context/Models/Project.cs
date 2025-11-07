@@ -89,6 +89,11 @@ public class Project : Entity<Project>
     public string? IndexingError { get; set; }
 
     /// <summary>
+    /// ID of the currently active indexing job (null if not indexing)
+    /// </summary>
+    public string? ActiveJobId { get; set; }
+
+    /// <summary>
     /// Whether file monitoring is enabled for this project
     /// </summary>
     public bool IsMonitoringEnabled => MonitorCodeChanges || MonitorDocChanges;

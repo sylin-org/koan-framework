@@ -1,9 +1,6 @@
 using FluentAssertions;
 using Koan.Context.Models;
 using Koan.Context.Services;
-using Koan.Data.Core;
-using Koan.Data.Vector;
-using Koan.Data.Vector.Abstractions;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
@@ -16,63 +13,68 @@ namespace Koan.Tests.Context.Unit.Specs.Retrieval;
 public class RetrievalService_Spec
 {
     private readonly Mock<IEmbeddingService> _embeddingMock;
+    private readonly Mock<ITokenCountingService> _tokenCounterMock;
     private readonly Mock<ILogger<RetrievalService>> _loggerMock;
     private readonly RetrievalService _service;
 
     public RetrievalService_Spec()
     {
-        _embeddingMock = new Mock<IEmbeddingService>();
-        _loggerMock = new Mock<ILogger<RetrievalService>>();
-        _service = new RetrievalService(_embeddingMock.Object, _loggerMock.Object);
+    _embeddingMock = new Mock<IEmbeddingService>();
+    _tokenCounterMock = new Mock<ITokenCountingService>();
+    _loggerMock = new Mock<ILogger<RetrievalService>>();
+    _service = new RetrievalService(
+        _embeddingMock.Object,
+        _tokenCounterMock.Object,
+        _loggerMock.Object);
     }
 
     [Fact]
     public async Task SearchAsync_EmptyQuery_ReturnsEmptyResult()
     {
         // Arrange
-        var projectId = Guid.NewGuid();
+        var projectId = Guid.NewGuid().ToString();
 
         // Act
         var result = await _service.SearchAsync(projectId, "");
 
         // Assert
-        result.Chunks.Should().BeEmpty();
-        result.TotalCount.Should().Be(0);
+    result.Chunks.Should().BeEmpty();
+    result.Metadata.TokensReturned.Should().Be(0);
     }
 
     [Fact]
     public async Task SearchAsync_NullQuery_ReturnsEmptyResult()
     {
         // Arrange
-        var projectId = Guid.NewGuid();
+    var projectId = Guid.NewGuid().ToString();
 
         // Act
         var result = await _service.SearchAsync(projectId, null!);
 
         // Assert
-        result.Chunks.Should().BeEmpty();
-        result.TotalCount.Should().Be(0);
+    result.Chunks.Should().BeEmpty();
+    result.Metadata.TokensReturned.Should().Be(0);
     }
 
     [Fact]
     public async Task SearchAsync_WhitespaceQuery_ReturnsEmptyResult()
     {
         // Arrange
-        var projectId = Guid.NewGuid();
+    var projectId = Guid.NewGuid().ToString();
 
         // Act
         var result = await _service.SearchAsync(projectId, "   ");
 
         // Assert
-        result.Chunks.Should().BeEmpty();
-        result.TotalCount.Should().Be(0);
+    result.Chunks.Should().BeEmpty();
+    result.Metadata.TokensReturned.Should().Be(0);
     }
 
     [Fact]
     public async Task SearchAsync_EmptyEmbedding_ReturnsEmptyResult()
     {
         // Arrange
-        var projectId = Guid.NewGuid();
+    var projectId = Guid.NewGuid().ToString();
         var query = "test query";
 
         _embeddingMock
@@ -83,8 +85,8 @@ public class RetrievalService_Spec
         var result = await _service.SearchAsync(projectId, query);
 
         // Assert
-        result.Chunks.Should().BeEmpty();
-        result.TotalCount.Should().Be(0);
+    result.Chunks.Should().BeEmpty();
+    result.Metadata.TokensReturned.Should().Be(0);
         _loggerMock.Verify(
             x => x.Log(
                 LogLevel.Warning,
@@ -99,7 +101,7 @@ public class RetrievalService_Spec
     public async Task SearchAsync_UsesDefaultOptions_WhenNullProvided()
     {
         // Arrange
-        var projectId = Guid.NewGuid();
+    var projectId = Guid.NewGuid().ToString();
         var query = "test query";
         var embedding = new float[] { 0.1f, 0.2f, 0.3f };
 
@@ -124,7 +126,7 @@ public class RetrievalService_Spec
     public async Task SearchAsync_RespectsAlphaParameter(float alpha)
     {
         // Arrange
-        var projectId = Guid.NewGuid();
+    var projectId = Guid.NewGuid().ToString();
         var query = "test query";
         var embedding = new float[] { 0.1f, 0.2f, 0.3f };
 
@@ -132,7 +134,7 @@ public class RetrievalService_Spec
             .Setup(x => x.EmbedAsync(query, It.IsAny<CancellationToken>()))
             .ReturnsAsync(embedding);
 
-        var options = new SearchOptions(Alpha: alpha);
+    var options = new SearchOptions(Alpha: alpha);
 
         // Act
         var result = await _service.SearchAsync(projectId, query, options);
@@ -149,7 +151,7 @@ public class RetrievalService_Spec
     public async Task SearchAsync_RespectsTopKParameter(int topK)
     {
         // Arrange
-        var projectId = Guid.NewGuid();
+    var projectId = Guid.NewGuid().ToString();
         var query = "test query";
         var embedding = new float[] { 0.1f, 0.2f, 0.3f };
 
@@ -157,7 +159,7 @@ public class RetrievalService_Spec
             .Setup(x => x.EmbedAsync(query, It.IsAny<CancellationToken>()))
             .ReturnsAsync(embedding);
 
-        var options = new SearchOptions(TopK: topK);
+    var options = new SearchOptions(MaxTokens: topK * 400);
 
         // Act
         var result = await _service.SearchAsync(projectId, query, options);
@@ -170,7 +172,7 @@ public class RetrievalService_Spec
     public async Task SearchAsync_LogsSearchParameters()
     {
         // Arrange
-        var projectId = Guid.NewGuid();
+    var projectId = Guid.NewGuid().ToString();
         var query = "test query";
         var embedding = new float[] { 0.1f, 0.2f, 0.3f };
 
@@ -178,7 +180,7 @@ public class RetrievalService_Spec
             .Setup(x => x.EmbedAsync(query, It.IsAny<CancellationToken>()))
             .ReturnsAsync(embedding);
 
-        var options = new SearchOptions(Alpha: 0.8f, TopK: 15);
+    var options = new SearchOptions(MaxTokens: 6000, Alpha: 0.8f);
 
         // Act
         await _service.SearchAsync(projectId, query, options);
@@ -198,7 +200,7 @@ public class RetrievalService_Spec
     public async Task SearchAsync_MeasuresDuration()
     {
         // Arrange
-        var projectId = Guid.NewGuid();
+    var projectId = Guid.NewGuid().ToString();
         var query = "test query";
         var embedding = new float[] { 0.1f, 0.2f, 0.3f };
 
@@ -210,14 +212,14 @@ public class RetrievalService_Spec
         var result = await _service.SearchAsync(projectId, query);
 
         // Assert
-        result.Duration.Should().BeGreaterThan(TimeSpan.Zero);
+        result.Metadata.Duration.Should().BeGreaterThan(TimeSpan.Zero);
     }
 
     [Fact]
     public async Task SearchAsync_HandlesEmbeddingServiceException()
     {
         // Arrange
-        var projectId = Guid.NewGuid();
+    var projectId = Guid.NewGuid().ToString();
         var query = "test query";
 
         _embeddingMock
@@ -225,26 +227,17 @@ public class RetrievalService_Spec
             .ThrowsAsync(new Exception("Embedding service unavailable"));
 
         // Act & Assert
-        await Assert.ThrowsAsync<Exception>(async () =>
-        {
-            await _service.SearchAsync(projectId, query);
-        });
+        var result = await _service.SearchAsync(projectId, query);
 
-        _loggerMock.Verify(
-            x => x.Log(
-                LogLevel.Error,
-                It.IsAny<EventId>(),
-                It.Is<It.IsAnyType>((v, t) => v.ToString()!.Contains("Search failed")),
-                It.IsAny<Exception>(),
-                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
-            Times.Once);
+        result.Chunks.Should().BeEmpty();
+        result.Warnings.Should().ContainSingle(w => w.Contains("Search failed"));
     }
 
     [Fact]
     public async Task SearchAsync_SupportsCancellation()
     {
         // Arrange
-        var projectId = Guid.NewGuid();
+        var projectId = Guid.NewGuid().ToString();
         var query = "test query";
         var cts = new CancellationTokenSource();
 
@@ -254,10 +247,10 @@ public class RetrievalService_Spec
             .ThrowsAsync(new OperationCanceledException());
 
         // Act & Assert
-        await Assert.ThrowsAsync<OperationCanceledException>(async () =>
-        {
-            await _service.SearchAsync(projectId, query, cancellationToken: cts.Token);
-        });
+        var result = await _service.SearchAsync(projectId, query, cancellationToken: cts.Token);
+
+        result.Chunks.Should().BeEmpty();
+        result.Warnings.Should().ContainSingle();
     }
 
     [Fact]
@@ -267,10 +260,11 @@ public class RetrievalService_Spec
         var options = new SearchOptions();
 
         // Assert
+        options.MaxTokens.Should().Be(5000);
         options.Alpha.Should().Be(0.7f);
-        options.TopK.Should().Be(10);
-        options.OffsetStart.Should().BeNull();
-        options.OffsetEnd.Should().BeNull();
+        options.ContinuationToken.Should().BeNull();
+        options.IncludeInsights.Should().BeTrue();
+        options.IncludeReasoning.Should().BeTrue();
     }
 
     [Fact]
@@ -278,21 +272,26 @@ public class RetrievalService_Spec
     {
         // Arrange
         var chunk = new SearchResultChunk(
+            Id: "chunk-1",
             Text: "Sample code",
-            FilePath: "src/Program.cs",
-            CommitSha: "abc123",
-            ChunkRange: "0:100",
-            Title: "Main Program",
-            Language: "csharp",
-            Score: 0.95f);
+            Score: 0.95f,
+            Provenance: new ChunkProvenance(
+                SourceIndex: 0,
+                StartByteOffset: 0,
+                EndByteOffset: 100,
+                StartLine: 1,
+                EndLine: 5,
+                Language: "csharp"),
+            Reasoning: new RetrievalReasoning(0.9f, 0.1f, "hybrid"));
 
         // Assert
         chunk.Text.Should().Be("Sample code");
-        chunk.FilePath.Should().Be("src/Program.cs");
-        chunk.CommitSha.Should().Be("abc123");
-        chunk.ChunkRange.Should().Be("0:100");
-        chunk.Title.Should().Be("Main Program");
-        chunk.Language.Should().Be("csharp");
+        chunk.Provenance.SourceIndex.Should().Be(0);
+        chunk.Provenance.StartByteOffset.Should().Be(0);
+        chunk.Provenance.EndByteOffset.Should().Be(100);
+        chunk.Provenance.StartLine.Should().Be(1);
+        chunk.Provenance.EndLine.Should().Be(5);
+        chunk.Provenance.Language.Should().Be("csharp");
         chunk.Score.Should().Be(0.95f);
     }
 }

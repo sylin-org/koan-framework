@@ -1,8 +1,11 @@
 using FluentAssertions;
 using Koan.Context.Controllers;
+using Koan.Context.Models;
 using Koan.Context.Services;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Moq;
 using Xunit;
 
@@ -14,14 +17,30 @@ namespace Koan.Tests.Context.Unit.Specs.Mcp;
 public class McpTools_Spec
 {
     private readonly Mock<IRetrievalService> _retrievalMock;
+    private readonly Mock<IIndexingService> _indexingMock;
+    private readonly Mock<ProjectResolver> _projectResolverMock;
     private readonly Mock<ILogger<McpToolsController>> _loggerMock;
     private readonly McpToolsController _controller;
 
     public McpTools_Spec()
     {
         _retrievalMock = new Mock<IRetrievalService>();
+        _indexingMock = new Mock<IIndexingService>();
+        _projectResolverMock = new Mock<ProjectResolver>(
+            Mock.Of<ILogger<ProjectResolver>>(),
+            Options.Create(new ProjectResolutionOptions()));
         _loggerMock = new Mock<ILogger<McpToolsController>>();
-        _controller = new McpToolsController(_retrievalMock.Object, _loggerMock.Object);
+        _indexingMock
+            .Setup(x => x.IndexProjectAsync(
+                It.IsAny<string>(),
+                It.IsAny<IProgress<IndexingProgress>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new IndexingResult(0, 0, 0, TimeSpan.Zero, Array.Empty<IndexingError>()));
+        _controller = new McpToolsController(
+            _retrievalMock.Object,
+            _indexingMock.Object,
+            _projectResolverMock.Object,
+            _loggerMock.Object);
     }
 
     #region ResolveLibraryId Tests
@@ -122,25 +141,10 @@ public class McpTools_Spec
     #region GetLibraryDocs Tests
 
     [Fact]
-    public async Task GetLibraryDocs_EmptyLibraryId_ReturnsBadRequest()
-    {
-        // Arrange
-        var request = new GetLibraryDocsRequest(Guid.Empty, "test query");
-
-        // Act
-        var result = await _controller.GetLibraryDocs(request, CancellationToken.None);
-
-        // Assert
-        result.Should().BeOfType<BadRequestObjectResult>();
-        var badRequest = result as BadRequestObjectResult;
-        badRequest!.Value.Should().NotBeNull();
-    }
-
-    [Fact]
     public async Task GetLibraryDocs_EmptyQuery_ReturnsBadRequest()
     {
         // Arrange
-        var request = new GetLibraryDocsRequest(Guid.NewGuid(), "");
+        var request = new GetLibraryDocsRequest("", LibraryId: "proj-1");
 
         // Act
         var result = await _controller.GetLibraryDocs(request, CancellationToken.None);
@@ -150,159 +154,78 @@ public class McpTools_Spec
     }
 
     [Fact]
-    public async Task GetLibraryDocs_NullQuery_ReturnsBadRequest()
+    public async Task GetLibraryDocs_UsesLibraryIdWhenProvided()
     {
         // Arrange
-        var request = new GetLibraryDocsRequest(Guid.NewGuid(), null!);
+    var projectId = Guid.NewGuid().ToString();
+    var project = CreateProject(projectId);
+
+        _projectResolverMock
+            .Setup(x => x.ResolveProjectAsync(
+                projectId.ToString(),
+                null,
+                It.IsAny<HttpContext?>(),
+                true,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(project);
+
+        var resultPayload = CreateSearchResult();
+
+        _retrievalMock
+            .Setup(x => x.SearchAsync(
+                project.Id.ToString(),
+                "test query",
+                It.IsAny<SearchOptions>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(resultPayload);
+
+        var request = new GetLibraryDocsRequest("test query", LibraryId: projectId.ToString());
 
         // Act
-        var result = await _controller.GetLibraryDocs(request, CancellationToken.None);
+        var response = await _controller.GetLibraryDocs(request, CancellationToken.None) as OkObjectResult;
 
         // Assert
-        result.Should().BeOfType<BadRequestObjectResult>();
+        response.Should().NotBeNull();
+        var body = response!.Value as GetLibraryDocsResponse;
+        body.Should().NotBeNull();
+        body!.Result.Should().BeEquivalentTo(resultPayload);
+        _projectResolverMock.VerifyAll();
     }
 
     [Fact]
-    public async Task GetLibraryDocs_WhitespaceQuery_ReturnsBadRequest()
+    public async Task GetLibraryDocs_UsesPathContextWhenProvided()
     {
         // Arrange
-        var request = new GetLibraryDocsRequest(Guid.NewGuid(), "   ");
+    var projectId = Guid.NewGuid().ToString();
+    var project = CreateProject(projectId);
+
+        _projectResolverMock
+            .Setup(x => x.ResolveProjectByPathAsync(
+                "C:/repo",
+                true,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(project);
+
+        var resultPayload = CreateSearchResult();
+        _retrievalMock
+            .Setup(x => x.SearchAsync(
+                project.Id.ToString(),
+                "test query",
+                It.IsAny<SearchOptions>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(resultPayload);
+
+        var request = new GetLibraryDocsRequest("test query", PathContext: "C:/repo");
 
         // Act
-        var result = await _controller.GetLibraryDocs(request, CancellationToken.None);
+        var response = await _controller.GetLibraryDocs(request, CancellationToken.None) as OkObjectResult;
 
         // Assert
-        result.Should().BeOfType<BadRequestObjectResult>();
-    }
-
-    [Fact]
-    public async Task GetLibraryDocs_DefaultAlpha_UsesSevenTenth()
-    {
-        // Arrange
-        var projectId = Guid.NewGuid();
-        var request = new GetLibraryDocsRequest(projectId, "test query");
-
-        var searchResult = new SearchResult(
-            new List<SearchResultChunk>(),
-            0,
-            TimeSpan.FromMilliseconds(10));
-
-        _retrievalMock
-            .Setup(x => x.SearchAsync(
-                projectId,
-                "test query",
-                It.Is<SearchOptions>(o => o.Alpha == 0.7f),
-                It.IsAny<CancellationToken>()))
-            .ReturnsAsync(searchResult);
-
-        // Act
-        // Note: This will fail without Project.Get mocked - would need integration test
-        // For unit test, we're validating the parameter transformation logic
-    }
-
-    [Fact]
-    public async Task GetLibraryDocs_CustomAlpha_PassesThrough()
-    {
-        // Arrange
-        var projectId = Guid.NewGuid();
-        var request = new GetLibraryDocsRequest(projectId, "test query", Alpha: 0.5f);
-
-        var searchResult = new SearchResult(
-            new List<SearchResultChunk>(),
-            0,
-            TimeSpan.FromMilliseconds(10));
-
-        _retrievalMock
-            .Setup(x => x.SearchAsync(
-                projectId,
-                "test query",
-                It.Is<SearchOptions>(o => o.Alpha == 0.5f),
-                It.IsAny<CancellationToken>()))
-            .ReturnsAsync(searchResult);
-
-        // Act
-        // Note: Would need Project.Get mocked for full test
-    }
-
-    [Fact]
-    public async Task GetLibraryDocs_DefaultTopK_UsesTen()
-    {
-        // Arrange
-        var projectId = Guid.NewGuid();
-        var request = new GetLibraryDocsRequest(projectId, "test query");
-
-        var searchResult = new SearchResult(
-            new List<SearchResultChunk>(),
-            0,
-            TimeSpan.FromMilliseconds(10));
-
-        _retrievalMock
-            .Setup(x => x.SearchAsync(
-                projectId,
-                "test query",
-                It.Is<SearchOptions>(o => o.TopK == 10),
-                It.IsAny<CancellationToken>()))
-            .ReturnsAsync(searchResult);
-
-        // Act
-        // Note: Would need Project.Get mocked for full test
-    }
-
-    [Theory]
-    [InlineData(5)]
-    [InlineData(20)]
-    [InlineData(50)]
-    public async Task GetLibraryDocs_CustomTopK_PassesThrough(int topK)
-    {
-        // Arrange
-        var projectId = Guid.NewGuid();
-        var request = new GetLibraryDocsRequest(projectId, "test query", TopK: topK);
-
-        var searchResult = new SearchResult(
-            new List<SearchResultChunk>(),
-            0,
-            TimeSpan.FromMilliseconds(10));
-
-        _retrievalMock
-            .Setup(x => x.SearchAsync(
-                projectId,
-                "test query",
-                It.Is<SearchOptions>(o => o.TopK == topK),
-                It.IsAny<CancellationToken>()))
-            .ReturnsAsync(searchResult);
-
-        // Act
-        // Note: Would need Project.Get mocked for full test
-    }
-
-    [Fact]
-    public async Task GetLibraryDocs_WithOffset_CalculatesOffsetEnd()
-    {
-        // Arrange
-        var projectId = Guid.NewGuid();
-        var request = new GetLibraryDocsRequest(
-            projectId,
-            "test query",
-            TopK: 10,
-            Offset: 20);
-
-        var searchResult = new SearchResult(
-            new List<SearchResultChunk>(),
-            0,
-            TimeSpan.FromMilliseconds(10));
-
-        _retrievalMock
-            .Setup(x => x.SearchAsync(
-                projectId,
-                "test query",
-                It.Is<SearchOptions>(o =>
-                    o.OffsetStart == 20 &&
-                    o.OffsetEnd == 30),
-                It.IsAny<CancellationToken>()))
-            .ReturnsAsync(searchResult);
-
-        // Act
-        // Note: Would need Project.Get mocked for full test
+        response.Should().NotBeNull();
+        var body = response!.Value as GetLibraryDocsResponse;
+        body.Should().NotBeNull();
+        body!.Result.Chunks.Should().HaveCount(1);
+        _projectResolverMock.VerifyAll();
     }
 
     #endregion
@@ -326,25 +249,31 @@ public class McpTools_Spec
         // Arrange & Act
         var libraryId = Guid.NewGuid();
         var request = new GetLibraryDocsRequest(
-            libraryId,
             "test query",
+            LibraryId: libraryId.ToString(),
             Alpha: 0.8f,
-            TopK: 15,
-            Offset: 10);
+            Tokens: 4000,
+            ContinuationToken: "next",
+            IncludeInsights: false,
+            IncludeReasoning: false,
+            Categories: new[] { "docs" });
 
         // Assert
-        request.LibraryId.Should().Be(libraryId);
+        request.LibraryId.Should().Be(libraryId.ToString());
         request.Query.Should().Be("test query");
         request.Alpha.Should().Be(0.8f);
-        request.TopK.Should().Be(15);
-        request.Offset.Should().Be(10);
+        request.Tokens.Should().Be(4000);
+        request.ContinuationToken.Should().Be("next");
+        request.IncludeInsights.Should().BeFalse();
+        request.IncludeReasoning.Should().BeFalse();
+        request.Categories.Should().ContainSingle(c => c == "docs");
     }
 
     [Fact]
     public void LibraryMatch_ContainsAllProvenanceFields()
     {
         // Arrange & Act
-        var id = Guid.NewGuid();
+        var id = Guid.NewGuid().ToString();
         var match = new LibraryMatch(
             Id: id,
             Name: "koan-framework",
@@ -366,25 +295,19 @@ public class McpTools_Spec
     public void GetLibraryDocsResponse_CalculatesHasMore()
     {
         // Arrange & Act
+        var payload = CreateSearchResult();
         var response = new GetLibraryDocsResponse(
-            LibraryId: Guid.NewGuid(),
+            LibraryId: Guid.NewGuid().ToString(),
             LibraryName: "test",
             Query: "query",
-            Results: new List<SearchResultChunk>
-            {
-                new("text1", "file1", null, null, null, "cs", 0.9f),
-                new("text2", "file2", null, null, null, "cs", 0.8f)
-            },
-            TotalResults: 15,
-            Duration: TimeSpan.FromMilliseconds(50),
-            Offset: 0,
-            Limit: 10,
-            HasMore: true);
+            Result: payload,
+            HasMore: true,
+            IndexingStatus: IndexingStatus.Ready.ToString());
 
         // Assert
         response.HasMore.Should().BeTrue();
-        response.Results.Should().HaveCount(2);
-        response.TotalResults.Should().Be(15);
+        response.Result.Should().BeEquivalentTo(payload);
+        response.IndexingStatus.Should().Be(IndexingStatus.Ready.ToString());
     }
 
     [Fact]
@@ -392,23 +315,64 @@ public class McpTools_Spec
     {
         // Arrange & Act
         var response = new GetLibraryDocsResponse(
-            LibraryId: Guid.NewGuid(),
+            LibraryId: Guid.NewGuid().ToString(),
             LibraryName: "test",
             Query: "query",
-            Results: new List<SearchResultChunk>
-            {
-                new("text1", "file1", null, null, null, "cs", 0.9f),
-                new("text2", "file2", null, null, null, "cs", 0.8f)
-            },
-            TotalResults: 2,
-            Duration: TimeSpan.FromMilliseconds(50),
-            Offset: 0,
-            Limit: 10,
-            HasMore: false);
+            Result: CreateSearchResult() with { ContinuationToken = null },
+            HasMore: false,
+            IndexingStatus: IndexingStatus.Ready.ToString());
 
         // Assert
         response.HasMore.Should().BeFalse();
     }
 
     #endregion
+
+    private static Project CreateProject(string id, IndexingStatus status = IndexingStatus.Ready)
+    {
+        return new Project
+        {
+            Id = id,
+            Name = "Test Project",
+            RootPath = "C:/repo",
+            Status = status,
+            IsActive = true
+        };
+    }
+
+    private static SearchResult CreateSearchResult()
+    {
+        var chunk = new SearchResultChunk(
+            Id: "chunk-1",
+            Text: "content",
+            Score: 0.9f,
+            Provenance: new ChunkProvenance(
+                SourceIndex: 0,
+                StartByteOffset: 0,
+                EndByteOffset: 10,
+                StartLine: 1,
+                EndLine: 2,
+                Language: "markdown"),
+            Reasoning: null);
+
+        return new SearchResult(
+            Chunks: new[] { chunk },
+            Metadata: new SearchMetadata(
+                TokensRequested: 5000,
+                TokensReturned: 120,
+                Page: 1,
+                Model: "EmbeddingStub",
+                VectorProvider: "default",
+                Timestamp: DateTime.UtcNow,
+                Duration: TimeSpan.FromMilliseconds(5)),
+            Sources: new SearchSources(
+                TotalFiles: 1,
+                Files: new[]
+                {
+                    new SourceFile("docs/file.md", "file", null, "sha-1")
+                }),
+            Insights: null,
+            ContinuationToken: null,
+            Warnings: Array.Empty<string>());
+    }
 }

@@ -37,7 +37,46 @@ public class Vector<TEntity> where TEntity : class, IEntity<string>
     public static IDisposable WithPartition(string partition)
         => Koan.Data.Core.EntityContext.Partition(partition);
 
-    // Save a single vector point; convenience overload
+    /// <summary>
+    /// Saves entity to vector store only (embeddings + metadata).
+    /// Does NOT save to relational store - use model.Save() separately if needed.
+    /// </summary>
+    public static Task Save(TEntity entity, ReadOnlyMemory<float> vector, IReadOnlyDictionary<string, object>? metadata = null, CancellationToken ct = default)
+        => VectorData<TEntity>.Save(entity, vector, metadata, ct);
+
+    /// <summary>
+    /// Saves entity to vector store only (embeddings + metadata).
+    /// Does NOT save to relational store - use model.Save() separately if needed.
+    /// </summary>
+    public static Task Save(TEntity entity, float[] vector, IReadOnlyDictionary<string, object>? metadata = null, CancellationToken ct = default)
+        => VectorData<TEntity>.Save(entity, new ReadOnlyMemory<float>(vector), metadata, ct);
+
+    /// <summary>
+    /// Saves multiple entities to vector store only (batch operation).
+    /// Does NOT save to relational store - use model.Save() for each entity if needed.
+    /// </summary>
+    public static Task<int> Save(IEnumerable<VectorData<TEntity>.VectorEntity> items, CancellationToken ct = default)
+        => VectorData<TEntity>.Save(items, ct);
+
+    /// <summary>
+    /// Convenience helper: Saves entity to BOTH relational store (via model.Save()) AND vector store.
+    /// </summary>
+    public static Task SaveWithVector(TEntity entity, ReadOnlyMemory<float> vector, IReadOnlyDictionary<string, object>? metadata = null, CancellationToken ct = default)
+        => VectorData<TEntity>.SaveWithVector(entity, vector, metadata, ct);
+
+    /// <summary>
+    /// Convenience helper: Saves entity to BOTH relational store (via model.Save()) AND vector store.
+    /// </summary>
+    public static Task SaveWithVector(TEntity entity, float[] vector, IReadOnlyDictionary<string, object>? metadata = null, CancellationToken ct = default)
+        => VectorData<TEntity>.SaveWithVector(entity, new ReadOnlyMemory<float>(vector), metadata, ct);
+
+    /// <summary>
+    /// Convenience helper: Saves multiple entities to BOTH relational store AND vector store (batch operation).
+    /// </summary>
+    public static Task<BatchResult> SaveWithVector(IEnumerable<VectorData<TEntity>.VectorEntity> items, CancellationToken ct = default)
+        => VectorData<TEntity>.SaveWithVector(items, ct);
+
+    // Save a single vector point by ID; convenience overload
     public static Task Save(string id, float[] embedding, object? metadata = null, CancellationToken ct = default)
         => Repo.UpsertAsync(id, embedding, metadata, ct);
 

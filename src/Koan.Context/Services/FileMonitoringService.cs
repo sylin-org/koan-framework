@@ -15,6 +15,8 @@ public class FileMonitoringService : IHostedService, IDisposable
 {
     private readonly ConcurrentDictionary<string, FileSystemWatcher> _watchers = new();
     private readonly ConcurrentDictionary<string, DebouncingQueue> _debounceQueues = new();
+    private readonly ConcurrentDictionary<string, bool> _suspendedProjects = new();
+    private readonly ConcurrentDictionary<string, GitignoreParser> _gitignoreParsers = new();
     private readonly ILogger<FileMonitoringService> _logger;
     private readonly FileMonitoringOptions _options;
     private readonly IServiceProvider _serviceProvider;
@@ -85,6 +87,9 @@ public class FileMonitoringService : IHostedService, IDisposable
                 _options.DebounceMilliseconds,
                 async changes => await ProcessChangesAsync(project, changes));
 
+            // Cache gitignore parser for this project
+            _gitignoreParsers[project.Id] = GitignoreParser.LoadFromDirectory(project.RootPath);
+
             _logger.LogInformation("Started watching project: {Name} at {Path}",
                 project.Name, project.RootPath);
 
@@ -98,6 +103,12 @@ public class FileMonitoringService : IHostedService, IDisposable
 
     private void OnFileChanged(Project project, FileSystemEventArgs e)
     {
+        // Skip if project monitoring is suspended (e.g., during full indexing)
+        if (_suspendedProjects.TryGetValue(project.Id, out var suspended) && suspended)
+        {
+            return;
+        }
+
         // Filter by project monitoring settings
         var relativePath = Path.GetRelativePath(project.RootPath, e.FullPath);
 
@@ -123,10 +134,9 @@ public class FileMonitoringService : IHostedService, IDisposable
             return;
         }
 
-        // Check against .gitignore
-        var gitignore = GitignoreParser.LoadFromDirectory(project.RootPath);
-
-        if (gitignore.ShouldExclude(relativePath))
+        // Check against .gitignore (use cached parser)
+        if (_gitignoreParsers.TryGetValue(project.Id, out var gitignore) &&
+            gitignore.ShouldExclude(relativePath))
         {
             _logger.LogTrace("Skipping {Path} - excluded by .gitignore", relativePath);
             return;
@@ -145,6 +155,12 @@ public class FileMonitoringService : IHostedService, IDisposable
 
     private void OnFileDeleted(Project project, FileSystemEventArgs e)
     {
+        // Skip if project monitoring is suspended (e.g., during full indexing)
+        if (_suspendedProjects.TryGetValue(project.Id, out var suspended) && suspended)
+        {
+            return;
+        }
+
         var relativePath = Path.GetRelativePath(project.RootPath, e.FullPath);
 
         // Early exit: Exclude system directories and temp files
@@ -213,11 +229,13 @@ public class FileMonitoringService : IHostedService, IDisposable
     private bool ShouldExcludeFromMonitoring(string relativePath)
     {
         // Excluded system directories (same as DocumentDiscoveryService)
+        // Note: Comparison is case-insensitive, so .koan matches both .koan and .Koan
         var excludedDirectories = new[]
         {
             ".git", "node_modules", "bin", "obj", ".vs", ".vscode",
             "dist", "build", "target", "coverage", ".next", ".nuxt",
-            "packages", "vendor", "__pycache__", ".pytest_cache"
+            "packages", "vendor", "__pycache__", ".pytest_cache",
+            ".koan"  // Koan framework runtime data (databases, caches, vectors)
         };
 
         // Check if path contains any excluded directory
@@ -236,7 +254,9 @@ public class FileMonitoringService : IHostedService, IDisposable
         if (fileName.StartsWith("~") ||      // Office temp files
             fileName.StartsWith(".#") ||      // Emacs temp files
             fileName.EndsWith(".tmp") ||      // Generic temp files
-            fileName.EndsWith(".swp"))        // Vim swap files
+            fileName.Contains(".tmp.") ||     // Temp file patterns like file.tmp.12345
+            fileName.EndsWith(".swp") ||      // Vim swap files
+            fileName.EndsWith("-journal"))    // SQLite journal files
         {
             return true;
         }
@@ -266,7 +286,29 @@ public class FileMonitoringService : IHostedService, IDisposable
             _logger.LogInformation("Stopped watching project {ProjectId}", projectId);
         }
 
+        _suspendedProjects.TryRemove(projectId, out _);
+        _gitignoreParsers.TryRemove(projectId, out _);
+
         await Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Suspends file monitoring for a project (e.g., during full indexing).
+    /// Events will be ignored until ResumeWatchingProject is called.
+    /// </summary>
+    public void SuspendWatchingProject(string projectId)
+    {
+        _suspendedProjects[projectId] = true;
+        _logger.LogDebug("Suspended file monitoring for project {ProjectId}", projectId);
+    }
+
+    /// <summary>
+    /// Resumes file monitoring for a project after suspension.
+    /// </summary>
+    public void ResumeWatchingProject(string projectId)
+    {
+        _suspendedProjects[projectId] = false;
+        _logger.LogDebug("Resumed file monitoring for project {ProjectId}", projectId);
     }
 
     public async Task StopAsync(CancellationToken cancellationToken)

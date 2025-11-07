@@ -9,17 +9,16 @@ namespace Koan.Context.Models;
 /// <remarks>
 /// Each chunk is a semantically meaningful portion of a document (800-1000 tokens)
 /// with metadata for provenance tracking and retrieval.
-/// This entity is stored in both relational storage (for metadata queries)
-/// and vector storage (for semantic search).
-/// Uses string IDs for compatibility with Vector&lt;T&gt; partition-aware storage.
+///
+/// Storage Model:
+/// - Relational (SQLite): Metadata via docChunk.Save()
+/// - Vector (Weaviate): Embeddings via Vector&lt;DocumentChunk&gt;.Save(docChunk, embedding)
+///
+/// IMPORTANT: Chunks are isolated by partition context (proj-{guid:N}), not by ProjectId field.
+/// All chunk operations must occur within EntityContext.Partition() to ensure proper isolation.
 /// </remarks>
 public class DocumentChunk : Entity<DocumentChunk>
 {
-    /// <summary>
-    /// Project/partition ID this chunk belongs to
-    /// </summary>
-    public string ProjectId { get; set; } = string.Empty;
-
     /// <summary>
     /// Relative file path within the project
     /// </summary>
@@ -36,9 +35,29 @@ public class DocumentChunk : Entity<DocumentChunk>
     public string? CommitSha { get; set; }
 
     /// <summary>
-    /// Byte offset range in source file (format: "start:end")
+    /// Byte offset where this chunk begins in the source file
     /// </summary>
-    public string? ChunkRange { get; set; }
+    public long StartByteOffset { get; set; }
+
+    /// <summary>
+    /// Byte offset where this chunk ends in the source file
+    /// </summary>
+    public long EndByteOffset { get; set; }
+
+    /// <summary>
+    /// Starting line number for the chunk (1-based)
+    /// </summary>
+    public int StartLine { get; set; }
+
+    /// <summary>
+    /// Ending line number for the chunk (1-based, inclusive)
+    /// </summary>
+    public int EndLine { get; set; }
+
+    /// <summary>
+    /// Optional direct URL for the source file (e.g., GitHub blob link)
+    /// </summary>
+    public string? SourceUrl { get; set; }
 
     /// <summary>
     /// Document title derived from heading hierarchy
@@ -83,8 +102,10 @@ public class DocumentChunk : Entity<DocumentChunk>
     /// <summary>
     /// Creates a new DocumentChunk with required fields
     /// </summary>
+    /// <remarks>
+    /// Must be called within EntityContext.Partition() to ensure proper project isolation
+    /// </remarks>
     public static DocumentChunk Create(
-        string projectId,
         string filePath,
         string searchText,
         int tokenCount,
@@ -92,9 +113,6 @@ public class DocumentChunk : Entity<DocumentChunk>
         string? title = null,
         string? language = null)
     {
-        if (string.IsNullOrWhiteSpace(projectId))
-            throw new ArgumentException("ProjectId cannot be empty", nameof(projectId));
-
         if (string.IsNullOrWhiteSpace(filePath))
             throw new ArgumentException("FilePath cannot be empty", nameof(filePath));
 
@@ -103,7 +121,6 @@ public class DocumentChunk : Entity<DocumentChunk>
 
         return new DocumentChunk
         {
-            ProjectId = projectId,
             FilePath = filePath,
             SearchText = searchText,
             TokenCount = tokenCount,

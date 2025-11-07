@@ -28,6 +28,7 @@
     <ProjectReference Include="..\Connectors\Data\Vector\Weaviate\Koan.Data.Vector.Connector.Weaviate.csproj" />
     <ProjectReference Include="..\Connectors\AI\Ollama\Koan.AI.Connector.Ollama.csproj" />
     <ProjectReference Include="..\Koan.Orchestration.Aspire\Koan.Orchestration.Aspire.csproj" />
+    <ProjectReference Include="..\Koan.Scheduling\Koan.Scheduling.csproj" />
   </ItemGroup>
 
 </Project>

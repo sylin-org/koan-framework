@@ -43,44 +43,75 @@ public class SearchController : ControllerBase
 
         try
         {
-            // Resolve project from explicit ID or working directory
+            // Resolve project context in priority order: explicit ID -> pathContext -> libraryId
             string projectId;
 
             if (!string.IsNullOrWhiteSpace(request.ProjectId))
             {
-                // Use explicit project ID
                 projectId = request.ProjectId;
             }
-            else if (!string.IsNullOrWhiteSpace(request.WorkingDirectory))
+            else if (!string.IsNullOrWhiteSpace(request.PathContext))
             {
-                // Resolve project from working directory (auto-creates and indexes if needed)
-                var project = await _projectResolver.ResolveProjectAsync(
-                    libraryId: null,
-                    workingDirectory: request.WorkingDirectory,
-                    autoCreate: true,
+                var project = await _projectResolver.ResolveProjectByPathAsync(
+                    request.PathContext,
                     cancellationToken: cancellationToken);
 
                 if (project == null)
                 {
-                    return NotFound(new { error = $"Could not resolve project from directory: {request.WorkingDirectory}" });
+                    return NotFound(new { error = $"Could not resolve project from pathContext: {request.PathContext}" });
                 }
 
                 projectId = project.Id;
 
                 _logger.LogInformation(
-                    "Resolved project {ProjectId} ({ProjectName}) from working directory {WorkingDirectory}",
-                    projectId,
-                    project.Name,
-                    request.WorkingDirectory);
+                    "Resolved pathContext {Path} to project {ProjectId} ({Name})",
+                    request.PathContext,
+                    project.Id,
+                    project.Name);
+            }
+            else if (!string.IsNullOrWhiteSpace(request.LibraryId))
+            {
+                var project = await _projectResolver.ResolveProjectAsync(
+                    libraryId: request.LibraryId,
+                    workingDirectory: null,
+                    httpContext: HttpContext,
+                    autoCreate: false,
+                    cancellationToken: cancellationToken);
+
+                if (project == null)
+                {
+                    return NotFound(new { error = $"Project {request.LibraryId} was not found" });
+                }
+
+                projectId = project.Id;
+            }
+            else if (!string.IsNullOrWhiteSpace(request.WorkingDirectory))
+            {
+                var project = await _projectResolver.ResolveProjectAsync(
+                    libraryId: null,
+                    workingDirectory: request.WorkingDirectory,
+                    httpContext: HttpContext,
+                    autoCreate: false,
+                    cancellationToken: cancellationToken);
+
+                if (project == null)
+                {
+                    return NotFound(new { error = $"Could not resolve project from workingDirectory: {request.WorkingDirectory}" });
+                }
+
+                projectId = project.Id;
             }
             else
             {
-                return BadRequest(new { error = "Either ProjectId or WorkingDirectory must be provided" });
+                return BadRequest(new { error = "Must provide projectId, pathContext, libraryId, or workingDirectory" });
             }
 
             var options = new SearchOptions(
+                MaxTokens: request.Tokens ?? 5000,
                 Alpha: request.Alpha ?? 0.7f,
-                TopK: request.TopK ?? 10);
+                ContinuationToken: request.ContinuationToken,
+                IncludeInsights: request.IncludeInsights ?? true,
+                IncludeReasoning: request.IncludeReasoning ?? true);
 
             var result = await _retrieval.SearchAsync(
                 projectId,
@@ -104,6 +135,11 @@ public class SearchController : ControllerBase
 public record SearchRequest(
     string Query,
     string? ProjectId = null,
+    string? PathContext = null,
+    string? LibraryId = null,
     string? WorkingDirectory = null,
     float? Alpha = null,
-    int? TopK = null);
+    int? Tokens = null,
+    string? ContinuationToken = null,
+    bool? IncludeInsights = null,
+    bool? IncludeReasoning = null);

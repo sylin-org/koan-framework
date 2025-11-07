@@ -1,5 +1,6 @@
 using Koan.Context.Models;
 using Koan.Data.Abstractions;
+using Koan.Data.Core;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -40,7 +41,7 @@ public class ProjectResolver
         if (!string.IsNullOrWhiteSpace(workingDirectory))
         {
             _logger.LogDebug("Resolving project by working directory: {Path}", workingDirectory);
-            return await ResolveByPathAsync(workingDirectory, autoCreate, cancellationToken);
+            return await ResolveProjectByPathAsync(workingDirectory, autoCreate, cancellationToken);
         }
 
         // Priority 3: Transport context (stdio MCP only - future enhancement)
@@ -48,6 +49,53 @@ public class ProjectResolver
 
         _logger.LogWarning("No project context found - no libraryId or workingDirectory provided");
         return null;
+    }
+
+    /// <summary>
+    /// Resolves a project based on an arbitrary file path, optionally auto-creating one.
+    /// </summary>
+    public async Task<Project?> ResolveProjectByPathAsync(
+        string pathContext,
+        bool autoCreate = true,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(pathContext))
+        {
+            throw new ArgumentException("Path context cannot be null or empty", nameof(pathContext));
+        }
+
+        var normalizedPath = ResolvePath(pathContext, _options.FollowSymbolicLinks);
+        var gitRoot = FindGitRoot(normalizedPath);
+
+        if (gitRoot != null)
+        {
+            var project = await ResolveByPathAsync(gitRoot, autoCreate, cancellationToken);
+            if (project != null)
+            {
+                return project;
+            }
+        }
+
+        // Fallback to directory itself when no git repo detected
+        var fallbackRoot = gitRoot ?? Path.GetDirectoryName(normalizedPath);
+
+        if (fallbackRoot == null)
+        {
+            throw new ArgumentException($"Invalid path context: {pathContext}", nameof(pathContext));
+        }
+
+        var resolved = await ResolveByPathAsync(fallbackRoot, autoCreate, cancellationToken);
+        if (resolved != null)
+        {
+            return resolved;
+        }
+
+        if (!autoCreate || !_options.AutoCreateProjectOnQuery)
+        {
+            return null;
+        }
+
+        return await AutoCreateProjectAsync(fallbackRoot, cancellationToken);
     }
 
     private async Task<Project?> ResolveByPathAsync(
@@ -117,13 +165,31 @@ public class ProjectResolver
             .ToList();
     }
 
+    private string? FindGitRoot(string path)
+    {
+        var current = new DirectoryInfo(path);
+
+        while (current != null)
+        {
+            var gitFolder = Path.Combine(current.FullName, ".git");
+            if (Directory.Exists(gitFolder))
+            {
+                return current.FullName;
+            }
+
+            current = current.Parent;
+        }
+
+        return null;
+    }
+
     private async Task<Project> AutoCreateProjectAsync(
         string path,
         CancellationToken cancellationToken)
     {
         var project = Project.CreateFromDirectory(path);
         project.Status = IndexingStatus.NotIndexed;
-        await Project.UpsertAsync(project, cancellationToken);
+        await project.Save(cancellationToken);
 
         _logger.LogInformation("Created project {Name} ({ProjectId}) at {Path}",
             project.Name, project.Id, project.RootPath);

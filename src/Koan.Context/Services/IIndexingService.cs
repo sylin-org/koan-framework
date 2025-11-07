@@ -11,11 +11,13 @@ public interface IIndexingService
     /// <param name="projectId">Project ID to index</param>
     /// <param name="progress">Optional progress reporter</param>
     /// <param name="cancellationToken">Cancellation token</param>
+    /// <param name="force">If true, cancels any existing indexing job and starts a new one</param>
     /// <returns>Indexing result with statistics</returns>
     Task<IndexingResult> IndexProjectAsync(
         string projectId,
         IProgress<IndexingProgress>? progress = null,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        bool force = false);
 }
 
 /// <summary>

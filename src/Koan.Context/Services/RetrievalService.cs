@@ -1,25 +1,35 @@
 using System.Diagnostics;
+using System.IO;
 using Koan.Context.Models;
 using Koan.Data.Core;
 using Koan.Data.Vector;
-using Koan.Data.Vector.Abstractions;
 using Microsoft.Extensions.Logging;
 
 namespace Koan.Context.Services;
 
 /// <summary>
-/// Service for semantic and hybrid search over indexed documents
+/// Service for semantic and hybrid search over indexed documents with AI-optimized response payloads.
 /// </summary>
 public class RetrievalService : IRetrievalService
 {
+    private const int MinTokenBudget = 1000;
+    private const int MaxTokenBudget = 10000;
+    private const int EstimatedTokensPerChunk = 350;
+
     private readonly IEmbeddingService _embedding;
+    private readonly ITokenCountingService _tokenCounter;
+    private readonly IContinuationTokenService _continuationTokenService;
     private readonly ILogger<RetrievalService> _logger;
 
     public RetrievalService(
         IEmbeddingService embedding,
+        ITokenCountingService tokenCounter,
+        IContinuationTokenService continuationTokenService,
         ILogger<RetrievalService> logger)
     {
         _embedding = embedding ?? throw new ArgumentNullException(nameof(embedding));
+        _tokenCounter = tokenCounter ?? throw new ArgumentNullException(nameof(tokenCounter));
+        _continuationTokenService = continuationTokenService ?? throw new ArgumentNullException(nameof(continuationTokenService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -29,79 +39,261 @@ public class RetrievalService : IRetrievalService
         SearchOptions? options = null,
         CancellationToken cancellationToken = default)
     {
+        var normalizedOptions = NormalizeOptions(options ?? new SearchOptions());
+
         if (string.IsNullOrWhiteSpace(query))
         {
-            return new SearchResult(Array.Empty<SearchResultChunk>(), 0, TimeSpan.Zero);
+            return CreateEmptyResult(normalizedOptions, warnings: Array.Empty<string>());
         }
 
         var stopwatch = Stopwatch.StartNew();
-        options ??= new SearchOptions();
+        var warnings = new List<string>();
+
+        if (!string.IsNullOrWhiteSpace(normalizedOptions.ContinuationToken))
+        {
+            warnings.Add("Continuation tokens are not yet supported; returning the first page only.");
+        }
 
         _logger.LogInformation(
-            "Searching project {ProjectId} for query: {Query} (alpha={Alpha}, topK={TopK})",
+            "Searching project {ProjectId} for query: {Query} (alpha={Alpha}, maxTokens={MaxTokens})",
             projectId,
             query,
-            options.Alpha,
-            options.TopK);
+            normalizedOptions.Alpha,
+            normalizedOptions.MaxTokens);
 
         try
         {
-            // Set partition context for this project
-            // Use "proj-" prefix to ensure valid partition name (must start with letter)
-            // Parse projectId as GUID and format without hyphens
             var partitionId = $"proj-{Guid.Parse(projectId):N}";
+            _logger.LogInformation("Setting partition context: {PartitionId}", partitionId);
+
             using (EntityContext.Partition(partitionId))
             {
-                // Generate query embedding
+                _logger.LogInformation("Generating embedding for query: {Query}", query);
                 var queryEmbedding = await _embedding.EmbedAsync(query, cancellationToken);
+                _logger.LogInformation("Generated embedding with dimension: {Dimension}", queryEmbedding.Length);
 
                 if (queryEmbedding.Length == 0)
                 {
-                    _logger.LogWarning("Empty embedding generated for query: {Query}", query);
-                    return new SearchResult(Array.Empty<SearchResultChunk>(), 0, stopwatch.Elapsed);
+                    stopwatch.Stop();
+                    warnings.Add("Embedding provider returned an empty vector for the supplied query.");
+                    return CreateEmptyResult(normalizedOptions, stopwatch.Elapsed, warnings);
                 }
 
-                // Perform hybrid vector search
-                var searchResult = await Vector<DocumentChunk>.Search(
+                var topK = CalculateTopK(normalizedOptions.MaxTokens);
+                _logger.LogInformation("Calling Vector<DocumentChunk>.Search with topK={TopK}, alpha={Alpha}", topK, normalizedOptions.Alpha);
+
+                var vectorResult = await Vector<DocumentChunk>.Search(
                     vector: queryEmbedding,
                     text: query,
-                    alpha: options.Alpha,
-                    topK: options.TopK,
+                    alpha: normalizedOptions.Alpha,
+                    topK: topK,
                     ct: cancellationToken);
 
-                // Load full DocumentChunk entities for each match
+                _logger.LogInformation("Vector search returned {MatchCount} matches", vectorResult.Matches.Count);
+
                 var chunks = new List<SearchResultChunk>();
-                foreach (var match in searchResult.Matches)
+                var sources = new List<SourceFile>();
+                var sourceIndex = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+                var tokensReturned = 0;
+
+                foreach (var match in vectorResult.Matches)
                 {
-                    var chunk = await DocumentChunk.Get(match.Id, cancellationToken);
-                    if (chunk != null)
+                    _logger.LogInformation("Processing match: ID={MatchId}, Score={Score}", match.Id, match.Score);
+                    var documentChunk = await DocumentChunk.Get(match.Id, cancellationToken);
+                    if (documentChunk is null)
                     {
-                        chunks.Add(new SearchResultChunk(
-                            Text: chunk.SearchText,
-                            FilePath: chunk.FilePath,
-                            CommitSha: chunk.CommitSha,
-                            ChunkRange: chunk.ChunkRange,
-                            Title: chunk.Title,
-                            Language: chunk.Language,
-                            Score: (float)match.Score
-                        ));
+                        _logger.LogWarning("DocumentChunk.Get returned null for ID={MatchId} (partition={PartitionId})", match.Id, partitionId);
+                        continue;
                     }
+                    _logger.LogInformation("Found chunk: ID={ChunkId}, FilePath={FilePath}", documentChunk.Id, documentChunk.FilePath);
+
+                    var chunkTokens = documentChunk.TokenCount > 0
+                        ? documentChunk.TokenCount
+                        : _tokenCounter.EstimateTokens(documentChunk.SearchText);
+                    tokensReturned += chunkTokens;
+
+                    var sourceKey = $"{documentChunk.FilePath}|{documentChunk.CommitSha}";
+                    if (!sourceIndex.TryGetValue(sourceKey, out var index))
+                    {
+                        index = sources.Count;
+                        sources.Add(new SourceFile(
+                            FilePath: documentChunk.FilePath,
+                            Title: documentChunk.Title ?? Path.GetFileName(documentChunk.FilePath),
+                            Url: documentChunk.SourceUrl,
+                            CommitSha: documentChunk.CommitSha ?? string.Empty));
+                        sourceIndex[sourceKey] = index;
+                    }
+
+                    var reasoning = normalizedOptions.IncludeReasoning
+                        ? BuildReasoning((float)match.Score, normalizedOptions.Alpha)
+                        : null;
+
+                    var startLine = documentChunk.StartLine <= 0 ? 1 : documentChunk.StartLine;
+                    var endLine = documentChunk.EndLine <= 0 ? startLine : documentChunk.EndLine;
+
+                    chunks.Add(new SearchResultChunk(
+                        Id: documentChunk.Id,
+                        Text: documentChunk.SearchText,
+                        Score: (float)match.Score,
+                        Provenance: new ChunkProvenance(
+                            SourceIndex: index,
+                            StartByteOffset: documentChunk.StartByteOffset,
+                            EndByteOffset: documentChunk.EndByteOffset,
+                            StartLine: startLine,
+                            EndLine: endLine,
+                            Language: documentChunk.Language),
+                        Reasoning: reasoning));
                 }
 
                 stopwatch.Stop();
 
-                _logger.LogInformation(
-                    "Search completed: {ResultCount} results in {Duration}ms",
-                    chunks.Count,
-                    stopwatch.ElapsedMilliseconds);
+                var metadata = new SearchMetadata(
+                    TokensRequested: normalizedOptions.MaxTokens,
+                    TokensReturned: tokensReturned,
+                    Page: 1,
+                    Model: _embedding.GetType().Name,
+                    VectorProvider: "default",
+                    Timestamp: DateTime.UtcNow,
+                    Duration: stopwatch.Elapsed);
 
-                return new SearchResult(chunks, chunks.Count, stopwatch.Elapsed);
+                var searchSources = new SearchSources(
+                    TotalFiles: sources.Count,
+                    Files: sources);
+
+                var insights = normalizedOptions.IncludeInsights
+                    ? BuildInsights(chunks, searchSources)
+                    : null;
+
+                return new SearchResult(
+                    Chunks: chunks,
+                    Metadata: metadata,
+                    Sources: searchSources,
+                    Insights: insights,
+                    ContinuationToken: null,
+                    Warnings: warnings);
             }
         }
         catch (Exception ex)
         {
+            stopwatch.Stop();
             _logger.LogError(ex, "Search failed for project {ProjectId}", projectId);
-            throw;
+            warnings.Add($"Search failed: {ex.Message}");
+            return CreateEmptyResult(normalizedOptions, stopwatch.Elapsed, warnings);
         }
+    }
+
+    private static SearchOptions NormalizeOptions(SearchOptions options)
+    {
+        var maxTokens = Math.Clamp(options.MaxTokens, MinTokenBudget, MaxTokenBudget);
+        var alpha = Math.Clamp(options.Alpha, 0f, 1f);
+        return options with { MaxTokens = maxTokens, Alpha = alpha };
+    }
+
+    private static int CalculateTopK(int maxTokens)
+    {
+        var estimate = Math.Max(1, maxTokens / EstimatedTokensPerChunk);
+        return Math.Clamp(estimate, 4, 20);
+    }
+
+    private static RetrievalReasoning BuildReasoning(float score, float alpha)
+    {
+        var semanticWeight = Math.Clamp(alpha, 0f, 1f);
+        var keywordWeight = 1f - semanticWeight;
+
+        var strategy = semanticWeight switch
+        {
+            <= 0.05f => "keyword",
+            >= 0.95f => "vector",
+            _ => "hybrid"
+        };
+
+        return new RetrievalReasoning(
+            SemanticScore: score * semanticWeight,
+            KeywordScore: score * keywordWeight,
+            Strategy: strategy);
+    }
+
+    private static SearchInsights BuildInsights(
+        IReadOnlyList<SearchResultChunk> chunks,
+        SearchSources sources)
+    {
+        if (chunks.Count == 0)
+        {
+            return new SearchInsights(
+                Topics: new Dictionary<string, int>(),
+                CompletenessLevel: "insufficient",
+                MissingTopics: Array.Empty<string>());
+        }
+
+        var topics = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var chunk in chunks)
+        {
+            var source = sources.Files[chunk.Provenance.SourceIndex];
+            var topic = ExtractTopic(source.FilePath);
+
+            if (topics.TryGetValue(topic, out var count))
+            {
+                topics[topic] = count + 1;
+            }
+            else
+            {
+                topics[topic] = 1;
+            }
+        }
+
+        var completeness = chunks.Count switch
+        {
+            >= 8 => "comprehensive",
+            >= 3 => "partial",
+            _ => "insufficient"
+        };
+
+        return new SearchInsights(
+            Topics: topics,
+            CompletenessLevel: completeness,
+            MissingTopics: Array.Empty<string>());
+    }
+
+    private static string ExtractTopic(string filePath)
+    {
+        if (string.IsNullOrEmpty(filePath))
+        {
+            return "general";
+        }
+
+        var sanitized = filePath.Replace('\\', '/');
+        var parts = sanitized.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length == 0 ? sanitized : parts[0];
+    }
+
+    private SearchResult CreateEmptyResult(
+        SearchOptions options,
+        TimeSpan? duration = null,
+        IReadOnlyList<string>? warnings = null)
+    {
+        var metadata = new SearchMetadata(
+            TokensRequested: options.MaxTokens,
+            TokensReturned: 0,
+            Page: 1,
+            Model: _embedding.GetType().Name,
+            VectorProvider: "default",
+            Timestamp: DateTime.UtcNow,
+            Duration: duration ?? TimeSpan.Zero);
+
+        var insights = options.IncludeInsights
+            ? new SearchInsights(
+                Topics: new Dictionary<string, int>(),
+                CompletenessLevel: "insufficient",
+                MissingTopics: Array.Empty<string>())
+            : null;
+
+        return new SearchResult(
+            Chunks: Array.Empty<SearchResultChunk>(),
+            Metadata: metadata,
+            Sources: new SearchSources(0, Array.Empty<SourceFile>()),
+            Insights: insights,
+            ContinuationToken: null,
+            Warnings: warnings ?? Array.Empty<string>());
     }
 }

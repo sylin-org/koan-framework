@@ -53,9 +53,10 @@ public class IncrementalIndexingService
 
             // Update project status
             project.Status = IndexingStatus.Updating;
-            await Project.UpsertAsync(project, cancellationToken);
+            await project.Save(cancellationToken);
 
-            using (EntityContext.Partition($"proj-{projectId:N}"))
+            var partitionId = $"proj-{Guid.Parse(projectId):N}";
+            using (EntityContext.Partition(partitionId))
             {
                 foreach (var change in changes)
                 {
@@ -73,7 +74,7 @@ public class IncrementalIndexingService
             // Update project metadata
             project.LastIndexed = DateTime.UtcNow;
             project.Status = IndexingStatus.Ready;
-            await Project.UpsertAsync(project, cancellationToken);
+            await project.Save(cancellationToken);
 
             _logger.LogInformation("Completed incremental indexing for project {Name}", project.Name);
         }
@@ -86,7 +87,7 @@ public class IncrementalIndexingService
             {
                 project.Status = IndexingStatus.Failed;
                 project.IndexingError = ex.Message;
-                await Project.UpsertAsync(project, cancellationToken);
+                await project.Save(cancellationToken);
             }
         }
         finally
@@ -130,7 +131,6 @@ public class IncrementalIndexingService
         var chunks = await DocumentChunk.Query(
             c => c.FilePath == relativePath,
             cancellationToken);
-
         // Delete from both relational and vector stores
         foreach (var chunk in chunks)
         {
@@ -176,12 +176,13 @@ public class IncrementalIndexingService
             commitSha: null,
             cancellationToken))
         {
+            var provenance = ComputeProvenance(extracted.FullText, chunk.StartOffset, chunk.EndOffset);
+
             // Generate embedding
             var embeddingVector = await embedding.EmbedAsync(chunk.Text, cancellationToken);
 
-            // Create DocumentChunk entity
+            // Create DocumentChunk entity (within partition context)
             var docChunk = DocumentChunk.Create(
-                projectId: chunk.ProjectId,
                 filePath: relativePath,
                 searchText: chunk.Text,
                 tokenCount: chunk.TokenCount,
@@ -189,7 +190,10 @@ public class IncrementalIndexingService
                 title: chunk.Title,
                 language: chunk.Language);
 
-            docChunk.ChunkRange = $"{chunk.StartOffset}:{chunk.EndOffset}";
+            docChunk.StartByteOffset = provenance.StartByteOffset;
+            docChunk.EndByteOffset = provenance.EndByteOffset;
+            docChunk.StartLine = provenance.StartLine;
+            docChunk.EndLine = provenance.EndLine;
             docChunk.Category = category;
             docChunk.PathSegments = pathSegments;
             docChunk.FileLastModified = fileInfo.LastWriteTimeUtc;
@@ -205,9 +209,12 @@ public class IncrementalIndexingService
                  Embedding: embeddingVector,
                  Metadata: (object?)new
                  {
-                     docChunk.ProjectId,
                      docChunk.FilePath,
                      docChunk.SearchText,
+                     docChunk.StartByteOffset,
+                     docChunk.EndByteOffset,
+                     docChunk.StartLine,
+                     docChunk.EndLine,
                      docChunk.Category,
                      docChunk.Language
                  })
@@ -215,6 +222,51 @@ public class IncrementalIndexingService
         }
 
         _logger.LogDebug("Re-indexed file {Path}", relativePath);
+    }
+
+    private static (long StartByteOffset, long EndByteOffset, int StartLine, int EndLine) ComputeProvenance(
+        string fullText,
+        int startOffset,
+        int endOffset)
+    {
+        if (string.IsNullOrEmpty(fullText))
+        {
+            return (0L, 0L, 1, 1);
+        }
+
+        var safeStart = Math.Clamp(startOffset, 0, fullText.Length);
+        var safeEnd = Math.Clamp(endOffset, safeStart, fullText.Length);
+
+        var span = fullText.AsSpan();
+        var prefixSpan = span[..safeStart];
+        var chunkSpan = span[safeStart..safeEnd];
+
+        var encoding = Encoding.UTF8;
+        var startBytes = encoding.GetByteCount(prefixSpan);
+        var chunkBytes = encoding.GetByteCount(chunkSpan);
+        var endBytes = startBytes + chunkBytes;
+
+        var startLine = 1 + CountNewLines(prefixSpan);
+        var endLine = chunkSpan.IsEmpty
+            ? startLine
+            : startLine + CountNewLines(chunkSpan);
+
+        return (startBytes, endBytes, startLine, endLine);
+    }
+
+    private static int CountNewLines(ReadOnlySpan<char> span)
+    {
+        var count = 0;
+
+        foreach (var ch in span)
+        {
+            if (ch == '\n')
+            {
+                count++;
+            }
+        }
+
+        return count;
     }
 
     private static async Task<string> ComputeFileHashAsync(string filePath)
