@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -8,6 +8,13 @@
     <RootNamespace>Koan.Context</RootNamespace>
     <AssemblyName>Koan.Context</AssemblyName>
   </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Include MCP SDK files (non-standard location) -->
+    <Content Include="mcp-sdk\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
 
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
@@ -35,7 +42,7 @@
 
   <ItemGroup>
     <!-- Exclude wwwroot from dotnet watch (UI changes don't restart backend) -->
-    <Watch Remove="Service\wwwroot\**\*" />
+    <Watch Remove="wwwroot\**\*" />
   </ItemGroup>
 
 </Project>

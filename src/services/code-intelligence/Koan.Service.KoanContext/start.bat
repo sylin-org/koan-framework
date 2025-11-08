@@ -8,6 +8,10 @@ echo.
 REM Change to service root directory
 cd /d "%~dp0"
 
+echo Cleaning up old processes...
+taskkill /F /IM koan.context.exe /T >nul 2>&1
+
+
 echo [1/3] Installing dependencies (if needed)...
 cd ui
 if not exist "node_modules\" (
@@ -30,8 +34,8 @@ start /B "" npm run build:watch
 echo.
 echo [3/3] Starting ASP.NET service...
 timeout /t 3 >nul
-cd ..\Service
-dotnet watch run
+cd ..
+dotnet watch --project Koan.Service.KoanContext.csproj run
 
 REM Cleanup: Kill background npm process when dotnet exits
 echo.

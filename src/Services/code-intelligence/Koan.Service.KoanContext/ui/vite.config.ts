@@ -10,8 +10,8 @@ export default defineConfig({
   publicDir: 'public',
 
   build: {
-    // Output to Service/wwwroot/ (ASP.NET Core static files directory)
-    outDir: '../Service/wwwroot',
+    // Output to ../wwwroot/ (ASP.NET Core static files directory)
+    outDir: '../wwwroot',
 
     // Empty wwwroot/ before each build (safe because it's 100% owned by Vite)
     emptyOutDir: true,
