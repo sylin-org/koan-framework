@@ -794,7 +794,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
     public async Task<int> UpsertManyAsync(IEnumerable<TEntity> models, CancellationToken ct = default)
     {
         using var conn = Open();
-        using var tx = conn.BeginTransaction();
+        // Let SQLite use autocommit - don't impose transaction control at adapter level
 
         var count = 0;
         foreach (var e in models)
@@ -805,7 +805,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
 
             try
             {
-                await conn.ExecuteAsync($"INSERT INTO [{TableName}] (Id, Json) VALUES (@Id, @Json) ON CONFLICT(Id) DO UPDATE SET Json = excluded.Json;", new { row.Id, row.Json }, tx);
+                await conn.ExecuteAsync($"INSERT INTO [{TableName}] (Id, Json) VALUES (@Id, @Json) ON CONFLICT(Id) DO UPDATE SET Json = excluded.Json;", new { row.Id, row.Json });
             }
             catch (SqliteException ex) when (IsNoSuchTable(ex))
             {
@@ -816,12 +816,11 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                     InvalidateHealth(sc, TableName);
                     EnsureOrchestrated(sc);
                 }
-                await conn.ExecuteAsync($"INSERT INTO [{TableName}] (Id, Json) VALUES (@Id, @Json) ON CONFLICT(Id) DO UPDATE SET Json = excluded.Json;", new { row.Id, row.Json }, tx);
+                await conn.ExecuteAsync($"INSERT INTO [{TableName}] (Id, Json) VALUES (@Id, @Json) ON CONFLICT(Id) DO UPDATE SET Json = excluded.Json;", new { row.Id, row.Json });
             }
             count++;
         }
 
-        tx.Commit();
         return count;
     }
 
