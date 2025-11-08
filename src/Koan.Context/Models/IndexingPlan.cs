@@ -18,11 +18,6 @@ public class IndexingPlan
     public List<DiscoveredFile> ChangedFiles { get; set; } = new();
 
     /// <summary>
-    /// Files with only metadata changes (timestamp changed, hash same)
-    /// </summary>
-    public List<DiscoveredFile> MetadataOnlyFiles { get; set; } = new();
-
-    /// <summary>
     /// Files completely unchanged (can skip)
     /// </summary>
     public List<DiscoveredFile> SkippedFiles { get; set; } = new();
@@ -40,7 +35,7 @@ public class IndexingPlan
     /// <summary>
     /// Total files discovered
     /// </summary>
-    public int TotalFiles => NewFiles.Count + ChangedFiles.Count + MetadataOnlyFiles.Count + SkippedFiles.Count;
+    public int TotalFiles => NewFiles.Count + ChangedFiles.Count + SkippedFiles.Count;
 
     /// <summary>
     /// Estimated time savings from skipping unchanged files
@@ -58,8 +53,8 @@ public class IndexingPlan
     public override string ToString()
     {
         return $"Plan: {NewFiles.Count} new, {ChangedFiles.Count} changed, " +
-               $"{MetadataOnlyFiles.Count} metadata-only, {SkippedFiles.Count} skipped, " +
-               $"{DeletedFiles.Count} deleted | Processing {TotalFilesToProcess}/{TotalFiles} files";
+               $"{SkippedFiles.Count} skipped, {DeletedFiles.Count} deleted | " +
+               $"Processing {TotalFilesToProcess}/{TotalFiles} files";
     }
 }
 

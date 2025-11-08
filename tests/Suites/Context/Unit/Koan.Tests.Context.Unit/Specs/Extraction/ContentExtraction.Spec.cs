@@ -1,4 +1,5 @@
 using FluentAssertions;
+using ExtractionService = Koan.Context.Services.Extraction;
 using Koan.Context.Services;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -7,21 +8,21 @@ using Xunit;
 namespace Koan.Tests.Context.Unit.Specs.Extraction;
 
 /// <summary>
-/// Tests for ContentExtractionService covering all extraction logic and edge cases
+/// Tests for ExtractionService covering all extraction logic and edge cases
 /// </summary>
 /// <remarks>
 /// Covers QA Report issues #3, #4, #15, #16, #17, #18, #23
 /// </remarks>
 public class ContentExtraction_Spec : IDisposable
 {
-    private readonly Mock<ILogger<ContentExtractionService>> _loggerMock;
-    private readonly ContentExtractionService _service;
+    private readonly Mock<ILogger<ExtractionService>> _loggerMock;
+    private readonly ExtractionService _service;
     private readonly string _testDir;
 
     public ContentExtraction_Spec()
     {
-        _loggerMock = new Mock<ILogger<ContentExtractionService>>();
-        _service = new ContentExtractionService(_loggerMock.Object);
+        _loggerMock = new Mock<ILogger<ExtractionService>>();
+        _service = new ExtractionService(_loggerMock.Object);
 
         _testDir = Path.Combine(Path.GetTempPath(), $"koan-test-{Guid.NewGuid():N}");
         Directory.CreateDirectory(_testDir);

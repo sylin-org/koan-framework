@@ -40,9 +40,9 @@ public class FileMonitoringService : IHostedService, IDisposable
         }
 
         // Load all active projects and start watching
-        var projects = await Project.Query(p => p.IsActive, cancellationToken);
+        var projects = await Project.Query(p => true, cancellationToken);
 
-        foreach (var project in projects.Where(p => p.IsMonitoringEnabled))
+        foreach (var project in projects)
         {
             await StartWatchingProjectAsync(project, cancellationToken);
         }
@@ -122,9 +122,6 @@ public class FileMonitoringService : IHostedService, IDisposable
 
         bool shouldIndex = category switch
         {
-            "source" or "test" => project.MonitorCodeChanges,
-            "decision" or "guide" or "api-doc" or "documentation" => project.MonitorDocChanges,
-            _ => project.MonitorCodeChanges  // Default to code
         };
 
         if (!shouldIndex)
@@ -268,7 +265,7 @@ public class FileMonitoringService : IHostedService, IDisposable
     {
         using var scope = _serviceProvider.CreateScope();
         var incrementalIndexer = scope.ServiceProvider
-            .GetRequiredService<IncrementalIndexingService>();
+            .GetRequiredService<IncrementalIndexer>();
 
         _logger.LogInformation("Processing {Count} file changes for project {Name}",
             changes.Count, project.Name);

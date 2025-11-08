@@ -14,15 +14,15 @@ namespace Koan.Context.Services;
 /// <summary>
 /// Handles incremental re-indexing of changed files
 /// </summary>
-public class IncrementalIndexingService
+public class IncrementalIndexer
 {
     private readonly IServiceProvider _serviceProvider;
-    private readonly ILogger<IncrementalIndexingService> _logger;
+    private readonly ILogger<IncrementalIndexer> _logger;
     private readonly SemaphoreSlim _concurrencyLimiter;
 
-    public IncrementalIndexingService(
+    public IncrementalIndexer(
         IServiceProvider serviceProvider,
-        ILogger<IncrementalIndexingService> logger,
+        ILogger<IncrementalIndexer> logger,
         IOptions<FileMonitoringOptions> options)
     {
         _serviceProvider = serviceProvider;
@@ -40,9 +40,9 @@ public class IncrementalIndexingService
         try
         {
             using var scope = _serviceProvider.CreateScope();
-            var extraction = scope.ServiceProvider.GetRequiredService<IContentExtractionService>();
-            var chunking = scope.ServiceProvider.GetRequiredService<IChunkingService>();
-            var embedding = scope.ServiceProvider.GetRequiredService<IEmbeddingService>();
+            var extraction = scope.ServiceProvider.GetRequiredService<Extraction>();
+            var chunking = scope.ServiceProvider.GetRequiredService<Chunker>();
+            var embedding = scope.ServiceProvider.GetRequiredService<Embedding>();
 
             var project = await Project.Get(projectId, cancellationToken);
             if (project == null)
@@ -52,7 +52,7 @@ public class IncrementalIndexingService
             }
 
             // Update project status
-            project.Status = IndexingStatus.Updating;
+            project.Status = IndexingStatus.Indexing;
             await project.Save(cancellationToken);
 
             var partitionId = $"proj-{Guid.Parse(projectId):N}";
@@ -86,7 +86,7 @@ public class IncrementalIndexingService
             if (project != null)
             {
                 project.Status = IndexingStatus.Failed;
-                project.IndexingError = ex.Message;
+                project.LastError = ex.Message;
                 await project.Save(cancellationToken);
             }
         }
@@ -99,9 +99,9 @@ public class IncrementalIndexingService
     private async Task ProcessSingleFileChangeAsync(
         Project project,
         FileChange change,
-        IContentExtractionService extraction,
-        IChunkingService chunking,
-        IEmbeddingService embedding,
+        Extraction extraction,
+        Chunker chunking,
+        Embedding embedding,
         CancellationToken cancellationToken)
     {
         var relativePath = Path.GetRelativePath(project.RootPath, change.Path);
@@ -128,7 +128,7 @@ public class IncrementalIndexingService
     private async Task DeleteChunksForFileAsync(string relativePath, CancellationToken cancellationToken)
     {
         // Query all chunks for this file
-        var chunks = await DocumentChunk.Query(
+        var chunks = await Chunk.Query(
             c => c.FilePath == relativePath,
             cancellationToken);
         // Delete from both relational and vector stores
@@ -139,7 +139,7 @@ public class IncrementalIndexingService
             // Also delete from vector store
             try
             {
-                await Vector<DocumentChunk>.Delete(chunk.Id, cancellationToken);
+                await Vector<Chunk>.Delete(chunk.Id, cancellationToken);
             }
             catch (Exception ex)
             {
@@ -153,9 +153,9 @@ public class IncrementalIndexingService
     private async Task IndexSingleFileAsync(
         Project project,
         string filePath,
-        IContentExtractionService extraction,
-        IChunkingService chunking,
-        IEmbeddingService embedding,
+        Extraction extraction,
+        Chunker chunking,
+        Embedding embedding,
         CancellationToken cancellationToken)
     {
         var relativePath = Path.GetRelativePath(project.RootPath, filePath);
@@ -181,8 +181,8 @@ public class IncrementalIndexingService
             // Generate embedding
             var embeddingVector = await embedding.EmbedAsync(chunk.Text, cancellationToken);
 
-            // Create DocumentChunk entity (within partition context)
-            var docChunk = DocumentChunk.Create(
+            // Create Chunk entity (within partition context)
+            var docChunk = Chunk.Create(
                 filePath: relativePath,
                 searchText: chunk.Text,
                 tokenCount: chunk.TokenCount,
@@ -203,7 +203,7 @@ public class IncrementalIndexingService
             await docChunk.Save(cancellationToken);
 
             // Save to vector store
-            await Vector<DocumentChunk>.Save(new[]
+            await Vector<Chunk>.Save(new[]
             {
                 (Id: docChunk.Id,
                  Embedding: embeddingVector,

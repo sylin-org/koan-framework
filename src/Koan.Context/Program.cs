@@ -2,7 +2,10 @@
 // Console app that exposes Web API, Web UI, and MCP endpoints
 // Pattern: follows g1c1.gardencoop with MCP integration
 
+using AspNetCoreRateLimit;
+using Koan.Context.Middleware;
 using Koan.Context.Services;
+using Koan.Context.Utilities;
 using Koan.Core;
 using Koan.Core.Hosting.App;
 using Koan.Mcp.Extensions;
@@ -23,6 +26,15 @@ builder.ConfigureSampleLogging();
 // Discovers: entities, controllers, MCP tools, vector adapters, orchestration evaluators
 builder.Services.AddKoan();
 
+// ✅ SECURITY: Path validation
+builder.Services.AddSingleton<PathValidator>();
+
+// ✅ SECURITY: Rate limiting
+builder.Services.AddMemoryCache();
+builder.Services.Configure<IpRateLimitOptions>(builder.Configuration.GetSection("IpRateLimiting"));
+builder.Services.AddInMemoryRateLimiting();
+builder.Services.AddSingleton<IRateLimitConfiguration, RateLimitConfiguration>();
+
 // ✅ REGISTER FILE MONITORING & PROJECT RESOLUTION SERVICES
 builder.Services.Configure<FileMonitoringOptions>(
     builder.Configuration.GetSection("Koan:Context:FileMonitoring"));
@@ -30,9 +42,10 @@ builder.Services.Configure<ProjectResolutionOptions>(
     builder.Configuration.GetSection("Koan:Context:ProjectResolution"));
 
 builder.Services.AddSingleton<ProjectResolver>();
-builder.Services.AddSingleton<ITokenCountingService, TokenCountingService>();
-builder.Services.AddSingleton<IncrementalIndexingService>();
+builder.Services.AddSingleton<TokenCounter, TokenCounter>();
+builder.Services.AddSingleton<IncrementalIndexer>();
 builder.Services.AddSingleton<IndexingCoordinator>();
+builder.Services.AddSingleton<Metrics>();
 builder.Services.AddHostedService<FileMonitoringService>();
 builder.Services.AddSingleton<FileMonitoringService>(sp =>
     (FileMonitoringService)sp.GetServices<IHostedService>()
@@ -44,6 +57,15 @@ var app = builder.Build();
 // Make services available globally (for static Entity<T> facades)
 AppHost.Current ??= app.Services;
 
+// ✅ SECURITY: Global exception handler (must be first in pipeline)
+app.UseGlobalExceptionHandler();
+
+// ✅ SECURITY: Rate limiting middleware (must be early in pipeline)
+app.UseIpRateLimiting();
+
+// ✅ SECURITY: Security headers (CSP, X-Frame-Options, HSTS, etc.)
+app.UseMiddleware<SecurityHeadersMiddleware>();
+
 // ✅ MCP ENDPOINTS (HTTP+SSE transport for Claude Desktop / Cline)
 app.MapKoanMcpEndpoints();  // Exposes /mcp/sse, /mcp/rpc, /mcp/health, /mcp/capabilities
 
@@ -52,7 +74,7 @@ app.MapControllers();  // Auto-discovers ProjectsController, etc.
 
 // ✅ WEB UI (static HTML/JS client)
 app.UseStaticFiles();  // Serves from wwwroot/
-app.MapFallbackToFile("index.html");  // SPA routing
+app.MapFallbackToFile("dashboard.html");  // SPA routing - new dashboard
 
 // Security: bind to localhost only by default
 // Port allocation: 27500-27510 range to avoid conflicts
@@ -66,13 +88,13 @@ else if (app.Urls.Count == 0)
     app.Urls.Add("http://localhost:27500");
 }
 
-// ✅ WEAVIATE AUTO-PROVISIONING
-// If Koan.Data.Vector.Connector.Weaviate is referenced:
-// - WeaviateOrchestrationEvaluator auto-registers
+// ✅ VECTOR STORE AUTO-PROVISIONING
+// If a vector connector is referenced (e.g., Koan.Data.Vector.Connector.Weaviate):
+// - OrchestrationEvaluator auto-registers
 // - Aspire detects vector dependency
-// - Spins up Weaviate container on first vector operation
-// - Endpoint: http://localhost:27501 (mapped from container's 8080)
-// - Volume: koan-weaviate-data (persistent)
+// - Spins up vector container on first vector operation
+// - Endpoint: http://localhost:27501 (mapped from container's default port)
+// - Volume: koan-vector-data (persistent)
 // - Configuration via appsettings.json or auto-detected
 
 // Configure sample lifecycle with browser launch
@@ -90,7 +112,7 @@ WHAT GETS AUTO-REGISTERED:
 
 1. Entities:
    - Project (from Koan.Context/Models/Project.cs)
-   - DocumentChunk (from Koan.Context/Models/DocumentChunk.cs)
+   - Chunk (from Koan.Context/Models/Chunk.cs)
 
 2. Controllers:
    - ProjectsController (REST API for project CRUD)
@@ -105,17 +127,17 @@ WHAT GETS AUTO-REGISTERED:
 
 4. Services:
    - IDocumentDiscoveryService
-   - IChunkingService
-   - IEmbeddingService
-   - IIndexingService
-   - IRetrievalService
+   - Chunker
+   - Embedding
+   - Indexer
+   - Search
 
 5. Vector Adapter:
-   - WeaviateVectorRepository<TEntity, TKey>
-   - WeaviatePartitionMapper
+   - VectorRepository<TEntity, TKey> (provider-specific implementation)
+   - PartitionMapper (provider-specific implementation)
 
 6. Orchestration:
-   - WeaviateOrchestrationEvaluator (auto-provisions Weaviate)
+   - OrchestrationEvaluator (auto-provisions vector store)
 
 ALL DISCOVERED VIA "REFERENCE = INTENT" PATTERN
 No manual registration needed!

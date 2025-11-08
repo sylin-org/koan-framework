@@ -1,9 +1,10 @@
 using FluentAssertions;
-using Koan.Context.Services;
 using Microsoft.Extensions.Logging;
 using Moq;
 using System.Security;
 using Xunit;
+using DiscoveryService = Koan.Context.Services.Discovery;
+using Koan.Context.Services; // For FileType, DiscoveredFile
 
 namespace Koan.Tests.Context.Unit.Specs.Discovery;
 
@@ -15,14 +16,14 @@ namespace Koan.Tests.Context.Unit.Specs.Discovery;
 /// </remarks>
 public class DocumentDiscovery_Spec : IDisposable
 {
-    private readonly Mock<ILogger<DocumentDiscoveryService>> _loggerMock;
-    private readonly DocumentDiscoveryService _service;
+    private readonly Mock<ILogger<DiscoveryService>> _loggerMock;
+    private readonly DiscoveryService _service;
     private readonly string _testDir;
 
     public DocumentDiscovery_Spec()
     {
-        _loggerMock = new Mock<ILogger<DocumentDiscoveryService>>();
-        _service = new DocumentDiscoveryService(_loggerMock.Object);
+        _loggerMock = new Mock<ILogger<DiscoveryService>>();
+        _service = new DiscoveryService(_loggerMock.Object);
 
         // Create temporary test directory
         _testDir = Path.Combine(Path.GetTempPath(), $"koan-test-{Guid.NewGuid():N}");

@@ -10,7 +10,7 @@ using Microsoft.Extensions.Logging;
 namespace Koan.Context.Tasks;
 
 /// <summary>
-/// Runs on app startup to maintain IndexingJob table health
+/// Runs on app startup to maintain Job table health
 /// </summary>
 /// <remarks>
 /// Maintenance operations:
@@ -19,17 +19,17 @@ namespace Koan.Context.Tasks;
 /// 3. Clean up old terminal jobs (older than 7 days)
 /// 4. Keep only most recent N jobs per project for audit history
 /// </remarks>
-internal sealed class IndexingJobMaintenanceTask : IScheduledTask, IOnStartup, IHasTimeout
+internal sealed class JobMaintenanceTask : IScheduledTask, IOnStartup, IHasTimeout
 {
-    private readonly ILogger<IndexingJobMaintenanceTask> _logger;
+    private readonly ILogger<JobMaintenanceTask> _logger;
     private readonly IServiceScopeFactory _serviceScopeFactory;
     private readonly bool _autoResumeEnabled;
     private readonly int _autoResumeDelaySeconds;
     private const int MaxJobsToRetainPerProject = 50; // Keep last 50 jobs per project
     private const int OldJobRetentionDays = 7; // Clean up jobs older than 7 days
 
-    public IndexingJobMaintenanceTask(
-        ILogger<IndexingJobMaintenanceTask> logger,
+    public JobMaintenanceTask(
+        ILogger<JobMaintenanceTask> logger,
         IServiceScopeFactory serviceScopeFactory,
         IConfiguration configuration)
     {
@@ -85,7 +85,7 @@ internal sealed class IndexingJobMaintenanceTask : IScheduledTask, IOnStartup, I
     /// <returns>Tuple of (count of recovered jobs, list of jobs to potentially resume)</returns>
     private async Task<(int count, List<(string projectId, JobStatus previousStatus)> jobsToResume)> RecoverStuckJobsAsync(CancellationToken ct)
     {
-        var stuckJobs = await IndexingJob.Query(
+        var stuckJobs = await Job.Query(
             j => j.Status == JobStatus.Pending ||
                  j.Status == JobStatus.Planning ||
                  j.Status == JobStatus.Indexing,
@@ -195,7 +195,7 @@ internal sealed class IndexingJobMaintenanceTask : IScheduledTask, IOnStartup, I
                 }
 
                 // Skip if project is not active
-                if (!project.IsActive)
+                if (!true)
                 {
                     _logger.LogInformation(
                         "Skipping auto-resume for project {ProjectId} ({Name}) - project is inactive",
@@ -219,9 +219,9 @@ internal sealed class IndexingJobMaintenanceTask : IScheduledTask, IOnStartup, I
                     {
                         // Create a new scope to resolve scoped services
                         using var scope = serviceScopeFactory.CreateScope();
-                        var indexingService = scope.ServiceProvider.GetRequiredService<IIndexingService>();
+                        var Indexer = scope.ServiceProvider.GetRequiredService<Indexer>();
 
-                        await indexingService.IndexProjectAsync(
+                        await Indexer.IndexProjectAsync(
                             projectId,
                             progress: null,
                             cancellationToken: CancellationToken.None,
@@ -262,7 +262,7 @@ internal sealed class IndexingJobMaintenanceTask : IScheduledTask, IOnStartup, I
     {
         var cutoffDate = DateTime.UtcNow.AddDays(-OldJobRetentionDays);
 
-        var oldJobs = await IndexingJob.Query(
+        var oldJobs = await Job.Query(
             j => (j.Status == JobStatus.Completed ||
                   j.Status == JobStatus.Cancelled ||
                   j.Status == JobStatus.Failed) &&
@@ -285,7 +285,7 @@ internal sealed class IndexingJobMaintenanceTask : IScheduledTask, IOnStartup, I
 
         foreach (var job in oldJobsList)
         {
-            await IndexingJob.Remove(job.Id, ct);
+            await Job.Remove(job.Id, ct);
         }
 
         return oldJobsList.Count;
@@ -301,7 +301,7 @@ internal sealed class IndexingJobMaintenanceTask : IScheduledTask, IOnStartup, I
     private async Task<int> TrimExcessJobsPerProjectAsync(CancellationToken ct)
     {
         // Get all jobs grouped by project
-        var allJobs = await IndexingJob.All(ct);
+        var allJobs = await Job.All(ct);
         var jobsByProject = allJobs
             .GroupBy(j => j.ProjectId)
             .ToList();
@@ -330,7 +330,7 @@ internal sealed class IndexingJobMaintenanceTask : IScheduledTask, IOnStartup, I
 
                 foreach (var job in jobsToDelete)
                 {
-                    await IndexingJob.Remove(job.Id, ct);
+                    await Job.Remove(job.Id, ct);
                     trimmedCount++;
                 }
             }

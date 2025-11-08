@@ -8,6 +8,8 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
 using Xunit;
+using SearchService = Koan.Context.Services.Search;
+using IndexerService = Koan.Context.Services.Indexer;
 
 namespace Koan.Tests.Context.Unit.Specs.Mcp;
 
@@ -16,16 +18,16 @@ namespace Koan.Tests.Context.Unit.Specs.Mcp;
 /// </summary>
 public class McpTools_Spec
 {
-    private readonly Mock<IRetrievalService> _retrievalMock;
-    private readonly Mock<IIndexingService> _indexingMock;
+    private readonly Mock<SearchService> _retrievalMock;
+    private readonly Mock<IndexerService> _indexingMock;
     private readonly Mock<ProjectResolver> _projectResolverMock;
     private readonly Mock<ILogger<McpToolsController>> _loggerMock;
     private readonly McpToolsController _controller;
 
     public McpTools_Spec()
     {
-        _retrievalMock = new Mock<IRetrievalService>();
-        _indexingMock = new Mock<IIndexingService>();
+        _retrievalMock = new Mock<SearchService>();
+        _indexingMock = new Mock<IndexerService>();
         _projectResolverMock = new Mock<ProjectResolver>(
             Mock.Of<ILogger<ProjectResolver>>(),
             Options.Create(new ProjectResolutionOptions()));
@@ -335,8 +337,7 @@ public class McpTools_Spec
             Id = id,
             Name = "Test Project",
             RootPath = "C:/repo",
-            Status = status,
-            IsActive = true
+            Status = status
         };
     }
 

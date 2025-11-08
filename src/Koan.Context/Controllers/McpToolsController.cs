@@ -15,14 +15,14 @@ namespace Koan.Context.Controllers;
 [Route("api/mcp")]
 public class McpToolsController : ControllerBase
 {
-    private readonly IRetrievalService _retrieval;
-    private readonly IIndexingService _indexing;
+    private readonly Search _retrieval;
+    private readonly Indexer _indexing;
     private readonly ProjectResolver _projectResolver;
     private readonly ILogger<McpToolsController> _logger;
 
     public McpToolsController(
-        IRetrievalService retrieval,
-        IIndexingService indexing,
+        Search retrieval,
+        Indexer indexing,
         ProjectResolver projectResolver,
         ILogger<McpToolsController> logger)
     {
@@ -106,7 +106,6 @@ public class McpToolsController : ControllerBase
                 case IndexingStatus.NotIndexed:
                     // Start indexing in background
                     project.Status = IndexingStatus.Indexing;
-                    project.IndexingStartedAt = DateTime.UtcNow;
                     await project.Save(cancellationToken);
 
                     _ = Task.Run(async () =>
@@ -136,19 +135,14 @@ public class McpToolsController : ControllerBase
                     _logger.LogDebug("Project {Name} is indexing, but proceeding with query (partial results)", project.Name);
                     break;
 
-                case IndexingStatus.Updating:
-                    // Project is updating but still queryable - proceed with search
-                    _logger.LogDebug("Project {Name} is updating, but proceeding with query", project.Name);
-                    break;
-
                 case IndexingStatus.Failed:
                     return StatusCode(500, new
                     {
                         error = "indexing_failed",
-                        message = $"Project '{project.Name}' indexing failed: {project.IndexingError}",
+                        message = $"Project '{project.Name}' indexing failed: {project.LastError}",
                         projectName = project.Name,
                         projectPath = project.RootPath,
-                        indexingError = project.IndexingError
+                        indexingError = project.LastError
                     });
 
                 case IndexingStatus.Ready:
@@ -158,7 +152,7 @@ public class McpToolsController : ControllerBase
 
             // Perform semantic search
             var searchOptions = new SearchOptions(
-                MaxTokens: request.Tokens ?? 5000,
+                MaxTokens: request.TokenCounter ?? 5000,
                 Alpha: request.Alpha ?? 0.7f,
                 ContinuationToken: request.ContinuationToken,
                 IncludeInsights: request.IncludeInsights ?? true,
@@ -211,7 +205,7 @@ public record GetReferencesRequest(
     string Query,
     string WorkingDirectory,
     float? Alpha = null,
-    int? Tokens = null,
+    int? TokenCounter = null,
     string? ContinuationToken = null,
     bool? IncludeInsights = null,
     bool? IncludeReasoning = null,

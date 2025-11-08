@@ -9,54 +9,24 @@ namespace Koan.Context.Models;
 public class Project : Entity<Project>
 {
     /// <summary>
-    /// Display name for the project
+    /// Display name (auto-derived from folder name)
     /// </summary>
     public string Name { get; set; } = string.Empty;
 
     /// <summary>
-    /// Absolute path to the project root directory
+    /// Absolute path to project root directory
     /// </summary>
     public string RootPath { get; set; } = string.Empty;
 
     /// <summary>
-    /// Type of project (dotnet, node, python, etc.)
+    /// Optional subdirectory for documentation (e.g., "docs")
     /// </summary>
-    public ProjectType ProjectType { get; set; } = ProjectType.Unknown;
+    public string? DocsPath { get; set; }
 
     /// <summary>
-    /// Git remote URL if project is in version control
-    /// </summary>
-    public string? GitRemote { get; set; }
-
-    /// <summary>
-    /// Last time the project was indexed
+    /// Last successful indexing timestamp
     /// </summary>
     public DateTime? LastIndexed { get; set; }
-
-    /// <summary>
-    /// Whether the project is actively being tracked
-    /// </summary>
-    public bool IsActive { get; set; } = true;
-
-    /// <summary>
-    /// When this project was first registered
-    /// </summary>
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-
-    /// <summary>
-    /// Last time project metadata was updated
-    /// </summary>
-    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
-
-    /// <summary>
-    /// Number of documents/chunks indexed
-    /// </summary>
-    public int DocumentCount { get; set; }
-
-    /// <summary>
-    /// Total size of indexed content in bytes
-    /// </summary>
-    public long IndexedBytes { get; set; }
 
     /// <summary>
     /// Current indexing status
@@ -64,53 +34,33 @@ public class Project : Entity<Project>
     public IndexingStatus Status { get; set; } = IndexingStatus.NotIndexed;
 
     /// <summary>
-    /// Whether to monitor code file changes for automatic re-indexing
+    /// Total chunks indexed
     /// </summary>
-    public bool MonitorCodeChanges { get; set; } = true;
+    public int DocumentCount { get; set; }
 
     /// <summary>
-    /// Whether to monitor documentation file changes for automatic re-indexing
+    /// Total bytes of indexed content
     /// </summary>
-    public bool MonitorDocChanges { get; set; } = true;
+    public long IndexedBytes { get; set; }
 
     /// <summary>
-    /// When indexing was started (for status tracking)
+    /// Git commit SHA at time of indexing (provenance)
     /// </summary>
-    public DateTime? IndexingStartedAt { get; set; }
+    public string? CommitSha { get; set; }
 
     /// <summary>
-    /// When indexing was completed (for status tracking)
+    /// Last error message if indexing failed
     /// </summary>
-    public DateTime? IndexingCompletedAt { get; set; }
-
-    /// <summary>
-    /// Error message if indexing failed
-    /// </summary>
-    public string? IndexingError { get; set; }
-
-    /// <summary>
-    /// ID of the currently active indexing job (null if not indexing)
-    /// </summary>
-    public string? ActiveJobId { get; set; }
-
-    /// <summary>
-    /// Whether file monitoring is enabled for this project
-    /// </summary>
-    public bool IsMonitoringEnabled => MonitorCodeChanges || MonitorDocChanges;
-
-    /// <summary>
-    /// Derived property: folder name from RootPath
-    /// </summary>
-    public string FolderName => Path.GetFileName(RootPath) ?? Name;
+    public string? LastError { get; set; }
 
     /// <summary>
     /// Creates a new project instance
     /// </summary>
     /// <param name="name">Project name</param>
     /// <param name="rootPath">Absolute path to project root</param>
-    /// <param name="projectType">Type of project</param>
+    /// <param name="docsPath">Optional subdirectory for documentation</param>
     /// <returns>New Project entity with auto-generated GUID v7 ID</returns>
-    public static Project Create(string name, string rootPath, ProjectType projectType = ProjectType.Unknown)
+    public static Project Create(string name, string rootPath, string? docsPath = null)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentException("Project name cannot be empty", nameof(name));
@@ -125,17 +75,14 @@ public class Project : Entity<Project>
         {
             Name = name,
             RootPath = rootPath,
-            ProjectType = projectType,
-            CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow,
-            IsActive = true
+            DocsPath = docsPath
         };
     }
 
     /// <summary>
     /// Creates a project from a directory path (auto-detect name from folder)
     /// </summary>
-    public static Project CreateFromDirectory(string directoryPath)
+    public static Project CreateFromDirectory(string directoryPath, string? docsPath = null)
     {
         if (!Directory.Exists(directoryPath))
             throw new DirectoryNotFoundException($"Directory not found: {directoryPath}");
@@ -144,7 +91,7 @@ public class Project : Entity<Project>
         if (string.IsNullOrWhiteSpace(folderName))
             throw new ArgumentException("Could not determine folder name from path", nameof(directoryPath));
 
-        return Create(folderName, directoryPath);
+        return Create(folderName, directoryPath, docsPath);
     }
 
     /// <summary>
@@ -153,30 +100,11 @@ public class Project : Entity<Project>
     public void MarkIndexed(int documentCount, long indexedBytes)
     {
         LastIndexed = DateTime.UtcNow;
-        UpdatedAt = DateTime.UtcNow;
         DocumentCount = documentCount;
         IndexedBytes = indexedBytes;
         Status = IndexingStatus.Ready;
-        IndexingCompletedAt = DateTime.UtcNow;
-        IndexingError = null;
+        LastError = null;
     }
-}
-
-/// <summary>
-/// Supported project types for automatic detection and tooling
-/// </summary>
-public enum ProjectType
-{
-    Unknown = 0,
-    Dotnet,
-    Node,
-    Python,
-    Java,
-    Go,
-    Rust,
-    Ruby,
-    Php,
-    Generic
 }
 
 /// <summary>
@@ -193,9 +121,6 @@ public enum IndexingStatus
     /// <summary>Indexed and ready for queries</summary>
     Ready = 2,
 
-    /// <summary>Incremental update in progress (still queryable)</summary>
-    Updating = 3,
-
-    /// <summary>Indexing failed</summary>
-    Failed = 4
+    /// <summary>Last indexing failed</summary>
+    Failed = 3
 }

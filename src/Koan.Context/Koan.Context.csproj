@@ -14,6 +14,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="AspNetCoreRateLimit" Version="5.0.0" />
     <PackageReference Include="Polly" Version="8.5.0" />
   </ItemGroup>
 
@@ -22,6 +23,7 @@
     <ProjectReference Include="..\Connectors\Data\Sqlite\Koan.Data.Connector.Sqlite.csproj" />
     <ProjectReference Include="..\Koan.Data.Core\Koan.Data.Core.csproj" />
     <ProjectReference Include="..\Koan.Web\Koan.Web.csproj" />
+    <ProjectReference Include="..\Connectors\Web\Swagger\Koan.Web.Connector.Swagger.csproj" />
     <ProjectReference Include="..\Koan.Mcp\Koan.Mcp.csproj" />
     <ProjectReference Include="..\Koan.AI\Koan.AI.csproj" />
     <ProjectReference Include="..\Koan.Data.Vector\Koan.Data.Vector.csproj" />

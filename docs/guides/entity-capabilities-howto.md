@@ -23,6 +23,7 @@ This section summarizes best practices and recommendations for maximizing the va
 - **Batch Operations:** Use `List<T>.Save()` and `Entity.Batch()` for bulk persistence and updates. Leverage lifecycle hooks (`BeforeUpsert`, `AfterLoad`, etc.) for validation and projections.
 - **Bulk Removal Strategies:** Use `RemoveAll()` with the appropriate strategy (`Safe`, `Fast`, `Optimized`) for test cleanup, production, or audit scenarios.
 - **Context Routing:** Use `EntityContext.Partition`, `EntityContext.Source`, and `EntityContext.Adapter` for multi-user, analytics, or provider-specific routing.
+- **Transaction Coordination:** Use `EntityContext.Transaction(name)` to coordinate entity operations across multiple adapters with best-effort atomicity. Auto-commit on dispose for minimal cognitive load.
 - **Provider Capabilities:** Check and adapt to provider capabilities (e.g., `SupportsFastRemove`, LINQ support) for optimal performance and compatibility.
 - **Pipelines and Jobs:** Use Koan Flow pipelines and Jobs for orchestrating multi-step or background operations (e.g., media processing, batch imports).
 - **Self-Reporting and Diagnostics:** Use Koan’s self-reporting features to surface provider elections, capabilities, and diagnostics in logs or UI.
@@ -34,6 +35,7 @@ This section summarizes best practices and recommendations for maximizing the va
 - Use `EntityController<T>` for all CRUD endpoints.
 - Implement batch operations and lifecycle hooks for bulk updates and validation.
 - Use context routing for user-specific or analytics scenarios.
+- Use `EntityContext.Transaction(name)` for multi-step operations requiring atomicity across entities or adapters.
 - Leverage provider capability checks to optimize for the current backend.
 - For media and vision pipelines, use Koan Jobs or Flow for background/cascading work.
 - Document and demonstrate these patterns in both code and developer docs.
@@ -637,7 +639,116 @@ Boot the runtime with `builder.Services.AddKoan();` in `Program.cs`. Everything 
 
 ---
 
-## 5. Advanced Transfers: Copy, Move, Mirror
+## 5. Transaction Coordination
+
+**Concepts**
+
+Ambient transaction support coordinates entity operations across multiple adapters with best-effort atomicity. Operations are tracked in memory and executed on commit or rollback. Transactions auto-commit on dispose (minimal cognitive load) or can be explicitly committed/rolled back. Named transactions provide correlation for telemetry and debugging.
+
+**Recipe**
+
+Add transaction support to DI in `Program.cs`:
+
+```csharp
+builder.Services.AddKoan();
+builder.Services.AddKoanTransactions(options =>
+{
+    options.AutoCommitOnDispose = true;  // Default: auto-commit
+    options.EnableTelemetry = true;      // Activity spans + logging
+    options.MaxTrackedOperations = 10_000;
+});
+```
+
+**Simple Transaction (Auto-Commit)**
+
+```csharp
+// Auto-commit on dispose (recommended for simple scenarios)
+using (EntityContext.Transaction("save-project"))
+{
+    var project = new Project { Name = "My Project" };
+    await project.Save(ct);
+
+    var job = new Job { ProjectId = project.Id, Name = "Job 1" };
+    await job.Save(ct);
+
+    // Auto-commit when using block exits
+}
+```
+
+**Explicit Commit/Rollback**
+
+```csharp
+// Explicit commit for critical operations
+using (EntityContext.Transaction("batch-import"))
+{
+    foreach (var item in items)
+    {
+        await item.Save(ct);
+    }
+
+    if (validationFailed)
+    {
+        await EntityContext.RollbackAsync(ct);
+        return;
+    }
+
+    await EntityContext.CommitAsync(ct);
+}
+```
+
+**Cross-Adapter Coordination**
+
+```csharp
+// Coordinate operations across SQLite and SQL Server
+using (EntityContext.Transaction("cross-adapter"))
+{
+    // Save to default adapter (SQLite)
+    await cacheEntry.Save(ct);
+
+    // Save to SQL Server
+    using (EntityContext.Adapter("sqlserver"))
+    {
+        await userRecord.Save(ct);
+    }
+
+    // Best-effort commit both
+    await EntityContext.CommitAsync(ct);
+}
+```
+
+**Transaction Context**
+
+```csharp
+// Check if in transaction
+if (EntityContext.InTransaction)
+{
+    var capabilities = EntityContext.Capabilities;
+    logger.LogInformation("Tracking {Count} operations across {Adapters} adapter(s)",
+        capabilities.TrackedOperationCount,
+        capabilities.Adapters.Length);
+}
+```
+
+**Usage Scenarios**
+
+Applications coordinate multi-step entity creation (project + jobs) with atomic all-or-nothing behavior. Data migrations use transactions with rollback on failure to ensure consistency. Cross-adapter operations (e.g., primary + backup storage) coordinate saves with best-effort atomicity across SQLite, SQL Server, JSON, or other providers.
+
+**Performance Considerations**
+
+Transactions track operations in memory. For large batches, break into smaller transactions (1,000 operations each) to avoid excessive memory usage. Use `MaxTrackedOperations` configuration to prevent unbounded growth.
+
+**Important Notes**
+
+- **Best-Effort Atomicity**: Framework provides sequential execution with error reporting, not true distributed transactions
+- **Nested Transactions**: Not supported - throws `InvalidOperationException`
+- **Infrastructure Operations**: `RemoveAll()` and `Truncate()` bypass transactions
+- **Deferred Execution**: Entity saves/deletes are tracked, not executed immediately
+
+For detailed usage patterns, examples, and troubleshooting, see the [Transaction Support Usage Guide](transactions-usage-guide.md).
+
+---
+
+## 6. Advanced Transfers: Copy, Move, Mirror
 
 **Concepts**
 
@@ -688,7 +799,7 @@ result.Audit.Last().IsSummary.Should().BeTrue();
 
 ---
 
-## 6. Streaming Workloads, Flow and Jobs
+## 7. Streaming Workloads, Flow and Jobs
 
 **Concepts**
 
@@ -732,7 +843,7 @@ Applications stream entity updates to Flow pipelines, generating embeddings at s
 
 ---
 
-## 7. AI and Vector Extensions
+## 8. AI and Vector Extensions
 
 **Concepts**
 
@@ -759,7 +870,7 @@ Applications export vector embeddings into a cache via `Copy()` so APIs can resp
 
 ---
 
-## 8. Observability and Testing
+## 9. Observability and Testing
 
 **Concepts**
 
@@ -791,7 +902,7 @@ QA teams examine audit summaries to ensure Move operations deleted exactly what 
 
 ---
 
-## 9. Deployment Readiness
+## 10. Deployment Readiness
 
 **Concepts**
 

@@ -288,7 +288,19 @@ public static class Data<TEntity, TKey>
         return CountAsync((object?)query ?? throw new ArgumentNullException(nameof(query)), strategy, null, ct);
     }
 
-    public static Task<bool> DeleteAsync(TKey id, CancellationToken ct = default) => Repo.DeleteAsync(id, ct);
+    public static Task<bool> DeleteAsync(TKey id, CancellationToken ct = default)
+    {
+        // Check if in transaction - defer execution if so
+        var context = EntityContext.Current;
+        if (context?.TransactionCoordinator != null)
+        {
+            context.TransactionCoordinator.TrackDelete<TEntity, TKey>(id, context);
+            return Task.FromResult(true);  // Return immediately - actual execution deferred
+        }
+
+        // Not in transaction - execute immediately
+        return Repo.DeleteAsync(id, ct);
+    }
     public static Task<int> DeleteManyAsync(IEnumerable<TKey> ids, CancellationToken ct = default) => Repo.DeleteManyAsync(ids, ct);
     public static Task<int> DeleteAllAsync(CancellationToken ct = default) => Repo.DeleteAllAsync(ct);
     public static Task<bool> DeleteAsync(TKey id, DataQueryOptions? options, CancellationToken ct = default)
@@ -361,7 +373,19 @@ public static class Data<TEntity, TKey>
         return await repo.UpsertAsync(current, ct);
     }
 
-    public static Task<TEntity> UpsertAsync(TEntity model, CancellationToken ct = default) => Repo.UpsertAsync(model, ct);
+    public static Task<TEntity> UpsertAsync(TEntity model, CancellationToken ct = default)
+    {
+        // Check if in transaction - defer execution if so
+        var context = EntityContext.Current;
+        if (context?.TransactionCoordinator != null)
+        {
+            context.TransactionCoordinator.TrackSave<TEntity, TKey>(model, context);
+            return Task.FromResult(model);  // Return immediately - actual execution deferred
+        }
+
+        // Not in transaction - execute immediately
+        return Repo.UpsertAsync(model, ct);
+    }
     public static Task<int> UpsertManyAsync(IEnumerable<TEntity> models, CancellationToken ct = default) => Repo.UpsertManyAsync(models, ct);
     public static IBatchSet<TEntity, TKey> Batch() => Repo.CreateBatch();
 
@@ -448,10 +472,34 @@ public static class Data<TEntity, TKey>
     }
 
     public static Task<TEntity> UpsertAsync(TEntity model, string partition, CancellationToken ct = default)
-    { using var _ = WithPartition(partition); return Repo.UpsertAsync(model, ct); }
+    {
+        // Check if in transaction - defer execution if so
+        var context = EntityContext.Current;
+        if (context?.TransactionCoordinator != null)
+        {
+            // For partitioned operations, pass partition to tracked operation
+            context.TransactionCoordinator.TrackSave<TEntity, TKey>(model, context with { Partition = partition });
+            return Task.FromResult(model);
+        }
+
+        using var _ = WithPartition(partition);
+        return Repo.UpsertAsync(model, ct);
+    }
 
     public static Task<bool> DeleteAsync(TKey id, string partition, CancellationToken ct = default)
-    { using var _ = WithPartition(partition); return Repo.DeleteAsync(id, ct); }
+    {
+        // Check if in transaction - defer execution if so
+        var context = EntityContext.Current;
+        if (context?.TransactionCoordinator != null)
+        {
+            // For partitioned operations, pass partition to tracked operation
+            context.TransactionCoordinator.TrackDelete<TEntity, TKey>(id, context with { Partition = partition });
+            return Task.FromResult(true);
+        }
+
+        using var _ = WithPartition(partition);
+        return Repo.DeleteAsync(id, ct);
+    }
 
     public static Task<int> UpsertManyAsync(IEnumerable<TEntity> models, string partition, CancellationToken ct = default)
     { using var _ = WithPartition(partition); return Repo.UpsertManyAsync(models, ct); }

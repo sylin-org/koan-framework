@@ -11,12 +11,12 @@ namespace Koan.Context.Controllers;
 [Route("api/search")]
 public class SearchController : ControllerBase
 {
-    private readonly IRetrievalService _retrieval;
+    private readonly Search _retrieval;
     private readonly ProjectResolver _projectResolver;
     private readonly ILogger<SearchController> _logger;
 
     public SearchController(
-        IRetrievalService retrieval,
+        Search retrieval,
         ProjectResolver projectResolver,
         ILogger<SearchController> logger)
     {
@@ -26,7 +26,7 @@ public class SearchController : ControllerBase
     }
 
     /// <summary>
-    /// Performs semantic search within a project
+    /// Performs semantic search within a project or across multiple projects
     /// </summary>
     /// <param name="request">Search request</param>
     /// <param name="cancellationToken">Cancellation token</param>
@@ -43,7 +43,13 @@ public class SearchController : ControllerBase
 
         try
         {
-            // Resolve project context in priority order: explicit ID -> pathContext -> libraryId
+            // Cross-project search: If ProjectIds array provided, search multiple projects
+            if (request.ProjectIds != null && request.ProjectIds.Any())
+            {
+                return await SearchMultipleProjects(request, cancellationToken);
+            }
+
+            // Single project search: Resolve project context in priority order
             string projectId;
 
             if (!string.IsNullOrWhiteSpace(request.ProjectId))
@@ -103,11 +109,11 @@ public class SearchController : ControllerBase
             }
             else
             {
-                return BadRequest(new { error = "Must provide projectId, pathContext, libraryId, or workingDirectory" });
+                return BadRequest(new { error = "Must provide projectId, projectIds, pathContext, libraryId, or workingDirectory" });
             }
 
             var options = new SearchOptions(
-                MaxTokens: request.Tokens ?? 5000,
+                MaxTokens: request.TokenCounter ?? 5000,
                 Alpha: request.Alpha ?? 0.7f,
                 ContinuationToken: request.ContinuationToken,
                 IncludeInsights: request.IncludeInsights ?? true,
@@ -127,6 +133,121 @@ public class SearchController : ControllerBase
             return StatusCode(500, new { error = "Search failed", message = ex.Message });
         }
     }
+
+    /// <summary>
+    /// Search across multiple projects and aggregate results
+    /// </summary>
+    private async Task<IActionResult> SearchMultipleProjects(
+        SearchRequest request,
+        CancellationToken cancellationToken)
+    {
+        var options = new SearchOptions(
+            MaxTokens: request.TokenCounter ?? 5000,
+            Alpha: request.Alpha ?? 0.7f,
+            ContinuationToken: request.ContinuationToken,
+            IncludeInsights: request.IncludeInsights ?? true,
+            IncludeReasoning: request.IncludeReasoning ?? true);
+
+        var projectResults = new List<object>();
+        var errors = new List<object>();
+
+        foreach (var projectId in request.ProjectIds!)
+        {
+            try
+            {
+                var result = await _retrieval.SearchAsync(
+                    projectId,
+                    request.Query,
+                    options,
+                    cancellationToken);
+
+                projectResults.Add(new
+                {
+                    projectId,
+                    results = result
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Search failed for project {ProjectId}", projectId);
+                errors.Add(new
+                {
+                    projectId,
+                    error = ex.Message
+                });
+            }
+        }
+
+        return Ok(new
+        {
+            query = request.Query,
+            totalProjects = request.ProjectIds.Count,
+            successfulProjects = projectResults.Count,
+            failedProjects = errors.Count,
+            results = projectResults,
+            errors
+        });
+    }
+
+    /// <summary>
+    /// Get search suggestions based on query prefix
+    /// </summary>
+    /// <param name="request">Suggestion request</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Suggested search queries</returns>
+    [HttpPost("suggestions")]
+    public async Task<IActionResult> GetSuggestions(
+        [FromBody] SuggestionRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(request.Prefix))
+        {
+            return BadRequest(new { error = "Prefix cannot be empty" });
+        }
+
+        try
+        {
+            // Simple suggestion logic: return common query patterns based on prefix
+            var suggestions = new List<string>();
+
+            // Pattern-based suggestions
+            if (request.Prefix.Length >= 2)
+            {
+                // Add code-specific suggestions
+                if (request.Prefix.Contains("class") || request.Prefix.Contains("interface"))
+                {
+                    suggestions.Add($"{request.Prefix} definition");
+                    suggestions.Add($"{request.Prefix} implementation");
+                }
+                else if (request.Prefix.Contains("function") || request.Prefix.Contains("method"))
+                {
+                    suggestions.Add($"{request.Prefix} signature");
+                    suggestions.Add($"{request.Prefix} usage example");
+                }
+                else
+                {
+                    suggestions.Add($"{request.Prefix} documentation");
+                    suggestions.Add($"{request.Prefix} examples");
+                    suggestions.Add($"{request.Prefix} best practices");
+                }
+            }
+
+            // Limit to max suggestions
+            var limit = request.MaxSuggestions ?? 5;
+            suggestions = suggestions.Take(limit).ToList();
+
+            return Ok(new
+            {
+                prefix = request.Prefix,
+                suggestions
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Suggestion generation failed for prefix {Prefix}", request.Prefix);
+            return StatusCode(500, new { error = "Suggestion generation failed", message = ex.Message });
+        }
+    }
 }
 
 /// <summary>
@@ -135,11 +256,19 @@ public class SearchController : ControllerBase
 public record SearchRequest(
     string Query,
     string? ProjectId = null,
+    List<string>? ProjectIds = null,  // For cross-project search
     string? PathContext = null,
     string? LibraryId = null,
     string? WorkingDirectory = null,
     float? Alpha = null,
-    int? Tokens = null,
+    int? TokenCounter = null,
     string? ContinuationToken = null,
     bool? IncludeInsights = null,
     bool? IncludeReasoning = null);
+
+/// <summary>
+/// Suggestion request payload
+/// </summary>
+public record SuggestionRequest(
+    string Prefix,
+    int? MaxSuggestions = 5);

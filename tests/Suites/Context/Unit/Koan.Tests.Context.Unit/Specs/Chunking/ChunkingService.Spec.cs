@@ -1,4 +1,5 @@
 using System.Text;
+using ChunkerService = Koan.Context.Services.Chunker;
 using FluentAssertions;
 using Koan.Context.Services;
 using Microsoft.Extensions.Logging;
@@ -8,7 +9,7 @@ using Xunit;
 namespace Koan.Tests.Context.Unit.Specs.Chunking;
 
 /// <summary>
-/// Comprehensive tests for ChunkingService
+/// Comprehensive tests for ChunkerService
 /// </summary>
 /// <remarks>
 /// Tests cover:
@@ -19,17 +20,17 @@ namespace Koan.Tests.Context.Unit.Specs.Chunking;
 /// - Large section splitting
 /// - Edge cases (empty documents, very long sections)
 /// </remarks>
-public class ChunkingServiceSpec : IDisposable
+public class ChunkerServiceSpec : IDisposable
 {
-    private readonly ChunkingService _service;
-    private readonly Mock<ILogger<ChunkingService>> _loggerMock;
+    private readonly ChunkerService _service;
+    private readonly Mock<ILogger<ChunkerService>> _loggerMock;
     private readonly string _testProjectId = "test-project";
     private readonly string _testCommit = "abc123";
 
-    public ChunkingServiceSpec()
+    public ChunkerServiceSpec()
     {
-        _loggerMock = new Mock<ILogger<ChunkingService>>();
-        _service = new ChunkingService(_loggerMock.Object);
+        _loggerMock = new Mock<ILogger<ChunkerService>>();
+        _service = new ChunkerService(_loggerMock.Object);
     }
 
     public void Dispose()

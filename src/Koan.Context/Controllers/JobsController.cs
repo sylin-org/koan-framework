@@ -33,7 +33,7 @@ public class JobsController : ControllerBase
     {
         try
         {
-            var job = await IndexingJob.Get(jobId, cancellationToken);
+            var job = await Job.Get(jobId, cancellationToken);
 
             if (job == null)
             {
@@ -51,7 +51,6 @@ public class JobsController : ControllerBase
                 job.SkippedFiles,
                 job.NewFiles,
                 job.ChangedFiles,
-                job.MetadataOnlyFiles,
                 job.ErrorFiles,
                 job.ChunksCreated,
                 job.VectorsSaved,
@@ -85,7 +84,7 @@ public class JobsController : ControllerBase
     {
         try
         {
-            var jobs = await IndexingJob.Query(
+            var jobs = await Job.Query(
                 j => j.ProjectId == projectId,
                 cancellationToken);
 
@@ -137,7 +136,7 @@ public class JobsController : ControllerBase
     {
         try
         {
-            var jobs = await IndexingJob.Query(
+            var jobs = await Job.Query(
                 j => j.ProjectId == projectId,
                 cancellationToken);
 
@@ -161,7 +160,6 @@ public class JobsController : ControllerBase
                 currentJob.SkippedFiles,
                 currentJob.NewFiles,
                 currentJob.ChangedFiles,
-                currentJob.MetadataOnlyFiles,
                 currentJob.ErrorFiles,
                 currentJob.ChunksCreated,
                 currentJob.VectorsSaved,
@@ -193,7 +191,7 @@ public class JobsController : ControllerBase
     {
         try
         {
-            var jobs = await IndexingJob.Query(
+            var jobs = await Job.Query(
                 j => j.Status == JobStatus.Planning ||
                      j.Status == JobStatus.Indexing ||
                      j.Status == JobStatus.Pending,
@@ -243,7 +241,7 @@ public class JobsController : ControllerBase
     {
         try
         {
-            var job = await IndexingJob.Get(jobId, cancellationToken);
+            var job = await Job.Get(jobId, cancellationToken);
 
             if (job == null)
             {

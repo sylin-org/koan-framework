@@ -1,5 +1,6 @@
 using Koan.Context.Models;
 using Koan.Context.Services;
+using Koan.Context.Utilities;
 using Koan.Data.Abstractions;
 using Koan.Data.Core;
 using Koan.Web.Controllers;
@@ -28,15 +29,18 @@ namespace Koan.Context.Controllers;
 [Route("api/projects")]
 public class ProjectsController : EntityController<Project>
 {
-    private readonly IIndexingService _indexingService;
+    private readonly Indexer _Indexer;
     private readonly FileMonitoringService _fileMonitoring;
+    private readonly PathValidator _pathValidator;
 
     public ProjectsController(
-        IIndexingService indexingService,
-        FileMonitoringService fileMonitoring)
+        Indexer Indexer,
+        FileMonitoringService fileMonitoring,
+        PathValidator pathValidator)
     {
-        _indexingService = indexingService ?? throw new ArgumentNullException(nameof(indexingService));
+        _Indexer = Indexer ?? throw new ArgumentNullException(nameof(Indexer));
         _fileMonitoring = fileMonitoring ?? throw new ArgumentNullException(nameof(fileMonitoring));
+        _pathValidator = pathValidator ?? throw new ArgumentNullException(nameof(pathValidator));
     }
 
     /// <summary>
@@ -49,12 +53,18 @@ public class ProjectsController : EntityController<Project>
     {
         try
         {
-            var project = Project.Create(request.Name, request.RootPath, request.ProjectType);
-
-            if (!string.IsNullOrWhiteSpace(request.GitRemote))
+            // SECURITY: Validate path before creating project
+            if (!_pathValidator.IsValidProjectPath(request.RootPath, out var pathError))
             {
-                project.GitRemote = request.GitRemote;
+                return BadRequest(new
+                {
+                    error = "Invalid project path",
+                    details = pathError,
+                    hint = "Ensure the path is absolute and within allowed directories"
+                });
             }
+
+            var project = Project.Create(request.Name, request.RootPath, request.DocsPath);
 
             var saved = await project.Save();
 
@@ -94,7 +104,7 @@ public class ProjectsController : EntityController<Project>
     [HttpGet("active")]
     public async Task<ActionResult<IEnumerable<Project>>> GetActive()
     {
-        var projects = await Project.Query(p => p.IsActive);
+        var projects = await Project.Query(p => true);
         return Ok(projects);
     }
 
@@ -133,11 +143,11 @@ public class ProjectsController : EntityController<Project>
         {
             try
             {
-                await _indexingService.IndexProjectAsync(id, force: force);
+                await _Indexer.IndexProjectAsync(id, force: force);
             }
             catch
             {
-                // Errors are logged by IndexingService
+                // Errors are logged by Indexer
             }
         });
 
@@ -164,10 +174,8 @@ public class ProjectsController : EntityController<Project>
             return NotFound();
 
         // Fetch active job details if there's an active job
-        IndexingJob? activeJob = null;
-        if (!string.IsNullOrWhiteSpace(project.ActiveJobId))
+        Job? activeJob = null;
         {
-            activeJob = await IndexingJob.Get(project.ActiveJobId);
         }
 
         return Ok(new
@@ -177,12 +185,7 @@ public class ProjectsController : EntityController<Project>
             status = project.Status.ToString(),
             lastIndexed = project.LastIndexed,
             documentCount = project.DocumentCount,
-            indexingStartedAt = project.IndexingStartedAt,
-            indexingCompletedAt = project.IndexingCompletedAt,
-            isMonitoringEnabled = project.IsMonitoringEnabled,
-            monitorCodeChanges = project.MonitorCodeChanges,
-            monitorDocChanges = project.MonitorDocChanges,
-            error = project.IndexingError,
+            error = project.LastError,
             activeJob = activeJob != null ? new
             {
                 id = activeJob.Id,
@@ -197,6 +200,99 @@ public class ProjectsController : EntityController<Project>
                 elapsed = activeJob.Elapsed,
                 currentOperation = activeJob.CurrentOperation
             } : null
+        });
+    }
+
+    /// <summary>
+    /// Get project health status (indexing health, data availability, errors)
+    /// </summary>
+    /// <param name="id">Project ID</param>
+    /// <returns>Project health information</returns>
+    [HttpGet("{id}/health")]
+    public async Task<IActionResult> GetProjectHealth(string id)
+    {
+        var project = await Project.Get(id);
+        if (project == null)
+            return NotFound();
+
+        var isHealthy = project.Status == IndexingStatus.Ready
+            && project.DocumentCount > 0
+            && string.IsNullOrEmpty(project.LastError);
+
+        return Ok(new
+        {
+            projectId = project.Id,
+            name = project.Name,
+            healthy = isHealthy,
+            status = project.Status.ToString(),
+            lastIndexed = project.LastIndexed,
+            documentCount = project.DocumentCount,
+            indexedBytes = project.IndexedBytes,
+            error = project.LastError,
+            warnings = new List<string?>
+            {
+                project.DocumentCount == 0 ? "No documents indexed" : null,
+                project.LastIndexed == null ? "Never indexed" : null,
+                !string.IsNullOrEmpty(project.LastError) ? $"Last error: {project.LastError}" : null
+            }.Where(w => w != null).ToList()
+        });
+    }
+
+    /// <summary>
+    /// Bulk index multiple projects in parallel
+    /// </summary>
+    /// <param name="request">Bulk indexing request with project IDs</param>
+    /// <returns>Bulk operation status</returns>
+    [HttpPost("bulk-index")]
+    public async Task<IActionResult> BulkIndex([FromBody] BulkIndexRequest request)
+    {
+        if (request.ProjectIds == null || !request.ProjectIds.Any())
+        {
+            return BadRequest(new { error = "ProjectIds cannot be empty" });
+        }
+
+        var results = new List<object>();
+        var notFound = new List<string>();
+
+        foreach (var projectId in request.ProjectIds)
+        {
+            var project = await Project.Get(projectId);
+            if (project == null)
+            {
+                notFound.Add(projectId);
+                continue;
+            }
+
+            // Start indexing in background (fire-and-forget)
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await _Indexer.IndexProjectAsync(projectId, force: request.Force);
+                }
+                catch
+                {
+                    // Errors are logged by Indexer
+                }
+            });
+
+            results.Add(new
+            {
+                projectId = project.Id,
+                name = project.Name,
+                message = "Indexing started",
+                statusUrl = $"/api/projects/{project.Id}/status"
+            });
+        }
+
+        return Accepted(new
+        {
+            message = $"Bulk indexing started for {results.Count} project(s)",
+            total = request.ProjectIds.Count,
+            started = results.Count,
+            notFound = notFound.Count,
+            projects = results,
+            projectsNotFound = notFound
         });
     }
 
@@ -216,25 +312,9 @@ public class ProjectsController : EntityController<Project>
             return NotFound();
 
         // Update settings
-        if (request.MonitorCodeChanges.HasValue)
-            project.MonitorCodeChanges = request.MonitorCodeChanges.Value;
-
-        if (request.MonitorDocChanges.HasValue)
-            project.MonitorDocChanges = request.MonitorDocChanges.Value;
-
         await project.Save();
 
-        // Restart file watcher if monitoring was re-enabled
-        if (project.IsMonitoringEnabled)
-        {
-            await _fileMonitoring.StartWatchingProjectAsync(project);
-        }
-        else
-        {
-            await _fileMonitoring.StopWatchingProjectAsync(project.Id);
-        }
-
-        return Ok(new { message = "Monitoring settings updated", project });
+        return Ok(new { message = "Project settings updated", project });
     }
 
     /// <summary>
@@ -267,18 +347,17 @@ public class ProjectsController : EntityController<Project>
 
         // Manual reindex works even if monitoring disabled
         project.Status = IndexingStatus.Indexing;
-        project.IndexingStartedAt = DateTime.UtcNow;
         await project.Save();
 
         _ = Task.Run(async () =>
         {
             try
             {
-                await _indexingService.IndexProjectAsync(id, cancellationToken: CancellationToken.None, force: force);
+                await _Indexer.IndexProjectAsync(id, cancellationToken: CancellationToken.None, force: force);
             }
             catch (Exception)
             {
-                // Error will be recorded in project.IndexingError
+                // Error will be recorded in project.LastError
             }
         });
 
@@ -298,8 +377,7 @@ public class ProjectsController : EntityController<Project>
 public record CreateProjectRequest(
     string Name,
     string RootPath,
-    ProjectType ProjectType = ProjectType.Unknown,
-    string? GitRemote = null
+    string? DocsPath = null
 );
 
 /// <summary>
@@ -316,4 +394,12 @@ public record IndexMetadataRequest(
 public record UpdateMonitoringRequest(
     bool? MonitorCodeChanges,
     bool? MonitorDocChanges
+);
+
+/// <summary>
+/// Request model for bulk indexing multiple projects
+/// </summary>
+public record BulkIndexRequest(
+    List<string> ProjectIds,
+    bool Force = false
 );

@@ -22,27 +22,30 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
     public void Initialize(IServiceCollection services)
     {
         // Register ingest pipeline services
-        services.AddScoped<IDocumentDiscoveryService, DocumentDiscoveryService>();
-        services.AddScoped<IContentExtractionService, ContentExtractionService>();
-        services.AddScoped<IChunkingService, ChunkingService>();
-        services.AddScoped<IEmbeddingService>(sp =>
+        services.AddScoped<Discovery>();
+        services.AddScoped<Extraction>();
+        services.AddScoped<Chunker>();
+        services.AddScoped<Embedding>(sp =>
         {
             var ai = sp.GetRequiredService<Koan.AI.Contracts.IAi>();
             var cache = sp.GetRequiredService<Microsoft.Extensions.Caching.Memory.IMemoryCache>();
-            var logger = sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<EmbeddingService>>();
+            var logger = sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<Embedding>>();
 
             // TODO: Get default model from configuration
             var defaultModel = "all-minilm";
 
-            return new EmbeddingService(ai, cache, logger, defaultModel);
+            return new Embedding(ai, cache, logger, defaultModel);
         });
-        services.AddScoped<IIndexingService, IndexingService>();
-        services.AddScoped<IRetrievalService, RetrievalService>();
+        services.AddScoped<Indexer>();
+        services.AddScoped<Search>();
 
         // Register Phase 1 AI-first services
-        services.AddSingleton<ITokenCountingService, TokenCountingService>();
-        services.AddSingleton<IContinuationTokenService, ContinuationTokenService>();
-        services.AddSingleton<ISourceUrlGenerator, SourceUrlGenerator>();
+        services.AddSingleton<TokenCounter>();
+        services.AddSingleton<Pagination>();
+        services.AddSingleton<UrlBuilder>();
+
+        // Register background services
+        services.AddHostedService<VectorSyncWorker>();
 
         // Add memory cache if not already registered
         services.AddMemoryCache();
@@ -52,5 +55,6 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
     {
         module.Describe(ModuleVersion);
         module.AddNote("Ingest pipeline: Discovery, Extraction, Chunking, Embedding, Indexing");
+        module.AddNote("Transactional Outbox: VectorSyncWorker (at-least-once delivery)");
     }
 }

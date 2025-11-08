@@ -1,9 +1,12 @@
 using FluentAssertions;
 using Koan.Context.Models;
-using Koan.Context.Services;
+using Koan.Context.Services; // For SearchResult, SearchOptions, etc.
 using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
+using EmbeddingsService = Koan.Context.Services.Embeddings;
+using TokensService = Koan.Context.Services.Tokens;
+using SearchService = Koan.Context.Services.Search;
 
 namespace Koan.Tests.Context.Unit.Specs.Retrieval;
 
@@ -12,17 +15,17 @@ namespace Koan.Tests.Context.Unit.Specs.Retrieval;
 /// </summary>
 public class RetrievalService_Spec
 {
-    private readonly Mock<IEmbeddingService> _embeddingMock;
-    private readonly Mock<ITokenCountingService> _tokenCounterMock;
-    private readonly Mock<ILogger<RetrievalService>> _loggerMock;
-    private readonly RetrievalService _service;
+    private readonly Mock<EmbeddingsService> _embeddingMock;
+    private readonly Mock<TokensService> _tokenCounterMock;
+    private readonly Mock<ILogger<SearchService>> _loggerMock;
+    private readonly SearchService _service;
 
     public RetrievalService_Spec()
     {
-    _embeddingMock = new Mock<IEmbeddingService>();
-    _tokenCounterMock = new Mock<ITokenCountingService>();
-    _loggerMock = new Mock<ILogger<RetrievalService>>();
-    _service = new RetrievalService(
+    _embeddingMock = new Mock<EmbeddingsService>();
+    _tokenCounterMock = new Mock<TokensService>();
+    _loggerMock = new Mock<ILogger<SearchService>>();
+    _service = new SearchService(
         _embeddingMock.Object,
         _tokenCounterMock.Object,
         _loggerMock.Object);
