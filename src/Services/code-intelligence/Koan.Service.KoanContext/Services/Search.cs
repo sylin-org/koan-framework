@@ -15,6 +15,7 @@ public class Search
     private const int MinTokenBudget = 1000;
     private const int MaxTokenBudget = 10000;
     private const int EstimatedTokensPerChunk = 350;
+    private const int MaxTopK = 100; // Increased from 20 to support continuation
 
     private readonly Embedding _embedding;
     private readonly TokenCounter _tokenCounter;
@@ -49,10 +50,23 @@ public class Search
         var stopwatch = Stopwatch.StartNew();
         var warnings = new List<string>();
 
+        // Parse continuation token if provided
+        ContinuationTokenData? continuationData = null;
         if (!string.IsNullOrWhiteSpace(normalizedOptions.ContinuationToken))
         {
-            warnings.Add("Continuation tokens are not yet supported; returning the first page only.");
+            continuationData = _Pagination.ParseToken(normalizedOptions.ContinuationToken);
+            if (continuationData == null)
+            {
+                warnings.Add("Invalid or expired continuation token; starting from first page.");
+            }
+            else if (continuationData.ProjectId != projectId || continuationData.Query != query)
+            {
+                warnings.Add("Continuation token does not match current query; starting from first page.");
+                continuationData = null;
+            }
         }
+
+        var currentPage = continuationData?.Page ?? 0;
 
         _logger.LogInformation(
             "Searching project {ProjectId} for query: {Query} (alpha={Alpha}, maxTokens={MaxTokens})",
@@ -78,8 +92,9 @@ public class Search
                     return CreateEmptyResult(normalizedOptions, stopwatch.Elapsed, warnings);
                 }
 
-                var topK = CalculateTopK(normalizedOptions.MaxTokens);
-                _logger.LogInformation("Calling Vector<Chunk>.Search with topK={TopK}, alpha={Alpha}", topK, normalizedOptions.Alpha);
+                // Fetch more results to support continuation
+                var topK = MaxTopK;
+                _logger.LogInformation("Calling Vector<Chunk>.Search with topK={TopK}, alpha={Alpha}, page={Page}", topK, normalizedOptions.Alpha, currentPage);
 
                 var vectorResult = await Vector<Chunk>.Search(
                     vector: queryEmbedding,
@@ -94,6 +109,9 @@ public class Search
                 var sources = new List<SourceFile>();
                 var sourceIndex = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
                 var tokensReturned = 0;
+                var skippedCount = 0;
+                var shouldSkip = continuationData != null;
+                string? lastChunkId = null;
 
                 foreach (var match in vectorResult.Matches)
                 {
@@ -105,6 +123,18 @@ public class Search
                         continue;
                     }
                     _logger.LogInformation("Found chunk: ID={ChunkId}, FilePath={FilePath}", documentChunk.Id, documentChunk.FilePath);
+
+                    // Skip chunks until we reach the last returned chunk from previous page
+                    if (shouldSkip)
+                    {
+                        if (documentChunk.Id == continuationData!.LastChunkId)
+                        {
+                            shouldSkip = false; // Found the last chunk, start collecting from next one
+                            _logger.LogInformation("Found continuation point at chunk {ChunkId}, skipped {SkippedCount} chunks", documentChunk.Id, skippedCount);
+                        }
+                        skippedCount++;
+                        continue;
+                    }
 
                     // Filter by language if specified
                     if (normalizedOptions.Languages != null &&
@@ -125,6 +155,15 @@ public class Search
                     var chunkTokens = documentChunk.TokenCount > 0
                         ? documentChunk.TokenCount
                         : _tokenCounter.EstimateTokens(documentChunk.SearchText);
+
+                    // Check if adding this chunk would exceed token budget
+                    if (tokensReturned + chunkTokens > normalizedOptions.MaxTokens && chunks.Count > 0)
+                    {
+                        _logger.LogInformation("Token budget reached ({TokensReturned}/{MaxTokens}), stopping at {ChunkCount} chunks",
+                            tokensReturned, normalizedOptions.MaxTokens, chunks.Count);
+                        break; // Stop processing, we have enough results
+                    }
+
                     tokensReturned += chunkTokens;
 
                     var sourceKey = $"{documentChunk.FilePath}|{documentChunk.CommitSha}";
@@ -158,7 +197,12 @@ public class Search
                             EndLine: endLine,
                             Language: documentChunk.Language),
                         Reasoning: reasoning));
+
+                    lastChunkId = documentChunk.Id; // Track last chunk added
                 }
+
+                // Determine if there are more results available
+                var hasMoreResults = chunks.Count > 0 && (skippedCount + chunks.Count) < vectorResult.Matches.Count;
 
                 stopwatch.Stop();
 
@@ -179,12 +223,30 @@ public class Search
                     ? BuildInsights(chunks, searchSources)
                     : null;
 
+                // Generate continuation token if there are more results
+                string? continuationToken = null;
+                if (hasMoreResults && !string.IsNullOrEmpty(lastChunkId))
+                {
+                    var tokenData = new ContinuationTokenData(
+                        ProjectId: projectId,
+                        Query: query,
+                        Alpha: normalizedOptions.Alpha,
+                        TokensRemaining: normalizedOptions.MaxTokens,
+                        LastChunkId: lastChunkId,
+                        CreatedAt: DateTime.UtcNow,
+                        Page: currentPage + 1);
+
+                    continuationToken = _Pagination.CreateToken(tokenData);
+                    _logger.LogInformation("Generated continuation token for page {Page}, last chunk: {LastChunkId}",
+                        currentPage + 1, lastChunkId);
+                }
+
                 return new SearchResult(
                     Chunks: chunks,
                     Metadata: metadata,
                     Sources: searchSources,
                     Insights: insights,
-                    ContinuationToken: null,
+                    ContinuationToken: continuationToken,
                     Warnings: warnings);
             }
         }
@@ -204,11 +266,7 @@ public class Search
         return options with { MaxTokens = maxTokens, Alpha = alpha };
     }
 
-    private static int CalculateTopK(int maxTokens)
-    {
-        var estimate = Math.Max(1, maxTokens / EstimatedTokensPerChunk);
-        return Math.Clamp(estimate, 4, 20);
-    }
+    // Note: CalculateTopK removed - now using fixed MaxTopK=100 to fetch more results for continuation support
 
     private static RetrievalReasoning BuildReasoning(float score, float alpha)
     {
