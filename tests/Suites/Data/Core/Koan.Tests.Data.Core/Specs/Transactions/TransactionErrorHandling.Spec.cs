@@ -37,12 +37,7 @@ public sealed class TransactionErrorHandlingSpec
     {
         await TestPipeline.For<TransactionErrorHandlingSpec>(_output, nameof(Commit_without_transaction_throws_exception))
             .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.CreateAsync(ctx))
-            .Arrange(static ctx =>
-            {
-                var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
-                return runtime;
-            })
-            .Act(static async (ctx, input) =>
+            .Assert(static async _ =>
             {
                 InvalidOperationException? exception = null;
 
@@ -56,12 +51,8 @@ public sealed class TransactionErrorHandlingSpec
                     exception = ex;
                 }
 
-                return exception;
-            })
-            .Assert(static (ctx, input, output) =>
-            {
-                output.Should().NotBeNull("commit without transaction should throw");
-                output!.Message.Should().Contain("No active transaction");
+                exception.Should().NotBeNull("commit without transaction should throw");
+                exception!.Message.Should().Contain("No active transaction");
             })
             .RunAsync();
     }
@@ -71,12 +62,7 @@ public sealed class TransactionErrorHandlingSpec
     {
         await TestPipeline.For<TransactionErrorHandlingSpec>(_output, nameof(Rollback_without_transaction_throws_exception))
             .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.CreateAsync(ctx))
-            .Arrange(static ctx =>
-            {
-                var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
-                return runtime;
-            })
-            .Act(static async (ctx, input) =>
+            .Assert(static async _ =>
             {
                 InvalidOperationException? exception = null;
 
@@ -90,12 +76,8 @@ public sealed class TransactionErrorHandlingSpec
                     exception = ex;
                 }
 
-                return exception;
-            })
-            .Assert(static (ctx, input, output) =>
-            {
-                output.Should().NotBeNull("rollback without transaction should throw");
-                output!.Message.Should().Contain("No active transaction");
+                exception.Should().NotBeNull("rollback without transaction should throw");
+                exception!.Message.Should().Contain("No active transaction");
             })
             .RunAsync();
     }
@@ -105,12 +87,7 @@ public sealed class TransactionErrorHandlingSpec
     {
         await TestPipeline.For<TransactionErrorHandlingSpec>(_output, nameof(Double_commit_throws_exception))
             .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.CreateAsync(ctx))
-            .Arrange(static ctx =>
-            {
-                var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
-                return runtime;
-            })
-            .Act(static async (ctx, input) =>
+            .Assert(static async _ =>
             {
                 InvalidOperationException? exception = null;
 
@@ -129,12 +106,8 @@ public sealed class TransactionErrorHandlingSpec
                     exception = ex;
                 }
 
-                return exception;
-            })
-            .Assert(static (ctx, input, output) =>
-            {
-                output.Should().NotBeNull("double commit should throw");
-                output!.Message.Should().Contain("already been completed");
+                exception.Should().NotBeNull("double commit should throw");
+                exception!.Message.Should().Contain("already been completed");
             })
             .RunAsync();
     }
@@ -144,12 +117,7 @@ public sealed class TransactionErrorHandlingSpec
     {
         await TestPipeline.For<TransactionErrorHandlingSpec>(_output, nameof(Empty_transaction_commits_successfully))
             .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.CreateAsync(ctx))
-            .Arrange(static ctx =>
-            {
-                var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
-                return runtime;
-            })
-            .Act(static async (ctx, input) =>
+            .Assert(static async _ =>
             {
                 var success = false;
 
@@ -160,11 +128,7 @@ public sealed class TransactionErrorHandlingSpec
                     success = true;
                 }
 
-                return success;
-            })
-            .Assert(static (ctx, input, output) =>
-            {
-                output.Should().BeTrue("empty transaction should commit successfully");
+                success.Should().BeTrue("empty transaction should commit successfully");
             })
             .RunAsync();
     }
@@ -178,12 +142,11 @@ public sealed class TransactionErrorHandlingSpec
             {
                 var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
                 var partition = EnsurePartition(ctx);
-
-                return new { runtime, partition };
+                ctx.SetItem("partition", partition);
             })
-            .Act(static async (ctx, input) =>
+            .Assert(static async ctx =>
             {
-                var (runtime, partition) = input;
+                var partition = ctx.GetRequiredItem<string>("partition");
 
                 var entity = new TodoEntity { Title = "Original", Description = "Version 1" };
 
@@ -208,11 +171,7 @@ public sealed class TransactionErrorHandlingSpec
                     retrieved!.Description.Should().Be("Version 3", "last save should win");
                 }
 
-                return entity;
-            })
-            .Assert(static (ctx, input, output) =>
-            {
-                output.Should().NotBeNull();
+                entity.Should().NotBeNull();
             })
             .RunAsync();
     }
@@ -222,12 +181,7 @@ public sealed class TransactionErrorHandlingSpec
     {
         await TestPipeline.For<TransactionErrorHandlingSpec>(_output, nameof(Transaction_context_restored_after_exception))
             .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.CreateAsync(ctx))
-            .Arrange(static ctx =>
-            {
-                var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
-                return runtime;
-            })
-            .Act(static async (ctx, input) =>
+            .Assert(static async _ =>
             {
                 var beforeTransaction = EntityContext.InTransaction;
 
@@ -246,12 +200,10 @@ public sealed class TransactionErrorHandlingSpec
 
                 var afterTransaction = EntityContext.InTransaction;
 
-                return new { beforeTransaction, afterTransaction };
-            })
-            .Assert(static (ctx, input, output) =>
-            {
-                output.beforeTransaction.Should().BeFalse();
-                output.afterTransaction.Should().BeFalse("context should be restored after exception");
+                beforeTransaction.Should().BeFalse();
+                afterTransaction.Should().BeFalse("context should be restored after exception");
+
+                await Task.CompletedTask;
             })
             .RunAsync();
     }
@@ -266,12 +218,13 @@ public sealed class TransactionErrorHandlingSpec
                 var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
                 var partition1 = $"partition-1-{ctx.ExecutionId:n}";
                 var partition2 = $"partition-2-{ctx.ExecutionId:n}";
-
-                return new { runtime, partition1, partition2 };
+                ctx.SetItem("partition1", partition1);
+                ctx.SetItem("partition2", partition2);
             })
-            .Act(static async (ctx, input) =>
+            .Assert(static async ctx =>
             {
-                var (runtime, partition1, partition2) = input;
+                var partition1 = ctx.GetRequiredItem<string>("partition1");
+                var partition2 = ctx.GetRequiredItem<string>("partition2");
 
                 var entity1 = new TodoEntity { Title = "Partition 1", Description = "In partition 1" };
                 var entity2 = new TodoEntity { Title = "Partition 2", Description = "In partition 2" };
@@ -311,12 +264,8 @@ public sealed class TransactionErrorHandlingSpec
                     count2.Should().Be(1);
                 }
 
-                return new { entity1, entity2 };
-            })
-            .Assert(static (ctx, input, output) =>
-            {
-                output.entity1.Should().NotBeNull();
-                output.entity2.Should().NotBeNull();
+                entity1.Should().NotBeNull();
+                entity2.Should().NotBeNull();
             })
             .RunAsync();
     }
@@ -330,12 +279,11 @@ public sealed class TransactionErrorHandlingSpec
             {
                 var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
                 var partition = EnsurePartition(ctx);
-
-                return new { runtime, partition };
+                ctx.SetItem("partition", partition);
             })
-            .Act(static async (ctx, input) =>
+            .Assert(static async ctx =>
             {
-                var (runtime, partition) = input;
+                var partition = ctx.GetRequiredItem<string>("partition");
 
                 var entity1 = new TodoEntity { Title = "SQLite + Partition", Description = "Default adapter with partition" };
                 var entity2 = new TodoEntity { Title = "JSON + Partition", Description = "JSON adapter with partition" };
@@ -373,12 +321,8 @@ public sealed class TransactionErrorHandlingSpec
                     retrieved2.Should().NotBeNull();
                 }
 
-                return new { entity1, entity2 };
-            })
-            .Assert(static (ctx, input, output) =>
-            {
-                output.entity1.Should().NotBeNull();
-                output.entity2.Should().NotBeNull();
+                entity1.Should().NotBeNull();
+                entity2.Should().NotBeNull();
             })
             .RunAsync();
     }

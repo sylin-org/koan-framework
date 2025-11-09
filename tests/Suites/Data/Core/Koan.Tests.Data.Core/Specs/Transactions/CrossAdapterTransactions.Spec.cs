@@ -41,12 +41,11 @@ public sealed class CrossAdapterTransactionsSpec
             {
                 var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
                 var partition = EnsurePartition(ctx);
-
-                return new { runtime, partition };
+                ctx.SetItem("partition", partition);
             })
-            .Act(static async (ctx, input) =>
+            .Assert(static async ctx =>
             {
-                var (runtime, partition) = input;
+                var partition = ctx.GetRequiredItem<string>("partition");
 
                 var entitySqlite = new TodoEntity
                 {
@@ -94,12 +93,8 @@ public sealed class CrossAdapterTransactionsSpec
                     retrievedJson.Should().NotBeNull("JSON entity should be persisted");
                 }
 
-                return new { entitySqlite, entityJson };
-            })
-            .Assert(static (ctx, input, output) =>
-            {
-                output.entitySqlite.Should().NotBeNull();
-                output.entityJson.Should().NotBeNull();
+                entitySqlite.Should().NotBeNull();
+                entityJson.Should().NotBeNull();
             })
             .RunAsync();
     }
@@ -113,12 +108,11 @@ public sealed class CrossAdapterTransactionsSpec
             {
                 var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
                 var partition = EnsurePartition(ctx);
-
-                return new { runtime, partition };
+                ctx.SetItem("partition", partition);
             })
-            .Act(static async (ctx, input) =>
+            .Assert(static async ctx =>
             {
-                var (runtime, partition) = input;
+                var partition = ctx.GetRequiredItem<string>("partition");
 
                 var entity1 = new TodoEntity
                 {
@@ -166,12 +160,8 @@ public sealed class CrossAdapterTransactionsSpec
                     retrieved2.Should().BeNull("JSON entity should not persist after rollback");
                 }
 
-                return new { entity1, entity2 };
-            })
-            .Assert(static (ctx, input, output) =>
-            {
-                output.entity1.Should().NotBeNull();
-                output.entity2.Should().NotBeNull();
+                entity1.Should().NotBeNull();
+                entity2.Should().NotBeNull();
             })
             .RunAsync();
     }
@@ -185,12 +175,11 @@ public sealed class CrossAdapterTransactionsSpec
             {
                 var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
                 var partition = EnsurePartition(ctx);
-
-                return new { runtime, partition };
+                ctx.SetItem("partition", partition);
             })
-            .Act(static async (ctx, input) =>
+            .Assert(static async ctx =>
             {
-                var (runtime, partition) = input;
+                var partition = ctx.GetRequiredItem<string>("partition");
 
                 var entities = Enumerable.Range(1, 10).Select(i => new TodoEntity
                 {
@@ -226,11 +215,7 @@ public sealed class CrossAdapterTransactionsSpec
                     }
                 }
 
-                return entities;
-            })
-            .Assert(static (ctx, input, output) =>
-            {
-                output.Should().HaveCount(10);
+                entities.Should().HaveCount(10);
             })
             .RunAsync();
     }
@@ -244,12 +229,11 @@ public sealed class CrossAdapterTransactionsSpec
             {
                 var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
                 var partition = EnsurePartition(ctx);
-
-                return new { runtime, partition };
+                ctx.SetItem("partition", partition);
             })
-            .Act(static async (ctx, input) =>
+            .Assert(static async ctx =>
             {
-                var (runtime, partition) = input;
+                var partition = ctx.GetRequiredItem<string>("partition");
 
                 TransactionCapabilities? capabilities = null;
 
@@ -273,15 +257,11 @@ public sealed class CrossAdapterTransactionsSpec
                     await EntityContext.CommitAsync();
                 }
 
-                return capabilities;
-            })
-            .Assert(static (ctx, input, output) =>
-            {
-                output.Should().NotBeNull();
-                output!.Adapters.Should().Contain(a => a == "Default" || a == "json");
-                output.TrackedOperationCount.Should().Be(2);
-                output.SupportsLocalTransactions.Should().BeTrue();
-                output.SupportsDistributedTransactions.Should().BeFalse("best-effort atomicity only");
+                capabilities.Should().NotBeNull();
+                capabilities!.Adapters.Should().Contain(a => a == "Default" || a == "json");
+                capabilities.TrackedOperationCount.Should().Be(2);
+                capabilities.SupportsLocalTransactions.Should().BeTrue();
+                capabilities.SupportsDistributedTransactions.Should().BeFalse("best-effort atomicity only");
             })
             .RunAsync();
     }
@@ -295,12 +275,11 @@ public sealed class CrossAdapterTransactionsSpec
             {
                 var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
                 var partition = EnsurePartition(ctx);
-
-                return new { runtime, partition };
+                ctx.SetItem("partition", partition);
             })
-            .Act(static async (ctx, input) =>
+            .Assert(static async ctx =>
             {
-                var (runtime, partition) = input;
+                var partition = ctx.GetRequiredItem<string>("partition");
 
                 // Create entities outside transaction
                 var entityToUpdate = new TodoEntity { Title = "To Update", Description = "Original" };
@@ -348,13 +327,9 @@ public sealed class CrossAdapterTransactionsSpec
                     created!.Title.Should().Be("New Entity");
                 }
 
-                return new { entityToUpdate, entityToDelete, newEntity };
-            })
-            .Assert(static (ctx, input, output) =>
-            {
-                output.entityToUpdate.Should().NotBeNull();
-                output.entityToDelete.Should().NotBeNull();
-                output.newEntity.Should().NotBeNull();
+                entityToUpdate.Should().NotBeNull();
+                entityToDelete.Should().NotBeNull();
+                newEntity.Should().NotBeNull();
             })
             .RunAsync();
     }

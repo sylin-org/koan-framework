@@ -41,12 +41,11 @@ public sealed class TransactionBasicsSpec
             {
                 var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
                 var partition = EnsurePartition(ctx);
-
-                return new { runtime, partition };
+                ctx.SetItem("partition", partition);
             })
-            .Act(static async (ctx, input) =>
+            .Assert(static async ctx =>
             {
-                var (runtime, partition) = input;
+                var partition = ctx.GetRequiredItem<string>("partition");
 
                 var entity1 = new TodoEntity
                 {
@@ -89,12 +88,8 @@ public sealed class TransactionBasicsSpec
                     retrieved2!.Title.Should().Be("Transaction Test 2");
                 }
 
-                return new { entity1, entity2 };
-            })
-            .Assert(static (ctx, input, output) =>
-            {
-                output.entity1.Should().NotBeNull();
-                output.entity2.Should().NotBeNull();
+                entity1.Should().NotBeNull();
+                entity2.Should().NotBeNull();
             })
             .RunAsync();
     }
@@ -108,12 +103,11 @@ public sealed class TransactionBasicsSpec
             {
                 var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
                 var partition = EnsurePartition(ctx);
-
-                return new { runtime, partition };
+                ctx.SetItem("partition", partition);
             })
-            .Act(static async (ctx, input) =>
+            .Assert(static async ctx =>
             {
-                var (runtime, partition) = input;
+                var partition = ctx.GetRequiredItem<string>("partition");
 
                 var entity = new TodoEntity
                 {
@@ -140,11 +134,7 @@ public sealed class TransactionBasicsSpec
                     retrieved.Should().BeNull("entity should not exist after rollback");
                 }
 
-                return entity;
-            })
-            .Assert(static (ctx, input, output) =>
-            {
-                output.Should().NotBeNull();
+                entity.Should().NotBeNull();
             })
             .RunAsync();
     }
@@ -158,12 +148,11 @@ public sealed class TransactionBasicsSpec
             {
                 var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
                 var partition = EnsurePartition(ctx);
-
-                return new { runtime, partition };
+                ctx.SetItem("partition", partition);
             })
-            .Act(static async (ctx, input) =>
+            .Assert(static async ctx =>
             {
-                var (runtime, partition) = input;
+                var partition = ctx.GetRequiredItem<string>("partition");
 
                 var entity = new TodoEntity
                 {
@@ -189,11 +178,7 @@ public sealed class TransactionBasicsSpec
                     retrieved!.Title.Should().Be("Auto-commit test");
                 }
 
-                return entity;
-            })
-            .Assert(static (ctx, input, output) =>
-            {
-                output.Should().NotBeNull();
+                entity.Should().NotBeNull();
             })
             .RunAsync();
     }
@@ -207,12 +192,11 @@ public sealed class TransactionBasicsSpec
             {
                 var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
                 var partition = EnsurePartition(ctx);
-
-                return new { runtime, partition };
+                ctx.SetItem("partition", partition);
             })
-            .Act(static async (ctx, input) =>
+            .Assert(static async ctx =>
             {
-                var (runtime, partition) = input;
+                var partition = ctx.GetRequiredItem<string>("partition");
 
                 // First, create an entity outside transaction
                 var entity = new TodoEntity
@@ -248,11 +232,7 @@ public sealed class TransactionBasicsSpec
                     retrieved.Should().BeNull();
                 }
 
-                return entity;
-            })
-            .Assert(static (ctx, input, output) =>
-            {
-                output.Should().NotBeNull();
+                entity.Should().NotBeNull();
             })
             .RunAsync();
     }
@@ -262,15 +242,8 @@ public sealed class TransactionBasicsSpec
     {
         await TestPipeline.For<TransactionBasicsSpec>(_output, nameof(Nested_transactions_throw_exception))
             .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.CreateAsync(ctx))
-            .Arrange(static ctx =>
+            .Assert(static async _ =>
             {
-                var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
-                return runtime;
-            })
-            .Act(static async (ctx, input) =>
-            {
-                var runtime = input;
-
                 InvalidOperationException? exception = null;
 
                 try
@@ -289,12 +262,10 @@ public sealed class TransactionBasicsSpec
                     exception = ex;
                 }
 
-                return exception;
-            })
-            .Assert(static (ctx, input, output) =>
-            {
-                output.Should().NotBeNull("nested transactions should throw InvalidOperationException");
-                output!.Message.Should().Contain("nested", "error message should mention nested transactions");
+                exception.Should().NotBeNull("nested transactions should throw InvalidOperationException");
+                exception!.Message.Should().Contain("nested", "error message should mention nested transactions");
+
+                await Task.CompletedTask;
             })
             .RunAsync();
     }
@@ -304,12 +275,7 @@ public sealed class TransactionBasicsSpec
     {
         await TestPipeline.For<TransactionBasicsSpec>(_output, nameof(Transaction_context_is_accessible))
             .Using<DataCoreRuntimeFixture>("runtime", static (ctx) => DataCoreRuntimeFixture.CreateAsync(ctx))
-            .Arrange(static ctx =>
-            {
-                var runtime = ctx.GetRequiredItem<DataCoreRuntimeFixture>("runtime");
-                return runtime;
-            })
-            .Act(static async (ctx, input) =>
+            .Assert(static async _ =>
             {
                 // Outside transaction
                 EntityContext.InTransaction.Should().BeFalse();
@@ -330,12 +296,8 @@ public sealed class TransactionBasicsSpec
                 // After transaction
                 EntityContext.InTransaction.Should().BeFalse();
 
-                return new { inTransactionFlag, transactionName };
-            })
-            .Assert(static (ctx, input, output) =>
-            {
-                output.inTransactionFlag.Should().BeTrue("should be in transaction inside using block");
-                output.transactionName.Should().Be("context-test");
+                inTransactionFlag.Should().BeTrue("should be in transaction inside using block");
+                transactionName.Should().Be("context-test");
             })
             .RunAsync();
     }
