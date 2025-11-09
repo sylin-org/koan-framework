@@ -8,17 +8,6 @@ using FluentAssertions;
 namespace Koan.Tests.Data.Core.Specs.Transactions;
 
 /// <summary>
-/// Test entity for transaction tests.
-/// </summary>
-internal sealed class TodoEntity : Entity<TodoEntity, string>
-{
-    [Identifier]
-    public override string Id { get; set; } = default!;
-    public string Title { get; set; } = string.Empty;
-    public string? Description { get; set; }
-}
-
-/// <summary>
 /// Transaction error handling and edge case tests.
 /// Tests exception handling, partial failures, and edge cases.
 /// </summary>
