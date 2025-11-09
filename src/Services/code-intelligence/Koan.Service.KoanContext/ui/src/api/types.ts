@@ -143,10 +143,40 @@ export interface SearchRequest {
 }
 
 export interface SearchResult {
-  chunks: Chunk[];
-  totalTokens: number;
+  projects: Array<{
+    id: string;
+    name: string;
+  }>;
+  chunks: Array<Chunk & { projectId?: string }>;  // projectId present in multi-project searches
+  metadata?: {
+    tokensRequested?: number;
+    tokensReturned?: number;
+    totalTokens?: number;
+    projectCount?: number;
+    page?: number;
+    model?: string;
+    vectorProvider?: string;
+    timestamp?: string;
+    duration?: string;
+  };
+  sources?: {
+    totalFiles: number;
+    files: Array<{
+      projectId?: string;
+      projectName?: string;
+      filePath: string;
+      title: string;
+      commitSha: string;
+    }>;
+  };
+  insights?: {
+    topics: Record<string, number>;
+    completenessLevel: string;
+    missingTopics: string[];
+  };
+  warnings?: string[] | null;
+  errors?: string[] | null;
   continuationToken?: string | null;
-  insights?: string | null;
   reasoning?: string | null;
 }
 

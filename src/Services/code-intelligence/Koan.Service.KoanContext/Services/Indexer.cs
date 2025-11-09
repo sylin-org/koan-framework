@@ -250,28 +250,26 @@ public class Indexer
                 job.AddWarning("No files to process - project is up to date");
             }
 
-            // Set partition context for this project
-            // Parse projectId as GUID and format without hyphens
-            var partitionId = $"proj-{Guid.Parse(projectId):N}";
-            using (EntityContext.Partition(partitionId))
+            // Set partition context for this project (adapters handle formatting)
+            using (EntityContext.Partition(projectId))
             {
                 // Validate partition context
                 var currentPartition = EntityContext.Current?.Partition;
-                if (currentPartition != partitionId)
+                if (currentPartition != projectId)
                 {
                     throw new InvalidOperationException(
-                        $"Partition context mismatch: expected '{partitionId}', got '{currentPartition ?? "(null)"}'");
+                        $"Partition context mismatch: expected '{projectId}', got '{currentPartition ?? "(null)"}'");
                 }
 
-                _logger.LogDebug("Partition context set to {PartitionId}", partitionId);
+                _logger.LogDebug("Partition context set to project {ProjectId}", projectId);
 
                 // 4.5. Bulk delete ALL existing chunks for this partition (clean slate for reindex)
-                _logger.LogInformation("Clearing all existing chunks for partition {PartitionId}", partitionId);
+                _logger.LogInformation("Clearing all existing chunks for project {ProjectId}", projectId);
 
                 // Clear vectors from vector store first
-                _logger.LogInformation("Flushing vector store for partition {PartitionId}", partitionId);
+                _logger.LogInformation("Flushing vector store for project {ProjectId}", projectId);
                 await Vector<Chunk>.Flush(effectiveCt);
-                _logger.LogInformation("Vector store flushed for partition {PartitionId}", partitionId);
+                _logger.LogInformation("Vector store flushed for project {ProjectId}", projectId);
 
                 // Then clear relational chunks from SQLite
                 var allChunks = await Chunk.Query(c => true, effectiveCt);
@@ -281,7 +279,7 @@ public class Indexer
                     await chunk.Delete(effectiveCt);
                     totalDeleted++;
                 }
-                _logger.LogInformation("Deleted {Count} existing chunks from partition {PartitionId}", totalDeleted, partitionId);
+                _logger.LogInformation("Deleted {Count} existing chunks from project {ProjectId}", totalDeleted, projectId);
                 job.LogOperation($"Cleared {totalDeleted} existing chunks from index");
 
                 // 5. Process files that need indexing (new + changed)
@@ -312,17 +310,17 @@ public class Indexer
                             job.ChunksCreated = chunksCreated;
                             job.VectorsSaved = vectorsSaved;
 
-                            // Update project's live stats (still inside partition context)
+                            // Update project's live stats
                             var (currentCount, currentBytes) = await GetActualChunkStatsAsync(effectiveCt);
 
                             project.DocumentCount = currentCount;
                             project.IndexedBytes = currentBytes;
                             project.Status = IndexingStatus.Indexing;
-                            await project.Save(effectiveCt);
 
-                            // Exit partition context temporarily to update job in root table
+                            // Exit partition context temporarily to update project and job in root table
                             using (EntityContext.Partition(null))
                             {
+                                await project.Save(effectiveCt);
                                 await job.Save(effectiveCt);
                             }
                         }
@@ -336,7 +334,32 @@ public class Indexer
 
                         // No per-file deletion needed - we bulk deleted all chunks at the start
 
-                        // Extract content
+                        // 1. Create/update IndexedFile FIRST (within partition context)
+                        var fileInfo = new FileInfo(file.AbsolutePath);
+                        var fileHash = await ComputeFileHashAsync(file.AbsolutePath, effectiveCt);
+
+                        var indexedFileResults = await IndexedFile.Query(
+                            f => f.RelativePath == file.RelativePath,
+                            effectiveCt);
+                        var indexedFile = indexedFileResults.FirstOrDefault();
+
+                        if (indexedFile == null)
+                        {
+                            indexedFile = IndexedFile.Create(
+                                file.RelativePath,
+                                fileHash,
+                                fileInfo.Length);
+                        }
+                        else
+                        {
+                            indexedFile.UpdateAfterIndexing(fileHash, fileInfo.Length);
+                        }
+
+                        await indexedFile.Save(effectiveCt);
+
+                        // Now we have indexedFile.Id to link chunks
+
+                        // 2. Extract content
                         var extracted = await _extraction.ExtractAsync(file.AbsolutePath, effectiveCt);
 
                         var fileChunks = 0;
@@ -353,8 +376,9 @@ public class Indexer
                             // Generate embedding
                             var embedding = await _embedding.EmbedAsync(chunk.Text, effectiveCt);
 
-                            // Create Chunk entity (within partition context)
+                            // Create Chunk entity (within partition context, linked to IndexedFile)
                             var docChunk = Chunk.Create(
+                                indexedFileId: indexedFile.Id,
                                 filePath: chunk.FilePath,
                                 searchText: chunk.Text,
                                 tokenCount: chunk.TokenCount,
@@ -372,10 +396,10 @@ public class Indexer
                             await docChunk.Save(effectiveCt);
 
                             _logger.LogTrace(
-                                "Saved chunk {ChunkId} for file {FilePath} (partition: {PartitionId})",
+                                "Saved chunk {ChunkId} for file {FilePath} (project: {ProjectId})",
                                 docChunk.Id,
                                 docChunk.FilePath,
-                                partitionId);
+                                projectId);
 
                             // Add to vector batch
                             batch.Add((
@@ -402,37 +426,11 @@ public class Indexer
                             if (batch.Count >= BatchSize)
                             {
                                 effectiveCt.ThrowIfCancellationRequested();
-                                await SaveVectorBatchAsync(job.Id, batch, partitionId, effectiveCt);
+                                await SaveVectorBatchAsync(job.Id, batch, projectId, effectiveCt);
                                 vectorsSaved += batch.Count;
                                 batch.Clear();
                             }
                         }
-
-                        // Update IndexedFile manifest
-                        var fileInfo = new FileInfo(file.AbsolutePath);
-                        var fileHash = await ComputeFileHashAsync(file.AbsolutePath, effectiveCt);
-
-                        var indexedFileResults = await IndexedFile.Query(
-                            f => f.ProjectId == projectId && f.RelativePath == file.RelativePath,
-                            effectiveCt);
-                        var indexedFile = indexedFileResults.FirstOrDefault();
-
-                        if (indexedFile == null)
-                        {
-                            indexedFile = IndexedFile.Create(
-                                projectId,
-                                file.RelativePath,
-                                fileHash,
-                                fileInfo.Length);
-                        }
-                        else
-                        {
-                            indexedFile.UpdateAfterIndexing(
-                                fileHash,
-                                fileInfo.Length);
-                        }
-
-                        await indexedFile.Save(effectiveCt);
 
                         filesProcessed++;
                         job.ProcessedFiles = filesProcessed;
@@ -465,7 +463,7 @@ public class Indexer
                 // Save remaining vectors
                 if (batch.Count > 0)
                 {
-                    await SaveVectorBatchAsync(job.Id, batch, partitionId, effectiveCt);
+                    await SaveVectorBatchAsync(job.Id, batch, projectId, effectiveCt);
                     vectorsSaved += batch.Count;
                     job.VectorsSaved = vectorsSaved;
                     job.LogOperation($"Completed indexing: {filesProcessed} files processed, {chunksCreated} chunks created");
@@ -476,9 +474,9 @@ public class Indexer
                 {
                     try
                     {
-                        // Remove from manifest
+                        // Remove from manifest (within partition context - IndexedFile is partitioned)
                         var indexedFileResults = await IndexedFile.Query(
-                            f => f.ProjectId == projectId && f.RelativePath == deletedPath,
+                            f => f.RelativePath == deletedPath,
                             effectiveCt);
                         var indexedFile = indexedFileResults.FirstOrDefault();
 
@@ -489,7 +487,7 @@ public class Indexer
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogWarning(ex, "Failed to delete chunks for {Path}", deletedPath);
+                        _logger.LogWarning(ex, "Failed to delete IndexedFile for {Path}", deletedPath);
                         job.AddWarning($"Failed to clean up deleted file: {deletedPath}");
                     }
                 }
@@ -679,7 +677,7 @@ public class Indexer
     private async Task SaveVectorBatchAsync(
         string jobId,
         List<(string Id, float[] Embedding, object? Metadata)> batch,
-        string partitionId,
+        string projectId,
         CancellationToken cancellationToken)
     {
         // Exit partition context to save SyncOperation records in root table (outbox pattern)
@@ -688,15 +686,15 @@ public class Indexer
             // Create SyncOperation records for outbox pattern
             foreach (var (id, embedding, metadata) in batch)
             {
-                var operation = SyncOperation.Create(jobId, id, partitionId, embedding, metadata);
+                var operation = SyncOperation.Create(jobId, id, projectId, embedding, metadata);
                 await operation.Save(cancellationToken);
             }
 
             _logger.LogDebug(
-                "Created {Count} vector operations for outbox processing (job: {JobId}, partition: {PartitionId})",
+                "Created {Count} vector operations for outbox processing (job: {JobId}, project: {ProjectId})",
                 batch.Count,
                 jobId,
-                partitionId);
+                projectId);
         }
     }
 
@@ -721,14 +719,15 @@ public class Indexer
 
         _logger.LogInformation("Planning differential scan for project {ProjectId}", projectId);
 
-        // 1. Load existing manifest
-        var existingFiles = await IndexedFile.Query(
-            f => f.ProjectId == projectId,
-            cancellationToken);
-
-        var manifest = existingFiles.ToDictionary(
-            f => f.RelativePath,
-            StringComparer.OrdinalIgnoreCase);
+        // 1. Load existing manifest (within partition context - IndexedFile is partitioned)
+        Dictionary<string, IndexedFile> manifest;
+        using (EntityContext.Partition(projectId))
+        {
+            var existingFiles = await IndexedFile.All(cancellationToken);
+            manifest = existingFiles.ToDictionary(
+                f => f.RelativePath,
+                StringComparer.OrdinalIgnoreCase);
+        }
 
         _logger.LogDebug("Loaded manifest with {Count} files", manifest.Count);
 

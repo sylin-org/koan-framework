@@ -180,7 +180,10 @@ export default function SearchPage() {
             return {
               ...data,
               chunks: [...prev.chunks, ...data.chunks],
-              totalTokens: prev.totalTokens + data.totalTokens,
+              metadata: {
+                ...data.metadata,
+                totalTokens: (prev.metadata?.totalTokens ?? 0) + (data.metadata?.totalTokens ?? 0),
+              },
               insights: prev.insights, // Keep original insights
               reasoning: prev.reasoning, // Keep original reasoning
             };
@@ -531,7 +534,7 @@ export default function SearchPage() {
                   </p>
                   {results && results.insights && (
                     <p className="text-xs text-primary-600 mt-1">
-                      💡 {results.insights}
+                      💡 Completeness: {results.insights.completenessLevel} • Topics: {Object.keys(results.insights.topics).length}
                     </p>
                   )}
                 </div>
@@ -669,7 +672,7 @@ export default function SearchPage() {
                         )}
                       </button>
                       <p className="text-xs text-muted-foreground mt-2">
-                        Showing {results.chunks.length} results · {results.totalTokens.toLocaleString()} tokens
+                        Showing {results.chunks.length} results · {(results.metadata?.totalTokens ?? 0).toLocaleString()} tokens
                       </p>
                     </div>
                   )}
@@ -678,7 +681,7 @@ export default function SearchPage() {
                   {!continuationToken && results.chunks.length > 0 && (
                     <div className="mt-6 text-center">
                       <p className="text-sm text-muted-foreground">
-                        End of results · {results.chunks.length} total · {results.totalTokens.toLocaleString()} tokens
+                        End of results · {results.chunks.length} total · {(results.metadata?.totalTokens ?? 0).toLocaleString()} tokens
                       </p>
                     </div>
                   )}

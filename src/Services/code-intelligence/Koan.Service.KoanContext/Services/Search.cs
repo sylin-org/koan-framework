@@ -63,10 +63,9 @@ public class Search
 
         try
         {
-            var partitionId = $"proj-{Guid.Parse(projectId):N}";
-            _logger.LogInformation("Setting partition context: {PartitionId}", partitionId);
+            _logger.LogInformation("Setting partition context for project: {ProjectId}", projectId);
 
-            using (EntityContext.Partition(partitionId))
+            using (EntityContext.Partition(projectId))
             {
                 _logger.LogInformation("Generating embedding for query: {Query}", query);
                 var queryEmbedding = await _embedding.EmbedAsync(query, cancellationToken);
@@ -102,7 +101,7 @@ public class Search
                     var documentChunk = await Chunk.Get(match.Id, cancellationToken);
                     if (documentChunk is null)
                     {
-                        _logger.LogWarning("Chunk.Get returned null for ID={MatchId} (partition={PartitionId})", match.Id, partitionId);
+                        _logger.LogWarning("Chunk.Get returned null for ID={MatchId} (project={ProjectId})", match.Id, projectId);
                         continue;
                     }
                     _logger.LogInformation("Found chunk: ID={ChunkId}, FilePath={FilePath}", documentChunk.Id, documentChunk.FilePath);

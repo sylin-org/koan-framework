@@ -44,13 +44,16 @@ public class SyncOperation : Entity<SyncOperation>
     public string JobId { get; set; } = string.Empty;
 
     /// <summary>
-    /// Partition ID for this chunk (e.g., "proj-{guid:N}")
+    /// Project ID for this chunk (domain GUID, not formatted partition ID)
     /// </summary>
     /// <remarks>
-    /// Required for VectorSyncWorker to set partition context when saving to vector store.
-    /// Chunks are partitioned by project, so vectors must be saved within the correct partition.
+    /// Stores the raw Project.Id GUID (e.g., "019a6584-3075-7076-ae69-4ced4e2799f5").
+    /// VectorSyncWorker formats this as partition ID (proj-{guid:N}) when saving to vector store.
+    ///
+    /// Architectural principle: Domain entities store domain identifiers (ProjectId),
+    /// infrastructure code handles formatting (partition IDs are implementation details).
     /// </remarks>
-    public string PartitionId { get; set; } = string.Empty;
+    public string ProjectId { get; set; } = string.Empty;
 
     /// <summary>
     /// Serialized embedding vector (JSON array of floats)
@@ -103,7 +106,7 @@ public class SyncOperation : Entity<SyncOperation>
     /// <summary>
     /// Creates a new pending sync operation
     /// </summary>
-    public static SyncOperation Create(string jobId, string chunkId, string partitionId, float[] embedding, object? metadata = null)
+    public static SyncOperation Create(string jobId, string chunkId, string projectId, float[] embedding, object? metadata = null)
     {
         if (string.IsNullOrWhiteSpace(jobId))
             throw new ArgumentException("JobId cannot be empty", nameof(jobId));
@@ -111,8 +114,8 @@ public class SyncOperation : Entity<SyncOperation>
         if (string.IsNullOrWhiteSpace(chunkId))
             throw new ArgumentException("ChunkId cannot be empty", nameof(chunkId));
 
-        if (string.IsNullOrWhiteSpace(partitionId))
-            throw new ArgumentException("PartitionId cannot be empty", nameof(partitionId));
+        if (string.IsNullOrWhiteSpace(projectId))
+            throw new ArgumentException("ProjectId cannot be empty", nameof(projectId));
 
         if (embedding == null || embedding.Length == 0)
             throw new ArgumentException("Embedding cannot be null or empty", nameof(embedding));
@@ -121,7 +124,7 @@ public class SyncOperation : Entity<SyncOperation>
         {
             JobId = jobId,
             ChunkId = chunkId,
-            PartitionId = partitionId,
+            ProjectId = projectId,
             EmbeddingJson = System.Text.Json.JsonSerializer.Serialize(embedding),
             MetadataJson = metadata != null
                 ? System.Text.Json.JsonSerializer.Serialize(metadata)

@@ -20,8 +20,22 @@ namespace Koan.Context.Models;
 public class Chunk : Entity<Chunk>
 {
     /// <summary>
-    /// Relative file path within the project
+    /// Foreign key to IndexedFile (proper relational integrity)
     /// </summary>
+    /// <remarks>
+    /// Links this chunk to its source file in the IndexedFile manifest.
+    /// Provides GUID-based relationship instead of error-prone string matching.
+    /// IndexedFile lives in root table, Chunk lives in partition table - cross-boundary FK is valid.
+    /// </remarks>
+    public string IndexedFileId { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Relative file path within the project (denormalized for performance)
+    /// </summary>
+    /// <remarks>
+    /// Denormalized from IndexedFile.RelativePath for fast search result display.
+    /// Single source of truth is IndexedFile.RelativePath (via IndexedFileId FK).
+    /// </remarks>
     public string FilePath { get; set; } = string.Empty;
 
     /// <summary>
@@ -106,6 +120,7 @@ public class Chunk : Entity<Chunk>
     /// Must be called within EntityContext.Partition() to ensure proper project isolation
     /// </remarks>
     public static Chunk Create(
+        string indexedFileId,
         string filePath,
         string searchText,
         int tokenCount,
@@ -113,6 +128,9 @@ public class Chunk : Entity<Chunk>
         string? title = null,
         string? language = null)
     {
+        if (string.IsNullOrWhiteSpace(indexedFileId))
+            throw new ArgumentException("IndexedFileId cannot be empty", nameof(indexedFileId));
+
         if (string.IsNullOrWhiteSpace(filePath))
             throw new ArgumentException("FilePath cannot be empty", nameof(filePath));
 
@@ -121,6 +139,7 @@ public class Chunk : Entity<Chunk>
 
         return new Chunk
         {
+            IndexedFileId = indexedFileId,
             FilePath = filePath,
             SearchText = searchText,
             TokenCount = tokenCount,

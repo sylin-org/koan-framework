@@ -60,58 +60,71 @@ public class SearchController : ControllerBase
             }
             else if (!string.IsNullOrWhiteSpace(request.PathContext))
             {
-                var project = await _projectResolver.ResolveProjectByPathAsync(
+                var resolvedProject = await _projectResolver.ResolveProjectByPathAsync(
                     request.PathContext,
                     cancellationToken: cancellationToken);
 
-                if (project == null)
+                if (resolvedProject == null)
                 {
                     return NotFound(new { error = $"Could not resolve project from pathContext: {request.PathContext}" });
                 }
 
-                projectId = project.Id;
+                projectId = resolvedProject.Id;
 
                 _logger.LogInformation(
                     "Resolved pathContext {Path} to project {ProjectId} ({Name})",
                     request.PathContext,
-                    project.Id,
-                    project.Name);
+                    resolvedProject.Id,
+                    resolvedProject.Name);
             }
             else if (!string.IsNullOrWhiteSpace(request.LibraryId))
             {
-                var project = await _projectResolver.ResolveProjectAsync(
+                var resolvedProject = await _projectResolver.ResolveProjectAsync(
                     libraryId: request.LibraryId,
                     workingDirectory: null,
                     httpContext: HttpContext,
                     autoCreate: false,
                     cancellationToken: cancellationToken);
 
-                if (project == null)
+                if (resolvedProject == null)
                 {
                     return NotFound(new { error = $"Project {request.LibraryId} was not found" });
                 }
 
-                projectId = project.Id;
+                projectId = resolvedProject.Id;
             }
             else if (!string.IsNullOrWhiteSpace(request.WorkingDirectory))
             {
-                var project = await _projectResolver.ResolveProjectAsync(
+                var resolvedProject = await _projectResolver.ResolveProjectAsync(
                     libraryId: null,
                     workingDirectory: request.WorkingDirectory,
                     httpContext: HttpContext,
                     autoCreate: false,
                     cancellationToken: cancellationToken);
 
-                if (project == null)
+                if (resolvedProject == null)
                 {
                     return NotFound(new { error = $"Could not resolve project from workingDirectory: {request.WorkingDirectory}" });
                 }
 
-                projectId = project.Id;
+                projectId = resolvedProject.Id;
             }
             else
             {
-                return BadRequest(new { error = "Must provide projectId, projectIds, pathContext, libraryId, or workingDirectory" });
+                // No project specified - search all projects
+                _logger.LogInformation("No project context provided - searching all projects");
+
+                var allProjects = await Project.All(cancellationToken);
+                var allProjectIds = allProjects.Select(p => p.Id).ToList();
+
+                if (!allProjectIds.Any())
+                {
+                    return NotFound(new { error = "No projects found in the system" });
+                }
+
+                // Use the multi-project search flow
+                var requestWithAllProjects = request with { ProjectIds = allProjectIds };
+                return await SearchMultipleProjects(requestWithAllProjects, cancellationToken);
             }
 
             var options = new SearchOptions(
@@ -128,7 +141,19 @@ public class SearchController : ControllerBase
                 options,
                 cancellationToken);
 
-            return Ok(result);
+            // Get project info for consistent response structure
+            var project = await Project.Get(projectId, cancellationToken);
+
+            // Return consistent structure matching multi-project format
+            return Ok(new
+            {
+                projects = new[] { new { id = projectId, name = project?.Name ?? "Unknown" } },
+                chunks = result.Chunks,
+                metadata = result.Metadata,
+                sources = result.Sources,
+                insights = result.Insights,
+                warnings = result.Warnings
+            });
         }
         catch (Exception ex)
         {
@@ -152,44 +177,88 @@ public class SearchController : ControllerBase
             IncludeReasoning: request.IncludeReasoning ?? true,
             Languages: request.Languages);
 
-        var projectResults = new List<object>();
-        var errors = new List<object>();
+        var allChunks = new List<object>();
+        var allSources = new List<object>();
+        var projects = new List<object>();
+        var errors = new List<string>();
+        var totalTokens = 0;
 
         foreach (var projectId in request.ProjectIds!)
         {
             try
             {
+                // Get project info
+                var project = await Project.Get(projectId, cancellationToken);
+                if (project == null)
+                {
+                    errors.Add($"Project {projectId} not found");
+                    continue;
+                }
+
+                projects.Add(new { id = project.Id, name = project.Name });
+
+                // Search this project
                 var result = await _retrieval.SearchAsync(
                     projectId,
                     request.Query,
                     options,
                     cancellationToken);
 
-                projectResults.Add(new
+                // Add chunks with projectId tagged
+                foreach (var chunk in result.Chunks)
                 {
-                    projectId,
-                    results = result
-                });
+                    allChunks.Add(new
+                    {
+                        id = chunk.Id,
+                        text = chunk.Text,
+                        score = chunk.Score,
+                        provenance = chunk.Provenance,
+                        reasoning = chunk.Reasoning,
+                        projectId = projectId  // Tag each chunk with its project
+                    });
+                }
+
+                // Aggregate sources
+                if (result.Sources?.Files != null)
+                {
+                    foreach (var file in result.Sources.Files)
+                    {
+                        allSources.Add(new
+                        {
+                            projectId,
+                            projectName = project.Name,
+                            filePath = file.FilePath,
+                            title = file.Title,
+                            commitSha = file.CommitSha
+                        });
+                    }
+                }
+
+                totalTokens += result.Metadata?.TokensReturned ?? 0;
             }
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, "Search failed for project {ProjectId}", projectId);
-                errors.Add(new
-                {
-                    projectId,
-                    error = ex.Message
-                });
+                errors.Add($"Project {projectId}: {ex.Message}");
             }
         }
 
         return Ok(new
         {
-            query = request.Query,
-            totalProjects = request.ProjectIds.Count,
-            successfulProjects = projectResults.Count,
-            failedProjects = errors.Count,
-            results = projectResults,
-            errors
+            projects,
+            chunks = allChunks,
+            metadata = new
+            {
+                totalTokens,
+                projectCount = projects.Count,
+                timestamp = DateTime.UtcNow
+            },
+            sources = new
+            {
+                totalFiles = allSources.Count,
+                files = allSources
+            },
+            errors = errors.Count > 0 ? errors : null
         });
     }
 
@@ -230,9 +299,7 @@ public class SearchController : ControllerBase
 
             foreach (var pid in projectIdList)
             {
-                var partitionId = $"proj-{Guid.Parse(pid):N}";
-
-                using (EntityContext.Partition(partitionId))
+                using (EntityContext.Partition(pid))
                 {
                     var chunks = await Chunk.All(cancellationToken);
 

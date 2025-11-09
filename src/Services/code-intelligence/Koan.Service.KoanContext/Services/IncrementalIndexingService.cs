@@ -55,8 +55,7 @@ public class IncrementalIndexer
             project.Status = IndexingStatus.Indexing;
             await project.Save(cancellationToken);
 
-            var partitionId = $"proj-{Guid.Parse(projectId):N}";
-            using (EntityContext.Partition(partitionId))
+            using (EntityContext.Partition(projectId))
             {
                 foreach (var change in changes)
                 {
@@ -127,10 +126,11 @@ public class IncrementalIndexer
 
     private async Task DeleteChunksForFileAsync(string relativePath, CancellationToken cancellationToken)
     {
-        // Query all chunks for this file
+        // Query all chunks for this file (within partition context)
         var chunks = await Chunk.Query(
             c => c.FilePath == relativePath,
             cancellationToken);
+
         // Delete from both relational and vector stores
         foreach (var chunk in chunks)
         {
@@ -147,7 +147,18 @@ public class IncrementalIndexer
             }
         }
 
-        _logger.LogDebug("Deleted {Count} chunks for file {Path}", chunks.Count, relativePath);
+        // Delete IndexedFile entry (within partition context)
+        var indexedFileResults = await IndexedFile.Query(
+            f => f.RelativePath == relativePath,
+            cancellationToken);
+        var indexedFile = indexedFileResults.FirstOrDefault();
+
+        if (indexedFile != null)
+        {
+            await indexedFile.Delete(cancellationToken);
+        }
+
+        _logger.LogDebug("Deleted {Count} chunks and IndexedFile for {Path}", chunks.Count, relativePath);
     }
 
     private async Task IndexSingleFileAsync(
@@ -162,12 +173,31 @@ public class IncrementalIndexer
         var category = PathCategorizer.DeriveCategory(relativePath);
         var pathSegments = PathCategorizer.GetPathSegments(relativePath);
 
-        // Extract content
-        var extracted = await extraction.ExtractAsync(filePath, cancellationToken);
-
-        // Get file metadata
+        // 1. Create/update IndexedFile FIRST (within partition context)
         var fileInfo = new FileInfo(filePath);
         var fileHash = await ComputeFileHashAsync(filePath);
+
+        var indexedFileResults = await IndexedFile.Query(
+            f => f.RelativePath == relativePath,
+            cancellationToken);
+        var indexedFile = indexedFileResults.FirstOrDefault();
+
+        if (indexedFile == null)
+        {
+            indexedFile = IndexedFile.Create(
+                relativePath,
+                fileHash,
+                fileInfo.Length);
+        }
+        else
+        {
+            indexedFile.UpdateAfterIndexing(fileHash, fileInfo.Length);
+        }
+
+        await indexedFile.Save(cancellationToken);
+
+        // 2. Extract content
+        var extracted = await extraction.ExtractAsync(filePath, cancellationToken);
 
         // Chunk content
         await foreach (var chunk in chunking.ChunkAsync(
@@ -181,8 +211,9 @@ public class IncrementalIndexer
             // Generate embedding
             var embeddingVector = await embedding.EmbedAsync(chunk.Text, cancellationToken);
 
-            // Create Chunk entity (within partition context)
+            // Create Chunk entity (within partition context, linked to IndexedFile)
             var docChunk = Chunk.Create(
+                indexedFileId: indexedFile.Id,
                 filePath: relativePath,
                 searchText: chunk.Text,
                 tokenCount: chunk.TokenCount,

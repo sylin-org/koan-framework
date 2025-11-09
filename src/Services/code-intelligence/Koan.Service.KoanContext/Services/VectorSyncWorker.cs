@@ -23,6 +23,7 @@ namespace Koan.Context.Services;
 public class VectorSyncWorker : BackgroundService
 {
     private readonly ILogger<VectorSyncWorker> _logger;
+    private readonly HashSet<string> _deletedJobIds = new();
     private const int MaxRetries = 5;
     private const int PollIntervalMs = 5000; // 5 seconds
 
@@ -54,6 +55,13 @@ public class VectorSyncWorker : BackgroundService
 
     private async Task ProcessPendingOperationsAsync(CancellationToken cancellationToken)
     {
+        // Clear the deleted jobs cache if it gets too large (prevent unbounded growth)
+        if (_deletedJobIds.Count > 1000)
+        {
+            _logger.LogInformation("Clearing deleted jobs cache ({Count} entries)", _deletedJobIds.Count);
+            _deletedJobIds.Clear();
+        }
+
         // Query pending operations (not using partition context - outbox table is global)
         var pendingOps = await SyncOperation.Query(
             op => op.Status == OperationStatus.Pending && op.RetryCount < MaxRetries,
@@ -97,6 +105,19 @@ public class VectorSyncWorker : BackgroundService
                 return;
             }
 
+            // Fast-fail if job is known to be deleted - don't waste resources processing
+            if (_deletedJobIds.Contains(operation.JobId))
+            {
+                _logger.LogDebug(
+                    "Skipping vector sync for operation {OpId} - job {JobId} is cached as deleted, deleting operation",
+                    operation.Id,
+                    operation.JobId);
+
+                // Delete the operation since the parent job no longer exists
+                await operation.Delete(cancellationToken);
+                return;
+            }
+
             _logger.LogDebug(
                 "Processing vector operation {OpId} for chunk {ChunkId} (attempt {Attempt}/{Max})",
                 operation.Id,
@@ -108,8 +129,8 @@ public class VectorSyncWorker : BackgroundService
             var embedding = operation.GetEmbedding();
             var metadata = operation.GetMetadata<object>();
 
-            // Set partition context for this chunk's project
-            using (EntityContext.Partition(operation.PartitionId))
+            // Set partition context for this chunk's project (adapters handle formatting)
+            using (EntityContext.Partition(operation.ProjectId))
             {
                 // Save to vector store within partition context
                 var batch = new List<(string Id, float[] Embedding, object? Metadata)>
@@ -125,40 +146,54 @@ public class VectorSyncWorker : BackgroundService
             await operation.Save(cancellationToken);
 
             // Increment job's VectorsSynced counter (in root context)
-            var job = await Job.Get(operation.JobId, cancellationToken);
-            if (job != null)
+            // Fast-fail if we know the job has been deleted
+            if (_deletedJobIds.Contains(operation.JobId))
             {
-                job.VectorsSynced++;
-
-                // Update ETA based on composite progress (chunking + vector syncing)
-                job.UpdateVectorSyncProgress();
-
+                // Job is in the deleted cache - skip lookup
                 _logger.LogDebug(
-                    "Job {JobId} progress: {VectorsSynced}/{ChunksCreated} vectors synced",
-                    job.Id,
-                    job.VectorsSynced,
-                    job.ChunksCreated);
-
-                // Check if all vectors have been synced to Weaviate
-                if (job.VectorsSynced >= job.ChunksCreated && job.ChunksCreated > 0)
-                {
-                    // Job is complete - all chunks created and all vectors synced
-                    job.Complete();
-                    _logger.LogInformation(
-                        "Job {JobId} completed: {ChunksCreated} chunks created, {VectorsSynced} vectors synced to Weaviate",
-                        job.Id,
-                        job.ChunksCreated,
-                        job.VectorsSynced);
-                }
-
-                await job.Save(cancellationToken);
+                    "Skipping job update for operation {OpId} - job {JobId} is known to be deleted (cached)",
+                    operation.Id,
+                    operation.JobId);
             }
             else
             {
-                _logger.LogWarning(
-                    "Job {JobId} not found for operation {OpId} - operation completed but job may have been deleted",
-                    operation.JobId,
-                    operation.Id);
+                var job = await Job.Get(operation.JobId, cancellationToken);
+                if (job != null)
+                {
+                    job.VectorsSynced++;
+
+                    // Update ETA based on composite progress (chunking + vector syncing)
+                    job.UpdateVectorSyncProgress();
+
+                    _logger.LogDebug(
+                        "Job {JobId} progress: {VectorsSynced}/{ChunksCreated} vectors synced",
+                        job.Id,
+                        job.VectorsSynced,
+                        job.ChunksCreated);
+
+                    // Check if all vectors have been synced to Weaviate
+                    if (job.VectorsSynced >= job.ChunksCreated && job.ChunksCreated > 0)
+                    {
+                        // Job is complete - all chunks created and all vectors synced
+                        job.Complete();
+                        _logger.LogInformation(
+                            "Job {JobId} completed: {ChunksCreated} chunks created, {VectorsSynced} vectors synced to Weaviate",
+                            job.Id,
+                            job.ChunksCreated,
+                            job.VectorsSynced);
+                    }
+
+                    await job.Save(cancellationToken);
+                }
+                else
+                {
+                    // Job not found - add to cache to avoid future lookups
+                    _deletedJobIds.Add(operation.JobId);
+                    _logger.LogWarning(
+                        "Job {JobId} not found for operation {OpId} - operation completed but job may have been deleted (caching for fast-fail)",
+                        operation.JobId,
+                        operation.Id);
+                }
             }
 
             _logger.LogDebug(
