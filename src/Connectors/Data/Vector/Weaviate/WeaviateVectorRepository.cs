@@ -40,34 +40,9 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
     {
         get
         {
-            // Check for partition context (ARCH-0071, uses EntityContext from DATA-0077)
-            var partition = Koan.Data.Core.EntityContext.Current?.Partition;
-
-            if (!string.IsNullOrWhiteSpace(partition))
-            {
-                // Partition-aware: use IVectorPartitionMapper to generate partition-specific class name
-                var mapper = _sp.GetService<Koan.Data.Vector.Abstractions.Partition.IVectorPartitionMapper>();
-                if (mapper != null)
-                {
-                    return mapper.MapStorageName<TEntity>(partition);
-                }
-                // Fallback if mapper not registered (shouldn't happen in normal operation)
-                _logger?.LogWarning("Partition '{Partition}' set but IVectorPartitionMapper not found. Falling back to default class name.", partition);
-            }
-
-            // No partition: use standard naming resolution
-            // Vector repository must use "weaviate" provider naming, not the entity's default DATA provider
-            var providers = _sp.GetServices<Koan.Data.Abstractions.Naming.INamingDefaultsProvider>();
-            var weaviateProvider = providers.FirstOrDefault(p => string.Equals(p.Provider, "weaviate", StringComparison.OrdinalIgnoreCase));
-            if (weaviateProvider == null)
-            {
-                // Fallback to simple type name if no naming provider found
-                return typeof(TEntity).Name;
-            }
-            var diResolver = _sp.GetRequiredService<Koan.Data.Abstractions.Naming.IStorageNameResolver>();
-            var convention = weaviateProvider.GetConvention(_sp);
-            var overrideFn = weaviateProvider.GetAdapterOverride(_sp);
-            return Koan.Data.Abstractions.Naming.StorageNameSelector.ResolveName(null, diResolver, typeof(TEntity), convention, overrideFn);
+            // DATA-0086: Use unified naming provider system via StorageNameRegistry
+            // Automatically handles partitions via EntityContext and adapter factory's INamingProvider
+            return Koan.Data.Core.Configuration.StorageNameRegistry.GetOrCompute<TEntity, TKey>(_sp);
         }
     }
 

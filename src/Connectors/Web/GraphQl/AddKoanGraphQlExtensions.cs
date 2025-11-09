@@ -346,31 +346,51 @@ public static class AddKoanGraphQlExtensions
             }
         }
 
-        // 2) Resolve naming defaults provider for this adapter (or any), and the DI resolver
-        var providers = sp.GetServices<INamingDefaultsProvider>();
-        var defaultsProvider = providers.FirstOrDefault(p => string.Equals(p.Provider, provider, StringComparison.OrdinalIgnoreCase))
-            ?? providers.FirstOrDefault();
-        var diResolver = sp.GetService<IStorageNameResolver>() ?? new DefaultStorageNameResolver();
+        // 2) DATA-0086: Resolve naming provider for this adapter
+        // Factories are registered as IDataAdapterFactory/IVectorAdapterFactory, not INamingProvider
+        // Use reflection to avoid hard dependency on Koan.Data.Vector.Abstractions
+        var dataFactories = sp.GetServices<IDataAdapterFactory>().Cast<INamingProvider>();
+
+        IEnumerable<INamingProvider> vectorFactories = Enumerable.Empty<INamingProvider>();
+        try
+        {
+            var vectorAdapterFactoryType = Type.GetType("Koan.Data.Vector.Abstractions.IVectorAdapterFactory, Koan.Data.Vector.Abstractions");
+            if (vectorAdapterFactoryType != null)
+            {
+                var getServicesMethod = typeof(ServiceProviderServiceExtensions)
+                    .GetMethod(nameof(ServiceProviderServiceExtensions.GetServices))!
+                    .MakeGenericMethod(vectorAdapterFactoryType);
+                var services = (System.Collections.IEnumerable)getServicesMethod.Invoke(null, new object[] { sp })!;
+                vectorFactories = services.Cast<INamingProvider>();
+            }
+        }
+        catch
+        {
+            // Vector abstractions not available, continue with data factories only
+        }
+
+        var allFactories = dataFactories.Concat(vectorFactories);
+        var namingProvider = allFactories.FirstOrDefault(p => string.Equals(p.Provider, provider, StringComparison.OrdinalIgnoreCase));
 
         string baseName;
-        if (defaultsProvider is null)
+        if (namingProvider != null)
         {
-            // Fallback to global conventions if no provider registered
-            var fallback = sp.GetService<Microsoft.Extensions.Options.IOptions<Koan.Data.Core.Naming.NamingFallbackOptions>>()?.Value;
-            var convFallback = fallback is not null
-                ? new StorageNameResolver.Convention(fallback.Style, fallback.Separator, fallback.Casing)
-                : new StorageNameResolver.Convention(StorageNamingStyle.EntityType, ".", NameCasing.AsIs);
-            baseName = StorageNameSelector.ResolveName(repository: null, diResolver, entityType, convFallback, adapterOverride: null);
+            // Use adapter's naming provider
+            baseName = namingProvider.GetStorageName(entityType, sp);
         }
         else
         {
-            var conv = defaultsProvider.GetConvention(sp);
-            var overrideFn = defaultsProvider.GetAdapterOverride(sp);
-            baseName = StorageNameSelector.ResolveName(repository: null, diResolver, entityType, conv, overrideFn);
+            // Fallback to default naming conventions
+            var diResolver = sp.GetService<IStorageNameResolver>() ?? new DefaultStorageNameResolver();
+            var fallback = sp.GetService<Microsoft.Extensions.Options.IOptions<Koan.Data.Core.Naming.NamingFallbackOptions>>()?.Value;
+            var convention = fallback is not null
+                ? new StorageNameResolver.Convention(fallback.Style, fallback.Separator, fallback.Casing)
+                : new StorageNameResolver.Convention(StorageNamingStyle.EntityType, ".", NameCasing.AsIs);
+            baseName = StorageNameResolver.Resolve(entityType, convention);
         }
 
-        // Ignore set suffix for type/field names
-        return baseName.Split('#')[0];
+        // Ignore partition suffix for type/field names
+        return baseName.Split('#')[0].Split(namingProvider?.RepositorySeparator ?? "#")[0];
     }
 
     private static string ResolveStorageNameFactory(Type entityType)

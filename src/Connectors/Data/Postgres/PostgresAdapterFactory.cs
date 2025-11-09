@@ -23,6 +23,8 @@ namespace Koan.Data.Connector.Postgres;
     LocalScheme = "postgres", LocalHost = "localhost", LocalPort = 5432, LocalPattern = "postgres://{host}:{port}")]
 public sealed class PostgresAdapterFactory : IDataAdapterFactory
 {
+    public string Provider => "postgres";
+
     public bool CanHandle(string provider)
         => string.Equals(provider, "postgres", StringComparison.OrdinalIgnoreCase)
            || string.Equals(provider, "postgresql", StringComparison.OrdinalIgnoreCase)
@@ -72,6 +74,30 @@ public sealed class PostgresAdapterFactory : IDataAdapterFactory
         };
 
         return new PostgresRepository<TEntity, TKey>(sp, sourceOpts, resolver);
+    }
+
+    // INamingProvider implementation
+    public string RepositorySeparator => "#";
+
+    public string GetStorageName(Type entityType, IServiceProvider services)
+    {
+        var opts = services.GetRequiredService<IOptions<PostgresOptions>>().Value;
+        var convention = new StorageNameResolver.Convention(
+            opts.NamingStyle,
+            opts.Separator,
+            NameCasing.AsIs);
+
+        return StorageNameResolver.Resolve(entityType, convention);
+    }
+
+    public string GetConcretePartition(string partition)
+    {
+        // Postgres: Remove hyphens from GUIDs, lowercase
+        if (Guid.TryParse(partition, out var guid))
+            return guid.ToString("N");  // N format = no hyphens, lowercase
+
+        // Named partitions: lowercase for Postgres convention
+        return partition.ToLowerInvariant();
     }
 }
 

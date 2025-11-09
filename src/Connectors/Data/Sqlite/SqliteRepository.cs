@@ -885,38 +885,28 @@ internal sealed class SqliteRepository<TEntity, TKey> :
             }
             var upserts = _adds.Concat(_updates);
             var added = _adds.Count; var updated = _updates.Count;
+            var deleted = 0;
             var requireAtomic = options?.RequireAtomic == true;
             if (!requireAtomic)
             {
                 if (upserts.Any()) await repo.UpsertManyAsync(upserts, ct);
-                var deleted = 0; if (_deletes.Any()) deleted = await repo.DeleteManyAsync(_deletes, ct);
+                if (_deletes.Any()) deleted = await repo.DeleteManyAsync(_deletes, ct);
                 return new BatchResult(added, updated, deleted);
             }
 
-            // Atomic path: single transaction
+            // Atomic path: use autocommit (no explicit transaction)
             using var conn = repo.Open();
-            using var tx = conn.BeginTransaction();
-            try
+            foreach (var e in upserts)
             {
-                foreach (var e in upserts)
-                {
-                    ct.ThrowIfCancellationRequested();
-                    var row = repo.ToRow(e);
-                    await conn.ExecuteAsync($"INSERT INTO [{repo.TableName}] (Id, Json) VALUES (@Id, @Json) ON CONFLICT(Id) DO UPDATE SET Json = excluded.Json;", new { row.Id, row.Json }, tx);
-                }
-                var deleted = 0;
-                if (_deletes.Any())
-                {
-                    deleted = await conn.ExecuteAsync($"DELETE FROM [{repo.TableName}] WHERE Id IN @Ids", new { Ids = _deletes.Select(i => i!.ToString()!).ToArray() }, tx);
-                }
-                tx.Commit();
-                return new BatchResult(added, updated, deleted);
+                ct.ThrowIfCancellationRequested();
+                var row = repo.ToRow(e);
+                await conn.ExecuteAsync($"INSERT INTO [{repo.TableName}] (Id, Json) VALUES (@Id, @Json) ON CONFLICT(Id) DO UPDATE SET Json = excluded.Json;", new { row.Id, row.Json });
             }
-            catch
+            if (_deletes.Any())
             {
-                try { tx.Rollback(); } catch { }
-                throw;
+                deleted = await conn.ExecuteAsync($"DELETE FROM [{repo.TableName}] WHERE Id IN @Ids", new { Ids = _deletes.Select(i => i!.ToString()!).ToArray() });
             }
+            return new BatchResult(added, updated, deleted);
         }
     }
 

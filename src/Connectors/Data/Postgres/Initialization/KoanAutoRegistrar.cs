@@ -35,7 +35,6 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar, IKoanAspireRegistrar
             Infrastructure.Constants.Configuration.Keys.Section,
             configuratorLifetime: ServiceLifetime.Singleton);
         services.TryAddSingleton<IStorageNameResolver, DefaultStorageNameResolver>();
-        services.TryAddEnumerable(new ServiceDescriptor(typeof(INamingDefaultsProvider), typeof(PostgresNamingDefaultsProvider), ServiceLifetime.Singleton));
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, PostgresHealthContributor>());
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IConfigureOptions<RelationalMaterializationOptions>, PostgresRelationalMaterializationOptionsConfigurator>());
 

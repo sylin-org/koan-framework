@@ -1,4 +1,5 @@
 using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Naming;
 using Koan.Data.Core;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -11,6 +12,8 @@ namespace Koan.Data.Connector.InMemory;
 [ProviderPriority(-100)]
 public sealed class InMemoryAdapterFactory : IDataAdapterFactory
 {
+    public string Provider => "inmemory";
+
     public bool CanHandle(string provider) =>
         string.Equals(provider, "inmemory", StringComparison.OrdinalIgnoreCase) ||
         string.Equals(provider, "memory", StringComparison.OrdinalIgnoreCase);
@@ -38,5 +41,20 @@ public sealed class InMemoryAdapterFactory : IDataAdapterFactory
 
         // Default partition
         return "default";
+    }
+
+    // INamingProvider implementation
+    public string RepositorySeparator => "#";
+
+    public string GetStorageName(Type entityType, IServiceProvider services)
+    {
+        // InMemory: Simple entity name
+        return entityType.Name;
+    }
+
+    public string GetConcretePartition(string partition)
+    {
+        // InMemory: Pass-through
+        return partition;
     }
 }

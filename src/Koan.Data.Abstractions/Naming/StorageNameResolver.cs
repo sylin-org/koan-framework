@@ -22,11 +22,11 @@ public static class StorageNameResolver
     {
         // 1) Explicit [Storage(Name=...)]
         var storage = entityType.GetCustomAttribute<StorageAttribute>();
-        if (!string.IsNullOrWhiteSpace(storage?.Name)) return storage!.Name!;
+        if (!string.IsNullOrWhiteSpace(storage?.Name)) return storage!.Name!.Trim();
 
         // 2) Shortcut [StorageName]
         var storageName = entityType.GetCustomAttribute<StorageNameAttribute>();
-        if (!string.IsNullOrWhiteSpace(storageName?.Name)) return storageName!.Name!;
+        if (!string.IsNullOrWhiteSpace(storageName?.Name)) return storageName!.Name!.Trim();
 
         // 3) Per-entity naming hint or adapter defaults
         var naming = entityType.GetCustomAttribute<StorageNamingAttribute>()?.Style ?? defaults.Style;

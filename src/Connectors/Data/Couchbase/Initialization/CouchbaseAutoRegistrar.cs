@@ -33,7 +33,6 @@ public sealed class CouchbaseAutoRegistrar : IKoanAutoRegistrar
         services.AddSingleton<CouchbaseClusterProvider>();
         services.AddSingleton<IDataAdapterFactory, CouchbaseAdapterFactory>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, CouchbaseHealthContributor>());
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<Koan.Data.Abstractions.Naming.INamingDefaultsProvider, CouchbaseNamingDefaultsProvider>());
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IKoanOrchestrationEvaluator, CouchbaseOrchestrationEvaluator>());
 
         // Register Couchbase discovery adapter (maintains "Reference = Intent")

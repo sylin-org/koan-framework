@@ -29,7 +29,6 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         services.AddSingleton<IConfigureOptions<ElasticSearchOptions>, ElasticSearchOptionsConfigurator>();
 
         services.TryAddSingleton<IStorageNameResolver, DefaultStorageNameResolver>();
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<INamingDefaultsProvider, ElasticSearchNamingDefaultsProvider>());
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, ElasticSearchHealthContributor>());
 
         // Register ElasticSearch discovery adapter (maintains "Reference = Intent")

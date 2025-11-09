@@ -1,6 +1,7 @@
-
+using System.Text;
 using Microsoft.Extensions.Options;
 using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Naming;
 using Koan.Data.Vector.Abstractions;
 using Koan.Orchestration;
 using Koan.Orchestration.Attributes;
@@ -28,6 +29,8 @@ namespace Koan.Data.Vector.Connector.Milvus;
     LocalScheme = "http", LocalHost = "localhost", LocalPort = 19530, LocalPattern = "http://{host}:{port}")]
 public sealed class MilvusVectorAdapterFactory : IVectorAdapterFactory
 {
+    public string Provider => "milvus";
+
     public bool CanHandle(string provider)
         => string.Equals(provider, "milvus", StringComparison.OrdinalIgnoreCase);
 
@@ -40,6 +43,42 @@ public sealed class MilvusVectorAdapterFactory : IVectorAdapterFactory
         var options = (IOptions<MilvusOptions>?)sp.GetService(typeof(IOptions<MilvusOptions>))
             ?? throw new InvalidOperationException("MilvusOptions not configured; bind Koan:Data:Milvus.");
         return new MilvusVectorRepository<TEntity, TKey>(httpFactory, options, sp);
+    }
+
+    // INamingProvider implementation
+    public string RepositorySeparator => "#";
+
+    public string GetStorageName(Type entityType, IServiceProvider services)
+    {
+        var convention = new StorageNameResolver.Convention(
+            StorageNamingStyle.EntityType,  // EntityType (not FullNamespace)
+            "_",
+            NameCasing.Lower);  // Lowercase
+
+        return StorageNameResolver.Resolve(entityType, convention);
+    }
+
+    public string GetConcretePartition(string partition)
+    {
+        // Milvus: Lowercase and sanitize
+        if (Guid.TryParse(partition, out var guid))
+            return guid.ToString("N");  // Lowercase, no hyphens
+
+        // Named partitions: lowercase and remove special characters
+        return SanitizeForMilvus(partition);
+    }
+
+    private static string SanitizeForMilvus(string partition)
+    {
+        var sanitized = new StringBuilder(partition.Length);
+        foreach (var c in partition.ToLowerInvariant())
+        {
+            if (char.IsLetterOrDigit(c) || c == '_')
+                sanitized.Append(c);
+            else
+                sanitized.Append('_');
+        }
+        return sanitized.ToString();
     }
 }
 

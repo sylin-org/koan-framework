@@ -1,7 +1,14 @@
+using Koan.Data.Abstractions.Naming;
+
 namespace Koan.Data.Abstractions;
 
-public interface IDataAdapterFactory
+/// <summary>
+/// Complete data adapter contract: repository creation and storage naming.
+/// Each adapter must implement both concerns.
+/// </summary>
+public interface IDataAdapterFactory : INamingProvider
 {
+    // Provider property inherited from INamingProvider
     bool CanHandle(string provider);
 
     /// <summary>

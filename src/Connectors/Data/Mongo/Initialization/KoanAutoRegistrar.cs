@@ -54,7 +54,6 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IAsyncAdapterInitializer, MongoClientProvider>());
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IAdapterReadiness, MongoClientProvider>());
         services.TryAddSingleton<IStorageNameResolver, DefaultStorageNameResolver>();
-        services.TryAddEnumerable(new ServiceDescriptor(typeof(INamingDefaultsProvider), typeof(MongoNamingDefaultsProvider), ServiceLifetime.Singleton));
         services.AddSingleton<IDataAdapterFactory, MongoAdapterFactory>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, MongoHealthContributor>());
 

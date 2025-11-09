@@ -33,7 +33,6 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 
         services.AddSingleton<IConfigureOptions<WeaviateOptions>, WeaviateOptionsConfigurator>();
         services.TryAddSingleton<IStorageNameResolver, DefaultStorageNameResolver>();
-        services.TryAddEnumerable(new ServiceDescriptor(typeof(INamingDefaultsProvider), typeof(WeaviateNamingDefaultsProvider), ServiceLifetime.Singleton));
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, WeaviateHealthContributor>());
 
         // Register orchestration evaluator for dependency management
@@ -45,9 +44,6 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 
         services.AddSingleton<IVectorAdapterFactory, WeaviateVectorAdapterFactory>();
         services.AddHttpClient("weaviate");
-
-        // Register partition mapper for per-partition class strategy (ARCH-0071, uses EntityContext from DATA-0077)
-        services.TryAddSingleton<Koan.Data.Vector.Abstractions.Partition.IVectorPartitionMapper, Koan.Data.Vector.Connector.Weaviate.Partition.WeaviatePartitionMapper>();
     }
 
     public void Describe(ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)

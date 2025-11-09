@@ -1,6 +1,8 @@
-
+using System;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Naming;
 using Koan.Data.Vector.Abstractions;
 using Koan.Orchestration;
 using Koan.Orchestration.Attributes;
@@ -29,6 +31,8 @@ namespace Koan.Data.Connector.ElasticSearch;
     LocalScheme = "http", LocalHost = "localhost", LocalPort = 9200, LocalPattern = "http://{host}:{port}")]
 public sealed class ElasticSearchVectorAdapterFactory : IVectorAdapterFactory
 {
+    public string Provider => "elasticsearch";
+
     public bool CanHandle(string provider)
         => string.Equals(provider, "elasticsearch", StringComparison.OrdinalIgnoreCase) ||
            string.Equals(provider, "elastic", StringComparison.OrdinalIgnoreCase);
@@ -42,6 +46,31 @@ public sealed class ElasticSearchVectorAdapterFactory : IVectorAdapterFactory
         var options = (IOptions<ElasticSearchOptions>?)sp.GetService(typeof(IOptions<ElasticSearchOptions>))
             ?? throw new InvalidOperationException("ElasticSearchOptions not configured; bind Koan:Data:ElasticSearch.");
         return new ElasticSearchVectorRepository<TEntity, TKey>(httpFactory, options, sp);
+    }
+
+    // INamingProvider implementation
+    public string RepositorySeparator => "-";  // Elasticsearch uses hyphens in index names
+
+    public string GetStorageName(Type entityType, IServiceProvider services)
+    {
+        var opts = services.GetService<IOptions<ElasticSearchOptions>>()?.Value;
+        var separator = opts?.IndexPrefix is not null ? "-" : "_";
+        var convention = new StorageNameResolver.Convention(
+            StorageNamingStyle.EntityType,
+            separator,
+            NameCasing.Lower);
+
+        return StorageNameResolver.Resolve(entityType, convention);
+    }
+
+    public string GetConcretePartition(string partition)
+    {
+        // Elasticsearch: Lowercase and sanitize for index names
+        if (Guid.TryParse(partition, out var guid))
+            return guid.ToString("N");  // Lowercase, no hyphens
+
+        // Named partitions: lowercase
+        return partition.ToLowerInvariant();
     }
 }
 

@@ -20,6 +20,8 @@ namespace Koan.Data.Connector.Couchbase;
     UriPattern = "couchbase://{host}", LocalScheme = "couchbase", LocalHost = "localhost", LocalPort = 8091, LocalPattern = "couchbase://{host}")]
 public sealed class CouchbaseAdapterFactory : IDataAdapterFactory
 {
+    public string Provider => "couchbase";
+
     public bool CanHandle(string provider)
         => string.Equals(provider, "couchbase", StringComparison.OrdinalIgnoreCase);
 
@@ -35,6 +37,39 @@ public sealed class CouchbaseAdapterFactory : IDataAdapterFactory
         // Note: Couchbase cluster provider is typically shared; source-specific
         // connections would require provider factory-level changes
         return new CouchbaseRepository<TEntity, TKey>(provider, resolver, sp, options);
+    }
+
+    // INamingProvider implementation
+    public string RepositorySeparator => "#";
+
+    public string GetStorageName(Type entityType, IServiceProvider services)
+    {
+        var options = services.GetRequiredService<IOptions<CouchbaseOptions>>().Value;
+
+        // Check adapter-level override FIRST
+        if (!string.IsNullOrWhiteSpace(options.Collection))
+            return options.Collection;
+
+        if (options.CollectionName != null)
+        {
+            var overrideName = options.CollectionName(entityType);
+            if (!string.IsNullOrWhiteSpace(overrideName))
+                return overrideName;
+        }
+
+        // Fall back to convention
+        var convention = new StorageNameResolver.Convention(
+            options.NamingStyle,
+            options.Separator ?? ".",
+            NameCasing.AsIs);
+
+        return StorageNameResolver.Resolve(entityType, convention);
+    }
+
+    public string GetConcretePartition(string partition)
+    {
+        // Couchbase: Pass-through (accepts most UTF-8 strings)
+        return partition;
     }
 }
 

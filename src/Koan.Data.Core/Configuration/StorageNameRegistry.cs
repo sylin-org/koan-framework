@@ -10,10 +10,14 @@ namespace Koan.Data.Core.Configuration;
 /// </summary>
 public static class StorageNameRegistry
 {
-    private static string BagKey(string provider, string? set)
-        => set is null || set.Length == 0 || string.Equals(set, "root", StringComparison.OrdinalIgnoreCase)
-            ? $"name:{provider}:root"
-            : $"name:{provider}:{set}";
+    private static string CacheKey(string provider, string? partition)
+    {
+        var trimmedPartition = partition?.Trim();
+
+        return string.IsNullOrEmpty(trimmedPartition)
+            ? $"name:{provider}"
+            : $"name:{provider}:{trimmedPartition}";
+    }
 
     public static string GetOrCompute<TEntity, TKey>(IServiceProvider sp)
         where TEntity : class, IEntity<TKey>
@@ -21,38 +25,79 @@ public static class StorageNameRegistry
     {
         var cfg = AggregateConfigs.Get<TEntity, TKey>(sp);
         var provider = cfg.Provider;
-        var set = EntityContext.Current?.Partition;
-        var key = BagKey(provider, set);
+        var partition = EntityContext.Current?.Partition;
+        var key = CacheKey(provider, partition);
         return AggregateBags.GetOrAdd<TEntity, TKey, string>(sp, key, () =>
         {
-            // Resolve the provider-specific defaults
-            var providers = sp.GetServices<INamingDefaultsProvider>();
-            INamingDefaultsProvider? defaultsProvider = providers.FirstOrDefault(p => string.Equals(p.Provider, provider, StringComparison.OrdinalIgnoreCase))
-                ?? providers.FirstOrDefault();
-            if (defaultsProvider is null)
-            {
-                // No registered defaults provider; fall back to the DI resolver with built-in defaults
-                var diFallback = sp.GetRequiredService<IStorageNameResolver>();
-                // Prefer global fallback options if configured
-                var fallback = sp.GetService<IOptions<Naming.NamingFallbackOptions>>()?.Value;
-                var convFallback = fallback is not null
-                    ? new StorageNameResolver.Convention(fallback.Style, fallback.Separator, fallback.Casing)
-                    : new StorageNameResolver.Convention(StorageNamingStyle.EntityType, ".", NameCasing.AsIs);
-                var baseName = StorageNameSelector.ResolveName(repository: null, diFallback, typeof(TEntity), convFallback, adapterOverride: null);
-                return AppendSet(baseName, set);
-            }
-            var diResolver = sp.GetRequiredService<IStorageNameResolver>();
-            var conv = defaultsProvider.GetConvention(sp);
-            var overrideFn = defaultsProvider.GetAdapterOverride(sp);
-            var resolved = StorageNameSelector.ResolveName(repository: null, diResolver, typeof(TEntity), conv, overrideFn);
-            return AppendSet(resolved, set);
+            var namingProvider = ResolveProvider(sp, provider);
+            return GetTargetRepositoryName<TEntity>(namingProvider, partition, sp);
         });
     }
 
-    private static string AppendSet(string baseName, string? set)
+    /// <summary>
+    /// Orchestrates full repository name resolution.
+    /// Composes: [StorageName] or [StorageName][Separator][ConcretePartition]
+    /// </summary>
+    private static string GetTargetRepositoryName<TEntity>(
+        INamingProvider np,
+        string? partition,
+        IServiceProvider services)
+        where TEntity : class
     {
-        if (string.IsNullOrWhiteSpace(set) || string.Equals(set, "root", StringComparison.OrdinalIgnoreCase))
-            return baseName;
-        return baseName + "#" + set;
+        // Get and trim storage name
+        var storageName = np.GetStorageName(typeof(TEntity), services).Trim();
+
+        // Trim and check partition
+        var trimmedPartition = partition?.Trim();
+        if (string.IsNullOrEmpty(trimmedPartition))
+            return storageName;
+
+        // Compose with partition
+        var repositorySeparator = np.RepositorySeparator;
+        var concretePartition = np.GetConcretePartition(trimmedPartition).Trim();
+
+        return storageName + repositorySeparator + concretePartition;
+    }
+
+    private static INamingProvider ResolveProvider(IServiceProvider sp, string providerKey)
+    {
+        // Factories are registered as IDataAdapterFactory and IVectorAdapterFactory, not INamingProvider
+        // We must query for the concrete types then cast to INamingProvider
+        var dataFactories = sp.GetServices<IDataAdapterFactory>().Cast<INamingProvider>();
+
+        // Try to get vector factories if available (optional dependency)
+        // Use reflection to avoid hard dependency on Koan.Data.Vector.Abstractions
+        IEnumerable<INamingProvider> vectorFactories = Enumerable.Empty<INamingProvider>();
+        try
+        {
+            var vectorAdapterFactoryType = Type.GetType("Koan.Data.Vector.Abstractions.IVectorAdapterFactory, Koan.Data.Vector.Abstractions");
+            if (vectorAdapterFactoryType != null)
+            {
+                var getServicesMethod = typeof(ServiceProviderServiceExtensions)
+                    .GetMethod(nameof(ServiceProviderServiceExtensions.GetServices))!
+                    .MakeGenericMethod(vectorAdapterFactoryType);
+                var services = (System.Collections.IEnumerable)getServicesMethod.Invoke(null, new object[] { sp })!;
+                vectorFactories = services.Cast<INamingProvider>();
+            }
+        }
+        catch
+        {
+            // Vector abstractions not available, continue with data factories only
+        }
+
+        // Combine both factory types
+        var allFactories = dataFactories.Concat(vectorFactories);
+
+        var provider = allFactories.FirstOrDefault(p =>
+            string.Equals(p.Provider, providerKey, StringComparison.OrdinalIgnoreCase));
+
+        if (provider == null)
+        {
+            throw new InvalidOperationException(
+                $"No adapter registered for provider '{providerKey}'. " +
+                $"Ensure an IDataAdapterFactory or IVectorAdapterFactory implementation is registered for this provider.");
+        }
+
+        return provider;
     }
 }

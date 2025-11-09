@@ -1,4 +1,5 @@
 using System;
+using System.Text;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -21,6 +22,8 @@ namespace Koan.Data.Connector.Sqlite;
     UriPattern = "Data Source={path}", LocalScheme = "file", LocalHost = "", LocalPort = 0, LocalPattern = "Data Source={path}")]
 public sealed class SqliteAdapterFactory : IDataAdapterFactory
 {
+    public string Provider => "sqlite";
+
     public bool CanHandle(string provider) => string.Equals(provider, "sqlite", StringComparison.OrdinalIgnoreCase);
 
     public IDataRepository<TEntity, TKey> Create<TEntity, TKey>(
@@ -66,5 +69,42 @@ public sealed class SqliteAdapterFactory : IDataAdapterFactory
         };
 
         return new SqliteRepository<TEntity, TKey>(sp, sourceOpts, resolver);
+    }
+
+    // INamingProvider implementation
+    public string RepositorySeparator => "#";
+
+    public string GetStorageName(Type entityType, IServiceProvider services)
+    {
+        var opts = services.GetRequiredService<IOptions<SqliteOptions>>().Value;
+        var convention = new StorageNameResolver.Convention(
+            opts.NamingStyle,
+            opts.Separator,
+            NameCasing.AsIs);
+
+        return StorageNameResolver.Resolve(entityType, convention);
+    }
+
+    public string GetConcretePartition(string partition)
+    {
+        // SQLite: Remove hyphens from GUIDs
+        if (Guid.TryParse(partition, out var guid))
+            return guid.ToString("N");  // N format = no hyphens, lowercase
+
+        // Named partitions: sanitize for SQLite table name compatibility
+        return SanitizeForSqlite(partition);
+    }
+
+    private static string SanitizeForSqlite(string partition)
+    {
+        var sanitized = new StringBuilder(partition.Length);
+        foreach (var c in partition)
+        {
+            if (char.IsLetterOrDigit(c) || c == '-' || c == '.' || c == '_')
+                sanitized.Append(c);
+            else
+                sanitized.Append('_');
+        }
+        return sanitized.ToString();
     }
 }

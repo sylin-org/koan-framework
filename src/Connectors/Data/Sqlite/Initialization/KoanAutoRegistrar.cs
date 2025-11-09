@@ -32,7 +32,6 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             Infrastructure.Constants.Configuration.Keys.Section,
             configuratorLifetime: ServiceLifetime.Singleton);
         services.TryAddSingleton<IStorageNameResolver, DefaultStorageNameResolver>();
-        services.TryAddEnumerable(new ServiceDescriptor(typeof(INamingDefaultsProvider), typeof(SqliteNamingDefaultsProvider), ServiceLifetime.Singleton));
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, SqliteHealthContributor>());
 
         // Register SQLite discovery adapter (maintains "Reference = Intent")

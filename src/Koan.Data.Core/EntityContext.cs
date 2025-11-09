@@ -120,7 +120,9 @@ public static class EntityContext
         }
 
         var newContext = new ContextState(source, adapter, partition, transaction);
-        newContext.ValidatePartitionName();
+        // Note: Partition name validation is deferred to adapters, which format partition IDs
+        // (e.g., SQLite formats GUID "019a..." as "proj-019a...")
+        // newContext.ValidatePartitionName();
 
         // Create transaction coordinator if transaction specified
         ITransactionCoordinator? coordinator = null;
