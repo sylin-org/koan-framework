@@ -88,8 +88,30 @@ public static class StorageNameRegistry
         // Combine both factory types
         var allFactories = dataFactories.Concat(vectorFactories);
 
-        var provider = allFactories.FirstOrDefault(p =>
-            string.Equals(p.Provider, providerKey, StringComparison.OrdinalIgnoreCase));
+        // Use CanHandle to find matching factory (supports provider aliases like "sqlserver" vs "mssql")
+        INamingProvider? provider = null;
+        foreach (var factory in allFactories)
+        {
+            // Cast back to check CanHandle (all INamingProviders are factories)
+            if (factory is IDataAdapterFactory dataFactory && dataFactory.CanHandle(providerKey))
+            {
+                provider = factory;
+                break;
+            }
+
+            // Try vector factory if available (using reflection to avoid hard dependency)
+            var factoryType = factory.GetType();
+            var canHandleMethod = factoryType.GetMethod("CanHandle");
+            if (canHandleMethod != null)
+            {
+                var canHandle = (bool)canHandleMethod.Invoke(factory, new object[] { providerKey })!;
+                if (canHandle)
+                {
+                    provider = factory;
+                    break;
+                }
+            }
+        }
 
         if (provider == null)
         {
