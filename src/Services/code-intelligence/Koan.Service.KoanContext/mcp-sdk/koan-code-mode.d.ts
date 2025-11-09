@@ -1,5 +1,5 @@
 ﻿// Auto-generated TypeScript definitions for Koan MCP Code Mode
-// Generated: 2025-11-09T19:16:33.0395355Z
+// Generated: 2025-11-09T21:32:01.2671952Z
 // Use these type definitions to guide code generation.
 // Code execution is JavaScript-only (no TypeScript transpilation).
 
@@ -32,4 +32,4 @@ export interface CodeModeContext {
   SDK: typeof Koan;
 }
 
-// integrity-sha256: 114ae80b1003808b364c3d6d04b37bdc19b0438610ae1d829188917d345f804d
+// integrity-sha256: 993e600887d62a5f42e63cecff812912ab88515644b18670a3c0f2092f49a4cc
