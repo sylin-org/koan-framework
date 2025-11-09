@@ -152,6 +152,7 @@ public class SearchController : ControllerBase
                 metadata = result.Metadata,
                 sources = result.Sources,
                 insights = result.Insights,
+                continuationToken = result.ContinuationToken,
                 warnings = result.Warnings
             });
         }
@@ -258,6 +259,10 @@ public class SearchController : ControllerBase
                 totalFiles = allSources.Count,
                 files = allSources
             },
+            continuationToken = (string?)null,  // TODO: Multi-project continuation not yet supported
+            warnings = request.ContinuationToken != null
+                ? new[] { "Continuation tokens not supported for multi-project searches" }
+                : null,
             errors = errors.Count > 0 ? errors : null
         });
     }
