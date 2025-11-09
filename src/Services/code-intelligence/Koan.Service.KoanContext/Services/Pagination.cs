@@ -16,7 +16,8 @@ public record ContinuationTokenData(
     DateTime CreatedAt,
     int Page,
     List<string>? ProjectIds = null,  // For multi-project searches
-    int ChunkOffset = 0);              // For multi-project pagination
+    int ChunkOffset = 0,               // For multi-project pagination
+    string? ProviderHint = null);      // Opaque provider-specific continuation token (Weaviate cursor, Qdrant offset, etc.)
 
 /// <summary>
 /// Pagination service - generates and validates opaque continuation tokens using compressed JSON

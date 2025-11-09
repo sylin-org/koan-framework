@@ -157,20 +157,23 @@ public class Vector<TEntity> where TEntity : class, IEntity<string>
     /// <param name="alpha">Optional semantic vs keyword weight. 0.0=keyword only, 1.0=semantic only, 0.5=balanced (default).</param>
     /// <param name="topK">Maximum number of results to return.</param>
     /// <param name="filter">Optional provider-specific filter.</param>
+    /// <param name="continuationToken">Optional continuation token for pagination. Returned by previous search results.</param>
     /// <param name="vectorName">Optional vector name for multi-vector entities.</param>
     /// <param name="ct">Cancellation token.</param>
-    /// <returns>Vector query results with similarity scores.</returns>
+    /// <returns>Vector query results with similarity scores and optional continuation token.</returns>
     public static Task<VectorQueryResult<string>> Search(
         float[] vector,
         string? text = null,
         double? alpha = null,
         int? topK = null,
         object? filter = null,
+        string? continuationToken = null,
         string? vectorName = null,
         CancellationToken ct = default)
         => VectorData<TEntity>.SearchAsync(new VectorQueryOptions(
             Query: vector,
             TopK: topK,
+            ContinuationToken: continuationToken,
             Filter: filter,
             VectorName: vectorName,
             SearchText: text,

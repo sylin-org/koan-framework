@@ -24,7 +24,7 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
     private volatile bool _schemaEnsured;
     private volatile int _discoveredDimension = -1; // -1 means not discovered yet
 
-    public VectorCapabilities Capabilities => VectorCapabilities.Knn | VectorCapabilities.Filters | VectorCapabilities.BulkUpsert | VectorCapabilities.BulkDelete | VectorCapabilities.Hybrid | VectorCapabilities.DynamicCollections;
+    public VectorCapabilities Capabilities => VectorCapabilities.Knn | VectorCapabilities.Filters | VectorCapabilities.BulkUpsert | VectorCapabilities.BulkDelete | VectorCapabilities.Hybrid | VectorCapabilities.NativeContinuation | VectorCapabilities.DynamicCollections;
 
     public WeaviateVectorRepository(IHttpClientFactory httpFactory, IOptions<WeaviateOptions> options, IServiceProvider sp)
     {
@@ -466,9 +466,19 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
             searchClause = $"nearVector: {{ vector: [{vectorStr}] }}";
         }
 
+        // Add cursor-based pagination support (native continuation)
+        var afterClause = !string.IsNullOrWhiteSpace(options.ContinuationToken)
+            ? $", after: \"{options.ContinuationToken}\""
+            : "";
+
+        if (!string.IsNullOrWhiteSpace(options.ContinuationToken))
+        {
+            _logger?.LogDebug("Weaviate: resuming search with cursor: {Cursor}", options.ContinuationToken);
+        }
+
         var args = string.IsNullOrEmpty(whereClause)
-            ? $"({searchClause}, limit: {topK})"
-            : $"({searchClause}, limit: {topK}, where: {whereClause})";
+            ? $"({searchClause}, limit: {topK}{afterClause})"
+            : $"({searchClause}, limit: {topK}, where: {whereClause}{afterClause})";
         var gql = new
         {
             // Request docId alongside _additional so we can map back to original ids
@@ -482,8 +492,14 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
             throw new InvalidOperationException($"Weaviate search failed: {(int)resp.StatusCode} {resp.ReasonPhrase} {body}");
         }
         var json = await resp.Content.ReadAsStringAsync(ct);
-        var matches = ParseGraphQlIds(json);
-        return new VectorQueryResult<TKey>(matches, ContinuationToken: null);
+        var (matches, nextCursor) = ParseGraphQlIdsWithCursor(json, topK);
+
+        _logger?.LogInformation(
+            "Weaviate search completed: {MatchCount} matches, nextCursor: {HasCursor}",
+            matches.Count,
+            nextCursor != null ? "present" : "null");
+
+        return new VectorQueryResult<TKey>(matches, ContinuationToken: nextCursor);
     }
 
     public async Task FlushAsync(CancellationToken ct = default)
@@ -706,6 +722,47 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
             }
         }
         return list;
+    }
+
+    private static (IReadOnlyList<VectorMatch<TKey>> Matches, string? NextCursor) ParseGraphQlIdsWithCursor(string json, int requestedLimit)
+    {
+        var root = JToken.Parse(json);
+        var list = new List<VectorMatch<TKey>>();
+        string? lastUuid = null;
+
+        var get = root["data"]?["Get"] as JObject;
+        if (get is null) return (list, null);
+
+        foreach (var prop in get.Properties())
+        {
+            if (prop.Value is not JArray arr) continue;
+            foreach (var itemTok in arr)
+            {
+                var item = itemTok as JObject;
+                if (item is null) continue;
+                var add = item["_additional"] as JObject;
+                var idStr = item["docId"]?.Value<string>() ?? add?["id"]?.Value<string>();
+                var distance = add?["distance"]?.Value<double?>() ?? 0.0;
+                var uuid = add?["id"]?.Value<string>();
+
+                if (idStr is null) continue;
+
+                TKey id = (TKey)Convert.ChangeType(idStr, typeof(TKey));
+                var score = 1.0 - distance;
+                list.Add(new VectorMatch<TKey>(id, score, null));
+
+                if (uuid != null)
+                {
+                    lastUuid = uuid;
+                }
+            }
+        }
+
+        // If we got a full page of results, there might be more (return cursor)
+        // If we got fewer results than requested, we've reached the end (return null)
+        var nextCursor = list.Count == requestedLimit ? lastUuid : null;
+
+        return (list, nextCursor);
     }
 
     // Deterministic UUID (v5-like) from class namespace + id using SHA-1

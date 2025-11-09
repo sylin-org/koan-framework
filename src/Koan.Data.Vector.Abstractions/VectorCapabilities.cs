@@ -7,7 +7,12 @@ public enum VectorCapabilities
     Knn = 1 << 0,
     Filters = 1 << 1,
     Hybrid = 1 << 2,
-    PaginationToken = 1 << 3,
+    /// <summary>
+    /// Provider supports native continuation/pagination via opaque continuation tokens.
+    /// When set, provider can efficiently resume searches without re-executing full queries.
+    /// Examples: Weaviate cursor-based pagination, Qdrant offset-based pagination.
+    /// </summary>
+    NativeContinuation = 1 << 3,
     StreamingResults = 1 << 4,
     MultiVectorPerEntity = 1 << 5,
     BulkUpsert = 1 << 6,

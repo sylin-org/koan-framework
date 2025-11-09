@@ -3,6 +3,7 @@ using System.IO;
 using Koan.Context.Models;
 using Koan.Data.Core;
 using Koan.Data.Vector;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 
 namespace Koan.Context.Services;
@@ -10,7 +11,7 @@ namespace Koan.Context.Services;
 /// <summary>
 /// Service for semantic and hybrid search over indexed documents with AI-optimized response payloads.
 /// </summary>
-public class Search 
+public class Search
 {
     private const int MinTokenBudget = 1000;
     private const int MaxTokenBudget = 10000;
@@ -20,17 +21,20 @@ public class Search
     private readonly Embedding _embedding;
     private readonly TokenCounter _tokenCounter;
     private readonly Pagination _Pagination;
+    private readonly IMemoryCache _embeddingCache;
     private readonly ILogger<Search> _logger;
 
     public Search(
         Embedding embedding,
         TokenCounter tokenCounter,
         Pagination Pagination,
+        IMemoryCache embeddingCache,
         ILogger<Search> logger)
     {
         _embedding = embedding ?? throw new ArgumentNullException(nameof(embedding));
         _tokenCounter = tokenCounter ?? throw new ArgumentNullException(nameof(tokenCounter));
         _Pagination = Pagination ?? throw new ArgumentNullException(nameof(Pagination));
+        _embeddingCache = embeddingCache ?? throw new ArgumentNullException(nameof(embeddingCache));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -81,9 +85,23 @@ public class Search
 
             using (EntityContext.Partition(projectId))
             {
-                _logger.LogInformation("Generating embedding for query: {Query}", query);
-                var queryEmbedding = await _embedding.EmbedAsync(query, cancellationToken);
-                _logger.LogInformation("Generated embedding with dimension: {Dimension}", queryEmbedding.Length);
+                // Get or create embedding (cached across all pages)
+                var cacheKey = $"embedding:{query}";
+                var queryEmbedding = await _embeddingCache.GetOrCreateAsync(
+                    cacheKey,
+                    async entry =>
+                    {
+                        entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(1);
+                        _logger.LogInformation("Generating embedding for query: {Query}", query);
+                        var embedding = await _embedding.EmbedAsync(query, cancellationToken);
+                        _logger.LogInformation("Generated embedding with dimension: {Dimension}", embedding.Length);
+                        return embedding;
+                    });
+
+                _logger.LogInformation(
+                    "Embedding: {Source} (dimension={Dim})",
+                    _embeddingCache.TryGetValue(cacheKey, out _) ? "cache hit" : "generated",
+                    queryEmbedding?.Length ?? 0);
 
                 if (queryEmbedding.Length == 0)
                 {
@@ -94,16 +112,22 @@ public class Search
 
                 // Fetch more results to support continuation
                 var topK = MaxTopK;
-                _logger.LogInformation("Calling Vector<Chunk>.Search with topK={TopK}, alpha={Alpha}, page={Page}", topK, normalizedOptions.Alpha, currentPage);
+                _logger.LogInformation("Calling Vector<Chunk>.Search with topK={TopK}, alpha={Alpha}, page={Page}, providerHint={HasHint}",
+                    topK, normalizedOptions.Alpha, currentPage, continuationData?.ProviderHint != null ? "present" : "null");
 
+                // Call vector search with provider hint (opaque pass-through)
                 var vectorResult = await Vector<Chunk>.Search(
                     vector: queryEmbedding,
                     text: query,
                     alpha: normalizedOptions.Alpha,
                     topK: topK,
+                    continuationToken: continuationData?.ProviderHint,  // Opaque to framework
                     ct: cancellationToken);
 
-                _logger.LogInformation("Vector search returned {MatchCount} matches", vectorResult.Matches.Count);
+                _logger.LogInformation(
+                    "Vector search returned {MatchCount} matches, providerHint: {HasHint}",
+                    vectorResult.Matches.Count,
+                    vectorResult.ContinuationToken != null ? "present" : "null");
 
                 var chunks = new List<SearchResultChunk>();
                 var sources = new List<SourceFile>();
@@ -234,11 +258,12 @@ public class Search
                         TokensRemaining: normalizedOptions.MaxTokens,
                         LastChunkId: lastChunkId,
                         CreatedAt: DateTime.UtcNow,
-                        Page: currentPage + 1);
+                        Page: currentPage + 1,
+                        ProviderHint: vectorResult.ContinuationToken);  // Store provider hint opaquely
 
                     continuationToken = _Pagination.CreateToken(tokenData);
-                    _logger.LogInformation("Generated continuation token for page {Page}, last chunk: {LastChunkId}",
-                        currentPage + 1, lastChunkId);
+                    _logger.LogInformation("Generated continuation token for page {Page}, last chunk: {LastChunkId}, providerHint: {HasHint}",
+                        currentPage + 1, lastChunkId, vectorResult.ContinuationToken != null ? "present" : "null");
                 }
 
                 return new SearchResult(
