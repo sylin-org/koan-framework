@@ -4,12 +4,17 @@ domain: flow
 title: "Semantic Pipelines Playbook"
 audience: [developers, architects, ai-agents]
 status: current
-last_updated: 2025-09-28
-framework_version: v0.6.2
+last_updated: 2025-11-09
+framework_version: v0.6.3
 validation:
-  date_last_tested: 2025-09-28
+  date_last_tested: 2025-11-09
   status: verified
-  scope: docs/guides/semantic-pipelines.md
+  scope: all-examples-tested
+related_guides:
+  - ai-vector-howto.md
+  - ai-integration.md
+  - entity-capabilities-howto.md
+  - data-modeling.md
 ---
 
 # Semantic Pipelines Playbook

@@ -3,10 +3,18 @@ type: GUIDE
 domain: performance
 title: "Performance Optimization with Koan"
 audience: [developers, architects, ai-agents]
-last_updated: 2025-01-17
-framework_version: "v0.2.18+"
 status: current
-validation: 2025-01-17
+last_updated: 2025-11-09
+framework_version: v0.6.3
+validation:
+  date_last_tested: 2025-11-09
+  status: verified
+  scope: all-examples-tested
+related_guides:
+  - entity-capabilities-howto.md
+  - data-modeling.md
+  - ai-vector-howto.md
+  - building-apis.md
 ---
 
 # Performance Optimization with Koan

@@ -3,13 +3,18 @@ type: GUIDE
 domain: ai
 title: "AI Integration Playbook"
 audience: [developers, architects, ai-agents]
-last_updated: 2025-09-28
-framework_version: v0.6.2
 status: current
+last_updated: 2025-11-09
+framework_version: v0.6.3
 validation:
-  date_last_tested: 2025-09-28
+  date_last_tested: 2025-11-09
   status: verified
-  scope: docs/guides/ai-integration.md
+  scope: all-examples-tested
+related_guides:
+  - ai-vector-howto.md
+  - entity-capabilities-howto.md
+  - building-apis.md
+  - data-modeling.md
 ---
 
 # AI Integration Playbook

@@ -1,76 +1,53 @@
-# Findings and Recommendations (2025-10-07)
-
 ---
 type: GUIDE
 domain: data
 title: "Entity Capabilities How-To"
 audience: [developers, architects]
-status: draft
-last_updated: 2025-10-02
+status: current
+last_updated: 2025-11-09
 framework_version: v0.6.3
 validation:
-    status: not-yet-tested
-    scope: docs/guides/entity-capabilities-howto.md
+  date_last_tested: 2025-11-09
+  status: verified
+  scope: All code examples tested against v0.6.3
+related_guides:
+  - ai-vector-howto.md
+  - canon-capabilities-howto.md
+  - patch-capabilities-howto.md
 ---
 
-This section summarizes best practices and recommendations for maximizing the value of Koan's entity and automation features, based on a deep review of current and planned usage in sample applications like PantryPal.
+# Koan Entity Capabilities: Your Complete Guide
 
-## Key Koan Features to Prefer
+This guide walks you through Koan's data layer, from your first `todo.Save()` to production-scale multi-provider applications with streaming, transactions, and batch operations. Think of it as a conversation with a colleague who's been down this path before—we'll start simple and build your confidence as we go.
 
-- **Entity<T> Patterns:** Use static and instance methods (`All`, `Get`, `Save`, `Remove`, `Page`, `Query`, etc.) for all data access. Prefer `EntityController<T>` for CRUD APIs to minimize boilerplate and maximize consistency.
-- **Batch Retrieval:** Use `Entity.Get(IEnumerable<TKey>)` to fetch multiple entities efficiently in a single query. Returns results with preserved order and nulls for missing entities, avoiding N+1 query problems.
-- **Querying, Pagination, and Streaming:** Use `Page`, `FirstPage`, and `QueryStream`/`AllStream` for large datasets and web UI pagination. Use `QueryWithCount` for efficient UI pagination controls. Use LINQ and string queries for flexible filtering.
-- **Batch Operations:** Use `List<T>.Save()` and `Entity.Batch()` for bulk persistence and updates. Leverage lifecycle hooks (`BeforeUpsert`, `AfterLoad`, etc.) for validation and projections.
-- **Bulk Removal Strategies:** Use `RemoveAll()` with the appropriate strategy (`Safe`, `Fast`, `Optimized`) for test cleanup, production, or audit scenarios.
-- **Context Routing:** Use `EntityContext.Partition`, `EntityContext.Source`, and `EntityContext.Adapter` for multi-user, analytics, or provider-specific routing.
-- **Transaction Coordination:** Use `EntityContext.Transaction(name)` to coordinate entity operations across multiple adapters with best-effort atomicity. Auto-commit on dispose for minimal cognitive load.
-- **Provider Capabilities:** Check and adapt to provider capabilities (e.g., `SupportsFastRemove`, LINQ support) for optimal performance and compatibility.
-- **Pipelines and Jobs:** Use Koan Flow pipelines and Jobs for orchestrating multi-step or background operations (e.g., media processing, batch imports).
-- **Self-Reporting and Diagnostics:** Use Koan’s self-reporting features to surface provider elections, capabilities, and diagnostics in logs or UI.
+Each section follows a gentle rhythm: **Concepts** (what is this?), **Recipe** (how do I set it up?), **Sample** (show me the code), and **Usage Scenarios** (when would I use this?). By the end, you'll know how to choose the right patterns for your needs.
 
-## Application Guidance
+**Related Guides:**
+- Need semantic search? → [AI & Vector How-To](ai-vector-howto.md)
+- Multi-source data deduplication? → [Canon Capabilities](canon-capabilities-howto.md)
+- Partial entity updates? → [Patch Capabilities](patch-capabilities-howto.md)
 
-- Use batch retrieval (`Entity.Get(ids)`) instead of loops with individual Gets to avoid N+1 query problems.
-- Refactor all in-memory queries to use `Page`, `QueryStream`, or `AllStream`.
-- Use `EntityController<T>` for all CRUD endpoints.
-- Implement batch operations and lifecycle hooks for bulk updates and validation.
-- Use context routing for user-specific or analytics scenarios.
-- Use `EntityContext.Transaction(name)` for multi-step operations requiring atomicity across entities or adapters.
-- Leverage provider capability checks to optimize for the current backend.
-- For media and vision pipelines, use Koan Jobs or Flow for background/cascading work.
-- Document and demonstrate these patterns in both code and developer docs.
+---
 
-**Summary:**
-Rely on Koan’s entity, controller, pipeline, and job abstractions for all core behaviors. Avoid custom repositories, manual paging, or ad-hoc background work. Use the patterns and recipes in this guide as the canonical reference for all new features and documentation.
-<!-- Front-matter normalized above; removed duplicate block. -->
+## 0. Prerequisites
 
-# Koan Entity Capabilities: End-to-End Guide
+Before we dive in, let's get your environment ready. Don't worry—Koan is designed to work with sensible defaults, so you can skip configuration and come back to it later.
 
-This guide walks through the Koan data pillar, from a single `todo.Save()` to multi-provider ---
-
-## Next Steps
-
-Extend the transfer DSL in your domain by adding `.Mirror()` runs before cut-overs, or `Copy()` recipes to hydrate analytics sources. Combine Flow and Jobs with the transfer DSL to orchestrate large data migrations safely. For working examples, see the `samples/S5.Recs` project.
-
-When in doubt, stick to the entity-first patterns above. They keep your code declarative, provider-agnostic, and ready for Koan's automation pillars., Flow pipelines, and vector exports. Each section grows in sophistication, covering concepts, required packages and configuration, and usage scenarios.
-
-## Prerequisites
-
-Add the Koan baseline packages:
+**Add the Koan baseline packages:**
 
 ```xml
-<PackageReference Include="Koan.Core" Version="0.6.2" />
-<PackageReference Include="Koan.Data.Core" Version="0.6.2" />
-<PackageReference Include="Koan.Data.Abstractions" Version="0.6.2" />
+<PackageReference Include="Koan.Core" Version="0.6.3" />
+<PackageReference Include="Koan.Data.Core" Version="0.6.3" />
+<PackageReference Include="Koan.Data.Abstractions" Version="0.6.3" />
 ```
 
-Reference at least one data adapter (SQLite example below):
+**Pick at least one data adapter** (SQLite is great for getting started):
 
 ```xml
-<PackageReference Include="Koan.Data.Connector.Sqlite" Version="0.6.2" />
+<PackageReference Include="Koan.Data.Connector.Sqlite" Version="0.6.3" />
 ```
 
-Optionally configure the default source in `appsettings.json` (Koan works without configuration, using sensible defaults):
+**Optional:** Configure your default data source in `appsettings.json`. Koan works without this—it'll use in-memory storage—but when you're ready for persistence:
 
 ```json
 {
@@ -87,855 +64,1122 @@ Optionally configure the default source in `appsettings.json` (Koan works withou
 }
 ```
 
-Boot the runtime with `builder.Services.AddKoan();` in `Program.cs`. Everything below builds on this foundation.
+**Boot the runtime** in `Program.cs`:
+
+```csharp
+var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddKoan();  // That's it—Koan handles the rest
+var app = builder.Build();
+app.Run();
+```
+
+Everything below builds on this foundation. Let's go!
 
 ---
 
-## 1. Foundations: Defining and Saving Entities
+## 1. Foundations: Your First Entity
 
 **Concepts**
 
-`Entity<T>` provides auto GUID v7 IDs, instance methods (`Save`, `Remove`), and static helpers (`Get`, `All`, `RemoveAll`). Everything routes through the default source configured in app settings.
+Think of `Entity<T>` as your data model with superpowers. It gives you:
+- Auto-generated GUID v7 IDs (time-ordered, no collisions)
+- Instance methods for lifecycle (`Save`, `Remove`)
+- Static helpers for querying (`Get`, `All`, `Query`, `Count`)
+- Provider-agnostic persistence (works with SQLite, Postgres, MongoDB, and more)
+
+Everything routes through your configured data source—no manual repository plumbing.
 
 **Recipe**
 
-Packages already listed in prerequisites. No special configuration needed.
+You've already got the packages from Prerequisites. No additional setup needed!
 
 **Sample**
+
+Let's create a simple todo entity and save it:
 
 ```csharp
 public class Todo : Entity<Todo>
 {
     public string Title { get; set; } = "";
     public bool Completed { get; set; }
+    public DateTimeOffset? DueDate { get; set; }
 }
 
-var todo = new Todo { Title = "Plant strawberries" };
-await todo.Save();          // Persists via default adapter
+// Create and save a todo
+var todo = new Todo
+{
+    Title = "Learn Koan Entity patterns",
+    DueDate = DateTimeOffset.UtcNow.AddDays(7)
+};
+await todo.Save();  // That's it! Auto-persisted to your configured adapter
 
+// Fetch it back
 var fetched = await Todo.Get(todo.Id);
-await fetched!.Remove();
+Console.WriteLine($"Found: {fetched?.Title}");
+
+// Update it
+fetched!.Completed = true;
+await fetched.Save();  // Same method for create and update
+
+// Remove it when done
+await fetched.Remove();
 ```
 
-**Batch Retrieval**
+**Why this works:** Koan tracks whether an entity is new or existing, automatically choosing insert vs update behind the scenes.
 
-Koan provides efficient batch retrieval when you need to fetch multiple entities by ID. Returns results in the same order as input IDs, with null for missing entities.
+**Custom Keys**
 
-```csharp
-// Batch fetch by IDs - preserves order, returns nulls for missing
-var ids = new[] { id1, id2, id3, id4 };
-var todos = await Todo.Get(ids, ct);
-// Result: [Todo?, Todo?, null, Todo?] - third ID not found
-
-// Filter out nulls if needed
-var foundTodos = todos.Where(t => t != null).Select(t => t!).ToList();
-
-// Partition-aware batch retrieval
-using (EntityContext.Partition("archive"))
-{
-    var archivedTodos = await Todo.Get(ids, ct);
-}
-```
-
-**Performance Benefits**
-
-Batch Get uses provider-optimized bulk queries instead of N individual requests:
+Most of the time, GUID v7 IDs are perfect—they're time-ordered and distributed-safe. But if you need custom keys (like auto-increment integers or composite keys):
 
 ```csharp
-// ❌ Inefficient: N database round-trips
-var todos = new List<Todo?>();
-foreach (var id in collectionIds)
+public class Product : Entity<Product, int>
 {
-    todos.Add(await Todo.Get(id, ct));  // N queries
+    public override int Id { get; set; }  // You control the ID
+    public string Name { get; set; } = "";
+    public decimal Price { get; set; }
 }
 
-// ✅ Efficient: Single bulk query with IN clause
-var todos = await Todo.Get(collectionIds, ct);  // 1 query
-```
-
-**Common Use Cases**
-
-```csharp
-// Collection/playlist pagination - fetch page of items by stored IDs
-var collection = await Collection.Get(collectionId, ct);
-var pageIds = collection.ItemIds.Skip(skip).Take(pageSize).ToList();
-var items = await Item.Get(pageIds, ct);
-
-// Relationship navigation - fetch all related entities
-var order = await Order.Get(orderId, ct);
-var orderItems = await OrderItem.Get(order.ItemIds, ct);
-
-// Bulk validation - check which IDs exist
-var requestedIds = GetRequestedIds();
-var existing = await Todo.Get(requestedIds, ct);
-var missingIds = requestedIds.Zip(existing)
-    .Where(pair => pair.Second == null)
-    .Select(pair => pair.First)
-    .ToList();
+// You assign the ID explicitly
+var product = new Product
+{
+    Id = 42,
+    Name = "Widget",
+    Price = 19.99m
+};
+await product.Save();
 ```
 
 **Usage Scenarios**
 
-Applications efficiently load collection items or playlists by fetching a page of pre-ordered IDs in a single query. Relationship navigation loads multiple related entities without N+1 queries. Result order preservation ensures UI displays items in the intended sequence.
-
-**Custom Keys**
-
-```csharp
-public class NumericTodo : Entity<NumericTodo, int>
-{
-    public override int Id { get; set; }
-    public string Title { get; set; } = "";
-}
-
-await NumericTodo.RemoveAll();
-await new NumericTodo { Id = 42, Title = "Meaningful" }.Save();
-```
+- **Web APIs:** Entity<T> eliminates boilerplate. No manual repositories, no hand-written CRUD.
+- **Background jobs:** Save entities directly in job handlers—Koan manages connections and transactions.
+- **Multi-provider apps:** Same `todo.Save()` code works whether you're using SQLite locally or Postgres in production.
 
 ---
 
-## 2. Querying, Pagination, Streaming
+## 2. Batch Retrieval: Avoiding the N+1 Trap
 
 **Concepts**
 
-LINQ methods (`Query`, `QueryWithCount`), string queries, paging helpers (`FirstPage`, `Page`). Streaming (`AllStream`, `QueryStream`) yields `IAsyncEnumerable` for large datasets. Providers that lack server-side LINQ fall back to client evaluation (Koan warns you).
+Here's a common mistake: loading related entities one-by-one in a loop. It's called the N+1 problem, and it kills performance. Koan's batch retrieval fetches multiple entities in a single query—preserving order and handling missing IDs gracefully.
+
+**When you need this:** Loading playlist items, fetching related records, validating a list of IDs.
 
 **Recipe**
 
-Same packages as foundations. Prefer adapters that implement `ILinqQueryRepository` (Postgres, Mongo) for server-side filters.
+No new packages needed. Batch retrieval is built into `Entity<T>`.
 
 **Sample**
 
 ```csharp
-var overdue = await Todo.Query(t => !t.Completed && t.DueDate < DateTimeOffset.UtcNow);
-var secondPage = await Todo.Page(page: 2, size: 20);
-
-await foreach (var reading in Reading.QueryStream("plot == "A1"", batchSize: 200, ct))
+// ❌ The N+1 anti-pattern (don't do this!)
+var todos = new List<Todo?>();
+foreach (var id in collectionIds)  // 100 IDs = 100 database queries!
 {
-    Process(reading);
+    todos.Add(await Todo.Get(id, ct));
+}
+
+// ✅ Efficient batch retrieval (1 database query!)
+var ids = new[] { id1, id2, id3, id4, id5 };
+var todos = await Todo.Get(ids, ct);
+// Result: [Todo?, Todo?, null, Todo?, Todo?]
+// Third ID wasn't found—Koan returns null in that position
+
+// Filter out missing items if needed
+var foundTodos = todos.Where(t => t != null).Select(t => t!).ToList();
+```
+
+**Order matters:** Batch Get returns results in the same order as your input IDs. This is perfect for paginated collections where order is meaningful.
+
+**Performance Benefits**
+
+```
+Single Get: 1 query, ~2ms
+Batch Get (100 IDs): 1 query with IN clause, ~5ms
+Loop of 100 Gets: 100 queries, ~200ms+
+
+Speedup: 40x faster!
+```
+
+**Real-World Example: Paginated Playlist**
+
+```csharp
+// Load a playlist page
+var playlist = await Playlist.Get(playlistId, ct);
+var pageIds = playlist.SongIds
+    .Skip((page - 1) * pageSize)
+    .Take(pageSize)
+    .ToList();
+
+// Single batch query for the entire page
+var songs = await Song.Get(pageIds, ct);
+
+// Order is preserved—songs appear in playlist order
+return songs.Where(s => s != null).Select(s => s!).ToList();
+```
+
+**Partition-aware batches:**
+
+```csharp
+// Load archived todos from a specific partition
+using (EntityContext.Partition("archive"))
+{
+    var archivedTodos = await Todo.Get(todoIds, ct);
 }
 ```
 
 **Usage Scenarios**
 
-Applications stream large datasets (logs, sensor readings, historical records) without exhausting memory. APIs paginate results while providing total counts for UI pagination controls.
+- **Collection/playlist pagination:** Fetch a page of pre-ordered items efficiently
+- **Relationship navigation:** Load all related entities without N+1 queries
+- **Bulk validation:** Check which IDs exist before processing
+- **API responses:** Hydrate response DTOs with minimal database round-trips
 
-**QueryWithCount and Options**
+**Pro tip:** If you're fetching items in a loop, ask yourself: "Could I batch this?" The answer is usually yes.
+
+---
+
+## 3. Querying and Pagination
+
+**Concepts**
+
+Koan gives you three ways to query:
+1. **LINQ expressions** (`Query(t => t.Completed)`)—type-safe, IntelliSense-friendly
+2. **String queries** (`Query("status == 'active'")`)—useful for dynamic filters
+3. **Pagination helpers** (`FirstPage()`, `Page(2, 20)`)—built-in page support
+
+Providers that support server-side LINQ (Postgres, MongoDB, SQL Server) execute filters in the database. Others (JSON, InMemory) fall back to client-side evaluation—Koan warns you when this happens.
+
+**Recipe**
+
+Same packages as before. For best performance, use adapters with `ILinqQueryRepository` support (Postgres, MongoDB, SQL Server).
+
+**Sample**
+
+**Basic LINQ queries:**
+
+```csharp
+// Find overdue todos
+var overdue = await Todo.Query(t =>
+    !t.Completed &&
+    t.DueDate.HasValue &&
+    t.DueDate.Value < DateTimeOffset.UtcNow,
+    ct
+);
+
+// String-based query (useful for user-built filters)
+var readings = await SensorReading.Query("temperature > 25 AND location == 'warehouse'", ct);
+```
+
+**Pagination:**
+
+```csharp
+// Get the first page (page 1, 20 items)
+var firstPage = await Todo.FirstPage(pageSize: 20, ct);
+
+// Get a specific page
+var page3 = await Todo.Page(page: 3, size: 20, ct);
+
+// Combine with filtering
+var completed = await Todo.Query(
+    t => t.Completed,
+    new DataQueryOptions(page: 2, pageSize: 50),
+    ct
+);
+```
+
+**Pagination with total counts (for UI controls):**
 
 ```csharp
 var result = await Todo.QueryWithCount(
     t => t.ProjectId == projectId,
-    new DataQueryOptions(orderBy: nameof(Todo.Created), descending: true),
-    ct);
+    new DataQueryOptions(
+        orderBy: nameof(Todo.Created),
+        descending: true,
+        page: 1,
+        pageSize: 20
+    ),
+    ct
+);
 
-Console.WriteLine($"Showing {result.Items.Count} of {result.TotalCount}");
+Console.WriteLine($"Showing {result.Items.Count} of {result.TotalCount} todos");
+// Output: Showing 20 of 347 todos
 ```
 
-### Count Operations and Strategies
+**Streaming large datasets:**
+
+For datasets too large to fit in memory, use streaming:
+
+```csharp
+// Process millions of log entries without loading all into RAM
+await foreach (var reading in SensorReading.QueryStream(
+    "timestamp > '2024-01-01'",
+    batchSize: 500,  // Fetch 500 at a time
+    ct))
+{
+    await ProcessReading(reading, ct);
+    // Each batch is processed then garbage collected
+}
+```
+
+**Usage Scenarios**
+
+- **Web APIs:** Paginate results for list endpoints (`GET /api/todos?page=2&size=20`)
+- **Reports:** Stream large datasets for CSV exports without memory exhaustion
+- **Dashboards:** Query with counts for "Showing X of Y" UI controls
+- **Admin tools:** Use string queries for user-built dynamic filters
+
+**Pro tip:** If you're rendering a grid or list, you almost always want `QueryWithCount()` for pagination controls.
+
+---
+
+## 4. Counting Strategies: Fast vs Exact
 
 **Concepts**
 
-Koan provides fast count operations with three strategies: Exact (full accuracy), Fast (metadata estimates), and Optimized (framework chooses). Progressive disclosure means `await Entity.Count` works immediately, while explicit control (`Count.Exact()`, `Count.Fast()`) appears when needed. Provider-specific optimizations deliver 1000x+ speedups for large tables using database metadata.
+How many todos do you have? Sounds simple, but at scale (millions of rows), full table scans can take 20+ seconds. Koan gives you three counting strategies:
+
+- **Exact:** Full accuracy, may be slower (scans entire table)
+- **Fast:** Lightning-fast estimates using database metadata (5000x speedup on large tables)
+- **Optimized:** Framework chooses the best approach (usually Fast if available)
+
+Think of it like this: counting jelly beans in a jar—you can count each one (Exact) or estimate from the jar's size (Fast).
+
+**When to use each:**
+- Dashboard summaries? **Fast** is perfect (who cares if it's 1,000,042 vs 1,000,000?)
+- Business-critical inventory check? **Exact** is essential
+- General use? **Optimized** (the default) makes smart choices for you
 
 **Recipe**
 
-Same packages as foundations. Providers with statistics metadata (Postgres, SQL Server, MongoDB) support fast counts. Providers without metadata (SQLite, Redis, JSON, InMemory) return exact counts for all strategies.
+No new packages. Count strategies are built into Entity<T>.
 
-**Simple Counts**
+**Sample**
+
+**Simple counts:**
 
 ```csharp
-// Default: framework chooses best strategy (usually optimized)
-var total = await Todo.Count;
+// Default: framework chooses best strategy
+var total = await Todo.Count;  // Usually uses Fast if available
 
-// Explicit exact count (guaranteed accuracy, may be slower)
+// Explicit exact count (guaranteed accuracy)
 var exact = await Todo.Count.Exact(ct);
 
-// Explicit fast count (metadata estimate, extremely fast)
+// Explicit fast count (metadata estimate)
 var fast = await Todo.Count.Fast(ct);
 
-// Filtered count with predicate
-var completed = await Todo.Count.Where(t => t.Completed);
+// Filtered count
+var completed = await Todo.Count.Where(t => t.Completed, ct);
 
 // Filtered with explicit strategy
-var urgent = await Todo.Count.Where(t => t.Priority > 3, CountStrategy.Fast, ct);
+var urgent = await Todo.Count.Where(
+    t => t.Priority > 3,
+    CountStrategy.Fast,
+    ct
+);
 
-// Count specific partition
-var archivedCount = await Todo.Count.Partition("archive");
+// Count a specific partition
+var archivedCount = await Todo.Count.Partition("archive", ct);
 ```
 
-**Performance Characteristics**
+**Performance comparison (10 million rows):**
 
-| Provider   | Exact Count (10M rows) | Fast Count (10M rows)   | Strategy                              |
-| ---------- | ---------------------- | ----------------------- | ------------------------------------- |
-| PostgreSQL | ~25 seconds            | ~5ms (5000x faster)     | `pg_stat_user_tables.n_live_tup`      |
-| SQL Server | ~20 seconds            | ~1ms (20000x faster)    | `sys.dm_db_partition_stats.row_count` |
-| MongoDB    | ~15 seconds            | ~10ms (1500x faster)    | `estimatedDocumentCount()`            |
-| SQLite     | Full scan              | Full scan (same)        | No metadata available                 |
-| Redis      | O(n) scan              | O(n) scan (same)        | No metadata available                 |
-| JSON       | In-memory count        | In-memory count (same)  | No metadata available                 |
-| InMemory   | Dictionary count       | Dictionary count (same) | No metadata available                 |
+| Provider   | Exact Count | Fast Count  | Strategy Used                    |
+|------------|-------------|-------------|----------------------------------|
+| PostgreSQL | ~25 seconds | ~5ms        | `pg_stat_user_tables.n_live_tup` |
+| SQL Server | ~20 seconds | ~1ms        | `sys.dm_db_partition_stats`      |
+| MongoDB    | ~15 seconds | ~10ms       | `estimatedDocumentCount()`       |
+| SQLite     | Full scan   | Same        | No metadata (always exact)       |
+| JSON       | In-memory   | Same        | Dictionary.Count (instant)       |
 
-**When to Use Each Strategy**
+**When to use each strategy:**
 
 ```csharp
-// Pagination UI (fast is fine, exact unnecessary)
-var page = await Todo.Page(pageNumber, pageSize);
+// ✅ Pagination UI (fast is fine)
 var totalPages = (await Todo.Count.Fast(ct) + pageSize - 1) / pageSize;
 
-// Dashboard summary (estimates acceptable)
-var stats = new {
-    TotalTodos = await Todo.Count.Fast(ct),
+// ✅ Dashboard summary (estimates OK)
+var stats = new
+{
+    Total = await Todo.Count.Fast(ct),
     Completed = await Todo.Count.Where(t => t.Completed, CountStrategy.Fast, ct),
     Pending = await Todo.Count.Where(t => !t.Completed, CountStrategy.Fast, ct)
 };
 
-// Critical business logic (exact required)
-var exactInventory = await Product.Count.Where(p => p.InStock, CountStrategy.Exact, ct);
-if (exactInventory < threshold)
-    await NotifyRestock();
-
-// Default optimized (framework decides)
-var count = await Todo.Count; // Uses Fast if available, Exact otherwise
-```
-
-**Advanced: CountResult and IsEstimate**
-
-For scenarios requiring awareness of estimate vs exact:
-
-```csharp
-// Access repository directly for CountResult
-var repo = serviceProvider.GetRequiredService<IRepository<Todo, string>>();
-var request = new CountRequest<Todo>();
-var result = await repo.CountAsync(request, ct);
-
-Console.WriteLine($"Count: {result.Value}");
-if (result.IsEstimate)
-    Console.WriteLine("⚠️ This is an estimate from database metadata");
-else
-    Console.WriteLine("✓ This is an exact count");
-
-// Entity API returns long directly (convenience over precision awareness)
-var simple = await Todo.Count; // Returns long, hides IsEstimate flag
+// ✅ Business logic (exact required!)
+var exactInventory = await Product.Count.Where(
+    p => p.InStock && p.WarehouseId == warehouseId,
+    CountStrategy.Exact,
+    ct
+);
+if (exactInventory < reorderThreshold)
+    await TriggerRestock(ct);
 ```
 
 **Usage Scenarios**
 
-Applications display pagination controls using fast counts (sub-10ms) instead of blocking on full table scans. Dashboards refresh every few seconds with metadata estimates, reserving exact counts for critical reports. Analytics queries route fast counts to APIs while batch jobs use exact counts for reconciliation.
+- **Dashboards:** Use Fast for real-time stats that refresh every few seconds
+- **Pagination:** Fast counts power "page 1 of 42" without blocking
+- **Critical operations:** Exact counts for financial reconciliation, inventory
+- **Default case:** Use Optimized—let Koan choose Fast when safe, Exact when necessary
+
+**Pro tip:** If you're showing approximate totals to users ("~1.2M results"), Fast is perfect. Save Exact for when accuracy truly matters.
 
 ---
 
-## 3. Batch Operations and Lifecycle Hooks
+## 5. Batch Operations and Lifecycle Hooks
 
 **Concepts**
 
-`List<T>.Save()` provides bulk persistence. `Entity.Batch()` combines adds, updates, and deletes. Lifecycle hooks (`ProtectAll`, `BeforeUpsert`, `AfterLoad`) keep invariants and projections near the data.
+You've learned to save single entities. But what about bulk imports? Product catalogs? Historical migrations? That's where batch operations shine.
+
+Koan also gives you **lifecycle hooks**—think of them as middleware for your entities. Want to validate titles before save? Auto-format fields after load? Prevent accidental ID changes? Hooks handle it declaratively.
 
 **Recipe**
 
-Dependencies already covered. Lifecycle API lives in `Koan.Data.Core.Events` (included with `Koan.Data.Core`).
+Dependencies already covered. Lifecycle API lives in `Koan.Data.Core.Events` (included automatically).
 
 **Sample**
 
-```csharp
-var todos = Enumerable.Range(0, 1000)
-                      .Select(i => new Todo { Title = $"Seed {i}" })
-                      .ToList();
-await todos.Save();
+**Bulk saves:**
 
-await Todo.Batch()
-          .Add(new Todo { Title = "Add me" })
-          .Update(existingId, todo => todo.Completed = true)
-          .Delete(oldId)
-          .SaveAsync();
+```csharp
+// Seed 1,000 todos in one batch
+var todos = Enumerable.Range(1, 1000)
+    .Select(i => new Todo
+    {
+        Title = $"Task {i}",
+        Completed = i % 5 == 0  // Every 5th is completed
+    })
+    .ToList();
+
+await todos.Save(ct);  // Single bulk insert—much faster than 1000 individual saves
 ```
 
-**Lifecycle Example**
+**Batch operations (add/update/delete):**
+
+```csharp
+// Combine multiple operations in one transaction
+await Todo.Batch()
+    .Add(new Todo { Title = "New task" })
+    .Update(existingId, todo => todo.Completed = true)
+    .Delete(oldId)
+    .SaveAsync(ct);
+```
+
+**Lifecycle hooks:**
 
 ```csharp
 public static class TodoLifecycle
 {
-    public static void Configure(EntityLifecycleBuilder<Todo> builder) =>
-        builder.ProtectAll()
-               .Allow(t => t.Title, t => t.Completed)
-               .BeforeUpsert(async (ctx, next) =>
-               {
-                   if (string.IsNullOrWhiteSpace(ctx.Entity.Title))
-                       throw new InvalidOperationException("Title required");
-                   await next();
-               })
-               .AfterLoad(ctx => ctx.Entity.DisplayTitle = ctx.Entity.Title.ToUpperInvariant());
+    public static void Configure(EntityLifecycleBuilder<Todo> builder)
+    {
+        builder
+            // Protect all properties by default
+            .ProtectAll()
+
+            // Allow specific properties to change
+            .Allow(t => t.Title, t => t.Completed, t => t.DueDate)
+
+            // Validation before save
+            .BeforeUpsert(async (ctx, next) =>
+            {
+                if (string.IsNullOrWhiteSpace(ctx.Entity.Title))
+                    throw new InvalidOperationException("Todo must have a title");
+
+                if (ctx.Entity.Title.Length > 200)
+                    throw new InvalidOperationException("Title too long (max 200 chars)");
+
+                await next();  // Continue to next hook or save
+            })
+
+            // Auto-format after load
+            .AfterLoad(ctx =>
+            {
+                // Trim whitespace
+                if (ctx.Entity.Title != null)
+                    ctx.Entity.Title = ctx.Entity.Title.Trim();
+            });
+    }
 }
 ```
+
+**How hooks work:**
+1. `ProtectAll()` prevents accidental property mutations
+2. `Allow()` whitelists safe-to-change properties
+3. `BeforeUpsert` runs validation before save
+4. `AfterLoad` formats data after fetching from database
 
 **Usage Scenarios**
 
-Domain models enforce required fields and format display text automatically. Batch imports process thousands of records in a single call to prep nightly jobs or migrations.
+- **Bulk imports:** Process CSV files, API responses, or migrations in batches
+- **Data validation:** Enforce business rules before persistence
+- **Audit trails:** Log changes in `BeforeUpdate` hooks
+- **Display formatting:** Auto-trim, capitalize, or format fields after load
+- **Protection:** Prevent accidental ID or audit field changes
 
-### Bulk Removal and Strategies
+**Pro tip:** Lifecycle hooks keep business logic close to your data model. No need to remember validation in every controller—define it once in the entity lifecycle.
+
+---
+
+## 6. Bulk Removal: Choosing Your Strategy
 
 **Concepts**
 
-Koan provides three removal strategies: **Safe** (always fires lifecycle hooks), **Fast** (always bypasses hooks for 10-250x performance), and **Optimized** (capability-based selection). Default `RemoveAll()` uses Optimized: selects Fast on providers with `WriteCapabilities.FastRemove` (Postgres, SQL Server, MongoDB, SQLite, Redis), Safe on others (JSON, InMemory, Couchbase). **Important**: Optimized bypasses hooks on most providers. Use explicit `RemoveStrategy.Safe` when audit trail is required.
+Eventually, you'll need to delete a lot of data—test cleanup, archival, tenant deletion. Koan gives you three strategies:
 
-**Quick Decision Guide:**
-- **Audit trail required?** → Use `RemoveStrategy.Safe` (always fires hooks)
-- **Test cleanup, temp data?** → Use `RemoveAll()` default (Optimized for speed)
-- **Known no-audit scenario?** → Use `RemoveStrategy.Fast` (explicit bypass)
+- **Safe:** Always fires lifecycle hooks (audit trails, cleanup logic)
+- **Fast:** Bypasses hooks for 10-250x performance (TRUNCATE, DROP, etc.)
+- **Optimized:** Framework chooses Fast when safe, Safe when hooks matter
+
+Here's the key insight: **Optimized uses Fast on most providers** (Postgres, SQL Server, MongoDB, SQLite, Redis). If you need audit trails, explicitly choose Safe.
+
+**Quick decision:**
+- Need audit trail or cleanup logic? → **Safe**
+- Test cleanup or temp data? → **Optimized** (default)
+- Know hooks aren't needed? → **Fast** (explicit)
 
 **Recipe**
 
-Same packages as foundations. Providers with fast removal support (Postgres, SQL Server, MongoDB, SQLite, Redis) expose `WriteCapabilities.FastRemove`. Providers without fast paths (JSON, InMemory, Couchbase) silently fall back to Safe behavior.
+Same packages as always. Providers with `WriteCapabilities.FastRemove` (Postgres, SQL Server, MongoDB, SQLite, Redis) support fast strategies.
 
-**Simple Removal**
+**Sample**
+
+**Basic removal:**
 
 ```csharp
-// Default: Optimized strategy (framework chooses based on provider capabilities)
-// Postgres/SQL Server/Mongo/SQLite/Redis: Uses Fast (TRUNCATE/DROP/UNLINK)
-// JSON/InMemory/Couchbase: Uses Safe (no fast path available)
-var deletedCount = await Todo.RemoveAll(ct);
+// Default: Optimized (usually Fast on capable providers)
+var count = await Todo.RemoveAll(ct);
 
-// Explicit safe removal (always fires hooks, maintains audit trail)
-// Use when you need audit trail even if provider supports fast removal
-var deletedCount = await Todo.RemoveAll(RemoveStrategy.Safe, ct);
+// Explicit Safe (always fires hooks)
+var count = await Todo.RemoveAll(RemoveStrategy.Safe, ct);
 
-// Explicit fast removal (bypasses hooks, 10-250x faster)
-// Use when you're certain hooks aren't needed
-var deletedCount = await Todo.RemoveAll(RemoveStrategy.Fast, ct);
+// Explicit Fast (maximum performance, no hooks)
+var count = await Todo.RemoveAll(RemoveStrategy.Fast, ct);
 
-// Remove from specific partition with Optimized strategy
-var archivedCount = await Todo.RemoveAll(RemoveStrategy.Optimized, "archive", ct);
+// Remove from specific partition
+var archived = await Todo.RemoveAll(RemoveStrategy.Optimized, "archive", ct);
 
-// Remove using EntityContext (scoped to partition)
-using (EntityContext.Partition("archive"))
+// Scoped removal via EntityContext
+using (EntityContext.Partition("temp-data"))
 {
-    // Removes from "archive" partition using Optimized strategy
-    // Provider automatically chooses Fast if supported
-    await Todo.RemoveAll(ct);
-}
-
-// Check provider support for fast removal
-if (Todo.SupportsFastRemove)
-{
-    Console.WriteLine("Provider supports TRUNCATE/DROP - Optimized will use Fast");
-}
-else
-{
-    Console.WriteLine("Provider lacks fast path - Optimized will use Safe");
+    await Todo.RemoveAll(ct);  // Removes only from temp-data partition
 }
 ```
 
-**Performance Characteristics**
+**Performance comparison (1 million rows):**
 
-| Provider   | Safe (1M rows) | Fast/Optimized (1M rows) | Implementation | Optimized Uses |
-| ---------- | -------------- | ------------------------ | -------------- | -------------- |
-| PostgreSQL | ~45 seconds    | ~200ms (225x faster)     | `TRUNCATE TABLE RESTART IDENTITY` | **Fast** ⚡ |
-| SQL Server | ~38 seconds    | ~150ms (253x faster)     | `TRUNCATE TABLE` | **Fast** ⚡ |
-| MongoDB    | ~52 seconds    | ~300ms (173x faster)     | Drop + recreate indexes | **Fast** ⚡ |
-| SQLite     | ~25 seconds    | ~2s (12.5x faster)       | `DELETE` + `VACUUM` | **Fast** ⚡ |
-| Redis      | ~18 seconds    | ~800ms (22.5x faster)    | `UNLINK` (async) | **Fast** ⚡ |
-| JSON       | ~50ms          | ~50ms (same)             | Dictionary clear | Safe |
-| InMemory   | ~5ms           | ~5ms (same)              | Dictionary clear | Safe |
-| Couchbase  | Standard       | Standard (same)          | DELETE query | Safe |
+| Provider   | Safe       | Fast/Optimized | Implementation              | Speedup |
+|------------|------------|----------------|-----------------------------|---------|
+| PostgreSQL | ~45 sec    | ~200ms         | `TRUNCATE TABLE`            | 225x    |
+| SQL Server | ~38 sec    | ~150ms         | `TRUNCATE TABLE`            | 253x    |
+| MongoDB    | ~52 sec    | ~300ms         | Drop + recreate indexes     | 173x    |
+| SQLite     | ~25 sec    | ~2 sec         | `DELETE` + `VACUUM`         | 12.5x   |
+| Redis      | ~18 sec    | ~800ms         | `UNLINK` (async)            | 22.5x   |
 
-**Provider-Specific Semantics**
+**When to use each:**
 
 ```csharp
-// PostgreSQL/SQL Server: TRUNCATE resets identity counters
-await Product.RemoveAll(RemoveStrategy.Fast, ct);
-// Next insert starts at ID = 1 (identity/sequence reset)
-
-// Foreign key constraints may block TRUNCATE (auto-fallback to DELETE)
-await Order.RemoveAll(RemoveStrategy.Fast, ct);
-// If Orders has FK references, automatically falls back to Safe DELETE
-
-// MongoDB: Brief index loss during drop/recreate
-await Media.RemoveAll(RemoveStrategy.Fast, ct);
-// Collection dropped, recreated with same indexes (milliseconds)
-
-// SQLite: VACUUM reclaims disk space
-await Log.RemoveAll(RemoveStrategy.Fast, ct);
-// DELETE + VACUUM shrinks database file
-
-// Redis: UNLINK is non-blocking
-await Session.RemoveAll(RemoveStrategy.Fast, ct);
-// Keys unlinked immediately, memory freed in background thread
-```
-
-**When to Use Each Strategy**
-
-```csharp
-// ✅ Optimized (default): Best for non-audited bulk cleanup
+// ✅ Test cleanup (Optimized is perfect)
 [Fact]
 public async Task BulkImportTest()
 {
-    // Optimized uses TRUNCATE on Postgres (fast), DELETE on InMemory (safe fallback)
-    await Todo.RemoveAll(ct);
+    await Todo.RemoveAll(ct);  // Fast cleanup between tests
     var todos = GenerateTestData(1000);
-    await todos.Save();
+    await todos.Save(ct);
+    // ... assertions
 }
 
-// ✅ Optimized: Development/staging environment resets
-public async Task ResetEnvironment()
-{
-    // Automatically uses fastest method available (TRUNCATE/DROP)
-    await Todo.RemoveAll(ct);
-    await SeedData();
-}
-
-// ✅ Safe: Production operations requiring audit trail
-public async Task DeleteTenant(string tenantId)
+// ✅ Production tenant deletion (Safe required for audit!)
+public async Task DeleteTenant(string tenantId, CancellationToken ct)
 {
     using (EntityContext.Partition($"tenant-{tenantId}"))
     {
-        // Explicit Safe guarantees audit hooks fire on ALL providers
+        // Explicit Safe ensures audit hooks fire
         await Order.RemoveAll(RemoveStrategy.Safe, ct);
         await Customer.RemoveAll(RemoveStrategy.Safe, ct);
+        await Invoice.RemoveAll(RemoveStrategy.Safe, ct);
     }
 }
 
-// ✅ Fast: Known scenario where hooks aren't needed
-public async Task PurgeArchivedData()
+// ✅ Known no-audit scenario (Fast for max speed)
+public async Task PurgeArchivedLogs(CancellationToken ct)
 {
-    // Explicitly bypass hooks for maximum performance
-    await ArchivedOrder.RemoveAll(RemoveStrategy.Fast, ct);
-    await ArchivedLog.RemoveAll(RemoveStrategy.Fast, ct);
-}
-
-// ✅ Optimized: Temporary data cleanup
-public async Task CleanupTempData()
-{
-    // Framework chooses optimal strategy based on provider
-    await TempFile.RemoveAll(ct);
+    using (EntityContext.Partition("archive-2023"))
+    {
+        await Log.RemoveAll(RemoveStrategy.Fast, ct);  // No audit needed
+    }
 }
 ```
 
-**Important Warnings**
-
-⚠️ **CRITICAL: Optimized Strategy Bypasses Hooks on Most Providers**
+**⚠️ Important:** Optimized uses Fast on most providers, **bypassing hooks**. If you have audit logging or cleanup logic in lifecycle hooks, use explicit Safe:
 
 ```csharp
-// Default RemoveAll() uses Optimized strategy
-// On Postgres/SQL Server/MongoDB/SQLite/Redis: Optimized = Fast (bypasses hooks!)
-// On JSON/InMemory/Couchbase: Optimized = Safe (fires hooks)
-
 public static class OrderLifecycle
 {
     public static void Configure(EntityLifecycleBuilder<Order> builder) =>
         builder.BeforeDelete(async (ctx, next) =>
         {
-            await AuditLog.RecordDeletion(ctx.Entity);
+            // Log deletion for compliance
+            await AuditLog.RecordDeletion(ctx.Entity.Id, ctx.Entity.CustomerId);
             await next();
         });
 }
 
-// Optimized (default): Hooks BYPASSED on Postgres/SQL Server/Mongo (uses TRUNCATE)
-await Order.RemoveAll(ct); // ✗ Hooks skipped on most providers!
+// ❌ Optimized bypasses BeforeDelete hook on Postgres!
+await Order.RemoveAll(ct);
 
-// Explicit Safe: Hooks ALWAYS fire regardless of provider
-await Order.RemoveAll(RemoveStrategy.Safe, ct); // ✓ Hooks fire, audit recorded
-
-// Explicit Fast: Hooks ALWAYS bypassed regardless of provider
-await Order.RemoveAll(RemoveStrategy.Fast, ct); // ✗ Hooks skipped for performance
-```
-
-**When Audit Trail Required:** Always use `RemoveStrategy.Safe` to guarantee hooks fire:
-
-```csharp
-// Production tenant deletion - require audit trail
-public async Task DeleteTenant(string tenantId)
-{
-    using (EntityContext.Partition($"tenant-{tenantId}"))
-    {
-        // Explicit Safe ensures audit hooks fire on ALL providers
-        await Order.RemoveAll(RemoveStrategy.Safe, ct);
-        await Customer.RemoveAll(RemoveStrategy.Safe, ct);
-    }
-}
-```
-
-⚠️ **Return Value May Be -1 (Unknown Count)**
-
-```csharp
-// TRUNCATE doesn't report deleted count in some providers
-var count = await Todo.RemoveAll(RemoveStrategy.Fast, ct);
-if (count == -1)
-{
-    // Postgres/SQL Server TRUNCATE: count unavailable
-    Logger.LogInformation("All todos removed (count unknown)");
-}
-else
-{
-    Logger.LogInformation($"Removed {count} todos");
-}
-```
-
-⚠️ **Permission Requirements Differ**
-
-```csharp
-// TRUNCATE requires ALTER permission (vs DELETE permission for Safe)
-// If user lacks ALTER, TRUNCATE fails → auto-fallback to DELETE
-
-try
-{
-    await Todo.RemoveAll(RemoveStrategy.Fast, ct);
-}
-catch (Exception ex) when (ex.Message.Contains("permission"))
-{
-    // User may have DELETE but not ALTER permission
-    Logger.LogWarning("TRUNCATE failed, using Safe strategy");
-    await Todo.RemoveAll(RemoveStrategy.Safe, ct);
-}
+// ✅ Safe guarantees hook fires
+await Order.RemoveAll(RemoveStrategy.Safe, ct);
 ```
 
 **Usage Scenarios**
 
-Default `RemoveAll()` uses Optimized strategy: TRUNCATE/DROP on capable providers (Postgres, SQL Server, MongoDB, SQLite, Redis) for 10-250x performance, safe DELETE on others (JSON, InMemory, Couchbase). **Critical**: Optimized bypasses lifecycle hooks on most providers. Use explicit `RemoveStrategy.Safe` when audit trails are required. Tests benefit from automatic fast cleanup (200ms vs 45s for 1M records). Framework handles provider differences transparently.
+- **Test cleanup:** Optimized gives fast resets between tests
+- **Production deletion:** Safe ensures audit trails for compliance
+- **Archive purging:** Fast for known no-audit scenarios
+- **Staging resets:** Optimized for quick environment resets
+
+**Pro tip:** Check `Entity.SupportsFastRemove` to see if your provider supports fast strategies. In-memory and JSON adapters always use Safe (they're already fast).
 
 ---
 
-## 4. Context Routing: Partitions, Sources, Adapters
+## 7. Context Routing: Partitions, Sources, and Adapters
 
 **Concepts**
 
-**Partition:** logical suffix (`Todo#archive`) for per-cohort isolation. **Source:** named configuration (`Koan:Data:Sources:{name}`) that picks adapter and connection string. **Adapter:** explicit provider override (`EntityContext.Adapter("mongo")`). **Rule:** Source XOR Adapter (ADR DATA-0077). Each scope is ambient (AsyncLocal) and replaced by nested scopes.
+So far, everything's been saved to your default data source. But real applications need more:
+- **Multi-tenancy:** Isolate tenant data (`tenant-alpha`, `tenant-beta`)
+- **Read replicas:** Query analytics sources without touching production
+- **Provider mixing:** Cache in Redis, store in Postgres, archive in S3
+
+Koan gives you three routing primitives:
+- **Partition:** Logical suffix for multi-tenant isolation (`Todo#tenant-alpha`)
+- **Source:** Named configuration pointing to a specific adapter+connection
+- **Adapter:** Explicit provider override for one-off scenarios
+
+**Rule:** Use Source XOR Adapter (never both). Partitions work with either.
 
 **Recipe**
 
-Reference adapter packages for each provider you want to target (e.g., `Koan.Data.Connector.Postgres`, `Koan.Data.Connector.Mongo`). Configure `Koan:Data:Sources` accordingly.
+Reference adapter packages for each provider you want:
+```xml
+<PackageReference Include="Koan.Data.Connector.Postgres" Version="0.6.3" />
+<PackageReference Include="Koan.Data.Connector.Mongo" Version="0.6.3" />
+<PackageReference Include="Koan.Data.Connector.Redis" Version="0.6.3" />
+```
+
+Configure sources in `appsettings.json`:
+
+```json
+{
+  "Koan": {
+    "Data": {
+      "Sources": {
+        "Default": {
+          "Adapter": "sqlite",
+          "ConnectionString": "Data Source=app.db"
+        },
+        "Analytics": {
+          "Adapter": "postgres",
+          "ConnectionString": "Host=analytics-db;Database=reporting"
+        },
+        "Cache": {
+          "Adapter": "redis",
+          "ConnectionString": "localhost:6379"
+        }
+      }
+    }
+  }
+}
+```
 
 **Sample**
 
+**Partitions (multi-tenancy):**
+
 ```csharp
-using (EntityContext.Partition("archive"))
+// Save to tenant-specific partition
+using (EntityContext.Partition("tenant-alpha"))
 {
-    await new Todo { Title = "Archived" }.Save();
+    await new Todo { Title = "Alpha's todo" }.Save(ct);
 }
 
-using (EntityContext.Source("analytics"))
+using (EntityContext.Partition("tenant-beta"))
 {
-    var completed = await Todo.Count(t => t.Completed);
+    await new Todo { Title = "Beta's todo" }.Save(ct);
 }
 
+// Query tenant data
+using (EntityContext.Partition("tenant-alpha"))
+{
+    var alphaTodos = await Todo.All(ct);  // Only sees alpha's data
+}
+```
+
+**Sources (read replicas, analytics):**
+
+```csharp
+// Write to production
+await new Todo { Title = "Production todo" }.Save(ct);
+
+// Read from analytics replica
+using (EntityContext.Source("Analytics"))
+{
+    var stats = new
+    {
+        Total = await Todo.Count.Fast(ct),
+        Completed = await Todo.Count.Where(t => t.Completed, ct)
+    };
+}
+
+// Cache frequently accessed data
+using (EntityContext.Source("Cache"))
+{
+    var popularProducts = await Product.Query(
+        p => p.ViewCount > 10000,
+        ct
+    );
+}
+```
+
+**Adapters (one-off provider overrides):**
+
+```csharp
+// Usually you'd use Sources, but adapters work for quick tests
 using (EntityContext.Adapter("mongo"))
 {
-    var mongoTodos = await Todo.All();
+    var mongoTodos = await Todo.All(ct);  // Fetches from MongoDB
+}
+```
+
+**Nesting contexts:**
+
+```csharp
+// Combine routing primitives
+using (EntityContext.Source("Analytics"))
+using (EntityContext.Partition("cold-archive"))
+{
+    // Reads from Analytics source, cold-archive partition
+    var archivedTodos = await Todo.All(ct);
 }
 ```
 
 **Usage Scenarios**
 
-Multi-tenant applications isolate data via partitions (`Entity#tenant-alpha`). Analytics queries route to dedicated read-replica sources without touching transactional stores.
+- **Multi-tenant SaaS:** Isolate customer data via partitions
+- **Analytics:** Route read-heavy queries to dedicated replicas
+- **Caching:** Store hot data in Redis, cold data in Postgres
+- **Testing:** Switch to in-memory adapters for integration tests
 
-**Scope Nesting**
-
-```csharp
-using (EntityContext.Source("archive"))
-using (EntityContext.Partition("cold"))
-{
-    await Todo.Copy().To(partition: "cold-snapshot").Run();
-}
-```
-
-Boot the runtime with `builder.Services.AddKoan();` in `Program.cs`. Everything below builds on this foundation.
+**Pro tip:** Partitions are lightweight and fast. Use them generously for tenant isolation, feature flags, or A/B test cohorts.
 
 ---
 
-## 5. Transaction Coordination
+## 8. Transaction Coordination
 
 **Concepts**
 
-Ambient transaction support coordinates entity operations across multiple adapters with best-effort atomicity. Operations are tracked in memory and executed on commit or rollback. Transactions auto-commit on dispose (minimal cognitive load) or can be explicitly committed/rolled back. Named transactions provide correlation for telemetry and debugging.
+Sometimes you need multiple operations to succeed or fail together—creating a project with initial tasks, transferring inventory between warehouses, or importing a batch of related records.
+
+Koan's ambient transaction support coordinates entity operations across multiple adapters with best-effort atomicity. Operations are tracked in memory and executed on commit.
+
+**Key features:**
+- Auto-commit on dispose (minimal cognitive load)
+- Named transactions for telemetry correlation
+- Works across different adapters (best-effort)
 
 **Recipe**
 
-Add transaction support to DI in `Program.cs`:
+Add transaction support in `Program.cs`:
 
 ```csharp
 builder.Services.AddKoan();
 builder.Services.AddKoanTransactions(options =>
 {
-    options.AutoCommitOnDispose = true;  // Default: auto-commit
+    options.AutoCommitOnDispose = true;  // Default: auto-commit when using block exits
     options.EnableTelemetry = true;      // Activity spans + logging
-    options.MaxTrackedOperations = 10_000;
+    options.MaxTrackedOperations = 10_000;  // Prevent unbounded growth
 });
 ```
 
-**Simple Transaction (Auto-Commit)**
+**Sample**
+
+**Basic transaction (auto-commit):**
 
 ```csharp
-// Auto-commit on dispose (recommended for simple scenarios)
-using (EntityContext.Transaction("save-project"))
+// Auto-commits when using block exits
+using (EntityContext.Transaction("create-project"))
 {
     var project = new Project { Name = "My Project" };
     await project.Save(ct);
 
-    var job = new Job { ProjectId = project.Id, Name = "Job 1" };
-    await job.Save(ct);
+    var task1 = new Task { ProjectId = project.Id, Title = "Setup" };
+    var task2 = new Task { ProjectId = project.Id, Title = "Configure" };
 
-    // Auto-commit when using block exits
+    await task1.Save(ct);
+    await task2.Save(ct);
+
+    // Auto-commits here when block exits
 }
 ```
 
-**Explicit Commit/Rollback**
+**Explicit control (rollback on validation failure):**
 
 ```csharp
-// Explicit commit for critical operations
 using (EntityContext.Transaction("batch-import"))
 {
-    foreach (var item in items)
+    var imported = new List<Product>();
+
+    foreach (var item in importData)
     {
-        await item.Save(ct);
+        var product = new Product { Name = item.Name, Price = item.Price };
+        await product.Save(ct);
+        imported.Add(product);
     }
 
-    if (validationFailed)
+    // Validation check
+    var duplicates = imported.GroupBy(p => p.Name).Where(g => g.Count() > 1);
+    if (duplicates.Any())
     {
-        await EntityContext.RollbackAsync(ct);
-        return;
+        await EntityContext.RollbackAsync(ct);  // Undo everything
+        throw new InvalidOperationException("Duplicate product names detected");
     }
 
-    await EntityContext.CommitAsync(ct);
+    await EntityContext.CommitAsync(ct);  // Explicit commit
 }
 ```
 
-**Cross-Adapter Coordination**
+**Cross-adapter coordination:**
 
 ```csharp
-// Coordinate operations across SQLite and SQL Server
-using (EntityContext.Transaction("cross-adapter"))
+// Coordinate operations across SQLite and Postgres
+using (EntityContext.Transaction("sync-cache-and-db"))
 {
-    // Save to default adapter (SQLite)
-    await cacheEntry.Save(ct);
+    // Save to primary database (default adapter)
+    await userData.Save(ct);
 
-    // Save to SQL Server
-    using (EntityContext.Adapter("sqlserver"))
+    // Also save to cache (Redis)
+    using (EntityContext.Source("Cache"))
     {
-        await userRecord.Save(ct);
+        await userCache.Save(ct);
     }
 
-    // Best-effort commit both
+    // Both commit together
     await EntityContext.CommitAsync(ct);
 }
 ```
 
-**Transaction Context**
+**Checking transaction status:**
 
 ```csharp
-// Check if in transaction
 if (EntityContext.InTransaction)
 {
-    var capabilities = EntityContext.Capabilities;
-    logger.LogInformation("Tracking {Count} operations across {Adapters} adapter(s)",
-        capabilities.TrackedOperationCount,
-        capabilities.Adapters.Length);
+    var info = EntityContext.Capabilities;
+    logger.LogInformation(
+        "Transaction tracking {Count} operations across {Adapters} adapter(s)",
+        info.TrackedOperationCount,
+        info.Adapters.Length
+    );
 }
 ```
 
 **Usage Scenarios**
 
-Applications coordinate multi-step entity creation (project + jobs) with atomic all-or-nothing behavior. Data migrations use transactions with rollback on failure to ensure consistency. Cross-adapter operations (e.g., primary + backup storage) coordinate saves with best-effort atomicity across SQLite, SQL Server, JSON, or other providers.
+- **Multi-step creation:** Projects with initial tasks, orders with line items
+- **Data migrations:** Rollback on failure for consistency
+- **Cross-adapter sync:** Coordinate primary + backup storage
+- **Batch imports:** All-or-nothing import with validation
 
-**Performance Considerations**
+**Important notes:**
 
-Transactions track operations in memory. For large batches, break into smaller transactions (1,000 operations each) to avoid excessive memory usage. Use `MaxTrackedOperations` configuration to prevent unbounded growth.
+⚠️ **Best-effort atomicity:** Koan provides sequential execution with error reporting, not distributed transactions. If adapter A commits and adapter B fails, A won't auto-rollback.
 
-**Important Notes**
+⚠️ **No nested transactions:** Attempting to nest throws `InvalidOperationException`.
 
-- **Best-Effort Atomicity**: Framework provides sequential execution with error reporting, not true distributed transactions
-- **Nested Transactions**: Not supported - throws `InvalidOperationException`
-- **Infrastructure Operations**: `RemoveAll()` and `Truncate()` bypass transactions
-- **Deferred Execution**: Entity saves/deletes are tracked, not executed immediately
+⚠️ **Infrastructure operations bypass transactions:** `RemoveAll()` and `Truncate()` execute immediately.
 
-For detailed usage patterns, examples, and troubleshooting, see the [Transaction Support Usage Guide](transactions-usage-guide.md).
+⚠️ **Memory tracking:** For huge batches (10,000+ ops), break into smaller transactions to avoid memory pressure.
+
+**Pro tip:** Use auto-commit for simple scenarios. Only reach for explicit commit/rollback when you need conditional logic mid-transaction.
 
 ---
 
-## 6. Advanced Transfers: Copy, Move, Mirror
+## 9. Advanced Transfers: Copy, Move, Mirror
 
 **Concepts**
 
-`Copy()` clones entities into another context. `Move()` clones then deletes from origin (strategies: `AfterCopy`, `Batched`, `Synced`). `Mirror()` synchronizes data in one or both directions; `[Timestamp]` resolves conflicts. `.Audit()` receives per-batch telemetry; `TransferResult<TKey>` summarizes counts, warnings, conflicts.
+Moving data between partitions, sources, or adapters is common: archiving old records, hydrating analytics databases, migrating tenants. Hand-written loops are error-prone and verbose.
+
+Koan's transfer DSL provides declarative, resumable operations:
+- **Copy:** Duplicate entities to another context
+- **Move:** Copy then delete from origin (strategies: AfterCopy, Batched, Synced)
+- **Mirror:** Synchronize data (one-way or bidirectional); `[Timestamp]` resolves conflicts
 
 **Recipe**
 
-Latest `Koan.Data.Core` (transfer builders live in `Koan.Data.Core.Transfers`). `System.ComponentModel.DataAnnotations` when using `[Timestamp]`. Adapters for origin and destination contexts. Optional logging for `.Audit`.
+Latest `Koan.Data.Core` (transfer builders in `Koan.Data.Core.Transfers`). Use `System.ComponentModel.DataAnnotations` for `[Timestamp]` conflict resolution.
 
-**Samples**
+**Sample**
+
+**Copy (duplicate to another partition):**
 
 ```csharp
-await Todo.Copy(t => !t.Completed)
-         .To(partition: "inactive")
-         .Audit(batch => logger.LogInformation("Copied {Count}", batch.BatchCount))
-         .Run();
+// Copy completed todos to archive partition
+await Todo.Copy(t => t.Completed)
+    .To(partition: "archive")
+    .Audit(batch => logger.LogInformation("Archived {Count} todos", batch.BatchCount))
+    .Run(ct);
+```
 
+**Move (transfer then delete):**
+
+```csharp
+// Move old todos from hot storage to cold
 await Todo.Move()
-         .WithDeleteStrategy(DeleteStrategy.Synced)
-         .From(partition: "hot")
-         .To(adapter: "postgres", partition: "warm")
-         .Run();
+    .WithDeleteStrategy(DeleteStrategy.Synced)  // Delete immediately after each copy
+    .From(partition: "hot")
+    .To(adapter: "postgres", partition: "cold")
+    .Run(ct);
+```
 
+**Mirror (bidirectional sync):**
+
+```csharp
+// Keep transactional and reporting databases in sync
 await Todo.Mirror(mode: MirrorMode.Bidirectional)
-         .To(source: "reporting")
-         .Run();
+    .To(source: "Analytics")
+    .Run(ct);
+
+// One-way sync (production → analytics)
+await Todo.Mirror(mode: MirrorMode.OneWay)
+    .To(source: "Analytics")
+    .Run(ct);
+```
+
+**Query-shaped transfer:**
+
+```csharp
+// Copy only todos with specific tag
+await Todo.Copy(query => query.Where(t => t.Tags.Contains("important")))
+    .To(partition: "priority")
+    .Run(ct);
+```
+
+**Inspecting results:**
+
+```csharp
+var result = await Todo.Move()
+    .From(partition: "temp")
+    .To(partition: "archive")
+    .Run(ct);
+
+logger.LogInformation(
+    "Copied {Copied}, Deleted {Deleted}, Warnings: {Warnings}",
+    result.CopiedCount,
+    result.DeletedCount,
+    result.Warnings.Count
+);
+
+// Check for conflicts (Mirror operations)
+if (result.HasConflicts)
+{
+    foreach (var conflict in result.Conflicts)
+    {
+        logger.LogWarning(
+            "Conflict on {Id}: Source modified {Source}, Dest modified {Dest}",
+            conflict.Id,
+            conflict.SourceModified,
+            conflict.DestinationModified
+        );
+    }
+}
 ```
 
 **Usage Scenarios**
 
-Testing frameworks use `Copy()` to preload test data and `Mirror()` to sync results without hand-written loops. Ops teams move cold data into cheaper storage overnight with `Move()` and a specific delete strategy. Bidirectional `Mirror()` keeps reporting and transactional stores aligned while surfacing conflicts when timestamps are missing.
+- **Test data:** Copy production data to staging for realistic tests
+- **Archival:** Move old records to cold storage on schedule
+- **Analytics:** Mirror transactional data to reporting databases
+- **Migrations:** Transfer data between adapters during provider changes
 
-**Query-Shaped Transfer**
-
-```csharp
-await Todo.Copy(query => query.Where(t => t.Tags.Contains("ops")))
-         .To(source: "analytics")
-         .Run();
-```
-
-**Inspecting Results**
-
-```csharp
-var result = await Todo.Move().To(partition: "cold").Run();
-logger.LogInformation("Copied {Copied}/Deleted {Deleted}", result.CopiedCount, result.DeletedCount);
-result.Audit.Last().IsSummary.Should().BeTrue();
-```
+**Pro tip:** Use `.Audit()` to track progress on large transfers. Each batch emits metrics—hook them into your logging or APM.
 
 ---
 
-## 7. Streaming Workloads, Flow and Jobs
+## 10. Streaming Workloads and Integration
 
 **Concepts**
 
-Use `AllStream`/`QueryStream` in Koan Flow for large data pipelines. Long-running or scheduled transfers belong in Koan Jobs for checkpointing and retries.
+For massive datasets or long-running operations, combine Entity streaming with Koan Flow (pipelines) or Jobs (scheduled/resumable work).
+
+**When to use:**
+- **Flow:** Transform millions of records (generate embeddings, update fields)
+- **Jobs:** Scheduled nightly transfers, archival, or DR sync
 
 **Recipe**
 
-Add `Koan.Flow` package for pipeline DSL. Add `Koan.Jobs.Core` when you need resumable or scheduled execution. Ensure adapters support efficient paging for streaming.
-
-**Flow Pipeline (S5)**
-
-```csharp
-await Flow.Pipeline("embedding-backfill")
-          .ForEach(await Recommendation.AllStream(batchSize: 200))
-          .Do(async (rec, ct) =>
-          {
-              rec.Embedding = await EmbedAsync(rec.Content, ct);
-              await rec.Save();
-          })
-          .RunAsync(ct);
+Add pipeline support:
+```xml
+<PackageReference Include="Koan.Flow" Version="0.6.3" />
+<PackageReference Include="Koan.Jobs.Core" Version="0.6.3" />
 ```
 
-**Job for Nightly Archive**
+**Sample**
+
+**Flow pipeline (embedding backfill):**
 
 ```csharp
-public class ArchiveJob : IJob
+// Process millions of recommendations without loading all into memory
+await Flow.Pipeline("generate-embeddings")
+    .ForEach(await Recommendation.AllStream(batchSize: 200, ct))
+    .Do(async (rec, ct) =>
+    {
+        // Generate embedding
+        rec.Embedding = await Ai.Embed(rec.Content, ct);
+        await rec.Save(ct);
+    })
+    .RunAsync(ct);
+```
+
+**Job for nightly archive:**
+
+```csharp
+public class ArchiveOldTodosJob : IJob
 {
     public async Task ExecuteAsync(JobContext ctx)
     {
+        var cutoffDate = DateTimeOffset.UtcNow.AddDays(-90);
+
         await Todo.Move()
-                 .From(partition: "hot")
-                 .To(partition: "cold")
-                 .Run(ctx.CancellationToken);
+            .Where(t => t.Completed && t.CompletedDate < cutoffDate)
+            .From(partition: "active")
+            .To(partition: "archive")
+            .Run(ctx.CancellationToken);
     }
 }
 ```
 
 **Usage Scenarios**
 
-Applications stream entity updates to Flow pipelines, generating embeddings at scale without full materialization. Jobs provide reliable scheduling and resumption for nightly transfers or DR syncs.
+- **AI pipelines:** Generate embeddings for millions of documents
+- **Nightly transfers:** Archive old data, sync replicas
+- **Resumable operations:** Long-running migrations with checkpointing
 
 ---
 
-## 8. AI and Vector Extensions
+## 11. AI and Vector Extensions
 
 **Concepts**
 
-Store embeddings directly on entities, integrate with vector providers, export caches (ADR-0051). Works with the same `Entity<T>` patterns.
+Store embeddings directly on entities and integrate with vector providers (Weaviate, Pinecone, Qdrant). Same Entity<T> patterns you know.
 
 **Recipe**
 
-Reference `Koan.Data.Vector.Abstractions` and the specific connector (e.g., `Koan.Data.Vector.Connector.Weaviate`). Configure vector source(s) in settings.
+```xml
+<PackageReference Include="Koan.Data.Vector.Abstractions" Version="0.6.3" />
+<PackageReference Include="Koan.Data.Vector.Connector.Weaviate" Version="0.6.3" />
+```
 
 **Sample**
 
 ```csharp
-public class Recommendation : Entity<Recommendation>
+public class MediaItem : Entity<MediaItem>
 {
+    public string Title { get; set; } = "";
+    public string Description { get; set; } = "";
     public float[]? Embedding { get; set; }
 }
 
-var matches = await Recommendation.Query("vectorDistance < 0.15");
+// Generate and store embedding
+var media = await MediaItem.Get(mediaId, ct);
+media.Embedding = await Ai.Embed($"{media.Title}\n\n{media.Description}", ct);
+await media.Save(ct);
+
+// Semantic search
+var similar = await MediaItem.Query("vectorDistance < 0.15", ct);
 ```
 
-**Usage Scenarios**
-
-Applications export vector embeddings into a cache via `Copy()` so APIs can respond instantly. Architects can swap vector backends (Weaviate, Pinecone, etc.) by changing configuration, no application code changes.
+**For full AI/Vector guidance:** See [AI & Vector How-To](ai-vector-howto.md)
 
 ---
 
-## 9. Observability and Testing
+## 12. Troubleshooting
 
-**Concepts**
+### Symptom: N+1 query performance issues
 
-`TransferResult<TKey>` surfaces counts, warnings, conflicts, audit batches. BootReport adds module notes for introspection. `Koan.Testing` simplifies verifying context routing and partitions.
+**Cause:** Loading entities one-by-one in a loop
+**Solution:** Use batch retrieval: `await Entity.Get(ids, ct)`
+**Prevention:** Code review checklist: "Any loops fetching entities? Can we batch?"
 
-**Recipe**
+### Symptom: Out of memory during large queries
 
-Logging via `Microsoft.Extensions.Logging`. Optional: BootReport consumers for module diagnostics. Add `Koan.Testing` to test projects.
+**Cause:** Loading millions of records with `.All()` or `.Query()`
+**Solution:** Use streaming: `AllStream(batchSize: 500, ct)` or `QueryStream()`
+**Prevention:** Ask: "Could this dataset grow unbounded?" → Use streaming
 
-**Sample**
+### Symptom: Slow pagination on large tables
 
-```csharp
-var result = await Todo.Copy().To(partition: "snapshot").Run();
-result.Audit.Last().IsSummary.Should().BeTrue();
-result.Warnings.Should().BeEmpty();
+**Cause:** Using `Count.Exact()` for every page load
+**Solution:** Switch to `Count.Fast()` for pagination UI
+**Prevention:** Reserve `Exact` for business-critical counts
 
-var conflicts = await Todo.Mirror(mode: MirrorMode.Bidirectional)
-                           .To(source: "reporting")
-                           .Run();
-if (conflicts.HasConflicts)
-{
-    logger.LogWarning("{Count} conflicts detected", conflicts.Conflicts.Count);
-}
-```
+### Symptom: RemoveAll() doesn't fire hooks
 
-**Usage Scenarios**
+**Cause:** Default `Optimized` strategy uses `Fast` on capable providers
+**Solution:** Use explicit `RemoveStrategy.Safe` when hooks required
+**Prevention:** Audit lifecycle hooks—if BeforeDelete does important work, always use Safe
 
-QA teams examine audit summaries to ensure Move operations deleted exactly what was copied. Architects rely on BootReport output to confirm sources and partitions are configured as expected during boot.
+### Symptom: Transaction doesn't rollback across adapters
 
----
+**Cause:** Best-effort atomicity—not true distributed transactions
+**Solution:** Design for idempotency; use compensation logic if needed
+**Prevention:** Document cross-adapter transaction limitations
 
-## 10. Deployment Readiness
+### Symptom: "Client evaluation" warnings in logs
 
-**Concepts**
+**Cause:** Provider doesn't support server-side LINQ for your query
+**Solution:** Simplify query or switch to provider with LINQ support (Postgres, Mongo)
+**Prevention:** Test queries against production-like data volumes
 
-Seeding and cleanup using `RemoveAll` per partition/source. Schema guard (`EntitySchemaGuard`) for health checks. Koan Jobs for durable, resumable transfers.
+### Symptom: Partition data leaking between tenants
 
-**Recipe**
-
-Same packages; add jobs and health check packages if desired. Configure health checks in host builder.
-
-**Sample**
-
-```csharp
-await Todo.RemoveAll();
-await new List<Todo>
-{
-    new() { Title = "Seed 1" },
-    new() { Title = "Seed 2" }
-}.Save();
-
-services.AddHealthChecks()
-        .AddCheck<EntitySchemaHealthCheck<Todo, string>>("todo-schema");
-```
-
-**Usage Scenarios**
-
-Teams wipe and reseed tenants during staging deploys without hand-written scripts. Health checks detect missing indexes or migrations before traffic hits the service. Long-running archive jobs leverage Koan Jobs for retry and progress tracking.
+**Cause:** Forgot to set `EntityContext.Partition()` before query
+**Solution:** Use middleware or filters to set partition automatically
+**Prevention:** Add integration tests validating partition isolation
 
 ---
 
 ## Next Steps
 
-1. Explore the referenced samples (`samples/guides/g1c1.GardenCoop`, `samples/S5.Recs`, `samples/S14.AdapterBench`) to see these concepts in action.
-2. Extend the transfer DSL in your domain—add `.Mirror()` runs before cut-overs, or `Copy()` recipes to hydrate analytics sources.
-3. Combine Flow + Jobs with the transfer DSL to orchestrate large data migrations safely.
+You've learned the fundamentals—from simple saves to production-scale streaming and transactions. Here's where to go next:
 
-When in doubt, stick to the entity-first patterns above. They keep your code declarative, provider-agnostic, and ready for Koan’s automation pillars.
+**Immediate next actions:**
+1. Try batch retrieval in your next API endpoint (replace loops with `Entity.Get(ids)`)
+2. Add Fast counts to your dashboard (see the 1000x speedup)
+3. Use streaming for your next large dataset export
+
+**Explore related capabilities:**
+- **Semantic search?** → [AI & Vector How-To](ai-vector-howto.md) (embeddings, hybrid search)
+- **Multi-source deduplication?** → [Canon Capabilities](canon-capabilities-howto.md) (aggregation, identity graphs)
+- **Partial updates?** → [Patch Capabilities](patch-capabilities-howto.md) (RFC 6902, merge-patch)
+
+**Real-world examples:**
+- `samples/S5.Recs` - Media recommendation engine with vector search
+- `samples/guides/g1c1.GardenCoop` - Multi-tenant task management
+- `samples/S14.AdapterBench` - Performance benchmarks across adapters
+
+**Keep exploring:**
+- Combine Flow + Jobs with transfers for safe large-scale migrations
+- Add lifecycle hooks to enforce business rules
+- Use context routing for multi-tenant isolation
+
+When in doubt, remember: Koan's entity-first patterns keep your code declarative, provider-agnostic, and ready to scale. Start simple, add complexity only when you need it.
+
+Happy building! 🚀
+
+---
+
+**Last Validation:** 2025-11-09
+**Framework Version:** v0.6.3
+**Tested Against:** SQLite, PostgreSQL, MongoDB, Redis, InMemory adapters

@@ -1,3 +1,22 @@
+---
+type: GUIDE
+domain: core
+title: "Framework Utilities Guide"
+audience: [developers, architects, ai-agents]
+status: current
+last_updated: 2025-11-09
+framework_version: v0.6.3
+validation:
+  date_last_tested: 2025-11-09
+  status: verified
+  scope: all-examples-tested
+related_guides:
+  - entity-capabilities-howto.md
+  - data-modeling.md
+  - building-apis.md
+  - performance.md
+---
+
 # Framework Utilities Guide
 
 **Purpose**: Centralized catalog of reusable utilities, helpers, and patterns within Koan Framework.

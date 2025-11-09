@@ -2,11 +2,19 @@
 type: GUIDE
 domain: web
 title: "Authentication Setup with Koan"
-audience: [developers, security-engineers]
-last_updated: 2025-01-17
-framework_version: "v0.2.18+"
+audience: [developers, security-engineers, ai-agents]
 status: current
-validation: 2025-01-17
+last_updated: 2025-11-09
+framework_version: v0.6.3
+validation:
+  date_last_tested: 2025-11-09
+  status: verified
+  scope: all-examples-tested
+related_guides:
+  - building-apis.md
+  - entity-capabilities-howto.md
+  - mcp-http-sse-howto.md
+  - aspire-integration.md
 ---
 
 # Authentication Setup with Koan

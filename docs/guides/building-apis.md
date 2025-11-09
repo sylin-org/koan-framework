@@ -3,13 +3,18 @@ type: GUIDE
 domain: web
 title: "API Delivery Playbook"
 audience: [developers, architects, ai-agents]
-last_updated: 2025-09-28
-framework_version: v0.6.2
 status: current
+last_updated: 2025-11-09
+framework_version: v0.6.3
 validation:
-  date_last_tested: 2025-09-28
+  date_last_tested: 2025-11-09
   status: verified
-  scope: docs/guides/building-apis.md
+  scope: all-examples-tested
+related_guides:
+  - entity-capabilities-howto.md
+  - patch-capabilities-howto.md
+  - authentication-setup.md
+  - data-modeling.md
 ---
 
 # API Delivery Playbook
