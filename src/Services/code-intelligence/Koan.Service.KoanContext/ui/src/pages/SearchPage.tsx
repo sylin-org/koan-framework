@@ -599,59 +599,73 @@ export default function SearchPage() {
               {results && results.chunks.length > 0 && (
                 <>
                   <div className="space-y-4">
-                    {results.chunks.map((chunk) => (
-                      <div key={chunk.id} className="bg-card border border-border rounded-lg p-5 hover:border-primary-300 transition-colors">
-                        {/* Header */}
-                        <div className="flex items-start justify-between mb-3">
-                          <div className="flex items-start gap-3 flex-1">
-                            <FileText className="w-5 h-5 text-primary-600 mt-0.5" />
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2">
-                                <h3 className="font-medium text-foreground">{chunk.title || chunk.filePath}</h3>
-                                {chunk.language && (
-                                  <span className="px-2 py-0.5 text-xs bg-muted text-muted-foreground rounded">
-                                    {chunk.language}
+                    {results.chunks.map((chunk) => {
+                      // Look up source file from sources array using provenance.sourceIndex
+                      const sourceFile = results.sources?.files[chunk.provenance.sourceIndex];
+                      const filePath = sourceFile?.filePath || 'Unknown file';
+                      const title = sourceFile?.title || filePath;
+                      const sourceUrl = sourceFile?.url;
+
+                      return (
+                        <div key={chunk.id} className="bg-card border border-border rounded-lg p-5 hover:border-primary-300 transition-colors">
+                          {/* Header */}
+                          <div className="flex items-start justify-between mb-3">
+                            <div className="flex items-start gap-3 flex-1">
+                              <FileText className="w-5 h-5 text-primary-600 mt-0.5" />
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2">
+                                  <h3 className="font-medium text-foreground">{title}</h3>
+                                  {chunk.provenance.language && (
+                                    <span className="px-2 py-0.5 text-xs bg-muted text-muted-foreground rounded">
+                                      {chunk.provenance.language}
+                                    </span>
+                                  )}
+                                  <span className="px-2 py-0.5 text-xs bg-primary-50 text-primary-700 rounded">
+                                    {(chunk.score * 100).toFixed(0)}% match
                                   </span>
-                                )}
+                                </div>
+                                <p className="text-sm text-muted-foreground mt-1">{filePath}</p>
+                                <p className="text-xs text-muted-foreground mt-0.5">
+                                  Lines {chunk.provenance.startLine}-{chunk.provenance.endLine}
+                                  {chunk.reasoning && (
+                                    <span> · {chunk.reasoning.strategy} search ({(chunk.reasoning.semanticScore * 100).toFixed(0)}% semantic, {(chunk.reasoning.keywordScore * 100).toFixed(0)}% keyword)</span>
+                                  )}
+                                </p>
                               </div>
-                              <p className="text-sm text-muted-foreground mt-1">{chunk.filePath}</p>
-                              <p className="text-xs text-muted-foreground mt-0.5">
-                                Lines {chunk.startLine}-{chunk.endLine} · {chunk.tokenCount} tokens
-                              </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => handleCopyCode(chunk.id, chunk.text)}
+                                className="p-2 hover:bg-muted rounded transition-colors"
+                                title="Copy code"
+                              >
+                                {copiedId === chunk.id ? (
+                                  <CheckCircle className="w-4 h-4 text-success-600" />
+                                ) : (
+                                  <Copy className="w-4 h-4 text-muted-foreground" />
+                                )}
+                              </button>
+                              {sourceUrl && (
+                                <a
+                                  href={sourceUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="p-2 hover:bg-muted rounded transition-colors"
+                                  title="Open in editor"
+                                >
+                                  <ExternalLink className="w-4 h-4 text-muted-foreground" />
+                                </a>
+                              )}
                             </div>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => handleCopyCode(chunk.id, chunk.searchText)}
-                              className="p-2 hover:bg-muted rounded transition-colors"
-                              title="Copy code"
-                            >
-                              {copiedId === chunk.id ? (
-                                <CheckCircle className="w-4 h-4 text-success-600" />
-                              ) : (
-                                <Copy className="w-4 h-4 text-muted-foreground" />
-                              )}
-                            </button>
-                            {chunk.sourceUrl && (
-                              <a
-                                href={chunk.sourceUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="p-2 hover:bg-muted rounded transition-colors"
-                                title="Open in editor"
-                              >
-                                <ExternalLink className="w-4 h-4 text-muted-foreground" />
-                              </a>
-                            )}
+
+                          {/* Code Preview */}
+                          <div className="bg-muted/30 rounded-lg p-4 font-mono text-sm overflow-x-auto">
+                            <pre className="whitespace-pre-wrap break-words">{chunk.text}</pre>
                           </div>
                         </div>
-
-                        {/* Code Preview */}
-                        <div className="bg-muted/30 rounded-lg p-4 font-mono text-sm overflow-x-auto">
-                          <pre className="whitespace-pre-wrap break-words">{chunk.searchText}</pre>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
 
                   {/* Load More Button */}

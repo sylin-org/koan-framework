@@ -50,6 +50,7 @@ export interface Job {
   elapsed: string; // TimeSpan as ISO duration string
 }
 
+// Legacy Chunk interface for backward compatibility (used by other parts of the system)
 export interface Chunk {
   id: string;
   filePath: string;
@@ -68,6 +69,31 @@ export interface Chunk {
   pathSegments?: string[] | null;
   fileLastModified: string;
   fileHash?: string | null;
+}
+
+// NEW: Search result chunk with nested provenance (matches backend SearchResultChunk)
+export interface SearchResultChunk {
+  id: string;
+  text: string;
+  score: number;
+  provenance: ChunkProvenance;
+  reasoning?: RetrievalReasoning | null;
+  projectId?: string; // Present in multi-project searches
+}
+
+export interface ChunkProvenance {
+  sourceIndex: number;
+  startByteOffset: number;
+  endByteOffset: number;
+  startLine: number;
+  endLine: number;
+  language?: string | null;
+}
+
+export interface RetrievalReasoning {
+  semanticScore: number;
+  keywordScore: number;
+  strategy: string; // "keyword" | "vector" | "hybrid"
 }
 
 // API Request/Response types
@@ -143,11 +169,11 @@ export interface SearchRequest {
 }
 
 export interface SearchResult {
-  projects: Array<{
+  projects?: Array<{
     id: string;
     name: string;
   }>;
-  chunks: Array<Chunk & { projectId?: string }>;  // projectId present in multi-project searches
+  chunks: Array<SearchResultChunk>;  // Use new SearchResultChunk type
   metadata?: {
     tokensRequested?: number;
     tokensReturned?: number;
@@ -165,14 +191,15 @@ export interface SearchResult {
       projectId?: string;
       projectName?: string;
       filePath: string;
-      title: string;
+      title?: string | null;
+      url?: string | null;
       commitSha: string;
     }>;
   };
   insights?: {
     topics: Record<string, number>;
     completenessLevel: string;
-    missingTopics: string[];
+    missingTopics?: string[] | null;
   };
   warnings?: string[] | null;
   errors?: string[] | null;
