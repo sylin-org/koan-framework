@@ -170,11 +170,34 @@ public class SearchController : ControllerBase
         SearchRequest request,
         CancellationToken cancellationToken)
     {
+        // Parse continuation token if provided
+        var pagination = HttpContext.RequestServices.GetRequiredService<Pagination>();
+        ContinuationTokenData? continuationData = null;
+        var chunkOffset = 0;
+
+        if (!string.IsNullOrWhiteSpace(request.ContinuationToken))
+        {
+            continuationData = pagination.ParseToken(request.ContinuationToken);
+            if (continuationData != null &&
+                continuationData.Query == request.Query &&
+                continuationData.ProjectIds != null &&
+                continuationData.ProjectIds.SequenceEqual(request.ProjectIds ?? new List<string>()))
+            {
+                chunkOffset = continuationData.ChunkOffset;
+                _logger.LogInformation("Multi-project continuation from offset {Offset}", chunkOffset);
+            }
+            else
+            {
+                _logger.LogWarning("Invalid multi-project continuation token, starting from beginning");
+            }
+        }
+
+        // Fetch more results per project to support pagination
         var options = new SearchOptions(
-            MaxTokens: request.TokenCounter ?? 5000,
+            MaxTokens: 10000,  // Fetch more results per project for aggregation
             Alpha: request.Alpha ?? 0.7f,
-            ContinuationToken: request.ContinuationToken,
-            IncludeInsights: request.IncludeInsights ?? true,
+            ContinuationToken: null,  // Don't use per-project continuation
+            IncludeInsights: false,   // Only include insights on first page
             IncludeReasoning: request.IncludeReasoning ?? true,
             Languages: request.Languages);
 
@@ -182,7 +205,6 @@ public class SearchController : ControllerBase
         var allSources = new List<object>();
         var projects = new List<object>();
         var errors = new List<string>();
-        var totalTokens = 0;
 
         foreach (var projectId in request.ProjectIds!)
         {
@@ -235,7 +257,6 @@ public class SearchController : ControllerBase
                     }
                 }
 
-                totalTokens += result.Metadata?.TokensReturned ?? 0;
             }
             catch (Exception ex)
             {
@@ -244,13 +265,59 @@ public class SearchController : ControllerBase
             }
         }
 
+        // Apply pagination: skip chunks from previous pages
+        var paginatedChunks = allChunks.Skip(chunkOffset).ToList();
+
+        // Apply token budget to determine how many chunks to return
+        var maxTokens = request.TokenCounter ?? 5000;
+        var returnedChunks = new List<object>();
+        var tokensReturned = 0;
+
+        foreach (var chunk in paginatedChunks)
+        {
+            // Estimate tokens (rough approximation)
+            var chunkTokens = 350; // EstimatedTokensPerChunk from Search.cs
+
+            if (tokensReturned + chunkTokens > maxTokens && returnedChunks.Count > 0)
+            {
+                break; // Token budget reached
+            }
+
+            returnedChunks.Add(chunk);
+            tokensReturned += chunkTokens;
+        }
+
+        // Generate continuation token if there are more results
+        var hasMoreResults = (chunkOffset + returnedChunks.Count) < allChunks.Count;
+        string? continuationToken = null;
+
+        if (hasMoreResults)
+        {
+            var tokenData = new ContinuationTokenData(
+                ProjectId: string.Join(",", request.ProjectIds!), // Store all project IDs
+                Query: request.Query,
+                Alpha: request.Alpha ?? 0.7f,
+                TokensRemaining: maxTokens,
+                LastChunkId: string.Empty,  // Not used for multi-project
+                CreatedAt: DateTime.UtcNow,
+                Page: chunkOffset / returnedChunks.Count + 1,
+                ProjectIds: request.ProjectIds,
+                ChunkOffset: chunkOffset + returnedChunks.Count);
+
+            continuationToken = pagination.CreateToken(tokenData);
+            _logger.LogInformation("Generated multi-project continuation token: offset {NewOffset}/{Total}",
+                chunkOffset + returnedChunks.Count, allChunks.Count);
+        }
+
         return Ok(new
         {
             projects,
-            chunks = allChunks,
+            chunks = returnedChunks,
             metadata = new
             {
-                totalTokens,
+                tokensReturned,
+                totalChunks = allChunks.Count,
+                returnedChunks = returnedChunks.Count,
                 projectCount = projects.Count,
                 timestamp = DateTime.UtcNow
             },
@@ -259,10 +326,7 @@ public class SearchController : ControllerBase
                 totalFiles = allSources.Count,
                 files = allSources
             },
-            continuationToken = (string?)null,  // TODO: Multi-project continuation not yet supported
-            warnings = request.ContinuationToken != null
-                ? new[] { "Continuation tokens not supported for multi-project searches" }
-                : null,
+            continuationToken,
             errors = errors.Count > 0 ? errors : null
         });
     }

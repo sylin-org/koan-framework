@@ -14,7 +14,9 @@ public record ContinuationTokenData(
     int TokensRemaining,
     string LastChunkId,
     DateTime CreatedAt,
-    int Page);
+    int Page,
+    List<string>? ProjectIds = null,  // For multi-project searches
+    int ChunkOffset = 0);              // For multi-project pagination
 
 /// <summary>
 /// Pagination service - generates and validates opaque continuation tokens using compressed JSON
