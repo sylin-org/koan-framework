@@ -5,6 +5,7 @@ using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Instructions;
 using Koan.Data.Abstractions.Naming;
 using Koan.Data.Vector.Abstractions;
+using Koan.Data.Vector.Abstractions.Configuration;
 using System.Net;
 using Newtonsoft.Json;
 using System.Security.Cryptography;
@@ -40,9 +41,9 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
     {
         get
         {
-            // DATA-0086: Use unified naming provider system via StorageNameRegistry
-            // Automatically handles partitions via EntityContext and adapter factory's INamingProvider
-            return Koan.Data.Core.Configuration.StorageNameRegistry.GetOrCompute<TEntity, TKey>(_sp);
+            // DATA-0086: Use vector-specific naming registry (VectorStorageNameRegistry)
+            // Automatically handles partitions via EntityContext and WeaviateAdapterFactory's INamingProvider
+            return VectorStorageNameRegistry.GetOrCompute<TEntity, TKey>(_sp);
         }
     }
 

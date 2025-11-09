@@ -13,6 +13,7 @@ using Newtonsoft.Json.Linq;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Instructions;
 using Koan.Data.Vector.Abstractions;
+using Koan.Data.Vector.Abstractions.Configuration;
 
 namespace Koan.Data.Vector.Connector.Milvus;
 
@@ -340,7 +341,7 @@ internal sealed class MilvusVectorRepository<TEntity, TKey> :
     }
 
     private string CollectionName
-        => _options.CollectionName ?? Koan.Data.Core.Configuration.StorageNameRegistry.GetOrCompute<TEntity, TKey>(_services);
+        => _options.CollectionName ?? VectorStorageNameRegistry.GetOrCompute<TEntity, TKey>(_services);
 
     private int EnsureDimension(int dimension)
     {

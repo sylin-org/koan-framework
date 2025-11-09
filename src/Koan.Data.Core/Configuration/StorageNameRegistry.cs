@@ -30,96 +30,23 @@ public static class StorageNameRegistry
         return AggregateBags.GetOrAdd<TEntity, TKey, string>(sp, key, () =>
         {
             var namingProvider = ResolveProvider(sp, provider);
-            return GetTargetRepositoryName<TEntity>(namingProvider, partition, sp);
+            return NamingComposer.Compose(namingProvider, typeof(TEntity), partition, sp);
         });
-    }
-
-    /// <summary>
-    /// Orchestrates full repository name resolution.
-    /// Composes: [StorageName] or [StorageName][Separator][ConcretePartition]
-    /// </summary>
-    private static string GetTargetRepositoryName<TEntity>(
-        INamingProvider np,
-        string? partition,
-        IServiceProvider services)
-        where TEntity : class
-    {
-        // Get and trim storage name
-        var storageName = np.GetStorageName(typeof(TEntity), services).Trim();
-
-        // Trim and check partition
-        var trimmedPartition = partition?.Trim();
-        if (string.IsNullOrEmpty(trimmedPartition))
-            return storageName;
-
-        // Compose with partition
-        var repositorySeparator = np.RepositorySeparator;
-        var concretePartition = np.GetConcretePartition(trimmedPartition).Trim();
-
-        return storageName + repositorySeparator + concretePartition;
     }
 
     private static INamingProvider ResolveProvider(IServiceProvider sp, string providerKey)
     {
-        // Factories are registered as IDataAdapterFactory and IVectorAdapterFactory, not INamingProvider
-        // We must query for the concrete types then cast to INamingProvider
-        var dataFactories = sp.GetServices<IDataAdapterFactory>().Cast<INamingProvider>();
+        // Query ONLY data adapter factories (vector has its own registry)
+        var factories = sp.GetServices<IDataAdapterFactory>();
 
-        // Try to get vector factories if available (optional dependency)
-        // Use reflection to avoid hard dependency on Koan.Data.Vector.Abstractions
-        IEnumerable<INamingProvider> vectorFactories = Enumerable.Empty<INamingProvider>();
-        try
+        foreach (var factory in factories)
         {
-            var vectorAdapterFactoryType = Type.GetType("Koan.Data.Vector.Abstractions.IVectorAdapterFactory, Koan.Data.Vector.Abstractions");
-            if (vectorAdapterFactoryType != null)
-            {
-                var getServicesMethod = typeof(ServiceProviderServiceExtensions)
-                    .GetMethod(nameof(ServiceProviderServiceExtensions.GetServices))!
-                    .MakeGenericMethod(vectorAdapterFactoryType);
-                var services = (System.Collections.IEnumerable)getServicesMethod.Invoke(null, new object[] { sp })!;
-                vectorFactories = services.Cast<INamingProvider>();
-            }
-        }
-        catch
-        {
-            // Vector abstractions not available, continue with data factories only
+            if (factory.CanHandle(providerKey))
+                return factory;
         }
 
-        // Combine both factory types
-        var allFactories = dataFactories.Concat(vectorFactories);
-
-        // Use CanHandle to find matching factory (supports provider aliases like "sqlserver" vs "mssql")
-        INamingProvider? provider = null;
-        foreach (var factory in allFactories)
-        {
-            // Cast back to check CanHandle (all INamingProviders are factories)
-            if (factory is IDataAdapterFactory dataFactory && dataFactory.CanHandle(providerKey))
-            {
-                provider = factory;
-                break;
-            }
-
-            // Try vector factory if available (using reflection to avoid hard dependency)
-            var factoryType = factory.GetType();
-            var canHandleMethod = factoryType.GetMethod("CanHandle");
-            if (canHandleMethod != null)
-            {
-                var canHandle = (bool)canHandleMethod.Invoke(factory, new object[] { providerKey })!;
-                if (canHandle)
-                {
-                    provider = factory;
-                    break;
-                }
-            }
-        }
-
-        if (provider == null)
-        {
-            throw new InvalidOperationException(
-                $"No adapter registered for provider '{providerKey}'. " +
-                $"Ensure an IDataAdapterFactory or IVectorAdapterFactory implementation is registered for this provider.");
-        }
-
-        return provider;
+        throw new InvalidOperationException(
+            $"No data adapter registered for provider '{providerKey}'. " +
+            $"Ensure an IDataAdapterFactory implementation is registered for this provider.");
     }
 }

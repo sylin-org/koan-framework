@@ -13,6 +13,7 @@ using Newtonsoft.Json.Linq;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Instructions;
 using Koan.Data.Vector.Abstractions;
+using Koan.Data.Vector.Abstractions.Configuration;
 
 namespace Koan.Data.Connector.OpenSearch;
 
@@ -428,7 +429,7 @@ internal sealed class OpenSearchVectorRepository<TEntity, TKey> :
                 return _options.IndexName!;
             }
 
-            var baseName = Koan.Data.Core.Configuration.StorageNameRegistry.GetOrCompute<TEntity, TKey>(_services);
+            var baseName = VectorStorageNameRegistry.GetOrCompute<TEntity, TKey>(_services);
             baseName = baseName.Replace('#', '-').Replace('.', '-').ToLowerInvariant();
             if (!string.IsNullOrEmpty(_options.IndexPrefix))
             {
