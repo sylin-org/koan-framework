@@ -6,6 +6,7 @@ import ToastContainer from './components/ToastContainer';
 
 // Pages
 import Dashboard from './pages/Dashboard';
+import MonitoringDashboard from './pages/MonitoringDashboard';
 import ProjectsList from './pages/ProjectsList';
 import ProjectDetail from './pages/ProjectDetail';
 import SearchPage from './pages/SearchPage';
@@ -37,6 +38,7 @@ function AppContent() {
 
         {/* Dashboard */}
         <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/monitoring" element={<MonitoringDashboard />} />
 
         {/* Projects */}
         <Route path="/projects" element={<ProjectsList />} />

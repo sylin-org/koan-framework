@@ -46,6 +46,11 @@ builder.Services.AddSingleton<TokenCounter, TokenCounter>();
 builder.Services.AddSingleton<IncrementalIndexer>();
 builder.Services.AddSingleton<IndexingCoordinator>();
 builder.Services.AddSingleton<Metrics>();
+
+// ✅ ENHANCED METRICS & INSTRUMENTATION
+builder.Services.AddSingleton<MetricsCollector>();
+builder.Services.AddSingleton<EnhancedMetrics>();
+
 builder.Services.AddHostedService<FileMonitoringService>();
 builder.Services.AddSingleton<FileMonitoringService>(sp =>
     (FileMonitoringService)sp.GetServices<IHostedService>()

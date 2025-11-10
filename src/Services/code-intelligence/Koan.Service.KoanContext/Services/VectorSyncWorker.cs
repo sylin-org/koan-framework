@@ -23,13 +23,17 @@ namespace Koan.Context.Services;
 public class VectorSyncWorker : BackgroundService
 {
     private readonly ILogger<VectorSyncWorker> _logger;
+    private readonly MetricsCollector _metricsCollector;
     private readonly HashSet<string> _deletedJobIds = new();
     private const int MaxRetries = 5;
     private const int PollIntervalMs = 5000; // 5 seconds
 
-    public VectorSyncWorker(ILogger<VectorSyncWorker> logger)
+    public VectorSyncWorker(
+        ILogger<VectorSyncWorker> logger,
+        MetricsCollector metricsCollector)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _metricsCollector = metricsCollector ?? throw new ArgumentNullException(nameof(metricsCollector));
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -74,11 +78,24 @@ public class VectorSyncWorker : BackgroundService
 
         _logger.LogDebug("Processing {Count} pending vector operations", opsList.Count);
 
+        var successCount = 0;
+        var failureCount = 0;
+
         foreach (var operation in opsList)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
+            var beforeStatus = operation.Status;
             await ProcessOperationAsync(operation, cancellationToken);
+
+            if (operation.Status == OperationStatus.Completed && beforeStatus != OperationStatus.Completed)
+            {
+                successCount++;
+            }
+            else if (operation.Status == OperationStatus.DeadLetter)
+            {
+                failureCount++;
+            }
         }
 
         _logger.LogInformation(
@@ -86,6 +103,16 @@ public class VectorSyncWorker : BackgroundService
             opsList.Count,
             opsList.Count(o => o.Status == OperationStatus.Completed),
             opsList.Count(o => o.Status == OperationStatus.DeadLetter));
+
+        // Record outbox processing metrics
+        if (successCount > 0)
+        {
+            _metricsCollector.RecordOutboxProcessed(successCount, true);
+        }
+        if (failureCount > 0)
+        {
+            _metricsCollector.RecordOutboxProcessed(failureCount, false);
+        }
     }
 
     private async Task ProcessOperationAsync(SyncOperation operation, CancellationToken cancellationToken)
@@ -181,6 +208,15 @@ public class VectorSyncWorker : BackgroundService
                             job.Id,
                             job.ChunksCreated,
                             job.VectorsSynced);
+
+                        // Record job completion metrics
+                        _metricsCollector.RecordJobCompleted(
+                            job.Id,
+                            job.ProjectId,
+                            job.Elapsed.TotalSeconds,
+                            true,
+                            job.ProcessedFiles,
+                            job.ChunksCreated);
                     }
 
                     await job.Save(cancellationToken);

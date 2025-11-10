@@ -11,10 +11,17 @@ namespace Koan.Context.Controllers;
 public class MetricsController : ControllerBase
 {
     private readonly Metrics _metrics;
+    private readonly EnhancedMetrics _enhancedMetrics;
+    private readonly MetricsCollector _metricsCollector;
 
-    public MetricsController(Metrics metrics)
+    public MetricsController(
+        Metrics metrics,
+        EnhancedMetrics enhancedMetrics,
+        MetricsCollector metricsCollector)
     {
         _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
+        _enhancedMetrics = enhancedMetrics ?? throw new ArgumentNullException(nameof(enhancedMetrics));
+        _metricsCollector = metricsCollector ?? throw new ArgumentNullException(nameof(metricsCollector));
     }
 
     /// <summary>
@@ -175,4 +182,558 @@ public class MetricsController : ControllerBase
             });
         }
     }
+
+    /// <summary>
+    /// Get P0 outbox queue health metrics
+    /// </summary>
+    /// <remarks>
+    /// Critical metrics for monitoring dual-store sync health:
+    /// - Pending operations count
+    /// - Dead-letter queue size
+    /// - Oldest pending operation age
+    /// - Processing rate
+    /// - Per-project breakdown
+    ///
+    /// Alerts trigger at:
+    /// - ⚠️ Pending > 100 or Age > 60s
+    /// - 🚨 Pending > 500 or Age > 300s or DeadLetter > 0
+    /// </remarks>
+    /// <returns>Outbox health status with alert thresholds</returns>
+    [HttpGet("outbox")]
+    public async Task<IActionResult> GetOutboxHealth(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var metrics = await _enhancedMetrics.GetOutboxHealthAsync(cancellationToken);
+
+            return Ok(new
+            {
+                data = metrics,
+                metadata = new
+                {
+                    timestamp = metrics.Timestamp,
+                    healthStatus = metrics.HealthStatus.ToString().ToLower(),
+                    alerts = GetOutboxAlerts(metrics)
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new
+            {
+                error = "Failed to retrieve outbox health metrics",
+                details = ex.Message
+            });
+        }
+    }
+
+    /// <summary>
+    /// Get component health matrix
+    /// </summary>
+    /// <remarks>
+    /// Comprehensive health checks for all system components:
+    /// - SQLite database connectivity
+    /// - Weaviate vector store (with latency)
+    /// - File monitoring service
+    /// - Outbox worker processing
+    ///
+    /// Results include individual component status and overall system health.
+    /// </remarks>
+    /// <returns>Component health status matrix</returns>
+    [HttpGet("components")]
+    public async Task<IActionResult> GetComponentHealth(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var metrics = await _enhancedMetrics.GetComponentHealthAsync(cancellationToken);
+
+            return Ok(new
+            {
+                data = metrics,
+                metadata = new
+                {
+                    timestamp = metrics.Timestamp,
+                    overallHealthy = metrics.OverallHealthy,
+                    componentCount = metrics.Components.Count,
+                    degradedComponents = metrics.Components.Count(c => c.Status != Koan.Context.Services.HealthStatus.Healthy)
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new
+            {
+                error = "Failed to retrieve component health",
+                details = ex.Message
+            });
+        }
+    }
+
+    /// <summary>
+    /// Get job system performance metrics
+    /// </summary>
+    /// <remarks>
+    /// Job queue and throughput metrics:
+    /// - Active and queued job counts
+    /// - Success rate (last 24 hours)
+    /// - Job throughput (jobs/hour)
+    /// - Processing rates (chunks/sec, files/sec)
+    ///
+    /// Useful for detecting job system bottlenecks or failures.
+    /// </remarks>
+    /// <returns>Job system metrics</returns>
+    [HttpGet("jobs")]
+    public async Task<IActionResult> GetJobMetrics(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var metrics = await _enhancedMetrics.GetJobSystemMetricsAsync(cancellationToken);
+
+            return Ok(new
+            {
+                data = metrics,
+                metadata = new
+                {
+                    timestamp = metrics.Timestamp,
+                    alerts = GetJobSystemAlerts(metrics)
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new
+            {
+                error = "Failed to retrieve job system metrics",
+                details = ex.Message
+            });
+        }
+    }
+
+    /// <summary>
+    /// Get vector database storage metrics
+    /// </summary>
+    /// <remarks>
+    /// Vector database capacity and growth metrics:
+    /// - Total collections (projects)
+    /// - Total vector count
+    /// - Estimated storage size
+    /// - Growth rate (vectors/day)
+    /// - Per-collection breakdown
+    ///
+    /// Useful for capacity planning and detecting indexing issues.
+    /// </remarks>
+    /// <returns>Vector DB metrics</returns>
+    [HttpGet("vector-db")]
+    public async Task<IActionResult> GetVectorDbMetrics(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var metrics = await _enhancedMetrics.GetVectorDbMetricsAsync(cancellationToken);
+
+            return Ok(new
+            {
+                data = metrics,
+                metadata = new
+                {
+                    timestamp = metrics.Timestamp,
+                    storageSizeReadable = FormatBytes(metrics.EstimatedSizeBytes),
+                    growthRatePerDay = metrics.GrowthRatePerDay
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new
+            {
+                error = "Failed to retrieve vector DB metrics",
+                details = ex.Message
+            });
+        }
+    }
+
+    /// <summary>
+    /// Get SQLite storage and index freshness metrics
+    /// </summary>
+    /// <remarks>
+    /// SQLite database storage and index health:
+    /// - Database size (with SQLite limits warning)
+    /// - Total chunks and files indexed
+    /// - Index freshness (fresh/stale/very stale project counts)
+    /// - Daily growth rate
+    ///
+    /// ⚠️ SQLite practical limit: ~5-10GB. Consider migration to Postgres when approaching.
+    /// </remarks>
+    /// <returns>Storage metrics</returns>
+    [HttpGet("storage")]
+    public async Task<IActionResult> GetStorageMetrics(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var metrics = await _enhancedMetrics.GetStorageMetricsAsync(cancellationToken);
+
+            return Ok(new
+            {
+                data = metrics,
+                metadata = new
+                {
+                    timestamp = metrics.Timestamp,
+                    dbSizeReadable = FormatBytes(metrics.EstimatedDbSizeBytes),
+                    indexedBytesReadable = FormatBytes(metrics.TotalIndexedBytes),
+                    alerts = GetStorageAlerts(metrics)
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new
+            {
+                error = "Failed to retrieve storage metrics",
+                details = ex.Message
+            });
+        }
+    }
+
+    /// <summary>
+    /// Get search performance statistics
+    /// </summary>
+    /// <param name="period">Time period (1h, 6h, 24h). Default: 1h</param>
+    /// <remarks>
+    /// Real search query performance metrics (not placeholder):
+    /// - Total query count
+    /// - Success/failure counts
+    /// - Latency percentiles (P50, P95, P99)
+    ///
+    /// Data is collected from actual search query instrumentation.
+    /// </remarks>
+    /// <returns>Search performance statistics</returns>
+    [HttpGet("search-performance")]
+    public IActionResult GetSearchPerformance([FromQuery] string period = "1h")
+    {
+        try
+        {
+            var timeSpan = period switch
+            {
+                "1h" => TimeSpan.FromHours(1),
+                "6h" => TimeSpan.FromHours(6),
+                "24h" => TimeSpan.FromHours(24),
+                _ => TimeSpan.FromHours(1)
+            };
+
+            var stats = _metricsCollector.CalculateSearchStats(timeSpan);
+
+            return Ok(new
+            {
+                data = stats,
+                metadata = new
+                {
+                    period,
+                    timestamp = DateTime.UtcNow,
+                    alerts = GetSearchPerformanceAlerts(stats)
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new
+            {
+                error = "Failed to retrieve search performance",
+                details = ex.Message
+            });
+        }
+    }
+
+    /// <summary>
+    /// Get comprehensive dashboard overview
+    /// </summary>
+    /// <remarks>
+    /// Aggregated metrics for dashboard overview panel:
+    /// - Critical alerts from all systems
+    /// - Outbox health summary
+    /// - Component health summary
+    /// - Job system status
+    /// - Search performance summary
+    ///
+    /// Single endpoint for dashboard "at-a-glance" view.
+    /// </remarks>
+    /// <returns>Dashboard overview metrics</returns>
+    [HttpGet("dashboard")]
+    public async Task<IActionResult> GetDashboardOverview(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var outbox = await _enhancedMetrics.GetOutboxHealthAsync(cancellationToken);
+            var components = await _enhancedMetrics.GetComponentHealthAsync(cancellationToken);
+            var jobs = await _enhancedMetrics.GetJobSystemMetricsAsync(cancellationToken);
+            var searchStats = _metricsCollector.CalculateSearchStats(TimeSpan.FromHours(1));
+
+            // Aggregate critical alerts
+            var criticalAlerts = new List<object>();
+            var outboxAlerts = GetOutboxAlerts(outbox);
+            var jobAlerts = GetJobSystemAlerts(jobs);
+
+            criticalAlerts.AddRange(outboxAlerts.Where(a => ((dynamic)a).Severity == "critical"));
+            criticalAlerts.AddRange(jobAlerts.Where(a => ((dynamic)a).Severity == "critical"));
+
+            if (!components.OverallHealthy)
+            {
+                var degraded = components.Components.Where(c => c.Status != Koan.Context.Services.HealthStatus.Healthy);
+                criticalAlerts.AddRange(degraded.Select(c => new
+                {
+                    Type = "component",
+                    Component = c.Name,
+                    Status = c.Status.ToString(),
+                    Message = c.Message,
+                    Severity = c.Status == Koan.Context.Services.HealthStatus.Critical ? "critical" : "warning"
+                }));
+            }
+
+            return Ok(new
+            {
+                data = new
+                {
+                    outboxHealth = new
+                    {
+                        status = outbox.HealthStatus.ToString().ToLower(),
+                        pending = outbox.PendingCount,
+                        deadLetter = outbox.DeadLetterCount,
+                        processingRate = outbox.ProcessingRatePerSecond
+                    },
+                    componentHealth = new
+                    {
+                        healthy = components.OverallHealthy,
+                        degradedCount = components.Components.Count(c => c.Status != Koan.Context.Services.HealthStatus.Healthy),
+                        components = components.Components.Select(c => new
+                        {
+                            name = c.Name,
+                            status = c.Status.ToString().ToLower(),
+                            latencyMs = c.LatencyMs
+                        })
+                    },
+                    jobSystem = new
+                    {
+                        active = jobs.ActiveJobsCount,
+                        queued = jobs.QueuedJobsCount,
+                        successRate24h = jobs.SuccessRate24h,
+                        failed24h = jobs.FailedLast24h
+                    },
+                    searchPerformance = new
+                    {
+                        totalQueries = searchStats.TotalQueries,
+                        avgLatencyMs = searchStats.AvgLatencyMs,
+                        p95LatencyMs = searchStats.P95LatencyMs,
+                        failureRate = searchStats.TotalQueries > 0
+                            ? (double)searchStats.FailedQueries / searchStats.TotalQueries * 100
+                            : 0.0
+                    },
+                    criticalAlerts
+                },
+                metadata = new
+                {
+                    timestamp = DateTime.UtcNow,
+                    criticalAlertCount = criticalAlerts.Count
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new
+            {
+                error = "Failed to retrieve dashboard overview",
+                details = ex.Message
+            });
+        }
+    }
+
+    #region Alert Helper Methods
+
+    private static List<object> GetOutboxAlerts(Services.OutboxHealthMetrics metrics)
+    {
+        var alerts = new List<object>();
+
+        if (metrics.DeadLetterCount > 0)
+        {
+            alerts.Add(new
+            {
+                Type = "outbox",
+                Severity = "critical",
+                Message = $"Dead-letter queue has {metrics.DeadLetterCount} operations requiring manual intervention"
+            });
+        }
+
+        if (metrics.PendingCount > 500)
+        {
+            alerts.Add(new
+            {
+                Type = "outbox",
+                Severity = "critical",
+                Message = $"Outbox queue critically high: {metrics.PendingCount} pending operations"
+            });
+        }
+        else if (metrics.PendingCount > 100)
+        {
+            alerts.Add(new
+            {
+                Type = "outbox",
+                Severity = "warning",
+                Message = $"Outbox queue elevated: {metrics.PendingCount} pending operations"
+            });
+        }
+
+        if (metrics.OldestAgeSeconds > 300)
+        {
+            alerts.Add(new
+            {
+                Type = "outbox",
+                Severity = "critical",
+                Message = $"Oldest pending operation is {(int)metrics.OldestAgeSeconds}s old (>5 minutes)"
+            });
+        }
+        else if (metrics.OldestAgeSeconds > 60)
+        {
+            alerts.Add(new
+            {
+                Type = "outbox",
+                Severity = "warning",
+                Message = $"Oldest pending operation is {(int)metrics.OldestAgeSeconds}s old (>1 minute)"
+            });
+        }
+
+        return alerts;
+    }
+
+    private static List<object> GetJobSystemAlerts(Services.JobSystemMetrics metrics)
+    {
+        var alerts = new List<object>();
+
+        if (metrics.SuccessRate24h < 80)
+        {
+            alerts.Add(new
+            {
+                Type = "jobs",
+                Severity = "critical",
+                Message = $"Job success rate critically low: {metrics.SuccessRate24h:F1}% (last 24h)"
+            });
+        }
+        else if (metrics.SuccessRate24h < 90)
+        {
+            alerts.Add(new
+            {
+                Type = "jobs",
+                Severity = "warning",
+                Message = $"Job success rate below threshold: {metrics.SuccessRate24h:F1}% (last 24h)"
+            });
+        }
+
+        if (metrics.ActiveJobsCount > 10)
+        {
+            alerts.Add(new
+            {
+                Type = "jobs",
+                Severity = "warning",
+                Message = $"High concurrent job count: {metrics.ActiveJobsCount} active jobs"
+            });
+        }
+
+        if (metrics.QueuedJobsCount > 3)
+        {
+            alerts.Add(new
+            {
+                Type = "jobs",
+                Severity = "warning",
+                Message = $"Job queue backlog: {metrics.QueuedJobsCount} jobs waiting"
+            });
+        }
+
+        return alerts;
+    }
+
+    private static List<object> GetStorageAlerts(Services.StorageMetrics metrics)
+    {
+        var alerts = new List<object>();
+
+        // SQLite practical limit is ~5-10GB
+        var dbSizeGb = metrics.EstimatedDbSizeBytes / (1024.0 * 1024.0 * 1024.0);
+
+        if (dbSizeGb > 10)
+        {
+            alerts.Add(new
+            {
+                Type = "storage",
+                Severity = "critical",
+                Message = $"SQLite database size ({dbSizeGb:F2} GB) exceeds recommended limit (10 GB). Consider migrating to PostgreSQL."
+            });
+        }
+        else if (dbSizeGb > 5)
+        {
+            alerts.Add(new
+            {
+                Type = "storage",
+                Severity = "warning",
+                Message = $"SQLite database size ({dbSizeGb:F2} GB) approaching limit. Plan migration to PostgreSQL."
+            });
+        }
+
+        if (metrics.VeryStaleProjects > 0)
+        {
+            alerts.Add(new
+            {
+                Type = "storage",
+                Severity = "warning",
+                Message = $"{metrics.VeryStaleProjects} project(s) have not been indexed in over 24 hours"
+            });
+        }
+
+        return alerts;
+    }
+
+    private static List<object> GetSearchPerformanceAlerts(Services.SearchPerformanceStats stats)
+    {
+        var alerts = new List<object>();
+
+        if (stats.P95LatencyMs > 1000)
+        {
+            alerts.Add(new
+            {
+                Type = "search",
+                Severity = "warning",
+                Message = $"Search P95 latency high: {stats.P95LatencyMs:F0}ms (>1s)"
+            });
+        }
+
+        if (stats.TotalQueries > 0)
+        {
+            var errorRate = (double)stats.FailedQueries / stats.TotalQueries * 100;
+            if (errorRate > 5)
+            {
+                alerts.Add(new
+                {
+                    Type = "search",
+                    Severity = "critical",
+                    Message = $"Search error rate high: {errorRate:F1}% ({stats.FailedQueries}/{stats.TotalQueries} queries failed)"
+                });
+            }
+            else if (errorRate > 1)
+            {
+                alerts.Add(new
+                {
+                    Type = "search",
+                    Severity = "warning",
+                    Message = $"Search error rate elevated: {errorRate:F1}% ({stats.FailedQueries}/{stats.TotalQueries} queries failed)"
+                });
+            }
+        }
+
+        return alerts;
+    }
+
+    private static string FormatBytes(long bytes)
+    {
+        if (bytes == 0) return "0 B";
+        var k = 1024;
+        var sizes = new[] { "B", "KB", "MB", "GB", "TB" };
+        var i = (int)Math.Floor(Math.Log(bytes) / Math.Log(k));
+        return $"{bytes / Math.Pow(k, i):F2} {sizes[i]}";
+    }
+
+    #endregion
 }

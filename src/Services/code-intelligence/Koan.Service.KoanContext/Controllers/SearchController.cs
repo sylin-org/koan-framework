@@ -16,15 +16,18 @@ public class SearchController : ControllerBase
     private readonly Search _retrieval;
     private readonly ProjectResolver _projectResolver;
     private readonly ILogger<SearchController> _logger;
+    private readonly MetricsCollector _metricsCollector;
 
     public SearchController(
         Search retrieval,
         ProjectResolver projectResolver,
-        ILogger<SearchController> logger)
+        ILogger<SearchController> logger,
+        MetricsCollector metricsCollector)
     {
         _retrieval = retrieval;
         _projectResolver = projectResolver;
         _logger = logger;
+        _metricsCollector = metricsCollector;
     }
 
     /// <summary>
@@ -43,12 +46,28 @@ public class SearchController : ControllerBase
             return BadRequest(new { error = "Query cannot be empty" });
         }
 
+        var searchStopwatch = System.Diagnostics.Stopwatch.StartNew();
+        var searchSuccess = false;
+        string? searchProjectId = null;
+
         try
         {
             // Cross-project search: If ProjectIds array provided, search multiple projects
             if (request.ProjectIds != null && request.ProjectIds.Any())
             {
-                return await SearchMultipleProjects(request, cancellationToken);
+                var searchResult = await SearchMultipleProjects(request, cancellationToken);
+                searchStopwatch.Stop();
+
+                // Record multi-project search metrics
+                _metricsCollector.RecordMultiProjectSearch(
+                    request.ProjectIds,
+                    request.Query,
+                    searchStopwatch.Elapsed.TotalMilliseconds,
+                    0, // Result count extracted from response if needed
+                    request.ProjectIds.Count,
+                    searchResult is OkObjectResult);
+
+                return searchResult;
             }
 
             // Single project search: Resolve project context in priority order
@@ -127,6 +146,8 @@ public class SearchController : ControllerBase
                 return await SearchMultipleProjects(requestWithAllProjects, cancellationToken);
             }
 
+            searchProjectId = projectId;
+
             var options = new SearchOptions(
                 MaxTokens: request.TokenCounter ?? 5000,
                 Alpha: request.Alpha ?? 0.7f,
@@ -142,6 +163,18 @@ public class SearchController : ControllerBase
                 request.Query,
                 options,
                 cancellationToken);
+
+            searchStopwatch.Stop();
+            searchSuccess = true;
+
+            // Record search metrics
+            _metricsCollector.RecordSearchQuery(
+                projectId,
+                request.Query,
+                searchStopwatch.Elapsed.TotalMilliseconds,
+                result.Chunks?.Count ?? 0,
+                true,
+                null);
 
             // Get project info for consistent response structure
             var project = await Project.Get(projectId, cancellationToken);
@@ -160,6 +193,20 @@ public class SearchController : ControllerBase
         }
         catch (Exception ex)
         {
+            searchStopwatch.Stop();
+
+            // Record failed search
+            if (searchProjectId != null)
+            {
+                _metricsCollector.RecordSearchQuery(
+                    searchProjectId,
+                    request.Query,
+                    searchStopwatch.Elapsed.TotalMilliseconds,
+                    0,
+                    false,
+                    ex.Message);
+            }
+
             _logger.LogError(ex, "Search failed for query {Query}", request.Query);
             return StatusCode(500, new { error = "Search failed", message = ex.Message });
         }

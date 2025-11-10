@@ -256,11 +256,11 @@ export default function Dashboard() {
               Search All
             </Link>
             <Link
-              to="/dashboard"
-              className="inline-flex items-center gap-2 px-4 py-2 border border-border rounded-lg hover:border-primary-300 hover:bg-primary-50 transition-colors"
+              to="/monitoring"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-success-600 text-white rounded-lg hover:bg-success-700 transition-colors"
             >
               <Activity className="w-4 h-4" />
-              View Analytics
+              System Monitoring
             </Link>
           </div>
         </div>
