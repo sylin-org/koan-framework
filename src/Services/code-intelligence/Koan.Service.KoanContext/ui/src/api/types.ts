@@ -316,3 +316,80 @@ export interface LanguageStats {
     percentage: number;
   }>;
 }
+
+// Search Profile Management Types
+
+export interface SearchCategory {
+  id: string;
+  name: string;
+  displayName: string;
+  description: string;
+  pathPatterns: string[];
+  priority: number;
+  defaultAlpha: number;
+  isActive: boolean;
+  icon?: string | null;
+  color?: string | null;
+}
+
+export interface SearchAudience {
+  id: string;
+  name: string;
+  displayName: string;
+  description: string;
+  categoryNames: string[];
+  defaultAlpha: number;
+  maxTokens: number;
+  includeReasoning: boolean;
+  includeInsights: boolean;
+  isActive: boolean;
+  icon?: string | null;
+}
+
+export interface CreateSearchCategoryRequest {
+  name: string;
+  displayName: string;
+  description: string;
+  pathPatterns: string[];
+  priority?: number;
+  defaultAlpha?: number;
+  icon?: string | null;
+  color?: string | null;
+}
+
+export interface UpdateSearchCategoryRequest {
+  name?: string;
+  displayName?: string;
+  description?: string;
+  pathPatterns?: string[];
+  priority?: number;
+  defaultAlpha?: number;
+  isActive?: boolean;
+  icon?: string | null;
+  color?: string | null;
+}
+
+export interface CreateSearchAudienceRequest {
+  name: string;
+  displayName: string;
+  description: string;
+  categoryNames: string[];
+  defaultAlpha?: number;
+  maxTokens?: number;
+  includeReasoning?: boolean;
+  includeInsights?: boolean;
+  icon?: string | null;
+}
+
+export interface UpdateSearchAudienceRequest {
+  name?: string;
+  displayName?: string;
+  description?: string;
+  categoryNames?: string[];
+  defaultAlpha?: number;
+  maxTokens?: number;
+  includeReasoning?: boolean;
+  includeInsights?: boolean;
+  isActive?: boolean;
+  icon?: string | null;
+}

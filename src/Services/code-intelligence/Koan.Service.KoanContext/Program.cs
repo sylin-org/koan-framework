@@ -51,6 +51,9 @@ builder.Services.AddSingleton<FileMonitoringService>(sp =>
     (FileMonitoringService)sp.GetServices<IHostedService>()
         .First(s => s is FileMonitoringService));
 
+// ✅ SEARCH PROFILE SEEDING (auto-seeds categories & audiences)
+builder.Services.AddHostedService<Koan.Context.Bootstrap.SearchProfileSeeder>();
+
 // Build app
 var app = builder.Build();
 

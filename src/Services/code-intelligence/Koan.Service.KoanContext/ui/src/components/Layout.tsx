@@ -6,6 +6,7 @@ import {
   FolderOpen,
   Activity,
   Settings,
+  Target,
   BookOpen,
   MessageCircle,
 } from 'lucide-react';
@@ -27,6 +28,7 @@ const primaryNav: NavItem[] = [
   { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard' },
   { icon: FolderOpen, label: 'Projects', path: '/projects' },
   { icon: Activity, label: 'Jobs', path: '/jobs' },
+  { icon: Target, label: 'Search Profiles', path: '/search-profiles' },
   { icon: Settings, label: 'Settings', path: '/settings' },
 ];
 

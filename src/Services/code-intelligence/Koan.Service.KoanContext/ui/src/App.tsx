@@ -13,6 +13,7 @@ import JobsList from './pages/JobsList';
 import JobDetail from './pages/JobDetail';
 import SettingsPage from './pages/SettingsPage';
 import DocsPage from './pages/DocsPage';
+import SearchProfilesPage from './pages/SearchProfilesPage';
 
 // Create TanStack Query client
 const queryClient = new QueryClient({
@@ -47,6 +48,9 @@ function AppContent() {
 
         {/* Settings */}
         <Route path="/settings" element={<SettingsPage />} />
+
+        {/* Search Profiles */}
+        <Route path="/search-profiles" element={<SearchProfilesPage />} />
 
         {/* Docs & Support */}
         <Route path="/docs" element={<DocsPage />} />

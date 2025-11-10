@@ -194,6 +194,13 @@ public class Chunker
     {
         var chunkText = currentChunk.ToString().Trim();
         var language = sectionsInChunk.FirstOrDefault(s => s.Language != null)?.Language;
+
+        // Fallback: Set language to "markdown" for prose in .md files
+        if (language == null && filePath.EndsWith(".md", StringComparison.OrdinalIgnoreCase))
+        {
+            language = "markdown";
+        }
+
         var endOffset = sectionsInChunk.Count > 0
             ? sectionsInChunk.Last().EndOffset
             : chunkStartOffset + chunkText.Length;

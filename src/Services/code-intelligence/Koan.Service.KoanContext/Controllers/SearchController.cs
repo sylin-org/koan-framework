@@ -133,7 +133,9 @@ public class SearchController : ControllerBase
                 ContinuationToken: request.ContinuationToken,
                 IncludeInsights: request.IncludeInsights ?? true,
                 IncludeReasoning: request.IncludeReasoning ?? true,
-                Languages: request.Languages);
+                Languages: request.Languages,
+                Categories: request.Categories,
+                Audience: request.Audience);
 
             var result = await _retrieval.SearchAsync(
                 projectId,
@@ -199,7 +201,9 @@ public class SearchController : ControllerBase
             ContinuationToken: null,  // Don't use per-project continuation
             IncludeInsights: false,   // Only include insights on first page
             IncludeReasoning: request.IncludeReasoning ?? true,
-            Languages: request.Languages);
+            Languages: request.Languages,
+            Categories: request.Categories,
+            Audience: request.Audience);
 
         var allChunks = new List<object>();
         var allSources = new List<object>();
@@ -489,7 +493,9 @@ public record SearchRequest(
     string? ContinuationToken = null,
     bool? IncludeInsights = null,
     bool? IncludeReasoning = null,
-    List<string>? Languages = null);  // Filter by programming language/file type
+    List<string>? Languages = null,  // Filter by programming language/file type
+    List<string>? Categories = null,  // Filter by content categories (e.g., ["guide", "documentation"])
+    string? Audience = null);          // Apply audience profile (e.g., "learner", "architect", "pm")
 
 /// <summary>
 /// Suggestion request payload

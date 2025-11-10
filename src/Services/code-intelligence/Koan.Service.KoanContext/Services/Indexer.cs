@@ -4,6 +4,7 @@ using Koan.Context.Models;
 using Koan.Data.Abstractions;
 using Koan.Data.Core;
 using Koan.Data.Vector;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using Polly;
 using Polly.Retry;
@@ -56,6 +57,7 @@ public class Indexer
     private readonly FileMonitoringService? _fileMonitor;
     private readonly ILogger<Indexer> _logger;
     private readonly AsyncRetryPolicy _retryPolicy;
+    private readonly Microsoft.Extensions.Caching.Memory.IMemoryCache _cache;
 
     private const int BatchSize = 100; // Save vectors in batches of 100
 
@@ -65,6 +67,7 @@ public class Indexer
         Chunker chunking,
         Embedding embedding,
         IndexingCoordinator coordinator,
+        Microsoft.Extensions.Caching.Memory.IMemoryCache cache,
         ILogger<Indexer> logger,
         FileMonitoringService? fileMonitor = null)
     {
@@ -73,6 +76,7 @@ public class Indexer
         _chunking = chunking ?? throw new ArgumentNullException(nameof(chunking));
         _embedding = embedding ?? throw new ArgumentNullException(nameof(embedding));
         _coordinator = coordinator ?? throw new ArgumentNullException(nameof(coordinator));
+        _cache = cache ?? throw new ArgumentNullException(nameof(cache));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _fileMonitor = fileMonitor;
 
@@ -390,6 +394,9 @@ public class Indexer
                             docChunk.EndByteOffset = provenance.EndByteOffset;
                             docChunk.StartLine = provenance.StartLine;
                             docChunk.EndLine = provenance.EndLine;
+
+                            // Determine category based on file path
+                            docChunk.Category = await DetermineCategoryAsync(chunk.FilePath, effectiveCt);
 
                             // Save to relational store immediately (no transaction buffering)
                             // Force synchronous commit to ensure chunk metadata is persisted
@@ -931,6 +938,122 @@ public class Indexer
             _logger.LogWarning(ex, "Failed to query actual chunk stats, returning zeros");
             return (0, 0);
         }
+    }
+
+    /// <summary>
+    /// Determines the category for a file based on path patterns from SearchCategory entities
+    /// </summary>
+    /// <remarks>
+    /// Loads categories from cache (30-min TTL), matches against path patterns.
+    /// Returns first match based on Priority ordering (highest first).
+    /// Returns null if no patterns match.
+    /// </remarks>
+    private async Task<string?> DetermineCategoryAsync(string filePath, CancellationToken ct)
+    {
+        // Load categories from cache (30-min TTL)
+        var cacheKey = "search-categories";
+        var categories = await _cache.GetOrCreateAsync(cacheKey, async entry =>
+        {
+            entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(30);
+
+            try
+            {
+                var all = await SearchCategory.Query(c => c.IsActive, ct);
+                return all.OrderByDescending(c => c.Priority).ToList();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to load search categories from database");
+                return new List<SearchCategory>();
+            }
+        });
+
+        if (categories == null || !categories.Any())
+        {
+            _logger.LogTrace("No search categories found in cache or database");
+            return null;
+        }
+
+        // Match against path patterns (first match wins)
+        var normalized = filePath.Replace('\\', '/').ToLowerInvariant();
+
+        foreach (var category in categories)
+        {
+            if (MatchesAnyPattern(normalized, category.PathPatterns))
+            {
+                _logger.LogTrace("File {Path} matched category {Category}", filePath, category.Name);
+                return category.Name;
+            }
+        }
+
+        _logger.LogTrace("File {Path} did not match any category", filePath);
+        return null;
+    }
+
+    /// <summary>
+    /// Checks if a normalized file path matches any of the provided glob patterns
+    /// </summary>
+    /// <remarks>
+    /// Supports basic glob syntax:
+    /// - ** = any subdirectories (e.g., "docs/**" matches "docs/a/b/c.md")
+    /// - * = any characters (e.g., "*.md" matches "readme.md")
+    /// - Exact match if no wildcards
+    /// </remarks>
+    private bool MatchesAnyPattern(string normalizedPath, List<string> patterns)
+    {
+        if (patterns == null || patterns.Count == 0)
+            return false;
+
+        foreach (var pattern in patterns)
+        {
+            if (string.IsNullOrWhiteSpace(pattern))
+                continue;
+
+            var normalizedPattern = pattern.ToLowerInvariant();
+
+            // Handle ** (any subdirectories)
+            if (normalizedPattern.Contains("**"))
+            {
+                var parts = normalizedPattern.Split("**", StringSplitOptions.RemoveEmptyEntries);
+                var prefix = parts.Length > 0 ? parts[0] : "";
+                var suffix = parts.Length > 1 ? parts[1] : "";
+
+                // Check prefix and suffix
+                var matchesPrefix = string.IsNullOrEmpty(prefix) || normalizedPath.StartsWith(prefix);
+                var matchesSuffix = string.IsNullOrEmpty(suffix) || normalizedPath.EndsWith(suffix);
+
+                if (matchesPrefix && matchesSuffix)
+                {
+                    return true;
+                }
+            }
+            // Handle * (any characters)
+            else if (normalizedPattern.Contains("*"))
+            {
+                var parts = normalizedPattern.Split('*', StringSplitOptions.RemoveEmptyEntries);
+                var currentIndex = 0;
+
+                // All parts must appear in order
+                foreach (var part in parts)
+                {
+                    var index = normalizedPath.IndexOf(part, currentIndex, StringComparison.Ordinal);
+                    if (index < 0)
+                        return false;
+
+                    currentIndex = index + part.Length;
+                }
+
+                return true;
+            }
+            // Exact match
+            else
+            {
+                if (normalizedPath == normalizedPattern)
+                    return true;
+            }
+        }
+
+        return false;
     }
 }
 

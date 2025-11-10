@@ -46,6 +46,48 @@ public class Search
     {
         var normalizedOptions = NormalizeOptions(options ?? new SearchOptions());
 
+        // 1. Resolve audience if provided
+        if (!string.IsNullOrWhiteSpace(normalizedOptions.Audience))
+        {
+            var (audienceCategories, audienceAlpha, audienceMaxTokens) =
+                await ResolveAudienceAsync(normalizedOptions.Audience, cancellationToken);
+
+            normalizedOptions = normalizedOptions with
+            {
+                Categories = audienceCategories,
+                Alpha = audienceAlpha,
+                MaxTokens = audienceMaxTokens
+            };
+
+            _logger.LogInformation(
+                "Applied audience profile '{Audience}': categories={Categories}, alpha={Alpha}, maxTokens={MaxTokens}",
+                normalizedOptions.Audience,
+                string.Join(", ", audienceCategories),
+                audienceAlpha,
+                audienceMaxTokens);
+        }
+
+        // 2. Auto-detect intent if no explicit categories
+        if ((normalizedOptions.Categories == null || normalizedOptions.Categories.Count == 0) &&
+            string.IsNullOrWhiteSpace(normalizedOptions.Audience))
+        {
+            var (inferredCategories, inferredAlpha) = InferSearchIntent(query);
+
+            if (inferredCategories.Any())
+            {
+                normalizedOptions = normalizedOptions with
+                {
+                    Categories = inferredCategories,
+                    Alpha = normalizedOptions.Alpha == 0.7f ? inferredAlpha : normalizedOptions.Alpha
+                };
+
+                _logger.LogInformation(
+                    "Inferred search intent from query: categories={Categories}, alpha={Alpha}",
+                    string.Join(", ", inferredCategories),
+                    inferredAlpha);
+            }
+        }
+
         if (string.IsNullOrWhiteSpace(query))
         {
             return CreateEmptyResult(normalizedOptions, warnings: Array.Empty<string>());
@@ -129,6 +171,52 @@ public class Search
                     vectorResult.Matches.Count,
                     vectorResult.ContinuationToken != null ? "present" : "null");
 
+                // OPTIMIZATION: Batch fetch all chunks instead of individual Get calls
+                var matchIds = vectorResult.Matches.Select(m => m.Id).ToList();
+                _logger.LogInformation("Batch fetching {Count} chunks from database", matchIds.Count);
+
+                var fetchedChunks = await Chunk.Get(matchIds, cancellationToken);
+                var chunkLookup = fetchedChunks
+                    .Where(c => c != null)
+                    .ToDictionary(c => c!.Id, c => c!);
+
+                _logger.LogInformation("Fetched {FetchedCount}/{RequestedCount} chunks from database ({MissingCount} missing)",
+                    chunkLookup.Count, matchIds.Count, matchIds.Count - chunkLookup.Count);
+
+                // Apply filters at database level would be ideal, but for now we filter in-memory
+                // with batch fetching to minimize round trips
+                if (normalizedOptions.Categories != null && normalizedOptions.Categories.Count > 0)
+                {
+                    var categoriesLower = normalizedOptions.Categories
+                        .Select(c => c.ToLowerInvariant())
+                        .ToHashSet();
+
+                    var preFilterCount = chunkLookup.Count;
+                    chunkLookup = chunkLookup
+                        .Where(kvp => !string.IsNullOrWhiteSpace(kvp.Value.Category) &&
+                                     categoriesLower.Contains(kvp.Value.Category.ToLowerInvariant()))
+                        .ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+
+                    _logger.LogInformation("Category filter applied: {AfterCount}/{BeforeCount} chunks match categories [{Categories}]",
+                        chunkLookup.Count, preFilterCount, string.Join(", ", normalizedOptions.Categories));
+                }
+
+                if (normalizedOptions.Languages != null && normalizedOptions.Languages.Count > 0)
+                {
+                    var languagesLower = normalizedOptions.Languages
+                        .Select(l => l.ToLowerInvariant())
+                        .ToHashSet();
+
+                    var preFilterCount = chunkLookup.Count;
+                    chunkLookup = chunkLookup
+                        .Where(kvp => !string.IsNullOrWhiteSpace(kvp.Value.Language) &&
+                                     languagesLower.Contains(kvp.Value.Language.ToLowerInvariant()))
+                        .ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+
+                    _logger.LogInformation("Language filter applied: {AfterCount}/{BeforeCount} chunks match languages [{Languages}]",
+                        chunkLookup.Count, preFilterCount, string.Join(", ", normalizedOptions.Languages));
+                }
+
                 var chunks = new List<SearchResultChunk>();
                 var sources = new List<SourceFile>();
                 var sourceIndex = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
@@ -137,16 +225,15 @@ public class Search
                 var shouldSkip = continuationData != null;
                 string? lastChunkId = null;
 
+                // Now iterate through matches in vector search order
                 foreach (var match in vectorResult.Matches)
                 {
-                    _logger.LogInformation("Processing match: ID={MatchId}, Score={Score}", match.Id, match.Score);
-                    var documentChunk = await Chunk.Get(match.Id, cancellationToken);
-                    if (documentChunk is null)
+                    // Look up chunk from batch-fetched results
+                    if (!chunkLookup.TryGetValue(match.Id, out var documentChunk))
                     {
-                        _logger.LogWarning("Chunk.Get returned null for ID={MatchId} (project={ProjectId})", match.Id, projectId);
+                        // Chunk was filtered out or missing from database
                         continue;
                     }
-                    _logger.LogInformation("Found chunk: ID={ChunkId}, FilePath={FilePath}", documentChunk.Id, documentChunk.FilePath);
 
                     // Skip chunks until we reach the last returned chunk from previous page
                     if (shouldSkip)
@@ -158,22 +245,6 @@ public class Search
                         }
                         skippedCount++;
                         continue;
-                    }
-
-                    // Filter by language if specified
-                    if (normalizedOptions.Languages != null &&
-                        normalizedOptions.Languages.Count > 0 &&
-                        !string.IsNullOrWhiteSpace(documentChunk.Language))
-                    {
-                        var languageMatches = normalizedOptions.Languages
-                            .Any(lang => string.Equals(lang, documentChunk.Language, StringComparison.OrdinalIgnoreCase));
-
-                        if (!languageMatches)
-                        {
-                            _logger.LogDebug("Skipping chunk {ChunkId} - language {Language} not in filter",
-                                documentChunk.Id, documentChunk.Language);
-                            continue;
-                        }
                     }
 
                     var chunkTokens = documentChunk.TokenCount > 0
@@ -365,6 +436,112 @@ public class Search
         return parts.Length == 0 ? sanitized : parts[0];
     }
 
+    /// <summary>
+    /// Resolves an audience profile from the database and returns its categories, alpha, and maxTokens
+    /// </summary>
+    /// <remarks>
+    /// Uses IMemoryCache with 30-minute TTL to avoid repeated database queries.
+    /// Returns defaults if audience not found or inactive.
+    /// </remarks>
+    private async Task<(List<string> Categories, float Alpha, int MaxTokens)> ResolveAudienceAsync(
+        string? audienceName,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(audienceName))
+            return (new List<string>(), 0.5f, 5000);
+
+        // Check cache first (30-min TTL)
+        var cacheKey = $"audience:{audienceName}";
+        var audience = await _embeddingCache.GetOrCreateAsync(cacheKey, async entry =>
+        {
+            entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(30);
+
+            try
+            {
+                var result = await SearchAudience.Query(
+                    a => a.Name == audienceName && a.IsActive,
+                    ct);
+
+                return result.FirstOrDefault();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to load audience '{Audience}' from database", audienceName);
+                return null;
+            }
+        });
+
+        if (audience == null)
+        {
+            _logger.LogWarning("Audience '{Audience}' not found or inactive, using defaults", audienceName);
+            return (new List<string>(), 0.5f, 5000);
+        }
+
+        return (audience.CategoryNames, audience.DefaultAlpha, audience.MaxTokens);
+    }
+
+    /// <summary>
+    /// Infers search intent from query text and returns suggested categories and alpha
+    /// </summary>
+    /// <remarks>
+    /// Heuristic-based intent detection for common query patterns.
+    /// Returns empty list if no specific intent detected (defaults will apply).
+    /// </remarks>
+    private (List<string> Categories, float Alpha) InferSearchIntent(string query)
+    {
+        var lower = query.ToLowerInvariant();
+
+        // Documentation-seeking queries
+        if (lower.Contains("documentation") || lower.Contains("guide") ||
+            lower.Contains("learn") || lower.Contains("tutorial"))
+        {
+            _logger.LogDebug("Inferred documentation intent from query");
+            return (new() { "guide", "documentation" }, 0.4f);
+        }
+
+        // Decision/rationale queries
+        if (lower.Contains("why") || lower.Contains("decision") ||
+            lower.Contains("rationale") || lower.Contains("adr"))
+        {
+            _logger.LogDebug("Inferred decision/rationale intent from query");
+            return (new() { "adr" }, 0.3f);
+        }
+
+        // Example/sample queries
+        if (lower.Contains("example") || lower.Contains("sample") ||
+            lower.Contains("demo") || lower.Contains("show me"))
+        {
+            _logger.LogDebug("Inferred example/sample intent from query");
+            return (new() { "sample", "test" }, 0.5f);
+        }
+
+        // Implementation queries
+        if (lower.Contains("implement") || lower.Contains("code") ||
+            lower.Contains("class") || lower.Contains("method"))
+        {
+            _logger.LogDebug("Inferred implementation intent from query");
+            return (new() { "source" }, 0.7f);
+        }
+
+        // How-to queries
+        if (lower.Contains("how to") || lower.Contains("how do i"))
+        {
+            _logger.LogDebug("Inferred how-to intent from query");
+            return (new() { "guide", "sample" }, 0.4f);
+        }
+
+        // Architecture/overview queries
+        if (lower.Contains("architecture") || lower.Contains("overview") ||
+            lower.Contains("design"))
+        {
+            _logger.LogDebug("Inferred architecture/overview intent from query");
+            return (new() { "adr", "documentation" }, 0.3f);
+        }
+
+        // Default: no specific intent detected
+        return (new List<string>(), 0.5f);
+    }
+
     private SearchResult CreateEmptyResult(
         SearchOptions options,
         TimeSpan? duration = null,
@@ -405,7 +582,9 @@ public record SearchOptions(
     string? ContinuationToken = null,
     bool IncludeInsights = true,
     bool IncludeReasoning = true,
-    List<string>? Languages = null
+    List<string>? Languages = null,
+    List<string>? Categories = null,  // Filter by categories (e.g., ["guide", "documentation"])
+    string? Audience = null            // Apply audience profile (e.g., "learner", "architect")
 );
 
 /// <summary>
