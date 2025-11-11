@@ -1,5 +1,6 @@
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { settingsApi } from '@/api';
+import type { TagSeedSummaryDto } from '@/api';
 
 /**
  * Query keys for settings
@@ -35,5 +36,14 @@ export function useTestVectorStore() {
 export function useTestDatabase() {
   return useMutation({
     mutationFn: () => settingsApi.testDatabase(),
+  });
+}
+
+/**
+ * Hook to force seed tag catalog
+ */
+export function useSeedTags() {
+  return useMutation<TagSeedSummaryDto>({
+    mutationFn: () => settingsApi.seedTags(),
   });
 }

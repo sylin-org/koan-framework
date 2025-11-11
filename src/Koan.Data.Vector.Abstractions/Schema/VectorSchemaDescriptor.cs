@@ -74,10 +74,10 @@ public sealed class VectorSchemaDescriptor
             case IDictionary<string, object?> dict:
                 return new Dictionary<string, object?>(dict, StringComparer.OrdinalIgnoreCase);
             case IEnumerable<KeyValuePair<string, object?>> kvps:
-            {
-                var materialized = kvps.ToDictionary(static kvp => kvp.Key, static kvp => kvp.Value, StringComparer.OrdinalIgnoreCase);
-                return materialized;
-            }
+                {
+                    var materialized = kvps.ToDictionary(static kvp => kvp.Key, static kvp => kvp.Value, StringComparer.OrdinalIgnoreCase);
+                    return materialized;
+                }
             default:
                 return null;
         }

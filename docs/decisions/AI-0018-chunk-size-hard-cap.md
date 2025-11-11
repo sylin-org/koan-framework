@@ -5,6 +5,7 @@ Date: 2025-11-10
 Owners: Koan Context Guild
 
 **Contract**
+
 - Inputs: extracted document sections scheduled for semantic chunking
 - Outputs: `ChunkedContent` segments reporting ≤1000 estimated tokens while preserving ordering and offsets
 - Error Modes: section slicing occurs when no full section fits; emits telemetry on repeated trims; failure if content cannot be sliced without data loss

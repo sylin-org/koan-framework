@@ -145,7 +145,7 @@ public class McpTools_Spec
     public async Task GetLibraryDocs_EmptyQuery_ReturnsBadRequest()
     {
         // Arrange
-    var request = new GetLibraryDocsRequest("", LibraryId: "019a6584-3075-7076-ae69-4ced4e2799f5");
+        var request = new GetLibraryDocsRequest("", LibraryId: "019a6584-3075-7076-ae69-4ced4e2799f5");
 
         // Act
         var result = await _controller.GetLibraryDocs(request, CancellationToken.None);
@@ -158,8 +158,8 @@ public class McpTools_Spec
     public async Task GetLibraryDocs_UsesLibraryIdWhenProvided()
     {
         // Arrange
-    var projectId = Guid.NewGuid().ToString();
-    var project = CreateProject(projectId);
+        var projectId = Guid.NewGuid().ToString();
+        var project = CreateProject(projectId);
 
         _projectResolverMock
             .Setup(x => x.ResolveProjectAsync(
@@ -196,8 +196,8 @@ public class McpTools_Spec
     public async Task GetLibraryDocs_UsesPathContextWhenProvided()
     {
         // Arrange
-    var projectId = Guid.NewGuid().ToString();
-    var project = CreateProject(projectId);
+        var projectId = Guid.NewGuid().ToString();
+        var project = CreateProject(projectId);
 
         _projectResolverMock
             .Setup(x => x.ResolveProjectByPathAsync(

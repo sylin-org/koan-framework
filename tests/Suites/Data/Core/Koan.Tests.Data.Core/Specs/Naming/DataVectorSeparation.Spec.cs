@@ -32,8 +32,8 @@ public class DataVectorSeparationSpec
     public void DataRegistry_UsesDataAdapterFactory()
     {
         // Arrange: Service provider with SQLite data adapter
-    var services = new ServiceCollection();
-    services.AddKoanDataCore(); // Registers core data services
+        var services = new ServiceCollection();
+        services.AddKoanDataCore(); // Registers core data services
 
         var sp = services.BuildServiceProvider();
 
@@ -66,9 +66,9 @@ public class DataVectorSeparationSpec
     public void VectorRegistry_UsesVectorAdapterFactory()
     {
         // Arrange: Service provider with Weaviate vector adapter
-    var services = new ServiceCollection();
-    services.AddKoanDataCore(); // Data layer required for entity metadata
-    services.AddKoanDataVector(); // Vector registry and defaults
+        var services = new ServiceCollection();
+        services.AddKoanDataCore(); // Data layer required for entity metadata
+        services.AddKoanDataVector(); // Vector registry and defaults
 
         // This test requires a vector adapter to be registered
         // Skip if no vector adapter available
@@ -94,9 +94,9 @@ public class DataVectorSeparationSpec
     public void SameEntity_DifferentNamesInDataVsVector()
     {
         // Arrange: Service provider with both data and vector adapters
-    var services = new ServiceCollection();
-    services.AddKoanDataCore();
-    services.AddKoanDataVector();
+        var services = new ServiceCollection();
+        services.AddKoanDataCore();
+        services.AddKoanDataVector();
 
         var sp = services.BuildServiceProvider();
         var vectorFactories = sp.GetServices<IVectorAdapterFactory>();
@@ -131,8 +131,8 @@ public class DataVectorSeparationSpec
     public void DataRegistry_WithPartition_UsesDataAdapter()
     {
         // Arrange
-    var services = new ServiceCollection();
-    services.AddKoanDataCore();
+        var services = new ServiceCollection();
+        services.AddKoanDataCore();
         var sp = services.BuildServiceProvider();
 
         // Act: Use partition context
@@ -159,9 +159,9 @@ public class DataVectorSeparationSpec
     public void VectorRegistry_WithPartition_UsesVectorAdapter()
     {
         // Arrange
-    var services = new ServiceCollection();
-    services.AddKoanDataCore();
-    services.AddKoanDataVector();
+        var services = new ServiceCollection();
+        services.AddKoanDataCore();
+        services.AddKoanDataVector();
         var sp = services.BuildServiceProvider();
 
         var vectorFactories = sp.GetServices<IVectorAdapterFactory>();

@@ -53,7 +53,7 @@ namespace Koan.Context.Services;
 /// QA Issue #35 FIXED: Structured error reporting with IndexingError type
 /// Content-Addressable Indexing: SHA256-based differential scanning with job tracking
 /// </remarks>
-public class Indexer 
+public class Indexer
 {
     private readonly Discovery _discovery;
     private readonly Extraction _extraction;
@@ -84,10 +84,10 @@ public class Indexer
         _discovery = discovery ?? throw new ArgumentNullException(nameof(discovery));
         _extraction = extraction ?? throw new ArgumentNullException(nameof(extraction));
         _chunking = chunking ?? throw new ArgumentNullException(nameof(chunking));
-    _embedding = embedding ?? throw new ArgumentNullException(nameof(embedding));
-    _planner = planner ?? throw new ArgumentNullException(nameof(planner));
-    _chunkMaintenance = chunkMaintenance ?? throw new ArgumentNullException(nameof(chunkMaintenance));
-    _tagResolver = tagResolver ?? throw new ArgumentNullException(nameof(tagResolver));
+        _embedding = embedding ?? throw new ArgumentNullException(nameof(embedding));
+        _planner = planner ?? throw new ArgumentNullException(nameof(planner));
+        _chunkMaintenance = chunkMaintenance ?? throw new ArgumentNullException(nameof(chunkMaintenance));
+        _tagResolver = tagResolver ?? throw new ArgumentNullException(nameof(tagResolver));
         _coordinator = coordinator ?? throw new ArgumentNullException(nameof(coordinator));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _fileMonitor = fileMonitor;

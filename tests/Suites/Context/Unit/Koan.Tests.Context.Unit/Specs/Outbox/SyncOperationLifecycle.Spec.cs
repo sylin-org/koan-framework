@@ -23,23 +23,23 @@ public class SyncOperationLifecycle_Spec
         var metadata = new { FilePath = "docs/file.md", StartLine = 1, EndLine = 10 };
 
         // Act
-    var indexedFileId = Guid.NewGuid().ToString();
+        var indexedFileId = Guid.NewGuid().ToString();
 
-    var operation = SyncOperation.Create(jobId, chunkId, indexedFileId, projectId, embedding, metadata);
+        var operation = SyncOperation.Create(jobId, chunkId, indexedFileId, projectId, embedding, metadata);
 
         // Assert
         operation.JobId.Should().Be(jobId);
         operation.ChunkId.Should().Be(chunkId);
-    operation.IndexedFileId.Should().Be(indexedFileId);
-    operation.Id.Should().Be(SyncOperation.ComposeId(chunkId, SyncOperationKind.SyncVector));
-    operation.Kind.Should().Be(SyncOperationKind.SyncVector);
+        operation.IndexedFileId.Should().Be(indexedFileId);
+        operation.Id.Should().Be(SyncOperation.ComposeId(chunkId, SyncOperationKind.SyncVector));
+        operation.Kind.Should().Be(SyncOperationKind.SyncVector);
         operation.ProjectId.Should().Be(projectId);
         operation.Status.Should().Be(OperationStatus.Pending);
         operation.RetryCount.Should().Be(0);
         operation.CreatedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(2));
-    operation.GetEmbedding().Should().BeEquivalentTo(embedding);
-    var metadataResult = operation.GetMetadata<Dictionary<string, object?>>();
-    metadataResult.Should().NotBeNull();
+        operation.GetEmbedding().Should().BeEquivalentTo(embedding);
+        var metadataResult = operation.GetMetadata<Dictionary<string, object?>>();
+        metadataResult.Should().NotBeNull();
     }
 
     [Fact]

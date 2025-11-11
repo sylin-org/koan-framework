@@ -51,11 +51,11 @@ public class StreamingController : ControllerBase
     {
         _logger.LogInformation("Starting SSE stream for job {JobId}", jobId);
 
-    // Set SSE headers
-    Response.ContentType = "text/event-stream";
-    Response.Headers["Cache-Control"] = "no-cache";
-    Response.Headers["Connection"] = "keep-alive";
-    Response.Headers["X-Accel-Buffering"] = "no"; // Disable nginx buffering
+        // Set SSE headers
+        Response.ContentType = "text/event-stream";
+        Response.Headers["Cache-Control"] = "no-cache";
+        Response.Headers["Connection"] = "keep-alive";
+        Response.Headers["X-Accel-Buffering"] = "no"; // Disable nginx buffering
 
         try
         {
@@ -131,11 +131,11 @@ public class StreamingController : ControllerBase
     {
         _logger.LogInformation("Starting SSE stream for all active jobs");
 
-    // Set SSE headers
-    Response.ContentType = "text/event-stream";
-    Response.Headers["Cache-Control"] = "no-cache";
-    Response.Headers["Connection"] = "keep-alive";
-    Response.Headers["X-Accel-Buffering"] = "no";
+        // Set SSE headers
+        Response.ContentType = "text/event-stream";
+        Response.Headers["Cache-Control"] = "no-cache";
+        Response.Headers["Connection"] = "keep-alive";
+        Response.Headers["X-Accel-Buffering"] = "no";
 
         try
         {

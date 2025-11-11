@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useSettings, useTestVectorStore, useTestDatabase } from '@/hooks/useSettings';
+import { useSettings, useTestVectorStore, useTestDatabase, useSeedTags } from '@/hooks/useSettings';
 import {
   Settings as SettingsIcon,
   Database,
@@ -11,12 +11,14 @@ import {
   Loader2,
   AlertCircle,
   Info,
+  Sparkles,
 } from 'lucide-react';
 
 export default function SettingsPage() {
   const { data: settings, isLoading, error } = useSettings();
   const testVectorStore = useTestVectorStore();
   const testDatabase = useTestDatabase();
+  const seedTags = useSeedTags();
 
   const [activeTab, setActiveTab] = useState<'vectorStore' | 'database' | 'ai' | 'indexing' | 'advanced'>('vectorStore');
 
@@ -42,6 +44,11 @@ export default function SettingsPage() {
   }
 
   if (!settings) return null;
+
+  const formatSeedTimestamp = (value: string) => {
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleString();
+  };
 
   const tabs = [
     { id: 'vectorStore' as const, label: 'Vector Store', icon: Database },
@@ -385,6 +392,61 @@ export default function SettingsPage() {
                           value={settings.system.autoResumeIndexing ? 'Yes' : 'No'}
                         />
                       </div>
+                    </div>
+
+                    {/* Tag Seeds */}
+                    <div>
+                      <h3 className="text-lg font-semibold text-foreground mb-4">Tag Seeds</h3>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Run the deterministic tag seeding pipeline to refresh vocabulary, rules, pipelines,
+                        and personas. Use this if tags drift or new environments need baseline metadata.
+                      </p>
+                      <button
+                        onClick={() => seedTags.mutate()}
+                        disabled={seedTags.isPending}
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50"
+                      >
+                        {seedTags.isPending ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Sparkles className="w-4 h-4" />
+                        )}
+                        Force Import Seed Tags
+                      </button>
+
+                      {seedTags.data && (
+                        <div className="mt-4 border border-border rounded-lg p-4 bg-muted/40">
+                          <p className="text-sm text-muted-foreground">
+                            Last run: {formatSeedTimestamp(seedTags.data.timestamp)} (forced: {seedTags.data.forced ? 'yes' : 'no'})
+                          </p>
+                          <div className="mt-4 overflow-x-auto">
+                            <table className="min-w-full text-sm">
+                              <thead>
+                                <tr className="text-left text-muted-foreground">
+                                  <th className="pb-2 pr-4">Segment</th>
+                                  <th className="pb-2 pr-4">Created</th>
+                                  <th className="pb-2">Updated</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {seedTags.data.reports.map((report) => (
+                                  <tr key={report.segment} className="border-t border-border/60">
+                                    <td className="py-2 pr-4 font-medium text-foreground capitalize">{report.segment}</td>
+                                    <td className="py-2 pr-4 text-foreground">{report.created}</td>
+                                    <td className="py-2 text-foreground">{report.updated}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
+
+                      {seedTags.isError && (
+                        <div className="mt-4 border border-danger-200 bg-danger-50 text-sm text-danger-800 rounded-lg p-3">
+                          {(seedTags.error instanceof Error ? seedTags.error.message : 'Failed to seed tags')}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

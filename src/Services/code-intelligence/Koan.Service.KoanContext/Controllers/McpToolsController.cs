@@ -210,7 +210,7 @@ public class McpToolsController : ControllerBase
         GetReferencesRequest request,
         CancellationToken cancellationToken)
     {
-    var projects = await Project.Query(_ => true, cancellationToken);
+        var projects = await Project.Query(_ => true, cancellationToken);
         if (projects.Count == 0)
         {
             return NotFound(new

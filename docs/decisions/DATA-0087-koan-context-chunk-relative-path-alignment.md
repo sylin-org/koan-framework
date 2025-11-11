@@ -7,12 +7,12 @@ date: 2025-11-11
 title: Koan.Context Chunk Metadata Relative Path Alignment
 ---
 
-| **Contract** | |
-| --- | --- |
-| **Inputs** | Koan.Context indexing pipeline (`Indexer`, `IncrementalIndexer`, legacy `IndexingService`), `Extraction.ExtractAsync`, persisted `IndexedFile` and `Chunk` tables, transactional outbox (`SyncOperation`). |
-| **Outputs** | Consistent relative-path metadata on `ExtractedDocument`, `Chunk`, and vector payloads; stable chunk maintenance that avoids deleting healthy embeddings. |
-| **Error Modes** | Partition maintenance deleting chunks due to perceived orphaning; vector sync over-count from replayed `SyncOperation` records; semantic search queries returning zero results after reindex. |
-| **Success Criteria** | Forced/ incremental reindex preserves chunk/vector counts; no orphan cleanup when manifest and chunk data agree; `ChunkMaintenanceService` no longer flushes valid data; regression tests/builds pass. |
+| **Contract**         |                                                                                                                                                                                                            |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Inputs**           | Koan.Context indexing pipeline (`Indexer`, `IncrementalIndexer`, legacy `IndexingService`), `Extraction.ExtractAsync`, persisted `IndexedFile` and `Chunk` tables, transactional outbox (`SyncOperation`). |
+| **Outputs**          | Consistent relative-path metadata on `ExtractedDocument`, `Chunk`, and vector payloads; stable chunk maintenance that avoids deleting healthy embeddings.                                                  |
+| **Error Modes**      | Partition maintenance deleting chunks due to perceived orphaning; vector sync over-count from replayed `SyncOperation` records; semantic search queries returning zero results after reindex.              |
+| **Success Criteria** | Forced/ incremental reindex preserves chunk/vector counts; no orphan cleanup when manifest and chunk data agree; `ChunkMaintenanceService` no longer flushes valid data; regression tests/builds pass.     |
 
 ## Summary
 

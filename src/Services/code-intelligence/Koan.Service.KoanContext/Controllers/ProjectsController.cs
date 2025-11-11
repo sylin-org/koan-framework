@@ -39,7 +39,7 @@ public class ProjectsController : EntityController<Project>
         FileMonitoringService fileMonitoring,
         PathValidator pathValidator)
     {
-    _indexProject = indexProject ?? throw new ArgumentNullException(nameof(indexProject));
+        _indexProject = indexProject ?? throw new ArgumentNullException(nameof(indexProject));
         _fileMonitoring = fileMonitoring ?? throw new ArgumentNullException(nameof(fileMonitoring));
         _pathValidator = pathValidator ?? throw new ArgumentNullException(nameof(pathValidator));
     }

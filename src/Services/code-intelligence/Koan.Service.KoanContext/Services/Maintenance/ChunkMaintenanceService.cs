@@ -42,7 +42,7 @@ public sealed class ChunkMaintenanceService
 
         var vectorFailures = new List<string>();
         var chunkIds = new List<string>();
-    var snapshotsRemoved = 0;
+        var snapshotsRemoved = 0;
 
         var indexedFile = await GetIndexedFileAsync(relativePath, cancellationToken);
         var chunks = await Chunk.Query(c => c.IndexedFileId == indexedFile.Id, cancellationToken);
@@ -68,7 +68,7 @@ public sealed class ChunkMaintenanceService
             chunkIds.Add(chunk.Id);
         }
 
-    if (snapshotsRemoved > 0)
+        if (snapshotsRemoved > 0)
         {
             _logger.LogDebug(
         "Removed {Count} vector snapshots for file {RelativePath}",
@@ -106,8 +106,8 @@ public sealed class ChunkMaintenanceService
 
         var chunkCount = 0;
         var vectorSuccess = 0;
-    var vectorFailures = new List<string>();
-    var snapshotsRemoved = 0;
+        var vectorFailures = new List<string>();
+        var snapshotsRemoved = 0;
 
         await foreach (var chunk in Chunk.AllStream(ct: cancellationToken))
         {
@@ -132,7 +132,7 @@ public sealed class ChunkMaintenanceService
             await chunk.Delete(cancellationToken);
         }
 
-    if (snapshotsRemoved > 0)
+        if (snapshotsRemoved > 0)
         {
             _logger.LogDebug(
         "Removed {Count} vector snapshots while clearing all chunks",

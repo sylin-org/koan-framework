@@ -34,8 +34,8 @@ public class EmbeddingServiceSpec : IDisposable
     {
         _aiMock = new Mock<IAi>();
         _cache = new MemoryCache(new MemoryCacheOptions());
-    _loggerMock = new Mock<ILogger<EmbeddingService>>();
-    _service = new EmbeddingService(_aiMock.Object, _cache, _loggerMock.Object, "test-model");
+        _loggerMock = new Mock<ILogger<EmbeddingService>>();
+        _service = new EmbeddingService(_aiMock.Object, _cache, _loggerMock.Object, "test-model");
 
         // Default mock behavior - return test embedding
         _aiMock.Setup(x => x.EmbedAsync(It.IsAny<AiEmbeddingsRequest>(), It.IsAny<CancellationToken>()))
@@ -105,8 +105,8 @@ public class EmbeddingServiceSpec : IDisposable
     public async Task EmbedAsync_DifferentModels_CreatesSeparateCacheEntries()
     {
         // Arrange
-    var service1 = new EmbeddingService(_aiMock.Object, _cache, _loggerMock.Object, "model-a");
-    var service2 = new EmbeddingService(_aiMock.Object, _cache, _loggerMock.Object, "model-b");
+        var service1 = new EmbeddingService(_aiMock.Object, _cache, _loggerMock.Object, "model-a");
+        var service2 = new EmbeddingService(_aiMock.Object, _cache, _loggerMock.Object, "model-b");
 
         // Act
         await service1.EmbedAsync("same text");

@@ -292,10 +292,10 @@ public class Discovery
     private static bool ShouldExclude(string filePath, string projectPath)
     {
         var relativePath = Path.GetRelativePath(projectPath, filePath);
-    var sanitized = relativePath.Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar);
-    var pathParts = sanitized.Split(new[] { Path.DirectorySeparatorChar }, StringSplitOptions.RemoveEmptyEntries);
+        var sanitized = relativePath.Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar);
+        var pathParts = sanitized.Split(new[] { Path.DirectorySeparatorChar }, StringSplitOptions.RemoveEmptyEntries);
 
-    if (pathParts.Any(part => part.Length > 1 && part.StartsWith(".", StringComparison.Ordinal)))
+        if (pathParts.Any(part => part.Length > 1 && part.StartsWith(".", StringComparison.Ordinal)))
         {
             return true;
         }

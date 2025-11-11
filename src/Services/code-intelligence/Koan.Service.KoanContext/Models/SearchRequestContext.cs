@@ -79,11 +79,11 @@ public sealed record SearchRequestContext(
             .Distinct(StringComparer.Ordinal)
             .ToArray();
 
-    var resolvedMaxTokens = Math.Clamp(maxTokens ?? 6000, 1000, 20000);
-    var defaultInsightSetting = channel == SearchChannel.Mcp ? false : true;
-    var defaultReasoningSetting = channel == SearchChannel.Mcp ? false : true;
-    var resolvedIncludeInsights = includeInsights ?? defaultInsightSetting;
-    var resolvedIncludeReasoning = includeReasoning ?? defaultReasoningSetting;
+        var resolvedMaxTokens = Math.Clamp(maxTokens ?? 6000, 1000, 20000);
+        var defaultInsightSetting = channel == SearchChannel.Mcp ? false : true;
+        var defaultReasoningSetting = channel == SearchChannel.Mcp ? false : true;
+        var resolvedIncludeInsights = includeInsights ?? defaultInsightSetting;
+        var resolvedIncludeReasoning = includeReasoning ?? defaultReasoningSetting;
 
         return new SearchRequestContext(
             Query: query,

@@ -9,12 +9,12 @@
 
 ---
 
-| **Contract** | **Details** |
-| --- | --- |
-| **Inputs** | Project registry (`Project`), indexed metadata (`IndexedFile`, `Chunk`), vector sync outbox (`SyncOperation`), live file system snapshot, maintenance command payloads (UI/API). |
-| **Outputs** | Deterministic maintenance jobs with audit logs, reconciled chunk metadata, replayed vector sync operations, targeted wipe results (metadata-only or vector-only), updated project/job status. |
-| **Error Modes** | Partition lock unavailable → surface 409 and refuse maintenance; file scan failure → partial results flagged and retriable; vector adapter offline → maintenance aborts prior to destructive steps; orphaned sync operations → moved to dead-letter with remediation guidance. |
-| **Success Criteria** | No automatic destructive wipes during restart, reconciliation repairs drift without full re-index, selective wipes require explicit confirmation, operations observable via structured events, UI exposes “House Chores” workflow with safe defaults. |
+| **Contract**         | **Details**                                                                                                                                                                                                                                                                    |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Inputs**           | Project registry (`Project`), indexed metadata (`IndexedFile`, `Chunk`), vector sync outbox (`SyncOperation`), live file system snapshot, maintenance command payloads (UI/API).                                                                                               |
+| **Outputs**          | Deterministic maintenance jobs with audit logs, reconciled chunk metadata, replayed vector sync operations, targeted wipe results (metadata-only or vector-only), updated project/job status.                                                                                  |
+| **Error Modes**      | Partition lock unavailable → surface 409 and refuse maintenance; file scan failure → partial results flagged and retriable; vector adapter offline → maintenance aborts prior to destructive steps; orphaned sync operations → moved to dead-letter with remediation guidance. |
+| **Success Criteria** | No automatic destructive wipes during restart, reconciliation repairs drift without full re-index, selective wipes require explicit confirmation, operations observable via structured events, UI exposes “House Chores” workflow with safe defaults.                          |
 
 ---
 

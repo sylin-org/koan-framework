@@ -7,6 +7,7 @@
 ## Progress Summary
 
 ### ✅ Completed
+
 1. **Architecture Documentation** (`koan-context-ai-optimization-phase1.md`)
 2. **Enhanced Models** (`IRetrievalService.cs`)
    - SearchResult with metadata, sources, insights, warnings
@@ -48,6 +49,7 @@ public class TokenCountingService : ITokenCountingService
 ```
 
 **Registration** in `Program.cs` or auto-registrar:
+
 ```csharp
 builder.Services.AddSingleton<ITokenCountingService, TokenCountingService>();
 ```
@@ -406,6 +408,7 @@ public class GitLabUrlGenerator : ISourceUrlGenerator
 This is the most complex task. The `RetrievalService.SearchAsync` method needs major refactoring:
 
 **Key Changes:**
+
 1. Parse continuation token or create new search
 2. Fetch generous initial result set (3x estimated chunks)
 3. Iterate chunks, accumulating tokens until budget exhausted
@@ -725,6 +728,7 @@ public async Task<SearchResult> GetLibraryDocs(
 ### Database Schema Changes
 
 DocumentChunk needs new columns:
+
 ```sql
 ALTER TABLE DocumentChunk ADD COLUMN StartByteOffset INTEGER DEFAULT 0;
 ALTER TABLE DocumentChunk ADD COLUMN EndByteOffset INTEGER DEFAULT 0;
@@ -734,6 +738,7 @@ ALTER TABLE DocumentChunk ADD COLUMN SourceUrl TEXT NULL;
 ### Backward Compatibility
 
 Old SearchController endpoints remain functional. New features are opt-in via:
+
 - `MaxTokens` parameter (defaults to old behavior if not specified)
 - `IncludeInsights=false` to skip insights
 - `IncludeReasoning=false` to skip reasoning

@@ -11,6 +11,7 @@
 **Koan.Context** is a self-contained, AI-powered semantic code search and context retrieval service built on the Koan Framework. It solves the fundamental challenge of understanding large codebases by transforming static code into searchable, AI-ready knowledge bases that developers and AI agents can query using natural language.
 
 **Key Value Propositions:**
+
 - **Zero-configuration semantic search** for any codebase within seconds
 - **Differential indexing** with 96-97% time savings on re-indexing
 - **Multi-project support** for monorepos and documentation hubs
@@ -19,6 +20,7 @@
 - **Persistent storage** in `.koan/data` for portability and version control
 
 **Target Audience:**
+
 - Enterprise development teams seeking AI-assisted code navigation
 - Open-source maintainers wanting intelligent documentation search
 - AI tool builders needing semantic code context APIs
@@ -51,12 +53,14 @@ Modern software projects face several critical challenges:
 1. **Cognitive Overload**: Developers spend 60-70% of their time reading and understanding existing code rather than writing new code.
 
 2. **Context Fragmentation**: Critical information is scattered across:
+
    - Source code files (thousands to millions)
    - Documentation (often outdated or incomplete)
    - Comments (may not reflect current implementation)
    - Commit history (high signal-to-noise ratio)
 
 3. **Traditional Search Limitations**:
+
    - **Keyword search** (grep, IDE search): Requires exact terminology knowledge
    - **Symbol navigation** (Go to Definition): Only works for known identifiers
    - **Full-text search** (Elasticsearch): No semantic understanding, high false positives
@@ -69,6 +73,7 @@ Modern software projects face several critical challenges:
 ### What Developers Actually Need
 
 When asking "How does authentication work in this codebase?", developers need:
+
 - Relevant code snippets (not entire files)
 - Conceptual understanding (not just syntax matches)
 - Cross-file connections (authentication flow spans multiple files)
@@ -135,6 +140,7 @@ When asking "How does authentication work in this codebase?", developers need:
 ### Data Flow
 
 **Indexing Flow:**
+
 ```
 1. Project Registered
    ↓
@@ -152,6 +158,7 @@ When asking "How does authentication work in this codebase?", developers need:
 ```
 
 **Query Flow:**
+
 ```
 1. Natural Language Query
    ↓
@@ -189,12 +196,14 @@ dotnet run
 ```
 
 **How it works:**
+
 - **Service Discovery**: Auto-detects running Weaviate/Ollama instances (local, Docker, Kubernetes)
 - **Auto-Provisioning**: Launches Docker containers if services not found
 - **Health Checking**: Waits for dependencies to be healthy before proceeding
 - **Session Management**: Cleans up containers on graceful shutdown
 
 **Technologies:**
+
 - `BaseOrchestrationEvaluator` pattern for extensible dependency detection
 - `WeaviateOrchestrationEvaluator` for vector database provisioning
 - Docker API integration via Koan.Orchestration.Aspire
@@ -206,6 +215,7 @@ dotnet run
 **Solution:** Content-aware differential scanning with **96-97% time savings**.
 
 **Implementation:**
+
 ```csharp
 public class IndexedFile : Entity<IndexedFile>
 {
@@ -218,6 +228,7 @@ public class IndexedFile : Entity<IndexedFile>
 ```
 
 **Scanning Algorithm:**
+
 1. Compute SHA256 for each file on disk
 2. Query `IndexedFile` table for existing hashes
 3. Categorize files:
@@ -227,11 +238,13 @@ public class IndexedFile : Entity<IndexedFile>
    - **Deleted**: In database but not on disk → remove vectors
 
 **Performance:**
+
 - 1% change rate: 99% files skipped, ~1 minute vs. 90+ minutes
 - 10% change rate: 90% files skipped, ~9 minutes vs. 90+ minutes
 - 100% change rate: 0% skipped, same as full index (cold start)
 
 **Reliability:**
+
 - ❌ **Rejected approaches**:
   - Timestamps (`LastModified`) → unreliable (OS metadata, git checkout)
   - File size alone → hash collisions possible
@@ -242,6 +255,7 @@ public class IndexedFile : Entity<IndexedFile>
 Koan.Context uses Koan Framework's **provider-agnostic patterns**:
 
 **Entity<T> Pattern (Relational Data):**
+
 ```csharp
 // Auto-generates GUID v7 IDs, supports any SQL/NoSQL provider
 public class Project : Entity<Project>
@@ -260,6 +274,7 @@ public class Project : Entity<Project>
 ```
 
 **Vector<T> Pattern (Similarity Search):**
+
 ```csharp
 // Provider-agnostic vector operations
 public class Chunk : Vector<Chunk>
@@ -281,6 +296,7 @@ public class Chunk : Vector<Chunk>
 ```
 
 **Benefits:**
+
 - **Testability**: Swap SQLite → Postgres → MongoDB without code changes
 - **Cost optimization**: Use Weaviate locally, Pinecone in production
 - **Future-proof**: New vector DBs supported by adding connector package
@@ -288,6 +304,7 @@ public class Chunk : Vector<Chunk>
 ### 4. **Smart Chunking with Context Preservation**
 
 **Problem:** Naive chunking (every N lines) breaks semantic units:
+
 ```csharp
 // Bad chunk boundary cuts method in half
 Chunk 1:
@@ -305,12 +322,14 @@ Chunk 2:
 ```
 
 **Koan.Context Solution:**
+
 - **Token-aware chunking**: Respects 1024-token budget (configurable)
 - **Syntax-aware boundaries**: Prefers method/class boundaries
 - **Overlap strategy**: 10% overlap to preserve context at boundaries
 - **Metadata preservation**: Each chunk knows its file, line range, type
 
 **Chunking Algorithm:**
+
 ```
 1. Parse file into semantic blocks (methods, classes, top-level statements)
 2. Start new chunk
@@ -327,6 +346,7 @@ Chunk 2:
 **Why not store everything in Weaviate?**
 
 Weaviate excels at vector similarity but is suboptimal for:
+
 - Filtering by exact values (project ID, file path)
 - Pagination across large result sets
 - Complex joins (file → chunks → metadata)
@@ -334,15 +354,16 @@ Weaviate excels at vector similarity but is suboptimal for:
 
 **Koan.Context Strategy:**
 
-| Data Type | Storage | Rationale |
-|-----------|---------|-----------|
-| **Project metadata** | SQLite | ACID, easy querying, join support |
-| **IndexedFile manifest** | SQLite | Differential scan lookups (SHA256 index) |
-| **Chunk metadata** | SQLite | Pagination, filtering, source attribution |
-| **Chunk vectors** | Weaviate | Similarity search (ANN with HNSW) |
-| **Job tracking** | SQLite | Status polling, history queries |
+| Data Type                | Storage  | Rationale                                 |
+| ------------------------ | -------- | ----------------------------------------- |
+| **Project metadata**     | SQLite   | ACID, easy querying, join support         |
+| **IndexedFile manifest** | SQLite   | Differential scan lookups (SHA256 index)  |
+| **Chunk metadata**       | SQLite   | Pagination, filtering, source attribution |
+| **Chunk vectors**        | Weaviate | Similarity search (ANN with HNSW)         |
+| **Job tracking**         | SQLite   | Status polling, history queries           |
 
 **Query Pattern:**
+
 ```
 1. Weaviate: Vector similarity search → List<ChunkID>
 2. SQLite: Metadata enrichment → List<ChunkWithMetadata>
@@ -354,6 +375,7 @@ Weaviate excels at vector similarity but is suboptimal for:
 ```
 
 **Benefits:**
+
 - **Performance**: SQLite index scans + Weaviate ANN = sub-second queries
 - **Cost**: SQLite is free, Weaviate local deployment is free
 - **Reliability**: SQLite ACID for metadata, eventual consistency for vectors OK
@@ -363,6 +385,7 @@ Weaviate excels at vector similarity but is suboptimal for:
 Koan.Context is a **first-class MCP server**, enabling seamless AI assistant integration.
 
 **What is MCP?**
+
 > Model Context Protocol (Anthropic): Standard for AI assistants to access external context sources
 
 **Koan.Context MCP Capabilities:**
@@ -370,28 +393,24 @@ Koan.Context is a **first-class MCP server**, enabling seamless AI assistant int
 ```typescript
 // Auto-generated TypeScript SDK (koan-code-mode.d.ts)
 interface KoanContextTools {
-    // Search across all projects
-    search_code(params: {
-        query: string,
-        projectIds?: string[],
-        limit?: number,
-        includeMetadata?: boolean
-    }): SearchResult;
+  // Search across all projects
+  search_code(params: {
+    query: string;
+    projectIds?: string[];
+    limit?: number;
+    includeMetadata?: boolean;
+  }): SearchResult;
 
-    // Get project health
-    get_project_health(params: {
-        projectId: string
-    }): ProjectHealth;
+  // Get project health
+  get_project_health(params: { projectId: string }): ProjectHealth;
 
-    // Trigger background indexing
-    index_project(params: {
-        projectId: string,
-        force?: boolean
-    }): IndexingJob;
+  // Trigger background indexing
+  index_project(params: { projectId: string; force?: boolean }): IndexingJob;
 }
 ```
 
 **Integration Example (Claude Desktop):**
+
 ```json
 {
   "mcpServers": {
@@ -407,6 +426,7 @@ interface KoanContextTools {
 ```
 
 **Usage in Claude:**
+
 ```
 User: How does authentication work in the backend?
 
@@ -418,6 +438,7 @@ Claude: [Uses koan-context MCP server]
 ```
 
 **Benefits:**
+
 - **No API keys**: MCP runs locally, no external API calls
 - **Context-aware**: AI sees actual implementation, not guesses
 - **Always up-to-date**: Differential indexing keeps context fresh
@@ -428,6 +449,7 @@ Claude: [Uses koan-context MCP server]
 While Koan.Context is API-first, it includes a **zero-config web UI**:
 
 **Features:**
+
 - Project management (add, remove, index)
 - Real-time search with highlighting
 - Job status monitoring (indexing progress)
@@ -435,6 +457,7 @@ While Koan.Context is API-first, it includes a **zero-config web UI**:
 - Cross-project search aggregation
 
 **Auto-Launch:**
+
 ```csharp
 // appsettings.json
 {
@@ -447,6 +470,7 @@ While Koan.Context is API-first, it includes a **zero-config web UI**:
 ```
 
 **Technology Stack:**
+
 - Vanilla JavaScript (no framework dependencies)
 - Server-Sent Events (SSE) for real-time updates
 - Responsive design (mobile-friendly)
@@ -460,6 +484,7 @@ While Koan.Context is API-first, it includes a **zero-config web UI**:
 Koan.Context uses **6 core entities** following Domain-Driven Design principles:
 
 #### 1. **Project** (Aggregate Root)
+
 ```csharp
 public class Project : Entity<Project>
 {
@@ -485,12 +510,14 @@ public class Project : Entity<Project>
 ```
 
 **Design Decisions:**
+
 - **Aggregate root**: All indexing operations scoped to project
 - **Status enum**: Explicit state machine (prevents invalid transitions)
 - **Error tracking**: `LastError` for debugging without log diving
-- **Statistics denormalization**: Avoid COUNT(*) queries on hot paths
+- **Statistics denormalization**: Avoid COUNT(\*) queries on hot paths
 
 #### 2. **IndexedFile** (Manifest)
+
 ```csharp
 public class IndexedFile : Entity<IndexedFile>
 {
@@ -513,11 +540,13 @@ public class IndexedFile : Entity<IndexedFile>
 ```
 
 **Why this design:**
+
 - **Differential scanning**: Quick hash lookups via index on `(ProjectId, RelativePath)`
 - **No chunking info**: ChunkCount was removed (denormalized, query Chunk table instead)
 - **No timestamps**: `LastModified` removed (unreliable, use ContentHash only)
 
 #### 3. **Chunk** (Vector + Metadata)
+
 ```csharp
 public class Chunk : Vector<Chunk>
 {
@@ -541,10 +570,12 @@ public class Chunk : Vector<Chunk>
 ```
 
 **Dual-store mapping:**
+
 - **SQLite**: `ProjectId, FileId, Content, StartLine, EndLine, SearchText`
 - **Weaviate**: `Content, SearchText, Embedding (384-dim vector)`
 
 #### 4. **Job** (Progress Tracking)
+
 ```csharp
 public class Job : Entity<Job>
 {
@@ -579,11 +610,13 @@ public class Job : Entity<Job>
 ```
 
 **Why track this:**
+
 - **User feedback**: Long indexing jobs need progress indicators
 - **Debugging**: Identify bottlenecks (files/sec, embeddings/sec)
 - **Retry logic**: Distinguish transient vs. permanent failures
 
 #### 5. **SyncOperation** (Vector Sync Coordination)
+
 ```csharp
 public class SyncOperation : Entity<SyncOperation>
 {
@@ -598,11 +631,13 @@ public class SyncOperation : Entity<SyncOperation>
 ```
 
 **Purpose:**
+
 - **Background worker**: `VectorSyncWorker` polls for pending operations
 - **Dual-store consistency**: Ensures SQLite chunks have corresponding Weaviate vectors
 - **Error recovery**: Retries failed syncs with exponential backoff
 
 #### 6. **Embedding** (Cost Tracking)
+
 ```csharp
 public class Embedding : Entity<Embedding>
 {
@@ -615,6 +650,7 @@ public class Embedding : Entity<Embedding>
 ```
 
 **Why track embeddings:**
+
 - **Cost analysis**: Token usage for commercial APIs (OpenAI, Cohere)
 - **Deduplication**: Avoid re-embedding identical text (cache by hash)
 - **Performance**: Track P50/P95/P99 latencies per model
@@ -720,6 +756,7 @@ The indexing pipeline is a **multi-stage, resumable workflow**:
 ```
 
 **Resumability:**
+
 - Job failures → Mark status as Failed, preserve progress
 - Service restart → Auto-resume via `IndexingJobMaintenanceTask`
 - Cancellation → Graceful shutdown with partial commit
@@ -785,12 +822,14 @@ public async Task<SearchResult> SearchAsync(
 ```
 
 **Partition Strategy:**
+
 - Each project gets its own Weaviate class: `KoanChunk_proj_{projectId}`
 - Prevents cross-project leakage
 - Enables per-project schema evolution
 - Simplifies project deletion (drop class)
 
 **Performance Optimizations:**
+
 1. **Approximate Nearest Neighbor (ANN)**: Weaviate uses HNSW index (sub-linear search)
 2. **Batch enrichment**: Single SQL query for all chunk metadata
 3. **Connection pooling**: Reuse HTTP connections to Weaviate
@@ -805,12 +844,14 @@ public async Task<SearchResult> SearchAsync(
 **Scenario:** Large monorepo with 500k+ lines of code across multiple teams.
 
 **Traditional Approach:**
+
 - Developer spends 30+ minutes grep-ing for authentication logic
 - Finds 200+ false positives with keyword "auth"
 - Manually filters to relevant 10 files
 - Reads thousands of lines to understand flow
 
 **With Koan.Context:**
+
 ```bash
 # One-time setup
 dotnet run
@@ -826,6 +867,7 @@ POST /api/search { "query": "JWT token validation flow" }
 ```
 
 **Benefits:**
+
 - **Time savings**: 30 minutes → 10 seconds
 - **Accuracy**: Semantic relevance > keyword matching
 - **Onboarding**: New developers productive in days, not months
@@ -835,6 +877,7 @@ POST /api/search { "query": "JWT token validation flow" }
 **Scenario:** Developer uses Claude/ChatGPT for code questions but AI lacks project context.
 
 **Traditional Approach:**
+
 ```
 Developer: How do I implement rate limiting in this codebase?
 AI: [Generic answer based on training data, may not match your architecture]
@@ -843,6 +886,7 @@ AI: [Better answer, but still guessing implementation details]
 ```
 
 **With Koan.Context MCP:**
+
 ```
 Developer: How do I implement rate limiting in this codebase?
 Claude: [Uses koan-context MCP to search "rate limiting"]
@@ -858,6 +902,7 @@ Claude: [Uses koan-context MCP to search "rate limiting"]
 ```
 
 **Benefits:**
+
 - **Contextual answers**: AI sees actual code, not generic patterns
 - **No copy-paste**: Automatic context retrieval
 - **Always current**: Differential indexing keeps AI context fresh
@@ -867,11 +912,13 @@ Claude: [Uses koan-context MCP to search "rate limiting"]
 **Scenario:** OSS project with extensive documentation across multiple repos.
 
 **Example:** Koan Framework itself
+
 - 15 repos (Core, Connectors, Examples)
 - 500+ markdown docs
 - 50k+ LOC
 
 **Setup:**
+
 ```bash
 # Index all repos
 POST /api/projects/bulk-index
@@ -893,6 +940,7 @@ POST /api/search
 ```
 
 **Benefits:**
+
 - **Unified search**: One index for all repos
 - **Contributor onboarding**: Semantic search > browsing README files
 - **AI integration**: MCP-powered chatbot on project website
@@ -902,6 +950,7 @@ POST /api/search
 **Scenario:** Security team needs to audit all authentication/authorization code.
 
 **Traditional Approach:**
+
 ```bash
 # Keyword search (high false positive rate)
 grep -r "password" .
@@ -912,6 +961,7 @@ grep -r "token" .
 ```
 
 **With Koan.Context:**
+
 ```bash
 # Semantic queries
 POST /api/search { "query": "password hashing implementation" }
@@ -922,6 +972,7 @@ POST /api/search { "query": "SQL injection vulnerability patterns" }
 ```
 
 **Benefits:**
+
 - **Precision**: Semantic understanding reduces false positives by 80%+
 - **Coverage**: Won't miss related code even if keywords differ
 - **Auditability**: Results include file:line references for report
@@ -931,11 +982,13 @@ POST /api/search { "query": "SQL injection vulnerability patterns" }
 **Scenario:** Migrating 100k LOC legacy system to new framework.
 
 **Challenge:**
+
 - 15-year-old codebase, original developers gone
 - Sparse documentation
 - Need to understand business logic before refactoring
 
 **Koan.Context Workflow:**
+
 ```bash
 # Index legacy codebase
 POST /api/projects { "rootPath": "/legacy-system" }
@@ -952,6 +1005,7 @@ POST /api/search { "query": "inventory management state machine" }
 ```
 
 **Benefits:**
+
 - **Knowledge extraction**: Turn undocumented code into queryable knowledge
 - **Risk reduction**: Understand dependencies before refactoring
 - **Team alignment**: Shared understanding via semantic search
@@ -981,6 +1035,7 @@ dotnet run
 ```
 
 **First run:**
+
 - Auto-provisions Weaviate container on port 8080
 - Auto-detects Ollama on `localhost:11434` (or provisions if configured)
 - Creates `.koan/data/` directory for persistence
@@ -1046,7 +1101,7 @@ docker run -d \
 
     "Orchestration": {
       "Services": {
-        "weaviate": "always"  // Options: always, auto, never, disabled
+        "weaviate": "always" // Options: always, auto, never, disabled
       }
     }
   }
@@ -1087,6 +1142,7 @@ curl -X POST http://localhost:27500/api/search \
 #### Via MCP (Claude Desktop):
 
 **~/.config/claude/claude_desktop_config.json:**
+
 ```json
 {
   "mcpServers": {
@@ -1100,6 +1156,7 @@ curl -X POST http://localhost:27500/api/search \
 ```
 
 **In Claude:**
+
 ```
 You: Index my project at /path/to/my-project
 
@@ -1123,43 +1180,52 @@ Claude: [Searches indexed project]
 #### **Projects**
 
 **GET /api/projects**
+
 - List all projects
 - Returns: `List<ProjectSummary>`
 
 **POST /api/projects**
+
 - Create new project
 - Body: `{ "name": string, "rootPath": string, "docsPath"?: string }`
 - Returns: `Project`
 
 **GET /api/projects/{id}**
+
 - Get project details
 - Returns: `Project`
 
 **GET /api/projects/{id}/health**
+
 - Get project health status
 - Returns: `{ projectId, name, healthy, status, warnings[] }`
 
 **POST /api/projects/{id}/index**
+
 - Start indexing job
 - Query params: `force=true` (optional, re-index all files)
 - Returns: `{ message, projectId, statusUrl }`
 
 **GET /api/projects/{id}/status**
+
 - Get indexing status
 - Returns: `{ projectId, name, status, documentCount }`
 
 **POST /api/projects/bulk-index**
+
 - Index multiple projects
 - Body: `{ "projectIds": string[], "forceReindex": boolean }`
 - Returns: `{ total, started, projects[], projectsNotFound[] }`
 
 **DELETE /api/projects/{id}**
+
 - Delete project and all indexed data
 - Returns: `204 No Content`
 
 #### **Search**
 
 **POST /api/search**
+
 - Semantic code search
 - Body:
   ```json
@@ -1175,6 +1241,7 @@ Claude: [Searches indexed project]
 - Returns: `SearchResult`
 
 **POST /api/search/suggestions**
+
 - Get autocomplete suggestions
 - Body: `{ "projectId": string, "prefix": string, "limit"?: 5 }`
 - Returns: `{ prefix, suggestions[] }`
@@ -1182,15 +1249,18 @@ Claude: [Searches indexed project]
 #### **Jobs**
 
 **GET /api/jobs**
+
 - List jobs (optionally filtered by project)
 - Query params: `projectId=...` (optional)
 - Returns: `List<JobSummary>`
 
 **GET /api/jobs/{id}**
+
 - Get job details
 - Returns: `Job`
 
 **POST /api/jobs/{id}/cancel**
+
 - Cancel running job
 - Returns: `204 No Content`
 
@@ -1199,6 +1269,7 @@ Claude: [Searches indexed project]
 Koan.Context exposes the following MCP tools:
 
 **search_code**
+
 ```typescript
 {
   name: "search_code",
@@ -1213,6 +1284,7 @@ Koan.Context exposes the following MCP tools:
 ```
 
 **get_project_health**
+
 ```typescript
 {
   name: "get_project_health",
@@ -1224,6 +1296,7 @@ Koan.Context exposes the following MCP tools:
 ```
 
 **index_project**
+
 ```typescript
 {
   name: "index_project",
@@ -1242,11 +1315,13 @@ Koan.Context exposes the following MCP tools:
 ### Indexing Performance
 
 **Test Setup:**
+
 - **Hardware**: 16-core Intel i9, 32GB RAM, NVMe SSD
 - **Model**: Ollama all-minilm (384 dimensions)
 - **Codebase**: ASP.NET Core (2,975 C# files, ~500k LOC)
 
 **Cold Start (Full Index):**
+
 - Files discovered: 2,975
 - Files indexed: 2,975 (100%)
 - Chunks created: 12,450
@@ -1255,6 +1330,7 @@ Koan.Context exposes the following MCP tools:
 - Throughput: **11 files/sec, 46 chunks/sec**
 
 **Differential Re-Index (1% Change Rate):**
+
 - Files discovered: 2,975
 - Files skipped: 2,946 (99%)
 - Files indexed: 29 (1%)
@@ -1263,6 +1339,7 @@ Koan.Context exposes the following MCP tools:
 - **Time savings: 97.5%**
 
 **Differential Re-Index (10% Change Rate):**
+
 - Files discovered: 2,975
 - Files skipped: 2,678 (90%)
 - Files indexed: 297 (10%)
@@ -1273,16 +1350,19 @@ Koan.Context exposes the following MCP tools:
 ### Query Performance
 
 **Vector Search (Weaviate HNSW):**
+
 - **P50**: 38ms
 - **P95**: 125ms
 - **P99**: 280ms
 
 **End-to-End Search (Vector + Metadata Enrichment):**
+
 - **P50**: 95ms
 - **P95**: 340ms
 - **P99**: 680ms
 
 **Scalability:**
+
 - **10k chunks**: <100ms P95
 - **100k chunks**: <200ms P95
 - **1M chunks**: <500ms P95 (with pagination)
@@ -1290,11 +1370,13 @@ Koan.Context exposes the following MCP tools:
 ### Resource Usage
 
 **Memory:**
+
 - **Service process**: 120-180 MB baseline
 - **Peak during indexing**: 450 MB (with 4 parallel workers)
 - **Weaviate container**: 200-400 MB (grows with index size)
 
 **Disk:**
+
 - **SQLite database**: ~1 MB per 1k files
 - **Weaviate data**: ~150 KB per 1k chunks (384-dim vectors)
 - **Example (ASP.NET Core)**:
@@ -1302,6 +1384,7 @@ Koan.Context exposes the following MCP tools:
   - Weaviate: 223 KB
 
 **CPU:**
+
 - **Indexing**: 60-80% utilization (parallel chunking)
 - **Idle**: <1% utilization
 - **Query**: 5-10% utilization (burst)
@@ -1315,23 +1398,27 @@ Koan.Context exposes the following MCP tools:
 **Use Case:** Individual developer with local codebase
 
 **Setup:**
+
 ```bash
 cd /path/to/your-project
 dotnet run --project /path/to/Koan.Context
 ```
 
 **Characteristics:**
+
 - Weaviate runs in Docker container
 - SQLite database in `.koan/data/`
 - Ollama on host machine (optional)
 - Auto-launches browser UI
 
 **Pros:**
+
 - Zero external dependencies
 - Complete privacy (no cloud calls)
 - Fast iteration (local embeddings)
 
 **Cons:**
+
 - Embeddings limited to local model quality
 - No team sharing (single-user)
 
@@ -1340,9 +1427,10 @@ dotnet run --project /path/to/Koan.Context
 **Use Case:** Team shares codebase index, hosted on build server
 
 **Setup:**
+
 ```yaml
 # docker-compose.yml
-version: '3.8'
+version: "3.8"
 services:
   koan-context:
     image: koan-context:latest
@@ -1358,16 +1446,19 @@ services:
 ```
 
 **Characteristics:**
+
 - Centralized index (no per-developer re-indexing)
 - OpenAI embeddings (better quality)
 - File monitoring (auto-reindex on git pull)
 
 **Pros:**
+
 - Team collaboration (shared search index)
 - Professional embeddings (OpenAI text-embedding-3-small)
 - Automatic updates (file watcher)
 
 **Cons:**
+
 - Requires hosted server
 - Embedding API costs (~$0.02 per 1M tokens)
 
@@ -1376,6 +1467,7 @@ services:
 **Use Case:** Large organization with multiple projects, high availability
 
 **Setup:**
+
 ```yaml
 # koan-context-deployment.yaml
 apiVersion: apps/v1
@@ -1393,24 +1485,24 @@ spec:
         app: koan-context
     spec:
       containers:
-      - name: koan-context
-        image: koan-context:latest
-        ports:
-        - containerPort: 27500
-        env:
-        - name: KOAN_DATA_DIR
-          value: /data
-        - name: KOAN_ORCHESTRATION_SERVICES_WEAVIATE
-          value: never  # Use external Weaviate cluster
-        - name: KOAN_DATA_SOURCES_DEFAULT_CONNECTIONSTRING
-          value: "Host=postgres;Database=koan_context"
-        volumeMounts:
-        - name: data
-          mountPath: /data
+        - name: koan-context
+          image: koan-context:latest
+          ports:
+            - containerPort: 27500
+          env:
+            - name: KOAN_DATA_DIR
+              value: /data
+            - name: KOAN_ORCHESTRATION_SERVICES_WEAVIATE
+              value: never # Use external Weaviate cluster
+            - name: KOAN_DATA_SOURCES_DEFAULT_CONNECTIONSTRING
+              value: "Host=postgres;Database=koan_context"
+          volumeMounts:
+            - name: data
+              mountPath: /data
       volumes:
-      - name: data
-        persistentVolumeClaim:
-          claimName: koan-context-pvc
+        - name: data
+          persistentVolumeClaim:
+            claimName: koan-context-pvc
 ---
 apiVersion: v1
 kind: Service
@@ -1420,24 +1512,27 @@ spec:
   selector:
     app: koan-context
   ports:
-  - protocol: TCP
-    port: 80
-    targetPort: 27500
+    - protocol: TCP
+      port: 80
+      targetPort: 27500
   type: LoadBalancer
 ```
 
 **Characteristics:**
+
 - External Postgres (not SQLite)
 - External Weaviate cluster (Kubernetes operator)
 - Horizontal scaling (2+ replicas)
 - Load balancer for HA
 
 **Pros:**
+
 - High availability (multi-replica)
 - Scalability (handle 1000s of queries/sec)
 - Enterprise features (audit logs, RBAC)
 
 **Cons:**
+
 - Operational complexity
 - Infrastructure costs
 
@@ -1446,6 +1541,7 @@ spec:
 **Use Case:** Pay-per-use, variable workload
 
 **Setup:**
+
 ```csharp
 // Program.cs
 var builder = WebApplication.CreateBuilder(args);
@@ -1469,16 +1565,19 @@ builder.Services.Configure<WeaviateOptions>(options =>
 ```
 
 **Characteristics:**
+
 - Lambda cold start: ~2-3 seconds
 - RDS Postgres for relational data
 - Weaviate Cloud Services for vectors
 
 **Pros:**
+
 - Cost-effective for low traffic
 - Auto-scaling
 - Managed infrastructure
 
 **Cons:**
+
 - Cold start latency
 - Lambda limits (512 MB memory, 15 min timeout)
 - No file monitoring (use S3 events instead)
@@ -1517,6 +1616,7 @@ jobs:
 ```
 
 **Benefits:**
+
 - Always-current index (no stale code)
 - Differential indexing = fast CI (seconds, not minutes)
 - Developers search latest code immediately after merge
@@ -1526,46 +1626,50 @@ jobs:
 **Scenario:** Search code from within Visual Studio Code
 
 **Extension API:**
+
 ```typescript
 // vscode-extension/src/extension.ts
-import * as vscode from 'vscode';
+import * as vscode from "vscode";
 
 export function activate(context: vscode.ExtensionContext) {
-    let disposable = vscode.commands.registerCommand('koan-context.search', async () => {
-        const query = await vscode.window.showInputBox({
-            prompt: 'Search codebase semantically'
-        });
+  let disposable = vscode.commands.registerCommand(
+    "koan-context.search",
+    async () => {
+      const query = await vscode.window.showInputBox({
+        prompt: "Search codebase semantically",
+      });
 
-        if (!query) return;
+      if (!query) return;
 
-        const response = await fetch('http://localhost:27500/api/search', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ query, limit: 20 })
-        });
+      const response = await fetch("http://localhost:27500/api/search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query, limit: 20 }),
+      });
 
-        const results = await response.json();
+      const results = await response.json();
 
-        // Show results in Quick Pick
-        const items = results.chunks.map(chunk => ({
-            label: chunk.filePath,
-            description: `Lines ${chunk.startLine}-${chunk.endLine}`,
-            detail: chunk.content.substring(0, 100) + '...'
-        }));
+      // Show results in Quick Pick
+      const items = results.chunks.map((chunk) => ({
+        label: chunk.filePath,
+        description: `Lines ${chunk.startLine}-${chunk.endLine}`,
+        detail: chunk.content.substring(0, 100) + "...",
+      }));
 
-        const selected = await vscode.window.showQuickPick(items);
+      const selected = await vscode.window.showQuickPick(items);
 
-        if (selected) {
-            // Open file at line
-            const doc = await vscode.workspace.openTextDocument(selected.label);
-            const editor = await vscode.window.showTextDocument(doc);
-            const line = parseInt(selected.description.match(/\d+/)[0]);
-            editor.selection = new vscode.Selection(line, 0, line, 0);
-            editor.revealRange(new vscode.Range(line, 0, line, 0));
-        }
-    });
+      if (selected) {
+        // Open file at line
+        const doc = await vscode.workspace.openTextDocument(selected.label);
+        const editor = await vscode.window.showTextDocument(doc);
+        const line = parseInt(selected.description.match(/\d+/)[0]);
+        editor.selection = new vscode.Selection(line, 0, line, 0);
+        editor.revealRange(new vscode.Range(line, 0, line, 0));
+      }
+    }
+  );
 
-    context.subscriptions.push(disposable);
+  context.subscriptions.push(disposable);
 }
 ```
 
@@ -1573,7 +1677,7 @@ export function activate(context: vscode.ExtensionContext) {
 
 **Scenario:** Search code from Slack for async team collaboration
 
-```python
+````python
 # slack-bot/app.py
 from slack_bolt import App
 import requests
@@ -1612,13 +1716,13 @@ def search_code(ack, command, say):
 
 if __name__ == "__main__":
     app.start(port=3000)
-```
+````
 
 ### 4. **Documentation Generator Integration**
 
 **Scenario:** Generate AI-powered documentation with code examples
 
-```python
+````python
 # doc-generator/generate.py
 import anthropic
 import requests
@@ -1668,7 +1772,7 @@ Include:
 # Usage
 docs = generate_docs("authentication and authorization")
 print(docs)
-```
+````
 
 ---
 
@@ -1677,16 +1781,19 @@ print(docs)
 ### Near-Term (Q1 2025)
 
 **Performance Enhancements:**
+
 - [ ] Streaming embeddings (reduce latency for large files)
 - [ ] GPU acceleration (CUDA-enabled embedding models)
 - [ ] Incremental chunking (re-use unchanged chunks within file)
 
 **Developer Experience:**
+
 - [ ] VS Code extension (native IDE integration)
 - [ ] IntelliJ plugin (JetBrains IDEs)
 - [ ] CLI tool (`koan-context search "query"`)
 
 **Scalability:**
+
 - [ ] Distributed indexing (multi-machine parallelization)
 - [ ] Redis caching layer (hot query results)
 - [ ] Read replicas (load balance search queries)
@@ -1694,16 +1801,19 @@ print(docs)
 ### Mid-Term (Q2-Q3 2025)
 
 **Advanced Search:**
+
 - [ ] Hybrid search (keyword + semantic fusion)
 - [ ] Faceted search (filter by file type, date, author)
 - [ ] Query expansion (synonyms, related terms)
 
 **AI Features:**
+
 - [ ] Agentic workflows (multi-step reasoning over code)
 - [ ] Code change impact analysis (what breaks if I change X?)
 - [ ] Automated test generation (based on implementation search)
 
 **Enterprise Features:**
+
 - [ ] RBAC (role-based access control)
 - [ ] Audit logging (who searched what, when)
 - [ ] Multi-tenancy (isolated projects per org)
@@ -1711,16 +1821,19 @@ print(docs)
 ### Long-Term (Q4 2025+)
 
 **Multi-Modal Code Understanding:**
+
 - [ ] AST-aware chunking (parse syntax tree for better boundaries)
 - [ ] Dataflow analysis (understand variable flow across files)
 - [ ] Call graph integration (navigate by invocation, not just search)
 
 **Collaborative Features:**
+
 - [ ] Shared annotations (team comments on code chunks)
 - [ ] Search history (learn from team queries)
 - [ ] Suggested searches (predictive based on context)
 
 **Platform Expansion:**
+
 - [ ] SaaS offering (Koan.Context Cloud)
 - [ ] Marketplace (pre-indexed OSS projects)
 - [ ] Training data for code LLMs (opt-in anonymized search logs)
@@ -1736,6 +1849,7 @@ Koan.Context is part of the **Koan Framework** open-source project.
 **Issues:** https://github.com/koan-framework/koan-framework/issues
 
 **Areas for Contribution:**
+
 1. **Vector Providers**: Add connectors for Qdrant, Pinecone, Milvus
 2. **Embedding Models**: Integrate additional models (CodeBERT, GraphCodeBERT)
 3. **Language Support**: Improve chunking for Python, Java, Go, Rust
@@ -1743,6 +1857,7 @@ Koan.Context is part of the **Koan Framework** open-source project.
 5. **Documentation**: Tutorials, best practices, case studies
 
 **Development Setup:**
+
 ```bash
 git clone https://github.com/koan-framework/koan-framework.git
 cd koan-framework/src/Koan.Context
@@ -1759,11 +1874,13 @@ dotnet run
 **MIT License**
 
 Koan.Context is free and open-source software. You may:
+
 - Use commercially
 - Modify and redistribute
 - Use in proprietary software
 
 **Dependencies:**
+
 - Koan Framework: MIT
 - Weaviate: BSD 3-Clause
 - Ollama: MIT
@@ -1784,6 +1901,7 @@ Koan.Context is free and open-source software. You may:
 ## Acknowledgments
 
 Koan.Context builds on the excellent work of:
+
 - **Anthropic** (Model Context Protocol, Claude AI)
 - **Weaviate** (Open-source vector database)
 - **Ollama** (Local LLM runtime)
@@ -1794,5 +1912,5 @@ Special thanks to the Koan Framework community for feedback and contributions.
 
 ---
 
-*Last Updated: 2025-11-08*
-*Document Version: 1.0*
+_Last Updated: 2025-11-08_
+_Document Version: 1.0_

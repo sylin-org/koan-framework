@@ -64,8 +64,8 @@ internal sealed class DataCoreRuntimeFixture : IAsyncDisposable
         services.AddSingleton<IConfiguration>(configuration);
         services.AddKoan();
         services.AddSingleton<IStorageNameResolver, DefaultStorageNameResolver>();
-    services.AddJsonAdapter(o => o.DirectoryPath = root);
-    services.AddKoanTransactions();
+        services.AddJsonAdapter(o => o.DirectoryPath = root);
+        services.AddKoanTransactions();
         if (includeSqlite)
         {
             services.AddSqliteAdapter(o => o.ConnectionString = $"Data Source={sqlitePath}");

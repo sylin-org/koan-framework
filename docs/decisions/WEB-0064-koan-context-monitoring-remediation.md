@@ -36,10 +36,10 @@ We reviewed the service and UI code to understand why numbers drift and why heal
 We will realign Koan.Context monitoring around verifiable sources and expose the route visibly.
 
 1. Introduce a `VectorIndexTelemetry` service that reconciles:
-   - Actual vector counts from the configured adapter (`Vector<Chunk>.Stats` or provider-specific stats API) *when available*.
+   - Actual vector counts from the configured adapter (`Vector<Chunk>.Stats` or provider-specific stats API) _when available_.
    - Relational chunk totals (`Chunk.CountAsync`) for a fallback path.
    - Pending vector operations from `SyncOperation.Query(...)` to surface `VectorsPending` and `VectorsBehindSeconds` so operators see backlog immediately.
-   Enhanced metrics will call this service instead of summing project aggregates.
+     Enhanced metrics will call this service instead of summing project aggregates.
 2. Add a `StorageFootprintSnapshot` helper that reads chunk/file totals via `Chunk.Query(...)` and `IndexedFile.Query(...)`, and calculates per-project freshness using the last successful job completion time. `Project.IndexedBytes` becomes secondary metadata, not the dashboard source of truth.
 3. Replace placeholder health checks with instrumented probes:
    - `FileMonitoringService` must emit its last heartbeat; the health check will flag warning beyond 2× cadence.

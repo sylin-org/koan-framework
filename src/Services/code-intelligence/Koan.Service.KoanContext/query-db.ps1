@@ -36,7 +36,8 @@ try {
         Write-Host "  ID: $($reader.GetString(0))"
         Write-Host "  Name: $($reader.GetString(1))"
         Write-Host "  RootPath: $($reader.GetString(2))"
-    } else {
+    }
+    else {
         Write-Host "Project NOT found in database" -ForegroundColor Red
     }
     $reader.Close()
@@ -49,8 +50,8 @@ try {
     while ($reader.Read()) {
         $pid = $reader.GetString(0)
         $pname = $reader.GetString(1)
-    $partitionId = $pid.Replace("-", "")
-    Write-Host "$pid ($pname) -> partition token: $partitionId"
+        $partitionId = $pid.Replace("-", "")
+        Write-Host "$pid ($pname) -> partition token: $partitionId"
 
         if ($partitionId -eq $targetPartition) {
             Write-Host "  ^^^ THIS IS THE TARGET PARTITION ^^^" -ForegroundColor Green
@@ -59,7 +60,8 @@ try {
     $reader.Close()
 
     $conn.Close()
-} catch {
+}
+catch {
     Write-Host "Error: $_" -ForegroundColor Red
     Write-Host "Trying with System.Data.SQLite from NuGet..."
 
@@ -68,7 +70,8 @@ try {
     if (Test-Path $dbPath) {
         Write-Host "Database file exists at: $dbPath" -ForegroundColor Green
         Write-Host "File size: $((Get-Item $dbPath).Length) bytes"
-    } else {
+    }
+    else {
         Write-Host "Database file NOT found at: $dbPath" -ForegroundColor Red
     }
 }

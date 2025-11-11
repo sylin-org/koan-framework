@@ -26,8 +26,8 @@ public static class VectorData<TEntity>
     public static async Task Save(TEntity entity, ReadOnlyMemory<float> vector, IReadOnlyDictionary<string, object>? metadata = null, CancellationToken ct = default)
     {
         System.ArgumentNullException.ThrowIfNull(entity);
-    var normalized = NormalizeMetadata(metadata);
-    await Repo.UpsertAsync(entity.Id, vector.ToArray(), normalized, ct);
+        var normalized = NormalizeMetadata(metadata);
+        await Repo.UpsertAsync(entity.Id, vector.ToArray(), normalized, ct);
     }
 
     /// <summary>
@@ -62,7 +62,7 @@ public static class VectorData<TEntity>
         if (list.Count == 0)
             return 0;
 
-    var vectors = list.Select(x => (x.Entity.Id, x.Vector.ToArray(), (object?)NormalizeMetadata(x.Metadata))).ToList();
+        var vectors = list.Select(x => (x.Entity.Id, x.Vector.ToArray(), (object?)NormalizeMetadata(x.Metadata))).ToList();
         return await Repo.UpsertManyAsync(vectors, ct);
     }
 
@@ -102,7 +102,7 @@ public static class VectorData<TEntity>
         }
 
         // Save vectors to vector store
-    var vectors = list.Select(x => (x.Entity.Id, x.Vector.ToArray(), (object?)NormalizeMetadata(x.Metadata))).ToList();
+        var vectors = list.Select(x => (x.Entity.Id, x.Vector.ToArray(), (object?)NormalizeMetadata(x.Metadata))).ToList();
         await Repo.UpsertManyAsync(vectors, ct);
 
         return new BatchResult(affected, 0, 0);

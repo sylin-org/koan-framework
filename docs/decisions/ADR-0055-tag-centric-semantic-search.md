@@ -9,12 +9,12 @@
 
 ---
 
-| **Contract** | **Details** |
-| --- | --- |
-| **Inputs** | Project manifest data, extracted file content (including frontmatter), resolver rule catalog, canonical tag vocabulary, search request context (web or MCP). |
-| **Outputs** | Tagged `Chunk` and `IndexedFile` records, serialized tag audit trails, search responses ranked by combined vector/tag scoring, governance telemetry. |
-| **Error Modes** | Resolver misconfiguration → indexing failure with surfaced rule id; unknown path/project for MCP → multi-project fallback; tag catalog mismatch → rule suppressed and warning logged; vector provider backpressure → standard retry/backoff already defined in DATA-0085. |
-| **Success Criteria** | Consistent tag availability across channels, explicit removal of category-based models, <200 ms overhead for MCP requests, explainable tag provenance per chunk, zero manual migrations (clean rebuild). |
+| **Contract**         | **Details**                                                                                                                                                                                                                                                               |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Inputs**           | Project manifest data, extracted file content (including frontmatter), resolver rule catalog, canonical tag vocabulary, search request context (web or MCP).                                                                                                              |
+| **Outputs**          | Tagged `Chunk` and `IndexedFile` records, serialized tag audit trails, search responses ranked by combined vector/tag scoring, governance telemetry.                                                                                                                      |
+| **Error Modes**      | Resolver misconfiguration → indexing failure with surfaced rule id; unknown path/project for MCP → multi-project fallback; tag catalog mismatch → rule suppressed and warning logged; vector provider backpressure → standard retry/backoff already defined in DATA-0085. |
+| **Success Criteria** | Consistent tag availability across channels, explicit removal of category-based models, <200 ms overhead for MCP requests, explainable tag provenance per chunk, zero manual migrations (clean rebuild).                                                                  |
 
 ---
 
@@ -150,11 +150,13 @@ score = (vectorSimilarity * w_semantic)
 ## Consequences
 
 - **Positive**
+
   - Tags become first-class signals without re-embedding costs.
   - Web and MCP channels share core logic while honoring channel constraints.
   - Governance is data-driven and explainable.
 
 - **Negative**
+
   - Requires full rebuild of existing admin UI and API contracts.
   - Downstream consumers must adopt new request contract; no category compatibility layer will ship.
   - Additional storage for tag audit metadata (acceptable given clarity gains).

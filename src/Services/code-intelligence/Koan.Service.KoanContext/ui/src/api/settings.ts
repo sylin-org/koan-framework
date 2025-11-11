@@ -1,5 +1,5 @@
 import { apiClient } from './client';
-import type { AppSettings, ConnectionTestResult } from './types';
+import type { AppSettings, ConnectionTestResult, TagSeedSummaryDto } from './types';
 
 /**
  * Settings API - Application configuration management
@@ -26,6 +26,14 @@ export const settingsApi = {
    */
   async testDatabase(): Promise<ConnectionTestResult> {
     const { data } = await apiClient.post<ConnectionTestResult>('/settings/test/database');
+    return data;
+  },
+
+  /**
+   * Force seed tag vocabulary, rules, pipelines, and personas
+   */
+  async seedTags(): Promise<TagSeedSummaryDto> {
+    const { data } = await apiClient.post<TagSeedSummaryDto>('/settings/seed-tags');
     return data;
   },
 };

@@ -140,10 +140,10 @@ public sealed class ChunkVectorState : Entity<ChunkVectorState>
         LastError = null;
         UpdatedAt = DateTime.UtcNow;
 
-        #pragma warning disable IL2026, IL3050
+#pragma warning disable IL2026, IL3050
         EmbeddingJson = JsonSerializer.Serialize(embedding);
         MetadataJson = metadata is null ? null : JsonSerializer.Serialize(metadata);
-        #pragma warning restore IL2026, IL3050
+#pragma warning restore IL2026, IL3050
     }
 
     /// <summary>
@@ -191,10 +191,10 @@ public sealed class ChunkVectorState : Entity<ChunkVectorState>
     /// </summary>
     public float[] GetEmbedding()
     {
-        #pragma warning disable IL2026, IL3050
+#pragma warning disable IL2026, IL3050
         return JsonSerializer.Deserialize<float[]>(EmbeddingJson)
                ?? throw new InvalidOperationException("Failed to deserialize embedding payload");
-        #pragma warning restore IL2026, IL3050
+#pragma warning restore IL2026, IL3050
     }
 
     /// <summary>
@@ -207,9 +207,9 @@ public sealed class ChunkVectorState : Entity<ChunkVectorState>
             return default;
         }
 
-        #pragma warning disable IL2026, IL3050
+#pragma warning disable IL2026, IL3050
         return JsonSerializer.Deserialize<T>(MetadataJson);
-        #pragma warning restore IL2026, IL3050
+#pragma warning restore IL2026, IL3050
     }
 }
 

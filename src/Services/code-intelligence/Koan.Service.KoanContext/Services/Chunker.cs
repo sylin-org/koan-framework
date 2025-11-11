@@ -17,7 +17,7 @@ namespace Koan.Context.Services;
 /// Token estimation: approximately 4 characters per token (GPT-style tokenization).
 /// QA Issue #10 FIXED: Extracted duplicate logic into YieldChunk method.
 /// </remarks>
-public class Chunker 
+public class Chunker
 {
     private readonly ILogger<Chunker> _logger;
 
@@ -84,7 +84,7 @@ public class Chunker
                     chunkStartOffset,
                     currentTitle);
 
-                var chunkToEmit = ProcessChunkForMerging(chunkBeforeHeading, ref bufferedChunk, out var buffered); 
+                var chunkToEmit = ProcessChunkForMerging(chunkBeforeHeading, ref bufferedChunk, out var buffered);
                 if (chunkToEmit != null)
                 {
                     yield return chunkToEmit;
@@ -437,7 +437,7 @@ public class Chunker
         string filePath,
         string currentTitle)
     {
-    var sentences = SplitIntoSentences(section.Text);
+        var sentences = SplitIntoSentences(section.Text);
 
         if (sentences.Count == 0)
         {

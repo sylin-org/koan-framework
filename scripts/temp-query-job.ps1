@@ -22,7 +22,8 @@ try {
         Write-Host (' VectorsSynced: {0}' -f $reader[1])
         Write-Host (' ChunksCreated: {0}' -f $reader[2])
         Write-Host (' ProcessedFiles: {0}' -f $reader[3])
-    } else {
+    }
+    else {
         Write-Host "Job $jobId not found"
     }
     $reader.Close()

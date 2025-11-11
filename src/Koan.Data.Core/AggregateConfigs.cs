@@ -37,7 +37,7 @@ public static class AggregateConfigs
     private static string DefaultProvider(IServiceProvider sp)
     {
         var factories = sp.GetServices<IDataAdapterFactory>().ToList();
-    if (factories.Count == 0) throw new InvalidOperationException("No IDataAdapterFactory instances registered. Ensure services.AddKoanDataCore() has been called and a data adapter module is referenced.");
+        if (factories.Count == 0) throw new InvalidOperationException("No IDataAdapterFactory instances registered. Ensure services.AddKoanDataCore() has been called and a data adapter module is referenced.");
 
         // Rank by ProviderPriorityAttribute (higher wins), then by type name for stability
         var ranked = factories

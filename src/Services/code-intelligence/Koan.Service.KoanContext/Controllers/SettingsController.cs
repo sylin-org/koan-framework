@@ -1,3 +1,4 @@
+using Koan.Context.Initialization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -13,13 +14,16 @@ public class SettingsController : ControllerBase
 {
     private readonly IConfiguration _configuration;
     private readonly ILogger<SettingsController> _logger;
+    private readonly TagSeedInitializer _tagSeedInitializer;
 
     public SettingsController(
         IConfiguration configuration,
-        ILogger<SettingsController> logger)
+        ILogger<SettingsController> logger,
+        TagSeedInitializer tagSeedInitializer)
     {
         _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _tagSeedInitializer = tagSeedInitializer ?? throw new ArgumentNullException(nameof(tagSeedInitializer));
     }
 
     /// <summary>
@@ -98,6 +102,24 @@ public class SettingsController : ControllerBase
         {
             _logger.LogError(ex, "Error retrieving settings");
             return StatusCode(500, new { error = "Failed to retrieve settings", details = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Force seeds tag vocabulary, rules, pipelines, and personas.
+    /// </summary>
+    [HttpPost("seed-tags")]
+    public async Task<IActionResult> SeedTags(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var summary = await _tagSeedInitializer.EnsureSeededAsync(force: true, cancellationToken).ConfigureAwait(false);
+            return Ok(summary);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to run tag seeding");
+            return StatusCode(500, new { error = "Failed to seed tags", details = ex.Message });
         }
     }
 

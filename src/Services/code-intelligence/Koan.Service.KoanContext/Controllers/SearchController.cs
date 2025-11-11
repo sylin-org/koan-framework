@@ -49,7 +49,7 @@ public class SearchController : ControllerBase
             return BadRequest(new { error = "Query cannot be empty" });
         }
 
-    var searchStopwatch = System.Diagnostics.Stopwatch.StartNew();
+        var searchStopwatch = System.Diagnostics.Stopwatch.StartNew();
         string? searchProjectId = null;
 
         try

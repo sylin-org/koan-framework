@@ -1,6 +1,7 @@
 # Koan.Context: UX Asset Specification & Implementation Plan
 
 ---
+
 **Type:** UX ASSET SPECIFICATION
 **Domain:** koan-context, design-system, frontend-architecture
 **Status:** proposed
@@ -20,11 +21,13 @@ This specification transforms Koan.Context from a functional MVP (single HTML fi
 **Quality Benchmark:** Grafana dashboards + Linear project management + Vercel deploy UI
 
 **Investment:**
+
 - **Design Phase:** $25k-30k (4-5 weeks, 1 senior UX engineer)
 - **Implementation Phase:** $40k-50k (6-8 weeks, 2 frontend engineers)
 - **Total:** $65k-80k
 
 **Key Deliverables:**
+
 1. Complete design system (tokens, components, patterns)
 2. Component library (30+ components, Storybook documented)
 3. 6 reimagined pages (Dashboard, Projects, Search, Jobs, Insights, Settings)
@@ -82,22 +85,22 @@ Current Backend API:
 
 ### 1.2 Current Capabilities Assessment
 
-| Feature | Status | Quality Grade | Notes |
-|---------|--------|---------------|-------|
-| **Project CRUD** | ✅ Working | C+ | Basic forms, minimal validation |
-| **Search** | ✅ Working | B- | Functional but text-only results |
-| **Settings** | ✅ Working | C | Configuration-focused, not user-friendly |
-| **Progress Tracking** | ⚠️ Partial | D+ | Polls every 10s, basic progress bar |
-| **Dashboard** | ❌ Missing | F | No overview/metrics page |
-| **Data Visualization** | ❌ Missing | F | No charts, graphs, or metrics |
-| **Real-time Updates** | ⚠️ Partial | D | Manual refresh, no SSE/WebSocket |
-| **Responsive Design** | ⚠️ Partial | C- | Basic media queries only |
-| **Accessibility** | ❌ Missing | F | No ARIA, no keyboard nav beyond basics |
-| **Design System** | ❌ Missing | F | Inline styles, no tokens |
-| **Component Library** | ❌ Missing | F | No reusable components |
-| **Error States** | ⚠️ Minimal | D+ | Alert boxes only |
-| **Empty States** | ⚠️ Minimal | D | Plain text messages |
-| **Loading States** | ⚠️ Minimal | D | "Loading..." text only |
+| Feature                | Status     | Quality Grade | Notes                                    |
+| ---------------------- | ---------- | ------------- | ---------------------------------------- |
+| **Project CRUD**       | ✅ Working | C+            | Basic forms, minimal validation          |
+| **Search**             | ✅ Working | B-            | Functional but text-only results         |
+| **Settings**           | ✅ Working | C             | Configuration-focused, not user-friendly |
+| **Progress Tracking**  | ⚠️ Partial | D+            | Polls every 10s, basic progress bar      |
+| **Dashboard**          | ❌ Missing | F             | No overview/metrics page                 |
+| **Data Visualization** | ❌ Missing | F             | No charts, graphs, or metrics            |
+| **Real-time Updates**  | ⚠️ Partial | D             | Manual refresh, no SSE/WebSocket         |
+| **Responsive Design**  | ⚠️ Partial | C-            | Basic media queries only                 |
+| **Accessibility**      | ❌ Missing | F             | No ARIA, no keyboard nav beyond basics   |
+| **Design System**      | ❌ Missing | F             | Inline styles, no tokens                 |
+| **Component Library**  | ❌ Missing | F             | No reusable components                   |
+| **Error States**       | ⚠️ Minimal | D+            | Alert boxes only                         |
+| **Empty States**       | ⚠️ Minimal | D             | Plain text messages                      |
+| **Loading States**     | ⚠️ Minimal | D             | "Loading..." text only                   |
 
 **Overall Grade: D+** (Functional but far from premium)
 
@@ -108,6 +111,7 @@ Current Backend API:
 #### Critical UX Debts
 
 **1. No Dashboard (Grafana-equivalent missing)**
+
 ```
 Current: Users land on Projects tab
 Expected: Dashboard with system health, metrics, recent activity
@@ -120,6 +124,7 @@ Impact: HIGH
 ```
 
 **2. Text-Only Search Results**
+
 ```
 Current: Code displayed as plain text in <pre> tags
 Expected: Syntax-highlighted code with file tree navigation
@@ -132,6 +137,7 @@ Impact: MEDIUM-HIGH
 ```
 
 **3. Polling-Based Progress Updates**
+
 ```
 Current: JavaScript polls /api/projects every 10 seconds
 Expected: Server-Sent Events (SSE) for real-time updates
@@ -144,6 +150,7 @@ Impact: MEDIUM
 ```
 
 **4. No Data Visualization**
+
 ```
 Current: Numbers displayed as text (e.g., "10,234 files")
 Expected: Charts showing trends, distribution, performance
@@ -156,6 +163,7 @@ Impact: MEDIUM-HIGH
 ```
 
 **5. Modal-Based Configuration**
+
 ```
 Current: Create project via generic modal
 Expected: Multi-step wizard with validation, path browser, preview
@@ -175,15 +183,15 @@ Impact: MEDIUM
 
 **Inspiration: Best-in-Class Products**
 
-| Aspect | Inspiration Source | Key Takeaway |
-|--------|-------------------|--------------|
-| **Dashboard Design** | Grafana | Grid-based layout, real-time metrics, customizable panels |
-| **Data Visualization** | Grafana | Time-series charts, gauges, stat panels, threshold indicators |
-| **Navigation** | Linear | Sidebar with command palette (Cmd+K), breadcrumbs, context switching |
-| **Search UX** | Algolia DocSearch | Instant results, keyboard navigation, result preview |
-| **Project Management** | Vercel Projects | Card-based layout, status indicators, quick actions |
-| **Job Tracking** | GitHub Actions | Real-time logs, expandable stages, duration tracking |
-| **Settings** | Stripe Dashboard | Sectioned forms, inline help, save indicators, dangerous action warnings |
+| Aspect                 | Inspiration Source | Key Takeaway                                                             |
+| ---------------------- | ------------------ | ------------------------------------------------------------------------ |
+| **Dashboard Design**   | Grafana            | Grid-based layout, real-time metrics, customizable panels                |
+| **Data Visualization** | Grafana            | Time-series charts, gauges, stat panels, threshold indicators            |
+| **Navigation**         | Linear             | Sidebar with command palette (Cmd+K), breadcrumbs, context switching     |
+| **Search UX**          | Algolia DocSearch  | Instant results, keyboard navigation, result preview                     |
+| **Project Management** | Vercel Projects    | Card-based layout, status indicators, quick actions                      |
+| **Job Tracking**       | GitHub Actions     | Real-time logs, expandable stages, duration tracking                     |
+| **Settings**           | Stripe Dashboard   | Sectioned forms, inline help, save indicators, dangerous action warnings |
 
 ### 2.2 Future State Screenshots (Wireframes)
 
@@ -366,59 +374,59 @@ Impact: MEDIUM
      ======================================== */
 
   /* Primary - Trust Blue */
-  --color-primary-50:  #EFF6FF;
-  --color-primary-100: #DBEAFE;
-  --color-primary-200: #BFDBFE;
-  --color-primary-300: #93C5FD;
-  --color-primary-400: #60A5FA;
-  --color-primary-500: #3B82F6;
-  --color-primary-600: #2563EB; /* PRIMARY */
-  --color-primary-700: #1D4ED8;
-  --color-primary-800: #1E40AF;
-  --color-primary-900: #1E3A8A;
+  --color-primary-50: #eff6ff;
+  --color-primary-100: #dbeafe;
+  --color-primary-200: #bfdbfe;
+  --color-primary-300: #93c5fd;
+  --color-primary-400: #60a5fa;
+  --color-primary-500: #3b82f6;
+  --color-primary-600: #2563eb; /* PRIMARY */
+  --color-primary-700: #1d4ed8;
+  --color-primary-800: #1e40af;
+  --color-primary-900: #1e3a8a;
 
   /* Success - Green */
-  --color-success-50:  #ECFDF5;
-  --color-success-100: #D1FAE5;
-  --color-success-200: #A7F3D0;
-  --color-success-300: #6EE7B7;
-  --color-success-400: #34D399;
-  --color-success-500: #10B981; /* SUCCESS */
+  --color-success-50: #ecfdf5;
+  --color-success-100: #d1fae5;
+  --color-success-200: #a7f3d0;
+  --color-success-300: #6ee7b7;
+  --color-success-400: #34d399;
+  --color-success-500: #10b981; /* SUCCESS */
   --color-success-600: #059669;
   --color-success-700: #047857;
-  --color-success-800: #065F46;
-  --color-success-900: #064E3B;
+  --color-success-800: #065f46;
+  --color-success-900: #064e3b;
 
   /* Warning - Amber */
-  --color-warning-50:  #FFFBEB;
-  --color-warning-100: #FEF3C7;
-  --color-warning-200: #FDE68A;
-  --color-warning-300: #FCD34D;
-  --color-warning-400: #FBBF24;
-  --color-warning-500: #F59E0B; /* WARNING */
-  --color-warning-600: #D97706;
-  --color-warning-700: #B45309;
-  --color-warning-800: #92400E;
-  --color-warning-900: #78350F;
+  --color-warning-50: #fffbeb;
+  --color-warning-100: #fef3c7;
+  --color-warning-200: #fde68a;
+  --color-warning-300: #fcd34d;
+  --color-warning-400: #fbbf24;
+  --color-warning-500: #f59e0b; /* WARNING */
+  --color-warning-600: #d97706;
+  --color-warning-700: #b45309;
+  --color-warning-800: #92400e;
+  --color-warning-900: #78350f;
 
   /* Error - Red */
-  --color-error-50:  #FEF2F2;
-  --color-error-100: #FEE2E2;
-  --color-error-200: #FECACA;
-  --color-error-300: #FCA5A5;
-  --color-error-400: #F87171;
-  --color-error-500: #EF4444; /* ERROR */
-  --color-error-600: #DC2626;
-  --color-error-700: #B91C1C;
-  --color-error-800: #991B1B;
-  --color-error-900: #7F1D1D;
+  --color-error-50: #fef2f2;
+  --color-error-100: #fee2e2;
+  --color-error-200: #fecaca;
+  --color-error-300: #fca5a5;
+  --color-error-400: #f87171;
+  --color-error-500: #ef4444; /* ERROR */
+  --color-error-600: #dc2626;
+  --color-error-700: #b91c1c;
+  --color-error-800: #991b1b;
+  --color-error-900: #7f1d1d;
 
   /* Neutrals - Gray */
-  --color-gray-50:  #FAFAFA;
-  --color-gray-100: #F5F5F5;
-  --color-gray-200: #E5E5E5;
-  --color-gray-300: #D4D4D4;
-  --color-gray-400: #A3A3A3;
+  --color-gray-50: #fafafa;
+  --color-gray-100: #f5f5f5;
+  --color-gray-200: #e5e5e5;
+  --color-gray-300: #d4d4d4;
+  --color-gray-400: #a3a3a3;
   --color-gray-500: #737373;
   --color-gray-600: #525252;
   --color-gray-700: #404040;
@@ -426,43 +434,43 @@ Impact: MEDIUM
   --color-gray-900: #171717;
 
   /* Semantic Colors */
-  --color-background:     var(--color-gray-50);
-  --color-surface:        #FFFFFF;
-  --color-border:         var(--color-gray-200);
-  --color-text-primary:   var(--color-gray-900);
+  --color-background: var(--color-gray-50);
+  --color-surface: #ffffff;
+  --color-border: var(--color-gray-200);
+  --color-text-primary: var(--color-gray-900);
   --color-text-secondary: var(--color-gray-600);
-  --color-text-tertiary:  var(--color-gray-500);
+  --color-text-tertiary: var(--color-gray-500);
 
   /* Code Highlight */
-  --color-code-purple: #7C3AED;
-  --color-code-cyan:   #06B6D4;
+  --color-code-purple: #7c3aed;
+  --color-code-cyan: #06b6d4;
 
   /* ========================================
      TYPOGRAPHY
      ======================================== */
 
   /* Font Families */
-  --font-family-sans:  'Inter', system-ui, -apple-system, sans-serif;
-  --font-family-mono:  'JetBrains Mono', 'Consolas', 'Monaco', monospace;
+  --font-family-sans: "Inter", system-ui, -apple-system, sans-serif;
+  --font-family-mono: "JetBrains Mono", "Consolas", "Monaco", monospace;
 
   /* Font Sizes (rem) */
-  --font-size-xs:   0.75rem;   /* 12px */
-  --font-size-sm:   0.875rem;  /* 14px */
-  --font-size-base: 1rem;      /* 16px */
-  --font-size-lg:   1.125rem;  /* 18px */
-  --font-size-xl:   1.25rem;   /* 20px */
-  --font-size-2xl:  1.5rem;    /* 24px */
-  --font-size-3xl:  1.875rem;  /* 30px */
-  --font-size-4xl:  2.25rem;   /* 36px */
+  --font-size-xs: 0.75rem; /* 12px */
+  --font-size-sm: 0.875rem; /* 14px */
+  --font-size-base: 1rem; /* 16px */
+  --font-size-lg: 1.125rem; /* 18px */
+  --font-size-xl: 1.25rem; /* 20px */
+  --font-size-2xl: 1.5rem; /* 24px */
+  --font-size-3xl: 1.875rem; /* 30px */
+  --font-size-4xl: 2.25rem; /* 36px */
 
   /* Font Weights */
-  --font-weight-normal:   400;
-  --font-weight-medium:   500;
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
   --font-weight-semibold: 600;
-  --font-weight-bold:     700;
+  --font-weight-bold: 700;
 
   /* Line Heights */
-  --line-height-tight:  1.2;
+  --line-height-tight: 1.2;
   --line-height-normal: 1.5;
   --line-height-relaxed: 1.6;
 
@@ -470,18 +478,18 @@ Impact: MEDIUM
      SPACING (8px grid)
      ======================================== */
 
-  --spacing-0:  0;
-  --spacing-1:  0.25rem;  /* 4px */
-  --spacing-2:  0.5rem;   /* 8px */
-  --spacing-3:  0.75rem;  /* 12px */
-  --spacing-4:  1rem;     /* 16px */
-  --spacing-5:  1.25rem;  /* 20px */
-  --spacing-6:  1.5rem;   /* 24px */
-  --spacing-8:  2rem;     /* 32px */
-  --spacing-10: 2.5rem;   /* 40px */
-  --spacing-12: 3rem;     /* 48px */
-  --spacing-16: 4rem;     /* 64px */
-  --spacing-20: 5rem;     /* 80px */
+  --spacing-0: 0;
+  --spacing-1: 0.25rem; /* 4px */
+  --spacing-2: 0.5rem; /* 8px */
+  --spacing-3: 0.75rem; /* 12px */
+  --spacing-4: 1rem; /* 16px */
+  --spacing-5: 1.25rem; /* 20px */
+  --spacing-6: 1.5rem; /* 24px */
+  --spacing-8: 2rem; /* 32px */
+  --spacing-10: 2.5rem; /* 40px */
+  --spacing-12: 3rem; /* 48px */
+  --spacing-16: 4rem; /* 64px */
+  --spacing-20: 5rem; /* 80px */
 
   /* ========================================
      BORDERS
@@ -492,9 +500,9 @@ Impact: MEDIUM
   --border-width-4: 4px;
 
   --border-radius-sm: 0.375rem; /* 6px */
-  --border-radius-md: 0.5rem;   /* 8px */
-  --border-radius-lg: 0.75rem;  /* 12px */
-  --border-radius-xl: 1rem;     /* 16px */
+  --border-radius-md: 0.5rem; /* 8px */
+  --border-radius-lg: 0.75rem; /* 12px */
+  --border-radius-xl: 1rem; /* 16px */
   --border-radius-full: 9999px;
 
   /* ========================================
@@ -510,38 +518,38 @@ Impact: MEDIUM
      TRANSITIONS
      ======================================== */
 
-  --transition-fast:   150ms ease;
-  --transition-base:   200ms ease;
-  --transition-slow:   300ms ease;
+  --transition-fast: 150ms ease;
+  --transition-base: 200ms ease;
+  --transition-slow: 300ms ease;
 
-  --ease-in:      cubic-bezier(0.4, 0, 1, 1);
-  --ease-out:     cubic-bezier(0, 0, 0.2, 1);
-  --ease-in-out:  cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
 
   /* ========================================
      Z-INDEX SCALE
      ======================================== */
 
-  --z-base:        0;
-  --z-dropdown:    1000;
-  --z-sticky:      1020;
-  --z-fixed:       1030;
+  --z-base: 0;
+  --z-dropdown: 1000;
+  --z-sticky: 1020;
+  --z-fixed: 1030;
   --z-modal-backdrop: 1040;
-  --z-modal:       1050;
-  --z-popover:     1060;
-  --z-tooltip:     1070;
+  --z-modal: 1050;
+  --z-popover: 1060;
+  --z-tooltip: 1070;
   --z-notification: 1080;
 }
 
 /* Dark Mode (future) */
 @media (prefers-color-scheme: dark) {
   :root {
-    --color-background:     var(--color-gray-900);
-    --color-surface:        var(--color-gray-800);
-    --color-border:         var(--color-gray-700);
-    --color-text-primary:   var(--color-gray-50);
+    --color-background: var(--color-gray-900);
+    --color-surface: var(--color-gray-800);
+    --color-border: var(--color-gray-700);
+    --color-text-primary: var(--color-gray-50);
     --color-text-secondary: var(--color-gray-400);
-    --color-text-tertiary:  var(--color-gray-500);
+    --color-text-tertiary: var(--color-gray-500);
   }
 }
 ```
@@ -598,22 +606,41 @@ Impact: MEDIUM
 }
 
 /* Font Weights */
-.font-normal   { font-weight: var(--font-weight-normal); }
-.font-medium   { font-weight: var(--font-weight-medium); }
-.font-semibold { font-weight: var(--font-weight-semibold); }
-.font-bold     { font-weight: var(--font-weight-bold); }
+.font-normal {
+  font-weight: var(--font-weight-normal);
+}
+.font-medium {
+  font-weight: var(--font-weight-medium);
+}
+.font-semibold {
+  font-weight: var(--font-weight-semibold);
+}
+.font-bold {
+  font-weight: var(--font-weight-bold);
+}
 
 /* Font Families */
-.font-sans { font-family: var(--font-family-sans); }
-.font-mono { font-family: var(--font-family-mono); }
+.font-sans {
+  font-family: var(--font-family-sans);
+}
+.font-mono {
+  font-family: var(--font-family-mono);
+}
 
 /* Text Colors */
-.text-primary   { color: var(--color-text-primary); }
-.text-secondary { color: var(--color-text-secondary); }
-.text-tertiary  { color: var(--color-text-tertiary); }
+.text-primary {
+  color: var(--color-text-primary);
+}
+.text-secondary {
+  color: var(--color-text-secondary);
+}
+.text-tertiary {
+  color: var(--color-text-tertiary);
+}
 
 /* Heading Styles */
-h1, .heading-1 {
+h1,
+.heading-1 {
   font-size: var(--font-size-4xl);
   font-weight: var(--font-weight-bold);
   line-height: var(--line-height-tight);
@@ -621,7 +648,8 @@ h1, .heading-1 {
   margin-bottom: var(--spacing-6);
 }
 
-h2, .heading-2 {
+h2,
+.heading-2 {
   font-size: var(--font-size-3xl);
   font-weight: var(--font-weight-semibold);
   line-height: var(--line-height-tight);
@@ -629,7 +657,8 @@ h2, .heading-2 {
   margin-bottom: var(--spacing-4);
 }
 
-h3, .heading-3 {
+h3,
+.heading-3 {
   font-size: var(--font-size-2xl);
   font-weight: var(--font-weight-semibold);
   line-height: var(--line-height-tight);
@@ -637,7 +666,8 @@ h3, .heading-3 {
   margin-bottom: var(--spacing-3);
 }
 
-h4, .heading-4 {
+h4,
+.heading-4 {
   font-size: var(--font-size-xl);
   font-weight: var(--font-weight-semibold);
   line-height: var(--line-height-normal);
@@ -655,10 +685,11 @@ h4, .heading-4 {
 #### Foundation Components
 
 **1. Button** (`Button.tsx`)
+
 ```typescript
 interface ButtonProps {
-  variant: 'primary' | 'secondary' | 'danger' | 'ghost';
-  size: 'sm' | 'md' | 'lg';
+  variant: "primary" | "secondary" | "danger" | "ghost";
+  size: "sm" | "md" | "lg";
   isLoading?: boolean;
   isDisabled?: boolean;
   leftIcon?: React.ReactNode;
@@ -670,13 +701,14 @@ interface ButtonProps {
 // Usage:
 <Button variant="primary" size="md" leftIcon={<PlusIcon />}>
   Create Project
-</Button>
+</Button>;
 ```
 
 **2. Input** (`Input.tsx`)
+
 ```typescript
 interface InputProps {
-  type: 'text' | 'password' | 'email' | 'number' | 'search';
+  type: "text" | "password" | "email" | "number" | "search";
   label?: string;
   placeholder?: string;
   helperText?: string;
@@ -689,6 +721,7 @@ interface InputProps {
 ```
 
 **3. Badge** (`Badge.tsx`)
+
 ```typescript
 interface BadgeProps {
   variant: 'success' | 'warning' | 'error' | 'info' | 'neutral';
@@ -702,10 +735,11 @@ interface BadgeProps {
 ```
 
 **4. Card** (`Card.tsx`)
+
 ```typescript
 interface CardProps {
-  variant: 'elevated' | 'outlined' | 'ghost';
-  padding: 'sm' | 'md' | 'lg';
+  variant: "elevated" | "outlined" | "ghost";
+  padding: "sm" | "md" | "lg";
   children: React.ReactNode;
   header?: React.ReactNode;
   footer?: React.ReactNode;
@@ -714,12 +748,13 @@ interface CardProps {
 ```
 
 **5. Modal** (`Modal.tsx`)
+
 ```typescript
 interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
   title: string;
-  size: 'sm' | 'md' | 'lg' | 'xl' | 'full';
+  size: "sm" | "md" | "lg" | "xl" | "full";
   closeOnOverlayClick?: boolean;
   children: React.ReactNode;
   footer?: React.ReactNode;
@@ -731,6 +766,7 @@ interface ModalProps {
 #### Data Display Components
 
 **6. Table** (`Table.tsx`)
+
 ```typescript
 interface TableProps {
   columns: ColumnDef[];
@@ -744,28 +780,30 @@ interface TableProps {
 ```
 
 **7. ProgressBar** (`ProgressBar.tsx`)
+
 ```typescript
 interface ProgressBarProps {
   value: number; // 0-100
   max?: number;
-  variant: 'default' | 'success' | 'warning' | 'error';
-  size: 'sm' | 'md' | 'lg';
+  variant: "default" | "success" | "warning" | "error";
+  size: "sm" | "md" | "lg";
   showLabel?: boolean;
   isIndeterminate?: boolean;
 }
 
 // Usage:
-<ProgressBar value={62} variant="default" size="md" showLabel />
+<ProgressBar value={62} variant="default" size="md" showLabel />;
 ```
 
 **8. StatCard** (`StatCard.tsx` - Grafana-inspired)
+
 ```typescript
 interface StatCardProps {
   label: string;
   value: string | number;
   change?: {
     value: number;
-    trend: 'up' | 'down' | 'neutral';
+    trend: "up" | "down" | "neutral";
     period: string;
   };
   icon?: React.ReactNode;
@@ -776,12 +814,13 @@ interface StatCardProps {
 <StatCard
   label="Total Projects"
   value={5}
-  change={{ value: +1, trend: 'up', period: 'today' }}
+  change={{ value: +1, trend: "up", period: "today" }}
   icon={<FolderIcon />}
-/>
+/>;
 ```
 
 **9. CodeBlock** (`CodeBlock.tsx`)
+
 ```typescript
 interface CodeBlockProps {
   code: string;
@@ -803,14 +842,15 @@ interface CodeBlockProps {
   endLine={58}
   highlightLines={[45, 46]}
   copyable
-/>
+/>;
 ```
 
 **10. Timeline** (`Timeline.tsx`)
+
 ```typescript
 interface TimelineProps {
   items: TimelineItem[];
-  variant: 'vertical' | 'horizontal';
+  variant: "vertical" | "horizontal";
 }
 
 interface TimelineItem {
@@ -818,7 +858,7 @@ interface TimelineItem {
   title: string;
   description?: string;
   icon?: React.ReactNode;
-  status?: 'pending' | 'completed' | 'failed';
+  status?: "pending" | "completed" | "failed";
 }
 ```
 
@@ -827,9 +867,10 @@ interface TimelineItem {
 #### Feedback Components
 
 **11. Toast** (`Toast.tsx`)
+
 ```typescript
 interface ToastProps {
-  variant: 'success' | 'error' | 'warning' | 'info';
+  variant: "success" | "error" | "warning" | "info";
   title: string;
   description?: string;
   duration?: number; // auto-dismiss ms
@@ -842,16 +883,17 @@ interface ToastProps {
 
 // Usage (via hook):
 const toast = useToast();
-toast.success('Project indexed successfully', {
-  description: '10,234 files processed in 38 minutes',
-  duration: 5000
+toast.success("Project indexed successfully", {
+  description: "10,234 files processed in 38 minutes",
+  duration: 5000,
 });
 ```
 
 **12. Alert** (`Alert.tsx`)
+
 ```typescript
 interface AlertProps {
-  variant: 'info' | 'success' | 'warning' | 'error';
+  variant: "info" | "success" | "warning" | "error";
   title: string;
   description?: string;
   onClose?: () => void;
@@ -863,15 +905,17 @@ interface AlertProps {
 ```
 
 **13. Spinner** (`Spinner.tsx`)
+
 ```typescript
 interface SpinnerProps {
-  size: 'sm' | 'md' | 'lg' | 'xl';
-  variant: 'default' | 'primary';
+  size: "sm" | "md" | "lg" | "xl";
+  variant: "default" | "primary";
   label?: string;
 }
 ```
 
 **14. Skeleton** (`Skeleton.tsx`)
+
 ```typescript
 interface SkeletonProps {
   variant: 'text' | 'rectangular' | 'circular';
@@ -890,6 +934,7 @@ interface SkeletonProps {
 #### Navigation Components
 
 **15. Sidebar** (`Sidebar.tsx`)
+
 ```typescript
 interface SidebarProps {
   items: SidebarItem[];
@@ -908,6 +953,7 @@ interface SidebarItem {
 ```
 
 **16. Breadcrumbs** (`Breadcrumbs.tsx`)
+
 ```typescript
 interface BreadcrumbsProps {
   items: BreadcrumbItem[];
@@ -922,12 +968,13 @@ interface BreadcrumbItem {
 ```
 
 **17. Tabs** (`Tabs.tsx`)
+
 ```typescript
 interface TabsProps {
   tabs: TabItem[];
   activeTab: string;
   onChange: (tabId: string) => void;
-  variant: 'line' | 'enclosed' | 'pills';
+  variant: "line" | "enclosed" | "pills";
 }
 
 interface TabItem {
@@ -940,6 +987,7 @@ interface TabItem {
 ```
 
 **18. CommandPalette** (`CommandPalette.tsx` - Linear-inspired)
+
 ```typescript
 interface CommandPaletteProps {
   isOpen: boolean;
@@ -965,6 +1013,7 @@ interface Command {
 #### Chart Components (Grafana-Quality)
 
 **19. LineChart** (`LineChart.tsx`)
+
 ```typescript
 interface LineChartProps {
   data: ChartData[];
@@ -983,6 +1032,7 @@ interface ChartData {
 ```
 
 **20. BarChart** (`BarChart.tsx`)
+
 ```typescript
 interface BarChartProps {
   data: ChartData[];
@@ -995,6 +1045,7 @@ interface BarChartProps {
 ```
 
 **21. PieChart** (`PieChart.tsx`)
+
 ```typescript
 interface PieChartProps {
   data: {
@@ -1009,6 +1060,7 @@ interface PieChartProps {
 ```
 
 **22. Gauge** (`Gauge.tsx` - Grafana-style)
+
 ```typescript
 interface GaugeProps {
   value: number;
@@ -1020,7 +1072,7 @@ interface GaugeProps {
   }[];
   label?: string;
   unit?: string;
-  size: 'sm' | 'md' | 'lg';
+  size: "sm" | "md" | "lg";
 }
 
 // Usage:
@@ -1029,17 +1081,18 @@ interface GaugeProps {
   min={0}
   max={500}
   thresholds={[
-    { value: 200, color: 'green' },
-    { value: 400, color: 'yellow' },
-    { value: 500, color: 'red' }
+    { value: 200, color: "green" },
+    { value: 400, color: "yellow" },
+    { value: 500, color: "red" },
   ]}
   label="Search Latency"
   unit="ms"
   size="md"
-/>
+/>;
 ```
 
 **23. Heatmap** (`Heatmap.tsx`)
+
 ```typescript
 interface HeatmapProps {
   data: {
@@ -1057,6 +1110,7 @@ interface HeatmapProps {
 #### Form Components
 
 **24. Select** (`Select.tsx`)
+
 ```typescript
 interface SelectProps {
   options: {
@@ -1075,6 +1129,7 @@ interface SelectProps {
 ```
 
 **25. Checkbox** (`Checkbox.tsx`)
+
 ```typescript
 interface CheckboxProps {
   label: string;
@@ -1086,6 +1141,7 @@ interface CheckboxProps {
 ```
 
 **26. Radio** (`Radio.tsx`)
+
 ```typescript
 interface RadioGroupProps {
   options: {
@@ -1100,17 +1156,19 @@ interface RadioGroupProps {
 ```
 
 **27. Switch** (`Switch.tsx`)
+
 ```typescript
 interface SwitchProps {
   checked: boolean;
   onChange: (checked: boolean) => void;
   label?: string;
-  size: 'sm' | 'md' | 'lg';
+  size: "sm" | "md" | "lg";
   isDisabled?: boolean;
 }
 ```
 
 **28. Slider** (`Slider.tsx`)
+
 ```typescript
 interface SliderProps {
   value: number;
@@ -1124,6 +1182,7 @@ interface SliderProps {
 ```
 
 **29. FileUpload** (`FileUpload.tsx`)
+
 ```typescript
 interface FileUploadProps {
   accept?: string;
@@ -1136,6 +1195,7 @@ interface FileUploadProps {
 ```
 
 **30. DatePicker** (`DatePicker.tsx`)
+
 ```typescript
 interface DatePickerProps {
   value?: Date;
@@ -1152,6 +1212,7 @@ interface DatePickerProps {
 #### Domain-Specific Components
 
 **31. ProjectCard** (`ProjectCard.tsx`)
+
 ```typescript
 interface ProjectCardProps {
   project: Project;
@@ -1165,6 +1226,7 @@ interface ProjectCardProps {
 ```
 
 **32. SearchResultCard** (`SearchResultCard.tsx`)
+
 ```typescript
 interface SearchResultCardProps {
   chunk: Chunk;
@@ -1179,6 +1241,7 @@ interface SearchResultCardProps {
 ```
 
 **33. JobProgressPanel** (`JobProgressPanel.tsx`)
+
 ```typescript
 interface JobProgressPanelProps {
   job: Job;
@@ -1192,6 +1255,7 @@ interface JobProgressPanelProps {
 ```
 
 **34. HealthStatusIndicator** (`HealthStatusIndicator.tsx`)
+
 ```typescript
 interface HealthStatusIndicatorProps {
   services: {
@@ -1217,7 +1281,7 @@ interface HealthStatusIndicatorProps {
     <StatCard
       label="Total Projects"
       value={5}
-      change={{ value: +1, trend: 'up', period: 'today' }}
+      change={{ value: +1, trend: "up", period: "today" }}
       icon={<FolderIcon />}
     />
   </GridItem>
@@ -1226,7 +1290,7 @@ interface HealthStatusIndicatorProps {
     <StatCard
       label="Total Chunks"
       value="127K"
-      change={{ value: +3.4, trend: 'up', period: 'today' }}
+      change={{ value: +3.4, trend: "up", period: "today" }}
       icon={<DocumentIcon />}
     />
   </GridItem>
@@ -1254,14 +1318,14 @@ interface HealthStatusIndicatorProps {
 
 ```typescript
 <ProjectList>
-  {projects.map(project => (
+  {projects.map((project) => (
     <ProjectCard
       key={project.id}
       project={project}
       onIndex={() => handleIndex(project.id)}
       onSearch={() => navigate(`/search?projectId=${project.id}`)}
       onDelete={() => handleDelete(project.id)}
-      showProgress={project.status === 'Indexing'}
+      showProgress={project.status === "Indexing"}
     />
   ))}
 </ProjectList>
@@ -1276,7 +1340,7 @@ interface HealthStatusIndicatorProps {
       value={query}
       onChange={setQuery}
       placeholder="Search your code..."
-      shortcuts={['/', 'Cmd+K']}
+      shortcuts={["/", "Cmd+K"]}
     />
   </SearchHeader>
 
@@ -1299,7 +1363,7 @@ interface HealthStatusIndicatorProps {
     </SearchFilters>
 
     <SearchResults>
-      {results.map(result => (
+      {results.map((result) => (
         <SearchResultCard
           key={result.id}
           chunk={result.chunk}
@@ -1326,6 +1390,7 @@ interface HealthStatusIndicatorProps {
 **Purpose:** Grafana-quality overview of system health, metrics, and activity
 
 **Layout:**
+
 ```
 ┌─────────────────────────────────────────────────────┐
 │ Header (Global)                                      │
@@ -1346,6 +1411,7 @@ interface HealthStatusIndicatorProps {
 ```
 
 **Components Used:**
+
 - `StatCard` (4x - metrics)
 - `HealthStatusIndicator` (1x - system health)
 - `LineChart` (1x - performance trends)
@@ -1353,6 +1419,7 @@ interface HealthStatusIndicatorProps {
 - `Timeline` (1x - recent activity)
 
 **Data Sources:**
+
 - `GET /api/metrics/summary` (new endpoint needed)
 - `GET /api/health` (new endpoint needed)
 - `GET /api/metrics/performance?period=24h` (new endpoint needed)
@@ -1360,6 +1427,7 @@ interface HealthStatusIndicatorProps {
 - `GET /api/activity/recent` (new endpoint needed)
 
 **Refresh Strategy:**
+
 - Metrics: Poll every 30 seconds
 - Active jobs: SSE connection for real-time updates
 - Activity: Poll every 60 seconds
@@ -1373,6 +1441,7 @@ interface HealthStatusIndicatorProps {
 **Purpose:** Manage all indexed projects (Vercel-style cards)
 
 **Layout:**
+
 ```
 ┌─────────────────────────────────────────────────────┐
 │ Header: Projects (5)  [+ New] [Bulk Actions ▼]     │
@@ -1389,6 +1458,7 @@ interface HealthStatusIndicatorProps {
 ```
 
 **Components Used:**
+
 - `ProjectCard` (Nx)
 - `FilterBar` (1x)
 - `Button` (actions)
@@ -1396,11 +1466,13 @@ interface HealthStatusIndicatorProps {
 - `Pagination` (1x)
 
 **Modals:**
+
 - Create Project Wizard (multi-step)
 - Edit Project Settings
 - Bulk Actions Menu
 
 **Data Sources:**
+
 - `GET /api/projects?page=1&filter=...`
 - `GET /api/jobs/active` (for progress enrichment)
 
@@ -1413,6 +1485,7 @@ interface HealthStatusIndicatorProps {
 **Purpose:** Semantic code search with filters (Algolia-quality)
 
 **Layout:**
+
 ```
 ┌─────────────────────────────────────────────────────┐
 │ Header: [Global Search Input - Cmd+K]              │
@@ -1436,6 +1509,7 @@ interface HealthStatusIndicatorProps {
 ```
 
 **Components Used:**
+
 - `SearchInput` (global, always accessible)
 - `FilterPanel` (collapsible)
 - `SearchResultCard` (Nx - syntax highlighted)
@@ -1443,6 +1517,7 @@ interface HealthStatusIndicatorProps {
 - `CodeBlock` (syntax highlighting)
 
 **Features:**
+
 - Instant search (debounced 300ms)
 - Keyboard navigation (j/k, Enter)
 - Result preview on hover
@@ -1450,6 +1525,7 @@ interface HealthStatusIndicatorProps {
 - Syntax highlighting via Prism.js
 
 **Data Sources:**
+
 - `POST /api/search` (with filters)
 - `POST /api/search/suggestions` (typeahead)
 
@@ -1462,6 +1538,7 @@ interface HealthStatusIndicatorProps {
 **Purpose:** View all indexing jobs (GitHub Actions-style)
 
 **Layout:**
+
 ```
 ┌─────────────────────────────────────────────────────┐
 │ Header: Jobs  [Active] [Completed] [Failed]        │
@@ -1482,6 +1559,7 @@ interface HealthStatusIndicatorProps {
 ```
 
 **Components Used:**
+
 - `JobCard` (Nx - with expand/collapse)
 - `ProgressBar` (per job)
 - `Timeline` (stage visualization)
@@ -1489,6 +1567,7 @@ interface HealthStatusIndicatorProps {
 - `Tabs` (Active/Completed/Failed)
 
 **Features:**
+
 - Real-time updates via SSE
 - Expandable job details
 - Stage-by-stage progress
@@ -1496,6 +1575,7 @@ interface HealthStatusIndicatorProps {
 - Cancel/Retry actions
 
 **Data Sources:**
+
 - `GET /api/jobs?status=active`
 - `GET /api/jobs?status=completed&limit=10`
 - `GET /api/jobs/{id}/logs` (streaming logs)
@@ -1510,6 +1590,7 @@ interface HealthStatusIndicatorProps {
 **Purpose:** Analytics and trends (usage, performance, quality)
 
 **Layout:**
+
 ```
 ┌─────────────────────────────────────────────────────┐
 │ Header: Insights  [Last 7 days ▼]                  │
@@ -1532,6 +1613,7 @@ interface HealthStatusIndicatorProps {
 ```
 
 **Components Used:**
+
 - `LineChart` (2x - trends)
 - `BarChart` (1x - top searches)
 - `PieChart` (1x - status distribution)
@@ -1539,6 +1621,7 @@ interface HealthStatusIndicatorProps {
 - `Select` (date range picker)
 
 **Data Sources:**
+
 - `GET /api/analytics/searches?period=7d`
 - `GET /api/analytics/performance?period=7d`
 - `GET /api/analytics/projects/health`
@@ -1553,6 +1636,7 @@ interface HealthStatusIndicatorProps {
 **Purpose:** Configure system behavior (Stripe-quality forms)
 
 **Layout:**
+
 ```
 ┌─────────────────────────────────────────────────────┐
 │ Header: Settings                                     │
@@ -1579,6 +1663,7 @@ interface HealthStatusIndicatorProps {
 ```
 
 **Components Used:**
+
 - `Tabs` or `Sidebar` (section navigation)
 - `Input` (text, number)
 - `Select` (dropdowns)
@@ -1588,6 +1673,7 @@ interface HealthStatusIndicatorProps {
 - `Button` (save, cancel, reset)
 
 **Features:**
+
 - Auto-save draft (localStorage)
 - Validation on blur
 - Dangerous action confirmation
@@ -1595,6 +1681,7 @@ interface HealthStatusIndicatorProps {
 - Export/Import settings
 
 **Data Sources:**
+
 - `GET /api/configuration`
 - `PUT /api/configuration`
 
@@ -1638,6 +1725,7 @@ interface HealthStatusIndicatorProps {
 #### Dashboard Metrics API
 
 **1. GET /api/metrics/summary**
+
 ```json
 {
   "projects": {
@@ -1668,6 +1756,7 @@ interface HealthStatusIndicatorProps {
 ```
 
 **2. GET /api/health**
+
 ```json
 {
   "healthy": true,
@@ -1701,6 +1790,7 @@ interface HealthStatusIndicatorProps {
 ```
 
 **3. GET /api/metrics/performance?period=24h**
+
 ```json
 {
   "period": "24h",
@@ -1733,6 +1823,7 @@ interface HealthStatusIndicatorProps {
 ```
 
 **4. GET /api/activity/recent?limit=10**
+
 ```json
 {
   "activities": [
@@ -1741,7 +1832,7 @@ interface HealthStatusIndicatorProps {
       "type": "search",
       "description": "Search \"authentication\" (127 results)",
       "metadata": {
-  "projectId": "019a6584-3075-7076-ae69-4ced4e2799f5",
+        "projectId": "019a6584-3075-7076-ae69-4ced4e2799f5",
         "latencyMs": 156,
         "resultCount": 127
       }
@@ -1751,7 +1842,7 @@ interface HealthStatusIndicatorProps {
       "type": "index_completed",
       "description": "Indexed koan-data (3,456 chunks)",
       "metadata": {
-  "projectId": "b8faedcf-1f52-4b21-9c2f-a879f9ed5b7f",
+        "projectId": "b8faedcf-1f52-4b21-9c2f-a879f9ed5b7f",
         "durationSeconds": 272,
         "chunksCreated": 3456
       }
@@ -1765,6 +1856,7 @@ interface HealthStatusIndicatorProps {
 #### Analytics API (Insights Page)
 
 **5. GET /api/analytics/searches?period=7d**
+
 ```json
 {
   "period": "7d",
@@ -1791,6 +1883,7 @@ interface HealthStatusIndicatorProps {
 ```
 
 **6. GET /api/analytics/projects/health**
+
 ```json
 {
   "distribution": {
@@ -1801,7 +1894,7 @@ interface HealthStatusIndicatorProps {
   },
   "projects": [
     {
-  "id": "019a6584-3075-7076-ae69-4ced4e2799f5",
+      "id": "019a6584-3075-7076-ae69-4ced4e2799f5",
       "name": "koan-core",
       "status": "Ready",
       "documentCount": 12345,
@@ -1817,6 +1910,7 @@ interface HealthStatusIndicatorProps {
 #### Real-Time Streaming API
 
 **7. SSE /api/jobs/stream**
+
 ```
 Content-Type: text/event-stream
 
@@ -1831,6 +1925,7 @@ data: {"jobId": "job-456", "status": "Failed", "errorMessage": "Path traversal d
 ```
 
 **8. SSE /api/metrics/stream**
+
 ```
 Content-Type: text/event-stream
 
@@ -1848,11 +1943,13 @@ data: {"projectId": "019a6584-3075-7076-ae69-4ced4e2799f5", "progress": 65}
 #### Projects Controller Enhancements
 
 **GET /api/projects?page=1&pageSize=20&status=Ready&sort=lastIndexed:desc**
+
 - Add pagination
 - Add filtering by status
 - Add sorting
 
 **GET /api/projects/{id}/analytics**
+
 ```json
 {
   "projectId": "019a6584-3075-7076-ae69-4ced4e2799f5",
@@ -2021,9 +2118,9 @@ interface UIStore {
   };
   toasts: Toast[];
 
-  openModal: (modal: keyof UIStore['modals']) => void;
-  closeModal: (modal: keyof UIStore['modals']) => void;
-  showToast: (toast: Omit<Toast, 'id'>) => void;
+  openModal: (modal: keyof UIStore["modals"]) => void;
+  closeModal: (modal: keyof UIStore["modals"]) => void;
+  showToast: (toast: Omit<Toast, "id">) => void;
   dismissToast: (id: string) => void;
 }
 ```
@@ -2038,18 +2135,24 @@ export function useRealtimeJobs() {
   const [jobs, setJobs] = useState<Job[]>([]);
 
   useEffect(() => {
-    const eventSource = new EventSource('/api/jobs/stream');
+    const eventSource = new EventSource("/api/jobs/stream");
 
-    eventSource.addEventListener('job-progress', (event) => {
+    eventSource.addEventListener("job-progress", (event) => {
       const data = JSON.parse(event.data);
-      setJobs(jobs => jobs.map(job =>
-        job.id === data.jobId
-          ? { ...job, progress: data.progress, currentOperation: data.currentOperation }
-          : job
-      ));
+      setJobs((jobs) =>
+        jobs.map((job) =>
+          job.id === data.jobId
+            ? {
+                ...job,
+                progress: data.progress,
+                currentOperation: data.currentOperation,
+              }
+            : job
+        )
+      );
     });
 
-    eventSource.addEventListener('job-completed', (event) => {
+    eventSource.addEventListener("job-completed", (event) => {
       const data = JSON.parse(event.data);
       // Update job status, show toast notification
     });
@@ -2067,13 +2170,13 @@ export function useRealtimeJobs() {
 
 ### 8.1 Chart Library Comparison
 
-| Library | Size | Composability | TypeScript | Verdict |
-|---------|------|---------------|------------|---------|
-| **Recharts** | 100KB | ✅ Excellent | ✅ Full | ✅ **SELECTED** |
-| Chart.js | 150KB | ⚠️ Limited | ⚠️ Partial | ❌ Imperative API |
-| Victory | 200KB | ✅ Excellent | ✅ Full | ❌ Too large |
-| Nivo | 180KB | ✅ Good | ✅ Full | ❌ Heavy animations |
-| D3.js | 240KB | ✅ Ultimate | ⚠️ Manual | ❌ Steep learning curve |
+| Library      | Size  | Composability | TypeScript | Verdict                 |
+| ------------ | ----- | ------------- | ---------- | ----------------------- |
+| **Recharts** | 100KB | ✅ Excellent  | ✅ Full    | ✅ **SELECTED**         |
+| Chart.js     | 150KB | ⚠️ Limited    | ⚠️ Partial | ❌ Imperative API       |
+| Victory      | 200KB | ✅ Excellent  | ✅ Full    | ❌ Too large            |
+| Nivo         | 180KB | ✅ Good       | ✅ Full    | ❌ Heavy animations     |
+| D3.js        | 240KB | ✅ Ultimate   | ⚠️ Manual  | ❌ Steep learning curve |
 
 **Selection: Recharts** - Perfect balance of size, composability, TypeScript support
 
@@ -2083,7 +2186,15 @@ export function useRealtimeJobs() {
 
 ```typescript
 // components/common/LineChart/LineChart.tsx
-import { LineChart as RechartsLine, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import {
+  LineChart as RechartsLine,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
 
 interface LineChartProps {
   data: { [key: string]: any }[];
@@ -2098,21 +2209,23 @@ export function LineChart({
   data,
   xAxisKey,
   yAxisKey,
-  color = 'var(--color-primary-600)',
+  color = "var(--color-primary-600)",
   height = 300,
-  showGrid = true
+  showGrid = true,
 }: LineChartProps) {
   return (
     <ResponsiveContainer width="100%" height={height}>
       <RechartsLine data={data}>
-        {showGrid && <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />}
+        {showGrid && (
+          <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
+        )}
         <XAxis dataKey={xAxisKey} stroke="var(--color-text-tertiary)" />
         <YAxis stroke="var(--color-text-tertiary)" />
         <Tooltip
           contentStyle={{
-            backgroundColor: 'var(--color-surface)',
-            border: '1px solid var(--color-border)',
-            borderRadius: 'var(--border-radius-md)'
+            backgroundColor: "var(--color-surface)",
+            border: "1px solid var(--color-border)",
+            borderRadius: "var(--border-radius-md)",
           }}
         />
         <Line
@@ -2150,6 +2263,7 @@ export function LineChart({
 **Week 1: Design System + Core Components**
 
 **Day 1-2: Project Setup**
+
 - [ ] Initialize Vite + React + TypeScript project
 - [ ] Configure Tailwind CSS
 - [ ] Set up ESLint + Prettier
@@ -2158,6 +2272,7 @@ export function LineChart({
 - [ ] Set up typography system
 
 **Day 3-5: Foundation Components (10)**
+
 - [ ] Button (all variants, loading states)
 - [ ] Input (text, search, with addons)
 - [ ] Badge (all semantic colors)
@@ -2172,6 +2287,7 @@ export function LineChart({
 **Week 2: Data Display + Navigation**
 
 **Day 1-3: Data Display Components (8)**
+
 - [ ] Table (sortable, paginated)
 - [ ] CodeBlock (syntax highlighting, line numbers)
 - [ ] StatCard (Grafana-style metrics)
@@ -2182,6 +2298,7 @@ export function LineChart({
 - [ ] Breadcrumbs
 
 **Day 4-5: Navigation Components (6)**
+
 - [ ] Sidebar (collapsible, with badges)
 - [ ] Header (global search, profile menu)
 - [ ] CommandPalette (Cmd+K, fuzzy search)
@@ -2196,16 +2313,18 @@ export function LineChart({
 **Week 3: Dashboard + Projects + Search**
 
 **Day 1-2: Dashboard Page**
+
 - [ ] Dashboard layout
 - [ ] Metrics grid (4 StatCards)
 - [ ] System health panel
 - [ ] Performance chart integration
 - [ ] Active jobs panel
 - [ ] Recent activity timeline
-- [ ] API integration (/api/metrics/*, /api/health)
+- [ ] API integration (/api/metrics/\*, /api/health)
 - [ ] SSE connection for live updates
 
 **Day 3-4: Projects Page**
+
 - [ ] Projects list layout
 - [ ] ProjectCard component (enhanced)
 - [ ] Filter bar (status, sort)
@@ -2215,6 +2334,7 @@ export function LineChart({
 - [ ] Real-time job progress updates
 
 **Day 5: Search Page**
+
 - [ ] Search layout (filters + results)
 - [ ] SearchResultCard (syntax highlighted)
 - [ ] Filter panel (collapsible)
@@ -2225,6 +2345,7 @@ export function LineChart({
 **Week 4: Jobs + Insights + Settings**
 
 **Day 1: Jobs Page**
+
 - [ ] Jobs list (active/completed/failed tabs)
 - [ ] JobCard (expandable, with logs)
 - [ ] Stage-by-stage progress
@@ -2233,15 +2354,17 @@ export function LineChart({
 - [ ] API integration (/api/jobs)
 
 **Day 2: Insights Page**
+
 - [ ] Insights layout
 - [ ] Chart integration (Recharts)
 - [ ] Usage trends (LineChart)
 - [ ] Performance gauges (3x)
 - [ ] Project health (PieChart)
 - [ ] Top searches (BarChart)
-- [ ] API integration (/api/analytics/*)
+- [ ] API integration (/api/analytics/\*)
 
 **Day 3: Settings Page**
+
 - [ ] Settings layout (sectioned)
 - [ ] Form components (Input, Select, Switch, Slider)
 - [ ] Unsaved changes warning
@@ -2250,6 +2373,7 @@ export function LineChart({
 - [ ] API integration (/api/configuration)
 
 **Day 4-5: Polish & Integration**
+
 - [ ] Global navigation wiring
 - [ ] Command palette integration
 - [ ] Keyboard shortcuts
@@ -2266,23 +2390,27 @@ export function LineChart({
 **Week 5: New Endpoints**
 
 **Day 1-2: Metrics API**
+
 - [ ] GET /api/metrics/summary
 - [ ] GET /api/health
 - [ ] GET /api/metrics/performance
 - [ ] GET /api/activity/recent
 
 **Day 3-4: Analytics API**
+
 - [ ] GET /api/analytics/searches
 - [ ] GET /api/analytics/projects/health
 - [ ] GET /api/analytics/top-queries
 
 **Day 5: Streaming API**
+
 - [ ] SSE /api/jobs/stream
 - [ ] SSE /api/metrics/stream
 
 **Week 6: Enhancements + Testing**
 
 **Day 1-3: API Enhancements**
+
 - [ ] Projects pagination/filtering/sorting
 - [ ] GET /api/projects/{id}/analytics
 - [ ] Enhanced error responses
@@ -2290,6 +2418,7 @@ export function LineChart({
 - [ ] Request logging
 
 **Day 4-5: Testing**
+
 - [ ] Unit tests for controllers
 - [ ] Integration tests for endpoints
 - [ ] Load testing (100 concurrent searches)
@@ -2302,6 +2431,7 @@ export function LineChart({
 **Week 7: Testing + Accessibility**
 
 **Day 1-3: Frontend Testing**
+
 - [ ] Unit tests for components (Vitest)
 - [ ] Integration tests for pages
 - [ ] E2E tests (Playwright)
@@ -2309,6 +2439,7 @@ export function LineChart({
 - [ ] Performance testing (Lighthouse)
 
 **Day 4-5: Accessibility**
+
 - [ ] WCAG 2.1 AA audit
 - [ ] Keyboard navigation testing
 - [ ] Screen reader testing (NVDA, VoiceOver)
@@ -2318,12 +2449,14 @@ export function LineChart({
 **Week 8: Documentation + Launch**
 
 **Day 1-2: Documentation**
+
 - [ ] Component documentation (Storybook)
 - [ ] API documentation (Swagger)
 - [ ] User guide (onboarding)
 - [ ] Developer guide (contribution)
 
 **Day 3-4: Final Polish**
+
 - [ ] Bug fixes from testing
 - [ ] Performance optimization
 - [ ] Bundle size optimization
@@ -2331,6 +2464,7 @@ export function LineChart({
 - [ ] Production build testing
 
 **Day 5: Launch**
+
 - [ ] Production deployment
 - [ ] Monitoring setup
 - [ ] Analytics configuration
@@ -2422,6 +2556,7 @@ Backend Enhancements: (~1,500 LOC C#)
 ```
 
 **Total Code Volume:**
+
 - Frontend: ~8,500 LOC (TypeScript + CSS)
 - Backend: ~1,500 LOC (C#)
 - Tests: ~1,200 LOC
@@ -2432,6 +2567,7 @@ Backend Enhancements: (~1,500 LOC C#)
 ### 10.3 Documentation Deliverables
 
 **1. Design System Documentation** (`DESIGN-SYSTEM.md`)
+
 - Complete color palette reference
 - Typography scale usage guide
 - Component API documentation (props, variants)
@@ -2440,6 +2576,7 @@ Backend Enhancements: (~1,500 LOC C#)
 - Code examples for each component
 
 **2. Component Storybook** (Interactive)
+
 - All 30+ components documented
 - Live props playground
 - Accessibility tests integrated
@@ -2448,6 +2585,7 @@ Backend Enhancements: (~1,500 LOC C#)
 - Do's and Don'ts
 
 **3. Frontend Architecture Guide** (`FRONTEND-ARCHITECTURE.md`)
+
 - Technology stack rationale
 - Project structure explanation
 - State management patterns
@@ -2456,6 +2594,7 @@ Backend Enhancements: (~1,500 LOC C#)
 - Testing strategy
 
 **4. API Documentation** (`API-REFERENCE.md`)
+
 - All endpoint specifications
 - Request/response schemas
 - Authentication details
@@ -2464,6 +2603,7 @@ Backend Enhancements: (~1,500 LOC C#)
 - Example curl commands
 
 **5. User Guide** (`USER-GUIDE.md`)
+
 - Getting started (5-minute setup)
 - Dashboard overview
 - Project management workflow
@@ -2473,6 +2613,7 @@ Backend Enhancements: (~1,500 LOC C#)
 - Keyboard shortcuts reference
 
 **6. Developer Guide** (`DEVELOPER-GUIDE.md`)
+
 - Local development setup
 - Running Storybook
 - Running tests
@@ -2485,6 +2626,7 @@ Backend Enhancements: (~1,500 LOC C#)
 ### 10.4 Asset Checklist
 
 **Design Assets:**
+
 - [ ] Figma design system file (~200 frames)
 - [ ] Component specifications (30+ components)
 - [ ] Page mockups (6 pages × 3 breakpoints = 18 layouts)
@@ -2493,6 +2635,7 @@ Backend Enhancements: (~1,500 LOC C#)
 - [ ] Logo variations (light/dark, horizontal/vertical)
 
 **Code Assets:**
+
 - [ ] Design system (tokens, typography, utilities)
 - [ ] Component library (30+ components)
 - [ ] Page implementations (6 pages)
@@ -2504,6 +2647,7 @@ Backend Enhancements: (~1,500 LOC C#)
 - [ ] Storybook stories (all components)
 
 **Backend Assets:**
+
 - [ ] MetricsController (5 endpoints)
 - [ ] HealthController (1 endpoint)
 - [ ] AnalyticsController (6 endpoints)
@@ -2514,6 +2658,7 @@ Backend Enhancements: (~1,500 LOC C#)
 - [ ] Integration tests (API endpoints)
 
 **Documentation Assets:**
+
 - [ ] Design system documentation
 - [ ] Component Storybook
 - [ ] Frontend architecture guide
@@ -2531,48 +2676,48 @@ Backend Enhancements: (~1,500 LOC C#)
 
 **Design Phase (4-5 weeks)**
 
-| Task | Hours | Rate | Cost |
-|------|-------|------|------|
-| Design system (tokens, components) | 80 | $150/hr | $12,000 |
-| Page layouts (6 pages × 3 breakpoints) | 54 | $150/hr | $8,100 |
-| Flow diagrams & specifications | 40 | $150/hr | $6,000 |
-| Storybook stories setup | 20 | $150/hr | $3,000 |
-| **Total Design** | **194** | | **$29,100** |
+| Task                                   | Hours   | Rate    | Cost        |
+| -------------------------------------- | ------- | ------- | ----------- |
+| Design system (tokens, components)     | 80      | $150/hr | $12,000     |
+| Page layouts (6 pages × 3 breakpoints) | 54      | $150/hr | $8,100      |
+| Flow diagrams & specifications         | 40      | $150/hr | $6,000      |
+| Storybook stories setup                | 20      | $150/hr | $3,000      |
+| **Total Design**                       | **194** |         | **$29,100** |
 
 **Frontend Implementation (6-8 weeks)**
 
-| Task | Hours | Rate | Cost |
-|------|-------|------|------|
-| Project setup + build system | 16 | $125/hr | $2,000 |
-| Design system implementation | 40 | $125/hr | $5,000 |
-| Component library (30+ components) | 120 | $125/hr | $15,000 |
-| Page implementations (6 pages) | 80 | $125/hr | $10,000 |
-| API integration + state management | 40 | $125/hr | $5,000 |
-| Real-time features (SSE) | 20 | $125/hr | $2,500 |
-| Testing (unit + integration + E2E) | 40 | $125/hr | $5,000 |
-| Accessibility + responsive design | 24 | $125/hr | $3,000 |
-| **Total Frontend** | **380** | | **$47,500** |
+| Task                               | Hours   | Rate    | Cost        |
+| ---------------------------------- | ------- | ------- | ----------- |
+| Project setup + build system       | 16      | $125/hr | $2,000      |
+| Design system implementation       | 40      | $125/hr | $5,000      |
+| Component library (30+ components) | 120     | $125/hr | $15,000     |
+| Page implementations (6 pages)     | 80      | $125/hr | $10,000     |
+| API integration + state management | 40      | $125/hr | $5,000      |
+| Real-time features (SSE)           | 20      | $125/hr | $2,500      |
+| Testing (unit + integration + E2E) | 40      | $125/hr | $5,000      |
+| Accessibility + responsive design  | 24      | $125/hr | $3,000      |
+| **Total Frontend**                 | **380** |         | **$47,500** |
 
 **Backend Implementation (2-3 weeks)**
 
-| Task | Hours | Rate | Cost |
-|------|-------|------|------|
-| New API endpoints (MetricsController, etc.) | 40 | $150/hr | $6,000 |
-| Streaming API (SSE) | 20 | $150/hr | $3,000 |
-| API enhancements (pagination, filtering) | 24 | $150/hr | $3,600 |
-| Testing (unit + integration) | 16 | $150/hr | $2,400 |
-| **Total Backend** | **100** | | **$15,000** |
+| Task                                        | Hours   | Rate    | Cost        |
+| ------------------------------------------- | ------- | ------- | ----------- |
+| New API endpoints (MetricsController, etc.) | 40      | $150/hr | $6,000      |
+| Streaming API (SSE)                         | 20      | $150/hr | $3,000      |
+| API enhancements (pagination, filtering)    | 24      | $150/hr | $3,600      |
+| Testing (unit + integration)                | 16      | $150/hr | $2,400      |
+| **Total Backend**                           | **100** |         | **$15,000** |
 
 **Documentation & Polish (1 week)**
 
-| Task | Hours | Rate | Cost |
-|------|-------|------|------|
-| Design system documentation | 8 | $100/hr | $800 |
-| User guide | 8 | $100/hr | $800 |
-| Developer guide | 8 | $100/hr | $800 |
-| API documentation | 8 | $100/hr | $800 |
-| Final testing + bug fixes | 16 | $125/hr | $2,000 |
-| **Total Documentation** | **48** | | **$5,200** |
+| Task                        | Hours  | Rate    | Cost       |
+| --------------------------- | ------ | ------- | ---------- |
+| Design system documentation | 8      | $100/hr | $800       |
+| User guide                  | 8      | $100/hr | $800       |
+| Developer guide             | 8      | $100/hr | $800       |
+| API documentation           | 8      | $100/hr | $800       |
+| Final testing + bug fixes   | 16     | $125/hr | $2,000     |
+| **Total Documentation**     | **48** |         | **$5,200** |
 
 **Total Investment: $96,800**
 
@@ -2602,11 +2747,13 @@ Backend Enhancements: (~1,500 LOC C#)
 **Quantitative Benefits:**
 
 1. **Reduced Support Costs**
+
    - Current: Users email "how do I..." questions (5-10/week, 30 min each)
    - Future: Self-service UI reduces support by 70%
    - Savings: ~$15k/year in support time
 
 2. **Faster Enterprise Sales Cycles**
+
    - Current: Demos require technical founder (2-3 hours per demo)
    - Future: Self-serve demo via premium UI (prospects explore independently)
    - Impact: 30% faster sales cycles, 20% higher close rate
@@ -2638,6 +2785,7 @@ Backend Enhancements: (~1,500 LOC C#)
 This specification transforms Koan.Context from a functional MVP into a **Grafana-quality premium application** suitable for enterprise adoption.
 
 **Key Achievements:**
+
 - **30+ reusable components** (design system foundation)
 - **6 reimagined pages** (Dashboard, Projects, Search, Jobs, Insights, Settings)
 - **Real-time updates** (SSE for live progress tracking)
@@ -2649,6 +2797,7 @@ This specification transforms Koan.Context from a functional MVP into a **Grafan
 **Returns:** 250-400% ROI in Year 1 through increased sales and reduced churn
 
 **Next Steps:**
+
 1. Approve budget and timeline
 2. Assemble team (internal or external)
 3. Begin Phase 1: Design System (Week 1)
@@ -2663,6 +2812,7 @@ This specification transforms Koan.Context from a functional MVP into a **Grafan
 **Next Review:** 2025-11-14
 
 **Related Documentation:**
+
 - [Koan.Context UX Proposal](KOAN-CONTEXT-UX-PROPOSAL.md)
 - [Koan.Context Overview](../guides/koan-context-overview.md)
 - [Koan.Context Hardening Proposal](KOAN-CONTEXT-HARDENING.md)

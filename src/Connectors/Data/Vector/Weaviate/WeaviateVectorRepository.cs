@@ -36,8 +36,8 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
         _options = options.Value;
         _sp = sp;
         _logger = (ILogger<WeaviateVectorRepository<TEntity, TKey>>?)sp.GetService(typeof(ILogger<WeaviateVectorRepository<TEntity, TKey>>));
-    var registry = (VectorSchemaRegistry?)sp.GetService(typeof(VectorSchemaRegistry));
-    _schemaDescriptor = registry?.Get<TEntity, TKey>() ?? VectorSchemaDescriptor.CreateFallback(typeof(TEntity));
+        var registry = (VectorSchemaRegistry?)sp.GetService(typeof(VectorSchemaRegistry));
+        _schemaDescriptor = registry?.Get<TEntity, TKey>() ?? VectorSchemaDescriptor.CreateFallback(typeof(TEntity));
         _http.BaseAddress = new Uri(_options.Endpoint);
         if (_http.Timeout == default)
             _http.Timeout = TimeSpan.FromSeconds(Math.Max(1, _options.DefaultTimeoutSeconds));
@@ -85,7 +85,7 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
         };
         var bodyJson = JsonConvert.SerializeObject(body, Formatting.Indented);
         _logger?.LogDebug("Weaviate: POST /v1/schema/classes for class {Class}. Schema body: {Body}", cls, bodyJson);
-    var create = await _http.PostAsync("/v1/schema/classes", new StringContent(bodyJson, System.Text.Encoding.UTF8, "application/json"), ct);
+        var create = await _http.PostAsync("/v1/schema/classes", new StringContent(bodyJson, System.Text.Encoding.UTF8, "application/json"), ct);
         var createResponse = await create.Content.ReadAsStringAsync(ct);
         _logger?.LogDebug("Weaviate: schema creation response ({Status}): {Response}", (int)create.StatusCode, createResponse);
         if (!create.IsSuccessStatusCode)
@@ -468,8 +468,8 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
             // Request docId alongside _additional so we can map back to original ids
             query = $"query {{ Get {{ {ClassName} {args} {{ docId _additional {{ id distance }} }} }} }}"
         };
-    var req = new StringContent(JsonConvert.SerializeObject(gql), System.Text.Encoding.UTF8, "application/json");
-    var resp = await _http.PostAsync("/v1/graphql", req, ct);
+        var req = new StringContent(JsonConvert.SerializeObject(gql), System.Text.Encoding.UTF8, "application/json");
+        var resp = await _http.PostAsync("/v1/graphql", req, ct);
         if (!resp.IsSuccessStatusCode)
         {
             var body = await resp.Content.ReadAsStringAsync(ct);

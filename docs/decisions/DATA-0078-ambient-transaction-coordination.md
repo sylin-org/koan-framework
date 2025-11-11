@@ -18,6 +18,7 @@ Entity operations (Save, Delete, UpsertMany) currently execute immediately and i
 3. **Batch operations**: Multiple entity changes should succeed or fail together
 
 Current workarounds are manual and error-prone:
+
 - Direct SQL transactions (adapter-specific, breaks abstraction)
 - Manual compensation logic (complex, easy to get wrong)
 - No framework support for cross-adapter coordination
@@ -64,20 +65,24 @@ public static class EntityContext
 ### Behavior
 
 **Deferred Execution**: When `EntityContext.Transaction()` is active:
+
 - `Entity<T>.Save()` tracks operation instead of executing immediately
 - `Entity<T>.Delete()` tracks operation instead of executing immediately
 - Operations grouped by adapter and executed in adapter-local transactions
 
 **Auto-Commit**: Transaction commits automatically on successful dispose
+
 - Zero cognitive load for happy path
 - No explicit commit needed (but allowed for clarity)
 
 **Auto-Rollback**: Transaction rolls back on:
+
 - Explicit `EntityContext.RollbackAsync()` call
 - Unhandled exception (dispose without commit)
 - Dispose without commit or rollback
 
 **Atomicity Guarantees**:
+
 - **Within adapter**: Full ACID via local database transactions
 - **Across adapters**: Best-effort coordination (not true distributed transactions)
 - **Failure window**: Between adapter commits (if adapter A commits, adapter B fails)
@@ -85,6 +90,7 @@ public static class EntityContext
 ### Usage Patterns
 
 #### Pattern 1: Auto-commit (recommended)
+
 ```csharp
 using (EntityContext.Transaction("save-project"))
 {
@@ -95,6 +101,7 @@ using (EntityContext.Transaction("save-project"))
 ```
 
 #### Pattern 2: Explicit commit (clarity)
+
 ```csharp
 using (EntityContext.Transaction("save-project"))
 {
@@ -105,6 +112,7 @@ using (EntityContext.Transaction("save-project"))
 ```
 
 #### Pattern 3: Conditional rollback
+
 ```csharp
 using (EntityContext.Transaction("save-project"))
 {
@@ -120,6 +128,7 @@ using (EntityContext.Transaction("save-project"))
 ```
 
 #### Pattern 4: Cross-adapter coordination
+
 ```csharp
 using (EntityContext.Transaction("cross-db"))
 {
@@ -136,6 +145,7 @@ using (EntityContext.Transaction("cross-db"))
 ```
 
 #### Pattern 5: Composition with partition
+
 ```csharp
 using (EntityContext.Transaction("index-batch"))
 using (EntityContext.Partition(projectId))
@@ -173,12 +183,14 @@ public interface ITransactionCoordinator
 ```
 
 **Operation Tracking**:
+
 - Operations grouped by adapter
 - Each adapter gets a local transaction (Direct API)
 - Operations executed in order within adapter
 - All adapters commit if all succeed
 
 **Compensation**: For adapters that don't support transactions (vectors):
+
 - Execute immediately (not tracked)
 - Provide cleanup delegates for compensation
 - Framework logs compensation attempts
@@ -214,6 +226,7 @@ using (EntityContext.Transaction("check-support"))
 ### Constraints
 
 **Nested transactions**: Not supported, throws clear error
+
 ```csharp
 using (EntityContext.Transaction("outer"))
 {
@@ -225,6 +238,7 @@ using (EntityContext.Transaction("outer"))
 ```
 
 **Mixed immediate/deferred**: Operations outside transaction execute immediately
+
 ```csharp
 await entity1.Save(ct);  // Immediate execution
 
@@ -236,6 +250,7 @@ using (EntityContext.Transaction("batch"))
 ```
 
 **Infrastructure operations**: These operations always execute immediately (not tracked):
+
 - `RemoveAll(RemoveStrategy.Fast)` - Bulk operations
 - Schema operations (`EnsureHealthyAsync`)
 - Vector operations (no transaction support in most vector DBs)
@@ -278,30 +293,35 @@ Activity: Koan.Data.Transaction
 ## Implementation Strategy
 
 ### Phase 1: Core Infrastructure (Week 1)
+
 - Update `EntityContext` with transaction parameter
 - Implement `ITransactionCoordinator` interface
 - Implement `TransactionCoordinator` with operation tracking
 - Create `TransactionScope` disposal logic
 
 ### Phase 2: Entity Integration (Week 2)
+
 - Update `Data<T,K>.UpsertAsync` to check for active transaction
 - Update `Data<T,K>.DeleteAsync` to check for active transaction
 - Implement operation tracking and grouping by adapter
 - Handle partition context in tracked operations
 
 ### Phase 3: Execution & Coordination (Week 3)
+
 - Integrate with Direct API for adapter-local transactions
 - Implement commit coordination (all adapters)
 - Implement rollback coordination
 - Add compensation pattern for non-transactional adapters
 
 ### Phase 4: Testing & Observability (Week 4)
+
 - Unit tests (operation tracking, commit/rollback)
 - Integration tests (SQLite, SQL Server, cross-adapter)
 - ActivitySource spans and structured logging
 - Performance benchmarks
 
 ### Phase 5: Documentation & Samples (Week 5)
+
 - API documentation
 - Usage guides
 - Migration examples

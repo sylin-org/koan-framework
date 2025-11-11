@@ -105,11 +105,11 @@ C:\Program Files\dotnet\sdk\10.0.100-rc.1.25451.107\
 
 ## Workloads Installed
 
-The following workloads were automatically installed with .NET 10 RC 1:
-- ✅ **maccatalyst** (18.5.10415-net10-p6)
-- ✅ **ios** (18.5.10415-net10-p6)
-- ✅ **maui-windows** (10.0.0-preview.6.25359.8)
-- ✅ **android** (36.0.0-preview.6.169)
+The following workloads remain available after installing the .NET 10 GA SDK (10.0.100). Exact version numbers will track the Visual Studio channel you use—run `dotnet workload list` to verify your environment.
+- ✅ **maccatalyst**
+- ✅ **ios**
+- ✅ **maui-windows**
+- ✅ **android**
 
 **Source**: Visual Studio 2026 Insiders integration
 
@@ -117,8 +117,8 @@ The following workloads were automatically installed with .NET 10 RC 1:
 
 ## Installation Verification Checklist
 
-- [x] .NET 10 RC 1 SDK installed (10.0.100-rc.1.25451.107)
-- [x] MSBuild version correct (17.15.0-preview-25451-107)
+- [x] .NET 10 GA SDK installed (10.0.100)
+- [x] MSBuild version aligns with .NET 10 GA release (17.15.0 or newer)
 - [x] All three runtimes installed (Core, ASP.NET Core, Windows Desktop)
 - [x] .NET 9 SDK retained for fallback
 - [x] New project creation works
@@ -126,19 +126,14 @@ The following workloads were automatically installed with .NET 10 RC 1:
 - [x] Project runs successfully
 - [x] Zero build errors or warnings in test
 - [x] MAUI workloads available
-- [x] Preview version notice displayed
+- [x] Preview warnings cleared (NETSDK1057 no longer emitted)
 
 ---
 
 ## Known Notices
 
 ### Informational Messages
-```
-NETSDK1057: You are using a preview version of .NET.
-See: https://aka.ms/dotnet-support-policy
-```
-
-**Assessment**: Expected informational message for RC version. Not a blocker.
+None at this time.
 
 ---
 

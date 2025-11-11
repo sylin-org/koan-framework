@@ -183,10 +183,10 @@ public class SyncOperation : Entity<SyncOperation>
     /// </summary>
     public float[] GetEmbedding()
     {
-        #pragma warning disable IL2026, IL3050
+#pragma warning disable IL2026, IL3050
         return JsonSerializer.Deserialize<float[]>(EmbeddingJson)
                ?? throw new InvalidOperationException("Failed to deserialize embedding");
-        #pragma warning restore IL2026, IL3050
+#pragma warning restore IL2026, IL3050
     }
 
     /// <summary>
@@ -197,9 +197,9 @@ public class SyncOperation : Entity<SyncOperation>
         if (string.IsNullOrWhiteSpace(MetadataJson))
             return default;
 
-        #pragma warning disable IL2026, IL3050
+#pragma warning disable IL2026, IL3050
         return JsonSerializer.Deserialize<T>(MetadataJson);
-        #pragma warning restore IL2026, IL3050
+#pragma warning restore IL2026, IL3050
     }
 
     /// <summary>
@@ -222,12 +222,12 @@ public class SyncOperation : Entity<SyncOperation>
             throw new ArgumentException("Embedding cannot be null or empty", nameof(embedding));
         }
 
-        #pragma warning disable IL2026, IL3050
+#pragma warning disable IL2026, IL3050
         EmbeddingJson = JsonSerializer.Serialize(embedding);
         MetadataJson = metadata != null
             ? JsonSerializer.Serialize(metadata)
             : null;
-        #pragma warning restore IL2026, IL3050
+#pragma warning restore IL2026, IL3050
 
         if (kindOverride.HasValue)
         {
