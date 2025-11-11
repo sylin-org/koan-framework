@@ -739,9 +739,9 @@ public async Task<SearchResult> SearchAsync(
     var queryVector = await _embeddingService.GenerateEmbeddingAsync(query, ct);
 
     // 2. Vector similarity search
-    var vectorOptions = new VectorSearchOptions
-    {
-        Partition = $"proj-{projectId.Replace("-", "")}",  // Partition isolation
+  var vectorOptions = new VectorSearchOptions
+  {
+    Partition = projectId,  // Raw project ID; adapters handle concrete partition naming
         Limit = options.Limit ?? 10,
         MinScore = options.MinScore ?? 0.7,  // Cosine similarity threshold
         Filters = new Dictionary<string, object>

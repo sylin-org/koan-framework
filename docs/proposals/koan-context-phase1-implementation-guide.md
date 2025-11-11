@@ -452,7 +452,7 @@ public async Task<SearchResult> SearchAsync(...)
     int estimatedChunks = maxTokens / 200;  // ~200 tokens/chunk
     int fetchCount = Math.Max(estimatedChunks * 3, 50);
 
-    using (EntityContext.Partition($"proj-{Guid.Parse(projectId):N}"))
+    using (EntityContext.Partition(projectId))
     {
         var searchResult = await Vector<DocumentChunk>.Search(
             vector: state.QueryEmbedding,

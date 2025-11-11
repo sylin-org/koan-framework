@@ -138,7 +138,7 @@ using (EntityContext.Transaction("cross-db"))
 #### Pattern 5: Composition with partition
 ```csharp
 using (EntityContext.Transaction("index-batch"))
-using (EntityContext.Partition("proj-abc123"))
+using (EntityContext.Partition(projectId))
 {
     foreach (var chunk in chunks)
     {

@@ -1741,7 +1741,7 @@ interface HealthStatusIndicatorProps {
       "type": "search",
       "description": "Search \"authentication\" (127 results)",
       "metadata": {
-        "projectId": "proj-abc",
+  "projectId": "019a6584-3075-7076-ae69-4ced4e2799f5",
         "latencyMs": 156,
         "resultCount": 127
       }
@@ -1751,7 +1751,7 @@ interface HealthStatusIndicatorProps {
       "type": "index_completed",
       "description": "Indexed koan-data (3,456 chunks)",
       "metadata": {
-        "projectId": "proj-xyz",
+  "projectId": "b8faedcf-1f52-4b21-9c2f-a879f9ed5b7f",
         "durationSeconds": 272,
         "chunksCreated": 3456
       }
@@ -1801,7 +1801,7 @@ interface HealthStatusIndicatorProps {
   },
   "projects": [
     {
-      "id": "proj-abc",
+  "id": "019a6584-3075-7076-ae69-4ced4e2799f5",
       "name": "koan-core",
       "status": "Ready",
       "documentCount": 12345,
@@ -1838,7 +1838,7 @@ event: search-completed
 data: {"latencyMs": 156, "resultCount": 127}
 
 event: indexing-progress
-data: {"projectId": "proj-abc", "progress": 65}
+data: {"projectId": "019a6584-3075-7076-ae69-4ced4e2799f5", "progress": 65}
 ```
 
 ---
@@ -1855,7 +1855,7 @@ data: {"projectId": "proj-abc", "progress": 65}
 **GET /api/projects/{id}/analytics**
 ```json
 {
-  "projectId": "proj-abc",
+  "projectId": "019a6584-3075-7076-ae69-4ced4e2799f5",
   "name": "koan-core",
   "indexingHistory": [
     {
