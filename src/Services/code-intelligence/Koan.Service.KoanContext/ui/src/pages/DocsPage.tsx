@@ -172,8 +172,9 @@ function SearchGuide() {
 
       <h3 className="text-lg font-semibold text-foreground mt-6 mb-3">Search Features</h3>
       <ul className="list-disc list-inside space-y-2 text-foreground mb-6">
-        <li><strong>Project Filtering:</strong> Search within specific projects only</li>
-        <li><strong>Hybrid Search:</strong> Combines semantic and keyword matching (alpha slider)</li>
+  <li><strong>Project Filtering:</strong> Search within specific projects only</li>
+  <li><strong>Tag Filters:</strong> Combine Any/All/Exclude tags to tune result scope</li>
+  <li><strong>Tag Governance:</strong> Use the Tags view to inspect distribution and sample chunks</li>
         <li><strong>Pagination:</strong> Load more results with "Load More" button</li>
         <li><strong>Code Preview:</strong> See code snippets with syntax highlighting</li>
         <li><strong>Copy Code:</strong> One-click copy to clipboard</li>
@@ -423,7 +424,7 @@ function TroubleshootingGuide() {
           <ul className="list-disc list-inside text-sm text-foreground space-y-1">
             <li>Ensure project is indexed (status: "Ready")</li>
             <li>Try a different search query (more specific or more general)</li>
-            <li>Adjust hybrid search alpha slider (try more semantic or more keyword)</li>
+            <li>Clear or relax tag filters (Any/All/Exclude) that may be eliminating matches</li>
             <li>Remove project filters to search all projects</li>
             <li>Check if project has 0 chunks (reindex may be needed)</li>
           </ul>
@@ -436,7 +437,7 @@ function TroubleshootingGuide() {
           <ul className="list-disc list-inside text-sm text-foreground space-y-1">
             <li>Rephrase query to be more specific</li>
             <li>Use more descriptive terms instead of generic keywords</li>
-            <li>Adjust alpha slider toward keyword search (left) for exact matching</li>
+            <li>Require must-have tags in the "All" field or exclude noisy tags to focus results</li>
             <li>Filter to specific projects if searching wrong codebase</li>
           </ul>
         </div>
@@ -507,8 +508,9 @@ function APIReference() {
         <pre className="text-foreground overflow-x-auto">{`{
   "query": "authentication middleware",
   "projectIds": ["project-guid"],
-  "alpha": 0.7,
-  "tokenCounter": 5000
+  "tagsAny": ["auth", "jwt"],
+  "tagsExclude": ["sample"],
+  "maxTokens": 5000
 }`}</pre>
       </div>
     </div>

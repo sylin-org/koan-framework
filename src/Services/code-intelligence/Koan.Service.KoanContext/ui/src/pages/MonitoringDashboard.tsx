@@ -14,7 +14,6 @@ import {
   AlertTriangle,
   Database,
   Activity,
-  Clock,
   HardDrive,
   Inbox,
   PlayCircle,

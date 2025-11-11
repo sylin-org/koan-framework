@@ -13,7 +13,9 @@ export default function SearchPage() {
   const [showFilters, setShowFilters] = useState(false);
   const [selectedProjects, setSelectedProjects] = useState<string[]>([]);
   const [selectedLanguages, setSelectedLanguages] = useState<string[]>([]);
-  const [alpha, setAlpha] = useState(0.7); // Hybrid search ratio (0=keyword, 1=semantic)
+  const [anyTagsInput, setAnyTagsInput] = useState('');
+  const [allTagsInput, setAllTagsInput] = useState('');
+  const [excludeTagsInput, setExcludeTagsInput] = useState('');
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [dynamicSuggestions, setDynamicSuggestions] = useState<string[]>([]);
   const [allResults, setAllResults] = useState<SearchResult | null>(null);
@@ -30,6 +32,24 @@ export default function SearchPage() {
   const searchMutation = useSearch();
   const suggestionsMutation = useSearchSuggestions();
   const toast = useToast();
+
+  const parseTagInput = (value: string) =>
+    value
+      .split(',')
+      .map((tag) => tag.trim())
+      .filter((tag) => tag.length > 0);
+
+  const resolveTagFilters = () => {
+    const anyTags = parseTagInput(anyTagsInput);
+    const allTags = parseTagInput(allTagsInput);
+    const excludeTags = parseTagInput(excludeTagsInput);
+
+    return {
+      tagsAny: anyTags.length > 0 ? anyTags : undefined,
+      tagsAll: allTags.length > 0 ? allTags : undefined,
+      tagsExclude: excludeTags.length > 0 ? excludeTags : undefined,
+    };
+  };
 
   // Load recent searches from localStorage on mount
   useEffect(() => {
@@ -86,7 +106,9 @@ export default function SearchPage() {
     const params = new URLSearchParams(window.location.search);
     const urlQuery = params.get('q');
     const urlProjects = params.get('projects');
-    const urlAlpha = params.get('alpha');
+    const urlTagsAny = params.get('tagsAny');
+    const urlTagsAll = params.get('tagsAll');
+    const urlTagsExclude = params.get('tagsExclude');
 
     if (urlQuery) {
       setQuery(urlQuery);
@@ -95,22 +117,36 @@ export default function SearchPage() {
         setSelectedProjects(urlProjects.split(','));
       }
 
-      if (urlAlpha) {
-        setAlpha(parseFloat(urlAlpha));
+      if (urlTagsAny) {
+        setAnyTagsInput(urlTagsAny);
+      }
+
+      if (urlTagsAll) {
+        setAllTagsInput(urlTagsAll);
+      }
+
+      if (urlTagsExclude) {
+        setExcludeTagsInput(urlTagsExclude);
       }
 
       // Trigger search automatically
       setTimeout(() => {
+        const anyTags = urlTagsAny ? parseTagInput(urlTagsAny) : undefined;
+        const allTags = urlTagsAll ? parseTagInput(urlTagsAll) : undefined;
+        const excludeTags = urlTagsExclude ? parseTagInput(urlTagsExclude) : undefined;
+
         searchMutation.mutate(
           {
             query: urlQuery,
             projectIds: urlProjects ? urlProjects.split(',') : undefined,
-            alpha: urlAlpha ? parseFloat(urlAlpha) : 0.7,
-            tokenCounter: 5000,
+            maxTokens: 5000,
             includeInsights: true,
             includeReasoning: true,
             continuationToken: null,
             languages: selectedLanguages.length > 0 ? selectedLanguages : undefined,
+            tagsAny: anyTags && anyTags.length > 0 ? anyTags : undefined,
+            tagsAll: allTags && allTags.length > 0 ? allTags : undefined,
+            tagsExclude: excludeTags && excludeTags.length > 0 ? excludeTags : undefined,
           },
           {
             onSuccess: (data) => {
@@ -132,17 +168,21 @@ export default function SearchPage() {
     setContinuationToken(null);
     setIsLoadingMore(false);
 
+    const { tagsAny, tagsAll, tagsExclude } = resolveTagFilters();
+
     // Perform search across selected projects or all projects
     searchMutation.mutate(
       {
         query,
         projectIds: selectedProjects.length > 0 ? selectedProjects : undefined,
-        alpha,
-        tokenCounter: 5000,
+        maxTokens: 5000,
         includeInsights: true,
         includeReasoning: true,
         continuationToken: null,
         languages: selectedLanguages.length > 0 ? selectedLanguages : undefined,
+        tagsAny,
+        tagsAll,
+        tagsExclude,
       },
       {
         onSuccess: (data) => {
@@ -161,16 +201,20 @@ export default function SearchPage() {
 
     setIsLoadingMore(true);
 
+    const { tagsAny, tagsAll, tagsExclude } = resolveTagFilters();
+
     searchMutation.mutate(
       {
         query,
         projectIds: selectedProjects.length > 0 ? selectedProjects : undefined,
-        alpha,
-        tokenCounter: 5000,
+        maxTokens: 5000,
         includeInsights: false,
         includeReasoning: false,
         continuationToken,
         languages: selectedLanguages.length > 0 ? selectedLanguages : undefined,
+        tagsAny,
+        tagsAll,
+        tagsExclude,
       },
       {
         onSuccess: (data) => {
@@ -211,8 +255,20 @@ export default function SearchPage() {
     if (selectedProjects.length > 0) {
       params.set('projects', selectedProjects.join(','));
     }
-    if (alpha !== 0.7) {
-      params.set('alpha', alpha.toString());
+    const sharedAnyTags = parseTagInput(anyTagsInput);
+    const sharedAllTags = parseTagInput(allTagsInput);
+    const sharedExcludeTags = parseTagInput(excludeTagsInput);
+
+    if (sharedAnyTags.length > 0) {
+      params.set('tagsAny', sharedAnyTags.join(','));
+    }
+
+    if (sharedAllTags.length > 0) {
+      params.set('tagsAll', sharedAllTags.join(','));
+    }
+
+    if (sharedExcludeTags.length > 0) {
+      params.set('tagsExclude', sharedExcludeTags.join(','));
     }
 
     const shareUrl = `${window.location.origin}${window.location.pathname}?${params.toString()}`;
@@ -398,42 +454,40 @@ export default function SearchPage() {
               )}
             </div>
 
-            {/* Relevance Slider */}
+            {/* Tag Filters */}
             <div className="mb-6">
-              <h3 className="text-sm font-medium text-foreground mb-3">
-                Min Relevance Score
-              </h3>
-              <input
-                type="range"
-                min="0"
-                max="100"
-                defaultValue="70"
-                className="w-full"
-              />
-              <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                <span>0.0</span>
-                <span>0.7</span>
-                <span>1.0</span>
-              </div>
-            </div>
-
-            {/* Hybrid Mode Slider */}
-            <div className="mb-6">
-              <h3 className="text-sm font-medium text-foreground mb-3">
-                Hybrid Mode
-              </h3>
-              <input
-                type="range"
-                min="0"
-                max="100"
-                value={alpha * 100}
-                onChange={(e) => setAlpha(parseInt(e.target.value) / 100)}
-                className="w-full"
-              />
-              <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                <span>Keyword</span>
-                <span>{alpha.toFixed(1)}</span>
-                <span>Semantic</span>
+              <h3 className="text-sm font-medium text-foreground mb-3">Tags</h3>
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs text-muted-foreground mb-1">Match any (comma separated)</label>
+                  <input
+                    type="text"
+                    value={anyTagsInput}
+                    onChange={(e) => setAnyTagsInput(e.target.value)}
+                    placeholder="search, mcp, roadmap"
+                    className="w-full px-3 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-muted-foreground mb-1">Require all</label>
+                  <input
+                    type="text"
+                    value={allTagsInput}
+                    onChange={(e) => setAllTagsInput(e.target.value)}
+                    placeholder="adr-0055, koan.context"
+                    className="w-full px-3 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-muted-foreground mb-1">Exclude</label>
+                  <input
+                    type="text"
+                    value={excludeTagsInput}
+                    onChange={(e) => setExcludeTagsInput(e.target.value)}
+                    placeholder="legacy, deprecated"
+                    className="w-full px-3 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  />
+                </div>
               </div>
             </div>
 
@@ -441,7 +495,9 @@ export default function SearchPage() {
               onClick={() => {
                 setSelectedProjects([]);
                 setSelectedLanguages([]);
-                setAlpha(0.7);
+                setAnyTagsInput('');
+                setAllTagsInput('');
+                setExcludeTagsInput('');
               }}
               className="w-full py-2 text-sm text-primary-600 hover:bg-primary-50 rounded transition-colors"
             >

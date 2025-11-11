@@ -65,7 +65,6 @@ export interface Chunk {
   language?: string | null;
   indexedAt: string;
   tokenCount: number;
-  category?: string | null;
   pathSegments?: string[] | null;
   fileLastModified: string;
   fileHash?: string | null;
@@ -160,12 +159,16 @@ export interface SearchRequest {
   pathContext?: string | null;
   libraryId?: string | null;
   workingDirectory?: string | null;
-  alpha?: number | null;
-  tokenCounter?: number | null;
+  persona?: string | null;
+  maxTokens?: number | null;
   continuationToken?: string | null;
   includeInsights?: boolean | null;
   includeReasoning?: boolean | null;
   languages?: string[] | null;
+  tagsAny?: string[] | null;
+  tagsAll?: string[] | null;
+  tagsExclude?: string[] | null;
+  tagBoosts?: Record<string, number> | null;
 }
 
 export interface SearchResult {
@@ -319,77 +322,35 @@ export interface LanguageStats {
 
 // Search Profile Management Types
 
-export interface SearchCategory {
+export interface TagDistributionEntry {
+  tag: string;
+  count: number;
+}
+
+export interface TagDistributionResponse {
+  totalChunks: number;
+  tags: TagDistributionEntry[];
+  metadata: {
+    timestamp: string;
+    projectCount: number;
+  };
+}
+
+export interface ChunkSample {
   id: string;
-  name: string;
-  displayName: string;
-  description: string;
-  pathPatterns: string[];
-  priority: number;
-  defaultAlpha: number;
-  isActive: boolean;
-  icon?: string | null;
-  color?: string | null;
+  filePath: string;
+  primaryTags: string[];
+  secondaryTags: string[];
+  fileTags: string[];
+  language: string;
+  title: string;
+  pathSegments: string[];
+  tokenCount: number;
+  textPreview: string;
 }
 
-export interface SearchAudience {
-  id: string;
-  name: string;
-  displayName: string;
-  description: string;
-  categoryNames: string[];
-  defaultAlpha: number;
-  maxTokens: number;
-  includeReasoning: boolean;
-  includeInsights: boolean;
-  isActive: boolean;
-  icon?: string | null;
-}
-
-export interface CreateSearchCategoryRequest {
-  name: string;
-  displayName: string;
-  description: string;
-  pathPatterns: string[];
-  priority?: number;
-  defaultAlpha?: number;
-  icon?: string | null;
-  color?: string | null;
-}
-
-export interface UpdateSearchCategoryRequest {
-  name?: string;
-  displayName?: string;
-  description?: string;
-  pathPatterns?: string[];
-  priority?: number;
-  defaultAlpha?: number;
-  isActive?: boolean;
-  icon?: string | null;
-  color?: string | null;
-}
-
-export interface CreateSearchAudienceRequest {
-  name: string;
-  displayName: string;
-  description: string;
-  categoryNames: string[];
-  defaultAlpha?: number;
-  maxTokens?: number;
-  includeReasoning?: boolean;
-  includeInsights?: boolean;
-  icon?: string | null;
-}
-
-export interface UpdateSearchAudienceRequest {
-  name?: string;
-  displayName?: string;
-  description?: string;
-  categoryNames?: string[];
-  defaultAlpha?: number;
-  maxTokens?: number;
-  includeReasoning?: boolean;
-  includeInsights?: boolean;
-  isActive?: boolean;
-  icon?: string | null;
+export interface ChunkSampleResponse {
+  projectId: string;
+  sampleSize: number;
+  chunks: ChunkSample[];
 }
