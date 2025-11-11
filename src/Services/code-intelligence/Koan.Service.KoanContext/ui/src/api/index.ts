@@ -7,3 +7,7 @@ export { searchApi } from './search';
 export { metricsApi } from './metrics';
 export { settingsApi } from './settings';
 export { diagnosticsApi } from './diagnostics';
+export { tagsApi } from './tags';
+export { tagRulesApi } from './tag-rules';
+export { tagPipelinesApi } from './tag-pipelines';
+export { searchPersonasApi } from './search-personas';

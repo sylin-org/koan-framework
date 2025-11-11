@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
 using Koan.Context.Models;
+using Koan.Data.Core;
+using Koan.Service.KoanContext.Infrastructure;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 
@@ -86,7 +88,7 @@ public class TagResolver
             .ToArray();
 
         var normalizedFileTags = TagEnvelope.NormalizeTags(input.FileTags);
-    var normalizedFrontmatter = NormalizeFrontmatter(input.Frontmatter);
+        var normalizedFrontmatter = NormalizeFrontmatter(input.Frontmatter);
 
         return new TagResolutionResult(
             Envelope: new TagEnvelope(primary, secondary, normalizedFileTags, normalizedFrontmatter, audit),
@@ -206,13 +208,15 @@ public class TagResolver
 
     private async Task<TagPipelineSnapshot> GetPipelineSnapshotAsync(string? pipelineName, CancellationToken cancellationToken)
     {
-        var cacheKey = $"tag-pipeline:{pipelineName}";
+        using var partitionScope = EntityContext.With(partition: null);
+        var targetPipelineName = string.IsNullOrWhiteSpace(pipelineName)
+            ? "default"
+            : pipelineName.Trim().ToLowerInvariant();
+        var cacheKey = Constants.CacheKeys.TagPipeline(targetPipelineName);
 
         return await _cache.GetOrCreateAsync(cacheKey, async entry =>
         {
             entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(10);
-
-            var targetPipelineName = string.IsNullOrWhiteSpace(pipelineName) ? "default" : pipelineName.Trim().ToLowerInvariant();
             var pipelineQuery = await TagPipeline.Query(p => p.Name == targetPipelineName, cancellationToken);
             var pipeline = pipelineQuery.FirstOrDefault() ?? new TagPipeline { Name = targetPipelineName, RuleIds = new List<string>() };
 
@@ -232,12 +236,13 @@ public class TagResolver
             _logger.LogDebug("Loaded tag pipeline {Pipeline} with {RuleCount} rules", targetPipelineName, rules.Count);
 
             return new TagPipelineSnapshot(pipeline, rules);
-    }) ?? new TagPipelineSnapshot(new TagPipeline { Name = string.IsNullOrWhiteSpace(pipelineName) ? "default" : pipelineName.Trim().ToLowerInvariant(), RuleIds = new List<string>() }, Array.Empty<TagRule>());
+    }) ?? new TagPipelineSnapshot(new TagPipeline { Name = targetPipelineName, RuleIds = new List<string>() }, Array.Empty<TagRule>());
     }
 
     private async Task<TagVocabularySnapshot> GetVocabularySnapshotAsync(CancellationToken cancellationToken)
     {
-        const string cacheKey = "tag-vocabulary";
+    using var partitionScope = EntityContext.With(partition: null);
+    const string cacheKey = Constants.CacheKeys.TagVocabulary;
 
         return await _cache.GetOrCreateAsync(cacheKey, async entry =>
         {

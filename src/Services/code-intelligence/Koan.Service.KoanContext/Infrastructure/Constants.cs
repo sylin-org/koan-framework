@@ -18,4 +18,47 @@ public static class Constants
         public const string AllowedDirectoriesSection = "Koan:Context:Security:AllowedDirectories";
         public const string MaxPathLengthKey = "Koan:Context:Security:MaxPathLength";
     }
+
+    public static class Routes
+    {
+        /// <summary>
+        /// Base path for tag vocabulary CRUD endpoints.
+        /// </summary>
+        public const string Tags = "api/tags";
+
+        /// <summary>
+        /// Base path for tag rule management endpoints.
+        /// </summary>
+        public const string TagRules = "api/tag-rules";
+
+        /// <summary>
+        /// Base path for tag pipeline management endpoints.
+        /// </summary>
+        public const string TagPipelines = "api/tag-pipelines";
+
+        /// <summary>
+        /// Base path for search persona management endpoints.
+        /// </summary>
+        public const string SearchPersonas = "api/search-personas";
+    }
+
+    public static class CacheKeys
+    {
+        /// <summary>
+        /// Global cache slot for tag vocabulary snapshots.
+        /// </summary>
+        public const string TagVocabulary = "tag-vocabulary";
+
+        /// <summary>
+        /// Formats the cache key for tag pipeline snapshots.
+        /// </summary>
+        public static string TagPipeline(string? pipelineName)
+            => $"tag-pipeline:{(string.IsNullOrWhiteSpace(pipelineName) ? "default" : pipelineName.Trim().ToLowerInvariant())}";
+
+        /// <summary>
+        /// Formats the cache key for resolved personas.
+        /// </summary>
+        public static string Persona(string? personaName)
+            => $"persona:{(string.IsNullOrWhiteSpace(personaName) ? "general" : personaName.Trim().ToLowerInvariant())}";
+    }
 }

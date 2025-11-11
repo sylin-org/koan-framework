@@ -1,5 +1,6 @@
 using Koan.Context.Models;
 using Koan.Context.Services;
+using Koan.Context.Services.Hooks;
 using Koan.Context.Services.Maintenance;
 using Koan.Core;
 using Koan.Core.Hosting.Bootstrap;
@@ -52,7 +53,15 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         services.AddSingleton<UrlBuilder>();
 
         // Register background services
+        services.AddSingleton<TagSeedInitializer>();
+        services.AddHostedService(sp => sp.GetRequiredService<TagSeedInitializer>());
         services.AddHostedService<VectorSyncWorker>();
+
+    services.AddScoped<Koan.Web.Hooks.IModelHook<TagVocabularyEntry>, TagVocabularyHooks>();
+    services.AddScoped<Koan.Web.Hooks.IModelHook<TagRule>, TagRuleHooks>();
+    services.AddScoped<Koan.Web.Hooks.IModelHook<TagPipeline>, TagPipelineHooks>();
+    services.AddScoped<Koan.Web.Hooks.IModelHook<SearchPersona>, SearchPersonaHooks>();
+    services.AddScoped<Koan.Context.Filters.PartitionScopeFilter>();
 
         // Add memory cache if not already registered
         services.AddMemoryCache();

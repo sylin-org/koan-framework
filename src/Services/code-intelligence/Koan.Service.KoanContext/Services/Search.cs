@@ -6,6 +6,7 @@ using System.Linq;
 using Koan.Context.Models;
 using Koan.Data.Core;
 using Koan.Data.Vector;
+using Koan.Service.KoanContext.Infrastructure;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 
@@ -405,7 +406,8 @@ public class Search : ISearchService
                 maxTokens: 6000);
         }
 
-        var cacheKey = $"persona:{personaId}";
+        var normalizedPersonaId = personaId.Trim().ToLowerInvariant();
+        var cacheKey = Constants.CacheKeys.Persona(normalizedPersonaId);
 
         var persona = await _embeddingCache.GetOrCreateAsync(cacheKey, async entry =>
         {
@@ -414,23 +416,23 @@ public class Search : ISearchService
             try
             {
                 var matches = await SearchPersona.Query(
-                    p => p.Name == personaId && p.IsActive,
+                    p => p.Name == normalizedPersonaId && p.IsActive,
                     ct);
 
                 return matches.FirstOrDefault();
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Failed to load persona '{Persona}' from database", personaId);
+                _logger.LogWarning(ex, "Failed to load persona '{Persona}' from database", normalizedPersonaId);
                 return null;
             }
         });
 
         if (persona == null)
         {
-            _logger.LogWarning("Persona '{Persona}' not found or inactive, using general defaults", personaId);
+            _logger.LogWarning("Persona '{Persona}' not found or inactive, using general defaults", normalizedPersonaId);
             return SearchPersona.Create(
-                name: personaId!,
+                name: normalizedPersonaId,
                 displayName: personaId!,
                 description: "Fallback persona",
                 semanticWeight: 0.65f,

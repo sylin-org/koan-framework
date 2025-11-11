@@ -311,6 +311,111 @@ export interface ConnectionTestResult {
   error?: string;
 }
 
+export interface TagSeedReportDto {
+  segment: string;
+  created: number;
+  updated: number;
+}
+
+export interface TagSeedSummaryDto {
+  completed: boolean;
+  forced: boolean;
+  timestamp: string;
+  reports: TagSeedReportDto[];
+}
+
+export interface TagVocabularyEntryDto {
+  id: string;
+  tag: string;
+  displayName?: string | null;
+  synonyms: string[];
+  isPrimary: boolean;
+}
+
+export interface TagVocabularyRequestDto {
+  tag: string;
+  displayName?: string | null;
+  synonyms?: string[] | null;
+  isPrimary: boolean;
+}
+
+export interface TagRuleDto {
+  id: string;
+  name: string;
+  scope: string;
+  matcherType: string;
+  pattern: string;
+  tags: string[];
+  confidence: number;
+  priority: number;
+  isActive: boolean;
+}
+
+export interface TagRuleRequestDto {
+  name: string;
+  scope: string;
+  matcherType: string;
+  pattern: string;
+  tags: string[];
+  confidence: number;
+  priority: number;
+  isActive: boolean;
+}
+
+export interface TagPipelineDto {
+  id: string;
+  name: string;
+  description: string;
+  ruleIds: string[];
+  maxPrimaryTags: number;
+  maxSecondaryTags: number;
+  enableAiFallback: boolean;
+}
+
+export interface TagPipelineRequestDto {
+  name: string;
+  description: string;
+  ruleIds: string[];
+  maxPrimaryTags: number;
+  maxSecondaryTags: number;
+  enableAiFallback: boolean;
+}
+
+export interface SearchPersonaDto {
+  id: string;
+  name: string;
+  displayName: string;
+  description: string;
+  semanticWeight: number;
+  tagWeight: number;
+  recencyWeight: number;
+  maxTokens: number;
+  includeInsights: boolean;
+  includeReasoning: boolean;
+  tagBoosts: Record<string, number>;
+  defaultTagsAny: string[];
+  defaultTagsAll: string[];
+  defaultTagsExclude: string[];
+  isActive: boolean;
+}
+
+export interface SearchPersonaRequestDto {
+  name: string;
+  displayName: string;
+  description: string;
+  semanticWeight: number;
+  tagWeight: number;
+  recencyWeight: number;
+  maxTokens: number;
+  includeInsights: boolean;
+  includeReasoning: boolean;
+  tagBoosts: Record<string, number>;
+  defaultTagsAny: string[];
+  defaultTagsAll: string[];
+  defaultTagsExclude: string[];
+  isActive: boolean;
+}
+
 export interface LanguageStats {
   totalChunks: number;
   languages: Array<{

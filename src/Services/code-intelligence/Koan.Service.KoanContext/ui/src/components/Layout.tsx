@@ -7,6 +7,10 @@ import {
   Activity,
   Settings,
   Tags,
+  Settings2,
+  SlidersHorizontal,
+  GitMerge,
+  UserCircle2,
   BookOpen,
   MessageCircle,
 } from 'lucide-react';
@@ -29,6 +33,10 @@ const primaryNav: NavItem[] = [
   { icon: FolderOpen, label: 'Projects', path: '/projects' },
   { icon: Activity, label: 'Jobs', path: '/jobs' },
   { icon: Tags, label: 'Tags', path: '/tags' },
+  { icon: SlidersHorizontal, label: 'Tag Rules', path: '/tags/rules' },
+  { icon: GitMerge, label: 'Tag Pipelines', path: '/tags/pipelines' },
+  { icon: UserCircle2, label: 'Search Personas', path: '/tags/personas' },
+  { icon: Settings2, label: 'Tag Governance', path: '/tags/governance' },
   { icon: Settings, label: 'Settings', path: '/settings' },
 ];
 
@@ -44,6 +52,11 @@ export default function Layout({ children }: LayoutProps) {
     if (path === '/') {
       return location.pathname === '/';
     }
+
+    if (path === '/tags') {
+      return location.pathname === '/tags';
+    }
+
     return location.pathname.startsWith(path);
   };
 

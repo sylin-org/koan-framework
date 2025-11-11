@@ -14,7 +14,11 @@ import JobsList from './pages/JobsList';
 import JobDetail from './pages/JobDetail';
 import SettingsPage from './pages/SettingsPage';
 import DocsPage from './pages/DocsPage';
-import TagGovernancePage from './pages/TagGovernancePage';
+import TagsPage from '@/modules/tags/TagsPage';
+import TagGovernancePage from '@/modules/tag-governance/TagGovernancePage';
+import TagRulesPage from '@/modules/tag-rules/TagRulesPage';
+import TagPipelinesPage from '@/modules/tag-pipelines/TagPipelinesPage';
+import SearchPersonasPage from '@/modules/search-personas/SearchPersonasPage';
 
 // Create TanStack Query client
 const queryClient = new QueryClient({
@@ -51,8 +55,12 @@ function AppContent() {
         {/* Settings */}
         <Route path="/settings" element={<SettingsPage />} />
 
-        {/* Search Profiles */}
-  <Route path="/tags" element={<TagGovernancePage />} />
+    {/* Tags */}
+    <Route path="/tags" element={<TagsPage />} />
+    <Route path="/tags/governance" element={<TagGovernancePage />} />
+    <Route path="/tags/rules" element={<TagRulesPage />} />
+    <Route path="/tags/pipelines" element={<TagPipelinesPage />} />
+    <Route path="/tags/personas" element={<SearchPersonasPage />} />
 
         {/* Docs & Support */}
         <Route path="/docs" element={<DocsPage />} />
