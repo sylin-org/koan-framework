@@ -40,16 +40,16 @@ public sealed class ChunkMaintenanceService
             throw new ArgumentException("Relative path cannot be null or whitespace", nameof(relativePath));
         }
 
-    var vectorFailures = new List<string>();
-    var chunkIds = new List<string>();
-    var operationsRemoved = 0;
+        var vectorFailures = new List<string>();
+        var chunkIds = new List<string>();
+    var snapshotsRemoved = 0;
 
-    var indexedFile = await GetIndexedFileAsync(relativePath, cancellationToken);
-    var chunks = await Chunk.Query(c => c.IndexedFileId == indexedFile.Id, cancellationToken);
+        var indexedFile = await GetIndexedFileAsync(relativePath, cancellationToken);
+        var chunks = await Chunk.Query(c => c.IndexedFileId == indexedFile.Id, cancellationToken);
 
         foreach (var chunk in chunks)
         {
-            operationsRemoved += await RemovePendingOperationsAsync(chunk.Id, cancellationToken);
+            snapshotsRemoved += await RemoveVectorSnapshotAsync(chunk.Id, cancellationToken);
 
             if (deleteVectors)
             {
@@ -68,11 +68,11 @@ public sealed class ChunkMaintenanceService
             chunkIds.Add(chunk.Id);
         }
 
-        if (operationsRemoved > 0)
+    if (snapshotsRemoved > 0)
         {
             _logger.LogDebug(
-                "Removed {Count} pending vector operations for file {RelativePath}",
-                operationsRemoved,
+        "Removed {Count} vector snapshots for file {RelativePath}",
+        snapshotsRemoved,
                 relativePath);
         }
 
@@ -106,14 +106,14 @@ public sealed class ChunkMaintenanceService
 
         var chunkCount = 0;
         var vectorSuccess = 0;
-        var vectorFailures = new List<string>();
-        var operationsRemoved = 0;
+    var vectorFailures = new List<string>();
+    var snapshotsRemoved = 0;
 
         await foreach (var chunk in Chunk.AllStream(ct: cancellationToken))
         {
             chunkCount++;
 
-            operationsRemoved += await RemovePendingOperationsAsync(chunk.Id, cancellationToken);
+            snapshotsRemoved += await RemoveVectorSnapshotAsync(chunk.Id, cancellationToken);
 
             if (deleteVectors)
             {
@@ -132,11 +132,11 @@ public sealed class ChunkMaintenanceService
             await chunk.Delete(cancellationToken);
         }
 
-        if (operationsRemoved > 0)
+    if (snapshotsRemoved > 0)
         {
             _logger.LogDebug(
-                "Removed {Count} pending vector operations while clearing all chunks",
-                operationsRemoved);
+        "Removed {Count} vector snapshots while clearing all chunks",
+        snapshotsRemoved);
         }
 
         var manifestDeleted = 0;
@@ -168,25 +168,19 @@ public sealed class ChunkMaintenanceService
         return indexedFile;
     }
 
-    private static async Task<int> RemovePendingOperationsAsync(string chunkId, CancellationToken cancellationToken)
+    private static async Task<int> RemoveVectorSnapshotAsync(string chunkId, CancellationToken cancellationToken)
     {
-        var pendingOperations = await SyncOperation.Query(
-            op => op.ChunkId == chunkId && op.Status == OperationStatus.Pending,
-            cancellationToken);
-
-        if (pendingOperations.Count == 0)
+        using (EntityContext.With(partition: null))
         {
-            return 0;
-        }
+            var snapshot = await ChunkVectorState.Get(chunkId, cancellationToken);
+            if (snapshot is null)
+            {
+                return 0;
+            }
 
-        var removed = 0;
-        foreach (var operation in pendingOperations)
-        {
-            await operation.Remove(cancellationToken);
-            removed++;
+            await snapshot.Remove(cancellationToken);
+            return 1;
         }
-
-        return removed;
     }
 
     /// <summary>

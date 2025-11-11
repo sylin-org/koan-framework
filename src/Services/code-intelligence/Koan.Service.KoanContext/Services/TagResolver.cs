@@ -232,7 +232,7 @@ public class TagResolver
             _logger.LogDebug("Loaded tag pipeline {Pipeline} with {RuleCount} rules", targetPipelineName, rules.Count);
 
             return new TagPipelineSnapshot(pipeline, rules);
-        }) ?? new TagPipelineSnapshot(new TagPipeline { Name = pipelineName, RuleIds = new List<string>() }, Array.Empty<TagRule>());
+    }) ?? new TagPipelineSnapshot(new TagPipeline { Name = string.IsNullOrWhiteSpace(pipelineName) ? "default" : pipelineName.Trim().ToLowerInvariant(), RuleIds = new List<string>() }, Array.Empty<TagRule>());
     }
 
     private async Task<TagVocabularySnapshot> GetVocabularySnapshotAsync(CancellationToken cancellationToken)

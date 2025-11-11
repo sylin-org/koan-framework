@@ -12,7 +12,7 @@ internal static class PipelineSnapshotMapper
 {
     public static async Task<IReadOnlyList<JobSnapshot>> LoadJobSnapshotsAsync(string pipelineId, CancellationToken ct)
     {
-        var jobs = await ProcessingJob.Query(job => job.PipelineId == pipelineId, ct);
+        var jobs = await ProcessingJob.Query(job => job.PipelineId == pipelineId, ct).ConfigureAwait(false);
 
         return jobs
             .OrderByDescending(job => job.CreatedAt)
@@ -23,7 +23,7 @@ internal static class PipelineSnapshotMapper
 
     public static async Task<IReadOnlyList<RunLogSnapshot>> LoadRunLogSnapshotsAsync(string pipelineId, CancellationToken ct)
     {
-        var logs = await RunLog.Query(log => log.PipelineId == pipelineId, ct);
+        var logs = await RunLog.Query(log => log.PipelineId == pipelineId, ct).ConfigureAwait(false);
 
         return logs
             .OrderByDescending(log => log.StartedAt)

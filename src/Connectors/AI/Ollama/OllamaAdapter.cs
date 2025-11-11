@@ -148,7 +148,7 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
         }
 
         var stopwatch = Stopwatch.StartNew();
-        await _concurrencyLimiter.WaitAsync(ct);
+        await _concurrencyLimiter.WaitAsync(ct).ConfigureAwait(false);
         stopwatch.Stop();
 
         if (stopwatch.Elapsed > ConcurrencyWaitLogThreshold && Logger.IsEnabled(LogLevel.Debug))
@@ -188,7 +188,7 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
         SemaphoreReleaser? lease = null;
         try
         {
-            lease = await AcquireConcurrencySlotAsync(ct);
+            lease = await AcquireConcurrencySlotAsync(ct).ConfigureAwait(false);
 
             // ADR-0015: Router handles member health selection - skip singleton readiness check
             var http = GetHttpClientForRequest(request.InternalConnectionString);
@@ -228,15 +228,15 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
 
             Logger.LogDebug("Ollama: POST {Path} model={Model}", "/api/generate", model);
             var payload = JsonConvert.SerializeObject(body, new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore });
-            using var resp = await http.PostAsync("/api/generate", new StringContent(payload, Encoding.UTF8, "application/json"), ct);
+            using var resp = await http.PostAsync("/api/generate", new StringContent(payload, Encoding.UTF8, "application/json"), ct).ConfigureAwait(false);
             if (!resp.IsSuccessStatusCode)
             {
-                var text = await resp.Content.ReadAsStringAsync(ct);
+                var text = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
                 Logger.LogWarning("Ollama: generate failed ({Status}) body={Body}", (int)resp.StatusCode, text);
             }
 
             resp.EnsureSuccessStatusCode();
-            var json = await resp.Content.ReadAsStringAsync(ct);
+            var json = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
             var doc = JsonConvert.DeserializeObject<OllamaGenerateResponse>(json)
                       ?? throw new InvalidOperationException("Empty response from Ollama.");
 
@@ -260,9 +260,9 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
         SemaphoreReleaser? lease = null;
         try
         {
-            lease = await AcquireConcurrencySlotAsync(ct);
+            lease = await AcquireConcurrencySlotAsync(ct).ConfigureAwait(false);
 
-            await WaitForReadinessAsync(null, ct);
+            await WaitForReadinessAsync(null, ct).ConfigureAwait(false);
 
             var http = GetHttpClientForRequest(request.InternalConnectionString);
             var model = request.Model ?? _defaultModel;
@@ -306,10 +306,10 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
             };
 
             Logger.LogDebug("Ollama: STREAM {Path} model={Model}", "/api/generate", model);
-            using var resp = await http.SendAsync(httpReq, HttpCompletionOption.ResponseHeadersRead, ct);
+            using var resp = await http.SendAsync(httpReq, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
             resp.EnsureSuccessStatusCode();
 
-            await foreach (var part in ReadJsonLinesAsync<OllamaGenerateResponse>(resp, ct))
+            await foreach (var part in ReadJsonLinesAsync<OllamaGenerateResponse>(resp, ct).ConfigureAwait(false))
             {
                 if (part is null)
                 {
@@ -333,7 +333,7 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
         SemaphoreReleaser? lease = null;
         try
         {
-            lease = await AcquireConcurrencySlotAsync(ct);
+            lease = await AcquireConcurrencySlotAsync(ct).ConfigureAwait(false);
 
             // ADR-0015: Router handles member health selection - skip singleton readiness check
             var http = GetHttpClientForRequest(request.InternalConnectionString);
@@ -349,15 +349,15 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
                 var body = new { model, prompt = input };
                 var payload = JsonConvert.SerializeObject(body);
 
-                using var resp = await http.PostAsync("/api/embeddings", new StringContent(payload, Encoding.UTF8, "application/json"), ct);
+                using var resp = await http.PostAsync("/api/embeddings", new StringContent(payload, Encoding.UTF8, "application/json"), ct).ConfigureAwait(false);
                 if (!resp.IsSuccessStatusCode)
                 {
-                    var text = await resp.Content.ReadAsStringAsync(ct);
+                    var text = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
                     Logger.LogWarning("Ollama: embeddings failed ({Status}) body={Body}", (int)resp.StatusCode, text);
                 }
 
                 resp.EnsureSuccessStatusCode();
-                var json = await resp.Content.ReadAsStringAsync(ct);
+                var json = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
                 var doc = JsonConvert.DeserializeObject<OllamaEmbeddingsResponse>(json)
                           ?? throw new InvalidOperationException("Empty response from Ollama.");
 
@@ -376,7 +376,7 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
     public async Task<IReadOnlyList<AiModelDescriptor>> ListModelsAsync(CancellationToken ct = default)
         => await this.WithReadinessAsync(async () =>
         {
-            var doc = await FetchTagsAsync(ct);
+            var doc = await FetchTagsAsync(ct).ConfigureAwait(false);
             var models = new List<AiModelDescriptor>();
 
             foreach (var model in doc?.models ?? Enumerable.Empty<OllamaTag>())
@@ -391,7 +391,7 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
             }
 
             return (IReadOnlyList<AiModelDescriptor>)models;
-        }, ct);
+        }, ct).ConfigureAwait(false);
 
     public Task<AiCapabilities> GetCapabilitiesAsync(CancellationToken ct = default)
     {
@@ -456,7 +456,7 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
 
         try
         {
-            await _stateManager.WaitAsync(effective, ct);
+            await _stateManager.WaitAsync(effective, ct).ConfigureAwait(false);
         }
         catch (TimeoutException ex)
         {
@@ -496,7 +496,7 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
 
         try
         {
-            await WaitForReadinessAsync(ReadinessTimeout, cancellationToken);
+            await WaitForReadinessAsync(ReadinessTimeout, cancellationToken).ConfigureAwait(false);
             Logger.LogInformation("[{AdapterId}] Ollama connection established - FinalBaseUrl={BaseUrl}",
                 AdapterId, _http.BaseAddress);
         }
@@ -518,13 +518,13 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
         if (orchestrationContext.HasCapability("container_managed"))
         {
             Logger.LogInformation("[{AdapterId}] Container is orchestration-managed, waiting for readiness", AdapterId);
-            await WaitForContainerReadiness(cancellationToken);
+            await WaitForContainerReadiness(cancellationToken).ConfigureAwait(false);
         }
 
         _ = EnsureInitializationStarted();
         try
         {
-            await WaitForReadinessAsync(ReadinessTimeout, cancellationToken);
+            await WaitForReadinessAsync(ReadinessTimeout, cancellationToken).ConfigureAwait(false);
             Logger.LogInformation("[{AdapterId}] Ollama connection established using orchestration-aware initialization", AdapterId);
         }
         catch (AdapterNotReadyException ex)
@@ -538,7 +538,7 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
         try
         {
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-            using var response = await _http.GetAsync("/", cancellationToken);
+            using var response = await _http.GetAsync("/", cancellationToken).ConfigureAwait(false);
             stopwatch.Stop();
 
             var healthData = new Dictionary<string, object?>
@@ -559,7 +559,7 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
 
             try
             {
-                var models = await ListModelsAsync(cancellationToken);
+                var models = await ListModelsAsync(cancellationToken).ConfigureAwait(false);
                 healthData["available_models"] = models.Count;
                 healthData["model_list"] = models.Take(5).Select(m => m.Name).ToArray();
             }
@@ -648,11 +648,11 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
                 timeoutCts.CancelAfter(ReadinessTimeout);
             }
 
-            await TestConnectivityAsync(timeoutCts.Token);
+            await TestConnectivityAsync(timeoutCts.Token).ConfigureAwait(false);
             Logger.LogDebug("[{AdapterId}] InitializeReadiness: Connectivity test passed", AdapterId);
 
             // Ensure all required models are available (not just the default)
-            var allModelsReady = await EnsureRequiredModelsAvailabilityAsync(timeoutCts.Token);
+            var allModelsReady = await EnsureRequiredModelsAvailabilityAsync(timeoutCts.Token).ConfigureAwait(false);
             var newState = allModelsReady ? AdapterReadinessState.Ready : AdapterReadinessState.Degraded;
             _stateManager.TransitionTo(newState);
 
@@ -725,7 +725,7 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
                 Provenance = provenance
             };
 
-            var result = await _modelManager.EnsureInstalledAsync(request, ct);
+            var result = await _modelManager.EnsureInstalledAsync(request, ct).ConfigureAwait(false);
 
             if (!result.Success)
             {
@@ -779,7 +779,7 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
             Provenance = provenance
         };
 
-        var result = await _modelManager.EnsureInstalledAsync(request, ct);
+        var result = await _modelManager.EnsureInstalledAsync(request, ct).ConfigureAwait(false);
         if (!result.Success)
         {
             Logger.LogWarning("[{AdapterId}] Failed to ensure default model '{Model}' is available: {Message}", AdapterId, _defaultModel, result.Message);
@@ -794,15 +794,15 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
 
     private async Task<OllamaTagsResponse?> FetchTagsAsync(CancellationToken ct)
     {
-        using var resp = await _http.GetAsync("/api/tags", ct);
+        using var resp = await _http.GetAsync("/api/tags", ct).ConfigureAwait(false);
         if (!resp.IsSuccessStatusCode)
         {
-            var text = await resp.Content.ReadAsStringAsync(ct);
+            var text = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
             Logger.LogWarning("Ollama: tags failed ({Status}) body={Body}", (int)resp.StatusCode, text);
             resp.EnsureSuccessStatusCode();
         }
 
-        var json = await resp.Content.ReadAsStringAsync(ct);
+        var json = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
         return JsonConvert.DeserializeObject<OllamaTagsResponse>(json);
     }
 
@@ -998,11 +998,11 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
 
     private static async IAsyncEnumerable<T?> ReadJsonLinesAsync<T>(HttpResponseMessage resp, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
     {
-        await using var stream = await resp.Content.ReadAsStreamAsync(ct);
+        await using var stream = await resp.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
         using var reader = new StreamReader(stream, Encoding.UTF8);
         while (!ct.IsCancellationRequested)
         {
-            var line = await reader.ReadLineAsync();
+            var line = await reader.ReadLineAsync().ConfigureAwait(false);
             if (line is null) break; // EOF
             if (string.IsNullOrWhiteSpace(line))
             {
@@ -1046,7 +1046,7 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
         Logger.LogDebug("[{AdapterId}] TestConnectivity: Testing connection to {BaseUrl}",
             AdapterId, _http.BaseAddress?.ToString() ?? "(null)");
 
-        using var response = await _http.GetAsync("/", cancellationToken);
+        using var response = await _http.GetAsync("/", cancellationToken).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
 
         Logger.LogDebug("[{AdapterId}] TestConnectivity: Success - Status={Status}", AdapterId, response.StatusCode);
@@ -1061,7 +1061,7 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
         {
             try
             {
-                using var response = await _http.GetAsync("/", cancellationToken);
+                using var response = await _http.GetAsync("/", cancellationToken).ConfigureAwait(false);
                 if (response.IsSuccessStatusCode)
                 {
                     Logger.LogInformation("[{AdapterId}] Container is ready (attempt {Attempt})", AdapterId, i + 1);
@@ -1071,7 +1071,7 @@ internal sealed class OllamaAdapter : BaseKoanAdapter,
             catch (Exception ex) when (i < maxRetries - 1)
             {
                 Logger.LogDebug(ex, "[{AdapterId}] Container not ready yet (attempt {Attempt}), retrying...", AdapterId, i + 1);
-                await Task.Delay(delayMs, cancellationToken);
+                await Task.Delay(delayMs, cancellationToken).ConfigureAwait(false);
             }
         }
 

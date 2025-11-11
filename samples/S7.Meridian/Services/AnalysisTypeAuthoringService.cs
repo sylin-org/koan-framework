@@ -76,7 +76,7 @@ public sealed class AnalysisTypeAuthoringService : IAnalysisTypeAuthoringService
         string rawResponse;
         try
         {
-            rawResponse = await Ai.Chat(chatOptions, ct);
+            rawResponse = await Ai.Chat(chatOptions, ct).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -119,7 +119,7 @@ public sealed class AnalysisTypeAuthoringService : IAnalysisTypeAuthoringService
             responseSummary,
             chatOptions.Model,
             metadata,
-            ct);
+            ct).ConfigureAwait(false);
 
         return new AnalysisTypeAiSuggestResponse
         {

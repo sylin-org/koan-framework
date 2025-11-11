@@ -9,12 +9,14 @@ namespace Koan.Context.Services;
 /// Enhanced metrics service providing P0 monitoring data for dashboard
 /// </summary>
 /// <remarks>
-/// Provides real-time metrics for:
-/// - P0: Outbox Queue Health (lag, dead letters, processing rate)
-/// - P0: Component Health Matrix (SQLite, Weaviate, Workers)
-/// - Job System Health (queue depth, throughput, failure rate)
-/// - Vector DB Storage & Growth
-/// - SQLite Storage & Index Freshness
+/// <para>Provides real-time metrics for:</para>
+/// <list type="bullet">
+/// <item><description>P0: Vector Queue Health (lag, failure count, processing rate)</description></item>
+/// <item><description>P0: Component Health Matrix (SQLite, Weaviate, Workers)</description></item>
+/// <item><description>Job System Health (queue depth, throughput, failure rate)</description></item>
+/// <item><description>Vector DB storage and growth</description></item>
+/// <item><description>SQLite storage and index freshness</description></item>
+/// </list>
 /// </remarks>
 public class EnhancedMetrics
 {
@@ -22,7 +24,7 @@ public class EnhancedMetrics
     private readonly ILogger<EnhancedMetrics> _logger;
     private readonly MetricsCollector _metricsCollector;
 
-    private const string OutboxCacheKey = "metrics:outbox";
+    private const string VectorQueueCacheKey = "metrics:vector_queue";
     private const string ComponentHealthCacheKey = "metrics:component_health";
     private const string JobSystemCacheKey = "metrics:job_system";
     private const string VectorDbCacheKey = "metrics:vector_db";
@@ -39,10 +41,10 @@ public class EnhancedMetrics
         _metricsCollector = metricsCollector ?? throw new ArgumentNullException(nameof(metricsCollector));
     }
 
-    #region P0 Metrics: Outbox Queue Health
+    #region P0 Metrics: Vector Queue Health
 
     /// <summary>
-    /// Gets critical outbox queue health metrics
+    /// Gets critical vector synchronization queue health metrics
     /// </summary>
     /// <remarks>
     /// Alerts:
@@ -50,74 +52,92 @@ public class EnhancedMetrics
     /// - 🚨 Pending > 500
     /// - ⚠️ OldestAge > 60s
     /// - 🚨 OldestAge > 300s
-    /// - 🚨 DeadLetter > 0
+    /// - 🚨 Failed > 0
     /// </remarks>
-    public async Task<OutboxHealthMetrics> GetOutboxHealthAsync(CancellationToken cancellationToken = default)
+    public async Task<VectorQueueHealthMetrics> GetVectorQueueHealthAsync(CancellationToken cancellationToken = default)
     {
-        return await _cache.GetOrCreateAsync(OutboxCacheKey, async entry =>
+        return await _cache.GetOrCreateAsync(VectorQueueCacheKey, async entry =>
         {
             entry.AbsoluteExpirationRelativeToNow = CacheDuration;
 
             try
             {
-                // Query pending operations (Status == Pending, RetryCount < 5)
-                var pendingOps = await SyncOperation.Query(
-                    op => op.Status == OperationStatus.Pending && op.RetryCount < 5,
+                // Query pending vector snapshots
+                var pendingSnapshots = await ChunkVectorState.Query(
+                    state => state.State == VectorSyncState.Pending,
                     cancellationToken);
 
-                var pendingList = pendingOps.ToList();
+                var pendingList = pendingSnapshots.ToList();
                 var pendingCount = pendingList.Count;
 
-                // Query dead-letter queue
-                var deadLetterOps = await SyncOperation.Query(
-                    op => op.Status == OperationStatus.DeadLetter,
+                // Query failed snapshots (exhausted retries)
+                var failedSnapshots = await ChunkVectorState.Query(
+                    state => state.State == VectorSyncState.Failed,
                     cancellationToken);
 
-                var deadLetterCount = deadLetterOps.Count();
+                var failedList = failedSnapshots.ToList();
+                var failedCount = failedList.Count;
 
-                // Query failed/retry queue
-                var retryOps = await SyncOperation.Query(
-                    op => op.Status == OperationStatus.Pending && op.RetryCount > 0 && op.RetryCount < 5,
-                    cancellationToken);
+                // Count retrying snapshots (pending with at least one attempt)
+                var retryCount = pendingList.Count(state => state.AttemptCount > 0);
 
-                var retryCount = retryOps.Count();
-
-                // Calculate oldest pending operation age
+                // Calculate oldest pending snapshot age based on last attempt or update
                 var now = DateTime.UtcNow;
-                var oldestAge = pendingList.Any()
-                    ? (now - pendingList.Min(op => op.CreatedAt)).TotalSeconds
+                var oldestPendingObservedAt = pendingList.Count > 0
+                    ? pendingList.Min(state => state.LastAttemptAt ?? state.UpdatedAt)
+                    : (DateTime?)null;
+                var oldestAge = oldestPendingObservedAt.HasValue
+                    ? System.Math.Max(0, (now - oldestPendingObservedAt.Value).TotalSeconds)
                     : 0.0;
 
-                // Calculate processing rate (operations processed in last 60 seconds)
+                // Calculate processing rate (snapshots synchronized in last 60 seconds)
                 var oneMinuteAgo = now.AddSeconds(-60);
-                var recentCompleted = await SyncOperation.Query(
-                    op => op.Status == OperationStatus.Completed && op.CompletedAt != null && op.CompletedAt >= oneMinuteAgo,
+                var recentlySynced = await ChunkVectorState.Query(
+                    state => state.State == VectorSyncState.Synced &&
+                             state.SyncedAt != null &&
+                             state.SyncedAt >= oneMinuteAgo,
                     cancellationToken);
 
-                var processingRate = recentCompleted.Count() / 60.0; // ops per second
+                var processedLastMinute = recentlySynced.Count();
+                var processingRate = processedLastMinute / 60.0; // snapshots per second
 
                 // Breakdown by project
+                var failedByProject = failedList
+                    .GroupBy(state => state.ProjectId)
+                    .ToDictionary(g => g.Key, g => g.Count());
+
                 var byProject = pendingList
-                    .GroupBy(op => op.ProjectId)
-                    .Select(g => new OutboxProjectBreakdown
+                    .GroupBy(state => state.ProjectId)
+                    .Select(group =>
                     {
-                        ProjectId = g.Key,
-                        PendingCount = g.Count()
+                        var oldestForProject = group.Min(state => state.LastAttemptAt ?? state.UpdatedAt);
+                        var oldestAgeSeconds = System.Math.Max(0, (now - oldestForProject).TotalSeconds);
+                        failedByProject.TryGetValue(group.Key, out var failedForProject);
+
+                        return new VectorQueueProjectBreakdown
+                        {
+                            ProjectId = group.Key,
+                            PendingCount = group.Count(),
+                            RetryingCount = group.Count(state => state.AttemptCount > 0),
+                            FailedCount = failedForProject,
+                            OldestAgeSeconds = oldestAgeSeconds
+                        };
                     })
                     .OrderByDescending(p => p.PendingCount)
+                    .ThenByDescending(p => p.RetryingCount)
                     .Take(10) // Top 10 projects
                     .ToList();
 
                 // Determine health status
-                var healthStatus = CalculateOutboxHealth(pendingCount, oldestAge, deadLetterCount);
+                var healthStatus = CalculateVectorQueueHealth(pendingCount, oldestAge, failedCount);
 
                 // Update metrics collector
-                _metricsCollector.UpdateOutboxState(pendingCount, deadLetterCount, oldestAge);
+                _metricsCollector.UpdateVectorQueueState(pendingCount, failedCount, oldestAge);
 
-                return new OutboxHealthMetrics
+                return new VectorQueueHealthMetrics
                 {
                     PendingCount = pendingCount,
-                    DeadLetterCount = deadLetterCount,
+                    FailedCount = failedCount,
                     RetryCount = retryCount,
                     OldestAgeSeconds = oldestAge,
                     ProcessingRatePerSecond = processingRate,
@@ -128,15 +148,15 @@ public class EnhancedMetrics
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to retrieve outbox health metrics");
-                return new OutboxHealthMetrics { HealthStatus = HealthStatus.Unknown };
+                _logger.LogError(ex, "Failed to retrieve vector queue health metrics");
+                return new VectorQueueHealthMetrics { HealthStatus = HealthStatus.Unknown };
             }
-        }) ?? new OutboxHealthMetrics { HealthStatus = HealthStatus.Unknown };
+        }) ?? new VectorQueueHealthMetrics { HealthStatus = HealthStatus.Unknown };
     }
 
-    private static HealthStatus CalculateOutboxHealth(int pending, double oldestAge, int deadLetter)
+    private static HealthStatus CalculateVectorQueueHealth(int pending, double oldestAge, int failed)
     {
-        if (deadLetter > 0) return HealthStatus.Critical;
+        if (failed > 0) return HealthStatus.Critical;
         if (pending > 500 || oldestAge > 300) return HealthStatus.Critical;
         if (pending > 100 || oldestAge > 60) return HealthStatus.Warning;
         return HealthStatus.Healthy;
@@ -166,8 +186,8 @@ public class EnhancedMetrics
             // File Monitor Health
             components.Add(CheckFileMonitorHealth());
 
-            // Outbox Worker Health
-            components.Add(await CheckOutboxWorkerHealthAsync(cancellationToken));
+            // Vector Sync Worker Health
+            components.Add(await CheckVectorSyncWorkerHealthAsync(cancellationToken));
 
             var overallHealthy = components.All(c => c.Status == HealthStatus.Healthy);
 
@@ -272,54 +292,73 @@ public class EnhancedMetrics
         };
     }
 
-    private async Task<ComponentHealth> CheckOutboxWorkerHealthAsync(CancellationToken cancellationToken)
+    private async Task<ComponentHealth> CheckVectorSyncWorkerHealthAsync(CancellationToken cancellationToken)
     {
         try
         {
-            // Check if outbox worker is making progress
+            // Check if vector sync worker is making progress
             var fiveMinutesAgo = DateTime.UtcNow.AddMinutes(-5);
-            var recentCompleted = await SyncOperation.Query(
-                op => op.Status == OperationStatus.Completed &&
-                      op.CompletedAt != null &&
-                      op.CompletedAt >= fiveMinutesAgo,
+
+            var recentSynced = await ChunkVectorState.Query(
+                state => state.State == VectorSyncState.Synced &&
+                         state.SyncedAt != null &&
+                         state.SyncedAt >= fiveMinutesAgo,
                 cancellationToken);
 
-            var recentCount = recentCompleted.Count();
+            var recentCount = recentSynced.Count();
 
-            // Check for stale pending operations (created >5 minutes ago, never attempted)
-            var staleOps = await SyncOperation.Query(
-                op => op.Status == OperationStatus.Pending &&
-                      op.CreatedAt < fiveMinutesAgo &&
-                      op.LastAttemptAt == null,
+            // Identify stale pending snapshots (no attempts in last 5 minutes)
+            var staleSnapshots = await ChunkVectorState.Query(
+                state => state.State == VectorSyncState.Pending &&
+                         (state.LastAttemptAt ?? state.UpdatedAt) < fiveMinutesAgo &&
+                         state.AttemptCount == 0,
                 cancellationToken);
 
-            var staleCount = staleOps.Count();
+            var staleCount = staleSnapshots.Count();
+
+            // Track failed snapshots needing intervention
+            var failedSnapshots = await ChunkVectorState.Query(
+                state => state.State == VectorSyncState.Failed,
+                cancellationToken);
+
+            var failedCount = failedSnapshots.Count();
+
+            if (failedCount > 0)
+            {
+                return new ComponentHealth
+                {
+                    Name = "Vector Sync Worker",
+                    Status = HealthStatus.Critical,
+                    Message = $"{failedCount} snapshot(s) require manual recovery",
+                    LastChecked = DateTime.UtcNow
+                };
+            }
 
             if (staleCount > 10)
             {
                 return new ComponentHealth
                 {
-                    Name = "Outbox Worker",
+                    Name = "Vector Sync Worker",
                     Status = HealthStatus.Warning,
-                    Message = $"Worker may be stalled ({staleCount} stale operations)",
+                    Message = $"Worker may be stalled ({staleCount} stale snapshots)",
                     LastChecked = DateTime.UtcNow
                 };
             }
 
             return new ComponentHealth
             {
-                Name = "Outbox Worker",
+                Name = "Vector Sync Worker",
                 Status = HealthStatus.Healthy,
-                Message = $"Processing normally ({recentCount} ops last 5min)",
+                Message = $"Processing normally ({recentCount} snapshots last 5min)",
                 LastChecked = DateTime.UtcNow
             };
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Outbox worker health check failed");
+            _logger.LogError(ex, "Vector sync worker health check failed");
             return new ComponentHealth
             {
-                Name = "Outbox Worker",
+                Name = "Vector Sync Worker",
                 Status = HealthStatus.Unknown,
                 Message = $"Health check error: {ex.Message}",
                 LastChecked = DateTime.UtcNow
@@ -553,22 +592,25 @@ public class EnhancedMetrics
 
 #region Metric Models
 
-public record OutboxHealthMetrics
+public record class VectorQueueHealthMetrics
 {
     public int PendingCount { get; init; }
-    public int DeadLetterCount { get; init; }
+    public int FailedCount { get; init; }
     public int RetryCount { get; init; }
     public double OldestAgeSeconds { get; init; }
     public double ProcessingRatePerSecond { get; init; }
-    public List<OutboxProjectBreakdown> ByProject { get; init; } = new();
+    public List<VectorQueueProjectBreakdown> ByProject { get; init; } = new();
     public HealthStatus HealthStatus { get; init; }
     public DateTime Timestamp { get; init; }
 }
 
-public record OutboxProjectBreakdown
+public record class VectorQueueProjectBreakdown
 {
     public string ProjectId { get; init; } = string.Empty;
     public int PendingCount { get; init; }
+    public int RetryingCount { get; init; }
+    public int FailedCount { get; init; }
+    public double OldestAgeSeconds { get; init; }
 }
 
 public record ComponentHealthMetrics

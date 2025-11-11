@@ -1,3 +1,8 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using Koan.Context.Models;
 using Koan.Data.Core;
 using Koan.Data.Vector;
@@ -7,26 +12,17 @@ using Microsoft.Extensions.Logging;
 namespace Koan.Context.Services;
 
 /// <summary>
-/// Background service that processes pending vector operations from the outbox table
+/// Background service that processes pending vector snapshots captured during indexing.
 /// </summary>
-/// <remarks>
-/// Implements the Transactional Outbox Pattern for reliable dual-store coordination.
-///
-/// Responsibilities:
-/// - Poll SyncOperation table every 5 seconds
-/// - Process pending operations (Status == Pending, RetryCount &lt; 5)
-/// - Retry failed operations with exponential backoff
-/// - Move permanently failed operations to dead-letter queue
-///
-/// This ensures at-least-once delivery even if the vector store is temporarily unavailable.
-/// </remarks>
-public class VectorSyncWorker : BackgroundService
+public sealed class VectorSyncWorker : BackgroundService
 {
+    private const int PollIntervalMs = 5000;
+    private const int MaxRetries = 5;
+    private const int MaxBatchSize = 50;
+
     private readonly ILogger<VectorSyncWorker> _logger;
     private readonly MetricsCollector _metricsCollector;
-    private readonly HashSet<string> _deletedJobIds = new();
-    private const int MaxRetries = 5;
-    private const int PollIntervalMs = 5000; // 5 seconds
+    private readonly HashSet<string> _deletedJobIds = new(StringComparer.Ordinal);
 
     public VectorSyncWorker(
         ILogger<VectorSyncWorker> logger,
@@ -38,237 +34,212 @@ public class VectorSyncWorker : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        _logger.LogInformation("VectorSyncWorker started - polling every {Interval}ms", PollIntervalMs);
+        _logger.LogInformation("VectorSyncWorker started – polling every {Interval} ms", PollIntervalMs);
 
         while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
-                await ProcessPendingOperationsAsync(stoppingToken);
+                await ProcessPendingSnapshotsAsync(stoppingToken);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error processing pending vector operations");
+                _logger.LogError(ex, "VectorSyncWorker encountered an error while processing snapshots");
             }
 
-            await Task.Delay(PollIntervalMs, stoppingToken);
+            try
+            {
+                await Task.Delay(PollIntervalMs, stoppingToken);
+            }
+            catch (TaskCanceledException)
+            {
+                break;
+            }
         }
 
         _logger.LogInformation("VectorSyncWorker stopped");
     }
 
-    private async Task ProcessPendingOperationsAsync(CancellationToken cancellationToken)
+    private async Task ProcessPendingSnapshotsAsync(CancellationToken cancellationToken)
     {
-        // Clear the deleted jobs cache if it gets too large (prevent unbounded growth)
-        if (_deletedJobIds.Count > 1000)
+        if (_deletedJobIds.Count > 1024)
         {
-            _logger.LogInformation("Clearing deleted jobs cache ({Count} entries)", _deletedJobIds.Count);
             _deletedJobIds.Clear();
+            _logger.LogDebug("Cleared deleted job cache after reaching 1024 entries");
         }
 
-        // Query pending operations (not using partition context - outbox table is global)
-        var pendingOps = await SyncOperation.Query(
-            op => op.Status == OperationStatus.Pending && op.RetryCount < MaxRetries,
+        var pendingStates = await ChunkVectorState.Query(
+            state => (state.State == VectorSyncState.Pending ||
+                      (state.State == VectorSyncState.Failed && state.AttemptCount < MaxRetries)),
             cancellationToken);
 
-        var opsList = pendingOps.ToList();
+        var snapshotBatch = pendingStates
+            .OrderBy(state => state.AttemptCount)
+            .ThenBy(state => state.LastAttemptAt ?? state.CreatedAt)
+            .ThenBy(state => state.UpdatedAt)
+            .Take(MaxBatchSize)
+            .ToList();
 
-        if (opsList.Count == 0)
+        if (snapshotBatch.Count == 0)
+        {
             return;
+        }
 
-        _logger.LogDebug("Processing {Count} pending vector operations", opsList.Count);
+        _logger.LogDebug("Processing {Count} pending vector snapshot(s)", snapshotBatch.Count);
 
-        var successCount = 0;
-        var failureCount = 0;
+        var succeeded = 0;
+        var permanentlyFailed = 0;
 
-        foreach (var operation in opsList)
+        foreach (var snapshot in snapshotBatch)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            var previousState = snapshot.State;
 
-            var beforeStatus = operation.Status;
-            await ProcessOperationAsync(operation, cancellationToken);
+            await ProcessSnapshotAsync(snapshot, cancellationToken);
 
-            if (operation.Status == OperationStatus.Completed && beforeStatus != OperationStatus.Completed)
+            if (snapshot.State == VectorSyncState.Synced && previousState != VectorSyncState.Synced)
             {
-                successCount++;
+                succeeded++;
             }
-            else if (operation.Status == OperationStatus.DeadLetter)
+            else if (snapshot.State == VectorSyncState.Failed && snapshot.AttemptCount >= MaxRetries)
             {
-                failureCount++;
+                permanentlyFailed++;
             }
         }
 
-        _logger.LogInformation(
-            "Processed {Count} vector operations ({Succeeded} succeeded, {Failed} failed)",
-            opsList.Count,
-            opsList.Count(o => o.Status == OperationStatus.Completed),
-            opsList.Count(o => o.Status == OperationStatus.DeadLetter));
-
-        // Record outbox processing metrics
-        if (successCount > 0)
+        if (succeeded > 0)
         {
-            _metricsCollector.RecordOutboxProcessed(successCount, true);
+            _metricsCollector.RecordVectorProcessing(succeeded, success: true);
         }
-        if (failureCount > 0)
+
+        if (permanentlyFailed > 0)
         {
-            _metricsCollector.RecordOutboxProcessed(failureCount, false);
+            _metricsCollector.RecordVectorProcessing(permanentlyFailed, success: false);
         }
     }
 
-    private async Task ProcessOperationAsync(SyncOperation operation, CancellationToken cancellationToken)
+    private async Task ProcessSnapshotAsync(ChunkVectorState snapshot, CancellationToken cancellationToken)
     {
+        if (string.IsNullOrWhiteSpace(snapshot.JobId))
+        {
+            _logger.LogWarning(
+                "Removing snapshot for chunk {ChunkId} because it is missing a job identifier",
+                snapshot.ChunkId);
+            await snapshot.Remove(cancellationToken);
+            return;
+        }
+
+        if (_deletedJobIds.Contains(snapshot.JobId))
+        {
+            _logger.LogDebug(
+                "Skipping snapshot for chunk {ChunkId} because job {JobId} no longer exists",
+                snapshot.ChunkId,
+                snapshot.JobId);
+            await snapshot.Remove(cancellationToken);
+            return;
+        }
+
         try
         {
-            // Check if this is an orphaned operation (no JobId - from old implementation)
-            if (string.IsNullOrWhiteSpace(operation.JobId))
+            if (snapshot.State == VectorSyncState.Failed)
             {
-                _logger.LogWarning(
-                    "Orphaned vector operation {OpId} for chunk {ChunkId} (no JobId) - marking as completed and deleting",
-                    operation.Id,
-                    operation.ChunkId);
-
-                // Delete orphaned operation
-                await operation.Delete(cancellationToken);
-                return;
+                snapshot.PrepareRetry();
+                await snapshot.Save(cancellationToken);
             }
 
-            // Fast-fail if job is known to be deleted - don't waste resources processing
-            if (_deletedJobIds.Contains(operation.JobId))
+            using (EntityContext.Partition(snapshot.ProjectId))
             {
-                _logger.LogDebug(
-                    "Skipping vector sync for operation {OpId} - job {JobId} is cached as deleted, deleting operation",
-                    operation.Id,
-                    operation.JobId);
-
-                // Delete the operation since the parent job no longer exists
-                await operation.Delete(cancellationToken);
-                return;
-            }
-
-            _logger.LogDebug(
-                "Processing vector operation {OpId} for chunk {ChunkId} (attempt {Attempt}/{Max})",
-                operation.Id,
-                operation.ChunkId,
-                operation.RetryCount + 1,
-                MaxRetries);
-
-            // Deserialize embedding and metadata
-            var embedding = operation.GetEmbedding();
-            var metadata = (object?)operation.GetMetadata<ChunkVectorMetadata>();
-
-            // Set partition context for this chunk's project (adapters handle formatting)
-            using (EntityContext.Partition(operation.ProjectId))
-            {
-                // Save to vector store within partition context
-                var batch = new List<(string Id, float[] Embedding, object? Metadata)>
+                var payload = new List<(string Id, float[] Embedding, object? Metadata)>
                 {
-                    (operation.ChunkId, embedding, metadata)
+                    (snapshot.ChunkId, snapshot.GetEmbedding(), snapshot.GetMetadata<ChunkVectorMetadata>())
                 };
 
-                await Vector<Chunk>.Save(batch, cancellationToken);
+                await Vector<Chunk>.Save(payload, cancellationToken);
             }
 
-            // Mark as completed (outside partition context, in root table)
-            operation.MarkCompleted();
-            await operation.Save(cancellationToken);
+            snapshot.MarkSynced();
+            await snapshot.Save(cancellationToken);
 
-            // Increment job's VectorsSynced counter (in root context)
-            // Fast-fail if we know the job has been deleted
-            if (_deletedJobIds.Contains(operation.JobId))
-            {
-                // Job is in the deleted cache - skip lookup
-                _logger.LogDebug(
-                    "Skipping job update for operation {OpId} - job {JobId} is known to be deleted (cached)",
-                    operation.Id,
-                    operation.JobId);
-            }
-            else
-            {
-                var job = await Job.Get(operation.JobId, cancellationToken);
-                if (job != null)
-                {
-                    job.VectorsSynced++;
-
-                    // Update ETA based on composite progress (chunking + vector syncing)
-                    job.UpdateVectorSyncProgress();
-
-                    _logger.LogDebug(
-                        "Job {JobId} progress: {VectorsSynced}/{ChunksCreated} vectors synced",
-                        job.Id,
-                        job.VectorsSynced,
-                        job.ChunksCreated);
-
-                    // Check if all vectors have been synced to Weaviate
-                    if (job.VectorsSynced >= job.ChunksCreated && job.ChunksCreated > 0)
-                    {
-                        // Job is complete - all chunks created and all vectors synced
-                        job.Complete();
-                        _logger.LogInformation(
-                            "Job {JobId} completed: {ChunksCreated} chunks created, {VectorsSynced} vectors synced to Weaviate",
-                            job.Id,
-                            job.ChunksCreated,
-                            job.VectorsSynced);
-
-                        // Record job completion metrics
-                        _metricsCollector.RecordJobCompleted(
-                            job.Id,
-                            job.ProjectId,
-                            job.Elapsed.TotalSeconds,
-                            true,
-                            job.ProcessedFiles,
-                            job.ChunksCreated);
-                    }
-
-                    await job.Save(cancellationToken);
-                }
-                else
-                {
-                    // Job not found - add to cache to avoid future lookups
-                    _deletedJobIds.Add(operation.JobId);
-                    _logger.LogWarning(
-                        "Job {JobId} not found for operation {OpId} - operation completed but job may have been deleted (caching for fast-fail)",
-                        operation.JobId,
-                        operation.Id);
-                }
-            }
-
-            _logger.LogDebug(
-                "Successfully synced vector for chunk {ChunkId} (operation {OpId})",
-                operation.ChunkId,
-                operation.Id);
+            await UpdateJobProgressAsync(snapshot.JobId, cancellationToken);
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(
-                ex,
-                "Failed to sync vector for chunk {ChunkId} (operation {OpId}, attempt {Attempt}/{Max})",
-                operation.ChunkId,
-                operation.Id,
-                operation.RetryCount + 1,
-                MaxRetries);
+            snapshot.RecordFailure(ex.Message, MaxRetries);
+            await snapshot.Save(cancellationToken);
 
-            operation.RecordFailure(ex.Message);
-            await operation.Save(cancellationToken);
-
-            if (operation.Status == OperationStatus.DeadLetter)
+            if (snapshot.State == VectorSyncState.Failed && snapshot.AttemptCount >= MaxRetries)
             {
                 _logger.LogError(
-                    "Vector operation {OpId} moved to dead-letter queue after {Retries} failed attempts. " +
-                    "Chunk {ChunkId} metadata is saved but vector is missing.",
-                    operation.Id,
-                    operation.RetryCount,
-                    operation.ChunkId);
+                    ex,
+                    "Vector sync for chunk {ChunkId} failed permanently after {Attempts} attempts",
+                    snapshot.ChunkId,
+                    snapshot.AttemptCount);
             }
+            else
+            {
+                _logger.LogWarning(
+                    ex,
+                    "Vector sync attempt {Attempt}/{Max} failed for chunk {ChunkId}",
+                    snapshot.AttemptCount,
+                    MaxRetries,
+                    snapshot.ChunkId);
+            }
+
+            await UpdateJobProgressAsync(snapshot.JobId, cancellationToken);
         }
     }
 
-    public override async Task StopAsync(CancellationToken cancellationToken)
+    private async Task UpdateJobProgressAsync(string jobId, CancellationToken cancellationToken)
     {
-        _logger.LogInformation("VectorSyncWorker stopping - processing remaining operations");
+        if (_deletedJobIds.Contains(jobId))
+        {
+            return;
+        }
 
-        // Give pending operations a chance to complete
-        await ProcessPendingOperationsAsync(cancellationToken);
+        var job = await Job.Get(jobId, cancellationToken);
+        if (job is null)
+        {
+            _deletedJobIds.Add(jobId);
+            _logger.LogWarning(
+                "Job {JobId} not found while updating vector sync progress; caching for fast skip",
+                jobId);
+            return;
+        }
 
-        await base.StopAsync(cancellationToken);
+        var snapshots = await ChunkVectorState.Query(state => state.JobId == jobId, cancellationToken);
+        var snapshotList = snapshots.ToList();
+
+        var total = snapshotList.Count;
+        var synced = snapshotList.Count(state => state.State == VectorSyncState.Synced);
+        var failed = snapshotList.Count(state => state.State == VectorSyncState.Failed);
+
+        job.VectorsSaved = total;
+        job.VectorsSynced = synced;
+        job.UpdateVectorSyncProgress();
+
+        if (failed > 0 && job.Status == JobStatus.Indexing)
+        {
+            job.CurrentOperation = $"Vector sync retrying ({synced}/{total} succeeded)";
+        }
+
+        if (synced >= job.ChunksCreated && job.ChunksCreated > 0 && job.Status != JobStatus.Completed)
+        {
+            job.Complete();
+            _logger.LogInformation(
+                "Job {JobId} completed vector synchronization ({ChunksCreated} chunks)",
+                job.Id,
+                job.ChunksCreated);
+
+            _metricsCollector.RecordJobCompleted(
+                job.Id!,
+                job.ProjectId,
+                job.Elapsed.TotalSeconds,
+                success: true,
+                job.ProcessedFiles,
+                job.ChunksCreated);
+        }
+
+        await job.Save(cancellationToken);
     }
 }
+

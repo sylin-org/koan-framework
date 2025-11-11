@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import {
   useDashboardOverview,
-  useOutboxHealth,
+  useVectorQueueHealth,
   useComponentHealth,
   useJobSystemMetrics,
   useVectorDbMetrics,
@@ -24,7 +24,7 @@ import {
 
 export default function MonitoringDashboard() {
   const { data: overview } = useDashboardOverview();
-  const { data: outbox } = useOutboxHealth();
+  const { data: vectorQueue } = useVectorQueueHealth();
   const { data: components } = useComponentHealth();
   const { data: jobs } = useJobSystemMetrics();
   const { data: vectorDb } = useVectorDbMetrics();
@@ -87,11 +87,24 @@ export default function MonitoringDashboard() {
                   {overview.data.criticalAlerts.length} Critical Alert{overview.data.criticalAlerts.length > 1 ? 's' : ''}
                 </h3>
                 <div className="mt-2 space-y-2">
-                  {overview.data.criticalAlerts.map((alert, idx) => (
-                    <div key={idx} className="text-sm text-danger-700">
-                      <span className="font-medium">[{alert.type}]</span> {alert.message}
-                    </div>
-                  ))}
+                  {overview.data.criticalAlerts.map((alert, idx) => {
+                    const metadata = alert.metadata as { component?: unknown; status?: unknown } | undefined;
+                    const componentName =
+                      metadata && typeof metadata.component === 'string' ? metadata.component : undefined;
+                    const statusLabel = metadata && typeof metadata.status === 'string' ? metadata.status : undefined;
+
+                    return (
+                      <div key={idx} className="text-sm text-danger-700">
+                        <span className="font-medium">[{alert.type}]</span> {alert.message}
+                        {componentName && (
+                          <span className="ml-1 text-xs text-muted-foreground">
+                            ({componentName}
+                            {statusLabel ? ` – ${statusLabel}` : ''})
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>
@@ -100,29 +113,29 @@ export default function MonitoringDashboard() {
 
         {/* P0 Metrics Row */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-          {/* Outbox Queue Health */}
-          <div className={`border rounded-lg p-6 ${getHealthColor(outbox?.healthStatus || 'unknown')}`}>
+          {/* Vector Queue Health */}
+          <div className={`border rounded-lg p-6 ${getHealthColor(vectorQueue?.healthStatus || 'unknown')}`}>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
                 <Inbox className="w-5 h-5" />
-                Outbox Queue
+                Vector Queue
               </h2>
-              {getHealthIcon(outbox?.healthStatus || 'unknown')}
+              {getHealthIcon(vectorQueue?.healthStatus || 'unknown')}
             </div>
 
-            {outbox ? (
+            {vectorQueue ? (
               <div className="space-y-3">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <p className="text-sm text-muted-foreground">Pending</p>
-                    <p className={`text-2xl font-bold ${outbox.pendingCount > 100 ? 'text-danger-600' : 'text-foreground'}`}>
-                      {outbox.pendingCount}
+                    <p className={`text-2xl font-bold ${vectorQueue.pendingCount > 100 ? 'text-danger-600' : 'text-foreground'}`}>
+                      {vectorQueue.pendingCount}
                     </p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Processing Rate</p>
                     <p className="text-2xl font-bold text-foreground">
-                      {outbox.processingRatePerSecond.toFixed(1)}/s
+                      {vectorQueue.processingRatePerSecond.toFixed(1)}/s
                     </p>
                   </div>
                 </div>
@@ -130,14 +143,14 @@ export default function MonitoringDashboard() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <p className="text-sm text-muted-foreground">Oldest Age</p>
-                    <p className={`text-lg font-medium ${outbox.oldestAgeSeconds > 60 ? 'text-warning-600' : 'text-foreground'}`}>
-                      {Math.round(outbox.oldestAgeSeconds)}s
+                    <p className={`text-lg font-medium ${vectorQueue.oldestAgeSeconds > 60 ? 'text-warning-600' : 'text-foreground'}`}>
+                      {Math.round(vectorQueue.oldestAgeSeconds)}s
                     </p>
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">Dead Letter</p>
-                    <p className={`text-lg font-medium ${outbox.deadLetterCount > 0 ? 'text-danger-600' : 'text-success-600'}`}>
-                      {outbox.deadLetterCount}
+                    <p className="text-sm text-muted-foreground">Failed</p>
+                    <p className={`text-lg font-medium ${vectorQueue.failedCount > 0 ? 'text-danger-600' : 'text-success-600'}`}>
+                      {vectorQueue.failedCount}
                     </p>
                   </div>
                 </div>

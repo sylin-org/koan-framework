@@ -49,8 +49,7 @@ public class SearchController : ControllerBase
             return BadRequest(new { error = "Query cannot be empty" });
         }
 
-        var searchStopwatch = System.Diagnostics.Stopwatch.StartNew();
-        var searchSuccess = false;
+    var searchStopwatch = System.Diagnostics.Stopwatch.StartNew();
         string? searchProjectId = null;
 
         try
@@ -173,7 +172,6 @@ public class SearchController : ControllerBase
                 cancellationToken);
 
             searchStopwatch.Stop();
-            searchSuccess = true;
 
             // Record search metrics
             _metricsCollector.RecordSearchQuery(

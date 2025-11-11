@@ -224,7 +224,8 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
             ? EntityContext.With(
                 source: clearedContext.Source,
                 adapter: clearedContext.Adapter,
-                partition: clearedContext.Partition)
+                partition: clearedContext.Partition,
+                preserveTransaction: false)
             : null;
 
         foreach (var (adapter, operations) in _operationsByAdapter)

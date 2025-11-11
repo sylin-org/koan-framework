@@ -187,7 +187,7 @@ public class Job : Entity<Job>
     /// Cascading delete: Removes all SyncOperations linked to this job
     /// to prevent orphaned outbox records.
     /// </remarks>
-    public new async Task Delete(CancellationToken cancellationToken = default)
+    public async Task Delete(CancellationToken cancellationToken = default)
     {
         // Delete associated SyncOperations first (cascade delete)
         var operations = await SyncOperation.Query(

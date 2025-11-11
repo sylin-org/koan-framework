@@ -1,10 +1,8 @@
 using Koan.Context.Models;
 using Koan.Context.Services;
-using Koan.Data.Abstractions;
 using Koan.Data.Core;
 using Koan.Scheduling;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace Koan.Context.Tasks;
@@ -22,21 +20,21 @@ namespace Koan.Context.Tasks;
 internal sealed class JobMaintenanceTask : IScheduledTask, IOnStartup, IHasTimeout
 {
     private readonly ILogger<JobMaintenanceTask> _logger;
-    private readonly IServiceScopeFactory _serviceScopeFactory;
     private readonly bool _autoResumeEnabled;
     private readonly int _autoResumeDelaySeconds;
+    private readonly IIndexingResumptionQueue _resumptionQueue;
     private const int MaxJobsToRetainPerProject = 50; // Keep last 50 jobs per project
     private const int OldJobRetentionDays = 7; // Clean up jobs older than 7 days
 
     public JobMaintenanceTask(
         ILogger<JobMaintenanceTask> logger,
-        IServiceScopeFactory serviceScopeFactory,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        IIndexingResumptionQueue resumptionQueue)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _serviceScopeFactory = serviceScopeFactory ?? throw new ArgumentNullException(nameof(serviceScopeFactory));
         _autoResumeEnabled = configuration.GetValue("Koan:Context:AutoResumeIndexing", true);
         _autoResumeDelaySeconds = configuration.GetValue("Koan:Context:AutoResumeDelay", 0);
+        _resumptionQueue = resumptionQueue ?? throw new ArgumentNullException(nameof(resumptionQueue));
     }
 
     public string Id => "koan-context:indexing-job-maintenance";
@@ -116,7 +114,7 @@ internal sealed class JobMaintenanceTask : IScheduledTask, IOnStartup, IHasTimeo
                 jobsToResume.Add((job.ProjectId, previousStatus));
             }
 
-            job.Cancel();
+            await job.Cancel(ct);
             job.ErrorMessage = $"Job cancelled during recovery. " +
                 $"Previous state: {previousStatus}, Operation: {previousOperation ?? "(none)"}";
 
@@ -169,105 +167,42 @@ internal sealed class JobMaintenanceTask : IScheduledTask, IOnStartup, IHasTimeo
                 _autoResumeDelaySeconds,
                 jobsToResume.Count);
 
-            // Schedule delayed resume - doesn't block startup
-            _ = Task.Run(async () =>
-            {
-                await Task.Delay(TimeSpan.FromSeconds(_autoResumeDelaySeconds));
-                await ResumeJobsInternalAsync(jobsToResume);
-            }, CancellationToken.None);
-
-            return jobsToResume.Count; // Return count of scheduled jobs
+            resumedCount = await EnqueueResumptionsAsync(jobsToResume, TimeSpan.FromSeconds(_autoResumeDelaySeconds), ct);
+            return resumedCount;
         }
-        else
-        {
-            _logger.LogInformation(
-                "Auto-resume enabled (immediate): attempting to resume {Count} interrupted indexing jobs",
-                jobsToResume.Count);
-        }
+        _logger.LogInformation(
+            "Auto-resume enabled (immediate): queuing {Count} interrupted indexing jobs",
+            jobsToResume.Count);
 
-        return await ResumeJobsInternalAsync(jobsToResume);
+        resumedCount = await EnqueueResumptionsAsync(jobsToResume, TimeSpan.Zero, ct);
+        return resumedCount;
     }
 
-    /// <summary>
-    /// Internal helper to resume jobs
-    /// </summary>
-    private async Task<int> ResumeJobsInternalAsync(List<(string projectId, JobStatus previousStatus)> jobsToResume)
+    private async Task<int> EnqueueResumptionsAsync(
+        IEnumerable<(string projectId, JobStatus previousStatus)> jobs,
+        TimeSpan delay,
+        CancellationToken ct)
     {
-        var resumedCount = 0;
+        var enqueued = 0;
 
-        foreach (var (projectId, previousStatus) in jobsToResume)
+        foreach (var (projectId, previousStatus) in jobs)
         {
-            try
-            {
-                // Verify project still exists
-                var project = await Project.Get(projectId);
-                if (project == null)
-                {
-                    _logger.LogWarning(
-                        "Skipping auto-resume for project {ProjectId} - project not found",
-                        projectId);
-                    continue;
-                }
+            ct.ThrowIfCancellationRequested();
 
-                // Skip if project is not active
-                if (!true)
-                {
-                    _logger.LogInformation(
-                        "Skipping auto-resume for project {ProjectId} ({Name}) - project is inactive",
-                        projectId,
-                        project.Name);
-                    continue;
-                }
-
-                _logger.LogInformation(
-                    "Auto-resuming indexing for project {ProjectId} ({Name}) - was {PreviousStatus}",
-                    projectId,
-                    project.Name,
-                    previousStatus);
-
-                // Fire-and-forget - don't block startup
-                // Capture serviceScopeFactory for use in Task.Run
-                var serviceScopeFactory = _serviceScopeFactory;
-                _ = Task.Run(async () =>
-                {
-                    try
-                    {
-                        // Create a new scope to resolve scoped services
-                        using var scope = serviceScopeFactory.CreateScope();
-                        var Indexer = scope.ServiceProvider.GetRequiredService<Indexer>();
-
-                        await Indexer.IndexProjectAsync(
-                            projectId,
-                            progress: null,
-                            cancellationToken: CancellationToken.None,
-                            force: false);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex,
-                            "Auto-resume failed for project {ProjectId}",
-                            projectId);
-                    }
-                }, CancellationToken.None);
-
-                resumedCount++;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex,
-                    "Failed to auto-resume project {ProjectId}",
-                    projectId);
-            }
+            var request = new IndexingResumptionRequest(projectId, previousStatus, delay);
+            await _resumptionQueue.EnqueueAsync(request, ct);
+            enqueued++;
         }
 
-        if (resumedCount > 0)
+        if (enqueued > 0)
         {
             _logger.LogInformation(
-                "Auto-resumed {Count} indexing jobs - they will continue in the background",
-                resumedCount);
+                "Queued {Count} indexing jobs for background resumption (delay {DelaySeconds}s)",
+                enqueued,
+                delay.TotalSeconds);
         }
 
-        return resumedCount;
+        return enqueued;
     }
 
     /// <summary>

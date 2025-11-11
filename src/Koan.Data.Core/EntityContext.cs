@@ -100,6 +100,7 @@ public static class EntityContext
     /// <param name="adapter">Adapter override</param>
     /// <param name="partition">Storage partition suffix</param>
     /// <param name="transaction">Transaction name for coordination</param>
+    /// <param name="preserveTransaction">When true, retain the ambient transaction if one exists and no new transaction is specified.</param>
     /// <returns>Disposable that restores previous context on disposal</returns>
     /// <exception cref="InvalidOperationException">Thrown when both source and adapter are specified, or when nesting transactions</exception>
     /// <exception cref="ArgumentException">Thrown when partition name is invalid</exception>
@@ -107,33 +108,48 @@ public static class EntityContext
         string? source = null,
         string? adapter = null,
         string? partition = null,
-        string? transaction = null)
+        string? transaction = null,
+        bool preserveTransaction = true)
     {
         var prev = _current.Value;
 
-        // Prevent nested transactions
+        // Prevent nested transactions when explicitly starting a new one
         if (!string.IsNullOrWhiteSpace(transaction) && prev?.Transaction != null)
         {
             throw new InvalidOperationException(
                 $"Cannot start transaction '{transaction}' inside existing transaction '{prev.Transaction}'. " +
-                $"Nested transactions are not supported.");
+                "nested transactions are not supported.");
         }
 
-        var newContext = new ContextState(source, adapter, partition, transaction);
-    // Note: Partition name validation is deferred to adapters, which format partition identifiers
-    // (e.g., SQLite may normalize GUID "019a..." to an adapter-specific value)
+        var effectiveSource = source ?? prev?.Source;
+        var effectiveAdapter = adapter ?? prev?.Adapter;
+        var effectivePartition = partition ?? prev?.Partition;
+        var effectiveTransaction = preserveTransaction
+            ? transaction ?? prev?.Transaction
+            : transaction;
+
+        var newContext = new ContextState(effectiveSource, effectiveAdapter, effectivePartition, effectiveTransaction);
+        // Note: Partition name validation is deferred to adapters, which format partition identifiers
+        // (e.g., SQLite may normalize GUID "019a..." to an adapter-specific value)
         // newContext.ValidatePartitionName();
 
-        // Create transaction coordinator if transaction specified
-        ITransactionCoordinator? coordinator = null;
+        ITransactionCoordinator? coordinatorForScope = null;
+        var activeCoordinator = preserveTransaction ? prev?.TransactionCoordinator : null;
+
+        // Create a new coordinator only when starting a new transaction
         if (!string.IsNullOrWhiteSpace(transaction))
         {
-            coordinator = CreateTransactionCoordinator(transaction);
-            newContext = newContext with { TransactionCoordinator = coordinator };
+            coordinatorForScope = CreateTransactionCoordinator(transaction);
+            activeCoordinator = coordinatorForScope;
+        }
+
+        if (activeCoordinator is not null)
+        {
+            newContext = newContext with { TransactionCoordinator = activeCoordinator };
         }
 
         _current.Value = newContext;
-        return new TransactionScope(prev, coordinator);
+        return new TransactionScope(prev, coordinatorForScope);
     }
 
     /// <summary>

@@ -35,7 +35,8 @@ S5.Recs' current import mechanism has several architectural brittleness points i
 
 3. **Synchronous Chaining**:
    ```
-   Import Batch → Vectorize Batch → Next Batch
+   Import Batch → Vecto
+   rize Batch → Next Batch
        │              │
        └──────────────┴─ BLOCKING: Must complete before next batch
    ```

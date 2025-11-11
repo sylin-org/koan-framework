@@ -2,15 +2,18 @@ import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/api';
 
 // Type definitions
-export interface OutboxHealthMetrics {
+export interface VectorQueueHealthMetrics {
   pendingCount: number;
-  deadLetterCount: number;
+  failedCount: number;
   retryCount: number;
   oldestAgeSeconds: number;
   processingRatePerSecond: number;
   byProject: Array<{
     projectId: string;
     pendingCount: number;
+    retryingCount: number;
+    failedCount: number;
+    oldestAgeSeconds: number;
   }>;
   healthStatus: 'healthy' | 'warning' | 'critical' | 'unknown';
   timestamp: string;
@@ -83,15 +86,14 @@ export interface Alert {
   type: string;
   severity: 'critical' | 'warning';
   message: string;
-  component?: string;
-  status?: string;
+  metadata?: Record<string, unknown>;
 }
 
 export interface DashboardOverview {
-  outboxHealth: {
+  vectorQueueHealth: {
     status: string;
     pending: number;
-    deadLetter: number;
+    failed: number;
     processingRate: number;
   };
   componentHealth: {
@@ -119,14 +121,16 @@ export interface DashboardOverview {
 }
 
 /**
- * Hook for fetching outbox queue health metrics
+ * Hook for fetching vector queue health metrics
  * Refreshes every 5 seconds for P0 monitoring
  */
-export function useOutboxHealth(pollInterval = 5000) {
+export function useVectorQueueHealth(pollInterval = 5000) {
   return useQuery({
-    queryKey: ['metrics', 'outbox'],
+    queryKey: ['metrics', 'vector-queue'],
     queryFn: async () => {
-      const response = await apiClient.get<{ data: OutboxHealthMetrics; metadata: any }>('/metrics/outbox');
+      const response = await apiClient.get<{ data: VectorQueueHealthMetrics; metadata: any }>(
+        '/metrics/vector-queue'
+      );
       return response.data.data;
     },
     refetchInterval: pollInterval,

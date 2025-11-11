@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Koan.Data.Abstractions;
 using Koan.Data.Core.Model;
 
@@ -29,9 +30,19 @@ namespace Koan.Context.Models;
 public class SyncOperation : Entity<SyncOperation>
 {
     /// <summary>
+    /// Distinguishes the logical store this operation targets.
+    /// </summary>
+    public SyncOperationKind Kind { get; set; } = SyncOperationKind.SyncVector;
+
+    /// <summary>
     /// ID of the Chunk entity this operation targets
     /// </summary>
     public string ChunkId { get; set; } = string.Empty;
+
+    /// <summary>
+    /// ID of the IndexedFile owning the chunk. Enables deduplication and reconciliation.
+    /// </summary>
+    public string IndexedFileId { get; set; } = string.Empty;
 
     /// <summary>
     /// ID of the Job that created this operation
@@ -106,7 +117,14 @@ public class SyncOperation : Entity<SyncOperation>
     /// <summary>
     /// Creates a new pending sync operation
     /// </summary>
-    public static SyncOperation Create(string jobId, string chunkId, string projectId, float[] embedding, object? metadata = null)
+    public static SyncOperation Create(
+        string jobId,
+        string chunkId,
+        string indexedFileId,
+        string projectId,
+        float[] embedding,
+        object? metadata = null,
+        SyncOperationKind kind = SyncOperationKind.SyncVector)
     {
         if (string.IsNullOrWhiteSpace(jobId))
             throw new ArgumentException("JobId cannot be empty", nameof(jobId));
@@ -114,24 +132,25 @@ public class SyncOperation : Entity<SyncOperation>
         if (string.IsNullOrWhiteSpace(chunkId))
             throw new ArgumentException("ChunkId cannot be empty", nameof(chunkId));
 
+        if (string.IsNullOrWhiteSpace(indexedFileId))
+            throw new ArgumentException("IndexedFileId cannot be empty", nameof(indexedFileId));
+
         if (string.IsNullOrWhiteSpace(projectId))
             throw new ArgumentException("ProjectId cannot be empty", nameof(projectId));
 
         if (embedding == null || embedding.Length == 0)
             throw new ArgumentException("Embedding cannot be null or empty", nameof(embedding));
 
-        return new SyncOperation
+        var operation = new SyncOperation
         {
-            JobId = jobId,
+            Id = ComposeId(chunkId, kind),
             ChunkId = chunkId,
-            ProjectId = projectId,
-            EmbeddingJson = System.Text.Json.JsonSerializer.Serialize(embedding),
-            MetadataJson = metadata != null
-                ? System.Text.Json.JsonSerializer.Serialize(metadata)
-                : null,
-            Status = OperationStatus.Pending,
-            CreatedAt = DateTime.UtcNow
+            Kind = kind
         };
+
+        operation.Reset(jobId, indexedFileId, projectId, embedding, metadata);
+
+        return operation;
     }
 
     /// <summary>
@@ -164,8 +183,10 @@ public class SyncOperation : Entity<SyncOperation>
     /// </summary>
     public float[] GetEmbedding()
     {
-        return System.Text.Json.JsonSerializer.Deserialize<float[]>(EmbeddingJson)
+        #pragma warning disable IL2026, IL3050
+        return JsonSerializer.Deserialize<float[]>(EmbeddingJson)
                ?? throw new InvalidOperationException("Failed to deserialize embedding");
+        #pragma warning restore IL2026, IL3050
     }
 
     /// <summary>
@@ -176,7 +197,70 @@ public class SyncOperation : Entity<SyncOperation>
         if (string.IsNullOrWhiteSpace(MetadataJson))
             return default;
 
-        return System.Text.Json.JsonSerializer.Deserialize<T>(MetadataJson);
+        #pragma warning disable IL2026, IL3050
+        return JsonSerializer.Deserialize<T>(MetadataJson);
+        #pragma warning restore IL2026, IL3050
+    }
+
+    /// <summary>
+    /// Resets the operation payload and requeues for processing.
+    /// </summary>
+    public void Reset(
+        string jobId,
+        string indexedFileId,
+        string projectId,
+        float[] embedding,
+        object? metadata = null,
+        SyncOperationKind? kindOverride = null)
+    {
+        JobId = jobId ?? throw new ArgumentNullException(nameof(jobId));
+        IndexedFileId = indexedFileId ?? throw new ArgumentNullException(nameof(indexedFileId));
+        ProjectId = projectId ?? throw new ArgumentNullException(nameof(projectId));
+
+        if (embedding is null || embedding.Length == 0)
+        {
+            throw new ArgumentException("Embedding cannot be null or empty", nameof(embedding));
+        }
+
+        #pragma warning disable IL2026, IL3050
+        EmbeddingJson = JsonSerializer.Serialize(embedding);
+        MetadataJson = metadata != null
+            ? JsonSerializer.Serialize(metadata)
+            : null;
+        #pragma warning restore IL2026, IL3050
+
+        if (kindOverride.HasValue)
+        {
+            Kind = kindOverride.Value;
+            if (!string.Equals(Id, ComposeId(ChunkId, Kind), StringComparison.Ordinal))
+            {
+                Id = ComposeId(ChunkId, Kind);
+            }
+        }
+
+        Status = OperationStatus.Pending;
+        RetryCount = 0;
+        LastAttemptAt = null;
+        CompletedAt = null;
+        LastError = null;
+        CreatedAt = DateTime.UtcNow;
+    }
+
+    public static string ComposeId(string chunkId, SyncOperationKind kind)
+    {
+        if (string.IsNullOrWhiteSpace(chunkId))
+        {
+            throw new ArgumentException("ChunkId cannot be empty", nameof(chunkId));
+        }
+
+        var suffix = kind switch
+        {
+            SyncOperationKind.StoreChunk => ":chunk",
+            SyncOperationKind.SyncVector => ":vector",
+            _ => ":op"
+        };
+
+        return string.Concat(chunkId, suffix);
     }
 }
 
@@ -193,4 +277,16 @@ public enum OperationStatus
 
     /// <summary>Failed after max retries (dead-letter queue)</summary>
     DeadLetter = 2
+}
+
+/// <summary>
+/// Logical destination for a sync operation.
+/// </summary>
+public enum SyncOperationKind
+{
+    /// <summary>Relational chunk persistence.</summary>
+    StoreChunk = 0,
+
+    /// <summary>Vector store synchronization.</summary>
+    SyncVector = 1
 }

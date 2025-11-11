@@ -41,26 +41,14 @@ internal sealed class SaveOperation<TEntity, TKey> : ITrackedOperation
 
     public async Task ExecuteAsync(CancellationToken ct)
     {
-        // Execute using the appropriate context
-        if (!string.IsNullOrWhiteSpace(_partition))
-        {
-            using var _ = EntityContext.Partition(_partition);
-            await Data<TEntity, TKey>.UpsertAsync(_entity, ct);
-        }
-        else if (!string.IsNullOrWhiteSpace(_context.Source))
-        {
-            using var _ = EntityContext.Source(_context.Source);
-            await Data<TEntity, TKey>.UpsertAsync(_entity, ct);
-        }
-        else if (!string.IsNullOrWhiteSpace(_context.Adapter))
-        {
-            using var _ = EntityContext.Adapter(_context.Adapter);
-            await Data<TEntity, TKey>.UpsertAsync(_entity, ct);
-        }
-        else
-        {
-            await Data<TEntity, TKey>.UpsertAsync(_entity, ct);
-        }
+        var partition = _partition ?? _context.Partition;
+
+        using var _ = EntityContext.With(
+            source: string.IsNullOrWhiteSpace(_context.Source) ? null : _context.Source,
+            adapter: string.IsNullOrWhiteSpace(_context.Adapter) ? null : _context.Adapter,
+            partition: partition);
+
+        await Data<TEntity, TKey>.UpsertAsync(_entity, ct);
     }
 
     public string GetAdapterHint()
@@ -89,26 +77,14 @@ internal sealed class DeleteOperation<TEntity, TKey> : ITrackedOperation
 
     public async Task ExecuteAsync(CancellationToken ct)
     {
-        // Execute using the appropriate context
-        if (!string.IsNullOrWhiteSpace(_partition))
-        {
-            using var _ = EntityContext.Partition(_partition);
-            await Data<TEntity, TKey>.DeleteAsync(_id, ct);
-        }
-        else if (!string.IsNullOrWhiteSpace(_context.Source))
-        {
-            using var _ = EntityContext.Source(_context.Source);
-            await Data<TEntity, TKey>.DeleteAsync(_id, ct);
-        }
-        else if (!string.IsNullOrWhiteSpace(_context.Adapter))
-        {
-            using var _ = EntityContext.Adapter(_context.Adapter);
-            await Data<TEntity, TKey>.DeleteAsync(_id, ct);
-        }
-        else
-        {
-            await Data<TEntity, TKey>.DeleteAsync(_id, ct);
-        }
+        var partition = _partition ?? _context.Partition;
+
+        using var _ = EntityContext.With(
+            source: string.IsNullOrWhiteSpace(_context.Source) ? null : _context.Source,
+            adapter: string.IsNullOrWhiteSpace(_context.Adapter) ? null : _context.Adapter,
+            partition: partition);
+
+        await Data<TEntity, TKey>.DeleteAsync(_id, ct);
     }
 
     public string GetAdapterHint()

@@ -1,15 +1,10 @@
 using FluentAssertions;
 using Koan.Context.Models;
-using Koan.Context.Services; // For FileType, DiscoveredFile, ExtractedDocument, etc.
+using Koan.Context.Services;
 using Koan.Data.Core;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
-using DiscoveryService = Koan.Context.Services.Discovery;
-using ExtractionService = Koan.Context.Services.Extraction;
-using ChunkerService = Koan.Context.Services.Chunker;
-using EmbeddingsService = Koan.Context.Services.Embeddings;
-using IndexerService = Koan.Context.Services.Indexer;
 
 namespace Koan.Tests.Context.Unit.Specs.Indexing;
 
@@ -27,12 +22,12 @@ namespace Koan.Tests.Context.Unit.Specs.Indexing;
 /// </remarks>
 public class IndexingServiceSpec
 {
-    private readonly Mock<DiscoveryService> _discoveryMock;
-    private readonly Mock<ExtractionService> _extractionMock;
-    private readonly Mock<ChunkerService> _chunkingMock;
-    private readonly Mock<EmbeddingsService> _embeddingMock;
-    private readonly Mock<ILogger<IndexerService>> _loggerMock;
-    private readonly IndexerService _service;
+    private readonly Mock<IDocumentDiscoveryService> _discoveryMock;
+    private readonly Mock<IContentExtractionService> _extractionMock;
+    private readonly Mock<IChunkingService> _chunkingMock;
+    private readonly Mock<IEmbeddingService> _embeddingMock;
+    private readonly Mock<ILogger<IndexingService>> _loggerMock;
+    private readonly IndexingService _service;
 
     private readonly Guid _testProjectId = Guid.NewGuid();
     private readonly string _testProjectIdString;
@@ -40,15 +35,15 @@ public class IndexingServiceSpec
 
     public IndexingServiceSpec()
     {
-        _discoveryMock = new Mock<DiscoveryService>();
-        _extractionMock = new Mock<ExtractionService>();
-        _chunkingMock = new Mock<ChunkerService>();
-        _embeddingMock = new Mock<EmbeddingsService>();
-        _loggerMock = new Mock<ILogger<IndexerService>>();
+        _discoveryMock = new Mock<IDocumentDiscoveryService>();
+        _extractionMock = new Mock<IContentExtractionService>();
+        _chunkingMock = new Mock<IChunkingService>();
+        _embeddingMock = new Mock<IEmbeddingService>();
+        _loggerMock = new Mock<ILogger<IndexingService>>();
 
         _testProjectIdString = _testProjectId.ToString();
 
-        _service = new IndexerService(
+        _service = new IndexingService(
             _discoveryMock.Object,
             _extractionMock.Object,
             _chunkingMock.Object,

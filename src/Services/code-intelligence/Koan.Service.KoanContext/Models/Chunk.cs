@@ -116,6 +116,11 @@ public class Chunk : Entity<Chunk>
     public string? FileHash { get; set; }
 
     /// <summary>
+    /// Deterministic version hash used to reconcile vector payloads.
+    /// </summary>
+    public string VectorVersion { get; set; } = string.Empty;
+
+    /// <summary>
     /// Creates a new Chunk with required fields
     /// </summary>
     /// <remarks>

@@ -24,7 +24,7 @@ public sealed class DeliverablesController : ControllerBase
     [HttpGet("latest")]
     public async Task<ActionResult<Deliverable>> GetLatest(string pipelineId, CancellationToken ct)
     {
-        var latest = await GetLatestDeliverable(pipelineId, ct);
+        var latest = await GetLatestDeliverable(pipelineId, ct).ConfigureAwait(false);
         if (latest is null)
         {
             return NotFound();
@@ -36,39 +36,39 @@ public sealed class DeliverablesController : ControllerBase
     [HttpGet("markdown")]
     public async Task<IActionResult> GetMarkdown(string pipelineId, CancellationToken ct)
     {
-        var deliverable = await GetLatestDeliverable(pipelineId, ct);
+        var deliverable = await GetLatestDeliverable(pipelineId, ct).ConfigureAwait(false);
         if (deliverable is null)
         {
             return NotFound();
         }
 
-        var markdown = await _renderer.RenderMarkdownAsync(deliverable, ct);
+        var markdown = await _renderer.RenderMarkdownAsync(deliverable, ct).ConfigureAwait(false);
         return Content(markdown, "text/markdown");
     }
 
     [HttpGet("json")]
     public async Task<IActionResult> GetJson(string pipelineId, CancellationToken ct)
     {
-        var deliverable = await GetLatestDeliverable(pipelineId, ct);
+        var deliverable = await GetLatestDeliverable(pipelineId, ct).ConfigureAwait(false);
         if (deliverable is null)
         {
             return NotFound();
         }
 
-        var json = await _renderer.RenderJsonAsync(deliverable, ct);
+        var json = await _renderer.RenderJsonAsync(deliverable, ct).ConfigureAwait(false);
         return Content(json, "application/json");
     }
 
     [HttpGet("pdf")]
     public async Task<IActionResult> GetPdf(string pipelineId, CancellationToken ct)
     {
-        var deliverable = await GetLatestDeliverable(pipelineId, ct);
+        var deliverable = await GetLatestDeliverable(pipelineId, ct).ConfigureAwait(false);
         if (deliverable is null)
         {
             return NotFound();
         }
 
-        var pdf = await _renderer.RenderPdfAsync(deliverable, ct);
+        var pdf = await _renderer.RenderPdfAsync(deliverable, ct).ConfigureAwait(false);
         if (pdf.Length == 0)
         {
             return StatusCode(StatusCodes.Status503ServiceUnavailable, "PDF renderer unavailable.");
@@ -83,7 +83,7 @@ public sealed class DeliverablesController : ControllerBase
 
     private static async Task<Deliverable?> GetLatestDeliverable(string pipelineId, CancellationToken ct)
     {
-        var pipeline = await DocumentPipeline.Get(pipelineId, ct);
+        var pipeline = await DocumentPipeline.Get(pipelineId, ct).ConfigureAwait(false);
         if (pipeline is null)
         {
             return null;
@@ -91,14 +91,14 @@ public sealed class DeliverablesController : ControllerBase
 
         if (!string.IsNullOrWhiteSpace(pipeline.DeliverableId))
         {
-            var deliverable = await Deliverable.Get(pipeline.DeliverableId, ct);
+            var deliverable = await Deliverable.Get(pipeline.DeliverableId, ct).ConfigureAwait(false);
             if (deliverable is not null)
             {
                 return deliverable;
             }
         }
 
-        var deliverables = await Deliverable.Query(d => d.PipelineId == pipelineId, ct);
+        var deliverables = await Deliverable.Query(d => d.PipelineId == pipelineId, ct).ConfigureAwait(false);
         return deliverables
             .Where(d => string.Equals(d.PipelineId, pipelineId, StringComparison.Ordinal))
             .OrderByDescending(d => d.CreatedAt)

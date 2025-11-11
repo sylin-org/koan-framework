@@ -46,6 +46,7 @@ builder.Services.AddSingleton<ProjectResolver>();
 builder.Services.AddSingleton<TokenCounter, TokenCounter>();
 builder.Services.AddSingleton<IncrementalIndexer>();
 builder.Services.AddSingleton<IndexingCoordinator>();
+builder.Services.AddSingleton<IIndexingResumptionQueue, IndexingResumptionQueue>();
 builder.Services.AddSingleton<Metrics>();
 builder.Services.AddSingleton<TagResolver>();
 builder.Services.AddScoped<ISearchService>(sp => sp.GetRequiredService<Search>());
@@ -61,6 +62,7 @@ builder.Services.AddSingleton<MetricsCollector>();
 builder.Services.AddSingleton<EnhancedMetrics>();
 
 builder.Services.AddHostedService<FileMonitoringService>();
+builder.Services.AddHostedService<IndexingResumptionWorker>();
 builder.Services.AddSingleton<FileMonitoringService>(sp =>
     (FileMonitoringService)sp.GetServices<IHostedService>()
         .First(s => s is FileMonitoringService));

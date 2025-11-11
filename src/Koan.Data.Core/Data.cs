@@ -373,18 +373,23 @@ public static class Data<TEntity, TKey>
         return await repo.UpsertAsync(current, ct);
     }
 
-    public static Task<TEntity> UpsertAsync(TEntity model, CancellationToken ct = default)
+    public static async Task<TEntity> UpsertAsync(TEntity model, CancellationToken ct = default)
     {
         // Check if in transaction - defer execution if so
         var context = EntityContext.Current;
         if (context?.TransactionCoordinator != null)
         {
+            var manager = Koan.Core.Hosting.App.AppHost.Current?.GetService<IAggregateIdentityManager>()
+                ?? throw new InvalidOperationException("Aggregate identity manager not registered. Ensure services.AddKoanDataCore() is configured correctly.");
+
+            await manager.EnsureIdAsync<TEntity, TKey>(model, ct);
+
             context.TransactionCoordinator.TrackSave<TEntity, TKey>(model, context);
-            return Task.FromResult(model);  // Return immediately - actual execution deferred
+            return model;  // Return immediately - actual execution deferred
         }
 
         // Not in transaction - execute immediately
-        return Repo.UpsertAsync(model, ct);
+        return await Repo.UpsertAsync(model, ct);
     }
     public static Task<int> UpsertManyAsync(IEnumerable<TEntity> models, CancellationToken ct = default) => Repo.UpsertManyAsync(models, ct);
     public static IBatchSet<TEntity, TKey> Batch() => Repo.CreateBatch();

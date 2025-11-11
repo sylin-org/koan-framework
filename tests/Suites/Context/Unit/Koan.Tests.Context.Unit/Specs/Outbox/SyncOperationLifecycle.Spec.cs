@@ -23,11 +23,16 @@ public class SyncOperationLifecycle_Spec
         var metadata = new { FilePath = "docs/file.md", StartLine = 1, EndLine = 10 };
 
         // Act
-        var operation = SyncOperation.Create(jobId, chunkId, projectId, embedding, metadata);
+    var indexedFileId = Guid.NewGuid().ToString();
+
+    var operation = SyncOperation.Create(jobId, chunkId, indexedFileId, projectId, embedding, metadata);
 
         // Assert
         operation.JobId.Should().Be(jobId);
         operation.ChunkId.Should().Be(chunkId);
+    operation.IndexedFileId.Should().Be(indexedFileId);
+    operation.Id.Should().Be(SyncOperation.ComposeId(chunkId, SyncOperationKind.SyncVector));
+    operation.Kind.Should().Be(SyncOperationKind.SyncVector);
         operation.ProjectId.Should().Be(projectId);
         operation.Status.Should().Be(OperationStatus.Pending);
         operation.RetryCount.Should().Be(0);
@@ -42,6 +47,7 @@ public class SyncOperationLifecycle_Spec
     {
         // Arrange
         var operation = SyncOperation.Create(
+            Guid.NewGuid().ToString(),
             Guid.NewGuid().ToString(),
             Guid.NewGuid().ToString(),
             Guid.NewGuid().ToString(),
@@ -68,6 +74,7 @@ public class SyncOperationLifecycle_Spec
             Guid.NewGuid().ToString(),
             Guid.NewGuid().ToString(),
             Guid.NewGuid().ToString(),
+            Guid.NewGuid().ToString(),
             new[] { 0.1f, 0.2f });
         operation.RecordFailure("transient");
 
@@ -78,5 +85,37 @@ public class SyncOperationLifecycle_Spec
         operation.Status.Should().Be(OperationStatus.Completed);
         operation.CompletedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(2));
         operation.LastError.Should().BeNull();
+    }
+
+    [Fact]
+    public void Reset_RequeuesWithDeterministicIdentity()
+    {
+        // Arrange
+        var chunkId = Guid.NewGuid().ToString();
+        var originalJob = Guid.NewGuid().ToString();
+        var indexedFileId = Guid.NewGuid().ToString();
+        var projectId = Guid.NewGuid().ToString();
+        var operation = SyncOperation.Create(
+            originalJob,
+            chunkId,
+            indexedFileId,
+            projectId,
+            new[] { 1f, 2f });
+
+        operation.MarkCompleted();
+
+        var newJob = Guid.NewGuid().ToString();
+        var newEmbedding = new[] { 5f, 6f };
+
+        // Act
+        operation.Reset(newJob, indexedFileId, projectId, newEmbedding);
+
+        // Assert
+        operation.Id.Should().Be(SyncOperation.ComposeId(chunkId, SyncOperationKind.SyncVector));
+        operation.JobId.Should().Be(newJob);
+        operation.Status.Should().Be(OperationStatus.Pending);
+        operation.RetryCount.Should().Be(0);
+        operation.CompletedAt.Should().BeNull();
+        operation.GetEmbedding().Should().BeEquivalentTo(newEmbedding);
     }
 }

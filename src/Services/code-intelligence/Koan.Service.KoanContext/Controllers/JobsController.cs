@@ -365,7 +365,7 @@ public class JobsController : ControllerBase
                 });
             }
 
-            job.Cancel();
+            await job.Cancel(cancellationToken);
             await job.Save(cancellationToken);
 
             _logger.LogInformation("Job {JobId} cancelled for project {ProjectId}", jobId, job.ProjectId);

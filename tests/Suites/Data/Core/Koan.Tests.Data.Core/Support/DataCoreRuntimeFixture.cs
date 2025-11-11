@@ -4,6 +4,7 @@ using Koan.Core.Hosting.Runtime;
 using Koan.Data.Abstractions.Naming;
 using Koan.Data.Connector.Json;
 using Koan.Data.Connector.Sqlite;
+using Koan.Data.Core.Transactions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -63,7 +64,8 @@ internal sealed class DataCoreRuntimeFixture : IAsyncDisposable
         services.AddSingleton<IConfiguration>(configuration);
         services.AddKoan();
         services.AddSingleton<IStorageNameResolver, DefaultStorageNameResolver>();
-        services.AddJsonAdapter(o => o.DirectoryPath = root);
+    services.AddJsonAdapter(o => o.DirectoryPath = root);
+    services.AddKoanTransactions();
         if (includeSqlite)
         {
             services.AddSqliteAdapter(o => o.ConnectionString = $"Data Source={sqlitePath}");

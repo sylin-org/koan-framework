@@ -12,7 +12,7 @@ namespace Koan.Context.Services;
 /// <remarks>
 /// Provides real-time instrumentation for:
 /// - Search query performance
-/// - Outbox queue health
+/// - Vector synchronization queue health
 /// - Job processing metrics
 /// - Component health status
 ///
@@ -28,11 +28,11 @@ public class MetricsCollector : IDisposable
     private readonly Counter<long> _searchQueryCounter;
     private readonly Histogram<double> _searchLatencyHistogram;
     private readonly Counter<long> _searchErrorCounter;
-    private readonly ObservableGauge<int> _outboxPendingGauge;
-    private readonly ObservableGauge<int> _outboxDeadLetterGauge;
-    private readonly Counter<long> _outboxProcessedCounter;
-    private readonly Counter<long> _outboxFailedCounter;
-    private readonly Histogram<double> _outboxAgeHistogram;
+    private readonly ObservableGauge<int> _vectorPendingGauge;
+    private readonly ObservableGauge<int> _vectorFailedGauge;
+    private readonly Counter<long> _vectorProcessedCounter;
+    private readonly Counter<long> _vectorFailedCounter;
+    private readonly Histogram<double> _vectorAgeHistogram;
     private readonly Counter<long> _jobCompletedCounter;
     private readonly Counter<long> _jobFailedCounter;
     private readonly Histogram<double> _jobDurationHistogram;
@@ -43,13 +43,13 @@ public class MetricsCollector : IDisposable
 
     // In-memory time-series storage (last 24 hours)
     private readonly ConcurrentQueue<SearchMetricEntry> _searchMetrics = new();
-    private readonly ConcurrentQueue<OutboxMetricEntry> _outboxMetrics = new();
+    private readonly ConcurrentQueue<VectorQueueMetricEntry> _vectorQueueMetrics = new();
     private readonly ConcurrentQueue<JobMetricEntry> _jobMetrics = new();
     private readonly TimeSpan _retentionPeriod = TimeSpan.FromHours(24);
 
     // Current state for observable gauges
-    private int _currentOutboxPending;
-    private int _currentOutboxDeadLetter;
+    private int _currentVectorPending;
+    private int _currentVectorFailed;
     private int _currentActiveJobs;
     private int _currentVectorCollections;
     private long _currentVectorCount;
@@ -74,29 +74,29 @@ public class MetricsCollector : IDisposable
             "koan.search.errors.total",
             description: "Total number of search query errors");
 
-        // Outbox metrics
-        _outboxPendingGauge = _meter.CreateObservableGauge(
-            "koan.outbox.pending",
-            () => _currentOutboxPending,
-            description: "Number of pending outbox operations");
+        // Vector sync queue metrics
+        _vectorPendingGauge = _meter.CreateObservableGauge(
+            "koan.vector.queue.pending",
+            () => _currentVectorPending,
+            description: "Number of chunks awaiting vector synchronization");
 
-        _outboxDeadLetterGauge = _meter.CreateObservableGauge(
-            "koan.outbox.deadletter",
-            () => _currentOutboxDeadLetter,
-            description: "Number of operations in dead-letter queue");
+        _vectorFailedGauge = _meter.CreateObservableGauge(
+            "koan.vector.queue.failed",
+            () => _currentVectorFailed,
+            description: "Number of chunk snapshots marked as failed");
 
-        _outboxProcessedCounter = _meter.CreateCounter<long>(
-            "koan.outbox.processed.total",
-            description: "Total number of successfully processed outbox operations");
+        _vectorProcessedCounter = _meter.CreateCounter<long>(
+            "koan.vector.queue.processed.total",
+            description: "Total number of vector snapshots processed successfully");
 
-        _outboxFailedCounter = _meter.CreateCounter<long>(
-            "koan.outbox.failed.total",
-            description: "Total number of failed outbox operations");
+        _vectorFailedCounter = _meter.CreateCounter<long>(
+            "koan.vector.queue.failed.total",
+            description: "Total number of vector snapshots that exhausted retry policy");
 
-        _outboxAgeHistogram = _meter.CreateHistogram<double>(
-            "koan.outbox.age",
+        _vectorAgeHistogram = _meter.CreateHistogram<double>(
+            "koan.vector.queue.oldest",
             unit: "s",
-            description: "Age of oldest pending outbox operation in seconds");
+            description: "Age of the oldest pending vector snapshot in seconds");
 
         // Job metrics
         _jobCompletedCounter = _meter.CreateCounter<long>(
@@ -211,46 +211,46 @@ public class MetricsCollector : IDisposable
 
     #endregion
 
-    #region Outbox Metrics
+    #region Vector Queue Metrics
 
     /// <summary>
-    /// Updates current outbox queue state
+    /// Updates current vector synchronization queue state
     /// </summary>
-    public void UpdateOutboxState(int pending, int deadLetter, double oldestAgeSeconds)
+    public void UpdateVectorQueueState(int pending, int failed, double oldestAgeSeconds)
     {
-        _currentOutboxPending = pending;
-        _currentOutboxDeadLetter = deadLetter;
+        _currentVectorPending = pending;
+        _currentVectorFailed = failed;
 
         if (oldestAgeSeconds > 0)
         {
-            _outboxAgeHistogram.Record(oldestAgeSeconds);
+            _vectorAgeHistogram.Record(oldestAgeSeconds);
         }
 
         // Store in time-series
-        var entry = new OutboxMetricEntry
+        var entry = new VectorQueueMetricEntry
         {
             Timestamp = DateTime.UtcNow,
             PendingCount = pending,
-            DeadLetterCount = deadLetter,
+            FailedCount = failed,
             OldestAgeSeconds = oldestAgeSeconds
         };
 
-        _outboxMetrics.Enqueue(entry);
-        CleanupOldMetrics(_outboxMetrics);
+        _vectorQueueMetrics.Enqueue(entry);
+        CleanupOldMetrics(_vectorQueueMetrics);
     }
 
     /// <summary>
-    /// Records outbox operation processing
+    /// Records vector snapshot processing results
     /// </summary>
-    public void RecordOutboxProcessed(int count, bool success)
+    public void RecordVectorProcessing(int count, bool success)
     {
         if (success)
         {
-            _outboxProcessedCounter.Add(count);
+            _vectorProcessedCounter.Add(count);
         }
         else
         {
-            _outboxFailedCounter.Add(count);
+            _vectorFailedCounter.Add(count);
         }
     }
 
@@ -345,12 +345,12 @@ public class MetricsCollector : IDisposable
     }
 
     /// <summary>
-    /// Gets outbox metrics for a time range
+    /// Gets vector queue metrics for a time range
     /// </summary>
-    public IEnumerable<OutboxMetricEntry> GetOutboxMetrics(DateTime? since = null)
+    public IEnumerable<VectorQueueMetricEntry> GetVectorQueueMetrics(DateTime? since = null)
     {
         var cutoff = since ?? DateTime.UtcNow.Subtract(_retentionPeriod);
-        return _outboxMetrics.Where(m => m.Timestamp >= cutoff).OrderBy(m => m.Timestamp);
+        return _vectorQueueMetrics.Where(m => m.Timestamp >= cutoff).OrderBy(m => m.Timestamp);
     }
 
     /// <summary>
@@ -440,11 +440,11 @@ public record SearchMetricEntry : IMetricEntry
     public string? ErrorMessage { get; init; }
 }
 
-public record OutboxMetricEntry : IMetricEntry
+public record VectorQueueMetricEntry : IMetricEntry
 {
     public DateTime Timestamp { get; init; }
     public int PendingCount { get; init; }
-    public int DeadLetterCount { get; init; }
+    public int FailedCount { get; init; }
     public double OldestAgeSeconds { get; init; }
 }
 

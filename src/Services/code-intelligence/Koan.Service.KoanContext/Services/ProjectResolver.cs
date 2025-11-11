@@ -33,7 +33,7 @@ public class ProjectResolver
     /// <summary>
     /// Resolve project by ID, working directory, or HTTP context
     /// </summary>
-    public async Task<Project?> ResolveProjectAsync(
+    public virtual async Task<Project?> ResolveProjectAsync(
         string? libraryId,
         string? workingDirectory,
         HttpContext? httpContext = null,
@@ -78,7 +78,7 @@ public class ProjectResolver
     /// <summary>
     /// Resolve project from file path (detects git root, matches existing projects)
     /// </summary>
-    public async Task<Project?> ResolveProjectByPathAsync(
+    public virtual async Task<Project?> ResolveProjectByPathAsync(
         string pathContext,
         bool autoCreate = true,
         CancellationToken cancellationToken = default)

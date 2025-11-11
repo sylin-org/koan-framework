@@ -184,27 +184,27 @@ public class MetricsController : ControllerBase
     }
 
     /// <summary>
-    /// Get P0 outbox queue health metrics
+    /// Get P0 vector queue health metrics
     /// </summary>
     /// <remarks>
-    /// Critical metrics for monitoring dual-store sync health:
-    /// - Pending operations count
-    /// - Dead-letter queue size
-    /// - Oldest pending operation age
+    /// Critical metrics for monitoring vector synchronization health:
+    /// - Pending snapshot count
+    /// - Failed snapshot count
+    /// - Oldest pending snapshot age
     /// - Processing rate
     /// - Per-project breakdown
     ///
     /// Alerts trigger at:
     /// - ⚠️ Pending > 100 or Age > 60s
-    /// - 🚨 Pending > 500 or Age > 300s or DeadLetter > 0
+    /// - 🚨 Pending > 500 or Age > 300s or Failed > 0
     /// </remarks>
-    /// <returns>Outbox health status with alert thresholds</returns>
-    [HttpGet("outbox")]
-    public async Task<IActionResult> GetOutboxHealth(CancellationToken cancellationToken = default)
+    /// <returns>Vector queue health status with alert thresholds</returns>
+    [HttpGet("vector-queue")]
+    public async Task<IActionResult> GetVectorQueueHealth(CancellationToken cancellationToken = default)
     {
         try
         {
-            var metrics = await _enhancedMetrics.GetOutboxHealthAsync(cancellationToken);
+            var metrics = await _enhancedMetrics.GetVectorQueueHealthAsync(cancellationToken);
 
             return Ok(new
             {
@@ -213,7 +213,9 @@ public class MetricsController : ControllerBase
                 {
                     timestamp = metrics.Timestamp,
                     healthStatus = metrics.HealthStatus.ToString().ToLower(),
-                    alerts = GetOutboxAlerts(metrics)
+                    alerts = GetVectorQueueAlerts(metrics)
+                        .Select(ToAlertPayload)
+                        .ToList()
                 }
             });
         }
@@ -221,7 +223,7 @@ public class MetricsController : ControllerBase
         {
             return StatusCode(500, new
             {
-                error = "Failed to retrieve outbox health metrics",
+                error = "Failed to retrieve vector queue health metrics",
                 details = ex.Message
             });
         }
@@ -235,7 +237,7 @@ public class MetricsController : ControllerBase
     /// - SQLite database connectivity
     /// - Weaviate vector store (with latency)
     /// - File monitoring service
-    /// - Outbox worker processing
+    /// - Vector sync worker processing
     ///
     /// Results include individual component status and overall system health.
     /// </remarks>
@@ -296,6 +298,8 @@ public class MetricsController : ControllerBase
                 {
                     timestamp = metrics.Timestamp,
                     alerts = GetJobSystemAlerts(metrics)
+                        .Select(ToAlertPayload)
+                        .ToList()
                 }
             });
         }
@@ -448,7 +452,7 @@ public class MetricsController : ControllerBase
     /// <remarks>
     /// Aggregated metrics for dashboard overview panel:
     /// - Critical alerts from all systems
-    /// - Outbox health summary
+    /// - Vector queue health summary
     /// - Component health summary
     /// - Job system status
     /// - Search performance summary
@@ -461,42 +465,52 @@ public class MetricsController : ControllerBase
     {
         try
         {
-            var outbox = await _enhancedMetrics.GetOutboxHealthAsync(cancellationToken);
+            var vectorQueue = await _enhancedMetrics.GetVectorQueueHealthAsync(cancellationToken);
             var components = await _enhancedMetrics.GetComponentHealthAsync(cancellationToken);
             var jobs = await _enhancedMetrics.GetJobSystemMetricsAsync(cancellationToken);
             var searchStats = _metricsCollector.CalculateSearchStats(TimeSpan.FromHours(1));
 
             // Aggregate critical alerts
-            var criticalAlerts = new List<object>();
-            var outboxAlerts = GetOutboxAlerts(outbox);
+            var vectorQueueAlerts = GetVectorQueueAlerts(vectorQueue);
             var jobAlerts = GetJobSystemAlerts(jobs);
 
-            criticalAlerts.AddRange(outboxAlerts.Where(a => ((dynamic)a).Severity == "critical"));
-            criticalAlerts.AddRange(jobAlerts.Where(a => ((dynamic)a).Severity == "critical"));
+            var criticalAlertDescriptors = new List<AlertDescriptor>();
+            criticalAlertDescriptors.AddRange(vectorQueueAlerts.Where(alert => string.Equals(alert.Severity, "critical", System.StringComparison.OrdinalIgnoreCase)));
+            criticalAlertDescriptors.AddRange(jobAlerts.Where(alert => string.Equals(alert.Severity, "critical", System.StringComparison.OrdinalIgnoreCase)));
 
             if (!components.OverallHealthy)
             {
                 var degraded = components.Components.Where(c => c.Status != Koan.Context.Services.HealthStatus.Healthy);
-                criticalAlerts.AddRange(degraded.Select(c => new
+                foreach (var component in degraded)
                 {
-                    Type = "component",
-                    Component = c.Name,
-                    Status = c.Status.ToString(),
-                    Message = c.Message,
-                    Severity = c.Status == Koan.Context.Services.HealthStatus.Critical ? "critical" : "warning"
-                }));
+                    var severity = component.Status == Koan.Context.Services.HealthStatus.Critical ? "critical" : "warning";
+                    criticalAlertDescriptors.Add(new AlertDescriptor(
+                        Type: "component",
+                        Severity: severity,
+                        Message: component.Message,
+                        Metadata: new
+                        {
+                            component = component.Name,
+                            status = component.Status.ToString(),
+                            latencyMs = component.LatencyMs
+                        }));
+                }
             }
+
+            var criticalAlerts = criticalAlertDescriptors
+                .Select(ToAlertPayload)
+                .ToList();
 
             return Ok(new
             {
                 data = new
                 {
-                    outboxHealth = new
+                    vectorQueueHealth = new
                     {
-                        status = outbox.HealthStatus.ToString().ToLower(),
-                        pending = outbox.PendingCount,
-                        deadLetter = outbox.DeadLetterCount,
-                        processingRate = outbox.ProcessingRatePerSecond
+                        status = vectorQueue.HealthStatus.ToString().ToLower(),
+                        pending = vectorQueue.PendingCount,
+                        failed = vectorQueue.FailedCount,
+                        processingRate = vectorQueue.ProcessingRatePerSecond
                     },
                     componentHealth = new
                     {
@@ -546,102 +560,84 @@ public class MetricsController : ControllerBase
 
     #region Alert Helper Methods
 
-    private static List<object> GetOutboxAlerts(Services.OutboxHealthMetrics metrics)
+    private static List<AlertDescriptor> GetVectorQueueAlerts(Services.VectorQueueHealthMetrics metrics)
     {
-        var alerts = new List<object>();
+        var alerts = new List<AlertDescriptor>();
 
-        if (metrics.DeadLetterCount > 0)
+        if (metrics.FailedCount > 0)
         {
-            alerts.Add(new
-            {
-                Type = "outbox",
-                Severity = "critical",
-                Message = $"Dead-letter queue has {metrics.DeadLetterCount} operations requiring manual intervention"
-            });
+            alerts.Add(new AlertDescriptor(
+                Type: "vector_queue",
+                Severity: "critical",
+                Message: $"Vector queue has {metrics.FailedCount} failed snapshot(s) requiring manual intervention"));
         }
 
         if (metrics.PendingCount > 500)
         {
-            alerts.Add(new
-            {
-                Type = "outbox",
-                Severity = "critical",
-                Message = $"Outbox queue critically high: {metrics.PendingCount} pending operations"
-            });
+            alerts.Add(new AlertDescriptor(
+                Type: "vector_queue",
+                Severity: "critical",
+                Message: $"Vector queue critically high: {metrics.PendingCount} pending snapshots"));
         }
         else if (metrics.PendingCount > 100)
         {
-            alerts.Add(new
-            {
-                Type = "outbox",
-                Severity = "warning",
-                Message = $"Outbox queue elevated: {metrics.PendingCount} pending operations"
-            });
+            alerts.Add(new AlertDescriptor(
+                Type: "vector_queue",
+                Severity: "warning",
+                Message: $"Vector queue elevated: {metrics.PendingCount} pending snapshots"));
         }
 
         if (metrics.OldestAgeSeconds > 300)
         {
-            alerts.Add(new
-            {
-                Type = "outbox",
-                Severity = "critical",
-                Message = $"Oldest pending operation is {(int)metrics.OldestAgeSeconds}s old (>5 minutes)"
-            });
+            alerts.Add(new AlertDescriptor(
+                Type: "vector_queue",
+                Severity: "critical",
+                Message: $"Oldest pending snapshot is {(int)metrics.OldestAgeSeconds}s old (>5 minutes)"));
         }
         else if (metrics.OldestAgeSeconds > 60)
         {
-            alerts.Add(new
-            {
-                Type = "outbox",
-                Severity = "warning",
-                Message = $"Oldest pending operation is {(int)metrics.OldestAgeSeconds}s old (>1 minute)"
-            });
+            alerts.Add(new AlertDescriptor(
+                Type: "vector_queue",
+                Severity: "warning",
+                Message: $"Oldest pending snapshot is {(int)metrics.OldestAgeSeconds}s old (>1 minute)"));
         }
 
         return alerts;
     }
 
-    private static List<object> GetJobSystemAlerts(Services.JobSystemMetrics metrics)
+    private static List<AlertDescriptor> GetJobSystemAlerts(Services.JobSystemMetrics metrics)
     {
-        var alerts = new List<object>();
+        var alerts = new List<AlertDescriptor>();
 
         if (metrics.SuccessRate24h < 80)
         {
-            alerts.Add(new
-            {
-                Type = "jobs",
-                Severity = "critical",
-                Message = $"Job success rate critically low: {metrics.SuccessRate24h:F1}% (last 24h)"
-            });
+            alerts.Add(new AlertDescriptor(
+                Type: "jobs",
+                Severity: "critical",
+                Message: $"Job success rate critically low: {metrics.SuccessRate24h:F1}% (last 24h)"));
         }
         else if (metrics.SuccessRate24h < 90)
         {
-            alerts.Add(new
-            {
-                Type = "jobs",
-                Severity = "warning",
-                Message = $"Job success rate below threshold: {metrics.SuccessRate24h:F1}% (last 24h)"
-            });
+            alerts.Add(new AlertDescriptor(
+                Type: "jobs",
+                Severity: "warning",
+                Message: $"Job success rate below threshold: {metrics.SuccessRate24h:F1}% (last 24h)"));
         }
 
         if (metrics.ActiveJobsCount > 10)
         {
-            alerts.Add(new
-            {
-                Type = "jobs",
-                Severity = "warning",
-                Message = $"High concurrent job count: {metrics.ActiveJobsCount} active jobs"
-            });
+            alerts.Add(new AlertDescriptor(
+                Type: "jobs",
+                Severity: "warning",
+                Message: $"High concurrent job count: {metrics.ActiveJobsCount} active jobs"));
         }
 
         if (metrics.QueuedJobsCount > 3)
         {
-            alerts.Add(new
-            {
-                Type = "jobs",
-                Severity = "warning",
-                Message = $"Job queue backlog: {metrics.QueuedJobsCount} jobs waiting"
-            });
+            alerts.Add(new AlertDescriptor(
+                Type: "jobs",
+                Severity: "warning",
+                Message: $"Job queue backlog: {metrics.QueuedJobsCount} jobs waiting"));
         }
 
         return alerts;
@@ -725,6 +721,29 @@ public class MetricsController : ControllerBase
 
         return alerts;
     }
+
+    private static object ToAlertPayload(AlertDescriptor descriptor)
+    {
+        if (descriptor.Metadata is null)
+        {
+            return new
+            {
+                type = descriptor.Type,
+                severity = descriptor.Severity,
+                message = descriptor.Message
+            };
+        }
+
+        return new
+        {
+            type = descriptor.Type,
+            severity = descriptor.Severity,
+            message = descriptor.Message,
+            metadata = descriptor.Metadata
+        };
+    }
+
+    private sealed record AlertDescriptor(string Type, string Severity, string Message, object? Metadata = null);
 
     private static string FormatBytes(long bytes)
     {

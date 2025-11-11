@@ -22,8 +22,8 @@ namespace Koan.Context.Services;
 /// </summary>
 /// <remarks>
 /// Parallel Processing Architecture:
-/// - Indexer (producer stream): Chunks files and creates SyncOperations
-/// - VectorSyncWorker (consumer stream): Processes SyncOperations and syncs to Weaviate
+/// - Indexer (producer stream): Chunks files and creates ChunkVectorState snapshots
+/// - VectorSyncWorker (consumer stream): Processes ChunkVectorState payloads and syncs to Weaviate
 /// - Both streams run in parallel from the first batch
 /// - Job completes when: all files chunked AND all vectors synced to Weaviate
 ///
@@ -32,7 +32,7 @@ namespace Koan.Context.Services;
 /// 2. Plan differential scan (SHA256-based change detection)
 /// 3. Set partition context for project
 /// 4. Process changed/new files and create chunks (SQLite)
-/// 5. Create SyncOperations for Transactional Outbox Pattern
+/// 5. Persist ChunkVectorState snapshots for background synchronization
 /// 6. Update manifest with file hashes
 /// 7. Query actual counts from database
 /// 8. Update project metadata
@@ -43,7 +43,7 @@ namespace Koan.Context.Services;
 /// Progress Tracking:
 /// - Composite: 50% chunking (ProcessedFiles/TotalFiles) + 50% vector sync (VectorsSynced/ChunksCreated)
 /// - ChunksCreated: Chunks saved to SQLite
-/// - VectorsSaved: SyncOperations created (outbox records)
+/// - VectorsSaved: ChunkVectorState snapshots captured (ready for sync)
 /// - VectorsSynced: Vectors successfully saved to Weaviate
 ///
 /// QA Issue #2 FIXED: Added Polly retry for batch saves
@@ -352,7 +352,7 @@ public class Indexer
                 var filesProcessed = 0;
                 var chunksCreated = 0;
                 var vectorsSaved = 0;
-                var batch = new List<(string Id, float[] Embedding, object? Metadata)>();
+                var batch = new List<(string ChunkId, string IndexedFileId, string ChunkVersion, float[] Embedding, object? Metadata)>();
 
                 foreach (var file in filesToIndex)
                 {
@@ -375,7 +375,7 @@ public class Indexer
                             project.Status = IndexingStatus.Indexing;
 
                             // Exit partition context temporarily to update project and job in root table
-                            using (EntityContext.Partition(null))
+                            using (EntityContext.With(partition: null))
                             {
                                 await project.Save(effectiveCt);
                                 await job.Save(effectiveCt);
@@ -477,6 +477,9 @@ public class Indexer
                             var chunkTagResult = await _tagResolver.ResolveAsync(chunkTagInput, effectiveCt);
                             docChunk.SetTagEnvelope(chunkTagResult.Envelope);
 
+                            var chunkVersion = ChunkVersionCalculator.Calculate(projectId, docChunk);
+                            docChunk.VectorVersion = chunkVersion;
+
                             // Save to relational store immediately (no transaction buffering)
                             // Force synchronous commit to ensure chunk metadata is persisted
                             await docChunk.Save(effectiveCt);
@@ -489,7 +492,9 @@ public class Indexer
 
                             // Add to vector batch
                             batch.Add((
-                                Id: docChunk.Id,
+                                ChunkId: docChunk.Id,
+                                IndexedFileId: docChunk.IndexedFileId,
+                                ChunkVersion: chunkVersion,
                                 Embedding: embedding,
                                 Metadata: new ChunkVectorMetadata
                                 {
@@ -513,13 +518,15 @@ public class Indexer
 
                             chunksCreated++;
                             fileChunks++;
+                            vectorsSaved = chunksCreated;
+                            job.VectorsSaved = vectorsSaved;
 
                             // Save batch when it reaches target size
                             if (batch.Count >= BatchSize)
                             {
                                 effectiveCt.ThrowIfCancellationRequested();
                                 await SaveVectorBatchAsync(job.Id, batch, projectId, effectiveCt);
-                                vectorsSaved += batch.Count;
+                                vectorsSaved = chunksCreated;
                                 batch.Clear();
                             }
                         }
@@ -556,7 +563,7 @@ public class Indexer
                 if (batch.Count > 0)
                 {
                     await SaveVectorBatchAsync(job.Id, batch, projectId, effectiveCt);
-                    vectorsSaved += batch.Count;
+                    vectorsSaved = chunksCreated;
                     job.VectorsSaved = vectorsSaved;
                     job.LogOperation($"Completed indexing: {filesProcessed} files processed, {chunksCreated} chunks created");
                 }
@@ -580,7 +587,7 @@ public class Indexer
                     project.Status);
 
                 // Exit partition context to save project in root table
-                using (EntityContext.Partition(null))
+                using (EntityContext.With(partition: null))
                 {
                     await project.Save(cancellationToken);
                 }
@@ -597,7 +604,7 @@ public class Indexer
             job.LogOperation($"Chunking phase complete: {job.ProcessedFiles} files, {job.ChunksCreated} chunks created");
 
             // Exit partition context to update job in root table
-            using (EntityContext.Partition(null))
+            using (EntityContext.With(partition: null))
             {
                 await job.Save(cancellationToken);
             }
@@ -605,7 +612,7 @@ public class Indexer
             stopwatch.Stop();
 
             _logger.LogInformation(
-                "Chunking complete: {FilesProcessed} files, {ChunksCreated} chunks, {VectorsSaved} outbox operations created in {Duration} (Job: {JobId}). " +
+                "Chunking complete: {FilesProcessed} files, {ChunksCreated} chunks, {VectorsSaved} vector snapshots captured in {Duration} (Job: {JobId}). " +
                 "Job will complete when VectorSyncWorker syncs all vectors to Weaviate.",
                 job.ProcessedFiles,
                 job.ChunksCreated,
@@ -640,11 +647,11 @@ public class Indexer
             // Mark job as cancelled
             if (job != null)
             {
-                job.Cancel();
+                await job.Cancel(CancellationToken.None);
                 job.ErrorMessage = "Cancelled by force restart";
 
                 // Exit partition context to update job in root table
-                using (EntityContext.Partition(null))
+                using (EntityContext.With(partition: null))
                 {
                     await job.Save(CancellationToken.None);
                 }
@@ -657,6 +664,7 @@ public class Indexer
             try
             {
                 var project = await Project.Get(projectId, CancellationToken.None);
+                if (project != null)
                 {
                     project.Status = IndexingStatus.Failed;
                     await project.Save(CancellationToken.None);
@@ -697,7 +705,7 @@ public class Indexer
                 job.Fail(ex.Message);
 
                 // Exit partition context to update job in root table
-                using (EntityContext.Partition(null))
+                using (EntityContext.With(partition: null))
                 {
                     await job.Save(CancellationToken.None);
                 }
@@ -710,6 +718,7 @@ public class Indexer
             try
             {
                 var project = await Project.Get(projectId, CancellationToken.None);
+                if (project != null)
                 {
                     project.Status = IndexingStatus.Failed;
                     project.LastError = ex.Message;
@@ -737,32 +746,52 @@ public class Indexer
     }
 
     /// <summary>
-    /// Saves a batch of vectors using Transactional Outbox Pattern
+    /// Persists vector payload snapshots for downstream synchronization.
     /// </summary>
     /// <remarks>
-    /// Instead of directly saving to vector store, creates SyncOperation records.
-    /// VectorSyncWorker polls these operations and retries with exponential backoff.
-    /// This ensures at-least-once delivery even if vector store is temporarily down.
+    /// Stores the latest embedding and metadata per chunk in <see cref="ChunkVectorState"/>.
+    /// The background worker consumes these snapshots idempotently, guaranteeing that each
+    /// chunk has at most one pending payload regardless of replays or restarts.
     /// </remarks>
     private async Task SaveVectorBatchAsync(
         string jobId,
-        List<(string Id, float[] Embedding, object? Metadata)> batch,
+        List<(string ChunkId, string IndexedFileId, string ChunkVersion, float[] Embedding, object? Metadata)> batch,
         string projectId,
         CancellationToken cancellationToken)
     {
-        // Exit partition context to save SyncOperation records in root table (outbox pattern)
-        using (EntityContext.Partition(null))
+        using (EntityContext.With(partition: null))
         {
-            // Create SyncOperation records for outbox pattern
-            foreach (var (id, embedding, metadata) in batch)
+            var created = 0;
+            var updated = 0;
+
+            foreach (var (chunkId, indexedFileId, chunkVersion, embedding, metadata) in batch)
             {
-                var operation = SyncOperation.Create(jobId, id, projectId, embedding, metadata);
-                await operation.Save(cancellationToken);
+                var state = await ChunkVectorState.Get(chunkId, cancellationToken);
+                if (state is null)
+                {
+                    state = ChunkVectorState.Create(
+                        chunkId,
+                        projectId,
+                        jobId,
+                        indexedFileId,
+                        chunkVersion,
+                        embedding,
+                        metadata);
+                    created++;
+                }
+                else
+                {
+                    state.Reset(projectId, jobId, indexedFileId, chunkVersion, embedding, metadata);
+                    updated++;
+                }
+
+                await state.Save(cancellationToken);
             }
 
             _logger.LogDebug(
-                "Created {Count} vector operations for outbox processing (job: {JobId}, project: {ProjectId})",
-                batch.Count,
+                "Upserted {Created} new and {Updated} existing vector snapshots (job: {JobId}, project: {ProjectId})",
+                created,
+                updated,
                 jobId,
                 projectId);
         }
