@@ -1,6 +1,8 @@
+using System.Collections.Generic;
 using FluentAssertions;
 using ExtractionService = Koan.Context.Services.Extraction;
 using Koan.Context.Services;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
@@ -17,12 +19,20 @@ public class ContentExtraction_Spec : IDisposable
 {
     private readonly Mock<ILogger<ExtractionService>> _loggerMock;
     private readonly ExtractionService _service;
+    private readonly IConfiguration _configuration;
     private readonly string _testDir;
 
     public ContentExtraction_Spec()
     {
         _loggerMock = new Mock<ILogger<ExtractionService>>();
-        _service = new ExtractionService(_loggerMock.Object);
+        _configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                { "Koan:Context:IndexingPerformance:MaxFileSizeMB", "10" }
+            })
+            .Build();
+
+        _service = new ExtractionService(_loggerMock.Object, _configuration);
 
         _testDir = Path.Combine(Path.GetTempPath(), $"koan-test-{Guid.NewGuid():N}");
         Directory.CreateDirectory(_testDir);

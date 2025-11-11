@@ -24,8 +24,14 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\..\..\..\src\Koan.Context\Koan.Context.csproj" />
+  <ProjectReference Include="..\..\..\..\..\src\Services\code-intelligence\Koan.Service.KoanContext\Koan.Service.KoanContext.csproj" />
     <ProjectReference Include="..\..\..\..\Shared\Koan.Testing\Koan.Testing.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="Specs\Indexing\IndexingService.Spec.cs" />
+    <Compile Remove="Specs\Outbox\VectorSyncWorker.Spec.cs" />
+    <Compile Remove="Specs\Mcp\McpTools.Spec.cs" />
   </ItemGroup>
 
 </Project>

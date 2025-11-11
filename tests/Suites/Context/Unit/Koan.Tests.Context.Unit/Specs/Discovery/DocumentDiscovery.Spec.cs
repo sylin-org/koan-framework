@@ -1,10 +1,17 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Security;
+using System.Threading.Tasks;
 using FluentAssertions;
+using Koan.Context.Services; // For FileType, DiscoveredFile
+using Koan.Context.Utilities;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Moq;
-using System.Security;
 using Xunit;
 using DiscoveryService = Koan.Context.Services.Discovery;
-using Koan.Context.Services; // For FileType, DiscoveredFile
 
 namespace Koan.Tests.Context.Unit.Specs.Discovery;
 
@@ -23,7 +30,16 @@ public class DocumentDiscovery_Spec : IDisposable
     public DocumentDiscovery_Spec()
     {
         _loggerMock = new Mock<ILogger<DiscoveryService>>();
-        _service = new DiscoveryService(_loggerMock.Object);
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Koan:Context:Security:AllowedDirectories:0"] = Path.GetTempPath(),
+                ["Koan:Context:Security:EnableRestrictivePathValidation"] = "true"
+            })
+            .Build();
+
+        var validator = new PathValidator(configuration);
+        _service = new DiscoveryService(_loggerMock.Object, validator);
 
         // Create temporary test directory
         _testDir = Path.Combine(Path.GetTempPath(), $"koan-test-{Guid.NewGuid():N}");

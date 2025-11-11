@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 using FluentAssertions;
 using Koan.Context.Controllers;
 using Koan.Context.Models;
@@ -8,8 +11,6 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
 using Xunit;
-using SearchService = Koan.Context.Services.Search;
-using IndexerService = Koan.Context.Services.Indexer;
 
 namespace Koan.Tests.Context.Unit.Specs.Mcp;
 
@@ -18,29 +19,27 @@ namespace Koan.Tests.Context.Unit.Specs.Mcp;
 /// </summary>
 public class McpTools_Spec
 {
-    private readonly Mock<SearchService> _retrievalMock;
-    private readonly Mock<IndexerService> _indexingMock;
+    private readonly Mock<ISearchService> _retrievalMock;
     private readonly Mock<ProjectResolver> _projectResolverMock;
     private readonly Mock<ILogger<McpToolsController>> _loggerMock;
     private readonly McpToolsController _controller;
+    private readonly List<(string ProjectId, bool Force)> _indexCalls = new();
 
     public McpTools_Spec()
     {
-        _retrievalMock = new Mock<SearchService>();
-        _indexingMock = new Mock<IndexerService>();
+        _retrievalMock = new Mock<ISearchService>();
         _projectResolverMock = new Mock<ProjectResolver>(
             Mock.Of<ILogger<ProjectResolver>>(),
             Options.Create(new ProjectResolutionOptions()));
         _loggerMock = new Mock<ILogger<McpToolsController>>();
-        _indexingMock
-            .Setup(x => x.IndexProjectAsync(
-                It.IsAny<string>(),
-                It.IsAny<IProgress<IndexingProgress>>(),
-                It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new IndexingResult(0, 0, 0, TimeSpan.Zero, Array.Empty<IndexingError>()));
+        IndexProjectAsync indexerStub = (projectId, force, cancellationToken, progress) =>
+        {
+            _indexCalls.Add((projectId, force));
+            return Task.FromResult(new IndexingResult(0, 0, 0, TimeSpan.Zero, Array.Empty<IndexingError>()));
+        };
         _controller = new McpToolsController(
             _retrievalMock.Object,
-            _indexingMock.Object,
+            indexerStub,
             _projectResolverMock.Object,
             _loggerMock.Object);
     }
@@ -146,7 +145,7 @@ public class McpTools_Spec
     public async Task GetLibraryDocs_EmptyQuery_ReturnsBadRequest()
     {
         // Arrange
-        var request = new GetLibraryDocsRequest("", LibraryId: "proj-1");
+    var request = new GetLibraryDocsRequest("", LibraryId: "019a6584-3075-7076-ae69-4ced4e2799f5");
 
         // Act
         var result = await _controller.GetLibraryDocs(request, CancellationToken.None);
@@ -176,8 +175,7 @@ public class McpTools_Spec
         _retrievalMock
             .Setup(x => x.SearchAsync(
                 project.Id.ToString(),
-                "test query",
-                It.IsAny<SearchOptions>(),
+                It.IsAny<SearchRequestContext>(),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(resultPayload);
 
@@ -212,8 +210,7 @@ public class McpTools_Spec
         _retrievalMock
             .Setup(x => x.SearchAsync(
                 project.Id.ToString(),
-                "test query",
-                It.IsAny<SearchOptions>(),
+                It.IsAny<SearchRequestContext>(),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(resultPayload);
 
@@ -337,7 +334,8 @@ public class McpTools_Spec
             Id = id,
             Name = "Test Project",
             RootPath = "C:/repo",
-            Status = status
+            Status = status,
+            IsActive = true
         };
     }
 

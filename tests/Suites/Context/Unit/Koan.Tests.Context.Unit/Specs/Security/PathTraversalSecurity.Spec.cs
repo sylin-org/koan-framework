@@ -1,4 +1,10 @@
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Threading.Tasks;
 using FluentAssertions;
+using Koan.Context.Utilities;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 using DiscoveryService = Koan.Context.Services.Discovery;
@@ -22,7 +28,16 @@ public class PathTraversalSecuritySpec
 
     public PathTraversalSecuritySpec()
     {
-        _discovery = new DiscoveryService(NullLogger<DiscoveryService>.Instance);
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Koan:Context:Security:AllowedDirectories:0"] = Path.GetTempPath(),
+                ["Koan:Context:Security:EnableRestrictivePathValidation"] = "true"
+            })
+            .Build();
+
+        var validator = new PathValidator(configuration);
+        _discovery = new DiscoveryService(NullLogger<DiscoveryService>.Instance, validator);
     }
 
     [Fact]
@@ -38,7 +53,7 @@ public class PathTraversalSecuritySpec
 
         // Assert
         await act.Should().ThrowAsync<ArgumentException>()
-            .WithMessage("*absolute path*");
+            .WithMessage("*must be absolute*");
     }
 
     [Fact]
@@ -253,7 +268,7 @@ public class PathTraversalSecuritySpec
         // Arrange
         var longPath = Path.Combine(
             Path.GetTempPath(),
-            new string('a', 300)); // Exceed typical max path
+            new string('a', 600)); // Exceed enforced max path length
 
         // Act
         Func<Task> act = async () => await _discovery
@@ -261,8 +276,8 @@ public class PathTraversalSecuritySpec
             .ToListAsync();
 
         // Assert - Should throw either PathTooLongException or DirectoryNotFoundException
-        await act.Should().ThrowAsync<Exception>()
-            .Where(ex => ex is PathTooLongException or DirectoryNotFoundException);
+        await act.Should().ThrowAsync<ArgumentException>()
+            .WithMessage("*maximum length*");
     }
 
     [Fact]

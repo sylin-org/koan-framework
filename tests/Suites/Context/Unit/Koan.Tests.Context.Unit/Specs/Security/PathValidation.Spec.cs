@@ -18,7 +18,8 @@ public class PathValidationSpec
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["Koan:Context:Security:AllowedDirectories:0"] = _tempAllowedPath
+                ["Koan:Context:Security:AllowedDirectories:0"] = _tempAllowedPath,
+                ["Koan:Context:Security:EnableRestrictivePathValidation"] = "true"
             })
             .Build();
 
