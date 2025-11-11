@@ -32,7 +32,13 @@ public class Extraction
         _logger.LogInformation("File size limit set to {MaxFileSizeMB} MB", maxFileSizeMB);
     }
 
-    public async Task<ExtractedDocument> ExtractAsync(string filePath, CancellationToken cancellationToken = default)
+    public Task<ExtractedDocument> ExtractAsync(string filePath, CancellationToken cancellationToken = default)
+        => ExtractAsync(filePath, relativePath: null, cancellationToken);
+
+    public async Task<ExtractedDocument> ExtractAsync(
+        string filePath,
+        string? relativePath,
+        CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(filePath))
         {
@@ -43,6 +49,10 @@ public class Extraction
         {
             throw new FileNotFoundException($"File not found: {filePath}");
         }
+
+        var resolvedRelativePath = string.IsNullOrWhiteSpace(relativePath)
+            ? Path.GetFileName(filePath)
+            : relativePath;
 
         // Security: Check file size before reading
         var fileInfo = new FileInfo(filePath);
@@ -68,7 +78,7 @@ public class Extraction
             _logger.LogWarning("Empty file: {FilePath}", filePath);
             return new ExtractedDocument(
                 FilePath: filePath,
-                RelativePath: Path.GetFileName(filePath),
+                RelativePath: resolvedRelativePath,
                 FullText: string.Empty,
                 Sections: Array.Empty<ContentSection>(),
                 TitleHierarchy: Array.Empty<string>());
@@ -81,7 +91,7 @@ public class Extraction
             _logger.LogWarning("File contains only whitespace: {FilePath}", filePath);
             return new ExtractedDocument(
                 FilePath: filePath,
-                RelativePath: Path.GetFileName(filePath),
+                RelativePath: resolvedRelativePath,
                 FullText: fullText,
                 Sections: Array.Empty<ContentSection>(),
                 TitleHierarchy: Array.Empty<string>());
@@ -100,7 +110,7 @@ public class Extraction
 
         return new ExtractedDocument(
             FilePath: filePath,
-            RelativePath: Path.GetFileName(filePath),
+            RelativePath: resolvedRelativePath,
             FullText: fullText,
             Sections: sections,
             TitleHierarchy: titleHierarchy);

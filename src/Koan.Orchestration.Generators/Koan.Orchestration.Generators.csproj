@@ -20,6 +20,9 @@
   </ItemGroup>
   <!-- Analyzer release tracking files must be included as AdditionalFiles for RS2008 compliance -->
   <ItemGroup>
+    <None Remove="AnalyzerReleases.Shipped.md;AnalyzerReleases.Unshipped.md" />
+  </ItemGroup>
+  <ItemGroup>
     <AdditionalFiles Include="AnalyzerReleases.Shipped.md" />
     <AdditionalFiles Include="AnalyzerReleases.Unshipped.md" />
   </ItemGroup>

@@ -1,5 +1,6 @@
 using Koan.Data.Abstractions;
 using Koan.Data.Core.Model;
+using Koan.Data.Vector.Abstractions.Schema;
 
 namespace Koan.Context.Models;
 
@@ -14,9 +15,10 @@ namespace Koan.Context.Models;
 /// - Relational (SQLite): Metadata via chunk.Save()
 /// - Vector: Embedding via Vector&lt;Chunk&gt;.Save(chunk, embedding)
 ///
-/// IMPORTANT: Chunks are isolated by partition context (proj-{guid:N}), not by ProjectId field.
+/// IMPORTANT: Chunks are isolated by partition context (raw project ID), not by ProjectId field.
 /// All chunk operations must occur within EntityContext.Partition() to ensure proper isolation.
 /// </remarks>
+[VectorSchema(typeof(ChunkVectorMetadata), EntityName = "KoanChunkVector")]
 public class Chunk : Entity<Chunk>
 {
     /// <summary>
@@ -94,14 +96,14 @@ public class Chunk : Entity<Chunk>
     public int TokenCount { get; set; }
 
     /// <summary>
-    /// Path-derived category (decision, guide, test, source, etc.)
-    /// </summary>
-    public string? Category { get; set; }
-
-    /// <summary>
     /// Path segments for context (e.g., ["docs", "decisions"])
     /// </summary>
     public string[]? PathSegments { get; set; }
+
+    /// <summary>
+    /// Structured tag metadata (primary, secondary, file-level inheritance, audit trail).
+    /// </summary>
+    public TagEnvelope Tags { get; set; } = TagEnvelope.Empty;
 
     /// <summary>
     /// Last modification time of the source file (for incremental updates)
@@ -148,5 +150,40 @@ public class Chunk : Entity<Chunk>
             Language = language,
             IndexedAt = DateTime.UtcNow
         };
+    }
+}
+
+public static class ChunkTagExtensions
+{
+    public static TagEnvelope GetTagEnvelope(this Chunk chunk)
+        => chunk.Tags;
+
+    public static IReadOnlyList<string> GetPrimaryTags(this Chunk chunk)
+        => chunk.Tags.Primary;
+
+    public static IReadOnlyList<string> GetSecondaryTags(this Chunk chunk)
+        => chunk.Tags.Secondary;
+
+    public static IReadOnlyList<TagAuditEntry> GetAuditTrail(this Chunk chunk)
+        => chunk.Tags.Audit;
+
+    public static void SetTagEnvelope(this Chunk chunk, TagEnvelope envelope)
+    {
+        chunk.Tags = envelope.Normalize();
+    }
+
+    public static void SetPrimaryTags(this Chunk chunk, IEnumerable<string>? tags)
+    {
+        chunk.SetTagEnvelope(chunk.Tags.WithPrimary(tags));
+    }
+
+    public static void SetSecondaryTags(this Chunk chunk, IEnumerable<string>? tags)
+    {
+        chunk.SetTagEnvelope(chunk.Tags.WithSecondary(tags));
+    }
+
+    public static void SetAuditTrail(this Chunk chunk, IEnumerable<TagAuditEntry>? auditEntries)
+    {
+        chunk.SetTagEnvelope(chunk.Tags.WithAudit(auditEntries));
     }
 }

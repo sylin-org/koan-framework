@@ -48,7 +48,7 @@ public class SyncOperation : Entity<SyncOperation>
     /// </summary>
     /// <remarks>
     /// Stores the raw Project.Id GUID (e.g., "019a6584-3075-7076-ae69-4ced4e2799f5").
-    /// VectorSyncWorker formats this as partition ID (proj-{guid:N}) when saving to vector store.
+    /// VectorSyncWorker delegates partition formatting to the active adapter when saving to the vector store.
     ///
     /// Architectural principle: Domain entities store domain identifiers (ProjectId),
     /// infrastructure code handles formatting (partition IDs are implementation details).

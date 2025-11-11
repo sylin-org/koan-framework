@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+using System.Threading;
 using Koan.Context.Models;
 using Koan.Context.Services;
 using Koan.Data.Abstractions;
@@ -15,19 +18,19 @@ namespace Koan.Context.Controllers;
 [Route("api/mcp")]
 public class McpToolsController : ControllerBase
 {
-    private readonly Search _retrieval;
-    private readonly Indexer _indexing;
+    private readonly ISearchService _retrieval;
+    private readonly IndexProjectAsync _indexProject;
     private readonly ProjectResolver _projectResolver;
     private readonly ILogger<McpToolsController> _logger;
 
     public McpToolsController(
-        Search retrieval,
-        Indexer indexing,
+    ISearchService retrieval,
+    IndexProjectAsync indexProject,
         ProjectResolver projectResolver,
         ILogger<McpToolsController> logger)
     {
         _retrieval = retrieval;
-        _indexing = indexing;
+        _indexProject = indexProject ?? throw new ArgumentNullException(nameof(indexProject));
         _projectResolver = projectResolver;
         _logger = logger;
     }
@@ -92,12 +95,11 @@ public class McpToolsController : ControllerBase
 
             if (project == null)
             {
-                return BadRequest(new
-                {
-                    error = "invalid_working_directory",
-                    message = $"Could not resolve project from working directory: {request.WorkingDirectory}",
-                    workingDirectory = request.WorkingDirectory
-                });
+                _logger.LogWarning(
+                    "Working directory {WorkingDirectory} did not resolve to a project. Falling back to multi-project search.",
+                    request.WorkingDirectory);
+
+                return await SearchAllProjectsAsync(request, cancellationToken);
             }
 
             // Check indexing status and handle appropriately
@@ -112,7 +114,7 @@ public class McpToolsController : ControllerBase
                     {
                         try
                         {
-                            await _indexing.IndexProjectAsync(project.Id, cancellationToken: CancellationToken.None);
+                            await _indexProject(project.Id, force: false, cancellationToken: CancellationToken.None);
                         }
                         catch (Exception ex)
                         {
@@ -150,18 +152,25 @@ public class McpToolsController : ControllerBase
                     break;
             }
 
-            // Perform semantic search
-            var searchOptions = new SearchOptions(
-                MaxTokens: request.TokenCounter ?? 5000,
-                Alpha: request.Alpha ?? 0.7f,
-                ContinuationToken: request.ContinuationToken,
-                IncludeInsights: request.IncludeInsights ?? true,
-                IncludeReasoning: request.IncludeReasoning ?? true);
+            var context = SearchRequestContext.Create(
+                query: request.Query,
+                projectIds: new[] { project.Id },
+                pathContext: null,
+                tagsAny: request.TagsAny,
+                tagsAll: request.TagsAll,
+                tagsExclude: request.TagsExclude,
+                tagBoosts: request.TagBoosts,
+                personaId: request.Persona,
+                channel: SearchChannel.Mcp,
+                continuationToken: request.ContinuationToken,
+                maxTokens: request.MaxTokens,
+                includeInsights: false,
+                includeReasoning: request.IncludeReasoning ?? false,
+                languages: request.Languages);
 
             var result = await _retrieval.SearchAsync(
                 project.Id,
-                request.Query,
-                searchOptions,
+                context,
                 cancellationToken);
 
             _logger.LogInformation(
@@ -196,6 +205,124 @@ public class McpToolsController : ControllerBase
             });
         }
     }
+
+    private async Task<IActionResult> SearchAllProjectsAsync(
+        GetReferencesRequest request,
+        CancellationToken cancellationToken)
+    {
+    var projects = await Project.Query(_ => true, cancellationToken);
+        if (projects.Count == 0)
+        {
+            return NotFound(new
+            {
+                error = "no_projects",
+                message = "No indexed projects are available for fallback search.",
+                workingDirectory = request.WorkingDirectory
+            });
+        }
+
+        const int estimatedTokensPerChunk = 350;
+        var tokenBudget = Math.Clamp(request.MaxTokens ?? 4000, 1000, 20000);
+        var accumulatedChunks = new List<SearchResultChunk>();
+        var accumulatedSources = new List<SourceFile>();
+        var warnings = new List<string>
+        {
+            "Working directory did not map to a project; returning multi-project fallback results."
+        };
+
+        var tokensConsumed = 0;
+        var hasMore = false;
+
+        foreach (var project in projects)
+        {
+            if (hasMore)
+            {
+                break;
+            }
+
+            var context = SearchRequestContext.Create(
+                query: request.Query,
+                projectIds: new[] { project.Id },
+                pathContext: null,
+                tagsAny: request.TagsAny,
+                tagsAll: request.TagsAll,
+                tagsExclude: request.TagsExclude,
+                tagBoosts: request.TagBoosts,
+                personaId: request.Persona,
+                channel: SearchChannel.Mcp,
+                continuationToken: null,
+                maxTokens: tokenBudget,
+                includeInsights: false,
+                includeReasoning: false,
+                languages: request.Languages);
+
+            var result = await _retrieval.SearchAsync(project.Id, context, cancellationToken);
+
+            if (result.Chunks.Count == 0)
+            {
+                continue;
+            }
+
+            var sourceBaseIndex = accumulatedSources.Count;
+            if (result.Sources?.Files != null)
+            {
+                accumulatedSources.AddRange(result.Sources.Files);
+            }
+
+            foreach (var chunk in result.Chunks)
+            {
+                if (tokensConsumed + estimatedTokensPerChunk > tokenBudget && accumulatedChunks.Count > 0)
+                {
+                    hasMore = true;
+                    break;
+                }
+
+                var adjustedProvenance = chunk.Provenance with
+                {
+                    SourceIndex = sourceBaseIndex + chunk.Provenance.SourceIndex
+                };
+
+                accumulatedChunks.Add(chunk with { Provenance = adjustedProvenance });
+                tokensConsumed += estimatedTokensPerChunk;
+            }
+
+            if (tokensConsumed >= tokenBudget)
+            {
+                hasMore = true;
+            }
+        }
+
+        var metadata = new SearchMetadata(
+            TokensRequested: tokenBudget,
+            TokensReturned: Math.Min(tokensConsumed, tokenBudget),
+            Page: 1,
+            Model: nameof(Search),
+            VectorProvider: "default",
+            Timestamp: DateTime.UtcNow,
+            Duration: TimeSpan.Zero);
+
+        var sources = new SearchSources(
+            TotalFiles: accumulatedSources.Count,
+            Files: accumulatedSources);
+
+        var fallbackResult = new SearchResult(
+            Chunks: accumulatedChunks,
+            Metadata: metadata,
+            Sources: sources,
+            Insights: null,
+            ContinuationToken: null,
+            Warnings: warnings);
+
+        var response = new GetReferencesResponse(
+            ProjectName: "all-projects",
+            ProjectPath: string.Empty,
+            Query: request.Query,
+            Result: fallbackResult,
+            HasMore: hasMore,
+            IndexingStatus: "Aggregate");
+
+        return Ok(response);
+    }
 }
 
 /// <summary>
@@ -204,12 +331,16 @@ public class McpToolsController : ControllerBase
 public record GetReferencesRequest(
     string Query,
     string WorkingDirectory,
-    float? Alpha = null,
-    int? TokenCounter = null,
+    string? Persona = null,
+    int? MaxTokens = null,
     string? ContinuationToken = null,
     bool? IncludeInsights = null,
     bool? IncludeReasoning = null,
-    string[]? Categories = null);
+    string[]? TagsAny = null,
+    string[]? TagsAll = null,
+    string[]? TagsExclude = null,
+    Dictionary<string, float>? TagBoosts = null,
+    string[]? Languages = null);
 
 /// <summary>
 /// Response with code references and metadata

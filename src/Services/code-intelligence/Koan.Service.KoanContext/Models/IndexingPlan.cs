@@ -28,6 +28,16 @@ public class IndexingPlan
     public List<string> DeletedFiles { get; set; } = new();
 
     /// <summary>
+    /// Chunks discovered in storage that no longer map to a known manifest or on-disk file.
+    /// </summary>
+    public List<string> OrphanedChunkFiles { get; set; } = new();
+
+    /// <summary>
+    /// Manifest entries whose chunk metadata is missing and require rebuild.
+    /// </summary>
+    public List<string> FilesMissingChunks { get; set; } = new();
+
+    /// <summary>
     /// Total files to process (new + changed)
     /// </summary>
     public int TotalFilesToProcess => NewFiles.Count + ChangedFiles.Count;
@@ -53,7 +63,8 @@ public class IndexingPlan
     public override string ToString()
     {
         return $"Plan: {NewFiles.Count} new, {ChangedFiles.Count} changed, " +
-               $"{SkippedFiles.Count} skipped, {DeletedFiles.Count} deleted | " +
+               $"{SkippedFiles.Count} skipped, {DeletedFiles.Count} deleted, " +
+               $"{OrphanedChunkFiles.Count} orphaned chunks, {FilesMissingChunks.Count} rebuilds | " +
                $"Processing {TotalFilesToProcess}/{TotalFiles} files";
     }
 }

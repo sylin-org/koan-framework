@@ -1,5 +1,12 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Security;
+using System.Threading;
+using System.Threading.Tasks;
+using Koan.Context.Utilities;
 using Microsoft.Extensions.Logging;
 
 namespace Koan.Context.Services;
@@ -15,6 +22,7 @@ namespace Koan.Context.Services;
 public class Discovery
 {
     private readonly ILogger<Discovery> _logger;
+    private readonly PathValidator _pathValidator;
 
     private static readonly string[] ExcludedDirectories =
     {
@@ -40,9 +48,10 @@ public class Discovery
         "samples/**/*.md"
     };
 
-    public Discovery(ILogger<Discovery> logger)
+    public Discovery(ILogger<Discovery> logger, PathValidator pathValidator)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _pathValidator = pathValidator ?? throw new ArgumentNullException(nameof(pathValidator));
     }
 
     public async IAsyncEnumerable<DiscoveredFile> DiscoverAsync(
@@ -50,18 +59,21 @@ public class Discovery
         string? docsPath = null,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(projectPath))
+        if (!_pathValidator.IsValidProjectPath(projectPath, out var validationError))
         {
-            throw new ArgumentException("Project path cannot be null or empty", nameof(projectPath));
+            if (!string.IsNullOrWhiteSpace(validationError) &&
+                validationError.Contains("does not exist", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new DirectoryNotFoundException(validationError);
+            }
+
+            throw new ArgumentException(validationError ?? "Invalid project path", nameof(projectPath));
         }
 
-        if (!Directory.Exists(projectPath))
-        {
-            throw new DirectoryNotFoundException($"Project path does not exist: {projectPath}");
-        }
+        var normalizedProjectPath = Path.GetFullPath(projectPath);
 
         // Validate and sanitize search path to prevent directory traversal
-        var searchPath = ValidateAndResolveSearchPath(projectPath, docsPath);
+        var searchPath = ValidateAndResolveSearchPath(normalizedProjectPath, docsPath);
 
         if (!Directory.Exists(searchPath))
         {
@@ -72,13 +84,13 @@ public class Discovery
         _logger.LogInformation("Discovering files (code + markdown) in {SearchPath}", searchPath);
 
         // Discover markdown files
-        await foreach (var file in DiscoverMarkdownFilesAsync(searchPath, projectPath, cancellationToken))
+        await foreach (var file in DiscoverMarkdownFilesAsync(searchPath, normalizedProjectPath, cancellationToken))
         {
             yield return file;
         }
 
         // Discover code files
-        await foreach (var file in DiscoverCodeFilesAsync(searchPath, projectPath, cancellationToken))
+        await foreach (var file in DiscoverCodeFilesAsync(searchPath, normalizedProjectPath, cancellationToken))
         {
             yield return file;
         }
@@ -143,6 +155,12 @@ public class Discovery
                 if (fileInfo.Attributes.HasFlag(FileAttributes.ReparsePoint))
                 {
                     _logger.LogDebug("Skipping symbolic link: {FilePath}", file);
+                    continue;
+                }
+
+                if (fileInfo.Attributes.HasFlag(FileAttributes.Hidden))
+                {
+                    _logger.LogDebug("Skipping hidden file: {FilePath}", file);
                     continue;
                 }
 
@@ -222,6 +240,12 @@ public class Discovery
                     continue;
                 }
 
+                if (fileInfo.Attributes.HasFlag(FileAttributes.Hidden))
+                {
+                    _logger.LogDebug("Skipping hidden file: {FilePath}", file);
+                    continue;
+                }
+
                 // Skip very large files (> 10MB for code files) to prevent memory exhaustion
                 if (fileInfo.Length > 10 * 1024 * 1024)
                 {
@@ -268,7 +292,13 @@ public class Discovery
     private static bool ShouldExclude(string filePath, string projectPath)
     {
         var relativePath = Path.GetRelativePath(projectPath, filePath);
-        var pathParts = relativePath.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+    var sanitized = relativePath.Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar);
+    var pathParts = sanitized.Split(new[] { Path.DirectorySeparatorChar }, StringSplitOptions.RemoveEmptyEntries);
+
+    if (pathParts.Any(part => part.Length > 1 && part.StartsWith(".", StringComparison.Ordinal)))
+        {
+            return true;
+        }
 
         return pathParts.Any(part => ExcludedDirectories.Contains(part, StringComparer.OrdinalIgnoreCase));
     }

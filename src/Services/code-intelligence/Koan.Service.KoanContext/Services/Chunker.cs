@@ -1,5 +1,9 @@
+using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 
 namespace Koan.Context.Services;
@@ -21,6 +25,7 @@ public class Chunker
     private const int TargetTokensMax = 1000;
     private const int OverlapTokens = 50;
     private const int CharsPerToken = 4; // Rough estimate for GPT-style tokenization
+    private const int HeadingMergeTokenThreshold = TargetTokensMin / 4;
 
     public Chunker(ILogger<Chunker> logger)
     {
@@ -49,6 +54,7 @@ public class Chunker
             yield break;
         }
 
+        var sections = document.Sections.ToList();
         var currentChunk = new StringBuilder();
         var currentTitle = document.TitleHierarchy.Count > 0
             ? string.Join(" > ", document.TitleHierarchy)
@@ -56,22 +62,107 @@ public class Chunker
         var chunkStartOffset = 0;
         var currentTokens = 0;
         var sectionsInChunk = new List<ContentSection>();
-        var chunksYielded = 0;
+        ChunkedContent? bufferedChunk = null;
 
-        foreach (var section in document.Sections)
+        for (var index = 0; index < sections.Count; index++)
         {
+            var section = sections[index];
             cancellationToken.ThrowIfCancellationRequested();
 
-            // Update title if we hit a heading
-            if (section.Type == ContentType.Heading && section.Title != null)
+            var isHeading = section.Type == ContentType.Heading;
+            var nextIsHeading = index + 1 < sections.Count &&
+                                sections[index + 1].Type == ContentType.Heading;
+
+            if (isHeading && currentTokens > 0)
+            {
+                var chunkBeforeHeading = YieldCurrentChunk(
+                    currentChunk,
+                    currentTokens,
+                    sectionsInChunk,
+                    projectId,
+                    document.RelativePath,
+                    chunkStartOffset,
+                    currentTitle);
+
+                var chunkToEmit = ProcessChunkForMerging(chunkBeforeHeading, ref bufferedChunk, out var buffered); 
+                if (chunkToEmit != null)
+                {
+                    yield return chunkToEmit;
+                }
+                if (!buffered)
+                {
+                    yield return chunkBeforeHeading;
+                }
+
+                ResetChunk(currentChunk, sectionsInChunk, out currentTokens, out chunkStartOffset);
+            }
+
+            if (isHeading && section.Title != null)
             {
                 currentTitle = section.Title;
             }
 
             var sectionTokens = EstimateTokens(section.Text);
+            var separatorTokens = sectionsInChunk.Count > 0 ? EstimateTokens("\n\n") : 0;
+
+            if (!isHeading && currentTokens > 0)
+            {
+                while (currentTokens + separatorTokens + sectionTokens > TargetTokensMax)
+                {
+                    var capacityTokens = TargetTokensMax - currentTokens - separatorTokens;
+
+                    // Try to consume just enough of the section to stay within the hard cap.
+                    if (TrySliceSection(section, capacityTokens, out var sliced, out var remainder))
+                    {
+                        sections[index] = sliced;
+                        if (remainder != null)
+                        {
+                            sections.Insert(index + 1, remainder);
+                        }
+
+                        section = sliced;
+                        sectionTokens = EstimateTokens(section.Text);
+                        separatorTokens = sectionsInChunk.Count > 0 ? EstimateTokens("\n\n") : 0;
+
+                        if (currentTokens + separatorTokens + sectionTokens <= TargetTokensMax)
+                        {
+                            break;
+                        }
+
+                        continue;
+                    }
+
+                    var chunk = YieldCurrentChunk(
+                        currentChunk,
+                        currentTokens,
+                        sectionsInChunk,
+                        projectId,
+                        document.RelativePath,
+                        chunkStartOffset,
+                        currentTitle);
+
+                    var chunkToEmit = ProcessChunkForMerging(chunk, ref bufferedChunk, out var buffered);
+                    if (chunkToEmit != null)
+                    {
+                        yield return chunkToEmit;
+                    }
+                    if (!buffered)
+                    {
+                        yield return chunk;
+                    }
+
+                    PrepareNextChunkWithOverlap(
+                        currentChunk,
+                        sectionsInChunk,
+                        out currentTokens,
+                        out chunkStartOffset);
+
+                    separatorTokens = sectionsInChunk.Count > 0 ? EstimateTokens("\n\n") : 0;
+                }
+            }
 
             // Handle sections larger than max tokens - split them
-            if (sectionTokens > TargetTokensMax)
+            if (sectionTokens > TargetTokensMax && !isHeading)
             {
                 // Yield current chunk first if it has content
                 if (currentTokens > 0)
@@ -85,8 +176,15 @@ public class Chunker
                         chunkStartOffset,
                         currentTitle);
 
-                    yield return chunk;
-                    chunksYielded++;
+                    var chunkToEmit = ProcessChunkForMerging(chunk, ref bufferedChunk, out var buffered);
+                    if (chunkToEmit != null)
+                    {
+                        yield return chunkToEmit;
+                    }
+                    if (!buffered)
+                    {
+                        yield return chunk;
+                    }
 
                     // Reset for next chunk with overlap
                     PrepareNextChunkWithOverlap(
@@ -94,6 +192,12 @@ public class Chunker
                         sectionsInChunk,
                         out currentTokens,
                         out chunkStartOffset);
+                }
+
+                if (bufferedChunk != null)
+                {
+                    yield return bufferedChunk;
+                    bufferedChunk = null;
                 }
 
                 // Split large section
@@ -104,14 +208,13 @@ public class Chunker
                     currentTitle))
                 {
                     yield return largeChunk;
-                    chunksYielded++;
                 }
 
                 continue;
             }
 
             // If adding this section would exceed max, yield current chunk first
-            if (currentTokens > 0 && currentTokens + sectionTokens > TargetTokensMax)
+            if (!isHeading && currentTokens > 0 && currentTokens + separatorTokens + sectionTokens > TargetTokensMax)
             {
                 var chunk = YieldCurrentChunk(
                     currentChunk,
@@ -122,8 +225,15 @@ public class Chunker
                     chunkStartOffset,
                     currentTitle);
 
-                yield return chunk;
-                chunksYielded++;
+                var chunkToEmit = ProcessChunkForMerging(chunk, ref bufferedChunk, out var buffered);
+                if (chunkToEmit != null)
+                {
+                    yield return chunkToEmit;
+                }
+                if (!buffered)
+                {
+                    yield return chunk;
+                }
 
                 // Reset for next chunk with overlap
                 PrepareNextChunkWithOverlap(
@@ -136,8 +246,7 @@ public class Chunker
             // Add section to current chunk
             AppendSectionToChunk(currentChunk, section, sectionsInChunk, ref currentTokens, ref chunkStartOffset);
 
-            // If chunk is big enough, consider yielding at heading boundaries
-            if (currentTokens >= TargetTokensMin && section.Type == ContentType.Heading)
+            if (!isHeading && currentTokens > TargetTokensMax)
             {
                 var chunk = YieldCurrentChunk(
                     currentChunk,
@@ -149,10 +258,37 @@ public class Chunker
                     currentTitle);
 
                 yield return chunk;
-                chunksYielded++;
 
-                // Reset for next chunk with overlap
                 PrepareNextChunkWithOverlap(
+                    currentChunk,
+                    sectionsInChunk,
+                    out currentTokens,
+                    out chunkStartOffset);
+            }
+
+            // If chunk is big enough and next section is a heading, finalize before heading
+            if (!isHeading && currentTokens >= TargetTokensMin && nextIsHeading)
+            {
+                var chunk = YieldCurrentChunk(
+                    currentChunk,
+                    currentTokens,
+                    sectionsInChunk,
+                    projectId,
+                    document.RelativePath,
+                    chunkStartOffset,
+                    currentTitle);
+
+                var chunkToEmit = ProcessChunkForMerging(chunk, ref bufferedChunk, out var buffered);
+                if (chunkToEmit != null)
+                {
+                    yield return chunkToEmit;
+                }
+                if (!buffered)
+                {
+                    yield return chunk;
+                }
+
+                ResetChunk(
                     currentChunk,
                     sectionsInChunk,
                     out currentTokens,
@@ -174,8 +310,20 @@ public class Chunker
                 chunkStartOffset,
                 currentTitle);
 
-            yield return chunk;
-            chunksYielded++;
+            var chunkToEmit = ProcessChunkForMerging(chunk, ref bufferedChunk, out var buffered);
+            if (chunkToEmit != null)
+            {
+                yield return chunkToEmit;
+            }
+            if (!buffered)
+            {
+                yield return chunk;
+            }
+        }
+
+        if (bufferedChunk != null)
+        {
+            yield return bufferedChunk;
         }
     }
 
@@ -240,6 +388,18 @@ public class Chunker
         sectionsInChunk.Clear();
     }
 
+    private static void ResetChunk(
+        StringBuilder currentChunk,
+        List<ContentSection> sectionsInChunk,
+        out int newTokens,
+        out int newStartOffset)
+    {
+        currentChunk.Clear();
+        sectionsInChunk.Clear();
+        newTokens = 0;
+        newStartOffset = 0;
+    }
+
     /// <summary>
     /// Appends a section to the current chunk
     /// </summary>
@@ -277,7 +437,29 @@ public class Chunker
         string filePath,
         string currentTitle)
     {
-        var sentences = SplitIntoSentences(section.Text);
+    var sentences = SplitIntoSentences(section.Text);
+
+        if (sentences.Count == 0)
+        {
+            sentences.Add(section.Text);
+        }
+
+        if (sentences.Count == 1 && EstimateTokens(sentences[0]) > TargetTokensMax)
+        {
+            await foreach (var chunk in SplitByTokenWindowAsync(
+                sentences[0],
+                projectId,
+                filePath,
+                currentTitle,
+                section.Language,
+                section.StartOffset))
+            {
+                yield return chunk;
+            }
+
+            yield break;
+        }
+
         var currentChunk = new StringBuilder();
         var currentTokens = 0;
         var chunkStartOffset = section.StartOffset;
@@ -335,10 +517,190 @@ public class Chunker
         }
     }
 
+    private async IAsyncEnumerable<ChunkedContent> SplitByTokenWindowAsync(
+        string text,
+        string projectId,
+        string filePath,
+        string currentTitle,
+        string? language,
+        int absoluteStartOffset)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            yield break;
+        }
+
+        var targetChars = TargetTokensMax * CharsPerToken;
+        var index = 0;
+        var currentStartOffset = absoluteStartOffset;
+
+        while (index < text.Length)
+        {
+            var length = Math.Min(targetChars, text.Length - index);
+            var slice = text.Substring(index, length);
+            var tokenCount = EstimateTokens(slice);
+            var endOffset = currentStartOffset + slice.Length;
+
+            yield return new ChunkedContent(
+                ProjectId: projectId,
+                FilePath: filePath,
+                Text: slice.Trim(),
+                TokenCount: tokenCount,
+                StartOffset: currentStartOffset,
+                EndOffset: endOffset,
+                Title: currentTitle,
+                Language: language);
+
+            if (index + length >= text.Length)
+            {
+                break;
+            }
+
+            var overlapText = GetOverlapText(slice, OverlapTokens);
+            var overlapLength = Math.Min(overlapText.Length, length - 1);
+
+            index += length - overlapLength;
+            currentStartOffset = endOffset - overlapLength;
+
+            await Task.Yield();
+        }
+    }
+
+    private static ChunkedContent MergeChunks(ChunkedContent first, ChunkedContent second)
+    {
+        var combinedText = string.Concat(first.Text, "\n\n", second.Text);
+        var combinedTokens = first.TokenCount + second.TokenCount;
+        var language = first.Language ?? second.Language;
+
+        return first with
+        {
+            Text = combinedText,
+            TokenCount = combinedTokens,
+            EndOffset = second.EndOffset,
+            Language = language
+        };
+    }
+
+    private static bool TrySliceSection(
+        ContentSection section,
+        int remainingTokenCapacity,
+        out ContentSection adjustedSection,
+        out ContentSection? remainder)
+    {
+        adjustedSection = section;
+        remainder = null;
+
+        if (remainingTokenCapacity <= 0)
+        {
+            return false;
+        }
+
+        var availableChars = Math.Max(remainingTokenCapacity * CharsPerToken, 0);
+
+        if (availableChars <= 0 || availableChars >= section.Text.Length)
+        {
+            return false;
+        }
+
+        var splitIndex = FindSplitIndex(section.Text, availableChars);
+
+        if (splitIndex <= 0 || splitIndex >= section.Text.Length)
+        {
+            return false;
+        }
+
+        var consumedText = section.Text[..splitIndex];
+        var remainingText = section.Text[splitIndex..];
+
+        if (string.IsNullOrWhiteSpace(consumedText) || string.IsNullOrWhiteSpace(remainingText))
+        {
+            return false;
+        }
+
+        var consumedTokens = EstimateTokens(consumedText);
+        if (consumedTokens > remainingTokenCapacity)
+        {
+            while (consumedTokens > remainingTokenCapacity && consumedText.Length > 0)
+            {
+                consumedText = consumedText[..^1];
+                consumedTokens = EstimateTokens(consumedText);
+            }
+
+            if (consumedText.Length == 0)
+            {
+                return false;
+            }
+
+            remainingText = section.Text[consumedText.Length..];
+        }
+
+        adjustedSection = section with
+        {
+            Text = consumedText,
+            EndOffset = section.StartOffset + consumedText.Length
+        };
+
+        remainder = section with
+        {
+            Text = remainingText,
+            StartOffset = adjustedSection.EndOffset
+        };
+
+        return true;
+    }
+
+    private static int FindSplitIndex(string text, int maxChars)
+    {
+        var limit = Math.Clamp(maxChars, 1, text.Length - 1);
+
+        for (var i = limit; i > Math.Max(0, limit - 400); i--)
+        {
+            if (char.IsWhiteSpace(text[i]))
+            {
+                return i;
+            }
+        }
+
+        return limit;
+    }
+
+    private static ChunkedContent? ProcessChunkForMerging(
+        ChunkedContent chunk,
+        ref ChunkedContent? bufferedChunk,
+        out bool buffered)
+    {
+        if (chunk.TokenCount >= HeadingMergeTokenThreshold)
+        {
+            var bufferedCandidate = bufferedChunk;
+            bufferedChunk = null;
+            buffered = false;
+            return bufferedCandidate;
+        }
+
+        if (bufferedChunk is null)
+        {
+            bufferedChunk = chunk;
+            buffered = true;
+            return null;
+        }
+
+        if (bufferedChunk.TokenCount + chunk.TokenCount <= HeadingMergeTokenThreshold)
+        {
+            bufferedChunk = MergeChunks(bufferedChunk, chunk);
+            buffered = true;
+            return null;
+        }
+
+        var emit = bufferedChunk;
+        bufferedChunk = chunk;
+        buffered = true;
+        return emit;
+    }
+
     /// <summary>
     /// Splits text into sentences at common boundaries
     /// </summary>
-    private static IEnumerable<string> SplitIntoSentences(string text)
+    private static List<string> SplitIntoSentences(string text)
     {
         // Split on sentence boundaries (. ! ?) followed by whitespace
         var sentences = new List<string>();
@@ -364,7 +726,9 @@ public class Chunker
             sentences.Add(currentSentence.ToString().Trim());
         }
 
-        return sentences.Where(s => !string.IsNullOrWhiteSpace(s));
+        return sentences
+            .Where(s => !string.IsNullOrWhiteSpace(s))
+            .ToList();
     }
 
     private static int EstimateTokens(string text)

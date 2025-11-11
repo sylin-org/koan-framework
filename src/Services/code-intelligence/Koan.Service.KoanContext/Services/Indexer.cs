@@ -1,10 +1,16 @@
+using System;
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Text;
 using Koan.Context.Models;
+using Koan.Context.Services.Maintenance;
+using Koan.Context.Utilities;
 using Koan.Data.Abstractions;
 using Koan.Data.Core;
-using Koan.Data.Vector;
-using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using Polly;
 using Polly.Retry;
@@ -53,30 +59,36 @@ public class Indexer
     private readonly Extraction _extraction;
     private readonly Chunker _chunking;
     private readonly Embedding _embedding;
+    private readonly IndexingPlanner _planner;
+    private readonly ChunkMaintenanceService _chunkMaintenance;
+    private readonly TagResolver _tagResolver;
     private readonly IndexingCoordinator _coordinator;
     private readonly FileMonitoringService? _fileMonitor;
     private readonly ILogger<Indexer> _logger;
     private readonly AsyncRetryPolicy _retryPolicy;
-    private readonly Microsoft.Extensions.Caching.Memory.IMemoryCache _cache;
 
     private const int BatchSize = 100; // Save vectors in batches of 100
 
     public Indexer(
-        Discovery discovery,
-        Extraction extraction,
-        Chunker chunking,
-        Embedding embedding,
-        IndexingCoordinator coordinator,
-        Microsoft.Extensions.Caching.Memory.IMemoryCache cache,
-        ILogger<Indexer> logger,
-        FileMonitoringService? fileMonitor = null)
+    Discovery discovery,
+    Extraction extraction,
+    Chunker chunking,
+    Embedding embedding,
+    IndexingPlanner planner,
+    ChunkMaintenanceService chunkMaintenance,
+    TagResolver tagResolver,
+    IndexingCoordinator coordinator,
+    ILogger<Indexer> logger,
+    FileMonitoringService? fileMonitor = null)
     {
         _discovery = discovery ?? throw new ArgumentNullException(nameof(discovery));
         _extraction = extraction ?? throw new ArgumentNullException(nameof(extraction));
         _chunking = chunking ?? throw new ArgumentNullException(nameof(chunking));
-        _embedding = embedding ?? throw new ArgumentNullException(nameof(embedding));
+    _embedding = embedding ?? throw new ArgumentNullException(nameof(embedding));
+    _planner = planner ?? throw new ArgumentNullException(nameof(planner));
+    _chunkMaintenance = chunkMaintenance ?? throw new ArgumentNullException(nameof(chunkMaintenance));
+    _tagResolver = tagResolver ?? throw new ArgumentNullException(nameof(tagResolver));
         _coordinator = coordinator ?? throw new ArgumentNullException(nameof(coordinator));
-        _cache = cache ?? throw new ArgumentNullException(nameof(cache));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _fileMonitor = fileMonitor;
 
@@ -191,7 +203,7 @@ public class Indexer
                 cancelledJobId = existingJobId;
                 if (existingJob != null)
                 {
-                    existingJob.Cancel();
+                    await existingJob.Cancel(CancellationToken.None);
                     existingJob.ErrorMessage = $"Cancelled by force restart (replaced by job {job.Id})";
                     await existingJob.Save(CancellationToken.None);
                 }
@@ -224,7 +236,11 @@ public class Indexer
             var commitSha = await _discovery.GetCommitShaAsync(project.RootPath);
 
             // 6. Plan differential scan
-            var plan = await PlanIndexingAsync(projectId, project.RootPath, effectiveCt);
+            var plan = await _planner.PlanAsync(
+                projectId,
+                project.RootPath,
+                forceReindex: force,
+                cancellationToken: effectiveCt);
 
             // 4. Update job with plan statistics
             job.Status = JobStatus.Indexing;
@@ -267,27 +283,64 @@ public class Indexer
 
                 _logger.LogDebug("Partition context set to project {ProjectId}", projectId);
 
-                // 4.5. Bulk delete ALL existing chunks for this partition (clean slate for reindex)
-                _logger.LogInformation("Clearing all existing chunks for project {ProjectId}", projectId);
-
-                // Clear vectors from vector store first
-                _logger.LogInformation("Flushing vector store for project {ProjectId}", projectId);
-                await Vector<Chunk>.Flush(effectiveCt);
-                _logger.LogInformation("Vector store flushed for project {ProjectId}", projectId);
-
-                // Then clear relational chunks from SQLite
-                var allChunks = await Chunk.Query(c => true, effectiveCt);
-                var totalDeleted = 0;
-                foreach (var chunk in allChunks)
+                if (plan.OrphanedChunkFiles.Count > 0)
                 {
-                    await chunk.Delete(effectiveCt);
-                    totalDeleted++;
+                    var orphanResults = await _chunkMaintenance.RemoveFilesAsync(
+                        plan.OrphanedChunkFiles,
+                        deleteIndexedFile: false,
+                        deleteVectors: true,
+                        cancellationToken: effectiveCt);
+
+                    var orphanChunksDeleted = orphanResults.Sum(r => r.ChunksDeleted);
+                    if (orphanChunksDeleted > 0)
+                    {
+                        _logger.LogInformation(
+                            "Removed {Count} orphaned chunk groups for project {ProjectId}",
+                            orphanChunksDeleted,
+                            projectId);
+                    }
+
+                    job.LogOperation($"Removed {orphanChunksDeleted} orphaned chunks");
                 }
-                _logger.LogInformation("Deleted {Count} existing chunks from project {ProjectId}", totalDeleted, projectId);
-                job.LogOperation($"Cleared {totalDeleted} existing chunks from index");
+
+                if (plan.DeletedFiles.Count > 0)
+                {
+                    var deletedResults = await _chunkMaintenance.RemoveFilesAsync(
+                        plan.DeletedFiles,
+                        deleteIndexedFile: true,
+                        deleteVectors: true,
+                        cancellationToken: effectiveCt);
+
+                    var deletedFilesReconciled = deletedResults.Count;
+                    var deletedChunks = deletedResults.Sum(r => r.ChunksDeleted);
+                    var manifestsRemoved = deletedResults.Count(r => r.IndexedFileRemoved);
+
+                    if (deletedChunks > 0)
+                    {
+                        _logger.LogInformation(
+                            "Removed {Count} chunks linked to deleted files for project {ProjectId}",
+                            deletedChunks,
+                            projectId);
+                    }
+
+                    job.LogOperation(
+                        $"Reconciled {deletedFilesReconciled} deleted files ({deletedChunks} chunks removed)");
+
+                    if (manifestsRemoved < deletedFilesReconciled)
+                    {
+                        var missing = deletedFilesReconciled - manifestsRemoved;
+                        if (missing > 0)
+                        {
+                            job.AddWarning($"{missing} deleted files had no manifest entry");
+                        }
+                    }
+                }
 
                 // 5. Process files that need indexing (new + changed)
                 var filesToIndex = plan.NewFiles.Concat(plan.ChangedFiles).ToList();
+                var changedLookup = new HashSet<string>(
+                    plan.ChangedFiles.Select(f => f.RelativePath),
+                    StringComparer.OrdinalIgnoreCase);
 
                 // Log start of file indexing
                 if (filesToIndex.Count > 0)
@@ -336,11 +389,18 @@ public class Indexer
                             VectorsSaved: vectorsSaved,
                             CurrentFile: file.RelativePath));
 
-                        // No per-file deletion needed - we bulk deleted all chunks at the start
+                        if (changedLookup.Contains(file.RelativePath))
+                        {
+                            await _chunkMaintenance.RemoveFileAsync(
+                                file.RelativePath,
+                                deleteIndexedFile: false,
+                                deleteVectors: true,
+                                cancellationToken: effectiveCt);
+                        }
 
                         // 1. Create/update IndexedFile FIRST (within partition context)
                         var fileInfo = new FileInfo(file.AbsolutePath);
-                        var fileHash = await ComputeFileHashAsync(file.AbsolutePath, effectiveCt);
+                        var fileHash = await FileHasher.ComputeSha256Async(file.AbsolutePath, effectiveCt);
 
                         var indexedFileResults = await IndexedFile.Query(
                             f => f.RelativePath == file.RelativePath,
@@ -359,12 +419,26 @@ public class Indexer
                             indexedFile.UpdateAfterIndexing(fileHash, fileInfo.Length);
                         }
 
+                        // 2. Extract content and derive metadata prior to saving manifest entry
+                        var extracted = await _extraction.ExtractAsync(
+                            file.AbsolutePath,
+                            file.RelativePath,
+                            effectiveCt);
+                        var frontmatter = FrontmatterParser.Parse(extracted.FullText);
+                        var filePathSegments = PathMetadata.GetPathSegments(file.RelativePath);
+                        var fileTagInput = TagResolverInput.ForFile(
+                            projectId,
+                            file.RelativePath,
+                            pipelineName: null,
+                            language: null,
+                            frontmatter: frontmatter.Metadata,
+                            fileTags: frontmatter.Tags);
+                        var fileTagResult = await _tagResolver.ResolveAsync(fileTagInput, effectiveCt);
+
+                        indexedFile.SetTagEnvelope(fileTagResult.Envelope);
                         await indexedFile.Save(effectiveCt);
 
-                        // Now we have indexedFile.Id to link chunks
-
-                        // 2. Extract content
-                        var extracted = await _extraction.ExtractAsync(file.AbsolutePath, effectiveCt);
+                        var inheritedTags = GetInheritedTags(fileTagResult.Envelope);
 
                         var fileChunks = 0;
 
@@ -395,8 +469,13 @@ public class Indexer
                             docChunk.StartLine = provenance.StartLine;
                             docChunk.EndLine = provenance.EndLine;
 
-                            // Determine category based on file path
-                            docChunk.Category = await DetermineCategoryAsync(chunk.FilePath, effectiveCt);
+                            docChunk.PathSegments = filePathSegments;
+                            docChunk.FileLastModified = fileInfo.LastWriteTimeUtc;
+                            docChunk.FileHash = fileHash;
+
+                            var chunkTagInput = fileTagInput.ForChunk(chunk.Language, chunk.Text, inheritedTags);
+                            var chunkTagResult = await _tagResolver.ResolveAsync(chunkTagInput, effectiveCt);
+                            docChunk.SetTagEnvelope(chunkTagResult.Envelope);
 
                             // Save to relational store immediately (no transaction buffering)
                             // Force synchronous commit to ensure chunk metadata is persisted
@@ -412,18 +491,24 @@ public class Indexer
                             batch.Add((
                                 Id: docChunk.Id,
                                 Embedding: embedding,
-                                Metadata: new
+                                Metadata: new ChunkVectorMetadata
                                 {
-                                    docChunk.FilePath,
-                                    docChunk.SearchText,
-                                    docChunk.CommitSha,
-                                    docChunk.StartByteOffset,
-                                    docChunk.EndByteOffset,
-                                    docChunk.StartLine,
-                                    docChunk.EndLine,
-                                    docChunk.SourceUrl,
-                                    docChunk.Title,
-                                    docChunk.Language
+                                    FilePath = docChunk.FilePath,
+                                    SearchText = docChunk.SearchText,
+                                    CommitSha = docChunk.CommitSha,
+                                    StartByteOffset = docChunk.StartByteOffset,
+                                    EndByteOffset = docChunk.EndByteOffset,
+                                    StartLine = docChunk.StartLine,
+                                    EndLine = docChunk.EndLine,
+                                    SourceUrl = docChunk.SourceUrl,
+                                    Title = docChunk.Title,
+                                    Language = docChunk.Language,
+                                    FileHash = docChunk.FileHash,
+                                    FileLastModified = docChunk.FileLastModified,
+                                    PathSegments = docChunk.PathSegments ?? Array.Empty<string>(),
+                                    PrimaryTags = docChunk.Tags.Primary,
+                                    SecondaryTags = docChunk.Tags.Secondary,
+                                    FileTags = docChunk.Tags.File
                                 }));
 
                             chunksCreated++;
@@ -476,28 +561,6 @@ public class Indexer
                     job.LogOperation($"Completed indexing: {filesProcessed} files processed, {chunksCreated} chunks created");
                 }
 
-                // 6. Handle deletions (chunks already bulk-deleted at start, just clean up manifest)
-                foreach (var deletedPath in plan.DeletedFiles)
-                {
-                    try
-                    {
-                        // Remove from manifest (within partition context - IndexedFile is partitioned)
-                        var indexedFileResults = await IndexedFile.Query(
-                            f => f.RelativePath == deletedPath,
-                            effectiveCt);
-                        var indexedFile = indexedFileResults.FirstOrDefault();
-
-                        if (indexedFile != null)
-                        {
-                            await indexedFile.Delete(effectiveCt);
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogWarning(ex, "Failed to delete IndexedFile for {Path}", deletedPath);
-                        job.AddWarning($"Failed to clean up deleted file: {deletedPath}");
-                    }
-                }
                 // 8. Query actual chunk count and bytes from vector store (within partition context)
                 _logger.LogInformation("🏁 [DEBUG] FINAL COMPLETION: Calling GetActualChunkStatsAsync...");
                 var (actualCount, actualBytes) = await GetActualChunkStatsAsync(cancellationToken);
@@ -705,150 +768,12 @@ public class Indexer
         }
     }
 
-    /// <summary>
-    /// Plans differential indexing by comparing discovered files against manifest
-    /// </summary>
-    /// <remarks>
-    /// Three-tier change detection:
-    /// 1. New files (not in manifest) → NewFiles
-    /// 2. Changed files (hash mismatch) → ChangedFiles
-    /// 3. Metadata-only (timestamp changed, hash same) → MetadataOnlyFiles
-    /// 4. Unchanged (timestamp same) → SkippedFiles
-    /// 5. Deleted (in manifest, not on disk) → DeletedFiles
-    /// </remarks>
-    private async Task<IndexingPlan> PlanIndexingAsync(
-        string projectId,
-        string projectRootPath,
-        CancellationToken cancellationToken)
+    private static IReadOnlyList<string> GetInheritedTags(TagEnvelope envelope)
     {
-        var planningStopwatch = Stopwatch.StartNew();
-        var plan = new IndexingPlan();
-
-        _logger.LogInformation("Planning differential scan for project {ProjectId}", projectId);
-
-        // 1. Load existing manifest (within partition context - IndexedFile is partitioned)
-        Dictionary<string, IndexedFile> manifest;
-        using (EntityContext.Partition(projectId))
-        {
-            var existingFiles = await IndexedFile.All(cancellationToken);
-            manifest = existingFiles.ToDictionary(
-                f => f.RelativePath,
-                StringComparer.OrdinalIgnoreCase);
-        }
-
-        _logger.LogDebug("Loaded manifest with {Count} files", manifest.Count);
-
-        // 2. Discover current files
-        var discoveredFiles = await _discovery
-            .DiscoverAsync(projectRootPath, cancellationToken: cancellationToken)
-            .ToListAsync(cancellationToken);
-
-        _logger.LogDebug("Discovered {Count} files on disk", discoveredFiles.Count);
-
-        // 3. Categorize each discovered file
-        foreach (var file in discoveredFiles)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            var fileInfo = new FileInfo(file.AbsolutePath);
-            var relativePath = file.RelativePath;
-
-            if (!manifest.TryGetValue(relativePath, out var existing))
-            {
-                // New file
-                plan.NewFiles.Add(file);
-                _logger.LogTrace("New file: {Path}", relativePath);
-                continue;
-            }
-
-            // File exists in manifest - compute hash to detect changes
-            var currentHash = await ComputeFileHashAsync(file.AbsolutePath, cancellationToken);
-
-            if (currentHash == existing.ContentHash)
-            {
-                // Content unchanged - skip
-                plan.SkippedFiles.Add(file);
-                _logger.LogTrace("Skipped (unchanged): {Path}", relativePath);
-            }
-            else
-            {
-                // Content changed - re-index
-                plan.ChangedFiles.Add(file);
-                _logger.LogTrace("Changed file: {Path}", relativePath);
-            }
-        }
-
-        // 4. Find deleted files
-        var discoveredPaths = new HashSet<string>(
-            discoveredFiles.Select(f => f.RelativePath),
-            StringComparer.OrdinalIgnoreCase);
-
-        foreach (var manifestPath in manifest.Keys)
-        {
-            if (!discoveredPaths.Contains(manifestPath))
-            {
-                plan.DeletedFiles.Add(manifestPath);
-                _logger.LogTrace("Deleted file: {Path}", manifestPath);
-            }
-        }
-
-        planningStopwatch.Stop();
-        plan.PlanningTime = planningStopwatch.Elapsed;
-
-        // 5. Estimate time savings
-        // Assume average processing time per file (can be refined with historical data)
-        var avgTimePerFile = TimeSpan.FromMilliseconds(500);
-        var filesSkipped = plan.SkippedFiles.Count;
-        plan.EstimatedTimeSavings = avgTimePerFile * filesSkipped;
-
-        _logger.LogInformation(
-            "Planning complete: {Plan} (saved ~{Savings:F1}s)",
-            plan,
-            plan.EstimatedTimeSavings.TotalSeconds);
-
-        return plan;
-    }
-
-    /// <summary>
-    /// Deletes all chunks and vectors for a file
-    /// </summary>
-    /// <remarks>
-    /// Relies on partition context for isolation - must be called within EntityContext.Partition()
-    /// </remarks>
-    private async Task DeleteChunksForFileAsync(
-        string relativePath,
-        CancellationToken cancellationToken)
-    {
-        // Query only by FilePath - partition context provides project isolation
-        var chunks = await Chunk.Query(
-            c => c.FilePath == relativePath,
-            cancellationToken);
-
-        var chunkCount = chunks.Count();
-
-        _logger.LogDebug(
-            "Deleting {Count} chunks for file {Path}",
-            chunkCount,
-            relativePath);
-
-        foreach (var chunk in chunks)
-        {
-            try
-            {
-                await Vector<Chunk>.Delete(chunk.Id, cancellationToken);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Failed to delete vector for chunk {ChunkId}", chunk.Id);
-            }
-
-            await chunk.Delete(cancellationToken);
-        }
-
-        _logger.LogInformation(
-            "Deleted {Count} chunks for file {Path}",
-            chunkCount,
-            relativePath);
+        return TagEnvelope.NormalizeTags(
+            envelope.Primary
+                .Concat(envelope.Secondary)
+                .Concat(envelope.File));
     }
 
     private static (long StartByteOffset, long EndByteOffset, int StartLine, int EndLine) ComputeProvenance(
@@ -897,19 +822,6 @@ public class Indexer
     }
 
     /// <summary>
-    /// Computes SHA256 hash of a file
-    /// </summary>
-    private static async Task<string> ComputeFileHashAsync(
-        string filePath,
-        CancellationToken cancellationToken)
-    {
-        using var sha256 = System.Security.Cryptography.SHA256.Create();
-        await using var fileStream = File.OpenRead(filePath);
-        var hashBytes = await sha256.ComputeHashAsync(fileStream, cancellationToken);
-        return Convert.ToHexString(hashBytes);
-    }
-
-    /// <summary>
     /// Queries actual chunk count and vector storage size
     /// </summary>
     /// <remarks>
@@ -940,121 +852,6 @@ public class Indexer
         }
     }
 
-    /// <summary>
-    /// Determines the category for a file based on path patterns from SearchCategory entities
-    /// </summary>
-    /// <remarks>
-    /// Loads categories from cache (30-min TTL), matches against path patterns.
-    /// Returns first match based on Priority ordering (highest first).
-    /// Returns null if no patterns match.
-    /// </remarks>
-    private async Task<string?> DetermineCategoryAsync(string filePath, CancellationToken ct)
-    {
-        // Load categories from cache (30-min TTL)
-        var cacheKey = "search-categories";
-        var categories = await _cache.GetOrCreateAsync(cacheKey, async entry =>
-        {
-            entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(30);
-
-            try
-            {
-                var all = await SearchCategory.Query(c => c.IsActive, ct);
-                return all.OrderByDescending(c => c.Priority).ToList();
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Failed to load search categories from database");
-                return new List<SearchCategory>();
-            }
-        });
-
-        if (categories == null || !categories.Any())
-        {
-            _logger.LogTrace("No search categories found in cache or database");
-            return null;
-        }
-
-        // Match against path patterns (first match wins)
-        var normalized = filePath.Replace('\\', '/').ToLowerInvariant();
-
-        foreach (var category in categories)
-        {
-            if (MatchesAnyPattern(normalized, category.PathPatterns))
-            {
-                _logger.LogTrace("File {Path} matched category {Category}", filePath, category.Name);
-                return category.Name;
-            }
-        }
-
-        _logger.LogTrace("File {Path} did not match any category", filePath);
-        return null;
-    }
-
-    /// <summary>
-    /// Checks if a normalized file path matches any of the provided glob patterns
-    /// </summary>
-    /// <remarks>
-    /// Supports basic glob syntax:
-    /// - ** = any subdirectories (e.g., "docs/**" matches "docs/a/b/c.md")
-    /// - * = any characters (e.g., "*.md" matches "readme.md")
-    /// - Exact match if no wildcards
-    /// </remarks>
-    private bool MatchesAnyPattern(string normalizedPath, List<string> patterns)
-    {
-        if (patterns == null || patterns.Count == 0)
-            return false;
-
-        foreach (var pattern in patterns)
-        {
-            if (string.IsNullOrWhiteSpace(pattern))
-                continue;
-
-            var normalizedPattern = pattern.ToLowerInvariant();
-
-            // Handle ** (any subdirectories)
-            if (normalizedPattern.Contains("**"))
-            {
-                var parts = normalizedPattern.Split("**", StringSplitOptions.RemoveEmptyEntries);
-                var prefix = parts.Length > 0 ? parts[0] : "";
-                var suffix = parts.Length > 1 ? parts[1] : "";
-
-                // Check prefix and suffix
-                var matchesPrefix = string.IsNullOrEmpty(prefix) || normalizedPath.StartsWith(prefix);
-                var matchesSuffix = string.IsNullOrEmpty(suffix) || normalizedPath.EndsWith(suffix);
-
-                if (matchesPrefix && matchesSuffix)
-                {
-                    return true;
-                }
-            }
-            // Handle * (any characters)
-            else if (normalizedPattern.Contains("*"))
-            {
-                var parts = normalizedPattern.Split('*', StringSplitOptions.RemoveEmptyEntries);
-                var currentIndex = 0;
-
-                // All parts must appear in order
-                foreach (var part in parts)
-                {
-                    var index = normalizedPath.IndexOf(part, currentIndex, StringComparison.Ordinal);
-                    if (index < 0)
-                        return false;
-
-                    currentIndex = index + part.Length;
-                }
-
-                return true;
-            }
-            // Exact match
-            else
-            {
-                if (normalizedPath == normalizedPattern)
-                    return true;
-            }
-        }
-
-        return false;
-    }
 }
 
 /// <summary>

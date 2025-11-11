@@ -1,6 +1,6 @@
 # Query SQLite database for partitions
 $dbPath = ".koan/data/Koan.sqlite"
-$targetPartition = "proj-019a658430757076ae694ced4e2799f5"
+$targetPartition = "019a658430757076ae694ced4e2799f5"
 $projectId = "019a6584-3075-7076-ae69-4ced4e2799f5"
 
 # Load System.Data.SQLite
@@ -49,8 +49,8 @@ try {
     while ($reader.Read()) {
         $pid = $reader.GetString(0)
         $pname = $reader.GetString(1)
-        $partitionId = "proj-" + $pid.Replace("-", "")
-        Write-Host "$pid ($pname) -> partition: $partitionId"
+    $partitionId = $pid.Replace("-", "")
+    Write-Host "$pid ($pname) -> partition token: $partitionId"
 
         if ($partitionId -eq $targetPartition) {
             Write-Host "  ^^^ THIS IS THE TARGET PARTITION ^^^" -ForegroundColor Green

@@ -154,7 +154,7 @@ public class VectorSyncWorker : BackgroundService
 
             // Deserialize embedding and metadata
             var embedding = operation.GetEmbedding();
-            var metadata = operation.GetMetadata<object>();
+            var metadata = (object?)operation.GetMetadata<ChunkVectorMetadata>();
 
             // Set partition context for this chunk's project (adapters handle formatting)
             using (EntityContext.Partition(operation.ProjectId))

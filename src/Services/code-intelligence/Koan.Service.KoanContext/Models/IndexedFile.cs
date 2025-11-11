@@ -14,13 +14,13 @@ namespace Koan.Context.Models;
 /// Performance: 96-97% time savings on re-indexing (1% change rate scenario)
 ///
 /// IMPORTANT: IndexedFile is a PARTITIONED entity (isolated by project).
-/// - NO ProjectId field - partition context provides isolation (partition = proj-{projectId:N})
+/// - NO ProjectId field - partition context provides isolation (partition = raw Project.Id value)
 /// - ALL operations must occur within EntityContext.Partition(projectId)
 /// - Contrast with SyncOperation: global entity with explicit ProjectId field for routing
 ///
 /// Architectural Rationale:
 /// - Per-project manifest table - partition provides natural isolation
-/// - Each project has its own IndexedFile table (proj-{guid:N} partition)
+/// - Each project has its own IndexedFile table (adapter-derived partition name)
 /// - Queries within partition scope only see files for that project
 /// - Clean separation: partitioned entities (IndexedFile, Chunk) vs global entities (SyncOperation, Job, Project)
 /// </remarks>
@@ -37,6 +37,9 @@ public class IndexedFile : Entity<IndexedFile>
 
     /// <summary>File size in bytes</summary>
     public long FileSize { get; set; }
+
+    /// <summary>Structured tag metadata persisted alongside file manifest.</summary>
+    public TagEnvelope Tags { get; set; } = TagEnvelope.Empty;
 
     /// <summary>
     /// Creates indexed file record
@@ -64,5 +67,40 @@ public class IndexedFile : Entity<IndexedFile>
         ContentHash = contentHash;
         FileSize = fileSize;
         LastIndexedAt = DateTime.UtcNow;
+    }
+}
+
+public static class IndexedFileTagExtensions
+{
+    public static TagEnvelope GetTagEnvelope(this IndexedFile file)
+        => file.Tags;
+
+    public static IReadOnlyList<string> GetFileTags(this IndexedFile file)
+        => file.Tags.File;
+
+    public static IReadOnlyDictionary<string, string> GetFrontmatter(this IndexedFile file)
+        => file.Tags.Frontmatter;
+
+    public static IReadOnlyList<TagAuditEntry> GetFileTagAuditTrail(this IndexedFile file)
+        => file.Tags.Audit;
+
+    public static void SetTagEnvelope(this IndexedFile file, TagEnvelope envelope)
+    {
+        file.Tags = envelope.Normalize();
+    }
+
+    public static void SetFileTags(this IndexedFile file, IEnumerable<string>? tags)
+    {
+        file.SetTagEnvelope(file.Tags.WithFile(tags));
+    }
+
+    public static void SetFrontmatter(this IndexedFile file, IReadOnlyDictionary<string, string>? frontmatter)
+    {
+        file.SetTagEnvelope(file.Tags.WithFrontmatter(frontmatter));
+    }
+
+    public static void SetFileTagAuditTrail(this IndexedFile file, IEnumerable<TagAuditEntry>? auditEntries)
+    {
+        file.SetTagEnvelope(file.Tags.WithAudit(auditEntries));
     }
 }

@@ -1,4 +1,6 @@
+using Koan.Context.Models;
 using Koan.Context.Services;
+using Koan.Context.Services.Maintenance;
 using Koan.Core;
 using Koan.Core.Hosting.Bootstrap;
 using Microsoft.Extensions.Configuration;
@@ -28,6 +30,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         // Register stateful pipeline services (scoped - per-request)
         services.AddScoped<Discovery>();
         services.AddScoped<Chunker>();
+        services.AddScoped<IndexingPlanner>();
         services.AddScoped<Embedding>(sp =>
         {
             var ai = sp.GetRequiredService<Koan.AI.Contracts.IAi>();
@@ -40,6 +43,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             return new Embedding(ai, cache, logger, defaultModel);
         });
         services.AddScoped<Indexer>();
+        services.AddSingleton<ChunkMaintenanceService>();
         services.AddScoped<Search>();
 
         // Register Phase 1 AI-first services

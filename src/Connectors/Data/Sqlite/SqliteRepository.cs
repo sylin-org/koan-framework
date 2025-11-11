@@ -116,7 +116,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
     }
 
     // StorageNameRegistry already handles partition appending via EntityContext.Current.Partition
-    // Format: {BaseTableName}#{partition_id} (e.g., "DocumentChunk#proj-019a5aff79cb78158dae3700a698f840")
+    // Format: {BaseTableName}#{partition_id} (e.g., "DocumentChunk#019a5aff79cb78158dae3700a698f840" or adapter-specific variant)
     private string TableName => Core.Configuration.StorageNameRegistry.GetOrCompute<TEntity, TKey>(_sp);
 
     private SqliteConnection CreateConnection()

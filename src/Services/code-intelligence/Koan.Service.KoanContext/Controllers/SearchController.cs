@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using Koan.Context.Models;
 using Koan.Context.Services;
 using Koan.Data.Core;
@@ -13,13 +16,13 @@ namespace Koan.Context.Controllers;
 [Route("api/search")]
 public class SearchController : ControllerBase
 {
-    private readonly Search _retrieval;
+    private readonly ISearchService _retrieval;
     private readonly ProjectResolver _projectResolver;
     private readonly ILogger<SearchController> _logger;
     private readonly MetricsCollector _metricsCollector;
 
     public SearchController(
-        Search retrieval,
+    ISearchService retrieval,
         ProjectResolver projectResolver,
         ILogger<SearchController> logger,
         MetricsCollector metricsCollector)
@@ -148,20 +151,25 @@ public class SearchController : ControllerBase
 
             searchProjectId = projectId;
 
-            var options = new SearchOptions(
-                MaxTokens: request.TokenCounter ?? 5000,
-                Alpha: request.Alpha ?? 0.7f,
-                ContinuationToken: request.ContinuationToken,
-                IncludeInsights: request.IncludeInsights ?? true,
-                IncludeReasoning: request.IncludeReasoning ?? true,
-                Languages: request.Languages,
-                Categories: request.Categories,
-                Audience: request.Audience);
+            var context = SearchRequestContext.Create(
+                query: request.Query,
+                projectIds: new[] { projectId },
+                pathContext: request.PathContext,
+                tagsAny: request.TagsAny,
+                tagsAll: request.TagsAll,
+                tagsExclude: request.TagsExclude,
+                tagBoosts: request.TagBoosts,
+                personaId: request.Persona,
+                channel: SearchChannel.Web,
+                continuationToken: request.ContinuationToken,
+                maxTokens: request.MaxTokens,
+                includeInsights: request.IncludeInsights,
+                includeReasoning: request.IncludeReasoning,
+                languages: request.Languages);
 
             var result = await _retrieval.SearchAsync(
                 projectId,
-                request.Query,
-                options,
+                context,
                 cancellationToken);
 
             searchStopwatch.Stop();
@@ -219,7 +227,6 @@ public class SearchController : ControllerBase
         SearchRequest request,
         CancellationToken cancellationToken)
     {
-        // Parse continuation token if provided
         var pagination = HttpContext.RequestServices.GetRequiredService<Pagination>();
         ContinuationTokenData? continuationData = null;
         var chunkOffset = 0;
@@ -233,35 +240,25 @@ public class SearchController : ControllerBase
                 continuationData.ProjectIds.SequenceEqual(request.ProjectIds ?? new List<string>()))
             {
                 chunkOffset = continuationData.ChunkOffset;
-                _logger.LogInformation("Multi-project continuation from offset {Offset}", chunkOffset);
             }
             else
             {
-                _logger.LogWarning("Invalid multi-project continuation token, starting from beginning");
+                continuationData = null;
             }
         }
 
-        // Fetch more results per project to support pagination
-        var options = new SearchOptions(
-            MaxTokens: 10000,  // Fetch more results per project for aggregation
-            Alpha: request.Alpha ?? 0.7f,
-            ContinuationToken: null,  // Don't use per-project continuation
-            IncludeInsights: false,   // Only include insights on first page
-            IncludeReasoning: request.IncludeReasoning ?? true,
-            Languages: request.Languages,
-            Categories: request.Categories,
-            Audience: request.Audience);
+        var aggregateTokenBudget = Math.Clamp(request.MaxTokens ?? 6000, 1000, 20000);
+        var perProjectTokenBudget = Math.Max(aggregateTokenBudget, 10000);
 
         var allChunks = new List<object>();
         var allSources = new List<object>();
         var projects = new List<object>();
         var errors = new List<string>();
 
-        foreach (var projectId in request.ProjectIds!)
+        foreach (var projectId in request.ProjectIds ?? Enumerable.Empty<string>())
         {
             try
             {
-                // Get project info
                 var project = await Project.Get(projectId, cancellationToken);
                 if (project == null)
                 {
@@ -271,14 +268,24 @@ public class SearchController : ControllerBase
 
                 projects.Add(new { id = project.Id, name = project.Name });
 
-                // Search this project
-                var result = await _retrieval.SearchAsync(
-                    projectId,
-                    request.Query,
-                    options,
-                    cancellationToken);
+                var context = SearchRequestContext.Create(
+                    query: request.Query,
+                    projectIds: new[] { projectId },
+                    pathContext: request.PathContext,
+                    tagsAny: request.TagsAny,
+                    tagsAll: request.TagsAll,
+                    tagsExclude: request.TagsExclude,
+                    tagBoosts: request.TagBoosts,
+                    personaId: request.Persona,
+                    channel: SearchChannel.Web,
+                    continuationToken: null,
+                    maxTokens: perProjectTokenBudget,
+                    includeInsights: false,
+                    includeReasoning: request.IncludeReasoning,
+                    languages: request.Languages);
 
-                // Add chunks with projectId tagged
+                var result = await _retrieval.SearchAsync(projectId, context, cancellationToken);
+
                 foreach (var chunk in result.Chunks)
                 {
                     allChunks.Add(new
@@ -288,11 +295,10 @@ public class SearchController : ControllerBase
                         score = chunk.Score,
                         provenance = chunk.Provenance,
                         reasoning = chunk.Reasoning,
-                        projectId = projectId  // Tag each chunk with its project
+                        projectId
                     });
                 }
 
-                // Aggregate sources
                 if (result.Sources?.Files != null)
                 {
                     foreach (var file in result.Sources.Files)
@@ -307,7 +313,6 @@ public class SearchController : ControllerBase
                         });
                     }
                 }
-
             }
             catch (Exception ex)
             {
@@ -316,48 +321,39 @@ public class SearchController : ControllerBase
             }
         }
 
-        // Apply pagination: skip chunks from previous pages
         var paginatedChunks = allChunks.Skip(chunkOffset).ToList();
-
-        // Apply token budget to determine how many chunks to return
-        var maxTokens = request.TokenCounter ?? 5000;
         var returnedChunks = new List<object>();
         var tokensReturned = 0;
 
         foreach (var chunk in paginatedChunks)
         {
-            // Estimate tokens (rough approximation)
-            var chunkTokens = 350; // EstimatedTokensPerChunk from Search.cs
-
-            if (tokensReturned + chunkTokens > maxTokens && returnedChunks.Count > 0)
+            const int chunkTokens = 350;
+            if (tokensReturned + chunkTokens > aggregateTokenBudget && returnedChunks.Count > 0)
             {
-                break; // Token budget reached
+                break;
             }
 
             returnedChunks.Add(chunk);
             tokensReturned += chunkTokens;
         }
 
-        // Generate continuation token if there are more results
         var hasMoreResults = (chunkOffset + returnedChunks.Count) < allChunks.Count;
         string? continuationToken = null;
 
         if (hasMoreResults)
         {
             var tokenData = new ContinuationTokenData(
-                ProjectId: string.Join(",", request.ProjectIds!), // Store all project IDs
+                ProjectId: string.Join(",", request.ProjectIds ?? new List<string>()),
                 Query: request.Query,
-                Alpha: request.Alpha ?? 0.7f,
-                TokensRemaining: maxTokens,
-                LastChunkId: string.Empty,  // Not used for multi-project
+                Alpha: 0.65f,
+                TokensRemaining: aggregateTokenBudget,
+                LastChunkId: string.Empty,
                 CreatedAt: DateTime.UtcNow,
-                Page: chunkOffset / returnedChunks.Count + 1,
+                Page: returnedChunks.Count == 0 ? 1 : (chunkOffset / Math.Max(returnedChunks.Count, 1)) + 1,
                 ProjectIds: request.ProjectIds,
                 ChunkOffset: chunkOffset + returnedChunks.Count);
 
             continuationToken = pagination.CreateToken(tokenData);
-            _logger.LogInformation("Generated multi-project continuation token: offset {NewOffset}/{Total}",
-                chunkOffset + returnedChunks.Count, allChunks.Count);
         }
 
         return Ok(new
@@ -531,18 +527,20 @@ public class SearchController : ControllerBase
 public record SearchRequest(
     string Query,
     string? ProjectId = null,
-    List<string>? ProjectIds = null,  // For cross-project search
+    List<string>? ProjectIds = null,
     string? PathContext = null,
     string? LibraryId = null,
     string? WorkingDirectory = null,
-    float? Alpha = null,
-    int? TokenCounter = null,
+    string? Persona = null,
+    int? MaxTokens = null,
     string? ContinuationToken = null,
     bool? IncludeInsights = null,
     bool? IncludeReasoning = null,
-    List<string>? Languages = null,  // Filter by programming language/file type
-    List<string>? Categories = null,  // Filter by content categories (e.g., ["guide", "documentation"])
-    string? Audience = null);          // Apply audience profile (e.g., "learner", "architect", "pm")
+    List<string>? Languages = null,
+    List<string>? TagsAny = null,
+    List<string>? TagsAll = null,
+    List<string>? TagsExclude = null,
+    Dictionary<string, float>? TagBoosts = null);
 
 /// <summary>
 /// Suggestion request payload

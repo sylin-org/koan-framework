@@ -16,6 +16,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using System.Threading;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -46,6 +47,14 @@ builder.Services.AddSingleton<TokenCounter, TokenCounter>();
 builder.Services.AddSingleton<IncrementalIndexer>();
 builder.Services.AddSingleton<IndexingCoordinator>();
 builder.Services.AddSingleton<Metrics>();
+builder.Services.AddSingleton<TagResolver>();
+builder.Services.AddScoped<ISearchService>(sp => sp.GetRequiredService<Search>());
+builder.Services.AddScoped<IndexProjectAsync>(sp =>
+{
+    var indexer = sp.GetRequiredService<Indexer>();
+    return (string projectId, bool force, CancellationToken cancellationToken, IProgress<IndexingProgress>? progress) =>
+        indexer.IndexProjectAsync(projectId, progress, cancellationToken, force);
+});
 
 // ✅ ENHANCED METRICS & INSTRUMENTATION
 builder.Services.AddSingleton<MetricsCollector>();
@@ -55,9 +64,6 @@ builder.Services.AddHostedService<FileMonitoringService>();
 builder.Services.AddSingleton<FileMonitoringService>(sp =>
     (FileMonitoringService)sp.GetServices<IHostedService>()
         .First(s => s is FileMonitoringService));
-
-// ✅ SEARCH PROFILE SEEDING (auto-seeds categories & audiences)
-builder.Services.AddHostedService<Koan.Context.Bootstrap.SearchProfileSeeder>();
 
 // Build app
 var app = builder.Build();

@@ -15,12 +15,12 @@ public static class NamingComposer
     /// </summary>
     /// <param name="provider">Naming provider (data or vector adapter factory)</param>
     /// <param name="entityType">Entity type to generate name for</param>
-    /// <param name="partition">Optional partition identifier (e.g., "proj-abc123")</param>
+    /// <param name="partition">Optional partition identifier (e.g., raw project GUID)</param>
     /// <param name="services">Service provider for dependency resolution</param>
     /// <returns>Fully composed storage name, optionally with partition suffix</returns>
     /// <example>
     /// Without partition: "Todos"
-    /// With partition: "Todos#proj-abc123" (data) or "Todos_proj_abc123" (vector)
+    /// With partition: "Todos#019a5aff79cb78158dae3700a698f840" (data) or adapter-specific variant (vector)
     /// </example>
     public static string Compose(
         INamingProvider provider,

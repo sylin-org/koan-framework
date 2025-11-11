@@ -71,6 +71,7 @@ public class Embedding
         // Check cache first
         if (_cache.TryGetValue<float[]>(cacheKey, out var cachedEmbedding))
         {
+            _logger.LogDebug("Embedding cache hit for text length {TextLength}", text.Length);
             return cachedEmbedding!;
         }
 

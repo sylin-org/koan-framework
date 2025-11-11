@@ -1,6 +1,12 @@
-using System.Security.Cryptography;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
 using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 using Koan.Context.Models;
+using Koan.Context.Services.Maintenance;
 using Koan.Context.Utilities;
 using Koan.Data.Abstractions;
 using Koan.Data.Core;
@@ -19,15 +25,21 @@ public class IncrementalIndexer
     private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<IncrementalIndexer> _logger;
     private readonly SemaphoreSlim _concurrencyLimiter;
+    private readonly ChunkMaintenanceService _chunkMaintenance;
+    private readonly TagResolver _tagResolver;
 
     public IncrementalIndexer(
         IServiceProvider serviceProvider,
         ILogger<IncrementalIndexer> logger,
-        IOptions<FileMonitoringOptions> options)
+        IOptions<FileMonitoringOptions> options,
+        ChunkMaintenanceService chunkMaintenance,
+        TagResolver tagResolver)
     {
         _serviceProvider = serviceProvider;
         _logger = logger;
         _concurrencyLimiter = new SemaphoreSlim(options.Value.MaxConcurrentReindexOperations);
+        _chunkMaintenance = chunkMaintenance ?? throw new ArgumentNullException(nameof(chunkMaintenance));
+        _tagResolver = tagResolver ?? throw new ArgumentNullException(nameof(tagResolver));
     }
 
     public async Task ProcessFileChangesAsync(
@@ -108,12 +120,20 @@ public class IncrementalIndexer
         switch (change.Type)
         {
             case FileChangeType.Deleted:
-                await DeleteChunksForFileAsync(relativePath, cancellationToken);
+                await _chunkMaintenance.RemoveFileAsync(
+                    relativePath,
+                    deleteIndexedFile: true,
+                    deleteVectors: true,
+                    cancellationToken: cancellationToken);
                 break;
 
             case FileChangeType.Modified:
                 // Delete old chunks
-                await DeleteChunksForFileAsync(relativePath, cancellationToken);
+                await _chunkMaintenance.RemoveFileAsync(
+                    relativePath,
+                    deleteIndexedFile: false,
+                    deleteVectors: true,
+                    cancellationToken: cancellationToken);
 
                 // Re-index if file still exists
                 if (File.Exists(change.Path))
@@ -122,43 +142,6 @@ public class IncrementalIndexer
                 }
                 break;
         }
-    }
-
-    private async Task DeleteChunksForFileAsync(string relativePath, CancellationToken cancellationToken)
-    {
-        // Query all chunks for this file (within partition context)
-        var chunks = await Chunk.Query(
-            c => c.FilePath == relativePath,
-            cancellationToken);
-
-        // Delete from both relational and vector stores
-        foreach (var chunk in chunks)
-        {
-            await chunk.Delete(cancellationToken);
-
-            // Also delete from vector store
-            try
-            {
-                await Vector<Chunk>.Delete(chunk.Id, cancellationToken);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Failed to delete vector for chunk {ChunkId}", chunk.Id);
-            }
-        }
-
-        // Delete IndexedFile entry (within partition context)
-        var indexedFileResults = await IndexedFile.Query(
-            f => f.RelativePath == relativePath,
-            cancellationToken);
-        var indexedFile = indexedFileResults.FirstOrDefault();
-
-        if (indexedFile != null)
-        {
-            await indexedFile.Delete(cancellationToken);
-        }
-
-        _logger.LogDebug("Deleted {Count} chunks and IndexedFile for {Path}", chunks.Count, relativePath);
     }
 
     private async Task IndexSingleFileAsync(
@@ -170,12 +153,8 @@ public class IncrementalIndexer
         CancellationToken cancellationToken)
     {
         var relativePath = Path.GetRelativePath(project.RootPath, filePath);
-        var category = PathCategorizer.DeriveCategory(relativePath);
-        var pathSegments = PathCategorizer.GetPathSegments(relativePath);
-
-        // 1. Create/update IndexedFile FIRST (within partition context)
         var fileInfo = new FileInfo(filePath);
-        var fileHash = await ComputeFileHashAsync(filePath);
+        var fileHash = await FileHasher.ComputeSha256Async(filePath, cancellationToken);
 
         var indexedFileResults = await IndexedFile.Query(
             f => f.RelativePath == relativePath,
@@ -194,10 +173,26 @@ public class IncrementalIndexer
             indexedFile.UpdateAfterIndexing(fileHash, fileInfo.Length);
         }
 
+        // 2. Extract content and derive metadata
+        var extracted = await extraction.ExtractAsync(
+            filePath,
+            relativePath,
+            cancellationToken);
+        var frontmatter = FrontmatterParser.Parse(extracted.FullText);
+        var pathSegments = PathMetadata.GetPathSegments(relativePath);
+
+        var fileTagInput = TagResolverInput.ForFile(
+            project.Id,
+            relativePath,
+            pipelineName: null,
+            language: null,
+            frontmatter: frontmatter.Metadata,
+            fileTags: frontmatter.Tags);
+        var fileTagResult = await _tagResolver.ResolveAsync(fileTagInput, cancellationToken);
+        indexedFile.SetTagEnvelope(fileTagResult.Envelope);
         await indexedFile.Save(cancellationToken);
 
-        // 2. Extract content
-        var extracted = await extraction.ExtractAsync(filePath, cancellationToken);
+        var inheritedTags = GetInheritedTags(fileTagResult.Envelope);
 
         // Chunk content
         await foreach (var chunk in chunking.ChunkAsync(
@@ -214,7 +209,7 @@ public class IncrementalIndexer
             // Create Chunk entity (within partition context, linked to IndexedFile)
             var docChunk = Chunk.Create(
                 indexedFileId: indexedFile.Id,
-                filePath: relativePath,
+                filePath: chunk.FilePath,
                 searchText: chunk.Text,
                 tokenCount: chunk.TokenCount,
                 commitSha: null,
@@ -225,10 +220,13 @@ public class IncrementalIndexer
             docChunk.EndByteOffset = provenance.EndByteOffset;
             docChunk.StartLine = provenance.StartLine;
             docChunk.EndLine = provenance.EndLine;
-            docChunk.Category = category;
             docChunk.PathSegments = pathSegments;
             docChunk.FileLastModified = fileInfo.LastWriteTimeUtc;
             docChunk.FileHash = fileHash;
+
+            var chunkTagInput = fileTagInput.ForChunk(chunk.Language, chunk.Text, inheritedTags);
+            var chunkTagResult = await _tagResolver.ResolveAsync(chunkTagInput, cancellationToken);
+            docChunk.SetTagEnvelope(chunkTagResult.Envelope);
 
             // Save to relational store
             await docChunk.Save(cancellationToken);
@@ -238,21 +236,37 @@ public class IncrementalIndexer
             {
                 (Id: docChunk.Id,
                  Embedding: embeddingVector,
-                 Metadata: (object?)new
+                 Metadata: (object?)new ChunkVectorMetadata
                  {
-                     docChunk.FilePath,
-                     docChunk.SearchText,
-                     docChunk.StartByteOffset,
-                     docChunk.EndByteOffset,
-                     docChunk.StartLine,
-                     docChunk.EndLine,
-                     docChunk.Category,
-                     docChunk.Language
+                     FilePath = docChunk.FilePath,
+                     SearchText = docChunk.SearchText,
+                     CommitSha = docChunk.CommitSha,
+                     StartByteOffset = docChunk.StartByteOffset,
+                     EndByteOffset = docChunk.EndByteOffset,
+                     StartLine = docChunk.StartLine,
+                     EndLine = docChunk.EndLine,
+                     SourceUrl = docChunk.SourceUrl,
+                     Title = docChunk.Title,
+                     Language = docChunk.Language,
+                     FileHash = docChunk.FileHash,
+                     FileLastModified = docChunk.FileLastModified,
+                     PathSegments = docChunk.PathSegments ?? Array.Empty<string>(),
+                     PrimaryTags = docChunk.Tags.Primary,
+                     SecondaryTags = docChunk.Tags.Secondary,
+                     FileTags = docChunk.Tags.File
                  })
             }, cancellationToken);
         }
 
         _logger.LogDebug("Re-indexed file {Path}", relativePath);
+    }
+
+    private static IReadOnlyList<string> GetInheritedTags(TagEnvelope envelope)
+    {
+        return TagEnvelope.NormalizeTags(
+            envelope.Primary
+                .Concat(envelope.Secondary)
+                .Concat(envelope.File));
     }
 
     private static (long StartByteOffset, long EndByteOffset, int StartLine, int EndLine) ComputeProvenance(
@@ -298,13 +312,5 @@ public class IncrementalIndexer
         }
 
         return count;
-    }
-
-    private static async Task<string> ComputeFileHashAsync(string filePath)
-    {
-        using var sha256 = SHA256.Create();
-        using var fileStream = File.OpenRead(filePath);
-        var hashBytes = await sha256.ComputeHashAsync(fileStream);
-        return Convert.ToHexString(hashBytes);
     }
 }

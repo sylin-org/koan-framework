@@ -12,15 +12,15 @@ namespace Koan.Context.Controllers;
 public class DiagnosticsController : ControllerBase
 {
     /// <summary>
-    /// Get category distribution across all chunks
+    /// Get primary tag distribution across all chunks
     /// </summary>
-    [HttpGet("categories")]
-    public async Task<IActionResult> GetCategoryDistribution(CancellationToken cancellationToken = default)
+    [HttpGet("tags")]
+    public async Task<IActionResult> GetTagDistribution(CancellationToken cancellationToken = default)
     {
         try
         {
             var projects = await Project.All(cancellationToken);
-            var categoryStats = new Dictionary<string, int>();
+            var tagStats = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
             var totalChunks = 0;
 
             foreach (var project in projects)
@@ -32,15 +32,19 @@ public class DiagnosticsController : ControllerBase
                     foreach (var chunk in chunks)
                     {
                         totalChunks++;
-                        var category = string.IsNullOrWhiteSpace(chunk.Category) ? "(empty)" : chunk.Category;
+                        var primaryTags = chunk.Tags.Primary;
 
-                        if (categoryStats.ContainsKey(category))
+                        if (primaryTags.Count == 0)
                         {
-                            categoryStats[category]++;
+                            tagStats.TryGetValue("(untagged)", out var untaggedCount);
+                            tagStats["(untagged)"] = untaggedCount + 1;
+                            continue;
                         }
-                        else
+
+                        foreach (var tag in primaryTags)
                         {
-                            categoryStats[category] = 1;
+                            tagStats.TryGetValue(tag, out var count);
+                            tagStats[tag] = count + 1;
                         }
                     }
                 }
@@ -49,8 +53,8 @@ public class DiagnosticsController : ControllerBase
             return Ok(new
             {
                 totalChunks,
-                categories = categoryStats.OrderByDescending(kvp => kvp.Value)
-                    .Select(kvp => new { category = kvp.Key, count = kvp.Value }),
+                tags = tagStats.OrderByDescending(kvp => kvp.Value)
+                    .Select(kvp => new { tag = kvp.Key, count = kvp.Value }),
                 metadata = new
                 {
                     timestamp = DateTime.UtcNow,
@@ -60,7 +64,7 @@ public class DiagnosticsController : ControllerBase
         }
         catch (Exception ex)
         {
-            return StatusCode(500, new { error = "Failed to get category distribution", details = ex.Message });
+            return StatusCode(500, new { error = "Failed to get tag distribution", details = ex.Message });
         }
     }
 
@@ -94,7 +98,9 @@ public class DiagnosticsController : ControllerBase
                 {
                     id = c.Id,
                     filePath = c.FilePath,
-                    category = c.Category ?? "(null)",
+                    primaryTags = c.Tags.Primary,
+                    secondaryTags = c.Tags.Secondary,
+                    fileTags = c.Tags.File,
                     language = c.Language ?? "(null)",
                     title = c.Title ?? "(null)",
                     pathSegments = c.PathSegments ?? Array.Empty<string>(),

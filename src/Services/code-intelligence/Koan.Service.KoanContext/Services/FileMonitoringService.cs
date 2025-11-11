@@ -118,29 +118,6 @@ public class FileMonitoringService : IHostedService, IDisposable
             return;
         }
 
-        var category = PathCategorizer.DeriveCategory(relativePath);
-
-        bool shouldIndex = category switch
-        {
-            "source" => true,          // Source code files
-            "documentation" => true,    // Markdown and docs
-            "guide" => true,           // Guides and tutorials
-            "api-doc" => true,         // API documentation
-            "architecture" => true,    // Architecture docs
-            "decision" => true,        // ADRs and decisions
-            "test" => false,           // Skip test files
-            "config" => true,          // Configuration files
-            "other" => true,           // Index unknown files by default
-            _ => true                  // Default to indexing
-        };
-
-        if (!shouldIndex)
-        {
-            _logger.LogTrace("Skipping {Path} - monitoring disabled for {Category}",
-                e.FullPath, category);
-            return;
-        }
-
         // Check against .gitignore (use cached parser)
         if (_gitignoreParsers.TryGetValue(project.Id, out var gitignore) &&
             gitignore.ShouldExclude(relativePath))

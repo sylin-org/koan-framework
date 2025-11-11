@@ -5,8 +5,10 @@ using System.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using Koan.Data.Abstractions;
 using Koan.Data.Vector.Abstractions;
+using Koan.Data.Vector.Abstractions.Schema;
 using Koan.Data.Core;
 using Koan.Data.Core.Model;
+using Koan.Core.Hosting.App;
 
 namespace Koan.Data.Vector;
 
@@ -24,7 +26,8 @@ public static class VectorData<TEntity>
     public static async Task Save(TEntity entity, ReadOnlyMemory<float> vector, IReadOnlyDictionary<string, object>? metadata = null, CancellationToken ct = default)
     {
         System.ArgumentNullException.ThrowIfNull(entity);
-        await Repo.UpsertAsync(entity.Id, vector.ToArray(), metadata, ct);
+    var normalized = NormalizeMetadata(metadata);
+    await Repo.UpsertAsync(entity.Id, vector.ToArray(), normalized, ct);
     }
 
     /// <summary>
@@ -37,13 +40,14 @@ public static class VectorData<TEntity>
 
         if (VectorWorkflow<TEntity>.IsAvailable())
         {
-            var payload = CloneMetadata(metadata);
+            var payload = NormalizeMetadata(metadata);
             await VectorWorkflow<TEntity>.Save(entity, vector.ToArray(), payload, null, ct);
             return;
         }
 
         await entity.Save(ct);
-        await Repo.UpsertAsync(entity.Id, vector.ToArray(), metadata, ct);
+        var normalized = NormalizeMetadata(metadata);
+        await Repo.UpsertAsync(entity.Id, vector.ToArray(), normalized, ct);
     }
 
     /// <summary>
@@ -58,7 +62,7 @@ public static class VectorData<TEntity>
         if (list.Count == 0)
             return 0;
 
-        var vectors = list.Select(x => (x.Entity.Id, x.Vector.ToArray(), (object?)x.Metadata)).ToList();
+    var vectors = list.Select(x => (x.Entity.Id, x.Vector.ToArray(), (object?)NormalizeMetadata(x.Metadata))).ToList();
         return await Repo.UpsertManyAsync(vectors, ct);
     }
 
@@ -78,7 +82,7 @@ public static class VectorData<TEntity>
                 return new BatchResult(0, 0, 0);
             }
 
-            var mapped = list.Select(x => (x.Entity, x.Vector.ToArray(), (object?)CloneMetadata(x.Metadata))).ToList();
+            var mapped = list.Select(x => (x.Entity, x.Vector.ToArray(), (object?)NormalizeMetadata(x.Metadata))).ToList();
             var result = await VectorWorkflow<TEntity>.SaveMany(mapped, null, ct);
             return new BatchResult(result.Documents, 0, 0);
         }
@@ -98,27 +102,62 @@ public static class VectorData<TEntity>
         }
 
         // Save vectors to vector store
-        var vectors = list.Select(x => (x.Entity.Id, x.Vector.ToArray(), (object?)x.Metadata)).ToList();
+    var vectors = list.Select(x => (x.Entity.Id, x.Vector.ToArray(), (object?)NormalizeMetadata(x.Metadata))).ToList();
         await Repo.UpsertManyAsync(vectors, ct);
 
         return new BatchResult(affected, 0, 0);
     }
 
     public static Task<int> UpsertManyAsync(IEnumerable<(string Id, float[] Embedding, object? Metadata)> items, CancellationToken ct = default)
-        => Repo.UpsertManyAsync(items, ct);
+    {
+        var materialized = items as IList<(string Id, float[] Embedding, object? Metadata)> ?? items.ToList();
+        if (materialized.Count == 0)
+        {
+            return Task.FromResult(0);
+        }
+
+        var normalized = materialized
+            .Select(x => (x.Id, x.Embedding, (object?)NormalizeMetadata(x.Metadata)))
+            .ToList();
+
+        return Repo.UpsertManyAsync(normalized, ct);
+    }
 
     public static Task<VectorQueryResult<string>> SearchAsync(VectorQueryOptions options, CancellationToken ct = default)
         => Repo.SearchAsync(options, ct);
 
-    private static Dictionary<string, object?>? CloneMetadata(IReadOnlyDictionary<string, object>? metadata)
+    private static IDictionary<string, object?>? NormalizeMetadata(object? metadata)
     {
-        if (metadata is null || metadata.Count == 0)
+        if (metadata is null)
         {
             return null;
         }
 
-        var copy = new Dictionary<string, object?>(System.StringComparer.OrdinalIgnoreCase);
-        foreach (var entry in metadata)
+        var descriptor = TryGetDescriptor();
+        if (descriptor is not null)
+        {
+            var projected = descriptor.ProjectMetadata(metadata);
+            if (projected is not null)
+            {
+                return ToDictionary(projected);
+            }
+        }
+
+        switch (metadata)
+        {
+            case IDictionary<string, object?> dict:
+                return new Dictionary<string, object?>(dict, StringComparer.OrdinalIgnoreCase);
+            case IReadOnlyDictionary<string, object?> readOnly:
+                return ToDictionary(readOnly);
+            default:
+                return null;
+        }
+    }
+
+    private static Dictionary<string, object?> ToDictionary(IReadOnlyDictionary<string, object?> source)
+    {
+        var copy = new Dictionary<string, object?>(source.Count, StringComparer.OrdinalIgnoreCase);
+        foreach (var entry in source)
         {
             if (string.IsNullOrWhiteSpace(entry.Key))
             {
@@ -129,6 +168,18 @@ public static class VectorData<TEntity>
         }
 
         return copy;
+    }
+
+    private static VectorSchemaDescriptor? TryGetDescriptor()
+    {
+        var provider = AppHost.Current;
+        if (provider is null)
+        {
+            return null;
+        }
+
+        var registry = provider.GetService<VectorSchemaRegistry>();
+        return registry?.TryGet<TEntity, string>();
     }
 
     public readonly record struct VectorEntity(

@@ -1,3 +1,7 @@
+using System;
+using System.Collections.Generic;
+using System.Net;
+using System.Security.Cryptography;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -6,9 +10,8 @@ using Koan.Data.Abstractions.Instructions;
 using Koan.Data.Abstractions.Naming;
 using Koan.Data.Vector.Abstractions;
 using Koan.Data.Vector.Abstractions.Configuration;
-using System.Net;
+using Koan.Data.Vector.Abstractions.Schema;
 using Newtonsoft.Json;
-using System.Security.Cryptography;
 using Newtonsoft.Json.Linq;
 
 namespace Koan.Data.Vector.Connector.Weaviate;
@@ -21,6 +24,7 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
     private readonly WeaviateOptions _options;
     private readonly IServiceProvider _sp;
     private readonly ILogger<WeaviateVectorRepository<TEntity, TKey>>? _logger;
+    private readonly VectorSchemaDescriptor _schemaDescriptor;
     private volatile bool _schemaEnsured;
     private volatile int _discoveredDimension = -1; // -1 means not discovered yet
 
@@ -32,6 +36,8 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
         _options = options.Value;
         _sp = sp;
         _logger = (ILogger<WeaviateVectorRepository<TEntity, TKey>>?)sp.GetService(typeof(ILogger<WeaviateVectorRepository<TEntity, TKey>>));
+    var registry = (VectorSchemaRegistry?)sp.GetService(typeof(VectorSchemaRegistry));
+    _schemaDescriptor = registry?.Get<TEntity, TKey>() ?? VectorSchemaDescriptor.CreateFallback(typeof(TEntity));
         _http.BaseAddress = new Uri(_options.Endpoint);
         if (_http.Timeout == default)
             _http.Timeout = TimeSpan.FromSeconds(Math.Max(1, _options.DefaultTimeoutSeconds));
@@ -70,34 +76,12 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
             _schemaEnsured = true; return;
         }
         // Create class with manual vectors
-        var properties = new List<object>
-        {
-            new { name = "docId", dataType = new[] { "text" } },
-            new
-            {
-                name = "searchText",
-                dataType = new[] { "text" },
-                indexSearchable = true,      // Enable BM25 indexing
-                tokenization = "word"
-            }
-        };
-
-        // Add filterable properties for common recommendation system use cases
-        // These enable filter push-down at the vector database layer
-        properties.Add(new { name = "genres", dataType = new[] { "text[]" } });
-        properties.Add(new { name = "tags", dataType = new[] { "text[]" } });
-        properties.Add(new { name = "rating", dataType = new[] { "number" } });
-        properties.Add(new { name = "year", dataType = new[] { "int" } });
-        properties.Add(new { name = "episodes", dataType = new[] { "int" } });
-        properties.Add(new { name = "mediaTypeId", dataType = new[] { "text" } });
-        properties.Add(new { name = "popularity", dataType = new[] { "number" } });
-
         var body = new
         {
             @class = cls,
             vectorizer = "none",
             vectorIndexConfig = new { distance = _options.Metric },
-            properties = properties.ToArray()
+            properties = BuildSchemaProperties()
         };
         var bodyJson = JsonConvert.SerializeObject(body, Formatting.Indented);
         _logger?.LogDebug("Weaviate: POST /v1/schema/classes for class {Class}. Schema body: {Body}", cls, bodyJson);
@@ -628,6 +612,92 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
     }
 
     // Translator helpers moved to WeaviateFilterTranslator
+
+    private object[] BuildSchemaProperties()
+    {
+        var properties = new List<object>
+        {
+            new { name = "docId", dataType = new[] { "text" } }
+        };
+
+        if (_schemaDescriptor.Properties.Count == 0)
+        {
+            properties.Add(new
+            {
+                name = "searchText",
+                dataType = new[] { "text" },
+                indexSearchable = true,
+                tokenization = "word"
+            });
+
+            return properties.ToArray();
+        }
+
+        foreach (var property in _schemaDescriptor.Properties)
+        {
+            if (string.Equals(property.Name, "docId", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var payload = CreateWeaviateProperty(property);
+            if (payload is not null)
+            {
+                properties.Add(payload);
+            }
+        }
+
+        return properties.ToArray();
+    }
+
+    private static object? CreateWeaviateProperty(VectorSchemaProperty property)
+    {
+        var dataType = property.Type switch
+        {
+            VectorSchemaPropertyType.Text => "text",
+            VectorSchemaPropertyType.TextArray => "text[]",
+            VectorSchemaPropertyType.Int => "int",
+            VectorSchemaPropertyType.Long => "number",
+            VectorSchemaPropertyType.Number => "number",
+            VectorSchemaPropertyType.Boolean => "boolean",
+            VectorSchemaPropertyType.DateTime => "date",
+            _ => null
+        };
+
+        if (dataType is null)
+        {
+            return null;
+        }
+
+        var payload = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["name"] = property.Name,
+            ["dataType"] = new[] { dataType }
+        };
+
+        if (!string.IsNullOrWhiteSpace(property.Description))
+        {
+            payload["description"] = property.Description;
+        }
+
+        if (property.Type == VectorSchemaPropertyType.Text && property.IsSearchable)
+        {
+            payload["indexSearchable"] = true;
+            payload["tokenization"] = "word";
+        }
+
+        if (property.IsFilterable)
+        {
+            payload["indexInverted"] = true;
+        }
+
+        if (property.IsSortable)
+        {
+            payload["sortable"] = true;
+        }
+
+        return payload;
+    }
 
     private void ValidateEmbedding(float[] embedding)
     {

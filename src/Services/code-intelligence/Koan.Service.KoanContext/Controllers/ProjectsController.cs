@@ -1,3 +1,4 @@
+using System.Threading;
 using Koan.Context.Models;
 using Koan.Context.Services;
 using Koan.Context.Utilities;
@@ -29,16 +30,16 @@ namespace Koan.Context.Controllers;
 [Route("api/projects")]
 public class ProjectsController : EntityController<Project>
 {
-    private readonly Indexer _Indexer;
+    private readonly IndexProjectAsync _indexProject;
     private readonly FileMonitoringService _fileMonitoring;
     private readonly PathValidator _pathValidator;
 
     public ProjectsController(
-        Indexer Indexer,
+    IndexProjectAsync indexProject,
         FileMonitoringService fileMonitoring,
         PathValidator pathValidator)
     {
-        _Indexer = Indexer ?? throw new ArgumentNullException(nameof(Indexer));
+    _indexProject = indexProject ?? throw new ArgumentNullException(nameof(indexProject));
         _fileMonitoring = fileMonitoring ?? throw new ArgumentNullException(nameof(fileMonitoring));
         _pathValidator = pathValidator ?? throw new ArgumentNullException(nameof(pathValidator));
     }
@@ -143,7 +144,7 @@ public class ProjectsController : EntityController<Project>
         {
             try
             {
-                await _Indexer.IndexProjectAsync(id, force: force);
+                await _indexProject(id, force, CancellationToken.None);
             }
             catch
             {
@@ -268,7 +269,7 @@ public class ProjectsController : EntityController<Project>
             {
                 try
                 {
-                    await _Indexer.IndexProjectAsync(projectId, force: request.Force);
+                    await _indexProject(projectId, request.Force, CancellationToken.None);
                 }
                 catch
                 {
@@ -353,7 +354,7 @@ public class ProjectsController : EntityController<Project>
         {
             try
             {
-                await _Indexer.IndexProjectAsync(id, cancellationToken: CancellationToken.None, force: force);
+                await _indexProject(id, force, CancellationToken.None);
             }
             catch (Exception)
             {
