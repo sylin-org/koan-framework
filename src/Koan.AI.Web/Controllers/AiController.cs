@@ -1,11 +1,13 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Koan.AI.Contracts;
 using Koan.AI.Contracts.Adapters;
 using Koan.AI.Contracts.Models;
 using Koan.AI.Contracts.Routing;
+using Koan.Web.Sse.Mvc;
 
 namespace Koan.AI.Web.Controllers;
 
@@ -13,9 +15,9 @@ namespace Koan.AI.Web.Controllers;
 [Route(Constants.Routes.Base)]
 public sealed class AiController : ControllerBase
 {
-    private readonly IAi _ai;
+    private readonly IAiPipeline _ai;
     private readonly IAiAdapterRegistry _registry;
-    public AiController(IAi ai, IAiAdapterRegistry registry)
+    public AiController(IAiPipeline ai, IAiAdapterRegistry registry)
     { _ai = ai; _registry = registry; }
 
     [HttpGet(Constants.Routes.Health)]
@@ -78,20 +80,22 @@ public sealed class AiController : ControllerBase
     }
 
     [HttpPost(Constants.Routes.ChatStream)]
-    public async Task Stream([FromBody] AiChatRequest request, CancellationToken ct)
+    public IActionResult ChatStream([FromBody] AiChatRequest request, CancellationToken ct)
+        => SseActionResult.StreamText(StreamDeltasAsync(request, ct));
+
+    private async IAsyncEnumerable<string> StreamDeltasAsync(
+        AiChatRequest request,
+        [EnumeratorCancellation] CancellationToken ct)
     {
-        Response.StatusCode = 200;
-        Response.ContentType = "text/event-stream";
-        Response.Headers.CacheControl = "no-cache";
-        Response.Headers.Pragma = "no-cache";
-        Response.Headers.Connection = "keep-alive";
-        Response.Headers["X-Accel-Buffering"] = "no"; // nginx
         await foreach (var chunk in _ai.StreamAsync(request, ct))
         {
-            var payload = chunk.DeltaText ?? string.Empty;
-            if (payload.Length == 0) continue;
-            await Response.WriteAsync($"data: {payload}\n\n", ct);
-            await Response.Body.FlushAsync(ct);
+            var payload = chunk.DeltaText;
+            if (string.IsNullOrEmpty(payload))
+            {
+                continue;
+            }
+
+            yield return payload;
         }
     }
 

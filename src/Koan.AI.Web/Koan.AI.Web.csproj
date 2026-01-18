@@ -18,5 +18,6 @@
   <ItemGroup>
     <ProjectReference Include="..\Koan.AI\Koan.AI.csproj" />
     <ProjectReference Include="..\Koan.AI.Contracts\Koan.AI.Contracts.csproj" />
+    <ProjectReference Include="..\Koan.Web.Sse\Koan.Web.Sse.csproj" />
   </ItemGroup>
 </Project>

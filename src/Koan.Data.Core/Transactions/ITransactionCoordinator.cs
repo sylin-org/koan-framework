@@ -36,6 +36,26 @@ public interface ITransactionCoordinator
         where TKey : notnull;
 
     /// <summary>
+    /// Track a vector save operation for deferred execution.
+    /// Coordinates with entity operations to ensure transactional consistency.
+    /// </summary>
+    void TrackVectorSave<TEntity, TKey>(
+        TKey id,
+        ReadOnlyMemory<float> embedding,
+        IReadOnlyDictionary<string, object>? metadata,
+        EntityContext.ContextState context)
+        where TEntity : class, IEntity<TKey>
+        where TKey : notnull;
+
+    /// <summary>
+    /// Track a vector delete operation for deferred execution.
+    /// Coordinates with entity operations to ensure transactional consistency.
+    /// </summary>
+    void TrackVectorDelete<TEntity, TKey>(TKey id, EntityContext.ContextState context)
+        where TEntity : class, IEntity<TKey>
+        where TKey : notnull;
+
+    /// <summary>
     /// Commit all tracked operations across all adapters.
     /// Opens local transaction per adapter, executes operations, commits all.
     /// </summary>

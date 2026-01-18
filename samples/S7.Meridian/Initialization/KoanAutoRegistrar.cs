@@ -63,7 +63,6 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         services.AddSingleton<ITextExtractor, TextExtractor>();
         services.AddSingleton<IPassageChunker, PassageChunker>();
         services.AddSingleton<IPipelineAlertService, PipelineAlertService>();
-        services.AddSingleton<IEmbeddingCache, EmbeddingCache>();
         services.AddSingleton<ISecureUploadValidator, SecureUploadValidator>();
         services.AddSingleton<IPassageIndexer, PassageIndexer>();
         services.AddSingleton<INotesExtractionService, NotesExtractionService>();

@@ -7,7 +7,7 @@
   <UseAppHost>false</UseAppHost>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Microsoft.AspNetCore.SpaServices.Extensions" Version="9.0.0" />
+    <PackageReference Include="Microsoft.AspNetCore.SpaServices.Extensions" Version="10.0.0" />
   </ItemGroup>
   <ItemGroup>
   <ProjectReference Include="..\..\src\\Connectors\\Data\\Sqlite\Koan.Data.Connector.Sqlite.csproj" />

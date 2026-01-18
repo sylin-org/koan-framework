@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Koan.Core.Observability.Health;
 using Koan.Core.Logging;
+using Koan.Core.Hosting.Bootstrap;
 using System.Reflection;
 
 namespace Koan.Core.BackgroundServices;
@@ -61,6 +62,7 @@ public class KoanBackgroundServiceOrchestrator : BackgroundService, IHealthContr
         if (!_options.Enabled)
         {
             _logger.LogKoanServices("disabled via configuration");
+            KoanStartupTimeline.Mark(KoanStartupStage.ServicesReady);
             return;
         }
 
@@ -78,6 +80,7 @@ public class KoanBackgroundServiceOrchestrator : BackgroundService, IHealthContr
             if (!backgroundServices.Any())
             {
                 _logger.LogKoanServices("no background services found");
+                KoanStartupTimeline.Mark(KoanStartupStage.ServicesReady);
                 await Task.Delay(Timeout.Infinite, stoppingToken);
                 return;
             }
@@ -102,6 +105,8 @@ public class KoanBackgroundServiceOrchestrator : BackgroundService, IHealthContr
                 _logger.LogKoanServices($"started: {string.Join(", ", startedServices)}");
             else
                 _logger.LogKoanServices("none started");
+
+            KoanStartupTimeline.Mark(KoanStartupStage.ServicesReady);
 
             // Wait for cancellation
             await Task.Delay(Timeout.Infinite, stoppingToken);

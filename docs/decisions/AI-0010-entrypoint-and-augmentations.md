@@ -4,6 +4,8 @@ Status: Accepted
 Date: 2025-08-19
 Owners: Koan AI
 
+> Updated by AI-0019: IAiRouter has been replaced with `AiRoutingEngine` and Microsoft.Extensions.AI pipeline clients. External entrypoint contracts here remain valid; internal routing flows now use the new pipeline abstraction.
+
 ## Context
 
 Koan needs a single, simple entrypoint for user prompts that remains stable whether a single provider or multiple routed providers are configured. We also need a first-class augmentation model (RAG, system prompts, moderation, tools, budgeting) that composes cleanly, is testable, and preserves SSE semantics.
@@ -123,7 +125,7 @@ Resolution and scoping
 Overrides and testing
 
 - Provide an AsyncLocal<IAi?> override used when set (highest precedence) for tests or ad-hoc scenarios.
-- Helpers: using Koan.Ai.With(IAi custom) to set override within a disposable scope; do not expose global mutable singletons.
+- Helpers: using Koan.Ai.With(IAiPipeline custom) to set override within a disposable scope; do not expose global mutable singletons.
 - Guidance: prefer constructor-injected IAi in libraries/services; use Koan.Ai facade in app/UI code for ergonomics.
 
 Performance and safety

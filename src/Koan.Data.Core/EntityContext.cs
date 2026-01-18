@@ -35,9 +35,10 @@ public static class EntityContext
         public string? Transaction { get; init; }
 
         /// <summary>
-        /// Internal: transaction coordinator instance.
+        /// Transaction coordinator instance for deferred execution.
+        /// Used by entity and vector operations to participate in transactions.
         /// </summary>
-        internal ITransactionCoordinator? TransactionCoordinator { get; init; }
+        public ITransactionCoordinator? TransactionCoordinator { get; init; }
 
         /// <summary>
         /// Create routing context with validation.

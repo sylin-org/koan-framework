@@ -92,3 +92,134 @@ internal sealed class DeleteOperation<TEntity, TKey> : ITrackedOperation
         return _context.Adapter ?? _context.Source ?? "Default";
     }
 }
+
+/// <summary>
+/// Tracked vector save operation.
+/// </summary>
+internal sealed class VectorSaveOperation<TEntity, TKey> : ITrackedOperation
+    where TEntity : class, IEntity<TKey>
+    where TKey : notnull
+{
+    private readonly TKey _id;
+    private readonly ReadOnlyMemory<float> _embedding;
+    private readonly IReadOnlyDictionary<string, object>? _metadata;
+    private readonly EntityContext.ContextState _context;
+    private readonly string? _partition;
+
+    public VectorSaveOperation(
+        TKey id,
+        ReadOnlyMemory<float> embedding,
+        IReadOnlyDictionary<string, object>? _metadata,
+        EntityContext.ContextState context,
+        string? partition = null)
+    {
+        _id = id ?? throw new ArgumentNullException(nameof(id));
+        _embedding = embedding;
+        this._metadata = _metadata;
+        _context = context ?? throw new ArgumentNullException(nameof(context));
+        _partition = partition;
+    }
+
+    public async Task ExecuteAsync(CancellationToken ct)
+    {
+        var partition = _partition ?? _context.Partition;
+
+        using var _ = EntityContext.With(
+            source: string.IsNullOrWhiteSpace(_context.Source) ? null : _context.Source,
+            adapter: string.IsNullOrWhiteSpace(_context.Adapter) ? null : _context.Adapter,
+            partition: partition);
+
+        // Use reflection to avoid circular dependency between Core and Vector assemblies
+        var vectorServiceType = Type.GetType("Koan.Data.Vector.IVectorService, Koan.Data.Vector");
+        if (vectorServiceType == null)
+            throw new InvalidOperationException("Koan.Data.Vector assembly not loaded. Cannot execute vector save within transaction.");
+
+        var vectorService = Koan.Core.Hosting.App.AppHost.Current?.GetService(vectorServiceType);
+        if (vectorService == null)
+            throw new InvalidOperationException("IVectorService not registered. Cannot execute vector save within transaction.");
+
+        // Call TryGetRepository<TEntity, TKey>() via reflection
+        var tryGetRepoMethod = vectorServiceType.GetMethod("TryGetRepository")?.MakeGenericMethod(typeof(TEntity), typeof(TKey));
+        if (tryGetRepoMethod == null)
+            throw new InvalidOperationException("TryGetRepository method not found on IVectorService.");
+
+        var repo = tryGetRepoMethod.Invoke(vectorService, null);
+        if (repo == null)
+            throw new InvalidOperationException($"No vector repository configured for {typeof(TEntity).Name}.");
+
+        // Call UpsertAsync via reflection
+        var upsertMethod = repo.GetType().GetMethod("UpsertAsync");
+        if (upsertMethod == null)
+            throw new InvalidOperationException("UpsertAsync method not found on vector repository.");
+
+        var task = upsertMethod.Invoke(repo, new object[] { _id, _embedding, _metadata, ct }) as Task;
+        if (task != null)
+            await task;
+    }
+
+    public string GetAdapterHint()
+    {
+        return $"vector:{_context.Adapter ?? _context.Source ?? "Default"}";
+    }
+}
+
+/// <summary>
+/// Tracked vector delete operation.
+/// </summary>
+internal sealed class VectorDeleteOperation<TEntity, TKey> : ITrackedOperation
+    where TEntity : class, IEntity<TKey>
+    where TKey : notnull
+{
+    private readonly TKey _id;
+    private readonly EntityContext.ContextState _context;
+    private readonly string? _partition;
+
+    public VectorDeleteOperation(TKey id, EntityContext.ContextState context, string? partition = null)
+    {
+        _id = id ?? throw new ArgumentNullException(nameof(id));
+        _context = context ?? throw new ArgumentNullException(nameof(context));
+        _partition = partition;
+    }
+
+    public async Task ExecuteAsync(CancellationToken ct)
+    {
+        var partition = _partition ?? _context.Partition;
+
+        using var _ = EntityContext.With(
+            source: string.IsNullOrWhiteSpace(_context.Source) ? null : _context.Source,
+            adapter: string.IsNullOrWhiteSpace(_context.Adapter) ? null : _context.Adapter,
+            partition: partition);
+
+        // Use reflection to avoid circular dependency between Core and Vector assemblies
+        var vectorServiceType = Type.GetType("Koan.Data.Vector.IVectorService, Koan.Data.Vector");
+        if (vectorServiceType == null)
+            throw new InvalidOperationException("Koan.Data.Vector assembly not loaded. Cannot execute vector delete within transaction.");
+
+        var vectorService = Koan.Core.Hosting.App.AppHost.Current?.GetService(vectorServiceType);
+        if (vectorService == null)
+            throw new InvalidOperationException("IVectorService not registered. Cannot execute vector delete within transaction.");
+
+        // Call TryGetRepository<TEntity, TKey>() via reflection
+        var tryGetRepoMethod = vectorServiceType.GetMethod("TryGetRepository")?.MakeGenericMethod(typeof(TEntity), typeof(TKey));
+        if (tryGetRepoMethod == null)
+            throw new InvalidOperationException("TryGetRepository method not found on IVectorService.");
+
+        var repo = tryGetRepoMethod.Invoke(vectorService, null);
+        if (repo == null)
+            throw new InvalidOperationException($"No vector repository configured for {typeof(TEntity).Name}.");
+
+        // Call DeleteAsync via reflection
+        var deleteMethod = repo.GetType().GetMethod("DeleteAsync");
+        if (deleteMethod == null)
+            throw new InvalidOperationException("DeleteAsync method not found on vector repository.");
+
+        var task = deleteMethod.Invoke(repo, new object[] { _id, ct }) as Task;
+        if (task != null)
+            await task;
+    }
+
+    public string GetAdapterHint()
+    {
+        return $"vector:{_context.Adapter ?? _context.Source ?? "Default"}";
+    }
+}

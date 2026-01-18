@@ -1,6 +1,7 @@
 using Koan.Media.Abstractions.Model;
 using Koan.Storage.Infrastructure;
 using Koan.Data.Vector.Abstractions;
+using Koan.Data.AI.Attributes;
 
 namespace S6.SnapVault.Models;
 
@@ -8,6 +9,11 @@ namespace S6.SnapVault.Models;
 /// Full-resolution photo asset with complete metadata (stored in cold tier for cost optimization)
 /// </summary>
 [StorageBinding(Profile = "cold", Container = "photos")]
+[Embedding(
+    Policy = EmbeddingPolicy.Explicit,
+    Async = true,
+    MaxTokens = 8191,
+    Version = 1)]
 public class PhotoAsset : MediaEntity<PhotoAsset>
 {
     // Event relationship
@@ -56,6 +62,40 @@ public class PhotoAsset : MediaEntity<PhotoAsset>
 
     // Processing
     public ProcessingStatus ProcessingStatus { get; set; } = ProcessingStatus.Pending;
+
+    /// <summary>
+    /// Converts photo metadata to embedding text for semantic search.
+    /// Called automatically by [Embedding] attribute lifecycle hook.
+    /// Prioritizes structured AI analysis, falls back to legacy fields.
+    /// </summary>
+    public string ToEmbeddingText()
+    {
+        var parts = new List<string>();
+
+        // Structured AI analysis first (best semantic content)
+        if (AiAnalysis != null)
+        {
+            parts.Add(AiAnalysis.ToEmbeddingText());
+        }
+
+        // Fallback to legacy fields if no structured analysis
+        if (!string.IsNullOrEmpty(OriginalFileName))
+            parts.Add($"Filename: {OriginalFileName}");
+
+        if (AutoTags.Any())
+            parts.Add($"Tags: {string.Join(", ", AutoTags)}");
+
+        if (!string.IsNullOrEmpty(MoodDescription))
+            parts.Add($"Mood: {MoodDescription}");
+
+        if (!string.IsNullOrEmpty(CameraModel))
+            parts.Add($"Camera: {CameraModel}");
+
+        if (Location != null)
+            parts.Add($"Location: {Location.Latitude}, {Location.Longitude}");
+
+        return string.Join("\n", parts);
+    }
 }
 
 public class GpsCoordinates

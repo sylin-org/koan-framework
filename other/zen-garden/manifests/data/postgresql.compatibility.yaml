@@ -1,0 +1,19 @@
+﻿# PostgreSQL (pgvector) Compatibility Rules
+
+version: "1"
+
+compatibility_rules:
+  - name: "insufficient-memory"
+    condition:
+      memory_mb_less_than: 512
+    reason: "PostgreSQL requires at least 512MB of RAM (practical minimum for stable operation)"
+    suggestion: "Increase stone memory or run fewer services"
+
+post_install_healthcheck:
+  enabled: true
+  scan_log_lines: 150
+  timeout_seconds: 30
+  patterns:
+    - pattern: "FATAL:.*out of memory|Cannot allocate memory|OOM"
+      reason: "Insufficient memory for PostgreSQL"
+      suggestion: "Increase stone RAM and retry, or reduce concurrent services"

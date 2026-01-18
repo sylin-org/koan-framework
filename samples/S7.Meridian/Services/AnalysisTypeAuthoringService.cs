@@ -76,7 +76,7 @@ public sealed class AnalysisTypeAuthoringService : IAnalysisTypeAuthoringService
         string rawResponse;
         try
         {
-            rawResponse = await Ai.Chat(chatOptions, ct).ConfigureAwait(false);
+            rawResponse = await Client.Chat(chatOptions, ct).ConfigureAwait(false);
         }
         catch (Exception ex)
         {

@@ -177,7 +177,7 @@ public sealed class SchemaGuidedExtractor : ISchemaGuidedExtractor
             _logger.LogDebug("Extracting batch '{Batch}' ({FieldCount} fields) using {Model}",
                 batch.CategoryName, batch.FieldPaths.Count, _options.Facts.ExtractionModel);
 
-            raw = await Ai.Chat(chatOptions, ct);
+            raw = await Client.Chat(chatOptions, ct);
 
             if (_logger.IsEnabled(LogLevel.Trace))
             {
@@ -492,10 +492,10 @@ public sealed class SchemaGuidedExtractor : ISchemaGuidedExtractor
         int topK,
         CancellationToken ct)
     {
-        // Check if vector workflow is available
-        if (!VectorWorkflow<Passage>.IsAvailable(MeridianConstants.VectorProfile))
+        // Check if vector storage is available
+        if (!Vector<Passage>.IsAvailable)
         {
-            _logger.LogDebug("Vector workflow unavailable; cannot use passage retrieval for document {DocumentId}",
+            _logger.LogDebug("Vector storage unavailable; cannot use passage retrieval for document {DocumentId}",
                 document.Id);
             return new List<Passage>();
         }
@@ -525,19 +525,16 @@ public sealed class SchemaGuidedExtractor : ISchemaGuidedExtractor
         try
         {
             // Generate query embedding
-            var queryEmbedding = await Ai.Embed(query, ct);
+            var queryEmbedding = await Client.Embed(query, ct);
 
-            // Search vector store
-            var searchOptions = new VectorQueryOptions(
-                Query: queryEmbedding,
-                TopK: topK,
-                Filter: new { sourceDocumentId = document.Id } // Only search this document's passages
-            );
+            // Search vector store with filter for this document only
+            var filter = Koan.Data.Abstractions.Vector.Filtering.VectorFilter.Eq("sourceDocumentId", document.Id);
 
-            var results = await VectorWorkflow<Passage>.Query(
-                searchOptions,
-                MeridianConstants.VectorProfile,
-                ct);
+            var results = await Vector<Passage>.Search(
+                vector: queryEmbedding,
+                topK: topK,
+                filter: filter,
+                ct: ct);
 
             if (results.Matches.Count == 0)
             {
@@ -546,7 +543,7 @@ public sealed class SchemaGuidedExtractor : ISchemaGuidedExtractor
                 return new List<Passage>();
             }
 
-            // Load passage entities
+            // Load passage entities (with automatic hydration)
             var passages = new List<Passage>();
             foreach (var match in results.Matches)
             {

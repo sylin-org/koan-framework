@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Koan.Core.Hosting.Bootstrap;
+using Koan.Core.Hosting.Registry;
 using Koan.Core.Orchestration.Abstractions;
 
 namespace Koan.Core.Orchestration;
@@ -29,69 +30,25 @@ public class ServiceDiscoveryAutoRegistrar : IKoanAutoRegistrar
                 provider.GetRequiredService<IConfiguration>(),
                 provider.GetRequiredService<ILogger<OrchestrationAwareServiceDiscoveryV2>>()));
 
-        // Auto-register all IServiceDiscoveryAdapter implementations
-        // These will be automatically injected into the coordinator
-        var adapters = DiscoverServiceDiscoveryAdapters();
+        // Auto-register all IServiceDiscoveryAdapter implementations discovered at compile time
+        var adapters = KoanRegistry.GetServiceDiscoveryAdapters();
 
-        foreach (var adapterType in adapters)
+        foreach (var adapter in adapters)
         {
-            services.TryAddSingleton(typeof(IServiceDiscoveryAdapter), adapterType);
+            services.TryAddSingleton(typeof(IServiceDiscoveryAdapter), adapter.ServiceType);
         }
     }
 
     public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
-        var adapters = DiscoverServiceDiscoveryAdapters();
+        var adapters = KoanRegistry.GetServiceDiscoveryAdapters();
 
         module.Describe(ModuleVersion);
-        module.AddNote($"ServiceDiscoveryAdapters: {adapters.Count()}");
+        module.AddNote($"ServiceDiscoveryAdapters: {adapters.Length}");
 
-        foreach (var adapterType in adapters)
+        foreach (var adapter in adapters)
         {
-            module.AddNote($"  • {adapterType.Name}");
-        }
-    }
-
-    private IEnumerable<Type> DiscoverServiceDiscoveryAdapters()
-    {
-        // Use cached assemblies to discover all IServiceDiscoveryAdapter implementations
-        var assemblies = AssemblyCache.Instance.GetAllAssemblies()
-            .Where(a => !a.IsDynamic && !IsSystemAssembly(a))
-            .ToArray();
-
-        return assemblies
-            .SelectMany(a => GetTypesFromAssembly(a))
-            .Where(t => typeof(IServiceDiscoveryAdapter).IsAssignableFrom(t) &&
-                       !t.IsInterface &&
-                       !t.IsAbstract &&
-                       t.IsClass)
-            .ToArray();
-    }
-
-    private static bool IsSystemAssembly(System.Reflection.Assembly assembly)
-    {
-        var name = assembly.FullName ?? "";
-        return name.StartsWith("System.") ||
-               name.StartsWith("Microsoft.") ||
-               name.StartsWith("netstandard") ||
-               name.StartsWith("mscorlib");
-    }
-
-    private static Type[] GetTypesFromAssembly(System.Reflection.Assembly assembly)
-    {
-        try
-        {
-            return assembly.GetTypes();
-        }
-        catch (System.Reflection.ReflectionTypeLoadException ex)
-        {
-            // Return only the types that loaded successfully
-            return ex.Types.Where(t => t != null).ToArray()!;
-        }
-        catch
-        {
-            // If we can't load types from this assembly, skip it
-            return Array.Empty<Type>();
+            module.AddNote($"  • {adapter.ServiceType.Name}");
         }
     }
 }

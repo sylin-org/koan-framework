@@ -27,6 +27,7 @@
 
     <!-- AI -->
     <ProjectReference Include="..\..\src\Koan.AI\Koan.AI.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Data.AI\Koan.Data.AI.csproj" />
     <ProjectReference Include="..\..\src\Connectors\AI\Ollama\Koan.AI.Connector.Ollama.csproj" />
 
     <!-- Vector Search -->
@@ -37,7 +38,7 @@
 
   <ItemGroup>
     <!-- Image Processing Library -->
-    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.11" />
+    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.12" />
     <PackageReference Include="SixLabors.ImageSharp.Drawing" Version="2.1.4" />
 
     <!-- EXIF Metadata -->

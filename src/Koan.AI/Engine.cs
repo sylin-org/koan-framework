@@ -8,24 +8,24 @@ namespace Koan.AI;
 // Preferred, semantic facade over Ai. Keeps terse defaults and allows targeted selection.
 public static class Engine
 {
-    public static bool IsAvailable => Ai.IsAvailable;
-    public static IAi? Try() => Ai.TryResolve();
+    public static bool IsAvailable => Client.IsAvailable;
+    public static IAiPipeline? Try() => Client.TryResolve();
 
     // Default engine
     public static Task<AiEmbeddingsResponse> Embed(AiEmbeddingsRequest req, CancellationToken ct = default)
-        => Ai.Embed(req, ct);
+        => Client.Embed(req, ct);
 
     public static Task<string> Chat(string message, CancellationToken ct = default)
-        => Ai.Chat(message, ct);
+        => Client.Chat(message, ct);
 
     public static Task<string> Chat(AiChatOptions options, CancellationToken ct = default)
-        => Ai.Chat(options, ct);
+        => Client.Chat(options, ct);
 
     public static IAsyncEnumerable<string> Stream(string message, CancellationToken ct = default)
-        => Ai.Stream(message, ct);
+        => Client.Stream(message, ct);
 
     public static IAsyncEnumerable<string> Stream(AiChatOptions options, CancellationToken ct = default)
-        => Ai.Stream(options, ct);
+        => Client.Stream(options, ct);
 
     // Targeted selection (provider and/or model)
     public static EngineSelector For(string? provider = null, string? model = null) => new(provider, model);

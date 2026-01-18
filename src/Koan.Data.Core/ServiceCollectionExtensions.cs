@@ -62,6 +62,9 @@ public static class ServiceCollectionExtensions
         // Relationship metadata scanning (ParentAttribute, etc.)
         services.TryAddSingleton<Koan.Data.Core.Relationships.IRelationshipMetadata, Koan.Data.Core.Relationships.RelationshipMetadataService>();
         Koan.Data.Core.Model.EntityMetadataProvider.RelationshipMetadataAccessor = sp => sp.GetRequiredService<Koan.Data.Core.Relationships.IRelationshipMetadata>();
+
+        // Auto-register transaction support (AI-0020) - "Reference = Intent" pattern
+        Transactions.TransactionServiceCollectionExtensions.AddKoanTransactions(services);
     }
 
     // One-liner startup: builds provider, runs discovery, starts runtime (greenfield)

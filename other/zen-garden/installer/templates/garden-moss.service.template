@@ -1,0 +1,36 @@
+﻿[Unit]
+Description=Garden Moss Daemon - Zen Garden Stone Manager
+Documentation=https://github.com/koan-framework/zen-garden
+After=network-online.target docker.service avahi-daemon.service
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=simple
+User=root
+Group=root
+ExecStartPre=/usr/local/bin/moss-update-helper.sh
+ExecStart=/usr/local/bin/garden-moss
+Restart=always
+RestartSec=10
+StandardOutput=journal+console
+StandardError=journal+console
+TTYPath=/dev/tty1
+SyslogIdentifier=garden-moss
+
+# Environment
+Environment="RUST_LOG=info"
+Environment="PORT=7185"
+
+# Security hardening
+NoNewPrivileges=false
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=false
+ReadWritePaths=/etc/zen-garden /var/lib/zen-garden /home/{{USERNAME}}/bin /usr/local/bin /etc/hostname /etc/hosts
+
+# Resource limits
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

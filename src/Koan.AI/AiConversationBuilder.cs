@@ -9,11 +9,11 @@ using Koan.AI.Contracts.Models;
 namespace Koan.AI;
 
 /// <summary>
-/// Fluent builder that composes a conversation-centric <see cref="AiChatRequest"/> and executes it via <see cref="IAi"/>.
+/// Fluent builder that composes a conversation-centric <see cref="AiChatRequest"/> and executes it via <see cref="IAiPipeline"/>.
 /// </summary>
 public sealed class AiConversationBuilder
 {
-    private readonly IAi _ai;
+    private readonly IAiPipeline _ai;
     private readonly List<AiMessage> _messages = new();
     private readonly List<AiAugmentationInvocation> _augmentations = new();
     private readonly Dictionary<string, string> _contextTags = new(StringComparer.OrdinalIgnoreCase);
@@ -24,7 +24,7 @@ public sealed class AiConversationBuilder
     private string? _budget;
     private AiRouteHints? _route;
 
-    internal AiConversationBuilder(IAi ai)
+    internal AiConversationBuilder(IAiPipeline ai)
         => _ai = ai ?? throw new ArgumentNullException(nameof(ai));
 
     public AiConversationBuilder WithMessage(AiMessage message)

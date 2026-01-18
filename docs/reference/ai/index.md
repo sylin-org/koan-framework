@@ -35,7 +35,7 @@ validation:
 
 Koan.AI unifies chat completion, embeddings, and vector-aware workflows:
 
-- `IAi` facade for chat, streaming, embeddings, and tokenization
+- `IAiPipeline` facade for chat, streaming, embeddings, and tokenization
 - Provider registry with capability discovery
 - Integration with Data (`[VectorField]`), Flow pipelines, and Messaging events
 - Configuration-first model selection (`DefaultProvider`, per-context overrides)
@@ -93,19 +93,22 @@ export Koan__AI__OpenAI__DefaultModel="gpt-4o"
 [Route("api/[controller]")]
 public class ChatController : ControllerBase
 {
-    private readonly IAi _ai;
+    private readonly IAiPipeline _pipeline;
 
-    public ChatController(IAi ai) => _ai = ai;
+    public ChatController(IAiPipeline pipeline) => _pipeline = pipeline;
 
     [HttpPost]
     public async Task<IActionResult> Chat([FromBody] string message)
     {
-        var response = await _ai.ChatAsync(new AiChatRequest
+        var response = await _pipeline.PromptAsync(new AiChatRequest
         {
-            Messages = [new() { Role = AiMessageRole.User, Content = message }]
+            Messages =
+            {
+                new AiMessage("user", message)
+            }
         });
 
-        return Ok(response.Choices?.FirstOrDefault()?.Message?.Content);
+        return Ok(response.Text);
     }
 }
 ```
@@ -118,14 +121,19 @@ public async Task StreamChat([FromBody] string message, CancellationToken ct)
 {
     Response.Headers.Append("Content-Type", "text/event-stream");
 
-    await foreach (var chunk in _ai.ChatStreamAsync(new AiChatRequest
+    await foreach (var chunk in _pipeline.StreamAsync(new AiChatRequest
     {
-        Messages = [new() { Role = AiMessageRole.User, Content = message }],
-        Stream = true
+        Messages =
+        {
+            new AiMessage("user", message)
+        }
     }, ct))
     {
-        await Response.WriteAsync($"data: {chunk.Content}\n\n", ct);
-        await Response.Body.FlushAsync(ct);
+        if (!string.IsNullOrEmpty(chunk.DeltaText))
+        {
+            await Response.WriteAsync($"data: {chunk.DeltaText}\n\n", ct);
+            await Response.Body.FlushAsync(ct);
+        }
     }
 }
 ```
@@ -141,13 +149,13 @@ public async Task<IActionResult> Conversation([FromBody] ConversationTurn[] hist
     var messages = history.Select(turn => new AiMessage { Role = turn.Role, Content = turn.Content }).ToList();
     messages.Add(new AiMessage { Role = AiMessageRole.User, Content = input });
 
-    var response = await _ai.ChatAsync(new AiChatRequest
+    var response = await _pipeline.PromptAsync(new AiChatRequest
     {
         Messages = messages,
-        MaxTokens = 500
+        Options = new AiPromptOptions { MaxOutputTokens = 500 }
     });
 
-    return Ok(response.Choices?.FirstOrDefault()?.Message?.Content);
+    return Ok(response.Text);
 }
 ```
 
@@ -174,14 +182,17 @@ public class Document : Entity<Document>
 
 public class DocumentIngestor
 {
-    private readonly IAi _ai;
+    private readonly IAiPipeline _ai;
 
-    public DocumentIngestor(IAi ai) => _ai = ai;
+    public DocumentIngestor(IAiPipeline ai) => _ai = ai;
 
     public async Task<Document> CreateAsync(string title, string content)
     {
-        var embedding = await _ai.EmbedAsync(new AiEmbeddingRequest { Input = content });
-        var vector = embedding.Embeddings.FirstOrDefault()?.Vector ?? [];
+        var response = await _ai.EmbedAsync(new AiEmbeddingsRequest
+        {
+            Input = { content }
+        });
+        var vector = response.Vectors.FirstOrDefault() ?? Array.Empty<float>();
 
         var document = new Document
         {
@@ -715,4 +726,3 @@ validation guardrails that align with the new S12.MedTrials sample.
 
 **Last Validation**: 2025-01-17 by Framework Specialist
 **Framework Version Tested**: v0.2.18+
-

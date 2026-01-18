@@ -1,5 +1,5 @@
 # S1.Web container (multi-stage)
-FROM mcr.microsoft.com/dotnet/sdk:10.0.100-rc.1 AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0.100 AS build
 WORKDIR /src
 # Copy entire Koan folder (multi-project) as build context
 COPY . .

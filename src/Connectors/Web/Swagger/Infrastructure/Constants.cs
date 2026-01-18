@@ -12,6 +12,7 @@ public static class Constants
             public const string RoutePrefix = nameof(RoutePrefix);
             public const string IncludeXmlComments = nameof(IncludeXmlComments);
             public const string RequireAuthOutsideDevelopment = nameof(RequireAuthOutsideDevelopment);
+            public const string DocumentDisplayName = nameof(DocumentDisplayName);
         }
     }
 }

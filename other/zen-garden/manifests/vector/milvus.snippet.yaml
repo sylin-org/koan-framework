@@ -1,0 +1,18 @@
+container_name: milvus
+image: milvusdb/milvus:latest
+command: ["milvus", "run", "standalone"]
+ports:
+  - "19530:19530"
+  - "9091:9091"
+environment:
+  ETCD_USE_EMBED: "true"
+volumes:
+  - milvus-data:/var/lib/milvus
+healthcheck:
+  test: ["CMD", "curl", "-f", "http://localhost:9091/healthz"]
+  interval: 15s
+  timeout: 5s
+  retries: 5
+restart: unless-stopped
+networks:
+  - zen-garden

@@ -1,3 +1,4 @@
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -6,6 +7,7 @@ using Koan.AI.Contracts;
 using Koan.AI.Contracts.Options;
 using Koan.AI.Contracts.Routing;
 using Koan.AI.Contracts.Sources;
+using Koan.AI.Pipeline;
 using Koan.AI.Sources;
 using Koan.Core;
 using Koan.Core.Modules;
@@ -43,8 +45,11 @@ public static class ServiceCollectionExtensions
 
         // Register existing infrastructure
         services.TryAddSingleton<IAiAdapterRegistry, InMemoryAdapterRegistry>();
-        services.TryAddSingleton<IAiRouter, DefaultAiRouter>();
-        services.TryAddSingleton<IAi, RouterAi>();
+        services.TryAddSingleton<AiRoutingEngine>();
+
+        services.TryAddSingleton<IChatClient, AdapterBackedChatClient>();
+        services.TryAddSingleton<IEmbeddingGenerator<string, Embedding<float>>, AdapterBackedEmbeddingGenerator>();
+        services.TryAddSingleton<IAiPipeline, KoanAiPipeline>();
 
         return services;
     }

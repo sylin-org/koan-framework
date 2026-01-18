@@ -95,7 +95,7 @@ public sealed class NotesExtractionService : INotesExtractionService
                 MaxTokens = 2000
             };
 
-            var response = await Ai.Chat(chatOptions, ct);
+            var response = await Client.Chat(chatOptions, ct);
 
             if (string.IsNullOrWhiteSpace(response))
             {

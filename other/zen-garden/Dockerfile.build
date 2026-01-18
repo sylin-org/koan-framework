@@ -1,0 +1,19 @@
+﻿# Build container for Zen Garden Linux binaries
+FROM rust:latest AS builder
+
+WORKDIR /build
+
+# Install dependencies
+RUN apt-get update && apt-get install -y \
+    musl-tools \
+    file \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy workspace files
+COPY Cargo.toml Cargo.lock ./
+COPY src/ ./src/
+
+# Build release binaries
+# Note: Default builds debug, pass --release for optimized
+CMD ["bash", "-c", "cargo build --bin garden-moss && cargo build --bin garden-rake"]
+

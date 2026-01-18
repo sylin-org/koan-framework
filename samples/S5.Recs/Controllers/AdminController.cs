@@ -665,6 +665,275 @@ public class AdminController(ISeedService seeder, ILogger<AdminController> _logg
         return Ok(stats);
     }
 
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Embedding Telemetry & Management Endpoints (ADR AI-0020 Phase 5)
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Get real-time embedding performance metrics for the last 24 hours.
+    /// Shows latency, cost, token usage, and queue health.
+    /// </summary>
+    [HttpGet("embeddings/metrics")]
+    public IActionResult GetEmbeddingMetrics(
+        [FromQuery] string? period = "1h",
+        [FromServices] Koan.Data.AI.Telemetry.EmbeddingTelemetry? telemetry = null)
+    {
+        if (telemetry == null)
+        {
+            return Ok(new {
+                available = false,
+                message = "EmbeddingTelemetry not registered. Add services.AddSingleton<EmbeddingTelemetry>() to enable metrics."
+            });
+        }
+
+        // Parse period (1h, 6h, 24h)
+        var timeSpan = period?.ToLowerInvariant() switch
+        {
+            "1h" => TimeSpan.FromHours(1),
+            "6h" => TimeSpan.FromHours(6),
+            "24h" => TimeSpan.FromHours(24),
+            _ => TimeSpan.FromHours(1)
+        };
+
+        var stats = telemetry.CalculateStats(timeSpan);
+
+        // Get latest queue metrics
+        var queueMetrics = telemetry.GetQueueMetrics(DateTime.UtcNow.Subtract(timeSpan)).LastOrDefault();
+
+        return Ok(new
+        {
+            period = period,
+            totalEmbeddings = stats.TotalEmbeddings,
+            successRate = stats.TotalEmbeddings > 0
+                ? Math.Round(stats.SuccessfulEmbeddings / (double)stats.TotalEmbeddings * 100, 2)
+                : 0,
+            performance = new
+            {
+                avgLatencyMs = Math.Round(stats.AvgLatencyMs, 2),
+                p50LatencyMs = Math.Round(stats.P50LatencyMs, 2),
+                p95LatencyMs = Math.Round(stats.P95LatencyMs, 2),
+                p99LatencyMs = Math.Round(stats.P99LatencyMs, 2)
+            },
+            cost = new
+            {
+                totalCost = Math.Round(stats.TotalCost, 4),
+                totalTokens = stats.TotalTokens,
+                avgCostPerEmbedding = stats.TotalEmbeddings > 0
+                    ? Math.Round(stats.TotalCost / stats.TotalEmbeddings, 6)
+                    : 0
+            },
+            queue = queueMetrics != null ? new
+            {
+                pending = queueMetrics.PendingCount,
+                failed = queueMetrics.FailedCount,
+                oldestAgeMinutes = Math.Round(queueMetrics.OldestAgeSeconds / 60.0, 2)
+            } : null
+        });
+    }
+
+    /// <summary>
+    /// Get detailed embedding metrics time-series data for charting/analysis.
+    /// </summary>
+    [HttpGet("embeddings/metrics/detailed")]
+    public IActionResult GetDetailedEmbeddingMetrics(
+        [FromQuery] string? since = null,
+        [FromServices] Koan.Data.AI.Telemetry.EmbeddingTelemetry? telemetry = null)
+    {
+        if (telemetry == null)
+        {
+            return Ok(new { available = false });
+        }
+
+        DateTime? sinceDt = null;
+        if (!string.IsNullOrEmpty(since) && DateTime.TryParse(since, out var parsed))
+        {
+            sinceDt = parsed;
+        }
+
+        var embeddingMetrics = telemetry.GetEmbeddingMetrics(sinceDt).ToList();
+        var queueMetrics = telemetry.GetQueueMetrics(sinceDt).ToList();
+
+        return Ok(new
+        {
+            embeddings = embeddingMetrics.Select(m => new
+            {
+                timestamp = m.Timestamp,
+                entityType = m.EntityType,
+                model = m.Model,
+                provider = m.Provider,
+                source = m.Source,
+                latencyMs = Math.Round(m.LatencyMs, 2),
+                tokens = m.Tokens,
+                cost = Math.Round(m.EstimatedCost, 6),
+                success = m.Success,
+                error = m.ErrorMessage
+            }),
+            queue = queueMetrics.Select(q => new
+            {
+                timestamp = q.Timestamp,
+                pending = q.PendingCount,
+                failed = q.FailedCount,
+                oldestAgeSeconds = Math.Round(q.OldestAgeSeconds, 2)
+            })
+        });
+    }
+
+    public record MigrateEmbeddingsRequest(
+        string TargetModel,
+        string? TargetSource = null,
+        string? TargetProvider = null,
+        int BatchSize = 50,
+        bool Parallel = false);
+
+    /// <summary>
+    /// Migrate all Media embeddings to a new model/provider.
+    /// Example: Migrate from Ollama to OpenAI, or upgrade from ada-002 to text-embedding-3-large.
+    /// This is a long-running operation - use GET /admin/embeddings/metrics to monitor progress.
+    /// </summary>
+    [HttpPost("embeddings/migrate")]
+    public async Task<IActionResult> MigrateEmbeddings(
+        [FromBody] MigrateEmbeddingsRequest request,
+        CancellationToken ct)
+    {
+        try
+        {
+            _logger.LogInformation(
+                "Starting embedding migration: model={Model}, source={Source}, provider={Provider}",
+                request.TargetModel, request.TargetSource, request.TargetProvider);
+
+            var result = await Koan.Data.AI.Migration.EmbeddingMigrator.ReEmbedAll<Models.Media>(
+                targetModel: request.TargetModel,
+                targetSource: request.TargetSource,
+                targetProvider: request.TargetProvider,
+                batchSize: request.BatchSize,
+                parallel: request.Parallel,
+                logger: _logger,
+                ct: ct);
+
+            return Ok(new
+            {
+                success = result.Success,
+                totalEntities = result.TotalEntities,
+                successful = result.SuccessfulEntities,
+                failed = result.FailedEntities,
+                duration = result.Duration,
+                successRate = Math.Round(result.SuccessRate, 2),
+                errorMessage = result.ErrorMessage
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Embedding migration failed");
+            return StatusCode(500, new { error = "Migration failed", details = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Export all Media embeddings to a JSON file for backup or analysis.
+    /// File will be saved to the configured output path.
+    /// </summary>
+    [HttpPost("embeddings/export-backup")]
+    public async Task<IActionResult> ExportEmbeddingsBackup(
+        [FromQuery] string? outputPath = null,
+        CancellationToken ct = default)
+    {
+        try
+        {
+            outputPath ??= Path.Combine(
+                Directory.GetCurrentDirectory(),
+                $"embeddings-backup-{DateTime.UtcNow:yyyy-MM-dd-HHmmss}.json");
+
+            _logger.LogInformation("Exporting embeddings to {Path}", outputPath);
+
+            await Koan.Data.AI.Migration.EmbeddingMigrator.ExportEmbeddings<Models.Media>(
+                outputPath: outputPath,
+                logger: _logger);
+
+            return Ok(new
+            {
+                success = true,
+                outputPath = outputPath,
+                message = "Embeddings exported successfully"
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Embedding export failed");
+            return StatusCode(500, new { error = "Export failed", details = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Clean up orphaned embedding states (states for entities that no longer exist).
+    /// Run this periodically to maintain database hygiene.
+    /// </summary>
+    [HttpPost("embeddings/cleanup-orphaned")]
+    public async Task<IActionResult> CleanupOrphanedEmbeddings(CancellationToken ct)
+    {
+        try
+        {
+            _logger.LogInformation("Cleaning up orphaned embedding states");
+
+            var removed = await Koan.Data.AI.Migration.EmbeddingMigrator.CleanupOrphanedStates<Models.Media>(
+                logger: _logger);
+
+            return Ok(new
+            {
+                success = true,
+                removed = removed,
+                message = $"Cleaned up {removed} orphaned embedding state(s)"
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Cleanup failed");
+            return StatusCode(500, new { error = "Cleanup failed", details = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Compare embedding model costs to help with migration decisions.
+    /// </summary>
+    [HttpGet("embeddings/model-costs")]
+    public IActionResult GetModelCosts()
+    {
+        var models = new[]
+        {
+            "text-embedding-3-small",
+            "text-embedding-3-large",
+            "text-embedding-ada-002"
+        };
+
+        var costs = models
+            .Select(model => new
+            {
+                model = model,
+                costPerMillion = Koan.Data.AI.Telemetry.EmbeddingCostEstimator.GetModelCostPerMillion(model),
+                provider = "openai"
+            })
+            .Where(m => m.costPerMillion.HasValue)
+            .Select(m => new
+            {
+                m.model,
+                m.provider,
+                costPerMillion = m.costPerMillion!.Value,
+                // Example cost for 100K entities with 2000 tokens each (200M tokens)
+                exampleCost100k = Math.Round((200_000_000 / 1_000_000.0) * (double)m.costPerMillion.Value, 2)
+            })
+            .ToList();
+
+        return Ok(new
+        {
+            models = costs,
+            note = "Example costs are for 100K entities with ~2000 tokens each (200M tokens total)",
+            localModels = new
+            {
+                ollama = "Free (local inference)",
+                lmStudio = "Free (local inference)"
+            }
+        });
+    }
+
     [HttpPost("cache/embeddings/export")]
     public async Task<IActionResult> ExportEmbeddingsToCache(
         [FromQuery] string? entityType,

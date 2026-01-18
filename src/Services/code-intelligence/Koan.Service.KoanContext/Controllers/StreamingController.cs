@@ -1,8 +1,11 @@
-using System.Text;
-using System.Text.Json;
+using System.Runtime.CompilerServices;
 using Koan.Context.Models;
+using Koan.Web.Sse;
+using Koan.Web.Sse.Mvc;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Serialization;
 
 namespace Koan.Context.Controllers;
 
@@ -13,6 +16,15 @@ namespace Koan.Context.Controllers;
 [Route("api/stream")]
 public class StreamingController : ControllerBase
 {
+    private static readonly JsonSerializerSettings SerializerSettings = new()
+    {
+        ContractResolver = new CamelCasePropertyNamesContractResolver(),
+        NullValueHandling = NullValueHandling.Ignore
+    };
+    private static readonly TimeSpan JobPollInterval = TimeSpan.FromSeconds(1);
+    private static readonly TimeSpan AllJobsPollInterval = TimeSpan.FromSeconds(2);
+    private const double ProgressChangeThreshold = 0.01;
+
     private readonly ILogger<StreamingController> _logger;
 
     public StreamingController(ILogger<StreamingController> logger)
@@ -47,78 +59,8 @@ public class StreamingController : ControllerBase
     /// <returns>SSE stream</returns>
     [HttpGet("jobs/{jobId}")]
     [Produces("text/event-stream")]
-    public async Task StreamJobProgress(string jobId, CancellationToken cancellationToken)
-    {
-        _logger.LogInformation("Starting SSE stream for job {JobId}", jobId);
-
-        // Set SSE headers
-        Response.ContentType = "text/event-stream";
-        Response.Headers["Cache-Control"] = "no-cache";
-        Response.Headers["Connection"] = "keep-alive";
-        Response.Headers["X-Accel-Buffering"] = "no"; // Disable nginx buffering
-
-        try
-        {
-            // Check if job exists
-            var job = await Job.Get(jobId, cancellationToken);
-            if (job == null)
-            {
-                await SendSseEvent("error", new { message = "Job not found", jobId }, cancellationToken);
-                return;
-            }
-
-            // Send initial status
-            await SendJobUpdate(job, cancellationToken);
-
-            var lastStatus = job.Status;
-            var lastProgress = job.Progress;
-
-            // Poll for updates
-            while (!cancellationToken.IsCancellationRequested)
-            {
-                // Reload job
-                job = await Job.Get(jobId, cancellationToken);
-                if (job == null)
-                {
-                    await SendSseEvent("error", new { message = "Job deleted", jobId }, cancellationToken);
-                    break;
-                }
-
-                // Check if status or progress changed
-                var statusChanged = job.Status != lastStatus;
-                var progressChanged = Math.Abs((double)(job.Progress - lastProgress)) > 0.01; // 1% threshold
-
-                if (statusChanged || progressChanged)
-                {
-                    await SendJobUpdate(job, cancellationToken);
-                    lastStatus = job.Status;
-                    lastProgress = job.Progress;
-                }
-
-                // Check if job is terminal
-                if (job.Status == JobStatus.Completed || job.Status == JobStatus.Failed || job.Status == JobStatus.Cancelled)
-                {
-                    await SendSseEvent("complete", new { jobId, status = job.Status.ToString() }, cancellationToken);
-                    break;
-                }
-
-                // Send heartbeat every 15 seconds
-                await SendSseEvent("heartbeat", new { timestamp = DateTime.UtcNow }, cancellationToken);
-
-                // Wait before next poll (1 second)
-                await Task.Delay(1000, cancellationToken);
-            }
-        }
-        catch (OperationCanceledException)
-        {
-            _logger.LogInformation("SSE stream cancelled for job {JobId}", jobId);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error in SSE stream for job {JobId}", jobId);
-            await SendSseEvent("error", new { message = "Stream error", details = ex.Message }, cancellationToken);
-        }
-    }
+    public IActionResult StreamJobProgress(string jobId, CancellationToken cancellationToken)
+        => SseActionResult.StreamEnvelopes(StreamJobProgressCore(jobId, cancellationToken));
 
     /// <summary>
     /// Stream all active jobs progress
@@ -127,81 +69,203 @@ public class StreamingController : ControllerBase
     /// <returns>SSE stream of all active jobs</returns>
     [HttpGet("jobs")]
     [Produces("text/event-stream")]
-    public async Task StreamAllJobs(CancellationToken cancellationToken)
+    public IActionResult StreamAllJobs(CancellationToken cancellationToken)
+        => SseActionResult.StreamEnvelopes(StreamAllJobsCore(cancellationToken));
+
+    private async IAsyncEnumerable<SseEnvelope> StreamJobProgressCore(string jobId, [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        _logger.LogInformation("Starting SSE stream for all active jobs");
+        _logger.LogInformation("Starting SSE stream for job {JobId}", jobId);
 
-        // Set SSE headers
-        Response.ContentType = "text/event-stream";
-        Response.Headers["Cache-Control"] = "no-cache";
-        Response.Headers["Connection"] = "keep-alive";
-        Response.Headers["X-Accel-Buffering"] = "no";
-
-        try
+        var (job, fetchError, cancelled) = await TryGetJobAsync(jobId, cancellationToken);
+        if (cancelled)
         {
-            var lastSnapshot = new Dictionary<string, (JobStatus Status, decimal Progress)>();
+            _logger.LogInformation("SSE stream cancelled for job {JobId}", jobId);
+            yield break;
+        }
 
-            while (!cancellationToken.IsCancellationRequested)
+        if (fetchError != null)
+        {
+            _logger.LogError(fetchError, "Error in SSE stream for job {JobId}", jobId);
+            yield return CreateEnvelope("error", new { message = "Stream error", details = fetchError.Message });
+            yield break;
+        }
+
+        if (job == null)
+        {
+            yield return CreateEnvelope("error", new { message = "Job not found", jobId });
+            yield break;
+        }
+
+        yield return CreateJobUpdate(job);
+
+        var lastStatus = job.Status;
+        var lastProgress = job.Progress;
+
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            var (currentJob, error, jobCancelled) = await TryGetJobAsync(jobId, cancellationToken);
+            if (jobCancelled)
             {
-                // Query active jobs
-                var activeJobs = await Job.Query(j =>
-                    j.Status == JobStatus.Pending ||
-                    j.Status == JobStatus.Planning ||
-                    j.Status == JobStatus.Indexing);
-
-                var jobsList = activeJobs.ToList();
-
-                // Send updates for changed jobs
-                foreach (var job in jobsList)
-                {
-                    var hasChanged = !lastSnapshot.TryGetValue(job.Id, out var last) ||
-                                   last.Status != job.Status ||
-                                   Math.Abs((double)(last.Progress - job.Progress)) > 0.01;
-
-                    if (hasChanged)
-                    {
-                        await SendJobUpdate(job, cancellationToken);
-                        lastSnapshot[job.Id] = (job.Status, job.Progress);
-                    }
-                }
-
-                // Remove completed jobs from snapshot
-                var completedJobIds = lastSnapshot
-                    .Where(kvp => !jobsList.Any(j => j.Id == kvp.Key))
-                    .Select(kvp => kvp.Key)
-                    .ToList();
-
-                foreach (var completedId in completedJobIds)
-                {
-                    lastSnapshot.Remove(completedId);
-                    await SendSseEvent("job-removed", new { jobId = completedId }, cancellationToken);
-                }
-
-                // Send heartbeat
-                await SendSseEvent("heartbeat", new
-                {
-                    timestamp = DateTime.UtcNow,
-                    activeJobs = jobsList.Count
-                }, cancellationToken);
-
-                // Wait before next poll
-                await Task.Delay(2000, cancellationToken);
+                _logger.LogInformation("SSE stream cancelled for job {JobId}", jobId);
+                yield break;
             }
-        }
-        catch (OperationCanceledException)
-        {
-            _logger.LogInformation("SSE stream for all jobs cancelled");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error in SSE stream for all jobs");
-            await SendSseEvent("error", new { message = "Stream error" }, cancellationToken);
+
+            if (error != null)
+            {
+                _logger.LogError(error, "Error in SSE stream for job {JobId}", jobId);
+                yield return CreateEnvelope("error", new { message = "Stream error", details = error.Message });
+                yield break;
+            }
+
+            job = currentJob;
+            if (job == null)
+            {
+                yield return CreateEnvelope("error", new { message = "Job deleted", jobId });
+                yield break;
+            }
+
+            var statusChanged = job.Status != lastStatus;
+            var progressChanged = Math.Abs((double)(job.Progress - lastProgress)) > ProgressChangeThreshold;
+
+            if (statusChanged || progressChanged)
+            {
+                yield return CreateJobUpdate(job);
+                lastStatus = job.Status;
+                lastProgress = job.Progress;
+            }
+
+            if (IsTerminal(job.Status))
+            {
+                yield return CreateEnvelope("complete", new { jobId, status = job.Status.ToString() });
+                yield break;
+            }
+
+            yield return CreateEnvelope("heartbeat", new { timestamp = DateTime.UtcNow });
+
+            if (!await WaitAsync(JobPollInterval, cancellationToken))
+            {
+                _logger.LogInformation("SSE stream cancelled for job {JobId}", jobId);
+                yield break;
+            }
         }
     }
 
-    private async Task SendJobUpdate(Job job, CancellationToken cancellationToken)
+    private async IAsyncEnumerable<SseEnvelope> StreamAllJobsCore([EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        var data = new
+        _logger.LogInformation("Starting SSE stream for all active jobs");
+
+        var lastSnapshot = new Dictionary<string, (JobStatus Status, decimal Progress)>();
+
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            var (jobs, error, cancelled) = await TryQueryActiveJobsAsync(cancellationToken);
+            if (cancelled)
+            {
+                _logger.LogInformation("SSE stream for all jobs cancelled");
+                yield break;
+            }
+
+            if (error != null)
+            {
+                _logger.LogError(error, "Error in SSE stream for all jobs");
+                yield return CreateEnvelope("error", new { message = "Stream error" });
+                yield break;
+            }
+
+            foreach (var job in jobs)
+            {
+                var hasChanged = !lastSnapshot.TryGetValue(job.Id, out var last) ||
+                                 last.Status != job.Status ||
+                                 Math.Abs((double)(last.Progress - job.Progress)) > ProgressChangeThreshold;
+
+                if (hasChanged)
+                {
+                    yield return CreateJobUpdate(job);
+                    lastSnapshot[job.Id] = (job.Status, job.Progress);
+                }
+            }
+
+            var completedJobIds = lastSnapshot
+                .Where(kvp => !jobs.Any(j => j.Id == kvp.Key))
+                .Select(kvp => kvp.Key)
+                .ToList();
+
+            foreach (var completedId in completedJobIds)
+            {
+                lastSnapshot.Remove(completedId);
+                yield return CreateEnvelope("job-removed", new { jobId = completedId });
+            }
+
+            yield return CreateEnvelope("heartbeat", new
+            {
+                timestamp = DateTime.UtcNow,
+                activeJobs = jobs.Count
+            });
+
+            if (!await WaitAsync(AllJobsPollInterval, cancellationToken))
+            {
+                _logger.LogInformation("SSE stream for all jobs cancelled");
+                yield break;
+            }
+        }
+    }
+
+    private static async Task<(Job? Job, Exception? Error, bool Cancelled)> TryGetJobAsync(string jobId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var job = await Job.Get(jobId, cancellationToken);
+            return (job, null, false);
+        }
+        catch (OperationCanceledException)
+        {
+            return (null, null, true);
+        }
+        catch (Exception ex)
+        {
+            return (null, ex, false);
+        }
+    }
+
+    private static async Task<(IReadOnlyList<Job> Jobs, Exception? Error, bool Cancelled)> TryQueryActiveJobsAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var activeJobs = await Job.Query(j =>
+                j.Status == JobStatus.Pending ||
+                j.Status == JobStatus.Planning ||
+                j.Status == JobStatus.Indexing);
+
+            return (activeJobs.ToList(), null, false);
+        }
+        catch (OperationCanceledException)
+        {
+            return (Array.Empty<Job>(), null, true);
+        }
+        catch (Exception ex)
+        {
+            return (Array.Empty<Job>(), ex, false);
+        }
+    }
+
+    private static async Task<bool> WaitAsync(TimeSpan interval, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await Task.Delay(interval, cancellationToken);
+            return true;
+        }
+        catch (OperationCanceledException)
+        {
+            return false;
+        }
+    }
+
+    private static bool IsTerminal(JobStatus status)
+        => status is JobStatus.Completed or JobStatus.Failed or JobStatus.Cancelled;
+
+    private static SseEnvelope CreateJobUpdate(Job job)
+        => CreateEnvelope("job-update", new
         {
             jobId = job.Id,
             projectId = job.ProjectId,
@@ -217,25 +281,11 @@ public class StreamingController : ControllerBase
             elapsed = job.Elapsed,
             currentOperation = job.CurrentOperation,
             errorMessage = job.ErrorMessage
-        };
-
-        await SendSseEvent("job-update", data, cancellationToken);
-    }
-
-    private async Task SendSseEvent(string eventType, object data, CancellationToken cancellationToken)
-    {
-        var json = JsonSerializer.Serialize(data, new JsonSerializerOptions
-        {
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
         });
 
-        var message = new StringBuilder();
-        message.AppendLine($"event: {eventType}");
-        message.AppendLine($"data: {json}");
-        message.AppendLine(); // Empty line to complete the event
-
-        var bytes = Encoding.UTF8.GetBytes(message.ToString());
-        await Response.Body.WriteAsync(bytes, cancellationToken);
-        await Response.Body.FlushAsync(cancellationToken);
+    private static SseEnvelope CreateEnvelope(string eventType, object payload)
+    {
+        var json = JsonConvert.SerializeObject(payload, SerializerSettings);
+        return new SseEnvelope(eventType, json);
     }
 }

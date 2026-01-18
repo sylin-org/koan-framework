@@ -1,0 +1,8 @@
+﻿{
+  "name": "aspire",
+  "description": ".NET Aspire Dashboard for observability",
+  "category": "observability",
+  "tags": ["observability", "dashboard", "metrics", "tracing"],
+  "port": 18888,
+  "volumes": []
+}

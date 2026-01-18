@@ -127,24 +127,27 @@ You now have REST CRUD, health checks, telemetry, and SQLite storage without con
   ```powershell
   dotnet add package Koan.AI.Ollama
   ```
-- Inject `IAi` for chat + semantic search:
+- Inject `IAiPipeline` for chat + semantic search:
 
   ```csharp
   public class TodosController : EntityController<Todo>
   {
-    private readonly IAi _ai;
-    public TodosController(IAi ai) => _ai = ai;
+    private readonly IAiPipeline _ai;
+    public TodosController(IAiPipeline ai) => _ai = ai;
 
       [HttpPost("{id}/suggestions")]
       public async Task<ActionResult<string>> GetSuggestions(string id)
       {
           var todo = await Todo.Get(id);
           if (todo is null) return NotFound();
-      var suggestion = await _ai.ChatAsync(new AiChatRequest
+      var suggestion = await _ai.PromptAsync(new AiChatRequest
       {
-        Messages = [ new() { Role = AiMessageRole.User, Content = $"What should I do after completing: {todo.Title}?" } ]
+        Messages =
+        {
+          new AiMessage("user", $"What should I do after completing: {todo.Title}?")
+        }
       });
-      return Ok(suggestion.Choices?.FirstOrDefault()?.Message?.Content);
+      return Ok(suggestion.Text);
       }
 
     [HttpGet("semantic-search")]
@@ -214,4 +217,3 @@ Flow pipelines unify intake, AI enrichment, and messaging without bespoke orches
 - Tooling: [ASPIRE Integration](../ASPIRE-INTEGRATION.md), Koan CLI (`scripts/` & `packaging/Koan-cli`).
 
 Keep iterating—Koan grows with your intent, not against it.
-

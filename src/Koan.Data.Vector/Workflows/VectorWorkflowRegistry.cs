@@ -294,12 +294,40 @@ internal sealed class VectorWorkflowRegistry : IVectorWorkflowRegistry, VectorWo
             System.ArgumentNullException.ThrowIfNull(embedding);
 
             var repo = EnsureRepository();
-            await Data<TEntity, string>.UpsertAsync(entity, ct);
-            var payload = MergeMetadata(metadata);
-            await repo.UpsertAsync(entity.Id, embedding, payload, ct);
-            LogOperation("save",
-                ("documents", (object?)1),
-                ("vectors", (object?)1));
+            bool entitySaved = false;
+
+            try
+            {
+                await Data<TEntity, string>.UpsertAsync(entity, ct);
+                entitySaved = true;
+
+                var payload = MergeMetadata(metadata);
+                await repo.UpsertAsync(entity.Id, embedding, payload, ct);
+
+                LogOperation("save",
+                    ("documents", (object?)1),
+                    ("vectors", (object?)1));
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                if (entitySaved)
+                {
+                    // Entity saved, vector failed - critical inconsistency
+                    throw new VectorCoordinationException(
+                        $"Vector save failed after entity was persisted. " +
+                        $"Entity {entity.Id} exists in database but has no vector representation. " +
+                        $"Use background re-embedding to recover.",
+                        entity.Id,
+                        entitySaved: true,
+                        vectorSaved: false,
+                        ex);
+                }
+                else
+                {
+                    // Entity save failed - clean failure, nothing persisted
+                    throw;
+                }
+            }
         }
 
         public async Task<VectorWorkflowSaveManyResult> SaveMany(

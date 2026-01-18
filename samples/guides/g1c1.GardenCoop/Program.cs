@@ -5,6 +5,12 @@ using Koan.Web.Extensions;
 using Koan.Web.Hosting;
 using Microsoft.AspNetCore.Builder;
 
+[assembly: KoanApp(
+    Name = "Garden Cooperative",
+    Description = "Neighborhood produce co-op slice showcasing Koan self-description.",
+    Tags = new[] { "sample", "gardening" }
+)]
+
 var builder = WebApplication.CreateBuilder(args);
 
 builder.ConfigureSampleLogging();
@@ -12,6 +18,20 @@ builder.ConfigureSampleLogging();
 // one line does everything - auto-registration magic!
 // finds all entities, controllers, and services automatically
 builder.Services.AddKoan();
+
+var initializers = Koan.Core.Hosting.Registry.KoanRegistry.GetInitializerTypes();
+Console.WriteLine($"Initializers registered: {initializers.Length}");
+foreach (var initializer in initializers)
+{
+    Console.WriteLine($" - {initializer.FullName}");
+}
+
+var autoRegistrars = Koan.Core.Hosting.Registry.KoanRegistry.GetAutoRegistrarTypes();
+Console.WriteLine($"Auto-registrars registered: {autoRegistrars.Length}");
+foreach (var registrar in autoRegistrars)
+{
+    Console.WriteLine($" * {registrar.FullName}");
+}
 
 var app = builder.Build();
 

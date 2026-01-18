@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+using System.Linq;
 using System.Reflection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -10,9 +12,8 @@ using Koan.Data.Core;  // For .Save() extension method
 namespace Koan.Data.AI.Initialization;
 
 /// <summary>
-/// Auto-registers [Embedding] attributes and wires up entity lifecycle hooks.
-/// Scans all loaded assemblies for entities with [Embedding] attribute and
-/// automatically configures embedding generation on Save().
+/// Auto-registers [Embedding] entities discovered via source-generated registries and wires up entity lifecycle hooks.
+/// Automatically configures embedding generation on Save().
 /// </summary>
 public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 {
@@ -21,8 +22,8 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 
     public void Initialize(IServiceCollection services)
     {
-        // Scan for [Embedding] attributes during startup
-        var embeddingTypes = ScanForEmbeddingTypes();
+        // Use source-generated registry populated at module initialization
+        var embeddingTypes = EmbeddingRegistry.GetRegisteredTypes();
 
         // Register event hooks for each entity type
         foreach (var entityType in embeddingTypes)
@@ -38,8 +39,14 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
             .BindConfiguration("Koan:Data:AI:EmbeddingWorker")
             .ValidateDataAnnotations();
 
-        // Track for boot report
-        EmbeddingRegistry.RegisterTypes(embeddingTypes);
+        // Register telemetry (singleton for metric collection)
+        services.AddSingleton<Telemetry.EmbeddingTelemetry>();
+
+        // Register health check
+        services.AddHealthChecks()
+            .AddCheck<Health.EmbeddingHealthCheck>("embeddings", tags: new[] { "ai", "embeddings", "ready" });
+
+        // Registry already populated by generators; nothing else to track here
     }
 
     public void Describe(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
@@ -65,42 +72,12 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
     }
 
     /// <summary>
-    /// Scans all loaded assemblies for entity types with [Embedding] attribute.
-    /// </summary>
-    private static List<Type> ScanForEmbeddingTypes()
-    {
-        var embeddingTypes = new List<Type>();
-
-        foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
-        {
-            // Skip system assemblies for performance
-            if (IsSystemAssembly(assembly))
-                continue;
-
-            try
-            {
-                var types = assembly.GetTypes()
-                    .Where(t => t.IsClass && !t.IsAbstract)
-                    .Where(t => t.GetCustomAttribute<EmbeddingAttribute>() != null)
-                    .ToList();
-
-                embeddingTypes.AddRange(types);
-            }
-            catch (ReflectionTypeLoadException)
-            {
-                // Skip assemblies that can't be loaded
-                continue;
-            }
-        }
-
-        return embeddingTypes;
-    }
-
-    /// <summary>
     /// Registers AfterUpsert hook for the specified entity type.
     /// Uses reflection to call Entity&lt;T&gt;.Events.AfterUpsert().
     /// </summary>
-    private static void RegisterEmbeddingHooks(Type entityType)
+    [RequiresUnreferencedCode("Embedding hooks use reflection against entity lifecyle APIs.")]
+    [RequiresDynamicCode("Embedding hooks create closed generic delegates at runtime.")]
+    private static void RegisterEmbeddingHooks([DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties | DynamicallyAccessedMemberTypes.PublicMethods)] Type entityType)
     {
         // Find the Entity<T> or Entity<T, TKey> base class
         var entityBaseType = FindEntityBaseType(entityType);
@@ -221,9 +198,6 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         await state.Save(ctx.CancellationToken);
     }
 
-    /// <summary>
-    /// Queues an embedding job for background processing.
-    /// </summary>
     private static async ValueTask QueueEmbeddingJobAsync<TEntity>(
         TEntity entity,
         EmbeddingMetadata metadata,
@@ -297,8 +271,14 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         // Build embedding text
         var text = metadata.BuildEmbeddingText(entity);
 
-        // Generate embedding using Ai facade
-        var embedding = await Koan.AI.Ai.Embed(text, ct);
+        // Generate embedding with source routing
+        float[] embedding;
+        using (metadata.Source != null || metadata.Model != null
+            ? Koan.AI.Client.Context(source: metadata.Source, model: metadata.Model)
+            : null)
+        {
+            embedding = await Koan.AI.Client.Embed(text, ct);
+        }
 
         // Store in vector database
         await Koan.Data.Vector.VectorData<TEntity>.SaveWithVector(entity, embedding, null, ct);
@@ -307,7 +287,8 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
     /// <summary>
     /// Finds the Entity&lt;T&gt; or Entity&lt;T, TKey&gt; base type for the given type.
     /// </summary>
-    private static Type? FindEntityBaseType(Type type)
+    [return: DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties | DynamicallyAccessedMemberTypes.PublicMethods)]
+    private static Type? FindEntityBaseType([DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties | DynamicallyAccessedMemberTypes.PublicMethods)] Type type)
     {
         var currentType = type;
         while (currentType != null)
@@ -330,15 +311,4 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         return null;
     }
 
-    /// <summary>
-    /// Checks if an assembly is a system assembly (for performance optimization).
-    /// </summary>
-    private static bool IsSystemAssembly(Assembly assembly)
-    {
-        var name = assembly.FullName ?? "";
-        return name.StartsWith("System.") ||
-               name.StartsWith("Microsoft.") ||
-               name.StartsWith("netstandard,") ||
-               name.StartsWith("mscorlib,");
-    }
 }

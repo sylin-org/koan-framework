@@ -1,9 +1,13 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Koan.Core;
 using Koan.Mcp.Options;
+using Koan.Web.Sse;
+using Koan.Web.Sse.Results;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -91,12 +95,7 @@ public sealed class HttpSseTransport
             return;
         }
 
-        context.Response.Headers.CacheControl = "no-cache";
-        context.Response.Headers.Pragma = "no-cache";
-        context.Response.Headers.Connection = "keep-alive";
-        context.Response.Headers["X-Accel-Buffering"] = "no";
         context.Response.Headers[HttpSseHeaders.SessionId] = session.Id;
-        context.Response.ContentType = "text/event-stream";
 
         var connectedAt = _timeProvider.GetUtcNow();
         session.Enqueue(ServerSentEvent.Connected(session.Id, connectedAt));
@@ -111,12 +110,8 @@ public sealed class HttpSseTransport
 
         try
         {
-            await foreach (var message in session.OutboundMessages(context.RequestAborted))
-            {
-                var formatted = message.ToWireFormat();
-                await context.Response.WriteAsync(formatted, context.RequestAborted);
-                await context.Response.Body.FlushAsync(context.RequestAborted);
-            }
+            var result = SseResults.StreamEnvelopes(StreamSession(session, context.RequestAborted));
+            await result.ExecuteAsync(context);
         }
         catch (OperationCanceledException)
         {
@@ -230,5 +225,13 @@ public sealed class HttpSseTransport
 
         envelope = new JsonRpcEnvelope(jsonRpc, method, parameters, id);
         return true;
+    }
+
+    private static async IAsyncEnumerable<SseEnvelope> StreamSession(HttpSseSession session, [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        await foreach (var message in session.OutboundMessages(cancellationToken))
+        {
+            yield return message.ToEnvelope();
+        }
     }
 }

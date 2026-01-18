@@ -45,8 +45,8 @@ public sealed class MeridianWebApplicationFactory : WebApplicationFactory<Progra
             AppHost.Current = null;
 
             // Replace external AI dependencies with deterministic test doubles.
-            services.RemoveAll<IAi>();
-            services.AddSingleton<IAi, FakeAuthoringAi>();
+            services.RemoveAll<IAiPipeline>();
+            services.AddSingleton<IAiPipeline, FakeAuthoringAi>();
 
             // Remove the Meridian job worker hosted service to avoid background polling in tests.
             var hostedDescriptors = services

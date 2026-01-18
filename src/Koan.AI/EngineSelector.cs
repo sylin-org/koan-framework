@@ -16,7 +16,7 @@ public readonly struct EngineSelector
     // Chat helpers (provider override supported via route hints)
     public Task<string> Prompt(string message, AiPromptOptions? opts = null, CancellationToken ct = default)
     {
-        var ai = Ai.TryResolve() ?? throw new InvalidOperationException("AI not available. Configure AddAi() and ensure AppHost.Current is set (greenfield boot).");
+        var ai = Client.TryResolve() ?? throw new InvalidOperationException("AI not available. Configure AddAi() and ensure AppHost.Current is set (greenfield boot).");
         var req = new AiChatRequest
         {
             Messages = new() { new AiMessage("user", message) },
@@ -29,7 +29,7 @@ public readonly struct EngineSelector
 
     public IAsyncEnumerable<AiChatChunk> Stream(string message, AiPromptOptions? opts = null, CancellationToken ct = default)
     {
-        var ai = Ai.TryResolve() ?? throw new InvalidOperationException("AI not available. Configure AddAi() and ensure AppHost.Current is set (greenfield boot).");
+        var ai = Client.TryResolve() ?? throw new InvalidOperationException("AI not available. Configure AddAi() and ensure AppHost.Current is set (greenfield boot).");
         var req = new AiChatRequest
         {
             Messages = new() { new AiMessage("user", message) },
@@ -44,13 +44,13 @@ public readonly struct EngineSelector
     public Task<AiEmbeddingsResponse> Embed(string input, CancellationToken ct = default)
     {
         var req = new AiEmbeddingsRequest { Input = new() { input }, Model = _model };
-        return Ai.Embed(req, ct);
+        return Client.Embed(req, ct);
     }
 
     public Task<AiEmbeddingsResponse> Embed(IEnumerable<string> input, CancellationToken ct = default)
     {
         var req = new AiEmbeddingsRequest { Input = input.ToList(), Model = _model };
-        return Ai.Embed(req, ct);
+        return Client.Embed(req, ct);
     }
 
     public Task<AiEmbeddingsResponse> Embed(AiEmbeddingsRequest req, CancellationToken ct = default)
@@ -59,6 +59,6 @@ public readonly struct EngineSelector
         var effective = req.Model is null && _model is not null
             ? req with { Model = _model }
             : req;
-        return Ai.Embed(effective, ct);
+        return Client.Embed(effective, ct);
     }
 }

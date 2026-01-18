@@ -1,0 +1,8 @@
+﻿{
+  "name": "couchbase",
+  "description": "Couchbase Server Community Edition",
+  "category": "data",
+  "tags": ["database", "document", "nosql", "cache"],
+  "port": 8091,
+  "volumes": ["couchbase-data"]
+}

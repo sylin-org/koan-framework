@@ -6,6 +6,7 @@
 
 > **⚠️ ARCHITECTURAL REVIEW (2025-11-05):**
 > This specification has been reviewed and updated based on codebase analysis. Key corrections:
+>
 > - **EntityContext already exists** (DATA-0077) — reuse for partition routing instead of building new WithContext()
 > - **Partition strategy:** Per-class-per-project ONLY (no shared-class filtering mode)
 > - **Weaviate deployment:** Single shared instance (not per-project instances)
@@ -54,7 +55,7 @@
 
 - `Koan.Mcp` host & tools pattern.
 - MCP HTTP+SSE transport examples.
-- `IAi` embedding and tokenization patterns.
+- `IAiPipeline` embedding and tokenization patterns.
 - `Vector<T>` façade and `VectorCapabilities` model.
 - Koan auto-provisioning (`ExecuteWithSchemaProvisioningAsync` / `IInstructionExecutor`) pattern.
 - Weaviate orchestration evaluator (pattern for Aspire provisioning).
@@ -461,7 +462,7 @@ Publish the following MCP tools under `context.*` naming:
 
 ## 12. Implementation milestones & checklist
 
-**Milestone 0 — Foundation & Partition Context** *(NEW — prerequisite for all other work)*
+**Milestone 0 — Foundation & Partition Context** _(NEW — prerequisite for all other work)_
 
 - Create `IPartitionContextProvider` interface and `AsyncLocalPartitionContextProvider` implementation.
 - Create `IVectorPartitionMapper` interface and `WeaviatePartitionMapper` implementation.
@@ -469,7 +470,7 @@ Publish the following MCP tools under `context.*` naming:
 - Update `Vector<T>` to consult partition context provider.
 - Unit tests for partition context and mapper.
 
-**Milestone 1 — Console App Skeleton** *(formerly Milestone 0)*
+**Milestone 1 — Console App Skeleton** _(formerly Milestone 0)_
 
 - Create `src/Koan.Context/Koan.Context.csproj` as **console app** (OutputType: Exe)
 - Follow [g1c1.gardencoop](../../samples/guides/g1c1.GardenCoop/Program.cs) pattern:
@@ -501,7 +502,7 @@ Publish the following MCP tools under `context.*` naming:
 - Add `DynamicCollections` capability flag.
 - Integration tests: save to two partitions, verify class isolation.
 
-**Milestone 4 — Weaviate Orchestration via Aspire** *(SIMPLIFIED — evaluator already exists)*
+**Milestone 4 — Weaviate Orchestration via Aspire** _(SIMPLIFIED — evaluator already exists)_
 
 - **No new evaluator code required** — `WeaviateOrchestrationEvaluator` already exists in `src/Connectors/Data/Vector/Weaviate/Orchestration/`.
 - Reference `Koan.Data.Vector.Connector.Weaviate` package to enable auto-provisioning.

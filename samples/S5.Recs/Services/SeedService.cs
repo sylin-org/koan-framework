@@ -647,7 +647,7 @@ internal sealed class SeedService : ISeedService
     {
         try
         {
-            var ai = Ai.TryResolve();
+            var ai = Client.TryResolve();
             var dataSvc = (IDataService?)_sp.GetService(typeof(IDataService));
             if (ai is null || dataSvc is null) { _logger?.LogWarning("Embedding and vector index skipped: AI or data service unavailable"); return 0; }
             if (!Vector<Media>.IsAvailable)
@@ -670,7 +670,7 @@ internal sealed class SeedService : ISeedService
     {
         try
         {
-            var ai = Ai.TryResolve();
+            var ai = Client.TryResolve();
             var dataSvc = (IDataService?)_sp.GetService(typeof(IDataService));
             if (ai is null || dataSvc is null) { _logger?.LogWarning("Embedding and vector index skipped: AI or data service unavailable"); return 0; }
             if (!Vector<Media>.IsAvailable)

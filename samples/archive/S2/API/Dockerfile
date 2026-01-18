@@ -1,5 +1,5 @@
 # S2.Api container (multi-stage)
-FROM mcr.microsoft.com/dotnet/sdk:10.0.100-rc.1 AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0.100 AS build
 WORKDIR /src
 COPY . .
 # Build using repository root as context; target S2.Api project path

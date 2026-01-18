@@ -51,7 +51,11 @@
     <ProjectReference Include="$(MSBuildThisFileDirectory)src\Koan.Orchestration.Generators\Koan.Orchestration.Generators.csproj"
                       OutputItemType="Analyzer"
                       ReferenceOutputAssembly="false"
-                      Condition="Exists('$(MSBuildThisFileDirectory)src\Koan.Orchestration.Generators\Koan.Orchestration.Generators.csproj') and '$(MSBuildProjectName)' != 'Koan.Orchestration.Generators'" />
+                      Condition="Exists('$(MSBuildThisFileDirectory)src\Koan.Orchestration.Generators\Koan.Orchestration.Generators.csproj') and '$(MSBuildProjectName)' != 'Koan.Orchestration.Generators' and '$(MSBuildProjectName)' != 'Koan.Core.Registry.Generators'" />
+    <ProjectReference Include="$(MSBuildThisFileDirectory)src\Koan.Core.Registry.Generators\Koan.Core.Registry.Generators.csproj"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="false"
+                      Condition="Exists('$(MSBuildThisFileDirectory)src\Koan.Core.Registry.Generators\Koan.Core.Registry.Generators.csproj') and '$(MSBuildProjectName)' != 'Koan.Core.Registry.Generators' and '$(MSBuildProjectName)' != 'Koan.Orchestration.Generators'" />
   </ItemGroup>
   <PropertyGroup Condition="Exists('$(MSBuildThisFileDirectory)icon.png')">
     <PackageIcon>icon.png</PackageIcon>

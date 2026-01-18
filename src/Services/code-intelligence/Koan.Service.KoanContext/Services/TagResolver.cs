@@ -236,13 +236,13 @@ public class TagResolver
             _logger.LogDebug("Loaded tag pipeline {Pipeline} with {RuleCount} rules", targetPipelineName, rules.Count);
 
             return new TagPipelineSnapshot(pipeline, rules);
-    }) ?? new TagPipelineSnapshot(new TagPipeline { Name = targetPipelineName, RuleIds = new List<string>() }, Array.Empty<TagRule>());
+        }) ?? new TagPipelineSnapshot(new TagPipeline { Name = targetPipelineName, RuleIds = new List<string>() }, Array.Empty<TagRule>());
     }
 
     private async Task<TagVocabularySnapshot> GetVocabularySnapshotAsync(CancellationToken cancellationToken)
     {
-    using var partitionScope = EntityContext.With(partition: null);
-    const string cacheKey = Constants.CacheKeys.TagVocabulary;
+        using var partitionScope = EntityContext.With(partition: null);
+        const string cacheKey = Constants.CacheKeys.TagVocabulary;
 
         return await _cache.GetOrCreateAsync(cacheKey, async entry =>
         {

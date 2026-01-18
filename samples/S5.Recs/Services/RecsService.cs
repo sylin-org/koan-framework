@@ -354,7 +354,7 @@ internal sealed class RecsService : IRecsService
             // Build search intent vector
             if (!string.IsNullOrWhiteSpace(text))
             {
-                searchVector = await Koan.AI.Ai.Embed(text!, ct);
+                searchVector = await Koan.AI.Client.Embed(text!, ct);
             }
             else if (!string.IsNullOrWhiteSpace(anchorMediaId))
             {
@@ -362,13 +362,13 @@ internal sealed class RecsService : IRecsService
                 if (anchorMedia != null)
                 {
                     var textAnchor = $"{anchorMedia.Title}\n\n{anchorMedia.Synopsis}\nGenres: {string.Join(", ", anchorMedia.Genres ?? Array.Empty<string>())}";
-                    searchVector = await Koan.AI.Ai.Embed(textAnchor, ct);
+                    searchVector = await Koan.AI.Client.Embed(textAnchor, ct);
                 }
             }
             else if (preferTags is { Length: > 0 })
             {
                 var tagText = $"Tags: {string.Join(", ", preferTags.Where(t => !string.IsNullOrWhiteSpace(t)))}";
-                searchVector = await Koan.AI.Ai.Embed(tagText, ct);
+                searchVector = await Koan.AI.Client.Embed(tagText, ct);
             }
 
             // Use cached user preference vector from profile
@@ -992,7 +992,7 @@ internal sealed class RecsService : IRecsService
             try
             {
                 var textBlend = $"{media.Title}\n\n{media.Synopsis}\nTags: {string.Join(", ", (media.Genres ?? Array.Empty<string>()).Concat(media.Tags ?? Array.Empty<string>()))}";
-                var vec = await Koan.AI.Ai.Embed(textBlend, ct);
+                var vec = await Koan.AI.Client.Embed(textBlend, ct);
 
                 if (vec is { Length: > 0 })
                 {

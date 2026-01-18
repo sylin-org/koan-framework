@@ -131,7 +131,7 @@ BEGIN:",
             Model = model
         };
 
-        var rawTranslation = await Ai.Chat(chatOptions, ct);
+        var rawTranslation = await Client.Chat(chatOptions, ct);
 
         // Post-process to remove common AI artifacts
         return CleanTranslationOutput(rawTranslation, targetLanguage);
@@ -404,7 +404,7 @@ BEGIN:",
                 SystemPrompt = "You are a language detection system. Identify the language and output ONLY the two-letter ISO 639-1 code in lowercase (examples: en, es, fr, de, ja, zh). Output nothing else - no explanations, no punctuation, just the code."
             };
 
-            var languageCode = await Ai.Chat(chatOptions, ct);
+            var languageCode = await Client.Chat(chatOptions, ct);
 
             // Extract just the code if AI added extra text
             var cleanCode = ExtractLanguageCode(languageCode);

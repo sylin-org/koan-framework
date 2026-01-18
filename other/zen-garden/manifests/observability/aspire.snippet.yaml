@@ -1,0 +1,15 @@
+container_name: aspire
+image: mcr.microsoft.com/dotnet/aspire-dashboard:latest
+ports:
+  - "18888:18888"
+  - "4317:18889"
+environment:
+  DOTNET_DASHBOARD_UNSECURED_ALLOW_ANONYMOUS: "true"
+healthcheck:
+  test: ["CMD", "curl", "-f", "http://localhost:18888/health"]
+  interval: 10s
+  timeout: 5s
+  retries: 5
+restart: unless-stopped
+networks:
+  - zen-garden

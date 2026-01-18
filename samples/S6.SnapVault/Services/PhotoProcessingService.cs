@@ -221,6 +221,10 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
 
     public async Task<PhotoAsset> GenerateAIMetadataAsync(PhotoAsset photo, CancellationToken ct = default)
     {
+        // Transaction coordination: Ensures atomic commits across entity + vector operations
+        // [Embedding] attribute handles embedding generation and vectorization automatically via lifecycle hooks
+        using var tx = EntityContext.Transaction($"ai-metadata-{photo.Id}");
+
         try
         {
             _logger.LogInformation("Generating AI metadata for photo {PhotoId}", photo.Id);
@@ -228,33 +232,31 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
             // Generate detailed description using vision AI
             await GenerateDetailedDescriptionAsync(photo, null, ct);
 
-            // Build embedding text from available metadata (including detailed description)
-            var embeddingText = BuildEmbeddingText(photo);
-
-            // Generate embedding using Koan AI (S5.Recs pattern)
-            var embedding = await Koan.AI.Ai.Embed(embeddingText, ct);
-
-            // Prepare vector metadata for hybrid search
-            var vectorMetadata = new Dictionary<string, object>
-            {
-                ["originalFileName"] = photo.OriginalFileName,
-                ["eventId"] = photo.EventId,
-                ["searchText"] = embeddingText // Required for hybrid search
-            };
-
-            // Save with vector using framework pattern (S5.Recs line 740)
-            await VectorData<PhotoAsset>.SaveWithVector(photo, embedding, vectorMetadata, ct);
-
+            // [Embedding] attribute automatically:
+            // 1. Calls photo.ToEmbeddingText() to build search text
+            // 2. Generates embedding via Client.Embed()
+            // 3. Stores entity + vector atomically via VectorData<T>.SaveWithVector()
             photo.ProcessingStatus = ProcessingStatus.Completed;
-            _logger.LogInformation("AI metadata generated for photo {PhotoId}", photo.Id);
+            await photo.Save(ct);
+
+            // Commit atomically (both entity + vector, or neither)
+            await EntityContext.CommitAsync(ct);
+
+            _logger.LogInformation("AI metadata generated for photo {PhotoId} (attribute-driven, transactional)", photo.Id);
 
             return photo;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to generate AI metadata for photo {PhotoId}", photo.Id);
+            _logger.LogError(ex, "Failed to generate AI metadata for photo {PhotoId}, rolling back transaction", photo.Id);
+
+            // Rollback discards both entity + vector operations
+            await EntityContext.RollbackAsync(ct);
+
+            // Save failed status (outside transaction)
             photo.ProcessingStatus = ProcessingStatus.Failed;
             await photo.Save(ct);
+
             throw;
         }
     }
@@ -265,15 +267,14 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
         {
             _logger.LogInformation("Semantic search: query='{Query}' alpha={Alpha} eventId={EventId} topK={TopK}", query, alpha, eventId, topK);
 
-            // Generate query embedding
-            var queryVector = await Koan.AI.Ai.Embed(query, ct);
-
-            // Check if vector search is available
             if (!Vector<PhotoAsset>.IsAvailable)
             {
                 _logger.LogWarning("Vector search unavailable, falling back to keyword search");
                 return await FallbackKeywordSearch(query, eventId, topK, ct);
             }
+
+            // Generate query embedding once vector search support is confirmed
+            var queryVector = await Koan.AI.Client.Embed(query, ct);
 
             // Perform hybrid vector search with user-controlled alpha (S5.Recs pattern - line 140)
             var vectorResults = await Vector<PhotoAsset>.Search(
@@ -311,11 +312,19 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
 
     private async Task<List<PhotoAsset>> FallbackKeywordSearch(string query, string? eventId, int topK, CancellationToken ct)
     {
+        var normalizedQuery = query?.Trim();
+        if (string.IsNullOrEmpty(normalizedQuery))
+        {
+            return new List<PhotoAsset>();
+        }
+
+        var queryLower = normalizedQuery.ToLower();
+
         var photos = await PhotoAsset.Query(p =>
             (string.IsNullOrEmpty(eventId) || p.EventId == eventId) &&
-            (p.OriginalFileName.Contains(query, StringComparison.OrdinalIgnoreCase) ||
-             p.AutoTags.Any(t => t.Contains(query, StringComparison.OrdinalIgnoreCase)) ||
-             p.MoodDescription.Contains(query, StringComparison.OrdinalIgnoreCase)), ct);
+            ((p.OriginalFileName != null && p.OriginalFileName.ToLower().Contains(queryLower)) ||
+             (p.AutoTags != null && p.AutoTags.Any(t => t != null && t.ToLower().Contains(queryLower))) ||
+             (p.MoodDescription != null && p.MoodDescription.ToLower().Contains(queryLower))), ct);
 
         return photos.Take(topK).ToList();
     }
@@ -393,35 +402,6 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
         var seconds = coordinate[2].ToDouble();
 
         return degrees + (minutes / 60.0) + (seconds / 3600.0);
-    }
-
-    private static string BuildEmbeddingText(PhotoAsset photo)
-    {
-        var parts = new List<string>();
-
-        // Structured AI analysis first (best semantic content)
-        if (photo.AiAnalysis != null)
-        {
-            parts.Add(photo.AiAnalysis.ToEmbeddingText());
-        }
-
-        // Fallback to legacy fields if no structured analysis
-        if (!string.IsNullOrEmpty(photo.OriginalFileName))
-            parts.Add($"Filename: {photo.OriginalFileName}");
-
-        if (photo.AutoTags.Any())
-            parts.Add($"Tags: {string.Join(", ", photo.AutoTags)}");
-
-        if (!string.IsNullOrEmpty(photo.MoodDescription))
-            parts.Add($"Mood: {photo.MoodDescription}");
-
-        if (!string.IsNullOrEmpty(photo.CameraModel))
-            parts.Add($"Camera: {photo.CameraModel}");
-
-        if (photo.Location != null)
-            parts.Add($"Location: {photo.Location.Latitude}, {photo.Location.Longitude}");
-
-        return string.Join("\n", parts);
     }
 
     private static async Task<(int width, int height)> GetStreamDimensions(Stream stream, CancellationToken ct)
@@ -658,16 +638,9 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
             // Apply variable substitution
             prompt = _promptFactory.SubstituteVariables(prompt, context);
 
-            // Use vision model
-            var visionOptions = new Koan.AI.Contracts.Options.AiVisionOptions
-            {
-                ImageBytes = imageBytes,
-                Prompt = prompt,
-                Model = "qwen2.5vl",
-                Temperature = 0.7
-            };
-
-            var response = await Koan.AI.Ai.Understand(visionOptions, ct);
+            // Use vision pipeline API (AI-0020 pattern)
+            var response = await Koan.AI.Ai.FromImage(imageBytes, "image/jpeg")
+                .ToText(prompt, model: "qwen2.5vl", ct);
 
             // Parse JSON with robust error handling
             var analysis = ParseAiResponse(response);
@@ -767,16 +740,9 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
         _logger.LogDebug("Classifying image style for photo {PhotoId}...", photo.Id);
         var classificationStart = Stopwatch.StartNew();
 
-        // Call AI for classification
-        var classificationOptions = new Koan.AI.Contracts.Options.AiVisionOptions
-        {
-            ImageBytes = imageBytes,
-            Prompt = classificationPrompt,
-            Model = "qwen2.5vl",
-            Temperature = 0.3 // Lower temperature for more consistent classification
-        };
-
-        var classificationResponse = await Koan.AI.Ai.Understand(classificationOptions, ct);
+        // Use vision pipeline API for classification (AI-0020 pattern)
+        var classificationResponse = await Koan.AI.Ai.FromImage(imageBytes, "image/jpeg")
+            .ToText(classificationPrompt, model: "qwen2.5vl", ct);
         classificationStart.Stop();
 
         // Parse classification result (should be style name like "portrait" or "landscape")
@@ -925,89 +891,98 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
             throw new InvalidOperationException($"Photo {photoId} not found");
         }
 
-        // 1. Buffer locked content before regeneration
-        // Buffer locked summary
-        string? lockedSummary = null;
-        bool summaryWasLocked = false;
+        // Transaction coordination: Ensures atomic commits across entity + vector operations
+        using var tx = EntityContext.Transaction($"ai-regen-{photoId}");
 
-        if (photo.AiAnalysis?.SummaryLocked == true)
+        try
         {
-            lockedSummary = photo.AiAnalysis.Summary;
-            summaryWasLocked = true;
-            _logger.LogDebug("Buffered locked summary: {Summary}", lockedSummary);
-        }
+            // 1. Buffer locked content before regeneration
+            // Buffer locked summary
+            string? lockedSummary = null;
+            bool summaryWasLocked = false;
 
-        // Buffer locked facts (all fact keys are lowercase, so we can use direct dictionary access)
-        var lockedFacts = new Dictionary<string, string>();
-
-        if (photo.AiAnalysis?.LockedFactKeys != null)
-        {
-            foreach (var factKey in photo.AiAnalysis.LockedFactKeys)
+            if (photo.AiAnalysis?.SummaryLocked == true)
             {
-                if (photo.AiAnalysis.Facts.TryGetValue(factKey, out var value))
+                lockedSummary = photo.AiAnalysis.Summary;
+                summaryWasLocked = true;
+                _logger.LogDebug("Buffered locked summary: {Summary}", lockedSummary);
+            }
+
+            // Buffer locked facts (all fact keys are lowercase, so we can use direct dictionary access)
+            var lockedFacts = new Dictionary<string, string>();
+
+            if (photo.AiAnalysis?.LockedFactKeys != null)
+            {
+                foreach (var factKey in photo.AiAnalysis.LockedFactKeys)
                 {
-                    lockedFacts[factKey] = value;
-                    _logger.LogDebug("Buffered locked fact: {FactKey} = {FactValue}", factKey, value);
+                    if (photo.AiAnalysis.Facts.TryGetValue(factKey, out var value))
+                    {
+                        lockedFacts[factKey] = value;
+                        _logger.LogDebug("Buffered locked fact: {FactKey} = {FactValue}", factKey, value);
+                    }
                 }
             }
-        }
 
-        // 2. Regenerate AI analysis (this will replace photo.AiAnalysis)
-        await GenerateDetailedDescriptionAsync(photo, analysisStyle, ct);
+            // 2. Regenerate AI analysis (this will replace photo.AiAnalysis)
+            await GenerateDetailedDescriptionAsync(photo, analysisStyle, ct);
 
-        // 3. Restore locked content (add them back if missing, overwrite if present)
-        if (photo.AiAnalysis != null)
-        {
-            // Restore locked summary
-            if (summaryWasLocked && lockedSummary != null)
+            // 3. Restore locked content (add them back if missing, overwrite if present)
+            if (photo.AiAnalysis != null)
             {
-                photo.AiAnalysis.Summary = lockedSummary;
-                photo.AiAnalysis.SummaryLocked = true;
-                _logger.LogDebug("Restored locked summary");
-            }
-
-            // Restore locked facts
-            if (lockedFacts.Count > 0)
-            {
-                foreach (var (factKey, value) in lockedFacts)
+                // Restore locked summary
+                if (summaryWasLocked && lockedSummary != null)
                 {
-                    // Add or overwrite the fact with the locked value
-                    photo.AiAnalysis.Facts[factKey] = value;
-                    _logger.LogDebug("Restored locked fact: {FactKey} = {FactValue}", factKey, value);
+                    photo.AiAnalysis.Summary = lockedSummary;
+                    photo.AiAnalysis.SummaryLocked = true;
+                    _logger.LogDebug("Restored locked summary");
                 }
 
-                // Restore locked keys set
-                photo.AiAnalysis.LockedFactKeys = new HashSet<string>(lockedFacts.Keys);
+                // Restore locked facts
+                if (lockedFacts.Count > 0)
+                {
+                    foreach (var (factKey, value) in lockedFacts)
+                    {
+                        // Add or overwrite the fact with the locked value
+                        photo.AiAnalysis.Facts[factKey] = value;
+                        _logger.LogDebug("Restored locked fact: {FactKey} = {FactValue}", factKey, value);
+                    }
+
+                    // Restore locked keys set
+                    photo.AiAnalysis.LockedFactKeys = new HashSet<string>(lockedFacts.Keys);
+                }
             }
+
+            // 4. Save with automatic re-embedding (attribute-driven)
+            // [Embedding] attribute detects content change and regenerates embedding automatically
+            await photo.Save(ct);
+
+            // Commit atomically (both entity + vector, or neither)
+            await EntityContext.CommitAsync(ct);
+
+            var lockedItems = new List<string>();
+            if (summaryWasLocked) lockedItems.Add("summary");
+            if (lockedFacts.Count > 0) lockedItems.Add($"{lockedFacts.Count} facts");
+
+            if (lockedItems.Count > 0)
+            {
+                _logger.LogInformation("AI analysis regenerated for photo {PhotoId} with locked {Items} preserved (transactional)",
+                    photoId, string.Join(" and ", lockedItems));
+            }
+            else
+            {
+                _logger.LogInformation("AI analysis regenerated for photo {PhotoId} (transactional)", photoId);
+            }
+
+            return photo;
         }
-
-        // 4. Regenerate embedding with the merged facts
-        var embeddingText = BuildEmbeddingText(photo);
-        var embedding = await Koan.AI.Ai.Embed(embeddingText, ct);
-
-        var vectorMetadata = new Dictionary<string, object>
+        catch (Exception ex)
         {
-            ["originalFileName"] = photo.OriginalFileName,
-            ["eventId"] = photo.EventId,
-            ["searchText"] = embeddingText
-        };
+            _logger.LogError(ex, "Failed to regenerate AI analysis for photo {PhotoId}, rolling back transaction", photoId);
 
-    await VectorData<PhotoAsset>.SaveWithVector(photo, embedding, vectorMetadata, ct);
+            // Rollback discards both entity + vector operations
+            await EntityContext.RollbackAsync(ct);
 
-        var lockedItems = new List<string>();
-        if (summaryWasLocked) lockedItems.Add("summary");
-        if (lockedFacts.Count > 0) lockedItems.Add($"{lockedFacts.Count} facts");
-
-        if (lockedItems.Count > 0)
-        {
-            _logger.LogInformation("AI analysis regenerated for photo {PhotoId} with locked {Items} preserved",
-                photoId, string.Join(" and ", lockedItems));
+            throw;
         }
-        else
-        {
-            _logger.LogInformation("AI analysis regenerated for photo {PhotoId}", photoId);
-        }
-
-        return photo;
     }
 }

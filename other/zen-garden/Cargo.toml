@@ -1,0 +1,41 @@
+﻿[workspace]
+members = [
+  # Old structure - will be removed in Phase 6
+  # "src/linux/common",
+  # "src/linux/moss",
+  # "src/windows/garden-rake",
+  "src/lantern",
+  
+  # New structure
+  "src/common",
+  "src/moss",
+  "src/rake",
+  "src/build-utils",
+]
+resolver = "2"
+
+[workspace.package]
+edition = "2021"
+rust-version = "1.75"
+authors = ["Koan Framework"]
+
+[workspace.dependencies]
+anyhow = "1.0"
+axum = "0.7"
+chrono = "0.4"
+clap = { version = "4.4", features = ["derive"] }
+mdns-sd = "0.7"
+reqwest = { version = "0.11", default-features = false, features = ["json", "rustls-tls", "stream"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "1.0"
+tokio = { version = "1.35", features = ["full"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
+uuid = { version = "1.6", features = ["v7"] }
+# zen-common = { path = "src/linux/common" }  # Moved to src/common
+
+[profile.release]
+strip = true      # Remove symbols for smaller binaries
+lto = true        # Link-time optimization
+codegen-units = 1 # Better optimization (slower compile, smaller binary)

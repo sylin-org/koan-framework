@@ -7,8 +7,9 @@ using Microsoft.Extensions.Logging;
 using Koan.Core;
 using Koan.Core.Extensions;
 using Koan.Web.Connector.Swagger.Infrastructure;
-using Swashbuckle.AspNetCore.Swagger;
+using Koan.Web.OpenApi.Options;
 using Koan.Web;
+using Swashbuckle.AspNetCore.SwaggerUI;
 
 namespace Koan.Web.Connector.Swagger.Hosting;
 
@@ -50,34 +51,23 @@ internal sealed class KoanSwaggerStartupFilter : IStartupFilter
 
                 if (enabled)
                 {
-                    // Ensure services were registered; if not, skip to avoid runtime 500s
-                    var provider = app.ApplicationServices.GetService<ISwaggerProvider>();
-                    if (provider is not null)
+                    app.UseSwaggerUI(ui =>
                     {
-                        // Apply Swagger middleware
-                        app.UseSwagger();
-                        app.UseSwaggerUI(ui =>
+                        ui.RoutePrefix = opts.RoutePrefix;
+                        ui.SwaggerEndpoint($"/openapi/{KoanOpenApiOptions.DefaultDocumentName}.json", "Koan API v1");
+                    });
+
+                    var swaggerUrl = KoanWeb.Urls.Build(opts.RoutePrefix, cfg, env);
+                    logger?.LogInformation("Koan.Web.Connector.Swagger enabled at {SwaggerUrl} (env={Env})", swaggerUrl, env?.EnvironmentName);
+
+                    // Optionally require auth outside Development
+                    if (env?.IsDevelopment() != true && opts.RequireAuthOutsideDevelopment)
+                    {
+                        app.MapWhen(ctx => ctx.Request.Path.StartsWithSegments($"/{opts.RoutePrefix}"), b =>
                         {
-                            ui.RoutePrefix = opts.RoutePrefix;
-                            ui.SwaggerEndpoint("/swagger/v1/swagger.json", "Koan API v1");
+                            b.UseAuthentication();
+                            b.UseAuthorization();
                         });
-
-                        var swaggerUrl = KoanWeb.Urls.Build(opts.RoutePrefix, cfg, env);
-                        logger?.LogInformation("Koan.Web.Connector.Swagger enabled at {SwaggerUrl} (env={Env})", swaggerUrl, env?.EnvironmentName);
-
-                        // Optionally require auth outside Development
-                        if (env?.IsDevelopment() != true && opts.RequireAuthOutsideDevelopment)
-                        {
-                            app.MapWhen(ctx => ctx.Request.Path.StartsWithSegments($"/{opts.RoutePrefix}"), b =>
-                            {
-                                b.UseAuthentication();
-                                b.UseAuthorization();
-                            });
-                        }
-                    }
-                    else
-                    {
-                        logger?.LogWarning("Koan.Web.Connector.Swagger requested but services were not registered. Call services.AddKoanSwagger() earlier or keep the auto-registrar.");
                     }
                 }
                 else

@@ -1,0 +1,15 @@
+container_name: rabbitmq
+image: rabbitmq:3-management-alpine
+ports:
+  - "5672:5672"
+  - "15672:15672"
+volumes:
+  - rabbitmq-data:/var/lib/rabbitmq
+healthcheck:
+  test: ["CMD", "rabbitmq-diagnostics", "ping"]
+  interval: 15s
+  timeout: 10s
+  retries: 5
+restart: unless-stopped
+networks:
+  - zen-garden

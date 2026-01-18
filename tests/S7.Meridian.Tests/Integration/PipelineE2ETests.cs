@@ -329,7 +329,7 @@ public sealed class PipelineE2ETests
             => $"{entity}:{model}:{hash}";
     }
 
-    private sealed class FakeAi : IAi
+    private sealed class FakeAi : IAiPipeline
     {
         public Task<AiChatResponse> PromptAsync(AiChatRequest request, CancellationToken ct = default)
         {

@@ -15,13 +15,14 @@
     <FileVersion>0.6.3</FileVersion>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="..\Koan.Orchestration.Cli.Core\Koan.Orchestration.Cli.Core.csproj" />
     <ProjectReference Include="..\Koan.Orchestration.Abstractions\Koan.Orchestration.Abstractions.csproj" />
     <ProjectReference Include="..\Connectors\Orchestration\Renderers\Compose\Koan.Orchestration.Renderers.Connector.Compose.csproj" />
     <ProjectReference Include="..\Connectors\Orchestration\Docker\Koan.Orchestration.Connector.Docker.csproj" />
     <ProjectReference Include="..\Connectors\Orchestration\Podman\Koan.Orchestration.Connector.Podman.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="System.Reflection.MetadataLoadContext" Version="9.0.0" />
+    <PackageReference Include="System.Reflection.MetadataLoadContext" Version="10.0.0" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
   </ItemGroup>
 </Project>

@@ -62,7 +62,6 @@ wwwroot/.cache/
 # Node (future UI work)
 node_modules/
 **/node_modules/
-/other
  
 # Docker runtime status artifacts (avoid committing transient ps outputs)
 /samples/**/ps.json
@@ -75,3 +74,4 @@ node_modules/
 /samples/S7.Meridian/storage
 /samples/S7.Meridian/scripts/phase4.5/try-it-yourself/output
 nul
+/other/zen-garden/dist

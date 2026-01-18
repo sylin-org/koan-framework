@@ -16,7 +16,7 @@ namespace S7.Meridian.Tests.Fakes;
 /// Deterministic AI stub for authoring endpoints so tests do not require external LLMs.
 /// Generates stable JSON payloads that satisfy SourceType and AnalysisType authoring contracts.
 /// </summary>
-internal sealed class FakeAuthoringAi : IAi
+internal sealed class FakeAuthoringAi : IAiPipeline
 {
     public Task<AiChatResponse> PromptAsync(AiChatRequest request, CancellationToken ct = default)
     {

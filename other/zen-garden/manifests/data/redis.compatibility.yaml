@@ -1,0 +1,19 @@
+﻿# Redis Stack Compatibility Rules
+
+version: "1"
+
+compatibility_rules:
+  - name: "insufficient-memory"
+    condition:
+      memory_mb_less_than: 256
+    reason: "Redis Stack requires at least 256MB of RAM (practical minimum for modules + baseline cache)"
+    suggestion: "Increase stone memory or use a smaller cache footprint"
+
+post_install_healthcheck:
+  enabled: true
+  scan_log_lines: 120
+  timeout_seconds: 20
+  patterns:
+    - pattern: "Cannot allocate memory|OOM"
+      reason: "Insufficient memory for Redis"
+      suggestion: "Increase stone RAM or reduce service count"

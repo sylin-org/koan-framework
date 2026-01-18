@@ -34,7 +34,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         services.AddScoped<IndexingPlanner>();
         services.AddScoped<Embedding>(sp =>
         {
-            var ai = sp.GetRequiredService<Koan.AI.Contracts.IAi>();
+            var ai = sp.GetRequiredService<Koan.AI.Contracts.IAiPipeline>();
             var cache = sp.GetRequiredService<Microsoft.Extensions.Caching.Memory.IMemoryCache>();
             var logger = sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<Embedding>>();
 
@@ -57,11 +57,11 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         services.AddHostedService(sp => sp.GetRequiredService<TagSeedInitializer>());
         services.AddHostedService<VectorSyncWorker>();
 
-    services.AddScoped<Koan.Web.Hooks.IModelHook<TagVocabularyEntry>, TagVocabularyHooks>();
-    services.AddScoped<Koan.Web.Hooks.IModelHook<TagRule>, TagRuleHooks>();
-    services.AddScoped<Koan.Web.Hooks.IModelHook<TagPipeline>, TagPipelineHooks>();
-    services.AddScoped<Koan.Web.Hooks.IModelHook<SearchPersona>, SearchPersonaHooks>();
-    services.AddScoped<Koan.Context.Filters.PartitionScopeFilter>();
+        services.AddScoped<Koan.Web.Hooks.IModelHook<TagVocabularyEntry>, TagVocabularyHooks>();
+        services.AddScoped<Koan.Web.Hooks.IModelHook<TagRule>, TagRuleHooks>();
+        services.AddScoped<Koan.Web.Hooks.IModelHook<TagPipeline>, TagPipelineHooks>();
+        services.AddScoped<Koan.Web.Hooks.IModelHook<SearchPersona>, SearchPersonaHooks>();
+        services.AddScoped<Koan.Context.Filters.PartitionScopeFilter>();
 
         // Add memory cache if not already registered
         services.AddMemoryCache();

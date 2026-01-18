@@ -13,21 +13,21 @@ namespace Koan.Context.Services;
 /// Embedding service with caching and retry support
 /// </summary>
 /// <remarks>
-/// Wraps IAi.EmbedAsync with SHA256-based caching to avoid redundant API calls.
+/// Wraps IAiPipeline.EmbedAsync with SHA256-based caching to avoid redundant API calls.
 /// Cache keys are based on hash(text + modelId) for deterministic lookups.
 /// QA Issue #21 FIXED: Added Polly retry for transient failures.
 /// QA Issue #31 FIXED: Exponential backoff with jitter.
 /// </remarks>
 public class Embedding
 {
-    private readonly IAi _ai;
+    private readonly IAiPipeline _ai;
     private readonly IMemoryCache _cache;
     private readonly ILogger<Embedding> _logger;
     private readonly string? _defaultModel;
     private readonly AsyncRetryPolicy _retryPolicy;
 
     public Embedding(
-        IAi ai,
+        IAiPipeline ai,
         IMemoryCache cache,
         ILogger<Embedding> logger,
         string? defaultModel = null)

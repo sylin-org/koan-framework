@@ -211,7 +211,7 @@ public sealed class DocumentClassifier : IDocumentClassifier
         float[] documentEmbedding;
         try
         {
-            documentEmbedding = await Ai.Embed(preview, ct);
+            documentEmbedding = await Client.Embed(preview, ct);
         }
         catch (Exception ex)
         {
@@ -278,7 +278,7 @@ public sealed class DocumentClassifier : IDocumentClassifier
 
         try
         {
-            var response = await Ai.Chat(chatOptions, ct);
+            var response = await Client.Chat(chatOptions, ct);
 
             // Check for empty response
             if (string.IsNullOrWhiteSpace(response))
@@ -471,7 +471,7 @@ public sealed class DocumentClassifier : IDocumentClassifier
                 builder.Append(" Signal phrases: ").Append(string.Join(", ", type.SignalPhrases));
             }
 
-            var newEmbedding = await Ai.Embed(builder.ToString(), ct);
+            var newEmbedding = await Client.Embed(builder.ToString(), ct);
             type.TypeEmbedding = newEmbedding;
             type.TypeEmbeddingVersion = type.Version;
             type.TypeEmbeddingComputedAt = DateTime.UtcNow;

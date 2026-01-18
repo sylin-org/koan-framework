@@ -24,7 +24,7 @@ public sealed class AiConversationBuilderSpec
         => TestPipeline.For<AiConversationBuilderSpec>(_output, nameof(Build_populates_context_and_augmentations))
             .Assert(_ =>
             {
-                var fake = new FakeAi();
+                var fake = new FakePipeline();
                 var builder = new AiConversationBuilder(fake)
                     .WithSystem("system prompt")
                     .WithUser("hello world")
@@ -65,7 +65,7 @@ public sealed class AiConversationBuilderSpec
         => TestPipeline.For<AiConversationBuilderSpec>(_output, nameof(SendAsync_delegates_to_underlying_ai))
             .Assert(async _ =>
             {
-                var fake = new FakeAi();
+                var fake = new FakePipeline();
                 var builder = new AiConversationBuilder(fake)
                     .WithUser("ping");
 
@@ -82,7 +82,7 @@ public sealed class AiConversationBuilderSpec
         => TestPipeline.For<AiConversationBuilderSpec>(_output, nameof(AskAsync_appends_user_turn_before_sending))
             .Assert(async _ =>
             {
-                var fake = new FakeAi();
+                var fake = new FakePipeline();
                 var builder = new AiConversationBuilder(fake)
                     .WithSystem("sys");
 
@@ -94,7 +94,7 @@ public sealed class AiConversationBuilderSpec
             })
             .RunAsync();
 
-    private sealed class FakeAi : IAi
+    private sealed class FakePipeline : IAiPipeline
     {
         public AiChatRequest? LastRequest { get; private set; }
 

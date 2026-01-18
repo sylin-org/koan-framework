@@ -1,0 +1,17 @@
+container_name: weaviate
+image: semitechnologies/weaviate:latest
+ports:
+  - "8080:8080"
+environment:
+  AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: "true"
+  PERSISTENCE_DATA_PATH: "/var/lib/weaviate"
+volumes:
+  - weaviate-data:/var/lib/weaviate
+healthcheck:
+  test: ["CMD", "curl", "-f", "http://localhost:8080/v1/.well-known/ready"]
+  interval: 15s
+  timeout: 5s
+  retries: 5
+restart: unless-stopped
+networks:
+  - zen-garden

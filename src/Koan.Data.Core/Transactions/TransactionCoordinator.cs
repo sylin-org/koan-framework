@@ -84,6 +84,49 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
         }
     }
 
+    public void TrackVectorSave<TEntity, TKey>(
+        TKey id,
+        ReadOnlyMemory<float> embedding,
+        IReadOnlyDictionary<string, object>? metadata,
+        EntityContext.ContextState context)
+        where TEntity : class, IEntity<TKey>
+        where TKey : notnull
+    {
+        ThrowIfCompleted();
+
+        lock (_lock)
+        {
+            var operation = new VectorSaveOperation<TEntity, TKey>(id, embedding, metadata, context);
+            TrackOperation(operation);
+
+            _logger.LogDebug(
+                "Transaction '{TransactionName}' tracked VectorSave<{EntityType}> (id: {EntityId}, dimensions: {Dimensions})",
+                Name,
+                typeof(TEntity).Name,
+                id,
+                embedding.Length);
+        }
+    }
+
+    public void TrackVectorDelete<TEntity, TKey>(TKey id, EntityContext.ContextState context)
+        where TEntity : class, IEntity<TKey>
+        where TKey : notnull
+    {
+        ThrowIfCompleted();
+
+        lock (_lock)
+        {
+            var operation = new VectorDeleteOperation<TEntity, TKey>(id, context);
+            TrackOperation(operation);
+
+            _logger.LogDebug(
+                "Transaction '{TransactionName}' tracked VectorDelete<{EntityType}> (id: {EntityId})",
+                Name,
+                typeof(TEntity).Name,
+                id);
+        }
+    }
+
     private void TrackOperation(ITrackedOperation operation)
     {
         var adapter = operation.GetAdapterHint();

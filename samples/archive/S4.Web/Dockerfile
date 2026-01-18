@@ -1,5 +1,5 @@
 # Build & publish S4.Web
-FROM mcr.microsoft.com/dotnet/sdk:10.0.100-rc.1 AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0.100 AS build
 WORKDIR /src
 # Only copy what the app needs to build: shared libs and the samples tree
 COPY ./src ./src

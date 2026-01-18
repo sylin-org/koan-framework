@@ -96,8 +96,8 @@ public sealed class TagRuleHooks : IModelHook<TagRule>
             throw new ValidationException("At least one tag must be emitted.");
         }
 
-    model.Confidence = Math.Clamp(model.Confidence, 0f, 1f);
-    model.Priority = Math.Clamp(model.Priority, 0, 10_000);
+        model.Confidence = Math.Clamp(model.Confidence, 0f, 1f);
+        model.Priority = Math.Clamp(model.Priority, 0, 10_000);
 
         if (string.IsNullOrWhiteSpace(model.Id))
         {

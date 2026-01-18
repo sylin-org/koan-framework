@@ -1,5 +1,5 @@
 ﻿# Build MCP Host
-FROM mcr.microsoft.com/dotnet/sdk:10.0.100-rc.1 AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0.100 AS build
 WORKDIR /src
 COPY . .
 RUN dotnet publish ./samples/S16.PantryPal/MCP/S16.PantryPal.McpHost.csproj -c Release -o /out

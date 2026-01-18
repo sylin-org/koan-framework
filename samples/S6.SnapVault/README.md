@@ -3,9 +3,23 @@
 **A production-ready photo management application showcasing Koan Framework's full capabilities: media processing, AI vision, semantic search, and modern web UX.**
 
 ![Status](https://img.shields.io/badge/status-production--ready-success)
-![Framework](https://img.shields.io/badge/koan-v1.0-blue)
+![Framework](https://img.shields.io/badge/koan-v0.6.3-blue)
 ![Backend](https://img.shields.io/badge/backend-ASP.NET_Core-purple)
 ![Frontend](https://img.shields.io/badge/frontend-vanilla_js-yellow)
+
+---
+
+## ✨ NEW: AI-0020 Modernization (2025-01)
+
+SnapVault has been **fully modernized** with the latest AI-0020 patterns:
+
+🔒 **Transaction Coordination** - Atomic commits prevent orphaned vectors (MongoDB + Weaviate)
+🏷️ **[Embedding] Attribute** - Declarative embedding generation with lifecycle hooks
+🚀 **Pipeline API** - Fluent vision analysis: `Ai.FromImage().ToText()`
+📊 **Production Monitoring** - Real-time cost tracking, success rate, latency alerts
+📉 **62.5% Code Reduction** - ~250 lines eliminated (400 → 150 AI-related code)
+
+**See**: [MIGRATION_GUIDE.md](./MIGRATION_GUIDE.md) for complete before/after comparison.
 
 ---
 
@@ -65,31 +79,49 @@ var masonry = await result.Branch().ResizeFit(300, 300).Upload<PhotoMasonryThumb
 
 **Why it matters**: Before DX-0047, this required ~80 lines of operator loops. The fluent API reduces it to 15 lines.
 
-### 🤖 AI Integration (Vision + Embeddings)
+### 🤖 AI Integration (Vision + Embeddings) - NEW AI-0020 Patterns!
 
-Integrate AI vision models with structured JSON output and semantic search:
+**Declarative embedding generation with attribute-driven lifecycle**:
 
 ```csharp
-// Vision analysis with anti-hallucination prompt engineering
-var analysis = await Ai.Understand(new AiVisionOptions {
-    ImageBytes = imageBytes,
-    Prompt = structuredJsonPrompt,
-    Model = "qwen2.5vl"
-});
+// 1. Add [Embedding] attribute to entity
+[Embedding(
+    Policy = EmbeddingPolicy.Explicit,
+    Async = true,            // Background queue processing
+    MaxTokens = 8191,        // Auto-truncation with warnings
+    Version = 1)]            // Schema versioning
+public class PhotoAsset : MediaEntity<PhotoAsset>
+{
+    public string ToEmbeddingText()  // Framework calls automatically
+    {
+        // Build searchable text from AI analysis + metadata
+        return $"{AiAnalysis.ToEmbeddingText()}\n{OriginalFileName}...";
+    }
+}
 
-// Generate embeddings for semantic search
-var embedding = await Ai.Embed(analysis.ToEmbeddingText());
+// 2. Vision analysis with fluent pipeline API
+var analysisJson = await Ai.FromImage(imageBytes, "image/jpeg")
+    .ToText(structuredJsonPrompt, model: "qwen2.5vl");
 
-// Hybrid search with user-controlled balance
+// 3. Save entity - framework handles embedding automatically!
+photo.ProcessingStatus = ProcessingStatus.Completed;
+await photo.Save(ct);  // ✨ Embedding + vectorization automatic
+
+// 4. Semantic search (hybrid: keyword + vector)
 var results = await Vector<PhotoAsset>.Search(
-    vector: embedding,
+    vector: queryEmbedding,
     text: query,
     alpha: 0.5,  // 50% semantic, 50% keyword
     topK: 20
 );
 ```
 
-**Why it matters**: Shows real-world AI integration with graceful fallbacks and prompt refinement strategies.
+**Why it matters**:
+- ✅ **62.5% code reduction** (400 → 150 lines) via declarative patterns
+- ✅ **Transaction safety** prevents orphaned vectors (atomic commits)
+- ✅ **Production monitoring** tracks cost, success rate, latency
+- ✅ **Async queue** handles high-volume scenarios (100+ photos)
+- ✅ **Auto-truncation** respects token limits with developer warnings
 
 ### 💾 Multi-Tier Storage Architecture
 

@@ -75,7 +75,7 @@ public sealed class FactCategorizer : IFactCategorizer
         string raw;
         try
         {
-            raw = await Ai.Chat(chatOptions, ct);
+            raw = await Client.Chat(chatOptions, ct);
             _logger.LogDebug("LLM categorization response length: {Length} characters", raw.Length);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)

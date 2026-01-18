@@ -1,0 +1,32 @@
+﻿# Runtime container for Garden Moss daemon (uses pre-built Linux binary)
+# Binary must be built with compatible glibc - use same base as Dockerfile.build
+FROM rust:latest
+
+# Install runtime dependencies only
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    libssl3 \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create moss user
+RUN useradd -m -u 1000 moss
+
+# Copy pre-built Linux binary from host
+COPY target/debug/garden-moss /usr/local/bin/garden-moss
+
+# Set permissions
+RUN chmod +x /usr/local/bin/garden-moss
+
+# Create data directory
+RUN mkdir -p /data && chown moss:moss /data
+
+USER moss
+WORKDIR /data
+
+# Expose Moss HTTP port
+EXPOSE 7185
+
+# Default command
+ENTRYPOINT ["/usr/local/bin/garden-moss"]
+CMD ["--stone-name", "test-stone"]

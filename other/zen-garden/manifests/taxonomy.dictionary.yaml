@@ -1,0 +1,49 @@
+﻿version: "1"
+
+# Maps user input tokens to canonical tokens.
+# Canonical tokens are lowercase and should match offering `tags` and/or stable category intents.
+map:
+  # Common intent tokens
+  db: database
+  databases: database
+  datastore: database
+  data-store: database
+
+  doc: document
+  docs: document
+  documentdb: document
+  document-db: document
+  json: document
+
+  rdbms: relational
+  sql: sql
+  nosql: nosql
+
+  mq: messaging
+  queue: messaging
+  broker: messaging
+
+  fts: search
+  fulltext: search
+  full-text: search
+
+  monitor: observability
+  monitoring: observability
+  metrics: observability
+  tracing: observability
+  dashboard: observability
+
+  llm: ai
+  ml: ai
+  models: ai
+  inference: ai
+
+  vectordb: vector
+  vector-db: vector
+  embeddings: embeddings
+  embedding: embeddings
+
+  # Preferences (stone-level)
+  ssd: ssd
+  nvme: nvme
+  hdd: hdd

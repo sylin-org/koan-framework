@@ -122,7 +122,7 @@ This proposal catalogues the codebase changes required to realize ADR-0055, iden
 
 - [ ] Remove legacy category/audience code paths (models, controllers, caches, React admin modules, MCP bindings).
 - [ ] Redesign `Chunk` and `IndexedFile` storage contracts around `TagEnvelope` aggregates (primary/secondary/file tags + audit + frontmatter).
-- [x] Introduce tag governance entities (`TagRule`, `TagPipeline`, `TagVocabulary`, `SearchPersona`) plus seeding strategy. *(Completed 2025-11-11 via `TagSeedInitializer` seeds for default vocabulary, pipeline, and personas.)*
+- [x] Introduce tag governance entities (`TagRule`, `TagPipeline`, `TagVocabulary`, `SearchPersona`) plus seeding strategy. _(Completed 2025-11-11 via `TagSeedInitializer` seeds for default vocabulary, pipeline, and personas.)_
 - [ ] Build resolver engine (scope matchers, normalization, deduplication, audit logging).
 - [ ] Integrate resolver into indexing flow; delete `DetermineCategoryAsync`; ensure chunk persistence writes tag data.
 - [ ] Implement `SearchRequestContext` and refactor `/api/search` logic (web + MCP) to use tag-aware ranking and multi-project fallback.

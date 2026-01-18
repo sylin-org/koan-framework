@@ -2,10 +2,12 @@ using Koan.AI;
 using Koan.Data.Abstractions;
 using Koan.Data.Core;
 using Koan.Data.Vector;
+using Koan.Data.AI.Telemetry;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System.Collections.Concurrent;
+using System.Diagnostics;
 
 namespace Koan.Data.AI.Workers;
 
@@ -17,6 +19,7 @@ public class EmbeddingWorker : BackgroundService
 {
     private readonly ILogger<EmbeddingWorker> _logger;
     private readonly IOptions<EmbeddingWorkerOptions> _options;
+    private readonly EmbeddingTelemetry? _telemetry;
 
     // Rate limiting: track embeddings generated per minute
     private readonly ConcurrentQueue<DateTimeOffset> _recentEmbeddings = new();
@@ -24,10 +27,12 @@ public class EmbeddingWorker : BackgroundService
 
     public EmbeddingWorker(
         ILogger<EmbeddingWorker> logger,
-        IOptions<EmbeddingWorkerOptions> options)
+        IOptions<EmbeddingWorkerOptions> options,
+        EmbeddingTelemetry? telemetry = null)
     {
         _logger = logger;
         _options = options;
+        _telemetry = telemetry;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -128,6 +133,8 @@ public class EmbeddingWorker : BackgroundService
     private async Task<int> ProcessJobsAsync<TEntity>(CancellationToken ct)
         where TEntity : class, IEntity<string>
     {
+        var batchStopwatch = Stopwatch.StartNew();
+
         // Query for pending jobs, ordered by priority (high first) then creation time (FIFO)
         var pendingJobs = (await EmbedJob<TEntity>.Query(
             j => j.Status == EmbedJobStatus.Pending,
@@ -177,6 +184,31 @@ public class EmbeddingWorker : BackgroundService
             }
         }
 
+        batchStopwatch.Stop();
+
+        // Record batch processing metrics
+        _telemetry?.RecordBatchProcessing(
+            entityType: typeof(TEntity).Name,
+            batchSize: processedCount,
+            durationSeconds: batchStopwatch.Elapsed.TotalSeconds);
+
+        // Record queue processing metrics
+        _telemetry?.RecordQueueProcessing(
+            count: processedCount,
+            success: true,
+            entityType: typeof(TEntity).Name);
+
+        // Update queue state (get latest counts for telemetry)
+        var allPending = await EmbedJob<TEntity>.Query(j => j.Status == EmbedJobStatus.Pending, ct);
+        var allFailed = await EmbedJob<TEntity>.Query(j => j.Status == EmbedJobStatus.FailedPermanent, ct);
+        var oldestPending = allPending.OrderBy(j => j.CreatedAt).FirstOrDefault();
+        var oldestAge = oldestPending != null ? (DateTimeOffset.UtcNow - oldestPending.CreatedAt).TotalSeconds : 0.0;
+
+        _telemetry?.UpdateQueueState(
+            pending: allPending.Count(),
+            failed: allFailed.Count(),
+            oldestAgeSeconds: oldestAge);
+
         return processedCount;
     }
 
@@ -186,57 +218,114 @@ public class EmbeddingWorker : BackgroundService
     private async Task ProcessJobAsync<TEntity>(EmbedJob<TEntity> job, CancellationToken ct)
         where TEntity : class, IEntity<string>
     {
-        // Load the entity to get fresh data
-        var entity = await Data<TEntity, string>.GetAsync(job.EntityId, ct);
-        if (entity == null)
+        var stopwatch = Stopwatch.StartNew();
+
+        try
         {
-            throw new InvalidOperationException($"Entity {job.EntityId} not found");
-        }
-
-        // Verify content signature hasn't changed
-        var metadata = EmbeddingMetadata.Get<TEntity>();
-        var currentSignature = metadata.ComputeSignature(entity);
-
-        if (currentSignature != job.ContentSignature)
-        {
-            _logger.LogWarning(
-                "Content signature changed for entity {EntityId} - regenerating embedding text",
-                job.EntityId);
-
-            // Update job with new content
-            job.EmbeddingText = metadata.BuildEmbeddingText(entity);
-            job.ContentSignature = currentSignature;
-        }
-
-        // Generate embedding
-        var embedding = await Ai.Embed(job.EmbeddingText, ct);
-
-        // Store in vector database
-        await VectorData<TEntity>.SaveWithVector(entity, embedding, null, ct);
-
-        // Update embedding state
-        var stateId = EmbeddingState<TEntity>.MakeId(job.EntityId);
-        var state = await EmbeddingState<TEntity>.Get(stateId, ct);
-
-        if (state == null)
-        {
-            state = new EmbeddingState<TEntity>
+            // Load the entity to get fresh data
+            var entity = await Data<TEntity, string>.GetAsync(job.EntityId, ct);
+            if (entity == null)
             {
-                Id = stateId,
-                EntityId = job.EntityId,
-                ContentSignature = currentSignature,
-                LastEmbeddedAt = DateTimeOffset.UtcNow,
-                Model = job.Model
-            };
-        }
-        else
-        {
-            state.ContentSignature = currentSignature;
-            state.LastEmbeddedAt = DateTimeOffset.UtcNow;
-            state.Model = job.Model;
-        }
+                throw new InvalidOperationException($"Entity {job.EntityId} not found");
+            }
 
-        await state.Save(ct);
+            // Verify content signature hasn't changed
+            var metadata = EmbeddingMetadata.Get<TEntity>();
+            var currentSignature = metadata.ComputeSignature(entity);
+
+            if (currentSignature != job.ContentSignature)
+            {
+                _logger.LogWarning(
+                    "Content signature changed for entity {EntityId} - regenerating embedding text",
+                    job.EntityId);
+
+                // Update job with new content
+                job.EmbeddingText = metadata.BuildEmbeddingText(entity);
+                job.ContentSignature = currentSignature;
+
+                // Record cache invalidation
+                _telemetry?.RecordCacheInvalidation(typeof(TEntity).Name, "content_changed");
+            }
+
+            // Estimate tokens for cost tracking
+            var estimatedTokens = EmbeddingMetadata.EstimateTokens(job.EmbeddingText);
+
+            // Generate embedding with source routing
+            float[] embedding;
+            using (metadata.Source != null || metadata.Model != null
+                ? Client.Context(source: metadata.Source, model: metadata.Model)
+                : null)
+            {
+                embedding = await Client.Embed(job.EmbeddingText, ct);
+            }
+
+            stopwatch.Stop();
+
+            // Estimate cost
+            var estimatedCost = EmbeddingCostEstimator.EstimateCost(
+                metadata.Model ?? job.Model,
+                metadata.Source?.Split('-').FirstOrDefault(), // Extract provider from source like "openai-prod"
+                estimatedTokens);
+
+            // Record telemetry
+            _telemetry?.RecordEmbeddingGeneration(
+                entityType: typeof(TEntity).Name,
+                model: metadata.Model ?? job.Model,
+                provider: metadata.Source?.Split('-').FirstOrDefault(),
+                source: metadata.Source,
+                latencyMs: stopwatch.Elapsed.TotalMilliseconds,
+                tokens: estimatedTokens,
+                estimatedCost: estimatedCost,
+                success: true);
+
+            // Store in vector database
+            await VectorData<TEntity>.SaveWithVector(entity, embedding, null, ct);
+
+            // Update embedding state
+            var stateId = EmbeddingState<TEntity>.MakeId(job.EntityId);
+            var state = await EmbeddingState<TEntity>.Get(stateId, ct);
+
+            if (state == null)
+            {
+                state = new EmbeddingState<TEntity>
+                {
+                    Id = stateId,
+                    EntityId = job.EntityId,
+                    ContentSignature = currentSignature,
+                    LastEmbeddedAt = DateTimeOffset.UtcNow,
+                    Model = job.Model
+                };
+            }
+            else
+            {
+                state.ContentSignature = currentSignature;
+                state.LastEmbeddedAt = DateTimeOffset.UtcNow;
+                state.Model = job.Model;
+            }
+
+            await state.Save(ct);
+        }
+        catch (Exception ex)
+        {
+            stopwatch.Stop();
+
+            // Record failure telemetry
+            var metadata = EmbeddingMetadata.Get<TEntity>();
+            var estimatedTokens = EmbeddingMetadata.EstimateTokens(job.EmbeddingText);
+
+            _telemetry?.RecordEmbeddingGeneration(
+                entityType: typeof(TEntity).Name,
+                model: metadata.Model ?? job.Model,
+                provider: metadata.Source?.Split('-').FirstOrDefault(),
+                source: metadata.Source,
+                latencyMs: stopwatch.Elapsed.TotalMilliseconds,
+                tokens: estimatedTokens,
+                estimatedCost: 0.0,
+                success: false,
+                errorMessage: ex.Message);
+
+            throw; // Re-throw for caller's error handling
+        }
     }
 
     /// <summary>

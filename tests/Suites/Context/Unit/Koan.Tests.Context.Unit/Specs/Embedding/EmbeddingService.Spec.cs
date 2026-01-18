@@ -23,7 +23,7 @@ namespace Koan.Tests.Context.Unit.Specs.Embedding;
 /// </remarks>
 public class EmbeddingServiceSpec : IDisposable
 {
-    private readonly Mock<IAi> _aiMock;
+    private readonly Mock<IAiPipeline> _aiMock;
     private readonly IMemoryCache _cache;
     private readonly Mock<ILogger<EmbeddingService>> _loggerMock;
     private readonly EmbeddingService _service;
@@ -32,7 +32,7 @@ public class EmbeddingServiceSpec : IDisposable
 
     public EmbeddingServiceSpec()
     {
-        _aiMock = new Mock<IAi>();
+        _aiMock = new Mock<IAiPipeline>();
         _cache = new MemoryCache(new MemoryCacheOptions());
         _loggerMock = new Mock<ILogger<EmbeddingService>>();
         _service = new EmbeddingService(_aiMock.Object, _cache, _loggerMock.Object, "test-model");

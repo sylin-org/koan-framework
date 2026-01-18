@@ -62,7 +62,7 @@ public sealed class SourceTypeAuthoringService : ISourceTypeAuthoringService
         string rawResponse;
         try
         {
-            rawResponse = await Ai.Chat(chatOptions, ct);
+            rawResponse = await Client.Chat(chatOptions, ct);
         }
         catch (Exception ex)
         {

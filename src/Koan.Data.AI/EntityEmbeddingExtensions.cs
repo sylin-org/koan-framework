@@ -40,9 +40,14 @@ public static class EntityEmbeddingExtensions
                 "Add [Embedding] to enable semantic search.");
         }
 
-        // Generate embedding for query text
-        // TODO: Use metadata.Model when Ai.Embed supports model parameter
-        var queryEmbedding = await Ai.Embed(query, ct);
+        // Generate embedding for query text with source routing
+        float[] queryEmbedding;
+        using (metadata.Source != null || metadata.Model != null
+            ? Client.Context(source: metadata.Source, model: metadata.Model)
+            : null)
+        {
+            queryEmbedding = await Client.Embed(query, ct);
+        }
 
         // Search for similar vectors
         var vectorResults = await Vector<TEntity>.Search(
@@ -99,10 +104,15 @@ public static class EntityEmbeddingExtensions
                 "Add [Embedding] to enable FindSimilar.");
         }
 
-        // Generate embedding from entity content
+        // Generate embedding from entity content with source routing
         var text = metadata.BuildEmbeddingText(entity);
-        // TODO: Use metadata.Model when Ai.Embed supports model parameter
-        var queryEmbedding = await Ai.Embed(text, ct);
+        float[] queryEmbedding;
+        using (metadata.Source != null || metadata.Model != null
+            ? Client.Context(source: metadata.Source, model: metadata.Model)
+            : null)
+        {
+            queryEmbedding = await Client.Embed(text, ct);
+        }
 
         // Search for similar vectors (fetch +1 to account for filtering source)
         var searchLimit = includeSource ? limit : limit + 1;

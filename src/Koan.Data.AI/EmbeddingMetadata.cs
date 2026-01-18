@@ -2,8 +2,11 @@ using System.Collections.Concurrent;
 using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using Koan.Data.AI.Attributes;
+using Microsoft.Extensions.Logging;
 
 namespace Koan.Data.AI;
 
@@ -14,6 +17,11 @@ namespace Koan.Data.AI;
 public class EmbeddingMetadata
 {
     private static readonly ConcurrentDictionary<Type, EmbeddingMetadata> _cache = new();
+    private static readonly ILogger? _logger = (Koan.Core.Hosting.App.AppHost.Current?.GetService(typeof(ILoggerFactory)) as ILoggerFactory)?.CreateLogger("Koan.Data.AI.EmbeddingMetadata");
+
+    // Approximate tokens per character for English text (tiktoken-style estimation)
+    // Real tokenizers vary, but ~4 chars/token is a reasonable heuristic
+    private const double CHARS_PER_TOKEN = 4.0;
 
     public EmbeddingPolicy Policy { get; init; }
     public string? Template { get; init; }
@@ -22,6 +30,12 @@ public class EmbeddingMetadata
     public string? Model { get; init; }
     public int BatchSize { get; init; }
     public int RateLimitPerMinute { get; init; }
+    public string? Source { get; init; }
+    public int MaxTokens { get; init; }
+    public int MaxDepth { get; init; }
+    public string[] Exclude { get; init; } = Array.Empty<string>();
+    public bool WarnOnTruncation { get; init; }
+    public int Version { get; init; }
 
     /// <summary>
     /// Gets cached metadata for the specified entity type.
@@ -74,25 +88,60 @@ public class EmbeddingMetadata
             Async = attr.Async,
             Model = attr.Model,
             BatchSize = attr.BatchSize,
-            RateLimitPerMinute = attr.RateLimitPerMinute
+            RateLimitPerMinute = attr.RateLimitPerMinute,
+            Source = attr.Source,
+            MaxTokens = attr.MaxTokens,
+            MaxDepth = attr.MaxDepth,
+            Exclude = attr.Exclude ?? Array.Empty<string>(),
+            WarnOnTruncation = attr.WarnOnTruncation,
+            Version = attr.Version
         };
     }
 
     /// <summary>
     /// Builds embedding text from entity based on configured properties/template.
+    /// Applies token truncation if MaxTokens > 0.
     /// </summary>
     public string BuildEmbeddingText(object entity)
     {
-        if (Template != null)
+        string text;
+
+        if (Policy == EmbeddingPolicy.FullJson)
         {
-            return RenderTemplate(entity);
+            text = SerializeToJson(entity);
+        }
+        else if (Template != null)
+        {
+            text = RenderTemplate(entity);
+        }
+        else
+        {
+            text = BuildFromProperties(entity);
         }
 
+        // Apply token truncation if configured
+        if (MaxTokens > 0)
+        {
+            text = TruncateToTokenLimit(text, entity.GetType());
+        }
+
+        return text;
+    }
+
+    /// <summary>
+    /// Builds embedding text from properties (legacy behavior).
+    /// </summary>
+    private string BuildFromProperties(object entity)
+    {
         var parts = new List<string>();
         var entityType = entity.GetType();
 
         foreach (var propName in Properties)
         {
+            // Skip excluded properties
+            if (Exclude.Contains(propName))
+                continue;
+
             var prop = entityType.GetProperty(propName);
             if (prop == null) continue;
 
@@ -117,9 +166,124 @@ public class EmbeddingMetadata
     }
 
     /// <summary>
+    /// Serializes entity to JSON for FullJson policy.
+    /// Respects MaxDepth, Exclude, and [EmbeddingIgnore] attributes.
+    /// </summary>
+    private string SerializeToJson(object entity)
+    {
+        // MaxDepth in [Embedding] means "nested object depth", but JsonSerializer counts from root
+        // Add 2 to account for root object + properties (MaxDepth=2 means allow 2 levels of nested objects)
+        var jsonMaxDepth = MaxDepth > 0 ? MaxDepth + 2 : 64;
+
+        var options = new JsonSerializerOptions
+        {
+            WriteIndented = false,
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+            MaxDepth = jsonMaxDepth,
+            ReferenceHandler = ReferenceHandler.IgnoreCycles
+        };
+
+        // Apply property exclusions if specified
+        if (Exclude != null && Exclude.Length > 0)
+        {
+            options.TypeInfoResolver = new ExclusionTypeInfoResolver(Exclude);
+        }
+
+        var json = JsonSerializer.Serialize(entity, entity.GetType(), options);
+        return json;
+    }
+
+    /// <summary>
+    /// Custom TypeInfoResolver that excludes specified properties from serialization.
+    /// </summary>
+    private class ExclusionTypeInfoResolver : System.Text.Json.Serialization.Metadata.DefaultJsonTypeInfoResolver
+    {
+        private readonly HashSet<string> _excludedProperties;
+
+        public ExclusionTypeInfoResolver(string[] excludedProperties)
+        {
+            _excludedProperties = new HashSet<string>(excludedProperties, StringComparer.OrdinalIgnoreCase);
+        }
+
+        public override System.Text.Json.Serialization.Metadata.JsonTypeInfo GetTypeInfo(Type type, JsonSerializerOptions options)
+        {
+            var typeInfo = base.GetTypeInfo(type, options);
+
+            if (typeInfo.Kind == System.Text.Json.Serialization.Metadata.JsonTypeInfoKind.Object)
+            {
+                // Remove excluded properties
+                var propsToRemove = typeInfo.Properties
+                    .Where(p => _excludedProperties.Contains(p.Name))
+                    .ToList();
+
+                foreach (var prop in propsToRemove)
+                {
+                    typeInfo.Properties.Remove(prop);
+                }
+            }
+
+            return typeInfo;
+        }
+    }
+
+    /// <summary>
+    /// Truncates text to fit within token limit.
+    /// Uses approximate token estimation (chars / 4).
+    /// Preserves word boundaries and adds ellipsis.
+    /// </summary>
+    private string TruncateToTokenLimit(string text, Type entityType)
+    {
+        var estimatedTokens = EstimateTokens(text);
+
+        if (estimatedTokens <= MaxTokens)
+            return text; // No truncation needed
+
+        // Truncate to approximate character limit (reserve 3 chars for "...")
+        var maxChars = (int)(MaxTokens * CHARS_PER_TOKEN) - 3;
+        if (maxChars <= 0)
+            return "...";
+
+        if (text.Length <= maxChars)
+            return text;
+
+        // Find last word boundary (space) before maxChars
+        var truncated = text.Substring(0, maxChars);
+        var lastSpace = truncated.LastIndexOf(' ');
+
+        if (lastSpace > 0)
+        {
+            truncated = truncated.Substring(0, lastSpace);
+        }
+
+        // Add ellipsis (without space before it)
+        truncated = truncated.TrimEnd() + "...";
+
+        // Emit warning if configured
+        if (WarnOnTruncation && _logger != null)
+        {
+            _logger.LogWarning(
+                "Embedding text truncated for {EntityType}: {EstimatedTokens} tokens > {MaxTokens} limit. " +
+                "Consider increasing MaxTokens or simplifying content structure.",
+                entityType.Name, estimatedTokens, MaxTokens);
+        }
+
+        return truncated;
+    }
+
+    /// <summary>
+    /// Estimates token count from text length.
+    /// Uses approximate heuristic: tokens ≈ chars / 4
+    /// </summary>
+    public static int EstimateTokens(string text)
+    {
+        return (int)Math.Ceiling(text.Length / CHARS_PER_TOKEN);
+    }
+
+    /// <summary>
     /// Renders template string with property values substituted.
     /// Template format: "{PropertyName}" gets replaced with property value.
     /// String arrays are automatically joined with ", ".
+    /// Respects Exclude list.
     /// </summary>
     private string RenderTemplate(object entity)
     {
@@ -129,6 +293,13 @@ public class EmbeddingMetadata
         // Replace {PropertyName} with property values
         foreach (var propName in Properties)
         {
+            // Skip excluded properties
+            if (Exclude.Contains(propName))
+            {
+                result = result.Replace($"{{{propName}}}", "");
+                continue;
+            }
+
             var prop = entityType.GetProperty(propName);
             if (prop == null) continue;
 
@@ -157,12 +328,15 @@ public class EmbeddingMetadata
 
     /// <summary>
     /// Computes SHA256 content signature from entity's embedding text.
-    /// Same content = same signature = no need to regenerate embedding.
+    /// Includes version number to force re-embedding when schema changes.
+    /// Same content + same version = same signature = no need to regenerate embedding.
     /// </summary>
     public string ComputeSignature(object entity)
     {
         var text = BuildEmbeddingText(entity);
-        return ComputeSignature(text);
+        // Include version in signature to invalidate cache when schema changes
+        var versionedContent = $"v{Version}:{text}";
+        return ComputeSignature(versionedContent);
     }
 
     /// <summary>
@@ -203,6 +377,8 @@ public class EmbeddingMetadata
                 .Where(p => p.CanRead && p.GetCustomAttribute<EmbeddingIgnoreAttribute>() == null)
                 .Select(p => p.Name)
                 .ToArray(),
+
+            EmbeddingPolicy.FullJson => Array.Empty<string>(), // Properties not used in FullJson mode
 
             EmbeddingPolicy.Explicit => throw new InvalidOperationException(
                 $"Type {entityType.Name} uses EmbeddingPolicy.Explicit but does not specify Properties or Template. " +

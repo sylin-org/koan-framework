@@ -1,0 +1,19 @@
+﻿# RabbitMQ Compatibility Rules
+
+version: "1"
+
+compatibility_rules:
+  - name: "insufficient-memory"
+    condition:
+      memory_mb_less_than: 512
+    reason: "RabbitMQ (Erlang VM) is typically unstable under 512MB RAM"
+    suggestion: "Increase stone memory or run fewer services"
+
+post_install_healthcheck:
+  enabled: true
+  scan_log_lines: 250
+  timeout_seconds: 45
+  patterns:
+    - pattern: "Cannot allocate memory|OOM"
+      reason: "Insufficient memory for RabbitMQ"
+      suggestion: "Increase stone RAM or reduce service count"

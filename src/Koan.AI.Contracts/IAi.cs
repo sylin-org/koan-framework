@@ -1,14 +1,8 @@
-using Koan.AI.Contracts.Models;
+using System;
 
 namespace Koan.AI.Contracts;
 
-public interface IAi
+[Obsolete("Use IAiPipeline instead.")]
+public interface IAi : IAiPipeline
 {
-    Task<AiChatResponse> PromptAsync(AiChatRequest request, CancellationToken ct = default);
-    IAsyncEnumerable<AiChatChunk> StreamAsync(AiChatRequest request, CancellationToken ct = default);
-    Task<AiEmbeddingsResponse> EmbedAsync(AiEmbeddingsRequest request, CancellationToken ct = default);
-
-    // Convenience
-    Task<string> PromptAsync(string message, string? model = null, AiPromptOptions? opts = null, CancellationToken ct = default);
-    IAsyncEnumerable<AiChatChunk> StreamAsync(string message, string? model = null, AiPromptOptions? opts = null, CancellationToken ct = default);
 }

@@ -1,0 +1,30 @@
+﻿# Milvus Compatibility Rules (standalone)
+
+version: "1"
+
+compatibility_rules:
+  - name: "x86_64-missing-sse42"
+    condition:
+      architectures: ["x86_64"]
+      cpu_features_missing: ["sse4_2"]
+    reason: "Milvus requires SIMD instructions; SSE4.2 (or better) is required on x86_64"
+    suggestion: "Use a newer x86_64 CPU with SSE4.2+, or move to ARM64 hardware"
+
+  - name: "insufficient-memory"
+    condition:
+      memory_mb_less_than: 8192
+    reason: "Milvus standalone is resource-heavy; <8GB RAM is likely unstable"
+    suggestion: "Increase stone memory or choose Weaviate/PostgreSQL (pgvector) for lighter workloads"
+
+post_install_healthcheck:
+  enabled: true
+  scan_log_lines: 300
+  timeout_seconds: 60
+  patterns:
+    - pattern: "Illegal instruction"
+      reason: "CPU instruction set incompatibility"
+      suggestion: "Use newer CPU hardware (SSE4.2+/AVX) or pick a different vector store"
+
+    - pattern: "Cannot allocate memory|OOM"
+      reason: "Insufficient memory for Milvus"
+      suggestion: "Increase stone RAM or reduce service count"

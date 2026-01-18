@@ -1,0 +1,8 @@
+﻿{
+  "name": "opensearch",
+  "description": "OpenSearch 2.x search and analytics",
+  "category": "search",
+  "tags": ["search", "database", "document", "analytics"],
+  "port": 9200,
+  "volumes": ["opensearch-data"]
+}

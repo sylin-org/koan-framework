@@ -1,0 +1,8 @@
+﻿{
+  "name": "mongodb",
+  "description": "Official MongoDB 7.x document database",
+  "category": "data",
+  "tags": ["database", "document", "nosql"],
+  "port": 27017,
+  "volumes": ["mongo-data"]
+}

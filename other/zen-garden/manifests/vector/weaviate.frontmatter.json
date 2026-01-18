@@ -1,0 +1,8 @@
+﻿{
+  "name": "weaviate",
+  "description": "Weaviate vector database",
+  "category": "vector",
+  "tags": ["vector", "database", "embeddings", "ai"],
+  "port": 8080,
+  "volumes": ["weaviate-data"]
+}

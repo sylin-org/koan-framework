@@ -23,11 +23,28 @@ public static class VectorData<TEntity>
     /// Saves entity to vector store only (embeddings + metadata).
     /// Does NOT save to relational store - use model.Save() separately if needed.
     /// </summary>
-    public static async Task Save(TEntity entity, ReadOnlyMemory<float> vector, IReadOnlyDictionary<string, object>? metadata = null, CancellationToken ct = default)
+    public static Task Save(TEntity entity, ReadOnlyMemory<float> vector, IReadOnlyDictionary<string, object>? metadata = null, CancellationToken ct = default)
     {
         System.ArgumentNullException.ThrowIfNull(entity);
+
+        var context = Koan.Data.Core.EntityContext.Current;
+
+        // Check for active transaction
+        if (context?.TransactionCoordinator != null)
+        {
+            // Defer execution - track in transaction
+            context.TransactionCoordinator.TrackVectorSave<TEntity, string>(
+                entity.Id,
+                vector,
+                metadata,
+                context);
+
+            return Task.CompletedTask;  // Deferred
+        }
+
+        // No transaction - execute immediately
         var normalized = NormalizeMetadata(metadata);
-        await Repo.UpsertAsync(entity.Id, vector.ToArray(), normalized, ct);
+        return Repo.UpsertAsync(entity.Id, vector.ToArray(), normalized, ct);
     }
 
     /// <summary>
@@ -45,9 +62,48 @@ public static class VectorData<TEntity>
             return;
         }
 
-        await entity.Save(ct);
-        var normalized = NormalizeMetadata(metadata);
-        await Repo.UpsertAsync(entity.Id, vector.ToArray(), normalized, ct);
+        var context = Koan.Data.Core.EntityContext.Current;
+
+        if (context?.TransactionCoordinator != null)
+        {
+            // In transaction: defer BOTH operations
+            await entity.Save(ct);  // Defers via Data<TEntity, string>
+            await Save(entity, vector, metadata, ct);  // Defers via our transaction-aware Save above
+            // Both execute atomically on commit
+            return;
+        }
+
+        // Not in transaction: execute sequentially with detailed error handling
+        bool entitySaved = false;
+        try
+        {
+            await entity.Save(ct);
+            entitySaved = true;
+
+            var normalized = NormalizeMetadata(metadata);
+            await Repo.UpsertAsync(entity.Id, vector.ToArray(), normalized, ct);
+            // Both succeeded
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            if (entitySaved)
+            {
+                // Entity saved, vector failed - critical inconsistency
+                throw new VectorCoordinationException(
+                    $"Vector save failed after entity was persisted. " +
+                    $"Entity {entity.Id} exists in database but has no vector representation. " +
+                    $"Use background re-embedding to recover.",
+                    entity.Id,
+                    entitySaved: true,
+                    vectorSaved: false,
+                    ex);
+            }
+            else
+            {
+                // Entity save failed - clean failure, nothing persisted
+                throw;
+            }
+        }
     }
 
     /// <summary>

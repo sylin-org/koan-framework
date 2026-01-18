@@ -27,6 +27,9 @@ builder.Services.AddScoped<IPhotoProcessingService, PhotoProcessingService>();
 builder.Services.AddScoped<PhotoSetService>();
 builder.Services.AddSingleton<IAnalysisPromptFactory, AnalysisPromptFactory>();
 
+// Production monitoring and telemetry
+builder.Services.AddSingleton<EmbeddingMonitoringService>();
+
 // Register background processing queue and worker
 builder.Services.AddSingleton<IPhotoProcessingQueue, InMemoryPhotoProcessingQueue>();
 builder.Services.AddHostedService<PhotoProcessingWorker>();

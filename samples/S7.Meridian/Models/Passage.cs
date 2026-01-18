@@ -1,7 +1,14 @@
 ﻿using Koan.Data.Core.Model;
+using Koan.Data.AI.Attributes;
 
 namespace Koan.Samples.Meridian.Models;
 
+[Embedding(
+    Properties = new[] { nameof(Text) },
+    Policy = EmbeddingPolicy.Explicit,
+    Async = true,
+    MaxTokens = 8191,
+    Version = 1)]
 public sealed class Passage : Entity<Passage>
 {
     public string SourceDocumentId { get; set; } = string.Empty;

@@ -78,7 +78,29 @@ public class Vector<TEntity> where TEntity : class, IEntity<string>
 
     // Save a single vector point by ID; convenience overload
     public static Task Save(string id, float[] embedding, object? metadata = null, CancellationToken ct = default)
-        => Repo.UpsertAsync(id, embedding, metadata, ct);
+    {
+        var context = Koan.Data.Core.EntityContext.Current;
+
+        // Check for active transaction
+        if (context?.TransactionCoordinator != null)
+        {
+            // Defer execution - track in transaction
+            var metadataDict = metadata != null
+                ? (metadata as IReadOnlyDictionary<string, object> ?? new Dictionary<string, object> { ["value"] = metadata })
+                : null;
+
+            context.TransactionCoordinator.TrackVectorSave<TEntity, string>(
+                id,
+                new ReadOnlyMemory<float>(embedding),
+                metadataDict,
+                context);
+
+            return Task.CompletedTask;  // Deferred
+        }
+
+        // No transaction - execute immediately
+        return Repo.UpsertAsync(id, embedding, metadata, ct);
+    }
 
     // Save a single vector point; returns affected count (0|1)
     public static Task<int> Save((string Id, float[] Embedding, object? Metadata) item, CancellationToken ct = default)
@@ -90,7 +112,20 @@ public class Vector<TEntity> where TEntity : class, IEntity<string>
 
     // Delete one or many
     public static Task<bool> Delete(string id, CancellationToken ct = default)
-        => Repo.DeleteAsync(id, ct);
+    {
+        var context = Koan.Data.Core.EntityContext.Current;
+
+        // Check for active transaction
+        if (context?.TransactionCoordinator != null)
+        {
+            // Defer execution - track in transaction
+            context.TransactionCoordinator.TrackVectorDelete<TEntity, string>(id, context);
+            return Task.FromResult(true);  // Deferred - assume success
+        }
+
+        // No transaction - execute immediately
+        return Repo.DeleteAsync(id, ct);
+    }
 
     public static Task<int> Delete(IEnumerable<string> ids, CancellationToken ct = default)
         => Repo.DeleteManyAsync(ids, ct);

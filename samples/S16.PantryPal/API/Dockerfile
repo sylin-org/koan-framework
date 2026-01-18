@@ -1,7 +1,7 @@
 # -------------------------------
 # Build stage
 # -------------------------------
-FROM mcr.microsoft.com/dotnet/sdk:10.0.100-rc.1 AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0.100 AS build
 WORKDIR /src
 COPY . .
 RUN dotnet publish ./samples/S16.PantryPal/API/S16.PantryPal.csproj -c Release -o /out /p:UseAppHost=false

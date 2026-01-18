@@ -1,0 +1,8 @@
+﻿{
+  "name": "milvus",
+  "description": "Milvus vector database (standalone)",
+  "category": "vector",
+  "tags": ["vector", "database", "embeddings", "ai"],
+  "port": 19530,
+  "volumes": ["milvus-data"]
+}

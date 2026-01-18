@@ -1,0 +1,8 @@
+﻿{
+  "name": "elasticsearch",
+  "description": "Elasticsearch 8.x search and analytics engine",
+  "category": "search",
+  "tags": ["search", "database", "document", "analytics"],
+  "port": 9200,
+  "volumes": ["elasticsearch-data"]
+}

@@ -1,0 +1,11 @@
+﻿[package]
+name = "garden-build-utils"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+
+[lib]
+name = "garden_build_utils"
+path = "src/lib.rs"
+
+[dependencies]

@@ -62,6 +62,8 @@
       href: AI-0017-fact-catalog-extraction.md
     - name: AI-0018 Chunk size hard cap enforcement
       href: AI-0018-chunk-size-hard-cap.md
+    - name: AI-0019 Koan.AI zero-config integration on Microsoft.Extensions.AI
+      href: AI-0019-koan-ai-meai-zero-config.md
 - name: Architecture (ARCH)
   items:
     - name: ARCH-0001 Rename generic parameter to TEntity
@@ -128,6 +130,12 @@
       href: ARCH-0063-docs-ia-realignment-and-retrieval-improvements.md
     - name: ARCH-0065 AddKoan bootstrap lives in Koan.Core
       href: ARCH-0065-addkoan-bootstrap-rehome.md
+- name: Core (CORE)
+  items:
+    - name: CORE-0072 Source-generated registries
+      href: CORE-0072-source-generated-registries.md
+    - name: CORE-0090 Application self-description baseline
+      href: CORE-0090-application-self-description.md
 - name: Data (DATA)
   items:
     - name: DATA-0002 Query capabilities flag
@@ -224,6 +232,8 @@
       href: DATA-0085-vector-module-split.md
     - name: DATA-0087 Koan.Context chunk relative path alignment
       href: DATA-0087-koan-context-chunk-relative-path-alignment.md
+    - name: DATA-0088 Adapter auto-configuration resolver pipeline
+      href: DATA-0088-adapter-auto-configuration-resolver-pipeline.md
 - name: Web (WEB)
   items:
     - name: WEB-0010 Separate AI web surface

@@ -20,6 +20,7 @@ using Koan.Data.Relational.Orchestration;
 using System.Collections.Concurrent;
 using System.Data;
 using System.Linq.Expressions;
+using System.Diagnostics.CodeAnalysis;
 using Newtonsoft.Json;
 
 namespace Koan.Data.Connector.Sqlite;
@@ -1414,12 +1415,13 @@ internal sealed class SqliteRepository<TEntity, TKey> :
             _pool = pool;
         }
 
+        [AllowNull]
         public string ConnectionString
         {
             get => _connection?.ConnectionString ?? string.Empty;
             set
             {
-                if (_connection != null) _connection.ConnectionString = value;
+                if (_connection != null) _connection.ConnectionString = value ?? string.Empty;
             }
         }
 

@@ -2,10 +2,10 @@
 
 ## Contract
 
-- **Inputs**: .NET 9 SDK, Koan repo checked out, no external services. Sensors simulated via UI or curl.
+- **Inputs**: .NET 10 SDK, Koan repo checked out, no external services. Sensors simulated via UI or curl.
 - **Outputs**: Console-hosted Koan slice with write-path automation and static AngularJS dashboard under `wwwroot/`.
 - **Error modes**: Startup misconfig (missing Koan deps), API failures during sensor loop, reminder lifecycle exceptions.
-- **Success criteria**: `dotnet run` launches console host, dashboard available at `http://localhost:5000`, reminders activate/retire as readings arrive, window close stops app.
+- **Success criteria**: `dotnet run` launches console host, dashboard available at `http://localhost:5000`, reminders activate/retire as readings arrive, window close stops app. Release publishes ship as NativeAOT single-file binaries via `dotnet publish`.
 
 ## Running the slice
 
@@ -14,11 +14,23 @@ cd samples/guides/g1c1.GardenCoop
 pwsh ./start.ps1    # optional helper, or just `dotnet run`
 ```
 
+- Windows users can call `start.bat` for the same Development run or `start-native.bat` to build and launch the NativeAOT binary (add `--rid linux-x64` to cross-compile from Windows).
 - The console prints lifecycle notes ("Sending email (fake)") when reminders activate.
 - Open the browser dashboard, toggle the sensor loop, or post readings manually.
 - Flip to the **Admin** tab to inspect sensors, their GUID serials, and rebind them to plots without reflashing hardware.
 - When the admin view needs auth, Koan auto-elects the in-process TestProvider and redirects to `/.testoauth/authorize`; no appsettings are required in Development.
 - Close the console window or press Ctrl+C to shut down.
+
+### Publish as NativeAOT
+
+```pwsh
+dotnet publish g1c1.GardenCoop.csproj -c Release -r win-x64 --self-contained true
+./bin/Release/net10.0/win-x64/native/g1c1.GardenCoop.exe
+```
+
+- Substitute `linux-x64` or `osx-arm64` for the runtime identifier when targeting other platforms.
+- The publish step produces a trimmed single-file binary under `bin/Release/net10.0/<rid>/native/` with SQLite embedded.
+- Environment defaults are identical to `dotnet run`; override URLs with `--urls` when needed.
 
 ## Key ingredients
 

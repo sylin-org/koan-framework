@@ -96,7 +96,7 @@ public sealed class DocumentStyleClassifier : IDocumentStyleClassifier
         string raw;
         try
         {
-            raw = await Ai.Chat(chatOptions, ct);
+            raw = await Client.Chat(chatOptions, ct);
             _logger.LogDebug("LLM document style classification response length: {Length} characters", raw.Length);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)

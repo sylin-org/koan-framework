@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Koan.AI.Contracts.Adapters;
 using Koan.AI.Connector.LMStudio.Discovery;
 using Koan.AI.Connector.LMStudio.Infrastructure;
 using Koan.AI.Connector.LMStudio.Options;
@@ -32,9 +33,8 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         services.AddKoanOptions<LMStudioOptions>(Constants.Section);
         services.AddSingleton<IConfigureOptions<LMStudioOptions>, LMStudioOptionsConfigurator>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IServiceDiscoveryAdapter, LMStudioDiscoveryAdapter>());
-
-        services.AddHostedService<LMStudioDiscoveryService>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IKoanOrchestrationEvaluator, LMStudioOrchestrationEvaluator>());
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IAiAdapterContributor, LMStudioAdapterContributor>());
     }
 
     public void Describe(ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
