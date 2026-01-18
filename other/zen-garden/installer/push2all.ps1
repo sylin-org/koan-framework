@@ -180,9 +180,9 @@ function Push-MossToStone {
         binary_data = $base64
     } | ConvertTo-Json
     
-    # Send refresh request
+    # Send upgrade request
     Write-Status "   Uploading to $($Stone.Endpoint)..."
-    $url = "$($Stone.Endpoint.TrimEnd('/'))/api/system/refresh"
+    $url = "$($Stone.Endpoint.TrimEnd('/'))/api/v1/stone/upgrade"
     
     try {
         $response = Invoke-RestMethod -Uri $url -Method Post -Body $payload -ContentType "application/json" -TimeoutSec 30

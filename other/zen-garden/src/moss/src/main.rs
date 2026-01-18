@@ -2420,6 +2420,23 @@ async fn main() -> anyhow::Result<()> {
     // Startup self-heal: adopt any existing zen-offering containers into the registry.
     adopt_existing_containers(&state).await;
 
+    // Build offerings index at startup
+    tracing::info!("Building offerings catalog...");
+    match ensure_offerings_index(&state, false).await {
+        Ok(_) => {
+            let idx_guard = state.offerings_index.read().await;
+            if let Some(idx) = idx_guard.as_ref() {
+                tracing::info!(
+                    offerings_count = idx.offerings.len(),
+                    "Offerings catalog loaded successfully"
+                );
+            }
+        }
+        Err(e) => {
+            tracing::warn!(error = ?e, "Failed to build offerings catalog - API will return empty results");
+        }
+    }
+
     // Check for pre-install manifest on first boot
     if let Some(manifest) = load_preinstall_manifest().await {
         if manifest.auto_install {

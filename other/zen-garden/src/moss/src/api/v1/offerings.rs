@@ -9,6 +9,7 @@ use axum::{
     http::StatusCode,
     Json,
 };
+use garden_common::ApiResponse;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -31,6 +32,7 @@ pub struct OfferingView {
     pub description: String,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub tags: Vec<String>,
+    pub image: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub compatibility: Option<CompatibilityView>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -51,7 +53,7 @@ pub struct CompatibilityView {
 pub async fn list_offerings_v1(
     State(state): State<AppState>,
     Query(query): Query<OfferingsQuery>,
-) -> Result<(StatusCode, Json<serde_json::Value>), (StatusCode, Json<crate::ApiError>)> {
+) -> Result<(StatusCode, Json<ApiResponse<Vec<OfferingView>>>), (StatusCode, Json<crate::ApiError>)> {
     // Get installed services from registry
     let registry = state.registry.read().await;
     let installed: HashMap<String, &crate::ServiceInfo> = registry
@@ -59,7 +61,7 @@ pub async fn list_offerings_v1(
         .map(|s| (s.name.clone(), s))
         .collect();
     
-    // Get available offerings from index
+    // Get available offerings from index (loaded at startup)
     let idx_guard = state.offerings_index.read().await;
     let offerings_index = idx_guard.as_ref().ok_or_else(|| {
         error_response(
@@ -75,12 +77,14 @@ pub async fn list_offerings_v1(
     // Add installed offerings with runtime details
     if query.state.as_deref() != Some("available") {
         for service in registry.iter() {
+            let image = state.docker.get_service_image(&service.name).await.unwrap_or_else(|_| "<unknown>".to_string());
             offerings.push(OfferingView {
                 name: service.name.clone(),
                 state: "installed".to_string(),
                 category: service.offering.clone(),
                 description: format!("{} service", service.offering),
                 tags: vec![],
+                image,
                 compatibility: None,
                 health: Some(simplify_health(&service.status)),
                 uptime: None, // TODO: Track uptime in ServiceInfo
@@ -98,6 +102,7 @@ pub async fn list_offerings_v1(
                     category: offering.category.clone(),
                     description: offering.description.clone(),
                     tags: offering.tags.clone(),
+                    image: offering.image.clone(),
                     compatibility: Some(CompatibilityView {
                         decision: offering.compatibility.decision.to_string(),
                         reason: offering.compatibility.reason.clone(),
@@ -111,9 +116,10 @@ pub async fn list_offerings_v1(
     
     Ok((
         StatusCode::OK,
-        Json(serde_json::json!({
-            "offerings": offerings
-        })),
+        Json(ApiResponse {
+            data: offerings,
+            suggestions: None,
+        }),
     ))
 }
 
@@ -122,19 +128,22 @@ pub async fn list_offerings_v1(
 pub async fn get_offering_v1(
     State(state): State<AppState>,
     Path(name): Path<String>,
-) -> Result<(StatusCode, Json<serde_json::Value>), (StatusCode, Json<crate::ApiError>)> {
+) -> Result<(StatusCode, Json<ApiResponse<serde_json::Value>>), (StatusCode, Json<crate::ApiError>)> {
     // Check if installed
     let registry = state.registry.read().await;
     if let Some(service) = registry.iter().find(|s| s.name == name) {
         return Ok((
             StatusCode::OK,
-            Json(serde_json::json!({
-                "name": service.name,
-                "state": "installed",
-                "category": service.offering,
-                "health": simplify_health(&service.status),
-                "version": service.version,
-            })),
+            Json(ApiResponse {
+                data: serde_json::json!({
+                    "name": service.name,
+                    "state": "installed",
+                    "category": service.offering,
+                    "health": simplify_health(&service.status),
+                    "version": service.version,
+                }),
+                suggestions: None,
+            }),
         ));
     }
     
@@ -152,17 +161,20 @@ pub async fn get_offering_v1(
     if let Some(offering) = offerings_index.offerings.iter().find(|o| o.name == name) {
         return Ok((
             StatusCode::OK,
-            Json(serde_json::json!({
-                "name": offering.name,
-                "state": "available",
-                "category": offering.category,
-                "description": offering.description,
-                "tags": offering.tags,
-                "compatibility": {
-                    "decision": offering.compatibility.decision.to_string(),
-                    "reason": offering.compatibility.reason,
-                },
-            })),
+            Json(ApiResponse {
+                data: serde_json::json!({
+                    "name": offering.name,
+                    "state": "available",
+                    "category": offering.category,
+                    "description": offering.description,
+                    "tags": offering.tags,
+                    "compatibility": {
+                        "decision": offering.compatibility.decision.to_string(),
+                        "reason": offering.compatibility.reason,
+                    },
+                }),
+                suggestions: None,
+            }),
         ));
     }
     

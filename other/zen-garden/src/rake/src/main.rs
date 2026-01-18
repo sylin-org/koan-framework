@@ -21,6 +21,15 @@ use stone_cache::StoneCache;
 // Global stone cache (hot cache architecture per design philosophy)
 static STONE_CACHE: once_cell::sync::Lazy<StoneCache> = once_cell::sync::Lazy::new(StoneCache::new);
 
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct TemplateInfo {
+    pub name: String,
+    pub category: String,
+    pub description: String,
+    #[serde(default)]
+    pub tags: Vec<String>,
+}
+
 enum ConnectionContext {
     Local,
     Remote { stone_name: String, endpoint: String },
@@ -81,8 +90,8 @@ async fn resolve_endpoint(client: &reqwest::Client, at: Option<String>) -> anyho
             // Fetch capabilities to get stone name for cache
             let caps_url = format!("{}/capabilities", endpoint.trim_end_matches('/'));
             if let Ok(resp) = client.get(&caps_url).timeout(Duration::from_secs(5)).send().await {
-                if let Ok(caps) = resp.json::<HardwareCapabilities>().await {
-                    let _ = tending::write_tending(caps.stone_name.clone(), endpoint.clone());
+                if let Ok(response) = resp.json::<ApiResponse<HardwareCapabilities>>().await {
+                    let _ = tending::write_tending(response.data.stone_name.clone(), endpoint.clone());
                 }
             }
             
@@ -111,13 +120,14 @@ async fn get_connection_context(
     endpoint: &str,
 ) -> anyhow::Result<ConnectionContext> {
     let caps_url = format!("{}/capabilities", endpoint.trim_end_matches('/'));
-    let caps: HardwareCapabilities = client
+    let response: ApiResponse<HardwareCapabilities> = client
         .get(&caps_url)
         .timeout(Duration::from_secs(5))
         .send()
         .await?
         .json()
         .await?;
+    let caps = response.data;
     
     // Cache the stone after fetching capabilities (hot cache architecture)
     STONE_CACHE.insert(
@@ -521,8 +531,8 @@ async fn fetch_offerings(
     if response.status() == reqwest::StatusCode::NOT_FOUND {
         anyhow::bail!("This stone's moss does not support validated offerings. Upgrade moss and retry.");
     }
-    let body = response.error_for_status()?.json::<OfferingsResponse>().await?;
-    Ok(body.offerings)
+    let api_response: ApiResponse<Vec<OfferingEntry>> = response.error_for_status()?.json().await?;
+    Ok(api_response.data)
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -630,7 +640,8 @@ fn stone_prefer_score(prefer: &[String], caps: Option<&HardwareCapabilities>) ->
 
 async fn fetch_capabilities(client: &reqwest::Client, endpoint: &str) -> anyhow::Result<HardwareCapabilities> {
     let url = format!("{}/capabilities", endpoint.trim_end_matches('/'));
-    Ok(client.get(url).send().await?.error_for_status()?.json().await?)
+    let response: ApiResponse<HardwareCapabilities> = client.get(url).send().await?.error_for_status()?.json().await?;
+    Ok(response.data)
 }
 
 async fn print_offer_query_recommendations(
@@ -817,7 +828,8 @@ async fn print_offering_info(
     if response.status() == reqwest::StatusCode::NOT_FOUND {
         anyhow::bail!("Unknown offering: {}", offering);
     }
-    let body = response.error_for_status()?.json::<serde_json::Value>().await?;
+    let api_response: ApiResponse<serde_json::Value> = response.error_for_status()?.json().await?;
+    let body = api_response.data;
 
     let name = body.get("name").and_then(|v| v.as_str()).unwrap_or(offering);
     let image = body.get("image").and_then(|v| v.as_str()).unwrap_or("<unknown>");
@@ -877,7 +889,8 @@ async fn fetch_offering_info_json(
     if response.status() == reqwest::StatusCode::NOT_FOUND {
         anyhow::bail!("Unknown offering: {}", offering);
     }
-    Ok(response.error_for_status()?.json::<serde_json::Value>().await?)
+    let api_response: ApiResponse<serde_json::Value> = response.error_for_status()?.json().await?;
+    Ok(api_response.data)
 }
 
 async fn print_alternatives_for_failed_install(
@@ -1124,7 +1137,8 @@ async fn observe_garden(
                         // Fetch stone capabilities to check name
                         let caps_url = format!("{}/capabilities", endpoint.trim_end_matches('/'));
                         if let Ok(resp) = client.get(&caps_url).timeout(Duration::from_secs(5)).send().await {
-                            if let Ok(caps) = resp.json::<HardwareCapabilities>().await {
+                            if let Ok(response) = resp.json::<ApiResponse<HardwareCapabilities>>().await {
+                                let caps = response.data;
                                 // Cache the discovered stone
                                 STONE_CACHE.insert(caps.stone_name.clone(), endpoint.clone(), caps.clone());
                                 
@@ -1173,10 +1187,12 @@ async fn observe_garden(
             client.get(&services_url).timeout(Duration::from_secs(5)).send()
         ) {
             Ok((caps_resp, services_resp)) => {
-                if let (Ok(capabilities), Ok(services)) = (
-                    caps_resp.json::<HardwareCapabilities>().await,
-                    services_resp.json::<Vec<ServiceInfo>>().await,
+                if let (Ok(caps_response), Ok(services_response)) = (
+                    caps_resp.json::<ApiResponse<HardwareCapabilities>>().await,
+                    services_resp.json::<serde_json::Value>().await,
                 ) {
+                    let capabilities = caps_response.data;
+                    let services: Vec<ServiceInfo> = serde_json::from_value(services_response.get("data").cloned().unwrap_or(services_response))?;
                     // Cache the stone (refresh TTL if already cached)
                     STONE_CACHE.insert(
                         capabilities.stone_name.clone(),
@@ -1352,44 +1368,39 @@ async fn list_templates(
         return Ok(());
     }
     
-    let body: serde_json::Value = response.json().await?;
-    if let Some(templates) = body.get("manifests").and_then(|t| t.as_array()) {
-        if templates.is_empty() {
-            println!("\nNo templates available");
-        } else {
-            println!("\nAvailable Templates:\n");
+    let api_response: ApiResponse<Vec<TemplateInfo>> = response.json().await?;
+    let templates = api_response.data;
+    if templates.is_empty() {
+        println!("\nNo templates available");
+    } else {
+        println!("\nAvailable Templates:\n");
+        
+        // Group templates by category
+        let mut categories: std::collections::HashMap<String, Vec<&TemplateInfo>> = 
+            std::collections::HashMap::new();
+        
+        for template in &templates {
+            let category = template.category.clone();
+            categories.entry(category).or_default().push(template);
+        }
             
-            // Group templates by category
-            let mut categories: std::collections::HashMap<String, Vec<&serde_json::Value>> = 
-                std::collections::HashMap::new();
-            
-            for template in templates {
-                let category = template["category"].as_str().unwrap_or("other").to_string();
-                categories.entry(category).or_default().push(template);
-            }
-            
-            // Sort categories
-            let mut category_names: Vec<String> = categories.keys().cloned().collect();
-            category_names.sort();
-            
-            // Display templates grouped by category
-            for category in category_names {
-                if let Some(items) = categories.get(&category) {
-                    let mut sorted_items = items.clone();
-                    sorted_items.sort_by_key(|t| t["name"].as_str().unwrap_or(""));
-                    
-                    println!("{}:", category.to_uppercase());
-                    for template in sorted_items {
-                        let name = template["name"].as_str().unwrap_or("unknown");
-                        let desc = template["description"].as_str().unwrap_or("");
-                        println!("  {:<18} {}", name, desc);
-                    }
-                    println!();
+        // Sort categories
+        let mut category_names: Vec<String> = categories.keys().cloned().collect();
+        category_names.sort();
+        
+        // Display templates grouped by category
+        for category in category_names {
+            if let Some(items) = categories.get(&category) {
+                let mut sorted_items = items.clone();
+                sorted_items.sort_by_key(|t| t.name.as_str());
+                
+                println!("{}:", category.to_uppercase());
+                for template in sorted_items {
+                    println!("  {:<18} {}", template.name, template.description);
                 }
+                println!();
             }
         }
-    } else {
-        println!("✗ Invalid response format");
     }
     
     Ok(())
@@ -1688,7 +1699,8 @@ async fn main() -> anyhow::Result<()> {
             
             let caps_url = format!("{}/capabilities", endpoint.trim_end_matches('/'));
             let health_url = format!("{}/health", endpoint.trim_end_matches('/'));
-            let caps: HardwareCapabilities = client.get(caps_url).send().await?.json().await?;
+            let response: ApiResponse<HardwareCapabilities> = client.get(caps_url).send().await?.json().await?;
+            let caps = response.data;
             let health_text: String = client.get(health_url).send().await?.text().await?;
             
             println!("Stone: {}", caps.stone_name);
@@ -2234,8 +2246,8 @@ async fn main() -> anyhow::Result<()> {
                                 for ep in endpoints {
                                     let caps_url = format!("{}/capabilities", ep.trim_end_matches('/'));
                                     if let Ok(resp) = client.get(&caps_url).send().await {
-                                        if let Ok(caps) = resp.json::<HardwareCapabilities>().await {
-                                            if caps.stone_name.to_lowercase() == name.to_lowercase() {
+                                        if let Ok(response) = resp.json::<ApiResponse<HardwareCapabilities>>().await {
+                                            if response.data.stone_name.to_lowercase() == name.to_lowercase() {
                                                 found = Some(ep);
                                                 break;
                                             }
@@ -2304,7 +2316,8 @@ async fn main() -> anyhow::Result<()> {
                             Ok(resp) if resp.status().is_success() => {
                                 // Get stone name from capabilities
                                 let caps_url = format!("{}/capabilities", local_endpoint);
-                                let caps: HardwareCapabilities = client.get(&caps_url).timeout(Duration::from_secs(5)).send().await?.json().await?;
+                                let response: ApiResponse<HardwareCapabilities> = client.get(&caps_url).timeout(Duration::from_secs(5)).send().await?.json().await?;
+                                let caps = response.data;
                                 tending::write_tending(caps.stone_name.clone(), local_endpoint.clone())?;
                                 println!("Now tending to: {} (localhost)", caps.stone_name);
                             }
@@ -2326,7 +2339,8 @@ async fn main() -> anyhow::Result<()> {
                             Ok(endpoint) => {
                                 // Get capabilities for stone name
                                 let caps_url = format!("{}/capabilities", endpoint.trim_end_matches('/'));
-                                let caps: HardwareCapabilities = client.get(&caps_url).timeout(Duration::from_secs(5)).send().await?.json().await?;
+                                let response: ApiResponse<HardwareCapabilities> = client.get(&caps_url).timeout(Duration::from_secs(5)).send().await?.json().await?;
+                                let caps = response.data;
                                 tending::write_tending(caps.stone_name.clone(), endpoint.clone())?;
                                 println!("  Found {}.local ({})", caps.stone_name, endpoint.trim_start_matches("http://"));
                                 println!("  Now tending to {}.local", caps.stone_name);
@@ -2342,7 +2356,8 @@ async fn main() -> anyhow::Result<()> {
                         match client.get(&health_url).timeout(Duration::from_secs(3)).send().await {
                             Ok(resp) if resp.status().is_success() => {
                                 let caps_url = format!("{}/capabilities", url.trim_end_matches('/'));
-                                let caps: HardwareCapabilities = client.get(&caps_url).timeout(Duration::from_secs(5)).send().await?.json().await?;
+                                let response: ApiResponse<HardwareCapabilities> = client.get(&caps_url).timeout(Duration::from_secs(5)).send().await?.json().await?;
+                                let caps = response.data;
                                 tending::write_tending(caps.stone_name.clone(), url.to_string())?;
                                 println!("Now tending to: {} ({})", caps.stone_name, url);
                             }
@@ -2365,8 +2380,9 @@ async fn main() -> anyhow::Result<()> {
                                     .timeout(Duration::from_secs(5))
                                     .send()
                                     .await?
-                                    .json()
-                                    .await?;
+                                    .json::<ApiResponse<HardwareCapabilities>>()
+                                    .await?
+                                    .data;
                                 tending::write_tending(caps.stone_name.clone(), endpoint.to_string())?;
                                 println!("Now tending to: {}.local ({})", caps.stone_name, endpoint.trim_start_matches("http://"));
                             }
@@ -2430,7 +2446,8 @@ async fn main() -> anyhow::Result<()> {
                             match client.get(&health_url).timeout(Duration::from_secs(3)).send().await {
                                 Ok(resp) if resp.status().is_success() => {
                                     let caps_url = format!("{}/capabilities", endpoint);
-                                    let caps: HardwareCapabilities = client.get(&caps_url).timeout(Duration::from_secs(5)).send().await?.json().await?;
+                                    let response: ApiResponse<HardwareCapabilities> = client.get(&caps_url).timeout(Duration::from_secs(5)).send().await?.json().await?;
+                                    let caps = response.data;
                                     tending::write_tending(caps.stone_name.clone(), endpoint.clone())?;
                                     println!("Context set to: {} ({})", caps.stone_name, endpoint);
                                 }
@@ -2444,7 +2461,8 @@ async fn main() -> anyhow::Result<()> {
                             match discovery::discover_moss() {
                                 Ok(endpoint) => {
                                     let caps_url = format!("{}/capabilities", endpoint.trim_end_matches('/'));
-                                    let caps: HardwareCapabilities = client.get(&caps_url).timeout(Duration::from_secs(5)).send().await?.json().await?;
+                                    let response: ApiResponse<HardwareCapabilities> = client.get(&caps_url).timeout(Duration::from_secs(5)).send().await?.json().await?;
+                                    let caps = response.data;
                                     tending::write_tending(caps.stone_name.clone(), endpoint.clone())?;
                                     println!("  Found {}.local ({})", caps.stone_name, endpoint.trim_start_matches("http://"));
                                     println!("  Context set to {}.local", caps.stone_name);
@@ -2459,7 +2477,8 @@ async fn main() -> anyhow::Result<()> {
                             match client.get(&health_url).timeout(Duration::from_secs(3)).send().await {
                                 Ok(resp) if resp.status().is_success() => {
                                     let caps_url = format!("{}/capabilities", url.trim_end_matches('/'));
-                                    let caps: HardwareCapabilities = client.get(&caps_url).timeout(Duration::from_secs(5)).send().await?.json().await?;
+                                    let response: ApiResponse<HardwareCapabilities> = client.get(&caps_url).timeout(Duration::from_secs(5)).send().await?.json().await?;
+                                    let caps = response.data;
                                     tending::write_tending(caps.stone_name.clone(), url.to_string())?;
                                     println!("Context set to: {} ({})", caps.stone_name, url);
                                 }
@@ -2479,8 +2498,9 @@ async fn main() -> anyhow::Result<()> {
                                         .timeout(Duration::from_secs(5))
                                         .send()
                                         .await?
-                                        .json()
-                                        .await?;
+                                        .json::<ApiResponse<HardwareCapabilities>>()
+                                        .await?
+                                        .data;
                                     tending::write_tending(caps.stone_name.clone(), endpoint.clone())?;
                                     println!("Context set to: {} ({})", caps.stone_name, endpoint);
                                 }

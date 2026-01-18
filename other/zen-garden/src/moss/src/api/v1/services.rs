@@ -465,7 +465,7 @@ pub async fn delete_service_v1(
 /// GET /api/v1/services/manifests - List all service manifests
 pub async fn list_manifests_v1(
     State(state): State<AppState>,
-) -> Result<(StatusCode, Json<serde_json::Value>), (StatusCode, Json<ApiError>)> {
+) -> Result<(StatusCode, Json<ApiResponse<Vec<crate::templates::TemplateInfo>>>), (StatusCode, Json<ApiError>)> {
     let manifests = state.templates.list_templates().map_err(|e| {
         error_response(
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -477,9 +477,10 @@ pub async fn list_manifests_v1(
     
     Ok((
         StatusCode::OK,
-        Json(serde_json::json!({
-            "manifests": manifests
-        })),
+        Json(ApiResponse {
+            data: manifests,
+            suggestions: None,
+        }),
     ))
 }
 
