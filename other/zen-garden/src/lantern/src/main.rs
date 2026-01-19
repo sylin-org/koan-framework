@@ -110,11 +110,11 @@ async fn main() -> Result<()> {
     // Build HTTP server
     let app = Router::new()
         .route("/health", get(handlers::health))
-        .route("/api/register", axum::routing::post(handlers::register))
-        .route("/api/resolve", get(handlers::resolve))
-        .route("/api/stones", get(handlers::list_stones))
-        .route("/api/topology", get(handlers::get_topology))
-        .route("/api/events/stream", get(handlers::event_stream))
+        .route("/api/v1/register", axum::routing::post(handlers::register))
+        .route("/api/v1/resolve", get(handlers::resolve))
+        .route("/api/v1/stones", get(handlers::list_stones))
+        .route("/api/v1/topology", get(handlers::get_topology))
+        .route("/api/v1/events/stream", get(handlers::event_stream))
         .with_state(state);
 
     let addr: SocketAddr = format!("0.0.0.0:{}", http_port).parse()?;

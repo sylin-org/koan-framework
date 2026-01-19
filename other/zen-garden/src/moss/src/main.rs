@@ -2194,7 +2194,7 @@ async fn main() -> anyhow::Result<()> {
     // - Historically the systemd unit set STONE_NAME, which can drift after first-boot rename.
     //
     // Priority: explicit CLI flag (--stone-name) > config file > system hostname > STONE_NAME env > default
-    let env_stone_name = std::env::var("STONE_NAME").ok();
+    let env_stone_name = std::env::var(garden_common::ENV_STONE_NAME).ok();
     let explicit_cli_stone_name = if cli.stone_name.is_some() && env_stone_name.is_none() {
         cli.stone_name.clone()
     } else {
@@ -2216,7 +2216,7 @@ async fn main() -> anyhow::Result<()> {
         .or_else(|| config.as_ref().and_then(|c| c.stone_name.clone()))
         .or_else(|| system_hostname.clone())
         .or_else(|| env_stone_name.clone())
-        .unwrap_or_else(|| "stone-01".to_string());
+        .unwrap_or_else(|| garden_common::DEFAULT_STONE_NAME.to_string());
     
     let port = cli.port
         .or_else(|| config.as_ref().and_then(|c| c.port))
@@ -2311,7 +2311,7 @@ async fn main() -> anyhow::Result<()> {
 
     // Prefer explicit STONE_HOST, otherwise auto-detect network IP
     let api_endpoint = {
-        if let Ok(host) = std::env::var("STONE_HOST") {
+        if let Ok(host) = std::env::var(garden_common::ENV_STONE_HOST) {
             let trimmed = host.trim();
             if !trimmed.is_empty() {
                 format!("http://{}:{}", trimmed, port)
@@ -2343,7 +2343,7 @@ async fn main() -> anyhow::Result<()> {
     });
 
     // Spawn Lantern registration loop (if LANTERN_ENDPOINT is set)
-    if let Ok(lantern_endpoint) = std::env::var("LANTERN_ENDPOINT") {
+    if let Ok(lantern_endpoint) = std::env::var(garden_common::ENV_LANTERN_ENDPOINT) {
         let trimmed = lantern_endpoint.trim().to_string();
         if !trimmed.is_empty() {
             let reg_stone_name = stone_name.clone();

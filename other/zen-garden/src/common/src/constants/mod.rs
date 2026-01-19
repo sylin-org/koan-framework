@@ -161,8 +161,17 @@ pub const SERVICE_UNKNOWN: &str = "unknown";
 // Environment Variable Names
 // ============================================================================
 
-/// Environment variable for stone endpoint override
+/// Environment variable for stone endpoint override (Rake client)
 pub const ENV_GARDEN_STONE: &str = "GARDEN_STONE";
+
+/// Stone name identifier (Moss daemon)
+pub const ENV_STONE_NAME: &str = "STONE_NAME";
+
+/// Stone host address (Moss daemon)
+pub const ENV_STONE_HOST: &str = "STONE_HOST";
+
+/// Lantern service registry endpoint (Moss discovery)
+pub const ENV_LANTERN_ENDPOINT: &str = "LANTERN_ENDPOINT";
 
 /// Environment variable to disable color output (universal standard)
 pub const ENV_NO_COLOR: &str = "NO_COLOR";
@@ -176,6 +185,29 @@ pub const ENV_GARDEN_UNICODE: &str = "GARDEN_UNICODE";
 
 /// Unknown value placeholder
 pub const VALUE_UNKNOWN: &str = "unknown";
+
+/// Default stone name when no configuration is provided
+pub const DEFAULT_STONE_NAME: &str = "stone-01";
+
+// ============================================================================
+// HTTP Headers and Authentication
+// ============================================================================
+
+/// HTTP Authorization header name (lowercase per HTTP/2 spec)
+pub const HEADER_AUTHORIZATION: &str = "authorization";
+
+/// Bearer token authentication scheme prefix
+pub const AUTH_BEARER_PREFIX: &str = "Bearer ";
+
+// ============================================================================
+// API Endpoint Paths
+// ============================================================================
+
+/// Health check endpoint path (used by Moss, Lantern, and Rake)
+pub const ENDPOINT_HEALTH: &str = "/health";
+
+/// Hardware capabilities endpoint path (Moss)
+pub const ENDPOINT_CAPABILITIES: &str = "/capabilities";
 
 // ============================================================================
 // Job/Operation Status Constants

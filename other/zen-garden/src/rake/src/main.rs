@@ -1386,7 +1386,7 @@ async fn observe_garden(
         tracing::info!(endpoint = %lantern, "Discovered Lantern - using for topology queries");
         
         // Fetch topology from Lantern
-        let topology_url = format!("{}/api/stones", lantern);
+        let topology_url = format!("{}/api/v1/stones", lantern);
         match client.get(&topology_url).timeout(Duration::from_secs(5)).send().await {
             Ok(resp) if resp.status().is_success() => {
                 if let Ok(topology) = resp.json::<garden_common::LanternTopology>().await {
@@ -3276,7 +3276,7 @@ async fn watch_events(
 ) -> anyhow::Result<()> {
     use futures_util::StreamExt;
 
-    let url = format!("{}/api/events", endpoint.trim_end_matches('/'));
+    let url = format!("{}/api/v1/events", endpoint.trim_end_matches('/'));
     println!("📡 Watching events from {}\n", endpoint);
 
     if let Some(ref pattern) = until_pattern {
