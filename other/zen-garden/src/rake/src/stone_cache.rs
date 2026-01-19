@@ -2,7 +2,7 @@ use anyhow::Result;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
-use garden_common::HardwareCapabilities;
+use garden_common::{GardenApiResponse, HardwareCapabilities};
 
 const CACHE_TTL: Duration = Duration::from_secs(90);
 
@@ -112,13 +112,14 @@ pub async fn fetch_and_cache_stone(
     cache: &StoneCache,
 ) -> Result<CachedStone> {
     let caps_url = format!("{}/capabilities", endpoint.trim_end_matches('/'));
-    let capabilities: HardwareCapabilities = client
+    let response: GardenApiResponse<HardwareCapabilities> = client
         .get(&caps_url)
         .timeout(Duration::from_secs(5))
         .send()
         .await?
         .json()
         .await?;
+    let capabilities = response.data;
     
     let stone_name = capabilities.stone_name.clone();
     cache.insert(stone_name.clone(), endpoint.to_string(), capabilities.clone());

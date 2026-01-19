@@ -1,6 +1,7 @@
 mod parser;
 mod stone_cache;
 mod tending;
+mod ui;
 
 #[cfg(test)]
 mod discovery_tests;
@@ -13,13 +14,26 @@ use clap::{Parser, Subcommand};
 use std::collections::BTreeMap;
 use std::time::Duration;
 use tracing_subscriber::EnvFilter;
-use garden_common::{ApiResponse, HardwareCapabilities, ServiceInfo};
-use garden_rake::client::resolve_target_endpoint;
+use garden_common::{GardenApiResponse, HardwareCapabilities, ServiceInfo, GardenHttpClient};
+use garden_rake::client::{resolve_target_endpoint, CachedStoneOps, CachedStoneInfo};
 use garden_rake::discovery;
 use stone_cache::StoneCache;
 
 // Global stone cache (hot cache architecture per design philosophy)
 static STONE_CACHE: once_cell::sync::Lazy<StoneCache> = once_cell::sync::Lazy::new(StoneCache::new);
+
+// Implement the trait for StoneCache
+impl CachedStoneOps for StoneCache {
+    fn get(&self, stone_name: &str) -> Option<CachedStoneInfo> {
+        self.get(stone_name).map(|cached| CachedStoneInfo {
+            endpoint: cached.endpoint,
+        })
+    }
+    
+    fn insert(&self, stone_name: String, endpoint: String, capabilities: HardwareCapabilities) {
+        self.insert(stone_name, endpoint, capabilities);
+    }
+}
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct TemplateInfo {
@@ -30,38 +44,21 @@ pub struct TemplateInfo {
     pub tags: Vec<String>,
 }
 
-enum ConnectionContext {
-    Local,
-    Remote { stone_name: String, endpoint: String },
-}
-
-impl ConnectionContext {
-    fn display(&self) {
-        match self {
-            ConnectionContext::Local => println!("Tending to: localhost\n"),
-            ConnectionContext::Remote { stone_name, endpoint } => {
-                // Extract just the host:port from the endpoint
-                let addr = endpoint
-                    .trim_start_matches("http://")
-                    .trim_start_matches("https://")
-                    .trim_end_matches('/');
-                // Show both DNS name and IP
-                println!("Tending to: {}.local ({})\n", stone_name, addr);
-            }
-        }
-    }
-}
-
 async fn resolve_endpoint(client: &reqwest::Client, at: Option<String>) -> anyhow::Result<String> {
+    let term = ui::TerminalInfo::detect();
     // Priority 1: --at flag (explicit override, deterministic)
     if let Some(explicit) = at {
-        return resolve_target_endpoint(client, &explicit).await;
+        let endpoint = resolve_target_endpoint(client, &explicit, Some(&*STONE_CACHE)).await?;
+        print_stone_header(client, &endpoint).await;
+        return Ok(endpoint);
     }
 
     // Priority 2: GARDEN_STONE environment variable
-    if let Ok(env_endpoint) = std::env::var("GARDEN_STONE") {
+    if let Ok(env_endpoint) = std::env::var(garden_common::ENV_GARDEN_STONE) {
         tracing::info!(endpoint = %env_endpoint, "Using GARDEN_STONE environment variable");
-        return resolve_target_endpoint(client, &env_endpoint).await;
+        let endpoint = resolve_target_endpoint(client, &env_endpoint, Some(&*STONE_CACHE)).await?;
+        print_stone_header(client, &endpoint).await;
+        return Ok(endpoint);
     }
 
     // Priority 3: Cached tending state (90s TTL)
@@ -73,6 +70,7 @@ async fn resolve_endpoint(client: &reqwest::Client, at: Option<String>) -> anyho
                 age_secs = tending.age_seconds(),
                 "Using cached tending state"
             );
+            print_stone_header(client, &tending.endpoint).await;
             return Ok(tending.endpoint);
         } else {
             tracing::debug!("Tending state expired, clearing cache");
@@ -82,7 +80,7 @@ async fn resolve_endpoint(client: &reqwest::Client, at: Option<String>) -> anyho
 
     // Priority 4: Auto-discover via UDP broadcast + cache result
     tracing::debug!("No cached tending, attempting auto-discovery");
-    println!("Discovering stones...");
+    println!("{}{} Discovering stones...", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("info", term.supports_color));
     match discovery::discover_moss() {
         Ok(endpoint) => {
             tracing::info!(endpoint = %endpoint, "Auto-discovered stone");
@@ -90,18 +88,19 @@ async fn resolve_endpoint(client: &reqwest::Client, at: Option<String>) -> anyho
             // Fetch capabilities to get stone name for cache
             let caps_url = format!("{}/capabilities", endpoint.trim_end_matches('/'));
             if let Ok(resp) = client.get(&caps_url).timeout(Duration::from_secs(5)).send().await {
-                if let Ok(response) = resp.json::<ApiResponse<HardwareCapabilities>>().await {
+                if let Ok(response) = resp.json::<GardenApiResponse<HardwareCapabilities>>().await {
                     let _ = tending::write_tending(response.data.stone_name.clone(), endpoint.clone());
                 }
             }
             
+            print_stone_header(client, &endpoint).await;
             Ok(endpoint)
         }
         Err(_) => {
             Err(anyhow::anyhow!(
                 "No Zen Garden stones discovered.\n\n\
                 Possible causes:\n\
-                  • No stones are running on your network\n\
+                  • No stones present on your network\n\
                   • Firewall is blocking UDP broadcast (port 7184)\n\
                   • Stone's garden-moss service is not running\n\n\
                 To fix:\n\
@@ -115,40 +114,49 @@ async fn resolve_endpoint(client: &reqwest::Client, at: Option<String>) -> anyho
     }
 }
 
-async fn get_connection_context(
-    client: &reqwest::Client,
-    endpoint: &str,
-) -> anyhow::Result<ConnectionContext> {
+/// Print stone header banner if tending to a valid stone
+/// This should be called at the start of every command
+async fn print_stone_header(client: &reqwest::Client, endpoint: &str) {
+    let term = ui::TerminalInfo::detect();
+    
+    // Fetch stone capabilities to get name and health
     let caps_url = format!("{}/capabilities", endpoint.trim_end_matches('/'));
-    let response: ApiResponse<HardwareCapabilities> = client
-        .get(&caps_url)
-        .timeout(Duration::from_secs(5))
-        .send()
-        .await?
-        .json()
-        .await?;
-    let caps = response.data;
-    
-    // Cache the stone after fetching capabilities (hot cache architecture)
-    STONE_CACHE.insert(
-        caps.stone_name.clone(),
-        endpoint.to_string(),
-        caps.clone(),
-    );
-    
-    if endpoint.starts_with("http://127.0.0.1") || endpoint.starts_with("http://localhost") {
-        Ok(ConnectionContext::Local)
-    } else {
-        Ok(ConnectionContext::Remote {
-            stone_name: caps.stone_name,
-            endpoint: endpoint.to_string(),
-        })
+    if let Ok(resp) = client.get(&caps_url).timeout(Duration::from_secs(3)).send().await {
+        if let Ok(response) = resp.json::<GardenApiResponse<HardwareCapabilities>>().await {
+            let stone_name = &response.data.stone_name;
+            
+            // Fetch health to get status
+            let health_url = format!("{}/health", endpoint.trim_end_matches('/'));
+            let health_status = if let Ok(health_resp) = client.get(&health_url).timeout(Duration::from_secs(2)).send().await {
+                if let Ok(health_json) = health_resp.json::<serde_json::Value>().await {
+                    // Map health to vitality language
+                    if let Some(status) = health_json.get("status").and_then(|v| v.as_str()) {
+                        match status {
+                            garden_common::HEALTH_HEALTHY => garden_common::VITALITY_THRIVING,
+                            garden_common::HEALTH_DEGRADED => garden_common::VITALITY_NEEDS_ATTENTION,
+                            garden_common::HEALTH_UNHEALTHY => garden_common::VITALITY_WITHERING,
+                            _ => garden_common::VITALITY_DORMANT
+                        }
+                    } else {
+                        garden_common::VITALITY_THRIVING
+                    }
+                } else {
+                    garden_common::VITALITY_DORMANT
+                }
+            } else {
+                garden_common::VITALITY_DORMANT
+            };
+            
+            println!("{}", ui::stone_banner(stone_name, health_status, term.supports_color));
+            println!();
+        }
     }
 }
 
 #[derive(Parser)]
 #[command(name = "garden-rake")]
 #[command(about = "Zen Garden management CLI")]
+#[command(version = concat!(env!("CARGO_PKG_VERSION"), ".", env!("BUILD_NUMBER")))]
 struct Cli {
     /// Suppress suggestions (zen: quietly, env: GARDEN_QUIET)
     #[arg(short, long, global = true)]
@@ -160,7 +168,8 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Get Stone status
+    /// Get Stone status (DEPRECATED: use 'observe' or 'tend' instead)
+    #[command(hide = false)]
     Status {
         /// Moss endpoint (omit to auto-discover)
         #[arg(long)]
@@ -207,6 +216,10 @@ enum Commands {
         /// Service name to remove
         service: String,
 
+        /// Skip confirmation prompt
+        #[arg(long)]
+        force: bool,
+
         /// Moss endpoint (omit to auto-discover)
         #[arg(long)]
         at: Option<String>,
@@ -217,7 +230,7 @@ enum Commands {
         /// Service name to upgrade (omit for all services)
         service: Option<String>,
 
-        /// Upgrade all services on the Stone
+        /// Upgrade all services on stone
         #[arg(long)]
         all: bool,
 
@@ -246,16 +259,16 @@ enum Commands {
         at: Option<String>,
     },
 
-    /// Phase 3 scaffolding: Place pebble or stone (zen syntax)
+    /// Phase 3 scaffolding: Place keystone or stone (zen syntax)
     #[command(
         long_about = "Initialize pond or join pond (zen syntax for 'pond init' or 'pond join').\n\n\
         Examples:\n  \
-        garden-rake place pebble              # Initialize pond\n  \
+        garden-rake place keystone              # Initialize pond\n  \
         garden-rake place stone --code ABC123 # Join pond with invitation\n\n\
         Note: Pond security implementation pending (Phase 3b)."
     )]
     Place {
-        /// Target: "pebble" or "stone"
+        /// Target: "keystone" or "stone"
         target: String,
 
         /// Invitation code (required for "stone")
@@ -266,7 +279,7 @@ enum Commands {
         #[arg(long)]
         at: Option<String>,
         
-        /// Passphrase for encrypting pond certificate (pebble only)
+        /// Passphrase for encrypting pond certificate (keystone only)
         #[arg(long)]
         passphrase: Option<String>,
     },
@@ -324,9 +337,9 @@ enum Commands {
         at: Option<String>,
     },
 
-    /// Refresh (update) garden-moss or garden-rake binary on a stone
+    /// Refresh (update) garden-moss or garden-rake binary on stone
     #[command(
-        long_about = "Update garden-moss or garden-rake binary on a remote stone (development use).\n\n\
+        long_about = "Update garden-moss or garden-rake binary on a stone (development use).\n\n\
         Examples:\n  \
         garden-rake refresh garden-moss --from ./target/release/garden-moss\n  \
         garden-rake refresh rake --from ./dist/linux-x64/garden-rake\n\n\
@@ -395,25 +408,11 @@ enum Commands {
         verbose: bool,
     },
 
-    /// Manage stone context (normative syntax for 'tend')
-    #[command(
-        long_about = "Manage which stone garden-rake commands target (normative syntax).\n\n\
-        Examples:\n  \
-        garden-rake context show              # Display current context\n  \
-        garden-rake context set stone-02      # Set context to stone-02\n  \
-        garden-rake context clear             # Clear context\n\n\
-        Context is cached for 90 seconds and automatically refreshed."
-    )]
-    Context {
-        #[command(subcommand)]
-        action: ContextAction,
-    },
-
     /// Manage pond security (normative syntax)
     #[command(
         long_about = "Manage pond security for multi-stone trust.\n\n\
         Examples:\n  \
-        garden-rake pond init                 # Initialize pond (place pebble)\n  \
+        garden-rake pond init                 # Initialize pond (place keystone)\n  \
         garden-rake pond status               # Show pond status\n  \
         garden-rake pond invite               # Generate invitation code\n  \
         garden-rake pond join <code>          # Join pond with code\n  \
@@ -438,7 +437,7 @@ enum Commands {
         Note: Pond security implementation pending (Phase 3b)."
     )]
     Lift {
-        /// Target type: 'pebble' or 'stone'
+        /// Target type: 'keystone' or 'stone'
         target_type: String,
         
         /// Stone name (required if target_type is 'stone')
@@ -458,7 +457,7 @@ enum OfferAction {
 
 #[derive(Debug, Subcommand)]
 enum PondAction {
-    /// Initialize pond security (place pebble)
+    /// Initialize pond security (place keystone)
     Init {
         /// Passphrase for encrypting pond certificate
         #[arg(long)]
@@ -482,24 +481,6 @@ enum PondAction {
     },
 }
 
-#[derive(Debug, Subcommand)]
-enum ContextAction {
-    /// Set stone context
-    Set {
-        /// Stone name, endpoint URL, or 'this'/'auto'
-        stone: String,
-    },
-    /// Show current context
-    Show,
-    /// Clear context cache
-    Clear,
-}
-
-#[derive(Debug, serde::Deserialize)]
-struct OfferingsResponse {
-    offerings: Vec<OfferingEntry>,
-}
-
 #[derive(Debug, serde::Deserialize)]
 struct OfferingEntry {
     name: String,
@@ -507,6 +488,7 @@ struct OfferingEntry {
     description: String,
     #[serde(default)]
     tags: Vec<String>,
+    #[allow(dead_code)] // Used for deserialization
     image: String,
     #[serde(default)]
     compatibility: OfferingCompatibility,
@@ -516,9 +498,13 @@ struct OfferingEntry {
 struct OfferingCompatibility {
     #[serde(default)]
     decision: String,
+    #[allow(dead_code)] // Used for deserialization
     reason: Option<String>,
+    #[allow(dead_code)] // Used for deserialization
     original_image: Option<String>,
+    #[allow(dead_code)] // Used for deserialization
     fallback_image: Option<String>,
+    #[allow(dead_code)] // Used for deserialization
     suggestion: Option<String>,
 }
 
@@ -526,12 +512,14 @@ async fn fetch_offerings(
     client: &reqwest::Client,
     endpoint: &str,
 ) -> anyhow::Result<Vec<OfferingEntry>> {
-    let url = format!("{}/api/v1/offerings", endpoint.trim_end_matches('/'));
-    let response = client.get(url).send().await?;
+    let moss = GardenHttpClient::new(client, endpoint);
+    let response = moss.get_raw("/api/v1/offerings").await?;
+    
     if response.status() == reqwest::StatusCode::NOT_FOUND {
         anyhow::bail!("This stone's moss does not support validated offerings. Upgrade moss and retry.");
     }
-    let api_response: ApiResponse<Vec<OfferingEntry>> = response.error_for_status()?.json().await?;
+    
+    let api_response: GardenApiResponse<Vec<OfferingEntry>> = response.error_for_status()?.json().await?;
     Ok(api_response.data)
 }
 
@@ -639,8 +627,8 @@ fn stone_prefer_score(prefer: &[String], caps: Option<&HardwareCapabilities>) ->
 }
 
 async fn fetch_capabilities(client: &reqwest::Client, endpoint: &str) -> anyhow::Result<HardwareCapabilities> {
-    let url = format!("{}/capabilities", endpoint.trim_end_matches('/'));
-    let response: ApiResponse<HardwareCapabilities> = client.get(url).send().await?.error_for_status()?.json().await?;
+    let moss = GardenHttpClient::new(client, endpoint);
+    let response: GardenApiResponse<HardwareCapabilities> = moss.get("/capabilities").await?;
     Ok(response.data)
 }
 
@@ -659,7 +647,7 @@ async fn print_offer_query_recommendations(
     let offerings = fetch_offerings(client, endpoint).await?;
     let mut ranked = offerings
         .into_iter()
-        .filter(|o| o.compatibility.decision.as_str() != "fail")
+        .filter(|o| o.compatibility.decision.as_str() != garden_common::COMPAT_FAIL)
         .map(|o| {
             let s = offering_relevance_score(&tokens, &o);
             (s, o)
@@ -701,7 +689,18 @@ async fn print_offer_anywhere_recommendations(
         anyhow::bail!("Query is empty");
     }
 
-    let endpoints = discovery::discover_all_moss(std::time::Duration::from_secs(2))?;
+    // Collect endpoints using streaming API
+    let mut endpoints = Vec::new();
+    let _ = discovery::discover_all_moss_stream(
+        std::time::Duration::from_secs(2),
+        |response, _instant| {
+            endpoints.push(response.stone_endpoint.clone());
+        },
+    );
+
+    if endpoints.is_empty() {
+        anyhow::bail!("No stones discovered");
+    }
 
     let mut candidates: Vec<(i32, String, String, OfferingEntry)> = Vec::new();
     for ep in endpoints {
@@ -717,7 +716,7 @@ async fn print_offer_anywhere_recommendations(
             Err(_) => continue,
         };
 
-        for o in offerings.into_iter().filter(|o| o.compatibility.decision.as_str() != "fail") {
+        for o in offerings.into_iter().filter(|o| o.compatibility.decision.as_str() != garden_common::COMPAT_FAIL) {
             let rel = offering_relevance_score(&tokens, &o);
             if rel <= 0 {
                 continue;
@@ -755,9 +754,46 @@ async fn print_offer_anywhere_recommendations(
     Ok(())
 }
 
+/// Render a table of services with status indicators and counts
+/// Extracted to avoid code duplication
+fn render_services_table(services: &[ServiceInfo], term: &ui::TerminalInfo) {
+    let mut table = ui::TableBuilder::new()
+        .add_column(ui::constants::MAX_SERVICE_NAME_LEN, ui::Align::Left)
+        .add_column(20, ui::Align::Left)
+        .add_column(16, ui::Align::Left);
+    
+    let mut running_count = 0;
+    let mut stopped_count = 0;
+    
+    for svc in services {
+        let status_str = format!("{:?}", svc.status);
+        if status_str.to_lowercase().contains(garden_common::SERVICE_RUNNING) {
+            running_count += 1;
+        } else {
+            stopped_count += 1;
+        }
+        
+        let status_display = ui::status_indicator(&status_str.to_lowercase(), term.supports_color);
+        table.add_row(vec![
+            ui::truncate_name(&svc.name, ui::constants::MAX_SERVICE_NAME_LEN),
+            status_display,
+            if svc.offering.is_empty() { garden_common::VALUE_UNKNOWN.to_string() } else { svc.offering.clone() },
+        ]);
+    }
+    
+    println!("{}", table.render());
+    println!();
+    println!("{}  {} services ({} running, {} stopped)", 
+        " ".repeat(ui::constants::DEFAULT_INDENT),
+        services.len(), 
+        running_count, 
+        stopped_count
+    );
+}
+
 fn format_offering_flag(compat: &OfferingCompatibility) -> &'static str {
     match compat.decision.as_str() {
-        "fallback" | "fail" => "(!)",
+        garden_common::COMPAT_FALLBACK | garden_common::COMPAT_FAIL => "(!)",
         _ => "",
     }
 }
@@ -766,55 +802,90 @@ async fn print_offerings_index(
     client: &reqwest::Client,
     endpoint: &str,
 ) -> anyhow::Result<()> {
+    let term = ui::TerminalInfo::detect();
+    
+    // Fetch running services
+    let services_url = format!("{}/api/v1/services", endpoint.trim_end_matches('/'));
+    let services: Vec<ServiceInfo> = if let Ok(response) = client.get(&services_url).send().await {
+        if let Ok(json) = response.json::<serde_json::Value>().await {
+            serde_json::from_value(json.get("data").cloned().unwrap_or(json)).unwrap_or_default()
+        } else {
+            Vec::new()
+        }
+    } else {
+        Vec::new()
+    };
+    
+    // Display running services if any
+    if !services.is_empty() {
+        println!("{}", ui::section_header("SERVICES", &term));
+        println!();
+        render_services_table(&services, &term);
+        println!();
+        println!();
+    }
+    
+    // Fetch and display available offerings
     let offerings = fetch_offerings(client, endpoint).await?;
     if offerings.is_empty() {
-        println!("No offerings available");
+        println!("{}", ui::empty_state("No offerings available", Some("Try: garden-rake offer refresh")));
         return Ok(());
     }
 
+    // Filter out incompatible offerings (decision = "fail")
+    let compatible_offerings: Vec<OfferingEntry> = offerings
+        .into_iter()
+        .filter(|o| o.compatibility.decision != garden_common::COMPAT_FAIL)
+        .collect();
+
+    if compatible_offerings.is_empty() {
+        let _term = ui::TerminalInfo::detect();
+        println!("{}", ui::empty_state("No compatible offerings", Some("All offerings are incompatible with this stone")));
+        return Ok(());
+    }
+
+    // Group by category
     let mut by_category: BTreeMap<String, Vec<OfferingEntry>> = BTreeMap::new();
-    for o in offerings {
+    let mut restricted_offerings: Vec<String> = Vec::new();
+    for o in compatible_offerings {
+        if o.compatibility.decision == garden_common::COMPAT_FALLBACK {
+            restricted_offerings.push(o.name.clone());
+        }
         by_category.entry(o.category.clone()).or_default().push(o);
     }
 
+    let term = ui::TerminalInfo::detect();
+    println!("{}", ui::section_header("AVAILABLE OFFERINGS", &term));
+    println!();
+
+    let grid = ui::CategoryGrid::new(&term);
+    
     for (category, mut items) in by_category {
         items.sort_by(|a, b| a.name.cmp(&b.name));
-        println!("{}", category.to_uppercase());
-        for o in items {
-            let flag = format_offering_flag(&o.compatibility);
-
-            match o.compatibility.decision.as_str() {
-                "fallback" => {
-                    let from = o.compatibility.original_image.as_deref().unwrap_or("<unknown>");
-                    let to = o.compatibility.fallback_image.as_deref().unwrap_or(o.image.as_str());
-                    let reason = o.compatibility.reason.as_deref().unwrap_or("compatibility restriction");
-                    println!("  {:<16} {:<18} {} - {} ({} → {}; {})", o.name, o.image, flag, o.description, from, to, reason);
-                }
-                "fail" => {
-                    let reason = o.compatibility.reason.as_deref().unwrap_or("incompatible");
-                    if let Some(suggestion) = o.compatibility.suggestion.as_deref() {
-                        println!(
-                            "  {:<16} {:<18} {} - {} (incompatible: {}; suggestion: {})",
-                            o.name,
-                            o.image,
-                            flag,
-                            o.description,
-                            reason,
-                            suggestion
-                        );
-                    } else {
-                        println!("  {:<16} {:<18} {} - {} (incompatible: {})", o.name, o.image, flag, o.description, reason);
-                    }
-                }
-                _ => {
-                    println!("  {:<16} {:<18} - {}", o.name, o.image, o.description);
-                }
-            }
-        }
+        
+        // Convert to name strings for CategoryGrid
+        let grid_items: Vec<String> = items.iter().map(|o| {
+            let flag = if o.compatibility.decision == garden_common::COMPAT_FALLBACK {
+                format!("{}{}", o.name, ui::constants::LEGEND_SYMBOL)
+            } else {
+                o.name.clone()
+            };
+            flag
+        }).collect();
+        
+        print!("{}", grid.render_category(&category, &grid_items));
         println!();
     }
 
-    println!("Legend: (!) restricted (fallback or incompatible)");
+    if !restricted_offerings.is_empty() {
+        println!("{}  {} restricted (uses compatibility fallback)", " ".repeat(ui::constants::DEFAULT_INDENT), ui::constants::LEGEND_SYMBOL);
+        println!();
+        println!("{}View compatibility details:", " ".repeat(ui::constants::DEFAULT_INDENT));
+        for name in &restricted_offerings {
+            println!("{}  garden-rake offer {} info", " ".repeat(ui::constants::DEFAULT_INDENT * 2), name);
+        }
+    }
+    
     Ok(())
 }
 
@@ -823,12 +894,15 @@ async fn print_offering_info(
     endpoint: &str,
     offering: &str,
 ) -> anyhow::Result<()> {
-    let url = format!("{}/api/v1/offerings/{}", endpoint.trim_end_matches('/'), offering);
-    let response = client.get(url).send().await?;
+    let moss = GardenHttpClient::new(client, endpoint);
+    let path = format!("/api/v1/offerings/{}", offering);
+    let response = moss.get_raw(&path).await?;
+    
     if response.status() == reqwest::StatusCode::NOT_FOUND {
         anyhow::bail!("Unknown offering: {}", offering);
     }
-    let api_response: ApiResponse<serde_json::Value> = response.error_for_status()?.json().await?;
+    
+    let api_response: GardenApiResponse<serde_json::Value> = response.error_for_status()?.json().await?;
     let body = api_response.data;
 
     let name = body.get("name").and_then(|v| v.as_str()).unwrap_or(offering);
@@ -838,10 +912,10 @@ async fn print_offering_info(
     println!("Image: {}", image);
 
     if let Some(compat) = body.get("compatibility") {
-        let decision = compat.get("decision").and_then(|v| v.as_str()).unwrap_or("pass");
+        let decision = compat.get("decision").and_then(|v| v.as_str()).unwrap_or(garden_common::COMPAT_PASS);
         match decision {
-            "pass" => println!("Compatibility: pass"),
-            "fallback" => {
+            garden_common::COMPAT_PASS => println!("Compatibility: pass"),
+            garden_common::COMPAT_FALLBACK => {
                 let reason = compat.get("reason").and_then(|v| v.as_str()).unwrap_or("<unspecified>");
                 let original = compat.get("original_image").and_then(|v| v.as_str());
                 let fallback = compat.get("fallback_image").and_then(|v| v.as_str());
@@ -852,7 +926,7 @@ async fn print_offering_info(
                 }
                 println!("  Reason: {}", reason);
             }
-            "fail" => {
+            garden_common::COMPAT_FAIL => {
                 let reason = compat.get("reason").and_then(|v| v.as_str()).unwrap_or("<unspecified>");
                 println!("Compatibility: fail");
                 println!("  Reason: {}", reason);
@@ -879,17 +953,203 @@ async fn print_offering_info(
     Ok(())
 }
 
+/// Stream job progress updates from Moss stone's /api/v1/events endpoint.
+/// Falls back to elapsed-time display if endpoint unavailable (older stones).
+///
+/// Implements golden standard: Physicality Over Theater
+/// - Shows real timing, no fake progress bars
+/// - Polls every 500ms for container operations (seconds/minutes duration)
+/// - Displays percentage when stone reports it, elapsed time always
+async fn stream_job_progress(
+    client: &reqwest::Client,
+    endpoint: &str,
+    job_id: &str,
+    service_name: &str,
+    quiet_mode: bool,
+) -> anyhow::Result<()> {
+    let events_url = format!("{}/api/v1/events?job_id={}", endpoint.trim_end_matches('/'), job_id);
+    let term = ui::TerminalInfo::detect();
+    let start_time = std::time::Instant::now();
+    
+    // Check if stone supports /api/v1/events (probe with HEAD request)
+    let probe = client.head(&events_url).send().await;
+    let events_supported = matches!(probe, Ok(resp) if resp.status() != reqwest::StatusCode::NOT_FOUND);
+    
+    if !events_supported {
+        // Fallback: show elapsed time without progress details
+        if !quiet_mode {
+            println!("{}{} Installing... (progress endpoint unavailable)", 
+                " ".repeat(ui::constants::DEFAULT_INDENT),
+                ui::progress_step(true, "")
+            );
+        }
+        
+        // Simple elapsed time loop (5 minute timeout)
+        let mut interval = tokio::time::interval(std::time::Duration::from_millis(500));
+        let timeout = std::time::Duration::from_secs(300);
+        
+        loop {
+            interval.tick().await;
+            let elapsed = start_time.elapsed();
+            
+            if elapsed >= timeout {
+                println!("\n{}⏱  Operation timeout ({})", 
+                    " ".repeat(ui::constants::DEFAULT_INDENT),
+                    ui::format_elapsed_time(timeout)
+                );
+                println!("{}Check status: garden-rake list", " ".repeat(ui::constants::DEFAULT_INDENT));
+                break;
+            }
+            
+            // Check completion by querying service list
+            let list_url = format!("{}/api/v1/services", endpoint.trim_end_matches('/'));
+            if let Ok(response) = client.get(&list_url).send().await {
+                if let Ok(value) = response.json::<serde_json::Value>().await {
+                    let services: Vec<ServiceInfo> = serde_json::from_value(
+                        value.get("data").cloned().unwrap_or(value)
+                    ).unwrap_or_default();
+                    
+                    if services.iter().any(|s| s.name == service_name) {
+                        if !quiet_mode {
+                            println!("\n{}{} Installation complete [{}]", 
+                                " ".repeat(ui::constants::DEFAULT_INDENT),
+                                ui::status_indicator("ok", term.supports_color),
+                                ui::format_elapsed_time(elapsed)
+                            );
+                        }
+                        break;
+                    }
+                }
+            }
+            
+            // Update progress display every 2 seconds
+            if elapsed.as_secs() % 2 == 0 && !quiet_mode {
+                print!("\r{}Installing... [{}]", 
+                    " ".repeat(ui::constants::DEFAULT_INDENT),
+                    ui::format_elapsed_time(elapsed)
+                );
+                use std::io::Write;
+                std::io::stdout().flush().ok();
+            }
+        }
+        
+        return Ok(());
+    }
+    
+    // Full progress streaming from /api/v1/events
+    if !quiet_mode {
+        println!("{}{} Installation started", 
+            " ".repeat(ui::constants::DEFAULT_INDENT),
+            ui::progress_step(true, "")
+        );
+    }
+    
+    let mut interval = tokio::time::interval(std::time::Duration::from_millis(500));
+    let timeout = std::time::Duration::from_secs(300); // 5 minutes
+    let mut last_message = String::new();
+    
+    loop {
+        interval.tick().await;
+        let elapsed = start_time.elapsed();
+        
+        if elapsed >= timeout {
+            println!("\n{}⏱  Operation timeout ({})", 
+                " ".repeat(ui::constants::DEFAULT_INDENT),
+                ui::format_elapsed_time(timeout)
+            );
+            println!("{}Check status: garden-rake list", " ".repeat(ui::constants::DEFAULT_INDENT));
+            break;
+        }
+        
+        // Poll /api/v1/events for job updates
+        match client.get(&events_url).send().await {
+            Ok(response) if response.status().is_success() => {
+                if let Ok(event) = response.json::<serde_json::Value>().await {
+                    let status = event.get("status").and_then(|v| v.as_str()).unwrap_or("unknown");
+                    let message = event.get("message").and_then(|v| v.as_str()).unwrap_or("");
+                    let progress = event.get("progress").and_then(|v| v.as_u64());
+                    
+                    // Display new status updates
+                    if !message.is_empty() && message != last_message && !quiet_mode {
+                        if let Some(pct) = progress {
+                            println!("\r{}{}% {} [{}]", 
+                                " ".repeat(ui::constants::DEFAULT_INDENT),
+                                pct,
+                                message,
+                                ui::format_elapsed_time(elapsed)
+                            );
+                        } else {
+                            println!("\r{}{} [{}]", 
+                                " ".repeat(ui::constants::DEFAULT_INDENT),
+                                message,
+                                ui::format_elapsed_time(elapsed)
+                            );
+                        }
+                        last_message = message.to_string();
+                    }
+                    
+                    // Check for completion
+                    if status == garden_common::STATUS_COMPLETED || status == garden_common::STATUS_SUCCESS {
+                        if !quiet_mode {
+                            println!("\n{}{} Installation complete [{}]", 
+                                " ".repeat(ui::constants::DEFAULT_INDENT),
+                                ui::status_indicator("ok", term.supports_color),
+                                ui::format_elapsed_time(elapsed)
+                            );
+                        }
+                        break;
+                    } else if status == garden_common::STATUS_FAILED || status == garden_common::STATUS_ERROR {
+                        println!("\n{}{} Installation failed: {}", 
+                            " ".repeat(ui::constants::DEFAULT_INDENT),
+                            ui::status_indicator("error", term.supports_color),
+                            message
+                        );
+                        break;
+                    }
+                }
+            }
+            Ok(response) if response.status() == reqwest::StatusCode::NOT_FOUND => {
+                // Job completed or not found
+                if !quiet_mode {
+                    println!("\n{}{} Installation complete (job finished) [{}]", 
+                        " ".repeat(ui::constants::DEFAULT_INDENT),
+                        ui::status_indicator("ok", term.supports_color),
+                        ui::format_elapsed_time(elapsed)
+                    );
+                }
+                break;
+            }
+            _ => {
+                // Network error or server issue, continue polling
+                if elapsed.as_secs() % 5 == 0 && !quiet_mode {
+                    print!("\r{}Checking progress... [{}]", 
+                        " ".repeat(ui::constants::DEFAULT_INDENT),
+                        ui::format_elapsed_time(elapsed)
+                    );
+                    use std::io::Write;
+                    std::io::stdout().flush().ok();
+                }
+            }
+        }
+    }
+    
+    Ok(())
+}
+
 async fn fetch_offering_info_json(
     client: &reqwest::Client,
     endpoint: &str,
     offering: &str,
 ) -> anyhow::Result<serde_json::Value> {
-    let url = format!("{}/api/v1/offerings/{}", endpoint.trim_end_matches('/'), offering);
-    let response = client.get(url).send().await?;
+    let moss = GardenHttpClient::new(client, endpoint);
+    let path = format!("/api/v1/offerings/{}", offering);
+    let response = moss.get_raw(&path).await?;
+    
     if response.status() == reqwest::StatusCode::NOT_FOUND {
         anyhow::bail!("Unknown offering: {}", offering);
     }
-    let api_response: ApiResponse<serde_json::Value> = response.error_for_status()?.json().await?;
+    
+    let api_response: GardenApiResponse<serde_json::Value> = response.error_for_status()?.json().await?;
     Ok(api_response.data)
 }
 
@@ -966,12 +1226,8 @@ async fn refresh_offerings_index(
     client: &reqwest::Client,
     endpoint: &str,
 ) -> anyhow::Result<()> {
-    let url = format!(
-        "{}/api/v1/offerings/refresh",
-        endpoint.trim_end_matches('/')
-    );
-
-    let response = client.post(url).send().await?;
+    let moss = GardenHttpClient::new(client, endpoint);
+    let response = moss.post_empty("/api/v1/offerings/refresh").await?;
     if response.status() == reqwest::StatusCode::NOT_FOUND {
         anyhow::bail!(
             "This stone's moss does not support offerings refresh. Upgrade moss and retry."
@@ -1065,6 +1321,51 @@ struct StoneData {
     services: Vec<ServiceInfo>,
 }
 
+/// Auto-discover a stone and set up tending relationship
+/// Tries localhost first, then network discovery
+async fn auto_discover_and_tend(client: &reqwest::Client) -> anyhow::Result<()> {
+    // Try localhost first
+    let local_endpoint = format!("http://127.0.0.1:{}", garden_common::ports::MOSS_HTTP);
+    let health_url = format!("{}/health", local_endpoint);
+    
+    if let Ok(resp) = client.get(&health_url).timeout(Duration::from_millis(200)).send().await {
+        if resp.status().is_success() {
+            // Get stone name from capabilities
+            let caps_url = format!("{}/capabilities", local_endpoint);
+            if let Ok(response) = client.get(&caps_url).timeout(Duration::from_secs(5)).send().await {
+                if let Ok(response) = response.json::<GardenApiResponse<HardwareCapabilities>>().await {
+                    let caps = response.data;
+                    tending::write_tending(caps.stone_name.clone(), local_endpoint.clone())?;
+                    println!("{}.local (localhost)", caps.stone_name);
+                    return Ok(());
+                }
+            }
+        }
+    }
+    
+    // Try network discovery
+    match discovery::discover_moss() {
+        Ok(endpoint) => {
+            // Get capabilities for stone name
+            let caps_url = format!("{}/capabilities", endpoint.trim_end_matches('/'));
+            let response: GardenApiResponse<HardwareCapabilities> = client
+                .get(&caps_url)
+                .timeout(Duration::from_secs(5))
+                .send()
+                .await?
+                .json()
+                .await?;
+            let caps = response.data;
+            tending::write_tending(caps.stone_name.clone(), endpoint.clone())?;
+            println!("{}.local ({})", caps.stone_name, endpoint.trim_start_matches("http://"));
+            Ok(())
+        }
+        Err(e) => {
+            Err(anyhow::anyhow!("No stones found on network or localhost: {}", e))
+        }
+    }
+}
+
 async fn observe_garden(
     client: &reqwest::Client,
     stone_filter: Option<String>,
@@ -1078,6 +1379,7 @@ async fn observe_garden(
     });
 
     // Try to discover Lantern first for enhanced topology view
+    let term = ui::TerminalInfo::detect();
     let lantern_endpoint = discovery::discover_lantern();
     
     if let Some(ref lantern) = lantern_endpoint {
@@ -1089,7 +1391,7 @@ async fn observe_garden(
             Ok(resp) if resp.status().is_success() => {
                 if let Ok(topology) = resp.json::<garden_common::LanternTopology>().await {
                     // Display Lantern-sourced topology
-                    display_lantern_topology(&topology, offering_filter.as_deref());
+                    display_lantern_topology(&topology, offering_filter.as_deref(), term.supports_unicode);
                     return Ok(());
                 }
             }
@@ -1102,138 +1404,156 @@ async fn observe_garden(
         }
     }
 
+    // Display header first
+    let supports_unicode = term.supports_unicode; // Capture for closures
+    if let Some(ref filter) = offerings_filter {
+        println!("{}", ui::section_header(&format!("GARDEN OVERVIEW (filtered: {})", filter.join(", ")), &term));
+    } else {
+        println!("{}", ui::section_header("GARDEN OVERVIEW", &term));
+    }
+    println!();
+
+    let discovery_start = std::time::Instant::now();
+    let mut stone_data = Vec::new();
+    
     // Fallback: Hot cache architecture - Check cache FIRST (zero discovery for common case)
     let cached_stones = STONE_CACHE.get_all();
     
-    // Discover all stones (cache-first with fallback to discovery)
-    let stones = if !cached_stones.is_empty() {
+    if !cached_stones.is_empty() {
         tracing::info!(count = cached_stones.len(), "Using cached stone discovery (cache hit)");
         
-        // Use cached endpoints, optionally filter by name
-        if let Some(specific_stone) = stone_filter.as_ref() {
-            let filtered: Vec<String> = cached_stones
-                .iter()
-                .filter(|cached| cached.capabilities.stone_name.to_lowercase() == specific_stone.to_lowercase())
-                .map(|cached| cached.endpoint.clone())
-                .collect();
+        // ✅ Stream cached results progressively (Container Infrastructure: "cache hits should also stream")
+        for cached in &cached_stones {
+            // Filter by name if specified
+            if let Some(ref filter_name) = stone_filter {
+                if cached.capabilities.stone_name.to_lowercase() != filter_name.to_lowercase() {
+                    continue;
+                }
+            }
             
-            if filtered.is_empty() {
-                println!("✗ Stone '{}' not found in cache", specific_stone);
-                return Ok(());
-            }
-            filtered
-        } else {
-            cached_stones.iter().map(|cached| cached.endpoint.clone()).collect()
-        }
-    } else {
-        tracing::info!("Cache miss - performing stone discovery");
-        
-        if let Some(specific_stone) = stone_filter.as_ref() {
-            // Discover all stones and filter by name
-            match discovery::discover_all_moss(Duration::from_secs(2)) {
-                Ok(endpoints) => {
-                    let mut filtered = Vec::new();
-                    for endpoint in endpoints {
-                        // Fetch stone capabilities to check name
-                        let caps_url = format!("{}/capabilities", endpoint.trim_end_matches('/'));
-                        if let Ok(resp) = client.get(&caps_url).timeout(Duration::from_secs(5)).send().await {
-                            if let Ok(response) = resp.json::<ApiResponse<HardwareCapabilities>>().await {
-                                let caps = response.data;
-                                // Cache the discovered stone
-                                STONE_CACHE.insert(caps.stone_name.clone(), endpoint.clone(), caps.clone());
-                                
-                                if caps.stone_name.to_lowercase() == specific_stone.to_lowercase() {
-                                    filtered.push(endpoint);
-                                }
-                            }
-                        }
-                    }
-                    if filtered.is_empty() {
-                        println!("✗ Stone '{}' not found", specific_stone);
-                        return Ok(());
-                    }
-                    filtered
-                }
-                _ => {
-                    println!("✗ No stones discovered");
-                    return Ok(());
-                }
-            }
-        } else {
-            // Discover all stones via UDP broadcast
-            match discovery::discover_all_moss(Duration::from_secs(2)) {
-                Ok(endpoints) if !endpoints.is_empty() => endpoints,
-                _ => {
-                    // Fallback to localhost
-                    vec![format!("http://127.0.0.1:{}", garden_common::ports::MOSS_HTTP)]
-                }
-            }
-        }
-    };
-
-    if stones.is_empty() {
-        println!("No stones discovered");
-        return Ok(());
-    }
-
-    // Fetch data from all stones
-    let mut stone_data = Vec::new();
-    for endpoint in stones {
-        let caps_url = format!("{}/capabilities", endpoint.trim_end_matches('/'));
-        let services_url = format!("{}/api/v1/services", endpoint.trim_end_matches('/'));
-
-        match tokio::try_join!(
-            client.get(&caps_url).timeout(Duration::from_secs(5)).send(),
-            client.get(&services_url).timeout(Duration::from_secs(5)).send()
-        ) {
-            Ok((caps_resp, services_resp)) => {
-                if let (Ok(caps_response), Ok(services_response)) = (
-                    caps_resp.json::<ApiResponse<HardwareCapabilities>>().await,
-                    services_resp.json::<serde_json::Value>().await,
-                ) {
-                    let capabilities = caps_response.data;
-                    let services: Vec<ServiceInfo> = serde_json::from_value(services_response.get("data").cloned().unwrap_or(services_response))?;
-                    // Cache the stone (refresh TTL if already cached)
-                    STONE_CACHE.insert(
-                        capabilities.stone_name.clone(),
-                        endpoint.clone(),
-                        capabilities.clone(),
-                    );
+            let elapsed = discovery_start.elapsed();
+            println!("{}{} {} [{}]", 
+                " ".repeat(ui::constants::DEFAULT_INDENT),
+                ui::bullet(supports_unicode),
+                cached.capabilities.stone_name,
+                ui::format_elapsed_time(elapsed)
+            );
+            
+            // Fetch services for cached stone
+            let services_url = format!("{}/api/v1/services", cached.endpoint.trim_end_matches('/'));
+            if let Ok(resp) = client.get(&services_url).timeout(Duration::from_secs(5)).send().await {
+                if let Ok(services_json) = resp.json::<serde_json::Value>().await {
+                    let services: Vec<ServiceInfo> = serde_json::from_value(
+                        services_json.get("data").cloned().unwrap_or(services_json)
+                    ).unwrap_or_default();
                     
                     stone_data.push(StoneData {
-                        capabilities,
+                        capabilities: cached.capabilities.clone(),
                         services,
                     });
                 }
             }
-            Err(e) => {
-                tracing::debug!(endpoint = %endpoint, error = ?e, "Failed to fetch stone data");
+        }
+        
+        if stone_filter.is_some() && stone_data.is_empty() {
+            println!("{}✗ Stone '{}' not found in cache", " ".repeat(ui::constants::DEFAULT_INDENT), stone_filter.as_ref().unwrap());
+            return Ok(());
+        }
+    } else {
+        tracing::info!("Cache miss - performing stone discovery");
+        
+        // Collect discovered responses for later fetching
+        let mut discovered_responses = Vec::new();
+        
+        // ✅ PROGRESSIVE DISCLOSURE - Stream as stones respond (5 seconds for network discovery)
+        let stone_count = discovery::discover_all_moss_stream(
+            Duration::from_secs(5),
+            |response, discovery_instant| {
+                // Filter by name if specified
+                if let Some(ref filter_name) = stone_filter {
+                    if response.stone_name.to_lowercase() != filter_name.to_lowercase() {
+                        return;
+                    }
+                }
+                
+                let elapsed = discovery_instant.duration_since(discovery_start);
+                println!("{}{} {} [{}]", 
+                    " ".repeat(ui::constants::DEFAULT_INDENT),
+                    ui::bullet(supports_unicode),
+                    response.stone_name,
+                    ui::format_elapsed_time(elapsed)
+                );
+                
+                // Collect for later fetching
+                discovered_responses.push(response);
+            }
+        );
+        
+        println!();
+        
+        // Fetch full data for discovered stones
+        for response in discovered_responses {
+            let caps_url = format!("{}/capabilities", response.stone_endpoint.trim_end_matches('/'));
+            if let Ok(resp) = client.get(&caps_url).timeout(Duration::from_secs(5)).send().await {
+                if let Ok(caps_response) = resp.json::<GardenApiResponse<HardwareCapabilities>>().await {
+                    let services_url = format!("{}/api/v1/services", response.stone_endpoint.trim_end_matches('/'));
+                    if let Ok(svc_resp) = client.get(&services_url).timeout(Duration::from_secs(5)).send().await {
+                        if let Ok(services_json) = svc_resp.json::<serde_json::Value>().await {
+                            let services: Vec<ServiceInfo> = serde_json::from_value(
+                                services_json.get("data").cloned().unwrap_or(services_json)
+                            ).unwrap_or_default();
+                            
+                            stone_data.push(StoneData {
+                                capabilities: caps_response.data,
+                                services,
+                            });
+                        }
+                    }
+                }
+            }
+        }
+        
+        if stone_count.is_err() || stone_count.as_ref().ok() == Some(&0) {
+            // Fallback to localhost (silent attempt first)
+            let localhost = format!("http://127.0.0.1:{}", garden_common::ports::MOSS_HTTP);
+            
+            // Fetch localhost capabilities and services
+            let caps_url = format!("{}/capabilities", localhost);
+            if let Ok(resp) = client.get(&caps_url).timeout(Duration::from_secs(5)).send().await {
+                if let Ok(caps_response) = resp.json::<GardenApiResponse<HardwareCapabilities>>().await {
+                    let services_url = format!("{}/api/v1/services", localhost);
+                    if let Ok(svc_resp) = client.get(&services_url).timeout(Duration::from_secs(5)).send().await {
+                        if let Ok(services_json) = svc_resp.json::<serde_json::Value>().await {
+                            let services: Vec<ServiceInfo> = serde_json::from_value(
+                                services_json.get("data").cloned().unwrap_or(services_json)
+                            ).unwrap_or_default();
+                            
+                            stone_data.push(StoneData {
+                                capabilities: caps_response.data,
+                                services,
+                            });
+                        }
+                    }
+                }
             }
         }
     }
 
     if stone_data.is_empty() {
-        println!("No reachable stones found");
+        println!("{}No reachable stones found", " ".repeat(ui::constants::DEFAULT_INDENT));
         return Ok(());
     }
 
-    // Display header
-    if let Some(ref filter) = offerings_filter {
-        println!("\n═══ GARDEN OVERVIEW (filtered: {}) ═══\n", filter.join(", "));
-    } else {
-        println!("\n═══ GARDEN OVERVIEW ═══\n");
-    }
-
-    // Display each stone
-    for stone in stone_data {
-        display_stone(&stone, &offerings_filter)?;
+    // Display detailed stone information
+    for stone in &stone_data {
+        display_stone(stone, &offerings_filter)?;
     }
 
     Ok(())
 }
 
 /// Display topology from Lantern registry
-fn display_lantern_topology(topology: &garden_common::LanternTopology, offering_filter: Option<&str>) {
+fn display_lantern_topology(topology: &garden_common::LanternTopology, offering_filter: Option<&str>, supports_unicode: bool) {
     println!("\n═══ GARDEN OVERVIEW (via Lantern) ═══\n");
     
     if topology.stones.is_empty() {
@@ -1243,9 +1563,9 @@ fn display_lantern_topology(topology: &garden_common::LanternTopology, offering_
 
     for stone in &topology.stones {
         let status_marker = match stone.status.as_str() {
-            "online" => "●",
-            "offline" => "○",
-            _ => "◐",
+            "online" => ui::bullet(supports_unicode),
+            "offline" => ui::hollow_bullet(supports_unicode),
+            _ => if supports_unicode { "◐" } else { "~" },
         };
         
         println!("{}  {} ({})", status_marker, stone.name, stone.status);
@@ -1281,16 +1601,19 @@ fn display_lantern_topology(topology: &garden_common::LanternTopology, offering_
 
 fn display_stone(stone: &StoneData, offering_filter: &Option<Vec<String>>) -> anyhow::Result<()> {
     let caps = &stone.capabilities;
+    let term = ui::TerminalInfo::detect();
     
-    // Stone header - just show name and basic info
-    println!("●  {} ({})", caps.stone_name, caps.hardware.cpu.architecture);
-
-    // Host resources (if available)
-    println!("   CPU: {} cores  │  Memory: {} MB  │  GPUs: {}",
-        caps.hardware.cpu.cores,
-        caps.hardware.memory.total_mb,
-        caps.hardware.gpus.len(),
-    );
+    // Stone banner
+    println!("{}", ui::stone_banner(&caps.stone_name, "online", term.supports_color));
+    
+    // System info
+    println!("{}", ui::label_value_line("ARCH", &caps.hardware.cpu.architecture, ui::constants::DEFAULT_INDENT));
+    println!("{}", ui::label_value_line("CPU", &format!("{} cores", caps.hardware.cpu.cores), ui::constants::DEFAULT_INDENT));
+    println!("{}", ui::label_value_line("MEMORY", &format!("{} MB", caps.hardware.memory.total_mb), ui::constants::DEFAULT_INDENT));
+    if !caps.hardware.gpus.is_empty() {
+        println!("{}", ui::label_value_line("GPU", &format!("{} device(s)", caps.hardware.gpus.len()), ui::constants::DEFAULT_INDENT));
+    }
+    println!();
 
     // Filter services if needed
     let filtered_services: Vec<&ServiceInfo> = if let Some(ref filters) = offering_filter {
@@ -1302,46 +1625,51 @@ fn display_stone(stone: &StoneData, offering_filter: &Option<Vec<String>>) -> an
     };
 
     if filtered_services.is_empty() && offering_filter.is_some() {
-        println!("   └─ No matching offerings");
+        println!("{}", ui::empty_state("No matching offerings", None));
         let hidden = stone.services.len();
         if hidden > 0 {
-            println!("      + {} other service{}", hidden, if hidden == 1 { "" } else { "s" });
+            println!("{}  {} other service{}", " ".repeat(ui::constants::DEFAULT_INDENT), hidden, if hidden == 1 { "" } else { "s" });
         }
     } else if filtered_services.is_empty() {
-        println!("   └─ No offerings");
+        println!("{}", ui::empty_state("No offerings", None));
     } else {
-        // Display offerings
-        println!("   OFFERINGS:");
-        for (idx, svc) in filtered_services.iter().enumerate() {
-            let is_last = idx == filtered_services.len() - 1;
-            let branch = if is_last { "└─" } else { "├─" };
+        // Display offerings table
+        println!("{}", ui::section_header("OFFERINGS", &term));
+        println!();
+        
+        let mut table = ui::TableBuilder::new()
+            .add_column(24, ui::Align::Left)
+            .add_column(12, ui::Align::Left)
+            .add_column(10, ui::Align::Right)
+            .add_column(10, ui::Align::Right)
+            .add_column(10, ui::Align::Right)
+            .add_column(10, ui::Align::Right);
+        
+        for svc in filtered_services.iter() {
+            let status_indicator = ui::status_indicator(&format!("{:?}", svc.status).to_lowercase(), term.supports_color);
             
-            let status_short = match svc.status {
-                garden_common::ServiceStatus::Running => "Run",
-                garden_common::ServiceStatus::Stopped => "Stop",
-                garden_common::ServiceStatus::Maintenance => "Maint",
-                garden_common::ServiceStatus::Degraded => "Degr",
-                garden_common::ServiceStatus::Unknown => "?",
-            };
-
             if let Some(ref res) = svc.resources {
-                println!("   {} {:<12}  {}  {}  {}  ↓{}  {}",
-                    branch,
-                    svc.name,
-                    status_short,
-                    format!("{:>6}", res.cpu_friendly),
-                    format!("{:>9}", res.memory_friendly),
-                    format!("{:>8}", res.network_rx_friendly),
-                    res.uptime_friendly,
-                );
+                table.add_row(vec![
+                    ui::truncate_name(&svc.name, ui::constants::MAX_SERVICE_NAME_LEN),
+                    status_indicator,
+                    res.cpu_friendly.clone(),
+                    res.memory_friendly.clone(),
+                    res.network_rx_friendly.clone(),
+                    res.uptime_friendly.clone(),
+                ]);
             } else {
-                println!("   {} {:<12}  {}",
-                    branch,
-                    svc.name,
-                    status_short,
-                );
+                table.add_row(vec![
+                    ui::truncate_name(&svc.name, ui::constants::MAX_SERVICE_NAME_LEN),
+                    status_indicator,
+                    "-".to_string(),
+                    "-".to_string(),
+                    "-".to_string(),
+                    "-".to_string(),
+                ]);
             }
         }
+        
+        println!("{}", table.render());
 
         // Show hidden count if filtered
         if offering_filter.is_some() {
@@ -1368,7 +1696,7 @@ async fn list_templates(
         return Ok(());
     }
     
-    let api_response: ApiResponse<Vec<TemplateInfo>> = response.json().await?;
+    let api_response: GardenApiResponse<Vec<TemplateInfo>> = response.json().await?;
     let templates = api_response.data;
     if templates.is_empty() {
         println!("\nNo templates available");
@@ -1411,6 +1739,7 @@ async fn show_template(
     endpoint: &str,
     name: &str,
 ) -> anyhow::Result<()> {
+    let term = ui::TerminalInfo::detect();
     let url = format!("{}/api/v1/services/{}/manifest", endpoint.trim_end_matches('/'), name);
     let response = client.get(&url).send().await?;
     
@@ -1535,15 +1864,15 @@ async fn show_template(
                 println!("{}", content);
                 println!();
             } else {
-                println!("✗ Invalid response format");
+                eprintln!("{}{} Invalid response format", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color));
             }
         }
         reqwest::StatusCode::NOT_FOUND => {
-            println!("✗ Template '{}' not found", name);
-            println!("   Use 'garden-rake template list' to see available templates");
+            eprintln!("{}{} Template '{}' not found", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), name);
+            eprintln!("{}Use 'garden-rake template list' to see available templates", " ".repeat(ui::constants::DEFAULT_INDENT));
         }
         status => {
-            println!("✗ Failed to retrieve template: {}", status);
+            eprintln!("{}{} Failed to retrieve template: {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), status);
         }
     }
     
@@ -1598,7 +1927,7 @@ fn normalize_zen_to_clap(parsed: &parser::ParsedCommand) -> anyhow::Result<Vec<S
             args.extend(parsed.args.clone());
         }
         "lift" => {
-            // lift = remove stone from pond or remove pebble
+            // lift = remove stone from pond or remove keystone
             // For now, map to place (Phase 3)
             args.push("place".to_string());
             args.extend(parsed.args.clone());
@@ -1690,27 +2019,58 @@ async fn main() -> anyhow::Result<()> {
     }
 
     let client = client_builder.build()?;
+    let term = ui::TerminalInfo::detect();
 
     match cli.command {
         Commands::Status { at } => {
+            // Deprecation notice (unless quiet mode)
+            if !quiet_mode {
+                eprintln!("{}⚠️  'status' command is deprecated", " ".repeat(ui::constants::DEFAULT_INDENT));
+                eprintln!("{}Use 'observe' for garden overview or 'tend' to set default stone", " ".repeat(ui::constants::DEFAULT_INDENT));
+                eprintln!();
+            }
+            
             let endpoint = resolve_endpoint(&client, at).await?;
-            let context = get_connection_context(&client, &endpoint).await?;
-            context.display();
             
             let caps_url = format!("{}/capabilities", endpoint.trim_end_matches('/'));
             let health_url = format!("{}/health", endpoint.trim_end_matches('/'));
-            let response: ApiResponse<HardwareCapabilities> = client.get(caps_url).send().await?.json().await?;
+            let response: GardenApiResponse<HardwareCapabilities> = client.get(caps_url).send().await?.json().await?;
             let caps = response.data;
-            let health_text: String = client.get(health_url).send().await?.text().await?;
+            let health_resp: String = client.get(health_url).send().await?.text().await?;
             
-            println!("Stone: {}", caps.stone_name);
-            println!("Health: {}", health_text);
-            println!("CPU: {} cores, {}", caps.hardware.cpu.cores, caps.hardware.cpu.architecture);
-            println!("Memory: {} MB", caps.hardware.memory.total_mb);
+            // Parse health response
+            let health_json: serde_json::Value = serde_json::from_str(&health_resp).unwrap_or_else(|_| serde_json::json!({}));
+            let health_status = health_json.get("status").and_then(|v| v.as_str()).unwrap_or("unknown");
+            
+            // Display stone banner
+            let term = ui::TerminalInfo::detect();
+            println!("{}", ui::stone_banner(&caps.stone_name, health_status, term.supports_color));
+            println!();
+            
+            // System info section
+            println!("{}", ui::section_header("SYSTEM", &term));
+            println!("{}", ui::label_value_line("ARCH", &caps.hardware.cpu.architecture, ui::constants::DEFAULT_INDENT));
+            println!("{}", ui::label_value_line("CPU", &format!("{} cores", caps.hardware.cpu.cores), ui::constants::DEFAULT_INDENT));
+            println!("{}", ui::label_value_line("MEMORY", &format!("{} MB", caps.hardware.memory.total_mb), ui::constants::DEFAULT_INDENT));
+            
+            // GPU section
             if !caps.hardware.gpus.is_empty() {
-                println!("GPUs:");
+                println!();
+                println!("{}", ui::section_header("GPU", &term));
                 for gpu in &caps.hardware.gpus {
-                    println!("  - {} {} ({})", gpu.vendor, gpu.model, gpu.capabilities.join(", "));
+                    println!("{}", ui::label_value_line("DEVICE", &format!("{} {}", gpu.vendor, gpu.model), ui::constants::DEFAULT_INDENT));
+                    println!("{}", ui::label_value_line("CAPABILITIES", &gpu.capabilities.join(", "), ui::constants::DEFAULT_INDENT));
+                }
+            }
+            
+            // Health details if available
+            if let Some(checks) = health_json.get("checks").and_then(|v| v.as_object()) {
+                println!();
+                println!("{}", ui::section_header("HEALTH", &term));
+                for (check_name, check_data) in checks {
+                    let status = check_data.get("status").and_then(|v| v.as_str()).unwrap_or("unknown");
+                    let indicator = ui::status_indicator(status, term.supports_color);
+                    println!("{}{} {}", " ".repeat(ui::constants::DEFAULT_INDENT), indicator, check_name.to_uppercase());
                 }
             }
         }
@@ -1732,8 +2092,6 @@ async fn main() -> anyhow::Result<()> {
             }
 
             let endpoint = resolve_endpoint(&client, at).await?;
-            let context = get_connection_context(&client, &endpoint).await?;
-            context.display();
 
             // If the user provided a non-offering token, treat it as a query.
             // We detect this by fetching offerings and checking for an exact name match.
@@ -1759,6 +2117,37 @@ async fn main() -> anyhow::Result<()> {
                     print_offering_info(&client, &endpoint, name).await?;
                 }
                 (Some(name), None) => {
+                    // Check if service is already installed
+                    let services_url = format!("{}/api/v1/services", endpoint.trim_end_matches('/'));
+                    if let Ok(response) = client.get(&services_url).send().await {
+                        if let Ok(json) = response.json::<serde_json::Value>().await {
+                            let services: Vec<ServiceInfo> = serde_json::from_value(json.get("data").cloned().unwrap_or(json)).unwrap_or_default();
+                            if let Some(existing) = services.iter().find(|s| s.offering == name) {
+                                let term = ui::TerminalInfo::detect();
+                                let status_str = format!("{:?}", existing.status).to_lowercase();
+                                let status_icon = ui::status_indicator(&status_str, term.supports_color);
+                                
+                                println!("{}{} Service '{}' is already installed ({})", 
+                                    " ".repeat(ui::constants::DEFAULT_INDENT),
+                                    status_icon,
+                                    existing.name,
+                                    status_str
+                                );
+                                println!();
+                                println!("{}Options:", " ".repeat(ui::constants::DEFAULT_INDENT));
+                                println!("{}  • View details:  garden-rake show {}", " ".repeat(ui::constants::DEFAULT_INDENT * 2), existing.name);
+                                println!("{}  • Remove service: garden-rake remove {}", " ".repeat(ui::constants::DEFAULT_INDENT * 2), existing.name);
+                                if status_str.contains(garden_common::SERVICE_STOPPED) {
+                                    println!("{}  • Start service:  garden-rake start {}", " ".repeat(ui::constants::DEFAULT_INDENT * 2), existing.name);
+                                } else if status_str.contains(garden_common::SERVICE_RUNNING) {
+                                    println!("{}  • Stop service:   garden-rake stop {}", " ".repeat(ui::constants::DEFAULT_INDENT * 2), existing.name);
+                                    println!("{}  • Restart service: garden-rake restart {}", " ".repeat(ui::constants::DEFAULT_INDENT * 2), existing.name);
+                                }
+                                return Ok(());
+                            }
+                        }
+                    }
+                    
                     // v1 API: POST /api/v1/services with JSON body
                     let url = format!("{}/api/v1/services", endpoint.trim_end_matches('/'));
                     let payload = serde_json::json!({
@@ -1773,6 +2162,7 @@ async fn main() -> anyhow::Result<()> {
 
                     match status {
                         reqwest::StatusCode::ACCEPTED | reqwest::StatusCode::OK => {
+                            let term = ui::TerminalInfo::detect();
                             if let Some(body) = body {
                                 // Parse ServiceActionResponse from v1 API
                                 let service_name = body.get("service").and_then(|v| v.as_str()).unwrap_or(name);
@@ -1780,20 +2170,33 @@ async fn main() -> anyhow::Result<()> {
                                 let api_status = body.get("status").and_then(|v| v.as_str()).unwrap_or("pending");
                                 let message = body.get("message").and_then(|v| v.as_str()).unwrap_or("");
                                 
+                                println!("{}", ui::stone_banner(service_name, api_status, term.supports_color));
+                                println!();
+                                
                                 // Extract job_id from message if present
-                                if message.contains("Job ID:") || message.contains("job:") {
-                                    println!("⏳ Installation queued for '{}'", service_name);
-                                    println!("   {}", message);
-                                    println!("   Check status: garden-rake status");
-                                } else if message.contains("Adopted") {
-                                    println!("✓ Service '{}' already exists (adopted)", service_name);
-                                    println!("   {}", message);
-                                } else if message.contains("maintenance") {
-                                    println!("⏳ Service under maintenance, retry later");
+                                let job_id = if message.contains("Job ID:") || message.contains("job:") {
+                                    // Try to parse job_id from message (format: "Job ID: abc123" or similar)
+                                    message
+                                        .split_whitespace()
+                                        .skip_while(|s| !s.contains("ID") && !s.contains("job"))
+                                        .nth(1)
+                                        .map(|s| s.trim_end_matches(&['.', ',', '!'][..]).to_string())
                                 } else {
-                                    println!("✓ {} {} ({})", action, service_name, api_status);
+                                    None
+                                };
+
+                                if let Some(job_id) = job_id {
+                                    // Stream progress updates if stone supports /api/v1/events
+                                    stream_job_progress(&client, &endpoint, &job_id, service_name, quiet_mode).await?;
+                                } else if message.contains("Adopted") {
+                                    println!("{}{} Service already exists (adopted)", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("ok", term.supports_color));
+                                    println!("{}{}", " ".repeat(ui::constants::DEFAULT_INDENT), message);
+                                } else if message.contains("maintenance") {
+                                    println!("{}{} Under maintenance, retry later", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("pending", term.supports_color));
+                                } else {
+                                    println!("{}{} {} ({})", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("ok", term.supports_color), action, api_status);
                                     if !message.is_empty() {
-                                        println!("   {}", message);
+                                        println!("{}{}", " ".repeat(ui::constants::DEFAULT_INDENT), message);
                                     }
                                 }
                                 
@@ -1801,10 +2204,11 @@ async fn main() -> anyhow::Result<()> {
                                 if !quiet_mode {
                                     if let Some(suggestions) = body.get("suggestions").and_then(|v| v.as_array()) {
                                         if !suggestions.is_empty() {
-                                            println!("\nSuggestions:");
+                                            println!();
+                                            println!("{}", ui::section_header("SUGGESTIONS", &term));
                                             for suggestion in suggestions {
                                                 if let Some(s) = suggestion.as_str() {
-                                                    println!("  • {}", s);
+                                                    println!("{}  • {}", " ".repeat(ui::constants::DEFAULT_INDENT), s);
                                                 }
                                             }
                                         }
@@ -1813,6 +2217,7 @@ async fn main() -> anyhow::Result<()> {
                             }
                         }
                         reqwest::StatusCode::BAD_REQUEST => {
+                            let term = ui::TerminalInfo::detect();
                             // Moss v1 uses structured ApiError
                             if let Some(body) = body {
                                 let code = body
@@ -1826,14 +2231,14 @@ async fn main() -> anyhow::Result<()> {
                                     .and_then(|v| v.as_str())
                                     .unwrap_or("Request failed");
 
-                                println!("✗ {} ({})", msg, code);
+                                println!("{}{} {} ({})", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), msg, code);
 
                                 if let Some(details) = body.get("error").and_then(|e| e.get("details")) {
                                     if let Some(reason) = details.get("reason").and_then(|v| v.as_str()) {
-                                        println!("  Reason: {}", reason);
+                                        println!("{}Reason: {}", " ".repeat(ui::constants::DEFAULT_INDENT * 2), reason);
                                     }
                                     if let Some(suggestion) = details.get("suggestion").and_then(|v| v.as_str()) {
-                                        println!("  Suggestion: {}", suggestion);
+                                        println!("{}Suggestion: {}", " ".repeat(ui::constants::DEFAULT_INDENT * 2), suggestion);
                                     }
                                 }
 
@@ -1845,25 +2250,32 @@ async fn main() -> anyhow::Result<()> {
 
                                     if anywhere_on_fail {
                                         if let Some(q) = derived_query {
-                                            println!("\nSearching across stones...");
+                                            println!("\n{}Searching across stones...", " ".repeat(ui::constants::DEFAULT_INDENT));
                                             let _ = print_offer_anywhere_recommendations(&client, &q, &prefer).await;
                                         }
                                     }
                                 }
                             } else {
-                                println!("✗ Failed: {}", status);
+                                println!("{}{} Failed: {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), status);
                             }
                         }
                         reqwest::StatusCode::NOT_FOUND => {
+                            let term = ui::TerminalInfo::detect();
                             // Unknown offering name? Treat it like a query on this stone.
-                            println!("✗ Unknown offering: {}", name);
+                            println!("{}{} Unknown offering: {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), name);
                             let _ = print_offer_query_recommendations(&client, &endpoint, name, &prefer).await;
                         }
-                        s if s.is_success() => println!("✓ Offered {}", name),
-                        reqwest::StatusCode::NOT_IMPLEMENTED => {
-                            println!("ℹ️  Offer not implemented on server")
+                        s if s.is_success() => {
+                            let term = ui::TerminalInfo::detect();
+                            println!("{}{} Offered {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("ok", term.supports_color), name);
                         }
-                        _ => println!("✗ Failed: {}", status),
+                        reqwest::StatusCode::NOT_IMPLEMENTED => {
+                            println!("{}ℹ️  Offer not implemented on server", " ".repeat(ui::constants::DEFAULT_INDENT));
+                        }
+                        _ => {
+                            let term = ui::TerminalInfo::detect();
+                            println!("{}{} Failed: {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), status);
+                        }
                     }
                 }
                 (None, Some(_)) => {
@@ -1874,25 +2286,43 @@ async fn main() -> anyhow::Result<()> {
 
         Commands::List { at } => {
             let endpoint = resolve_endpoint(&client, at).await?;
-            let context = get_connection_context(&client, &endpoint).await?;
-            context.display();
             
             let url = format!("{}/api/v1/services", endpoint.trim_end_matches('/'));
             let response: serde_json::Value = client.get(url).send().await?.json().await?;
             let services: Vec<ServiceInfo> = serde_json::from_value(response.get("data").cloned().unwrap_or(response))?;
+            
+            let term = ui::TerminalInfo::detect();
+            
             if services.is_empty() {
-                println!("No services installed");
+                println!("{}", ui::empty_state("No services installed", Some("Use: garden-rake offer <service>")));
             } else {
-                for svc in services {
-                    println!("{} - {:?}", svc.name, svc.status);
-                }
+                println!("{}", ui::section_header("SERVICES", &term));
+                println!();
+                render_services_table(&services, &term);
             }
         }
 
-        Commands::Remove { service, at } => {
+        Commands::Remove { service, at, force } => {
             let endpoint = resolve_endpoint(&client, at).await?;
-            let context = get_connection_context(&client, &endpoint).await?;
-            context.display();
+            print_stone_header(&client, &endpoint).await;
+            
+            // Confirmation prompt (unless --force or quiet mode)
+            if !force && !quiet_mode {
+                println!("{}⚠️  This will permanently remove service '{}'", " ".repeat(ui::constants::DEFAULT_INDENT), service);
+                println!("{}Container and any associated volumes will be deleted.", " ".repeat(ui::constants::DEFAULT_INDENT));
+                print!("{}Continue? [y/N]: ", " ".repeat(ui::constants::DEFAULT_INDENT));
+                use std::io::Write;
+                std::io::stdout().flush()?;
+                
+                let mut input = String::new();
+                std::io::stdin().read_line(&mut input)?;
+                
+                if !input.trim().eq_ignore_ascii_case("y") {
+                    println!("{}Cancelled", " ".repeat(ui::constants::DEFAULT_INDENT));
+                    return Ok(());
+                }
+                println!();
+            }
             
             // v1 API: DELETE /api/v1/services/:service
             let url = format!(
@@ -1909,9 +2339,9 @@ async fn main() -> anyhow::Result<()> {
                     if let Ok(body) = response.json::<serde_json::Value>().await {
                         let message = body.get("message").and_then(|v| v.as_str()).unwrap_or("");
                         
-                        println!("✓ Removed {}", service);
+                        println!("{}{} Removed {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("ok", term.supports_color), service);
                         if !message.is_empty() {
-                            println!("   {}", message);
+                            println!("{}   {}", " ".repeat(ui::constants::DEFAULT_INDENT), message);
                         }
                         
                         // Display suggestions if present and not in quiet mode
@@ -1928,11 +2358,15 @@ async fn main() -> anyhow::Result<()> {
                             }
                         }
                     } else {
-                        println!("✓ Removed {}", service);
+                        println!("{}{} Removed {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("ok", term.supports_color), service);
                     }
                 }
-                reqwest::StatusCode::NOT_FOUND => println!("✗ Service '{}' not found", service),
-                _ => println!("✗ Failed: {}", status),
+                reqwest::StatusCode::NOT_FOUND => {
+                    eprintln!("{}{} Service '{}' not found", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), service);
+                }
+                _ => {
+                    eprintln!("{}{} Failed: {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), status);
+                }
             }
         }
 
@@ -1946,7 +2380,7 @@ async fn main() -> anyhow::Result<()> {
                 let list_response = client.get(&list_url).send().await?;
                 
                 if !list_response.status().is_success() {
-                    println!("✗ Failed to retrieve service list: {}", list_response.status());
+                    eprintln!("{}{} Failed to retrieve service list: {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), list_response.status());
                     return Ok(());
                 }
                 
@@ -1971,20 +2405,20 @@ async fn main() -> anyhow::Result<()> {
                     }
                     
                     if !upgraded.is_empty() {
-                        println!("✓ Upgraded {} service(s)", upgraded.len());
+                        println!("{}{} Upgraded {} service(s)", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("ok", term.supports_color), upgraded.len());
                         for name in &upgraded {
-                            println!("  - {}", name);
+                            println!("{}  - {}", " ".repeat(ui::constants::DEFAULT_INDENT), name);
                         }
                     }
                     
                     if !failed.is_empty() {
-                        println!("✗ Failed to upgrade {} service(s)", failed.len());
+                        eprintln!("{}{} Failed to upgrade {} service(s)", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), failed.len());
                         for name in &failed {
-                            println!("  - {}", name);
+                            eprintln!("{}  - {}", " ".repeat(ui::constants::DEFAULT_INDENT), name);
                         }
                     }
                 } else {
-                    println!("✗ No services found");
+                    eprintln!("{}{} No services found", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color));
                 }
             } else if let Some(svc_name) = service {
                 // v1 API: POST /api/v1/services/:service/nourish
@@ -2003,9 +2437,9 @@ async fn main() -> anyhow::Result<()> {
                             let message = body.get("message").and_then(|v| v.as_str()).unwrap_or("");
                             let api_status = body.get("status").and_then(|v| v.as_str()).unwrap_or("upgraded");
                             
-                            println!("✓ Upgraded {} ({})", svc_name, api_status);
+                            println!("{}{} Upgraded {} ({})", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("ok", term.supports_color), svc_name, api_status);
                             if !message.is_empty() {
-                                println!("   {}", message);
+                                println!("{}   {}", " ".repeat(ui::constants::DEFAULT_INDENT), message);
                             }
                             
                             // Display suggestions if present and not in quiet mode
@@ -2022,16 +2456,18 @@ async fn main() -> anyhow::Result<()> {
                                 }
                             }
                         } else {
-                            println!("✓ Upgraded {}", svc_name);
+                            println!("{}{} Upgraded {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("ok", term.supports_color), svc_name);
                         }
                     }
                     reqwest::StatusCode::ACCEPTED => {
-                        println!("⏳ Service under maintenance, retry later")
+                        println!("{}{} Service under maintenance, retry later", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("pending", term.supports_color));
                     }
                     reqwest::StatusCode::NOT_FOUND => {
-                        println!("✗ Service '{}' not found", svc_name)
+                        eprintln!("{}{} Service '{}' not found", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), svc_name);
                     }
-                    _ => println!("✗ Failed: {}", status),
+                    _ => {
+                        eprintln!("{}{} Failed: {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), status);
+                    }
                 }
             }
         }
@@ -2054,9 +2490,9 @@ async fn main() -> anyhow::Result<()> {
                         let message = body.get("message").and_then(|v| v.as_str()).unwrap_or("");
                         let api_status = body.get("status").and_then(|v| v.as_str()).unwrap_or("stopped");
                         
-                        println!("✓ Stopped {} ({})", service, api_status);
+                        println!("{}{} Stopped {} ({})", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("ok", term.supports_color), service, api_status);
                         if !message.is_empty() {
-                            println!("   {}", message);
+                            println!("{}   {}", " ".repeat(ui::constants::DEFAULT_INDENT), message);
                         }
                         
                         // Display suggestions if present and not in quiet mode
@@ -2073,11 +2509,15 @@ async fn main() -> anyhow::Result<()> {
                             }
                         }
                     } else {
-                        println!("✓ Stopped {}", service);
+                        println!("{}{} Stopped {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("ok", term.supports_color), service);
                     }
                 }
-                reqwest::StatusCode::NOT_FOUND => println!("✗ Service '{}' not found", service),
-                _ => println!("✗ Failed: {}", status),
+                reqwest::StatusCode::NOT_FOUND => {
+                    eprintln!("{}{} Service '{}' not found", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), service);
+                }
+                _ => {
+                    eprintln!("{}{} Failed: {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), status);
+                }
             }
         }
 
@@ -2099,9 +2539,9 @@ async fn main() -> anyhow::Result<()> {
                         let message = body.get("message").and_then(|v| v.as_str()).unwrap_or("");
                         let api_status = body.get("status").and_then(|v| v.as_str()).unwrap_or("running");
                         
-                        println!("✓ Started {} ({})", service, api_status);
+                        println!("{}{} Started {} ({})", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("ok", term.supports_color), service, api_status);
                         if !message.is_empty() {
-                            println!("   {}", message);
+                            println!("{}   {}", " ".repeat(ui::constants::DEFAULT_INDENT), message);
                         }
                         
                         // Display suggestions if present and not in quiet mode
@@ -2118,11 +2558,15 @@ async fn main() -> anyhow::Result<()> {
                             }
                         }
                     } else {
-                        println!("✓ Started {}", service);
+                        println!("{}{} Started {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("ok", term.supports_color), service);
                     }
                 }
-                reqwest::StatusCode::NOT_FOUND => println!("✗ Service '{}' not found", service),
-                _ => println!("✗ Failed: {}", status),
+                reqwest::StatusCode::NOT_FOUND => {
+                    eprintln!("{}{} Service '{}' not found", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), service);
+                }
+                _ => {
+                    eprintln!("{}{} Failed: {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), status);
+                }
             }
         }
 
@@ -2135,7 +2579,7 @@ async fn main() -> anyhow::Result<()> {
             let endpoint = resolve_endpoint(&client, at).await?;
             
             match target.as_str() {
-                "pebble" => {
+                "keystone" => {
                     // Initialize pond (pond init)
                     let pass = passphrase.clone().unwrap_or_else(|| {
                         // In a real implementation, prompt for passphrase
@@ -2147,25 +2591,25 @@ async fn main() -> anyhow::Result<()> {
                     
                     match client.post(&url).json(&payload).send().await {
                         Ok(response) if response.status() == reqwest::StatusCode::NOT_IMPLEMENTED => {
-                            println!("ℹ️  Pond security not yet implemented (Phase 3b)");
-                            println!("   This command will initialize pond security with encrypted certificates.");
+                            println!("{}{} Pond security not yet implemented (Phase 3b)", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("info", term.supports_color));
+                            println!("{}This command will initialize pond security with encrypted certificates.", " ".repeat(ui::constants::DEFAULT_INDENT));
                         }
                         Ok(response) if response.status().is_success() => {
-                            println!("✓ Pond initialized (pebble placed)");
+                            println!("{}{} Pond initialized (keystone placed)", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("ok", term.supports_color));
                         }
                         Ok(response) => {
-                            println!("✗ Failed to initialize pond: {}", response.status());
+                            eprintln!("{}{} Failed to initialize pond: {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), response.status());
                         }
                         Err(e) => {
-                            println!("✗ Request failed: {}", e);
+                            eprintln!("{}{} Request failed: {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), e);
                         }
                     }
                 }
                 "stone" => {
                     // Join pond (pond join)
                     if code.is_none() {
-                        println!("✗ Error: --code required for placing a stone");
-                        println!("   Example: garden-rake place stone --code ABC123");
+                        eprintln!("{}{} Error: --code required for placing a stone", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color));
+                        eprintln!("{}Example: garden-rake place stone --code ABC123", " ".repeat(ui::constants::DEFAULT_INDENT));
                         return Ok(());
                     }
                     
@@ -2174,22 +2618,22 @@ async fn main() -> anyhow::Result<()> {
                     
                     match client.post(&url).json(&payload).send().await {
                         Ok(response) if response.status() == reqwest::StatusCode::NOT_IMPLEMENTED => {
-                            println!("ℹ️  Pond security not yet implemented (Phase 3b)");
-                            println!("   This command will join an existing pond using an invitation code.");
+                            println!("{}{} Pond security not yet implemented (Phase 3b)", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("info", term.supports_color));
+                            println!("{}This command will join an existing pond using an invitation code.", " ".repeat(ui::constants::DEFAULT_INDENT));
                         }
                         Ok(response) if response.status().is_success() => {
-                            println!("✓ Joined pond successfully");
+                            println!("{}{} Joined pond successfully", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("ok", term.supports_color));
                         }
                         Ok(response) => {
-                            println!("✗ Failed to join pond: {}", response.status());
+                            eprintln!("{}{} Failed to join pond: {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), response.status());
                         }
                         Err(e) => {
-                            println!("✗ Request failed: {}", e);
+                            eprintln!("{}{} Request failed: {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), e);
                         }
                     }
                 }
                 _ => {
-                    println!("✗ Invalid target: '{}'. Use 'pebble' or 'stone'", target);
+                    eprintln!("{}{} Invalid target: '{}'. Use 'keystone' or 'stone'", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), target);
                 }
             }
         }
@@ -2200,13 +2644,13 @@ async fn main() -> anyhow::Result<()> {
             
             match client.post(&url).send().await {
                 Ok(response) if response.status() == reqwest::StatusCode::NOT_IMPLEMENTED => {
-                    println!("ℹ️  Pond security not yet implemented (Phase 3b)");
-                    println!("   This command will generate a time-limited TOTP invitation code.");
+                    println!("{}{} Pond security not yet implemented (Phase 3b)", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("info", term.supports_color));
+                    println!("{}This command will generate a time-limited TOTP invitation code.", " ".repeat(ui::constants::DEFAULT_INDENT));
                 }
                 Ok(response) if response.status().is_success() => {
                     if let Ok(body) = response.json::<serde_json::Value>().await {
                         if let Some(code) = body.get("data").and_then(|d| d.get("code")).and_then(|c| c.as_str()) {
-                            println!("✓ Invitation code: {}", code);
+                            println!("{}{} Invitation code: {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("ok", term.supports_color), code);
                             if let Some(ttl) = body.get("data").and_then(|d| d.get("ttl_seconds")).and_then(|t| t.as_u64()) {
                                 println!("   Valid for {} seconds", ttl);
                             }
@@ -2214,10 +2658,10 @@ async fn main() -> anyhow::Result<()> {
                     }
                 }
                 Ok(response) => {
-                    println!("✗ Failed to generate invitation: {}", response.status());
+                    eprintln!("{}{} Failed to generate invitation: {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), response.status());
                 }
                 Err(e) => {
-                    println!("✗ Request failed: {}", e);
+                    eprintln!("{}{} Request failed: {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), e);
                 }
             }
         }
@@ -2240,30 +2684,37 @@ async fn main() -> anyhow::Result<()> {
                         at_endpoint.clone()
                     } else {
                         // Try to resolve by stone name
-                        match discovery::discover_all_moss(Duration::from_secs(2)) {
-                            Ok(endpoints) => {
-                                let mut found = None;
-                                for ep in endpoints {
-                                    let caps_url = format!("{}/capabilities", ep.trim_end_matches('/'));
-                                    if let Ok(resp) = client.get(&caps_url).send().await {
-                                        if let Ok(response) = resp.json::<ApiResponse<HardwareCapabilities>>().await {
-                                            if response.data.stone_name.to_lowercase() == name.to_lowercase() {
-                                                found = Some(ep);
-                                                break;
-                                            }
-                                        }
-                                    }
-                                }
-                                match found {
-                                    Some(ep) => ep,
-                                    None => {
-                                        println!("✗ Stone '{}' not found", name);
-                                        return Ok(());
+                        let mut endpoints = Vec::new();
+                        let _ = discovery::discover_all_moss_stream(
+                            Duration::from_secs(2),
+                            |response, _instant| {
+                                endpoints.push(response);
+                            },
+                        );
+                        
+                        if endpoints.is_empty() {
+                            eprintln!("{}{} No stones discovered", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color));
+                            return Ok(());
+                        }
+                        
+                        let mut found = None;
+                        for response in endpoints {
+                            let ep = &response.stone_endpoint;
+                            let caps_url = format!("{}/capabilities", ep.trim_end_matches('/'));
+                            if let Ok(resp) = client.get(&caps_url).send().await {
+                                if let Ok(caps_response) = resp.json::<GardenApiResponse<HardwareCapabilities>>().await {
+                                    if caps_response.data.stone_name.to_lowercase() == name.to_lowercase() {
+                                        found = Some(ep.clone());
+                                        break;
                                     }
                                 }
                             }
-                            Err(_) => {
-                                println!("✗ No stones discovered");
+                        }
+                        
+                        match found {
+                            Some(ep) => ep,
+                            None => {
+                                eprintln!("{}{} Stone '{}' not found", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), name);
                                 return Ok(());
                             }
                         }
@@ -2282,16 +2733,12 @@ async fn main() -> anyhow::Result<()> {
             match command {
                 TemplateCommands::List { at } => {
                     let endpoint = resolve_endpoint(&client, at).await?;
-                    let context = get_connection_context(&client, &endpoint).await?;
-                    context.display();
                     
                     list_templates(&client, &endpoint).await?;
                 }
                 
                 TemplateCommands::Show { name, at } => {
                     let endpoint = resolve_endpoint(&client, at).await?;
-                    let context = get_connection_context(&client, &endpoint).await?;
-                    context.display();
                     
                     show_template(&client, &endpoint, &name).await?;
                 }
@@ -2316,7 +2763,7 @@ async fn main() -> anyhow::Result<()> {
                             Ok(resp) if resp.status().is_success() => {
                                 // Get stone name from capabilities
                                 let caps_url = format!("{}/capabilities", local_endpoint);
-                                let response: ApiResponse<HardwareCapabilities> = client.get(&caps_url).timeout(Duration::from_secs(5)).send().await?.json().await?;
+                                let response: GardenApiResponse<HardwareCapabilities> = client.get(&caps_url).timeout(Duration::from_secs(5)).send().await?.json().await?;
                                 let caps = response.data;
                                 tending::write_tending(caps.stone_name.clone(), local_endpoint.clone())?;
                                 println!("Now tending to: {} (localhost)", caps.stone_name);
@@ -2339,7 +2786,7 @@ async fn main() -> anyhow::Result<()> {
                             Ok(endpoint) => {
                                 // Get capabilities for stone name
                                 let caps_url = format!("{}/capabilities", endpoint.trim_end_matches('/'));
-                                let response: ApiResponse<HardwareCapabilities> = client.get(&caps_url).timeout(Duration::from_secs(5)).send().await?.json().await?;
+                                let response: GardenApiResponse<HardwareCapabilities> = client.get(&caps_url).timeout(Duration::from_secs(5)).send().await?.json().await?;
                                 let caps = response.data;
                                 tending::write_tending(caps.stone_name.clone(), endpoint.clone())?;
                                 println!("  Found {}.local ({})", caps.stone_name, endpoint.trim_start_matches("http://"));
@@ -2356,7 +2803,7 @@ async fn main() -> anyhow::Result<()> {
                         match client.get(&health_url).timeout(Duration::from_secs(3)).send().await {
                             Ok(resp) if resp.status().is_success() => {
                                 let caps_url = format!("{}/capabilities", url.trim_end_matches('/'));
-                                let response: ApiResponse<HardwareCapabilities> = client.get(&caps_url).timeout(Duration::from_secs(5)).send().await?.json().await?;
+                                let response: GardenApiResponse<HardwareCapabilities> = client.get(&caps_url).timeout(Duration::from_secs(5)).send().await?.json().await?;
                                 let caps = response.data;
                                 tending::write_tending(caps.stone_name.clone(), url.to_string())?;
                                 println!("Now tending to: {} ({})", caps.stone_name, url);
@@ -2368,7 +2815,7 @@ async fn main() -> anyhow::Result<()> {
                     }
                     stone_name => {
                         // Resolve stone name (or simple host) to an endpoint
-                        let endpoint = resolve_target_endpoint(&client, stone_name).await?;
+                        let endpoint = resolve_target_endpoint(&client, stone_name, Some(&*STONE_CACHE)).await?;
 
                         // Validate it and store tending state
                         let health_url = format!("{}/health", endpoint.trim_end_matches('/'));
@@ -2380,7 +2827,7 @@ async fn main() -> anyhow::Result<()> {
                                     .timeout(Duration::from_secs(5))
                                     .send()
                                     .await?
-                                    .json::<ApiResponse<HardwareCapabilities>>()
+                                    .json::<GardenApiResponse<HardwareCapabilities>>()
                                     .await?
                                     .data;
                                 tending::write_tending(caps.stone_name.clone(), endpoint.to_string())?;
@@ -2393,127 +2840,62 @@ async fn main() -> anyhow::Result<()> {
                     }
                 }
             } else {
-                // Show current tending state
+                // Show current tending state - auto-discover if needed
                 match tending::read_tending() {
-                    Ok(state) => {
-                        if state.is_valid() {
-                            if verbose {
-                                println!("Tending to: {}.local ({})", state.stone_name, state.endpoint);
-                                println!("Last seen: {} seconds ago", state.age_seconds());
-                                println!("Status: Active ({} seconds remaining in cache)", state.ttl_remaining_seconds());
-                            } else {
-                                println!("{}.local ({})", state.stone_name, state.endpoint.trim_start_matches("http://"));
+                    Ok(state) if state.is_valid() => {
+                        // Valid cached state - verify stone is still reachable
+                        let health_url = format!("{}/health", state.endpoint.trim_end_matches('/'));
+                        match client.get(&health_url).timeout(Duration::from_millis(500)).send().await {
+                            Ok(resp) if resp.status().is_success() => {
+                                if verbose {
+                                    println!("Tending to: {}.local ({})", state.stone_name, state.endpoint);
+                                    println!("Last seen: {} seconds ago", state.age_seconds());
+                                    println!("Status: Active ({} seconds remaining in cache)", state.ttl_remaining_seconds());
+                                } else {
+                                    println!("{}.local ({})", state.stone_name, state.endpoint.trim_start_matches("http://"));
+                                }
                             }
-                        } else {
-                            println!("Tending state expired.");
-                            println!("\nUse 'garden-rake tend auto' to auto-discover, or specify an endpoint.");
+                            _ => {
+                                // Stone no longer reachable - try to rediscover
+                                tracing::debug!("Tended stone {} no longer reachable, attempting rediscovery", state.stone_name);
+                                if let Err(e) = auto_discover_and_tend(&client).await {
+                                    return Err(anyhow::anyhow!(
+                                        "Previously tended stone '{}' is no longer reachable.\n\n{}\n\n\
+                                        Options:\n\
+                                        • Auto-discover stone: garden-rake tend auto\n\
+                                        • Explicit endpoint: garden-rake tend http://<ip>:7185",
+                                        state.stone_name, e
+                                    ));
+                                }
+                            }
+                        }
+                    }
+                    Ok(state) => {
+                        // Expired state - try to rediscover
+                        tracing::debug!("Tending state expired, attempting rediscovery");
+                        if let Err(e) = auto_discover_and_tend(&client).await {
+                            return Err(anyhow::anyhow!(
+                                "Tending state expired (last tended: {}).\n\n{}\n\n\
+                                Options:\n\
+                                • Auto-discover stone: garden-rake tend auto\n\
+                                • Explicit endpoint: garden-rake tend http://<ip>:7185",
+                                state.stone_name, e
+                            ));
                         }
                     }
                     Err(_) => {
-                        println!("Not tending to any stone.");
-                        println!("\nUse 'garden-rake tend auto' to auto-discover, or specify an endpoint.");
-                    }
-                }
-            }
-        }
-
-        Commands::Context { action } => {
-            match action {
-                ContextAction::Show => {
-                    match tending::read_tending() {
-                        Ok(state) => {
-                            if state.is_valid() {
-                                println!("Current context: {} ({})", state.stone_name, state.endpoint);
-                                println!("Set {} seconds ago", state.age_seconds());
-                                println!("Cache expires in {} seconds", state.ttl_remaining_seconds());
-                            } else {
-                                println!("Context expired.");
-                                println!("Use 'garden-rake context set auto' to auto-discover, or set a specific stone.");
-                            }
-                        }
-                        Err(_) => {
-                            println!("No context set.");
-                            println!("Use 'garden-rake context set auto' to auto-discover, or set a specific stone.");
+                        // No cached state - auto-discover
+                        tracing::debug!("No tending state found, attempting auto-discovery");
+                        if let Err(e) = auto_discover_and_tend(&client).await {
+                            return Err(anyhow::anyhow!(
+                                "Not tending to any stone.\n\n{}\n\n\
+                                Options:\n\
+                                • Auto-discover stone: garden-rake tend auto\n\
+                                • Explicit endpoint: garden-rake tend http://<ip>:7185",
+                                e
+                            ));
                         }
                     }
-                }
-                ContextAction::Set { stone } => {
-                    match stone.as_str() {
-                        "this" | "local" => {
-                            let endpoint = "http://localhost:3939".to_string();
-                            let health_url = format!("{}/health", endpoint);
-                            
-                            match client.get(&health_url).timeout(Duration::from_secs(3)).send().await {
-                                Ok(resp) if resp.status().is_success() => {
-                                    let caps_url = format!("{}/capabilities", endpoint);
-                                    let response: ApiResponse<HardwareCapabilities> = client.get(&caps_url).timeout(Duration::from_secs(5)).send().await?.json().await?;
-                                    let caps = response.data;
-                                    tending::write_tending(caps.stone_name.clone(), endpoint.clone())?;
-                                    println!("Context set to: {} ({})", caps.stone_name, endpoint);
-                                }
-                                _ => {
-                                    return Err(anyhow::anyhow!("No Moss daemon found at localhost:3939"));
-                                }
-                            }
-                        }
-                        "auto" => {
-                            println!("Discovering stones...");
-                            match discovery::discover_moss() {
-                                Ok(endpoint) => {
-                                    let caps_url = format!("{}/capabilities", endpoint.trim_end_matches('/'));
-                                    let response: ApiResponse<HardwareCapabilities> = client.get(&caps_url).timeout(Duration::from_secs(5)).send().await?.json().await?;
-                                    let caps = response.data;
-                                    tending::write_tending(caps.stone_name.clone(), endpoint.clone())?;
-                                    println!("  Found {}.local ({})", caps.stone_name, endpoint.trim_start_matches("http://"));
-                                    println!("  Context set to {}.local", caps.stone_name);
-                                }
-                                Err(_) => {
-                                    return Err(anyhow::anyhow!("No stones discovered on network"));
-                                }
-                            }
-                        }
-                        url if url.starts_with("http://") || url.starts_with("https://") => {
-                            let health_url = format!("{}/health", url.trim_end_matches('/'));
-                            match client.get(&health_url).timeout(Duration::from_secs(3)).send().await {
-                                Ok(resp) if resp.status().is_success() => {
-                                    let caps_url = format!("{}/capabilities", url.trim_end_matches('/'));
-                                    let response: ApiResponse<HardwareCapabilities> = client.get(&caps_url).timeout(Duration::from_secs(5)).send().await?.json().await?;
-                                    let caps = response.data;
-                                    tending::write_tending(caps.stone_name.clone(), url.to_string())?;
-                                    println!("Context set to: {} ({})", caps.stone_name, url);
-                                }
-                                _ => {
-                                    return Err(anyhow::anyhow!("Could not connect to endpoint: {}", url));
-                                }
-                            }
-                        }
-                        stone_name => {
-                            let endpoint = resolve_target_endpoint(&client, stone_name).await?;
-                            let health_url = format!("{}/health", endpoint.trim_end_matches('/'));
-                            match client.get(&health_url).timeout(Duration::from_secs(3)).send().await {
-                                Ok(resp) if resp.status().is_success() => {
-                                    let caps_url = format!("{}/capabilities", endpoint.trim_end_matches('/'));
-                                    let caps: HardwareCapabilities = client
-                                        .get(&caps_url)
-                                        .timeout(Duration::from_secs(5))
-                                        .send()
-                                        .await?
-                                        .json::<ApiResponse<HardwareCapabilities>>()
-                                        .await?
-                                        .data;
-                                    tending::write_tending(caps.stone_name.clone(), endpoint.clone())?;
-                                    println!("Context set to: {} ({})", caps.stone_name, endpoint);
-                                }
-                                _ => {
-                                    return Err(anyhow::anyhow!("Could not connect to stone: {}", stone_name));
-                                }
-                            }
-                        }
-                    }
-                }
-                ContextAction::Clear => {
-                    tending::clear_tending()?;
-                    println!("Context cleared.");
                 }
             }
         }
@@ -2525,7 +2907,7 @@ async fn main() -> anyhow::Result<()> {
                 PondAction::Init { passphrase } => {
                     let pass = passphrase.clone().unwrap_or_else(|| {
                         // In a real implementation, prompt for passphrase securely
-                        println!("ℹ️  Using default passphrase. Use --passphrase for custom encryption.");
+                        println!("{}{} Using default passphrase. Use --passphrase for custom encryption.", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("info", term.supports_color));
                         "changeme".to_string()
                     });
                     
@@ -2534,12 +2916,12 @@ async fn main() -> anyhow::Result<()> {
                     
                     match client.post(&url).json(&payload).send().await {
                         Ok(response) if response.status() == reqwest::StatusCode::NOT_IMPLEMENTED => {
-                            println!("ℹ️  Pond security not yet implemented (Phase 3b)");
-                            println!("   This command will initialize pond security with encrypted certificates.");
-                            println!("   Future: Creates cornerstone and pebble for multi-stone trust.");
+                            println!("{}{} Pond security not yet implemented (Phase 3b)", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("info", term.supports_color));
+                            println!("{}This command will initialize pond security with encrypted certificates.", " ".repeat(ui::constants::DEFAULT_INDENT));
+                            println!("{}Future: Creates cornerstone and keystone for multi-stone trust.", " ".repeat(ui::constants::DEFAULT_INDENT));
                         }
                         Ok(response) if response.status().is_success() => {
-                            println!("✓ Pond initialized successfully");
+                            println!("{}{} Pond initialized successfully", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("ok", term.supports_color));
                             if let Ok(body) = response.json::<serde_json::Value>().await {
                                 if let Some(cornerstone) = body.get("data").and_then(|d| d.get("cornerstone")).and_then(|c| c.as_str()) {
                                     println!("   Cornerstone: {}", cornerstone);
@@ -2547,10 +2929,10 @@ async fn main() -> anyhow::Result<()> {
                             }
                         }
                         Ok(response) => {
-                            println!("✗ Failed to initialize pond: {}", response.status());
+                            eprintln!("{}{} Failed to initialize pond: {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), response.status());
                         }
                         Err(e) => {
-                            println!("✗ Request failed: {}", e);
+                            eprintln!("{}{} Request failed: {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), e);
                         }
                     }
                 }
@@ -2566,7 +2948,7 @@ async fn main() -> anyhow::Result<()> {
                                     let note = data.get("note").and_then(|n| n.as_str()).unwrap_or("");
                                     
                                     if active {
-                                        println!("✓ Pond active");
+                                        println!("{}{} Pond active", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("ok", term.supports_color));
                                         if let Some(cornerstone) = data.get("cornerstone").and_then(|c| c.as_str()) {
                                             println!("   Cornerstone: {}", cornerstone);
                                         }
@@ -2591,10 +2973,10 @@ async fn main() -> anyhow::Result<()> {
                             }
                         }
                         Ok(response) => {
-                            println!("✗ Failed to get pond status: {}", response.status());
+                            eprintln!("{}{} Failed to get pond status: {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), response.status());
                         }
                         Err(e) => {
-                            println!("✗ Request failed: {}", e);
+                            eprintln!("{}{} Request failed: {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), e);
                         }
                     }
                 }
@@ -2603,14 +2985,14 @@ async fn main() -> anyhow::Result<()> {
                     
                     match client.post(&url).send().await {
                         Ok(response) if response.status() == reqwest::StatusCode::NOT_IMPLEMENTED => {
-                            println!("ℹ️  Pond security not yet implemented (Phase 3b)");
-                            println!("   This command will generate a time-limited TOTP invitation code.");
+                            println!("{}{} Pond security not yet implemented (Phase 3b)", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("info", term.supports_color));
+                            println!("{}This command will generate a time-limited TOTP invitation code.", " ".repeat(ui::constants::DEFAULT_INDENT));
                         }
                         Ok(response) if response.status().is_success() => {
                             if let Ok(body) = response.json::<serde_json::Value>().await {
                                 if let Some(data) = body.get("data") {
                                     if let Some(code) = data.get("code").and_then(|c| c.as_str()) {
-                                        println!("✓ Invitation code: {}", code);
+                                        println!("{}{} Invitation code: {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("ok", term.supports_color), code);
                                         if let Some(ttl) = data.get("ttl_seconds").and_then(|t| t.as_u64()) {
                                             println!("   Valid for {} seconds", ttl);
                                         }
@@ -2622,10 +3004,10 @@ async fn main() -> anyhow::Result<()> {
                             }
                         }
                         Ok(response) => {
-                            println!("✗ Failed to generate invitation: {}", response.status());
+                            eprintln!("{}{} Failed to generate invitation: {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), response.status());
                         }
                         Err(e) => {
-                            println!("✗ Request failed: {}", e);
+                            eprintln!("{}{} Request failed: {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), e);
                         }
                     }
                 }
@@ -2635,11 +3017,11 @@ async fn main() -> anyhow::Result<()> {
                     
                     match client.post(&url).json(&payload).send().await {
                         Ok(response) if response.status() == reqwest::StatusCode::NOT_IMPLEMENTED => {
-                            println!("ℹ️  Pond security not yet implemented (Phase 3b)");
-                            println!("   This command will join an existing pond using an invitation code.");
+                            println!("{}{} Pond security not yet implemented (Phase 3b)", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("info", term.supports_color));
+                            println!("{}This command will join an existing pond using an invitation code.", " ".repeat(ui::constants::DEFAULT_INDENT));
                         }
                         Ok(response) if response.status().is_success() => {
-                            println!("✓ Joined pond successfully");
+                            println!("{}{} Joined pond successfully", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("ok", term.supports_color));
                             if let Ok(body) = response.json::<serde_json::Value>().await {
                                 if let Some(data) = body.get("data") {
                                     if let Some(stone_name) = data.get("stone_name").and_then(|s| s.as_str()) {
@@ -2652,10 +3034,10 @@ async fn main() -> anyhow::Result<()> {
                             }
                         }
                         Ok(response) => {
-                            println!("✗ Failed to join pond: {}", response.status());
+                            eprintln!("{}{} Failed to join pond: {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), response.status());
                         }
                         Err(e) => {
-                            println!("✗ Request failed: {}", e);
+                            eprintln!("{}{} Request failed: {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), e);
                         }
                     }
                 }
@@ -2664,17 +3046,17 @@ async fn main() -> anyhow::Result<()> {
                     
                     match client.delete(&url).send().await {
                         Ok(response) if response.status() == reqwest::StatusCode::NOT_IMPLEMENTED => {
-                            println!("ℹ️  Pond security not yet implemented (Phase 3b)");
-                            println!("   This command will remove pond security from this stone.");
+                            println!("{}{} Pond security not yet implemented (Phase 3b)", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("info", term.supports_color));
+                            println!("{}This command will remove pond security from this stone.", " ".repeat(ui::constants::DEFAULT_INDENT));
                         }
                         Ok(response) if response.status().is_success() => {
-                            println!("✓ Pond removed from this stone");
+                            println!("{}{} Pond removed from this stone", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("ok", term.supports_color));
                         }
                         Ok(response) => {
-                            println!("✗ Failed to remove pond: {}", response.status());
+                            eprintln!("{}{} Failed to remove pond: {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), response.status());
                         }
                         Err(e) => {
-                            println!("✗ Request failed: {}", e);
+                            eprintln!("{}{} Request failed: {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), e);
                         }
                     }
                 }
@@ -2683,17 +3065,17 @@ async fn main() -> anyhow::Result<()> {
                     
                     match client.delete(&url).send().await {
                         Ok(response) if response.status() == reqwest::StatusCode::NOT_IMPLEMENTED => {
-                            println!("ℹ️  Pond security not yet implemented (Phase 3b)");
-                            println!("   This command will remove a stone from the pond trust network.");
+                            println!("{}{} Pond security not yet implemented (Phase 3b)", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("info", term.supports_color));
+                            println!("{}This command will remove a stone from the pond trust network.", " ".repeat(ui::constants::DEFAULT_INDENT));
                         }
                         Ok(response) if response.status().is_success() => {
-                            println!("✓ Removed {} from pond", stone_name);
+                            println!("{}{} Removed {} from pond", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("ok", term.supports_color), stone_name);
                         }
                         Ok(response) => {
-                            println!("✗ Failed to untrust stone: {}", response.status());
+                            eprintln!("{}{} Failed to untrust stone: {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), response.status());
                         }
                         Err(e) => {
-                            println!("✗ Request failed: {}", e);
+                            eprintln!("{}{} Request failed: {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), e);
                         }
                     }
                 }
@@ -2704,31 +3086,31 @@ async fn main() -> anyhow::Result<()> {
             let endpoint = resolve_endpoint(&client, at).await?;
             
             match target_type.as_str() {
-                "pebble" => {
+                "keystone" => {
                     // Remove pond (pond remove)
                     let url = format!("{}/api/v1/pond", endpoint.trim_end_matches('/'));
                     
                     match client.delete(&url).send().await {
                         Ok(response) if response.status() == reqwest::StatusCode::NOT_IMPLEMENTED => {
-                            println!("ℹ️  Pond security not yet implemented (Phase 3b)");
-                            println!("   This command will remove pond security (lift the pebble).");
+                            println!("{}{} Pond security not yet implemented (Phase 3b)", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("info", term.supports_color));
+                            println!("{}This command will remove pond security (lift the keystone).", " ".repeat(ui::constants::DEFAULT_INDENT));
                         }
                         Ok(response) if response.status().is_success() => {
-                            println!("✓ Pebble lifted (pond removed)");
+                            println!("{}{} Keystone lifted (pond removed)", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("ok", term.supports_color));
                         }
                         Ok(response) => {
-                            println!("✗ Failed to lift pebble: {}", response.status());
+                            eprintln!("{}{} Failed to lift keystone: {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), response.status());
                         }
                         Err(e) => {
-                            println!("✗ Request failed: {}", e);
+                            eprintln!("{}{} Request failed: {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), e);
                         }
                     }
                 }
                 "stone" => {
                     // Untrust stone (pond untrust)
                     if stone_name.is_none() {
-                        println!("✗ Error: stone name required for 'lift stone'");
-                        println!("   Example: garden-rake lift stone stone-02");
+                        eprintln!("{}{} Error: stone name required for 'lift stone'", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color));
+                        eprintln!("{}Example: garden-rake lift stone stone-02", " ".repeat(ui::constants::DEFAULT_INDENT));
                         return Ok(());
                     }
                     
@@ -2737,38 +3119,34 @@ async fn main() -> anyhow::Result<()> {
                     
                     match client.delete(&url).send().await {
                         Ok(response) if response.status() == reqwest::StatusCode::NOT_IMPLEMENTED => {
-                            println!("ℹ️  Pond security not yet implemented (Phase 3b)");
-                            println!("   This command will remove a stone from the pond trust network.");
+                            println!("{}{} Pond security not yet implemented (Phase 3b)", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("info", term.supports_color));
+                            println!("{}This command will remove a stone from the pond trust network.", " ".repeat(ui::constants::DEFAULT_INDENT));
                         }
                         Ok(response) if response.status().is_success() => {
-                            println!("✓ Lifted {} from pond", name);
+                            println!("{}{} Lifted {} from pond", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("ok", term.supports_color), name);
                         }
                         Ok(response) => {
-                            println!("✗ Failed to lift stone: {}", response.status());
+                            eprintln!("{}{} Failed to lift stone: {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), response.status());
                         }
                         Err(e) => {
-                            println!("✗ Request failed: {}", e);
+                            eprintln!("{}{} Request failed: {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), e);
                         }
                     }
                 }
                 _ => {
-                    println!("✗ Invalid target: '{}'. Use 'pebble' or 'stone'", target_type);
+                    eprintln!("{}{} Invalid target: '{}'. Use 'keystone' or 'stone'", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), target_type);
                 }
             }
         }
 
         Commands::Refresh { component, from, at } => {
             let endpoint = resolve_endpoint(&client, at).await?;
-            let ctx = get_connection_context(&client, &endpoint).await?;
-            print!("Refreshing {} on ", component);
-            ctx.display();
+            println!("Refreshing {}...", component);
             refresh_component(&client, &endpoint, &component, &from).await?;
         }
 
         Commands::Reconcile { drop_invalid, at } => {
             let endpoint = resolve_endpoint(&client, at).await?;
-            let ctx = get_connection_context(&client, &endpoint).await?;
-            ctx.display();
 
             let body = reconcile_system(&client, &endpoint, drop_invalid).await?;
 
@@ -2788,8 +3166,8 @@ async fn main() -> anyhow::Result<()> {
                 .map(|a| a.len())
                 .unwrap_or(0);
 
-            println!("✓ Reconcile complete");
-            println!("  Adopted: {}", adopted);
+            println!("{}{} Reconcile complete", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("ok", term.supports_color));
+            println!("{}  Adopted: {}", " ".repeat(ui::constants::DEFAULT_INDENT), adopted);
             if drop_invalid {
                 println!("  Dropped invalid: {}", dropped);
             }
@@ -2954,9 +3332,10 @@ async fn watch_events(
                                 };
 
                                 let time_part = if timestamp.len() >= 19 {
-                                    format!("[{}] ", &timestamp[11..19]) // HH:MM:SS
+                                    format!("[{}] ", &timestamp[11..19]) // HH:MM:SS from ISO timestamp
                                 } else {
-                                    String::new()
+                                    // No event timestamp - use current wall-clock time
+                                    format!("[{}] ", ui::format_wall_clock())
                                 };
 
                                 println!("{}{} {}", time_part, symbol, message);
@@ -2969,8 +3348,8 @@ async fn watch_events(
                                     }
                                 }
                             } else {
-                                // Raw event data
-                                println!("• {}", data);
+                                // Raw event data - add wall-clock timestamp
+                                println!("[{}] • {}", ui::format_wall_clock(), data);
 
                                 if let Some(ref pattern) = until_pattern {
                                     if data.contains(pattern) {

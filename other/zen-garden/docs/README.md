@@ -1,105 +1,187 @@
-﻿# Zen Garden
+﻿---
+audience: [visitor, developer, operator, contributor]
+doc_type: navigation
+status: current
+last_verified: 2026-01-18
+canonical: true
+note: "Navigation hub for Zen Garden documentation. Audience-specific routing with visual structure diagram."
+related:
+  - ../README.md
+  - START_HERE.md
+  - glossary.md
+---
 
-**Automatic service discovery for self-hosted infrastructure. Plug in a device running MongoDB—apps discover it automatically. No hardcoded IPs or server names. No configuration files.**
+# Documentation Hub
+
+**Navigate Zen Garden documentation by your role and need.**
 
 ---
 
-## What This Is
+## Choose Your Path
 
-Zen Garden is an open protocol for discovering services on your local network. Instead of hardcoding `mongodb://192.168.1.50:27017` in every config file, you write `zen-garden:mongodb`. Services announce themselves via mDNS. Apps discover them by intent, not location.
+### 🌱 I'm New Here
 
-**The result:** Turn old laptops into useful infrastructure. Reduce e-waste. Own your data.
+Start with the basics:
+
+1. **[Project README](../README.md)** - 30-second pitch, 2-minute mental model
+2. **[Start Here](START_HERE.md)** - Complete beginner path (hardware → first Stone → first service)
+3. **[Glossary](glossary.md)** - Essential terms (Stone, Offering, Pond, Moss, Rake)
+4. **[Core Concepts](concepts/overview.md)** - What is a Stone? How does discovery work?
+5. **[System Architecture](concepts/architecture.md)** - How components fit together
+
+**Example use case:** [Installing your first Stone](guides/first-stone.md)
 
 ---
 
-## Quick Example
+### 🔧 I Need to Operate
 
-```bash
-# Start a MongoDB Stone
-docker run -d -p 27017:27017 -e ANNOUNCE_SERVICE=mongodb zen-garden/stone:latest
+Deploy, configure, and maintain your garden:
 
-# Your app connects automatically
-CONNECTION_STRING="zen-garden:mongodb" node app.js
+**Guides:**
+- [Hardware Selection Guide](guides/hardware.md) - Choosing the right hardware for your Stone
+- [Install Your First Stone](guides/first-stone.md) - Hardware selection, USB installer, verification
+- [Manage Service Offerings](guides/offering-services.md) - Plant, upgrade, rest, wake, take away
+- [Troubleshooting](guides/troubleshooting.md) - Common problems and solutions
+
+**Operations:**
+- [Release Notes](ops/release-notes.md) - Current release, breaking changes, known issues
+- [Roadmap](ops/roadmap.md) - Development timeline and milestones
+
+**Reference:**
+- [Port Allocation](reference/ports.md) - Reserved ports (7184-7199)
+- [Service Offerings](reference/offerings.md) - Available services catalog
+
+---
+
+### 🛠️ I Need Technical Details
+
+Architecture, specifications, and API documentation:
+
+**Specifications:**
+- [Moss Daemon](specs/moss-daemon.md) - HTTP API, Docker Compose, health monitoring
+- [Rake CLI](specs/rake-cli.md) - Hot cache discovery, UDP broadcast, CLI commands
+- [Service Offerings](specs/offerings.md) - Templates, taxonomy, query recommendations
+- [Discovery Protocol](specs/discovery.md) - mDNS, TXT records, connection string resolution
+- [Security (Full)](specs/security.md) - Pond security, mTLS, threat models
+
+**API Reference:**
+- [HTTP API](reference/api.md) - Moss endpoints, request/response formats
+- [Connection Strings](reference/connection-strings.md) - Protocol details, mDNS announcement
+
+---
+
+### 🔐 I Need Security Information
+
+Understand threat models and optional security layer:
+
+**Security Documentation:**
+- [Security Overview](security/overview.md) - Default plaintext, optional Pond mTLS
+- [Setting Up Pond Security](security/pond-setup.md) - Certificate management, admission
+- [Threat Analysis](security/threat-analysis.md) - Attack vectors, mitigations
+
+**Complete Specification:**
+- [Security Specification](specs/security.md) - Comprehensive cryptography details
+
+---
+
+### 🏗️ I Want to Contribute
+
+Architecture decisions, proposals, and development:
+
+**Architecture Decisions:**
+- [Decision Records](decisions/) - ADRs documenting design choices
+- [Decision Index](decisions/README.md) - Browse by category (DATA, WEB, MESS, etc.)
+
+**Proposals:**
+- [Proposals Directory](proposals/) - Feature proposals and evaluations
+
+**Development:**
+- [Roadmap](ops/roadmap.md) - Implementation timeline
+- [Release Notes](ops/release-notes.md) - Version history
+
+---
+
+## Documentation Structure
+
+```
+docs/
+├── README.md ...................... This file (navigation hub)
+├── glossary.md .................... Essential term definitions
+├── START_HERE.md .................. Beginner quickstart
+│
+├── concepts/
+│   └── architecture.md ............ System architecture overview
+│
+├── guides/
+│   ├── first-stone.md ............. Install your first Stone
+│   ├── offering-services.md ....... Manage service lifecycle
+│   └── troubleshooting.md ......... Common problems and solutions
+│
+├── specs/
+│   ├── moss-daemon.md ............. Moss daemon specification
+│   ├── rake-cli.md ................ Rake CLI specification
+│   ├── offerings.md ............... Service offerings specification
+│   ├── discovery.md ............... Discovery protocol specification
+│   ├── security.md ................ Complete security specification
+│   └── technical.md ............... Comprehensive technical spec (legacy)
+│
+├── security/
+│   ├── overview.md ................ Security posture summary
+│   ├── pond-setup.md .............. Pond security setup guide
+│   └── threat-analysis.md ......... Threat models and mitigations
+│
+├── reference/
+│   ├── api.md ..................... HTTP API reference
+│   ├── connection-strings.md ...... Protocol and mDNS details
+│   ├── offerings.md ............... Available services catalog
+│   └── ports.md ................... Port allocation registry
+│
+├── ops/
+│   ├── release-notes.md ........... Release history and known issues
+│   └── roadmap.md ................. Development timeline
+│
+└── decisions/
+    └── (ADRs) ..................... Architecture decision records
 ```
 
-That's it. No IP addresses, no DNS configuration, no service registry.
+---
+
+## Quick Links by Topic
+
+### Getting Started
+- [Project README](../README.md) - What is Zen Garden?
+- [First Stone Installation](guides/first-stone.md) - Hardware → service deployment
+- [Glossary](glossary.md) - Learn the vocabulary
+
+### Service Management
+- [Offering Services Guide](guides/offering-services.md) - Full lifecycle management
+- [Service Catalog](reference/offerings.md) - Available offerings
+- [Troubleshooting](guides/troubleshooting.md) - Fix common issues
+
+### API & Integration
+- [HTTP API Reference](reference/api.md) - Moss endpoints
+- [Connection Strings](reference/connection-strings.md) - zen-garden:// protocol
+- [Discovery Protocol](specs/discovery.md) - mDNS details
+
+### Security
+- [Security Overview](security/overview.md) - Default posture
+- [Pond Setup](security/pond-setup.md) - Optional mTLS
+- [Threat Analysis](security/threat-analysis.md) - Attack vectors
+
+### Development
+- [Moss Daemon Spec](specs/moss-daemon.md) - Implementation details
+- [Rake CLI Spec](specs/rake-cli.md) - CLI tool details
+- [Roadmap](ops/roadmap.md) - What's coming
+- [Architecture Decisions](decisions/) - Design rationale
 
 ---
 
-## Why This Exists
+## See Also
 
-**Two problems:**
-
-1. **Self-hosting is too hard** - IP addresses change, configurations break, coordination work scales poorly
-2. **Functional hardware becomes waste** - 62 million tonnes of e-waste annually (UN 2024), much of it still functional
-
-**One solution:** Make service discovery automatic. Give old hardware new purpose.
+- **[Project Root README](../README.md)** - Overview and quick pitch
+- **[Glossary](glossary.md)** - Term definitions
+- **[START_HERE](START_HERE.md)** - Beginner tutorial
 
 ---
 
-## Documentation
-
-**Start here:**
-
-- [Understanding Zen Garden](UNDERSTANDING.md) - How it works, core concepts
-- [Getting Started](GETTING-STARTED.md) - Run your first Stone in 5 minutes
-
-**Go deeper:**
-
-- [Technical Reference](REFERENCE.md) - Protocol details, API documentation
-- [Hardware Guide](HARDWARE.md) - Turn old laptops into Stones
-- [Security Model](SECURITY.md) - When to add cryptographic binding
-
-**Context:**
-
-- [Mission & Impact](MISSION.md) - Environmental and social goals
-- [Development Roadmap](ROADMAP.md) - Implementation timeline
-- [Community Stories](STORIES.md) - Real people using Zen Garden
-
----
-
-## Current Status
-
-**Phase:** Active design + prototype development  
-**Maintained by:** Sylin.org (Koan Framework maintainer)  
-**License:** Open source (see LICENSE)
-
-**What exists today:**
-
-- Protocol specification (in development)
-- Service manifests (14 service types documented)
-- USB installer (Debian Stone setup via NewStone.ps1)
-
-**What's next:**
-
-- Hello World prototype (February 2026)
-- mDNS discovery implementation
-- Community validation
-
----
-
-## Contributing
-
-This is an open protocol. Multiple implementations welcome (Rust, Python, Go, JavaScript).
-
-**How to help:**
-
-- Test the prototype on your hardware
-- Report issues, suggest improvements
-- Write integrations for your favorite services
-- Translate documentation
-- Share your Stone builds
-
-See [CONTRIBUTING.md](../CONTRIBUTING.md) for details.
-
----
-
-## Contact
-
-- GitHub Issues: Bug reports, feature requests
-- Discussions: Questions, ideas, proposals
-- Maintainer: Available via GitHub
-
----
-
-_"Infrastructure you can hold, swap, and own."_
+**Last Updated:** January 18, 2026

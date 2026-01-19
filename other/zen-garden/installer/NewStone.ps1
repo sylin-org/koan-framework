@@ -845,6 +845,71 @@ function New-DebianConfig {
 # Debian preseed doesn't require overlay files like Alpine's apkovl
 # All configuration is handled via preseed.cfg and late_command hooks
 
+function Copy-BrandingAssets {
+    param([string]$UsbDrive)
+    
+    $brandingPreparedDir = Join-Path $PSScriptRoot "branding\prepared"
+    
+    if (-not (Test-Path $brandingPreparedDir)) {
+        Write-Step "Branding assets not found (optional)" "SKIP"
+        return
+    }
+    
+    $manifestPath = Join-Path $brandingPreparedDir "manifest.json"
+    if (-not (Test-Path $manifestPath)) {
+        Write-Step "Branding manifest missing; skipping branding" "SKIP"
+        return
+    }
+    
+    Write-Step "Applying branding overlay..." "..."
+    
+    # Check manifest age
+    try {
+        $manifest = Get-Content $manifestPath -Raw | ConvertFrom-Json
+        $preparedDate = [datetime]::Parse($manifest.prepared_at)
+        $ageInDays = ([datetime]::UtcNow - $preparedDate).Days
+        
+        if ($ageInDays -gt 30) {
+            Write-Step "Branding assets are $ageInDays days old; consider re-running Prepare-BrandingArtifacts.ps1" "WARN"
+        }
+    }
+    catch {
+        # Non-fatal - continue with branding application
+    }
+    
+    # Copy ISOLINUX splash screen (BIOS boot)
+    $isolinuxSplash = Join-Path $brandingPreparedDir "isolinux\zen-splash.txt"
+    $isolinuxDest = Join-Path $UsbDrive "isolinux"
+    if ((Test-Path $isolinuxSplash) -and (Test-Path $isolinuxDest)) {
+        Copy-Item $isolinuxSplash $isolinuxDest -Force
+        Write-Step "ISOLINUX splash screen applied" "OK"
+    }
+    
+    # Copy first-boot branding to stone-root (MOTD, SSH banners, etc.)
+    $stoneRootSource = Join-Path $brandingPreparedDir "stone-root"
+    $stoneRootDest = Join-Path $UsbDrive "stone-root"
+    if ((Test-Path $stoneRootSource) -and (Test-Path $stoneRootDest)) {
+        # Recursively copy all first-boot assets
+        Get-ChildItem $stoneRootSource -Recurse -File | ForEach-Object {
+            $relativePath = $_.FullName.Substring($stoneRootSource.Length + 1)
+            $destPath = Join-Path $stoneRootDest $relativePath
+            $destDir = Split-Path $destPath -Parent
+            
+            if (-not (Test-Path $destDir)) {
+                New-Item -ItemType Directory -Path $destDir -Force | Out-Null
+            }
+            
+            Copy-Item $_.FullName $destPath -Force
+        }
+        Write-Step "First-boot branding applied (MOTD, SSH banner)" "OK"
+    }
+    
+    # Note: GRUB/ISOLINUX menu configs are applied by Update-GrubConfig/Update-IsolinuxConfig
+    # Note: GTK installer branding requires initrd repacking (not yet implemented)
+    
+    Write-Step "Branding overlay complete" "OK"
+}
+
 function Write-StoneFiles {
     param([string]$UsbDrive)
     
@@ -1219,14 +1284,27 @@ function Update-IsolinuxConfig {
     $isolinuxCfg = Join-Path $isolinuxDir "isolinux.cfg"
     if (Test-Path $isolinuxCfg) {
         $lines = Get-Content $isolinuxCfg
+        $hasSplash = Test-Path (Join-Path $isolinuxDir "zen-splash.txt")
+        $hasDisplay = $false
+        
         $lines = $lines | ForEach-Object {
             if ($_ -match '^timeout\s+') {
                 'timeout 10'  # 10 = 1 second in ISOLINUX
+            }
+            elseif ($_ -match '^display\s+') {
+                $hasDisplay = $true
+                $_
             }
             else {
                 $_
             }
         }
+        
+        # Add display directive if splash exists and not already present
+        if ($hasSplash -and -not $hasDisplay) {
+            $lines = @('display zen-splash.txt') + $lines
+        }
+        
         $content = ($lines -join "`n") + "`n"
         if ($PSVersionTable.PSVersion.Major -ge 6) {
             $content | Out-File -FilePath $isolinuxCfg -Encoding utf8NoBOM -NoNewline
@@ -1555,6 +1633,9 @@ function Main {
     
     # Write stone setup files to USB
     Write-StoneFiles -UsbDrive $wizardState.UsbDrive
+    
+    # Apply branding overlay (boot menus, GTK theme, first-boot assets)
+    Copy-BrandingAssets -UsbDrive $wizardState.UsbDrive
     
     # Update GRUB for Debian autoinstall (UEFI boot)
     Update-GrubConfig -UsbDrive $wizardState.UsbDrive

@@ -8,12 +8,26 @@ pub mod utils;
 pub mod constants;
 pub mod responses;
 pub mod jobs;
+pub mod client;
 
 // Re-export commonly used items
 pub use types::*;
 pub use utils::*;
 pub use responses::*;
 pub use jobs::*;
+pub use client::{GardenHttpClient, GardenApiResponse};
+
+// Re-export health and vitality constants for easy access
+pub use constants::{
+    HEALTH_HEALTHY, HEALTH_DEGRADED, HEALTH_UNHEALTHY,
+    CHECK_PASS, CHECK_WARN, CHECK_FAIL,
+    COMPAT_PASS, COMPAT_FALLBACK, COMPAT_FAIL,
+    VITALITY_THRIVING, VITALITY_NEEDS_ATTENTION, VITALITY_WITHERING, VITALITY_DORMANT,
+    SERVICE_RUNNING, SERVICE_STOPPED, SERVICE_MAINTENANCE, SERVICE_DEGRADED, SERVICE_UNKNOWN,
+    ENV_GARDEN_STONE, ENV_NO_COLOR, ENV_GARDEN_UNICODE,
+    VALUE_UNKNOWN,
+    STATUS_COMPLETED, STATUS_SUCCESS, STATUS_FAILED, STATUS_ERROR,
+};
 
 // Compatibility aliases for old code (to be removed during Phase 3 refactoring)
 pub mod ports {

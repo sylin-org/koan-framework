@@ -1,4 +1,17 @@
-﻿# API Error Response Standardization
+﻿---
+audience: [contributor]
+doc_type: notes
+status: current
+last_verified: 2026-01-18
+canonical: false
+note: "Implementation documentation for error response standardization"
+related:
+  - docs/REFERENCE.md
+  - docs/TECHNICAL-SPEC.md
+  - ARCHITECTURE.md
+---
+
+# API Error Response Standardization
 
 ## Summary
 

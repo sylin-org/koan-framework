@@ -1,4 +1,4 @@
-﻿[package]
+[package]
 name = "garden-rake"
 version = "0.1.0"
 edition = "2021"
@@ -23,6 +23,9 @@ reqwest = { version = "0.11", default-features = false, features = ["json", "rus
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 uuid = { version = "1.6", features = ["v7"] }
+colored = "2.1"
+terminal_size = "0.3"
+supports-color = "3.0"
 
 [build-dependencies]
 garden-build-utils = { path = "../build-utils" }

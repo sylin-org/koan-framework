@@ -1,33 +1,11 @@
-﻿//! Standardized API Response Wrappers
-//! Consistent response envelopes for all HTTP endpoints
+﻿//! Standardized API Response Builders
+//! Server-side utilities for constructing error responses
+//!
+//! Note: GardenApiResponse (success wrapper) is now in the client module
+//! since it's primarily used for HTTP client deserialization of JSON APIs.
 
-use serde::{Deserialize, Serialize};
 use crate::types::{ApiError, ErrorDetails};
 use std::collections::HashMap;
-
-/// Standard success response wrapper with optional suggestions
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ApiResponse<T> {
-    pub data: T,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub suggestions: Option<Vec<String>>,
-}
-
-impl<T> ApiResponse<T> {
-    pub fn new(data: T) -> Self {
-        Self {
-            data,
-            suggestions: None,
-        }
-    }
-
-    pub fn with_suggestions(data: T, suggestions: Vec<String>) -> Self {
-        Self {
-            data,
-            suggestions: Some(suggestions),
-        }
-    }
-}
 
 /// Standard error response builder
 pub struct ApiErrorBuilder {

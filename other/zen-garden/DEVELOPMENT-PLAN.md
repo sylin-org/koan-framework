@@ -1,3 +1,17 @@
+---
+audience: [contributor, maintainer]
+doc_type: guide
+status: current
+last_verified: 2026-01-18
+canonical: false
+note: "Day-by-day implementation guide, references canonical specs"
+related:
+  - docs/TECHNICAL-SPEC.md
+  - docs/SECURITY-SPEC.md
+  - ARCHITECTURE.md
+  - BUILD-DISTRIBUTION.md
+---
+
 # Zen Garden Development Plan
 
 **Project:** Garden-Moss Daemon + Rake CLI  
@@ -133,7 +147,7 @@ Even though Pond is Phase 3, we need scaffolding NOW:
 - API endpoint structure for Pond operations (`/api/operations/place/{target}`)
 - Placeholder handlers returning "Not Implemented" (HTTP 501)
 - Config file support for Pond settings (disabled by default)
-- Request/response types in `common` crate (PebbleRequest, StoneInvite, etc.)
+- Request/response types in `common` crate (KeystoneRequest, StoneInvite, etc.)
 - Middleware hooks for future mTLS validation (no-op in Phase 1)
 
 ### Key Technologies
@@ -193,7 +207,7 @@ Add these to Garden-Moss HTTP API (return 501 Not Implemented):
 
 ```rust
 // Phase 1: Scaffold only, return 501
-POST /api/operations/place/pebble    // Initialize Pond (Cornerstone)
+POST /api/operations/place/keystone    // Initialize Pond (Cornerstone)
 POST /api/operations/invite/stone     // Generate invitation code
 POST /api/operations/place/stone      // Join Pond with code
 
@@ -213,12 +227,12 @@ POST /api/operations/place/stone      // Join Pond with code
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PondConfig {
     pub enabled: bool,
-    pub pebble_path: Option<String>,
+    pub keystone_path: Option<String>,
     pub require_mtls: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PebbleRequest {
+pub struct KeystoneRequest {
     pub pond_name: String,
 }
 
@@ -247,7 +261,7 @@ Add to `garden-moss.toml`:
 ```toml
 [pond]
 enabled = false                    # Phase 1: Always false
-pebble_path = "/etc/zen-garden/pond/pebble"
+keystone_path = "/etc/zen-garden/pond/keystone"
 require_mtls = false               # Phase 3: Enable mTLS
 ```
 
@@ -256,7 +270,7 @@ require_mtls = false               # Phase 3: Enable mTLS
 Add to Rake CLI (return "Not implemented yet" message):
 
 ```bash
-garden-rake place pebble           # Phase 1: Print "Available in Phase 3"
+garden-rake place keystone           # Phase 1: Print "Available in Phase 3"
 garden-rake invite stone           # Phase 1: Print "Available in Phase 3"
 garden-rake place stone CODE       # Phase 1: Print "Available in Phase 3"
 ```
@@ -429,12 +443,12 @@ pub struct DiscoveryResponse {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PondConfig {
     pub enabled: bool,
-    pub pebble_path: Option<String>,  // Path to Pond root certificate
+    pub keystone_path: Option<String>,  // Path to Pond root certificate
     pub require_mtls: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PebbleRequest {
+pub struct KeystoneRequest {
     pub pond_name: String,  // Name of the security domain
 }
 
@@ -664,7 +678,7 @@ use axum::{
 pub async fn validate_mtls<B>(req: Request<B>, next: Next<B>) -> Response {
     // Phase 1: No-op - always allow
     // Phase 3: Extract and validate client certificate
-    //   - Verify certificate chain against Pond pebble
+    //   - Verify certificate chain against Pond keystone
     //   - Check certificate hasn't been revoked
     //   - Ensure certificate is for authorized Stone
 
@@ -799,9 +813,9 @@ enum Commands {
     },
 
     // Phase 1 scaffolding: Security commands (print "Available in Phase 3")
-    /// Place pebble or stone (Phase 3 feature)
+    /// Place keystone or stone (Phase 3 feature)
     Place {
-        /// Target: "pebble" or "stone"
+        /// Target: "keystone" or "stone"
         target: String,
 
         /// Invitation code (required for "stone")
@@ -875,8 +889,8 @@ cargo run --bin garden-rake -- list
 # Expected: "No services installed"
 
 # Phase 1 scaffolding: Security commands
-cargo run --bin garden-rake -- place pebble
-# Expected: "ℹ️  Phase 3 Feature: Place pebble (not yet implemented)"
+cargo run --bin garden-rake -- place keystone
+# Expected: "ℹ️  Phase 3 Feature: Place keystone (not yet implemented)"
 
 cargo run --bin garden-rake -- invite stone-02
 # Expected: "ℹ️  Phase 3 Feature: Invite stone-02 (not yet implemented)"
@@ -1582,7 +1596,7 @@ Commands::Upgrade { service, at, all } => {
 
 ### Security Scaffolding (Phase 1 - Stubs Only)
 
-- [x] Security types defined in common crate (PondConfig, PebbleRequest, etc.) ✅
+- [x] Security types defined in common crate (PondConfig, KeystoneRequest, etc.) ✅
 - [x] Security endpoints return 501 (`POST /api/operations/place/:target`, `POST /api/operations/invite/:stone_name`) ✅
 - [x] Security commands in Rake CLI print "Phase 3 Feature" messages ✅
 - [ ] [pond] configuration section in garden-moss.toml (enabled=false) ⚠️ NOT IN CONFIG FILE

@@ -74,11 +74,34 @@ pub fn discover_moss() -> Result<String> {
 }
 
 /// Discover all Moss instances on the network
-pub fn discover_all_moss(timeout: Duration) -> Result<Vec<String>> {
+/// Discover all Moss instances on the network with progressive disclosure
+/// 
+/// Streams discovered stones via callback as they respond, rather than batching.
+/// This exposes network physics and provides immediate feedback to users.
+/// 
+/// # Arguments
+/// * `timeout` - Maximum duration to wait for responses
+/// * `on_discovered` - Callback invoked for each unique stone discovered
+///   - Receives: (DiscoveryResponse, discovery_instant)
+///   - Called immediately when stone responds
+/// 
+/// # Returns
+/// Total count of unique stones discovered
+pub fn discover_all_moss_stream<F>(
+    timeout: Duration,
+    mut on_discovered: F,
+) -> Result<usize>
+where
+    F: FnMut(DiscoveryResponse, std::time::Instant) -> (),
+{
+    use std::collections::HashSet;
+    use std::time::Instant;
+
     let socket = UdpSocket::bind("0.0.0.0:0")?;
     let local = socket.local_addr()?;
     socket.set_broadcast(true)?;
-    socket.set_read_timeout(Some(timeout))?;
+    // Short read timeout for polling (not the full discovery timeout)
+    socket.set_read_timeout(Some(Duration::from_millis(100)))?;
 
     let request_id = uuid::Uuid::now_v7().to_string();
     let request = DiscoveryRequest {
@@ -90,33 +113,49 @@ pub fn discover_all_moss(timeout: Duration) -> Result<Vec<String>> {
     let request_bytes = serde_json::to_vec(&request)?;
     let sent = socket.send_to(&request_bytes, format!("255.255.255.255:{}", ports::DISCOVERY_UDP))?;
 
-    tracing::debug!(?local, bytes = sent, request_id = %request_id, "Sent UDP discovery broadcast (all)");
+    tracing::debug!(?local, bytes = sent, request_id = %request_id, "Sent UDP discovery broadcast (streaming mode)");
 
-    // Collect all responses within timeout
-    let mut endpoints = Vec::new();
+    let start = Instant::now();
+    let mut discovered_endpoints = HashSet::new();
     let mut buf = [0u8; 1024];
 
     loop {
+        // Check if we've exceeded the discovery timeout
+        if start.elapsed() >= timeout {
+            tracing::debug!(count = discovered_endpoints.len(), "Discovery timeout reached");
+            break;
+        }
+
         match socket.recv_from(&mut buf) {
             Ok((len, addr)) => {
                 if let Ok(response) = serde_json::from_slice::<DiscoveryResponse>(&buf[..len]) {
-                    tracing::info!(?addr, stone = %response.stone_name, "Discovered Moss");
-                    if !endpoints.contains(&response.stone_endpoint) {
-                        endpoints.push(response.stone_endpoint);
+                    // Only process unique endpoints
+                    if !discovered_endpoints.contains(&response.stone_endpoint) {
+                        discovered_endpoints.insert(response.stone_endpoint.clone());
+                        let discovery_instant = Instant::now();
+                        
+                        tracing::info!(
+                            ?addr, 
+                            stone = %response.stone_name,
+                            elapsed_ms = discovery_instant.duration_since(start).as_millis(),
+                            "Discovered Moss (streaming)"
+                        );
+                        
+                        // ✅ IMMEDIATE CALLBACK - Progressive disclosure
+                        on_discovered(response, discovery_instant);
                     }
                 }
             }
+            Err(e) if e.kind() == std::io::ErrorKind::WouldBlock || e.kind() == std::io::ErrorKind::TimedOut => {
+                // Timeout on this recv, continue polling
+                continue;
+            }
             Err(e) => {
-                // Timeout or error - return what we have
-                tracing::debug!(error = ?e, count = endpoints.len(), "Discovery collection ended");
+                tracing::debug!(error = ?e, count = discovered_endpoints.len(), "Discovery ended with error");
                 break;
             }
         }
     }
 
-    if endpoints.is_empty() {
-        Err(anyhow::anyhow!("No Moss instances discovered"))
-    } else {
-        Ok(endpoints)
-    }
+    Ok(discovered_endpoints.len())
 }

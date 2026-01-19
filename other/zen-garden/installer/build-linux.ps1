@@ -72,6 +72,16 @@ Write-Host ""
 # Create dist directories
 New-Item -ItemType Directory -Force -Path $LINUX_DIR | Out-Null
 
+# Get version from parent script or generate default
+if (-not $env:GARDEN_VERSION) {
+    $revision = (Get-Date).ToString("yyyyMMddHHmm")
+    $env:GARDEN_VERSION = "0.1.$revision"
+    $env:BUILD_NUMBER = $revision
+    Write-Host "⚠ Version not set by parent, using default: $env:GARDEN_VERSION" -ForegroundColor Yellow
+    Write-Host ""
+}
+$version = $env:GARDEN_VERSION
+
 if ($UseDocker) {
     # Docker-based build (Windows, or Linux with Docker preference)
     
@@ -181,12 +191,13 @@ if ($UseDocker) {
         }
         
         # Execute build in the persistent container with build number
-        docker exec -e CARGO_BUILD_NUMBER=$env:CARGO_BUILD_NUMBER $containerName $buildArgs
+        docker exec -e BUILD_NUMBER=$env:BUILD_NUMBER $containerName $buildArgs
         
         if ($LASTEXITCODE -ne 0) { throw "Build failed" }
         
         # Copy binaries from target to dist/linux/
         $srcDir = Join-Path $WORKSPACE_ROOT "target" $buildProfile
+        Copy-Item "$srcDir\garden-lantern" "$LINUX_DIR\garden-lantern" -Force
         Copy-Item "$srcDir\garden-moss" "$LINUX_DIR\garden-moss" -Force
         Copy-Item "$srcDir\garden-rake" "$LINUX_DIR\garden-rake" -Force
         Copy-Item "$srcDir\garden-lantern" "$LINUX_DIR\garden-lantern" -Force
@@ -221,9 +232,13 @@ if ($UseDocker) {
         
         # Copy binaries from target to dist/linux/
         $srcDir = Join-Path $WORKSPACE_ROOT "target" $buildProfile
-        Copy-Item "$srcDir/garden-lantern" "$LINUX_DIR/garden-lantern" -Force
-        Copy-Item "$srcDir/garden-moss" "$LINUX_DIR/garden-moss" -Force
-        Copy-Item "$srcDir/garden-rake" "$LINUX_DIR/garden-rake" -Force
+        Copy-Item "$srcDir/garden-lantern" "$LINUX_DIR/garden-lantern-$version" -Force
+        Copy-Item "$srcDir/garden-moss" "$LINUX_DIR/garden-moss-$version" -Force
+        Copy-Item "$srcDir/garden-rake" "$LINUX_DIR/garden-rake-$version" -Force
+        # Also create unversioned copies for convenience
+        Copy-Item "$LINUX_DIR/garden-lantern-$version" "$LINUX_DIR/garden-lantern" -Force
+        Copy-Item "$LINUX_DIR/garden-moss-$version" "$LINUX_DIR/garden-moss" -Force
+        Copy-Item "$LINUX_DIR/garden-rake-$version" "$LINUX_DIR/garden-rake" -Force
         
         Write-Host "  ✓ Binaries built`n" -ForegroundColor Green
         

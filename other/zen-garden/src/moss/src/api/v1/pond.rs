@@ -3,8 +3,8 @@
     http::{HeaderMap, StatusCode},
     Json,
 };
-use garden_common::ApiResponse;
 use crate::{error_response, AppState};
+use crate::api::responses::ApiResponse;
 use garden_common::ApiError;
 use serde::{Deserialize, Serialize};
 
@@ -16,7 +16,7 @@ pub struct PondInitRequest {
 #[derive(Serialize)]
 pub struct PondInitResponse {
     pub cornerstone: String,
-    pub pebble_path: String,
+    pub keystone_path: String,
     pub certificate_expires: String,
     pub status: String,
     pub note: String,
@@ -145,7 +145,7 @@ pub async fn pond_status_v1(
         cornerstone: None,
         stones: vec![],
         tier: "garden-pond".to_string(),
-        note: "Pond security not initialized. Run 'garden-rake place pebble' to secure your garden.".to_string(),
+        note: "Pond security not initialized. Run 'garden-rake place keystone' to secure your garden.".to_string(),
     };
 
     Ok(Json(ApiResponse::new(response)))

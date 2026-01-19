@@ -3,6 +3,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use crate::constants::*;
 
 // ============================================================================
 // Service Types
@@ -62,21 +63,21 @@ pub struct ComponentHealth {
 impl ComponentHealth {
     pub fn healthy(details: HashMap<String, serde_json::Value>) -> Self {
         Self {
-            status: "healthy".to_string(),
+            status: HEALTH_HEALTHY.to_string(),
             details,
         }
     }
 
     pub fn degraded(details: HashMap<String, serde_json::Value>) -> Self {
         Self {
-            status: "degraded".to_string(),
+            status: HEALTH_DEGRADED.to_string(),
             details,
         }
     }
 
     pub fn unhealthy(details: HashMap<String, serde_json::Value>) -> Self {
         Self {
-            status: "unhealthy".to_string(),
+            status: HEALTH_UNHEALTHY.to_string(),
             details,
         }
     }
@@ -346,12 +347,12 @@ pub struct GardenEvent {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PondConfig {
     pub enabled: bool,
-    pub pebble_path: Option<String>,
+    pub keystone_path: Option<String>,
     pub require_mtls: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PebbleRequest {
+pub struct KeystoneRequest {
     pub pond_name: String,
 }
 
@@ -509,7 +510,7 @@ mod tests {
     fn test_pond_config_defaults() {
         let config = PondConfig {
             enabled: false,
-            pebble_path: None,
+            keystone_path: None,
             require_mtls: false,
         };
         assert!(!config.enabled);

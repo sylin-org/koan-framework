@@ -1,4 +1,16 @@
-﻿# Zen Garden Architecture
+﻿---
+audience: [contributor, developer, ai]
+doc_type: reference
+status: current
+last_verified: 2026-01-18
+canonical: true
+related:
+  - docs/TECHNICAL-SPEC.md
+  - BUILD-DISTRIBUTION.md
+  - docs/reference/service-catalog.md
+---
+
+# Zen Garden Architecture
 
 ## Overview
 

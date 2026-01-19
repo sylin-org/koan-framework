@@ -28,11 +28,12 @@ use tokio_stream::wrappers::BroadcastStream;
 use tokio_stream::StreamExt;
 use tracing_subscriber::EnvFilter;
 use garden_common::{
-    error_codes, ApiError, ApiResponse, CpuCapabilities, DaemonHealthStatus, DiskCapabilities, ErrorDetails, 
+    error_codes, ApiError, CpuCapabilities, DaemonHealthStatus, DiskCapabilities, ErrorDetails, 
     HardwareCapabilities, HardwareInventory, HealthCheck, ServiceHealthStatus, 
     MemoryCapabilities, MetricsSnapshot, Ports, RuntimeInfo, ServiceInfo, 
     ServiceStatus,
 };
+use api::responses::ApiResponse;
 
 /// Create standardized error response with code, message, and optional details
 /// 
@@ -465,7 +466,7 @@ fn compile_compatibility(
         let capabilities = get_current_compat_capabilities();
         match evaluate_compatibility(rules, &capabilities) {
             CompatibilityDecision::Pass => CompiledCompatibility {
-                decision: "pass".to_string(),
+                decision: garden_common::COMPAT_PASS.to_string(),
                 reason: None,
                 original_image: None,
                 fallback_image: None,
@@ -475,7 +476,7 @@ fn compile_compatibility(
                 let original_image = template.image.clone();
                 template.image = image.clone();
                 CompiledCompatibility {
-                    decision: "fallback".to_string(),
+                    decision: garden_common::COMPAT_FALLBACK.to_string(),
                     reason: Some(reason),
                     original_image: Some(original_image),
                     fallback_image: Some(image),
@@ -483,7 +484,7 @@ fn compile_compatibility(
                 }
             }
             CompatibilityDecision::Fail { reason, suggestion } => CompiledCompatibility {
-                decision: "fail".to_string(),
+                decision: garden_common::COMPAT_FAIL.to_string(),
                 reason: Some(reason),
                 original_image: Some(template.image.clone()),
                 fallback_image: None,
@@ -492,7 +493,7 @@ fn compile_compatibility(
         }
     } else {
         CompiledCompatibility {
-            decision: "pass".to_string(),
+            decision: garden_common::COMPAT_PASS.to_string(),
             reason: None,
             original_image: None,
             fallback_image: None,
@@ -715,12 +716,12 @@ async fn stream_logs(
 async fn check_docker_health(state: &AppState) -> HealthCheck {
     if state.docker.is_healthy().await {
         HealthCheck {
-            status: "pass".to_string(),
+            status: garden_common::CHECK_PASS.to_string(),
             message: None,
         }
     } else {
         HealthCheck {
-            status: "fail".to_string(),
+            status: garden_common::CHECK_FAIL.to_string(),
             message: Some("Docker daemon unavailable".to_string()),
         }
     }
@@ -732,7 +733,7 @@ fn check_disk_health() -> HealthCheck {
             let available_percent = (resources.disk.available_bytes as f32 / resources.disk.total_bytes as f32) * 100.0;
             if available_percent < 10.0 {
                 HealthCheck {
-                    status: "warn".to_string(),
+                    status: garden_common::CHECK_WARN.to_string(),
                     message: Some(format!(
                         "Low disk space: {:.1}% free ({} available)",
                         available_percent,
@@ -741,13 +742,13 @@ fn check_disk_health() -> HealthCheck {
                 }
             } else {
                 HealthCheck {
-                    status: "pass".to_string(),
+                    status: garden_common::CHECK_PASS.to_string(),
                     message: None,
                 }
             }
         }
         Err(e) => HealthCheck {
-            status: "fail".to_string(),
+            status: garden_common::CHECK_FAIL.to_string(),
             message: Some(format!("Failed to check disk: {}", e)),
         },
     }
@@ -758,7 +759,7 @@ fn check_memory_health() -> HealthCheck {
         Ok(resources) => {
             if resources.memory.used_percent > 90.0 {
                 HealthCheck {
-                    status: "warn".to_string(),
+                    status: garden_common::CHECK_WARN.to_string(),
                     message: Some(format!(
                         "High memory usage: {:.1}% ({} used of {})",
                         resources.memory.used_percent,
@@ -768,13 +769,13 @@ fn check_memory_health() -> HealthCheck {
                 }
             } else {
                 HealthCheck {
-                    status: "pass".to_string(),
+                    status: garden_common::CHECK_PASS.to_string(),
                     message: None,
                 }
             }
         }
         Err(e) => HealthCheck {
-            status: "fail".to_string(),
+            status: garden_common::CHECK_FAIL.to_string(),
             message: Some(format!("Failed to check memory: {}", e)),
         },
     }
@@ -811,14 +812,14 @@ async fn health(State(state): State<AppState>) -> (StatusCode, Json<DaemonHealth
     
     // HTTP status code based on overall status
     let http_status = match overall_status.as_str() {
-        "unhealthy" => StatusCode::SERVICE_UNAVAILABLE,
+        garden_common::HEALTH_UNHEALTHY => StatusCode::SERVICE_UNAVAILABLE,
         _ => StatusCode::OK,
     };
 
     // Legacy boolean flags for backward compatibility
-    let docker_ok = docker_check.status == "pass";
-    let disk_ok = disk_check.status != "fail";
-    let memory_ok = memory_check.status != "fail";
+    let docker_ok = docker_check.status == garden_common::CHECK_PASS;
+    let disk_ok = disk_check.status != garden_common::CHECK_FAIL;
+    let memory_ok = memory_check.status != garden_common::CHECK_FAIL;
     let uptime_seconds = state.start_time.elapsed().as_secs();
 
     (
@@ -913,18 +914,18 @@ fn determine_overall_status(components: &HashMap<String, garden_common::Componen
     
     for component in components.values() {
         match component.status.as_str() {
-            "unhealthy" => has_unhealthy = true,
-            "degraded" => has_degraded = true,
+            garden_common::HEALTH_UNHEALTHY => has_unhealthy = true,
+            garden_common::HEALTH_DEGRADED => has_degraded = true,
             _ => {}
         }
     }
     
     if has_unhealthy {
-        "unhealthy".to_string()
+        garden_common::HEALTH_UNHEALTHY.to_string()
     } else if has_degraded {
-        "degraded".to_string()
+        garden_common::HEALTH_DEGRADED.to_string()
     } else {
-        "healthy".to_string()
+        garden_common::HEALTH_HEALTHY.to_string()
     }
 }
 
@@ -1950,8 +1951,9 @@ async fn load_preinstall_manifest() -> Option<PreInstallManifest> {
 }
 
 #[derive(clap::Parser)]
-#[command(name = "moss")]
+#[command(name = "garden-moss")]
 #[command(about = "Zen Garden Moss - Service orchestration daemon")]
+#[command(version = concat!(env!("CARGO_PKG_VERSION"), ".", env!("BUILD_NUMBER")))]
 struct Cli {
     /// Stone name identifier
     /// Priority: CLI arg > STONE_NAME env var > config file > default
@@ -2240,9 +2242,10 @@ async fn main() -> anyhow::Result<()> {
         "Moss daemon starting with merged configuration (priority: CLI > Env > Config > Defaults)"
     );
     
-    // Spawn first-boot initialization as background task if needed
-    if console::is_first_run() {
-        tracing::info!("First run detected, spawning background initialization task");
+    // Spawn first-boot initialization as background task if needed (Linux only)
+    // Windows/dev environments don't need hostname/hosts/avahi setup
+    if cfg!(target_os = "linux") && console::is_first_run() {
+        tracing::info!("First run detected on Linux, spawning background initialization task");
         
         let init_stone_name = stone_name.clone();
         let init_port = port;

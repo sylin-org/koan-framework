@@ -1,0 +1,6 @@
+﻿# Prepared artifacts are build outputs - regenerate with Prepare-BrandingArtifacts.ps1
+prepared/
+
+# Temporary working files
+*.tmp
+*.bak

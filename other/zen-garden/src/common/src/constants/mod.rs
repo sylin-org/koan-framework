@@ -84,6 +84,116 @@ pub const INSUFFICIENT_RESOURCES: &str = "INSUFFICIENT_RESOURCES";
 pub const DOCKER_UNAVAILABLE: &str = "DOCKER_UNAVAILABLE";
 
 // ============================================================================
+// Health Status Constants (Moss API)
+// ============================================================================
+
+/// Overall daemon health status - healthy
+pub const HEALTH_HEALTHY: &str = "healthy";
+
+/// Overall daemon health status - degraded (some components warn/degraded)
+pub const HEALTH_DEGRADED: &str = "degraded";
+
+/// Overall daemon health status - unhealthy (critical failure)
+pub const HEALTH_UNHEALTHY: &str = "unhealthy";
+
+// ============================================================================
+// Health Check Status Constants (HealthCheck struct)
+// ============================================================================
+
+/// Health check passed
+pub const CHECK_PASS: &str = "pass";
+
+/// Health check warning (degraded but functional)
+pub const CHECK_WARN: &str = "warn";
+
+/// Health check failed (critical)
+pub const CHECK_FAIL: &str = "fail";
+
+// ============================================================================
+// Compatibility Decision Constants
+// ============================================================================
+
+/// Offering is fully compatible with stone hardware
+pub const COMPAT_PASS: &str = "pass";
+
+/// Offering can run but will use fallback configuration
+pub const COMPAT_FALLBACK: &str = "fallback";
+
+/// Offering is incompatible and cannot run on this stone
+pub const COMPAT_FAIL: &str = "fail";
+
+// ============================================================================
+// Vitality Language Constants (Rake UI)
+// ============================================================================
+
+/// Stone/service is healthy and fully operational
+pub const VITALITY_THRIVING: &str = "thriving";
+
+/// Stone/service has warnings or degraded performance
+pub const VITALITY_NEEDS_ATTENTION: &str = "needs attention";
+
+/// Stone/service is critically unhealthy
+pub const VITALITY_WITHERING: &str = "withering";
+
+/// Stone/service is offline or unreachable
+pub const VITALITY_DORMANT: &str = "dormant";
+
+// ============================================================================
+// Service Status Constants
+// ============================================================================
+
+/// Service is running
+pub const SERVICE_RUNNING: &str = "running";
+
+/// Service is stopped
+pub const SERVICE_STOPPED: &str = "stopped";
+
+/// Service is in maintenance mode
+pub const SERVICE_MAINTENANCE: &str = "maintenance";
+
+/// Service is degraded
+pub const SERVICE_DEGRADED: &str = "degraded";
+
+/// Service status unknown
+pub const SERVICE_UNKNOWN: &str = "unknown";
+
+// ============================================================================
+// Environment Variable Names
+// ============================================================================
+
+/// Environment variable for stone endpoint override
+pub const ENV_GARDEN_STONE: &str = "GARDEN_STONE";
+
+/// Environment variable to disable color output (universal standard)
+pub const ENV_NO_COLOR: &str = "NO_COLOR";
+
+/// Environment variable to enable Unicode support (Windows override)
+pub const ENV_GARDEN_UNICODE: &str = "GARDEN_UNICODE";
+
+// ============================================================================
+// Common Default Values
+// ============================================================================
+
+/// Unknown value placeholder
+pub const VALUE_UNKNOWN: &str = "unknown";
+
+// ============================================================================
+// Job/Operation Status Constants
+// ============================================================================
+
+/// Job or operation completed successfully
+pub const STATUS_COMPLETED: &str = "completed";
+
+/// Operation succeeded (alternative to COMPLETED)
+pub const STATUS_SUCCESS: &str = "success";
+
+/// Job or operation failed
+pub const STATUS_FAILED: &str = "failed";
+
+/// Error occurred during operation
+pub const STATUS_ERROR: &str = "error";
+
+// ============================================================================
 // Standard Error Codes Documentation
 // ============================================================================
 // Mapped to HTTP status codes:

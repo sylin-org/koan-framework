@@ -53,19 +53,59 @@ $WORKSPACE_ROOT = (Get-Item $PSScriptRoot).Parent.FullName
 $DIST_DIR = Join-Path $WORKSPACE_ROOT "dist"
 $INSTALLER_DIR = $PSScriptRoot
 
+# Load version from version.json
+$versionFile = Join-Path $WORKSPACE_ROOT "version.json"
+if (-not (Test-Path $versionFile)) {
+    Write-Error "version.json not found at $versionFile"
+    exit 1
+}
+
+$versionData = Get-Content $versionFile | ConvertFrom-Json
+$major = $versionData.major
+$minor = $versionData.minor
+$revision = (Get-Date).ToString("yyyyMMddHHmm")
+$version = "$major.$minor.$revision"
+
 Write-Host "`n╔════════════════════════════════════════════════════╗" -ForegroundColor Cyan
 Write-Host "║   Zen Garden Distribution Build                   ║" -ForegroundColor Cyan
 Write-Host "╚════════════════════════════════════════════════════╝`n" -ForegroundColor Cyan
+
+Write-Host "Version: $version" -ForegroundColor Cyan
+Write-Host "  Phase: $major.$minor - $($versionData.description)" -ForegroundColor DarkGray
+Write-Host "  Moment: $revision ($(Get-Date -Format 'yyyy-MM-dd HH:mm'))" -ForegroundColor DarkGray
+Write-Host ""
 
 Write-Host "Platform Selection:" -ForegroundColor Yellow
 Write-Host "  Linux Build: $(if ($SkipLinux) { '❌ Skipped' } else { '✓ Enabled' })"
 Write-Host "  Windows Build: $(if ($SkipWindows) { '❌ Skipped' } else { '✓ Enabled' })"
 Write-Host ""
 
-# Generate build number (timestamp format: yyyyMMdd.HHmm)
-$buildNumber = (Get-Date).ToString("yyyyMMdd.HHmm")
-$env:CARGO_BUILD_NUMBER = $buildNumber
-Write-Host "Build Number: $buildNumber" -ForegroundColor Cyan
+# Set version for build scripts
+$env:GARDEN_VERSION = $version
+$env:BUILD_NUMBER = $revision
+
+# Update Cargo.toml files with version
+Write-Host "Updating Cargo.toml files with version $major.$minor..." -ForegroundColor DarkGray
+$cargoFiles = @(
+    (Join-Path $WORKSPACE_ROOT "src\moss\Cargo.toml"),
+    (Join-Path $WORKSPACE_ROOT "src\rake\Cargo.toml"),
+    (Join-Path $WORKSPACE_ROOT "src\lantern\Cargo.toml"),
+    (Join-Path $WORKSPACE_ROOT "src\common\Cargo.toml")
+)
+
+foreach ($file in $cargoFiles) {
+    if (Test-Path $file) {
+        $lines = Get-Content $file
+        $updated = $lines | ForEach-Object {
+            if ($_ -match '^version\s*=\s*"[\d\.]+"' -and $_ -notmatch 'rust-version') {
+                "version = `"$major.$minor.0`""
+            } else {
+                $_
+            }
+        }
+        Set-Content $file ($updated -join "`n")
+    }
+}
 Write-Host ""
 
 # Create dist directory

@@ -9,7 +9,7 @@ use axum::{
     http::StatusCode,
     Json,
 };
-use garden_common::ApiResponse;
+use crate::api::responses::ApiResponse;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 

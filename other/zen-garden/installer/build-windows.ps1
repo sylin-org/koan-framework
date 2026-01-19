@@ -48,18 +48,21 @@ if (-not $IsWindows) {
 $buildProfile = if ($Release) { "release" } else { "debug" }
 $buildFlag = if ($Release) { "--release" } else { "" }
 
+# Get version from parent script or generate default
+if (-not $env:GARDEN_VERSION) {
+    $revision = (Get-Date).ToString("yyyyMMddHHmm")
+    $env:GARDEN_VERSION = "0.1.$revision"
+    $env:BUILD_NUMBER = $revision
+    Write-Host "⚠ Version not set by parent, using default: $env:GARDEN_VERSION" -ForegroundColor Yellow
+}
+$version = $env:GARDEN_VERSION
+
 Write-Host "Configuration:" -ForegroundColor Yellow
 Write-Host "  Platform: Windows"
+Write-Host "  Version: $version"
 Write-Host "  Build Type: $(if ($Release) { 'Release (optimized)' } else { 'Debug (fast)' })"
 Write-Host "  Output Dir: $WINDOWS_DIR"
 Write-Host ""
-
-# Generate build number if not already set by parent script
-if (-not $env:CARGO_BUILD_NUMBER) {
-    $env:CARGO_BUILD_NUMBER = (Get-Date).ToString("yyyyMMdd.HHmm")
-    Write-Host "Build Number: $env:CARGO_BUILD_NUMBER" -ForegroundColor Cyan
-    Write-Host ""
-}
 
 # Create dist directories
 New-Item -ItemType Directory -Force -Path $WINDOWS_DIR | Out-Null

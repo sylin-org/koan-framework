@@ -3,8 +3,7 @@
     http::{HeaderMap, StatusCode},
     Json,
 };
-use garden_common::ApiResponse;
-use crate::api::responses::{CreateServiceRequest, ServiceActionResponse};
+use crate::api::responses::{CreateServiceRequest, ServiceActionResponse, ApiResponse};
 use crate::api::suggestions::{generate_suggestions, SuggestionContext};
 use crate::{error_response, AppState, persist_registry_to_disk};
 use garden_common::{ApiError, ServiceInfo, ServiceStatus};
@@ -120,7 +119,7 @@ pub async fn create_service_v1(
         }
     };
 
-    if compiled.compatibility.decision == "fail" {
+    if compiled.compatibility.decision == garden_common::COMPAT_FAIL {
         let reason = compiled.compatibility.reason.unwrap_or_else(|| "Unknown reason".to_string());
         return Err(error_response(
             StatusCode::BAD_REQUEST,

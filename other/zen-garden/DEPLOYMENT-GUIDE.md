@@ -1,3 +1,14 @@
+---
+audience: [operator, contributor]
+doc_type: guide
+status: current
+last_verified: 2026-01-18
+canonical: false
+related:
+  - docs/HARDWARE.md
+  - docs/TECHNICAL-SPEC.md
+---
+
 # Zen Garden Deployment Guide
 
 **Quick Start:** Build binaries → Create USB → Deploy Stone → Test

@@ -1,0 +1,19 @@
+﻿# Zen Garden ISOLINUX Menu Configuration
+# This file contains ISOLINUX menu customizations applied to isolinux/isolinux.cfg
+# Format: Plain text config that NewStone.ps1 will inject into ISOLINUX config
+
+# Timeout (deciseconds, 30 = 3 seconds)
+timeout 30
+prompt 1
+
+# Display splash screen (if zen-splash.txt exists)
+display zen-splash.txt
+
+# Menu labels (NewStone.ps1 will apply these)
+LABEL_INSTALL="Zen Garden Stone - Install"
+LABEL_VERBOSE="Zen Garden Stone - Install (verbose)"
+LABEL_BOOT_HD="Boot from first hard disk"
+
+# Kernel parameters (default for automated install)
+KERNEL_PARAMS_AUTO="auto=true priority=critical file=/cdrom/preseed.cfg quiet splash"
+KERNEL_PARAMS_VERBOSE="auto=true priority=critical file=/cdrom/preseed.cfg"

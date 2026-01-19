@@ -3,8 +3,7 @@
     http::{HeaderMap, StatusCode},
     Json,
 };
-use garden_common::ApiResponse;
-use crate::api::responses::{GardenOverview, StoneInfo};
+use crate::api::responses::{GardenOverview, StoneInfo, ApiResponse};
 use crate::api::suggestions::{generate_suggestions, SuggestionContext};
 use crate::{error_response, AppState, metrics};
 use garden_common::{ApiError, CpuCapabilities, DiskCapabilities, HardwareCapabilities, HardwareInventory, MemoryCapabilities};
@@ -129,7 +128,7 @@ async fn get_local_stone_info(state: &AppState) -> Result<StoneInfo, (StatusCode
     Ok(StoneInfo {
         name: state.stone_name.clone(),
         endpoint,
-        health: "healthy".to_string(), // TODO: actual health check
+        health: garden_common::HEALTH_HEALTHY.to_string(), // TODO: actual health check
         services_count,
         cpu_usage: 0.0, // TODO: Get from metrics
         memory_usage: 0.0, // TODO: Get from metrics
