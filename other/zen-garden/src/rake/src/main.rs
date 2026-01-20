@@ -1690,16 +1690,17 @@ fn display_stone(stone: &StoneData, offering_filter: &Option<Vec<String>>) -> an
         garden_common::DetectionStatus::Complete => "thriving",
     };
     
-    // Stone name with colored status indicator
-    let status_indicator = ui::status_indicator(status_text, term.supports_color);
-    let stone_name_colored = if term.supports_color {
+    // Display stone name in bold, then status indicator on same line
+    let stone_name_display = if term.supports_color {
         use colored::Colorize;
-        caps.stone_name.to_uppercase().bright_white().bold().to_string()
+        caps.stone_name.to_uppercase().bold().to_string()
     } else {
         caps.stone_name.to_uppercase()
     };
-    let header = format!("{} {}", stone_name_colored, status_indicator);
-    println!("\n{}", ui::section_header_v2(&header, true, false)); // Don't double-color the header
+    let status_indicator = ui::status_indicator(status_text, term.supports_color);
+    
+    println!("\n{} {}", stone_name_display, status_indicator);
+    println!("{}", "─".repeat(21));
     
     
     // === SYSTEM SECTION === (match status command)
