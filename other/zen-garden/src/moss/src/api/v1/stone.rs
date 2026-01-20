@@ -23,6 +23,12 @@ pub async fn upgrade_stone_v1(
     State(state): State<AppState>,
     Json(payload): Json<UpgradeRequest>,
 ) -> (StatusCode, Json<serde_json::Value>) {
+    tracing::info!(
+        component = %payload.component,
+        binary_size = payload.binary_data.len(),
+        "Upgrade request received at /api/v1/stone/upgrade"
+    );
+    
     // This is the same as the old /api/system/refresh endpoint
     // Forward to existing implementation
     crate::refresh_component(

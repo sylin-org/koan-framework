@@ -243,12 +243,12 @@ function Push-BinariesToStone {
     $mossPayload = @{
         component = "garden-moss"
         binary_data = $mossBase64
-    } | ConvertTo-Json
+    } | ConvertTo-Json -Depth 10 -Compress
     
     $url = "$($Stone.Endpoint.TrimEnd('/'))/api/v1/stone/upgrade"
     
     try {
-        $response = Invoke-RestMethod -Uri $url -Method Post -Body $payload -ContentType "application/json" -TimeoutSec 30
+        $response = Invoke-RestMethod -Uri $url -Method Post -Body $mossPayload -ContentType "application/json; charset=utf-8" -TimeoutSec 30
         
         Write-Status "   ✅ Moss upload successful" -Type "Success"
         if ($response.architecture) {
@@ -291,10 +291,10 @@ function Push-BinariesToStone {
         $rakePayload = @{
             component = "garden-rake"
             binary_data = $rakeBase64
-        } | ConvertTo-Json
+        } | ConvertTo-Json -Depth 10 -Compress
         
         try {
-            $rakeResponse = Invoke-RestMethod -Uri $url -Method Post -Body $rakePayload -ContentType "application/json" -TimeoutSec 30
+            $rakeResponse = Invoke-RestMethod -Uri $url -Method Post -Body $rakePayload -ContentType "application/json; charset=utf-8" -TimeoutSec 30
             Write-Status "   ✅ Rake upload successful" -Type "Success"
             Write-Status "   ✅ $($Stone.Name) fully updated" -Type "Success"
             return $true
@@ -385,13 +385,13 @@ try {
                 $mossPayload = @{
                     component = "garden-moss"
                     binary_data = $mossBase64
-                } | ConvertTo-Json
+                } | ConvertTo-Json -Depth 10 -Compress
                 
                 $url = "$($StoneEndpoint.TrimEnd('/'))/api/v1/stone/upgrade"
                 
                 try {
                     # Push moss
-                    $response = Invoke-RestMethod -Uri $url -Method Post -Body $mossPayload -ContentType "application/json" -TimeoutSec 30
+                    $response = Invoke-RestMethod -Uri $url -Method Post -Body $mossPayload -ContentType "application/json; charset=utf-8" -TimeoutSec 30
                     
                     # Wait and check health
                     Start-Sleep -Seconds 4
@@ -419,10 +419,10 @@ try {
                     $rakePayload = @{
                         component = "garden-rake"
                         binary_data = $rakeBase64
-                    } | ConvertTo-Json
+                    } | ConvertTo-Json -Depth 10 -Compress
                     
                     try {
-                        Invoke-RestMethod -Uri $url -Method Post -Body $rakePayload -ContentType "application/json" -TimeoutSec 30 | Out-Null
+                        Invoke-RestMethod -Uri $url -Method Post -Body $rakePayload -ContentType "application/json; charset=utf-8" -TimeoutSec 30 | Out-Null
                         return @{ Success = $true; Name = $StoneName; Platform = $Platform }
                     }
                     catch {

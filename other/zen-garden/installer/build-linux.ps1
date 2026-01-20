@@ -9,8 +9,8 @@
     - Detects existing build container and reuses it (perennial)
     - Only rebuilds container when Dockerfile changes or forced
 
-.PARAMETER Release
-    Build optimized release binaries (default: debug)
+.PARAMETER DebugBuild
+    Build debug binaries instead of optimized release (default: release)
 
 .PARAMETER ForceRebuild
     Force rebuild of Docker build container
@@ -22,8 +22,12 @@
     Check for outdated dependencies before building
 
 .EXAMPLE
-    .\build-linux.ps1 -Release
-    # Build release binaries using Docker (reuses existing image)
+    .\build-linux.ps1
+    # Build optimized release binaries using Docker (default, reuses existing image)
+
+.EXAMPLE
+    .\build-linux.ps1 -DebugBuild
+    # Build debug binaries (faster compile, larger size)
 
 .EXAMPLE
     .\build-linux.ps1 -ForceRebuild
@@ -40,7 +44,7 @@
 
 [CmdletBinding()]
 param(
-    [switch]$Release,
+    [switch]$DebugBuild,
     [switch]$ForceRebuild,
     [switch]$Native,
     [switch]$CheckUpdates
@@ -121,9 +125,9 @@ if ($UseDocker) {
         }
     }
     
-    # Determine build type
-    $buildProfile = if ($Release) { "release" } else { "debug" }
-    $buildFlag = if ($Release) { "--release" } else { "" }
+    # Determine build type (default: release for production)
+    $buildProfile = if ($DebugBuild) { "debug" } else { "release" }
+    $buildFlag = if (-not $DebugBuild) { "--release" } else { "" }
     
     # Docker-based build
     Write-Host "Building binaries in container..." -ForegroundColor Cyan
@@ -150,7 +154,7 @@ if ($UseDocker) {
         
         # Build all three binaries in one container run for efficiency
         $buildArgs = @("cargo", "build")
-        if ($Release) { $buildArgs += "--release" }
+        if (-not $DebugBuild) { $buildArgs += "--release" }
         $buildArgs += @("--bin", "garden-moss", "--bin", "garden-lantern", "--bin", "garden-rake")
         
         $containerName = "zen-garden-builder-container"
@@ -212,9 +216,9 @@ if ($UseDocker) {
     # Native Linux build
     Write-Host "Building binaries natively..." -ForegroundColor Cyan
     
-    # Determine build type
-    $buildProfile = if ($Release) { "release" } else { "debug" }
-    $buildFlag = if ($Release) { "--release" } else { "" }
+    # Determine build type (default: release for production)
+    $buildProfile = if ($DebugBuild) { "debug" } else { "release" }
+    $buildFlag = if (-not $DebugBuild) { "--release" } else { "" }
     
     Push-Location $WORKSPACE_ROOT
     try {
@@ -223,7 +227,7 @@ if ($UseDocker) {
         Write-Host "  → Building garden-rake (Linux CLI)..."
         
         $buildArgs = @("build")
-        if ($Release) { $buildArgs += "--release" }
+        if (-not $DebugBuild) { $buildArgs += "--release" }
         $buildArgs += @("--bin", "garden-moss", "--bin", "garden-lantern", "--bin", "garden-rake")
         
         cargo @buildArgs

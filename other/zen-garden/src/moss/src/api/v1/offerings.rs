@@ -61,16 +61,10 @@ pub async fn list_offerings_v1(
         .map(|s| (s.name.clone(), s))
         .collect();
     
-    // Get available offerings from index (loaded at startup)
+    // Get available offerings from index (may still be building)
     let idx_guard = state.offerings_index.read().await;
-    let offerings_index = idx_guard.as_ref().ok_or_else(|| {
-        error_response(
-            StatusCode::SERVICE_UNAVAILABLE,
-            "INDEX_UNAVAILABLE",
-            "Offerings catalog not yet loaded".to_string(),
-            None,
-        )
-    })?;
+    let offerings_index = idx_guard.as_ref();
+    let catalog_building = offerings_index.is_none();
     
     let mut offerings: Vec<OfferingView> = Vec::new();
     
@@ -92,33 +86,41 @@ pub async fn list_offerings_v1(
         }
     }
     
-    // Add available offerings (not yet installed)
+    // Add available offerings (not yet installed) - only if catalog loaded
     if query.state.as_deref() != Some("installed") {
-        for offering in &offerings_index.offerings {
-            if !installed.contains_key(&offering.name) {
-                offerings.push(OfferingView {
-                    name: offering.name.clone(),
-                    state: "available".to_string(),
-                    category: offering.category.clone(),
-                    description: offering.description.clone(),
-                    tags: offering.tags.clone(),
-                    image: offering.image.clone(),
-                    compatibility: Some(CompatibilityView {
-                        decision: offering.compatibility.decision.to_string(),
-                        reason: offering.compatibility.reason.clone(),
-                    }),
-                    health: None,
-                    uptime: None,
-                });
+        if let Some(offerings_index) = offerings_index {
+            for offering in &offerings_index.offerings {
+                if !installed.contains_key(&offering.name) {
+                    offerings.push(OfferingView {
+                        name: offering.name.clone(),
+                        state: "available".to_string(),
+                        category: offering.category.clone(),
+                        description: offering.description.clone(),
+                        tags: offering.tags.clone(),
+                        image: offering.image.clone(),
+                        compatibility: Some(CompatibilityView {
+                            decision: offering.compatibility.decision.to_string(),
+                            reason: offering.compatibility.reason.clone(),
+                        }),
+                        health: None,
+                        uptime: None,
+                    });
+                }
             }
         }
     }
+    
+    let suggestions = if catalog_building {
+        Some(vec!["Catalog still building - available offerings may be incomplete".to_string()])
+    } else {
+        None
+    };
     
     Ok((
         StatusCode::OK,
         Json(ApiResponse {
             data: offerings,
-            suggestions: None,
+            suggestions,
         }),
     ))
 }

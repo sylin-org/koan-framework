@@ -9,8 +9,8 @@
     
     This is the main entry point for full distribution builds.
 
-.PARAMETER Release
-    Build optimized release binaries (default: debug)
+.PARAMETER DebugBuild
+    Build debug binaries instead of optimized release (default: release)
 
 .PARAMETER SkipTests
     Skip running tests before build
@@ -25,21 +25,25 @@
     Force rebuild of Docker build container (Linux only)
 
 .EXAMPLE
-    .\dist.ps1 -Release
-    # Build release binaries for all platforms
+    .\dist.ps1
+    # Build optimized release binaries for all platforms (default)
 
 .EXAMPLE
-    .\dist.ps1 -Release -SkipTests
+    .\dist.ps1 -DebugBuild
+    # Build debug binaries (faster compile, larger size)
+
+.EXAMPLE
+    .\dist.ps1 -SkipTests
     # Fast build without tests
 
 .EXAMPLE
-    .\dist.ps1 -SkipWindows -Release
-    # Build Linux binaries only
+    .\dist.ps1 -SkipWindows
+    # Build Linux binaries only (optimized release)
 #>
 
 [CmdletBinding()]
 param(
-    [switch]$Release,
+    [switch]$DebugBuild,
     [switch]$SkipTests,
     [switch]$SkipLinux,
     [switch]$SkipWindows,
@@ -120,7 +124,7 @@ if (-not $SkipLinux) {
     Write-Host "═══════════════════════════════════════════════════`n" -ForegroundColor Cyan
     
     $dockerArgs = @{}
-    if ($Release) { $dockerArgs.Add('Release', $true) }
+    if ($DebugBuild) { $dockerArgs.Add('DebugBuild', $true) }
     if ($ForceRebuild) { $dockerArgs.Add('ForceRebuild', $true) }
     
     $linuxScript = Join-Path $INSTALLER_DIR "build-linux.ps1"
@@ -150,7 +154,7 @@ if (-not $SkipWindows) {
         Write-Host "═══════════════════════════════════════════════════`n" -ForegroundColor Cyan
         
         $windowsArgs = @{}
-        if ($Release) { $windowsArgs['Release'] = $true }
+        if ($DebugBuild) { $windowsArgs['DebugBuild'] = $true }
         if ($SkipTests) { $windowsArgs['SkipTests'] = $true }
         
         $windowsScript = Join-Path $INSTALLER_DIR "build-windows.ps1"

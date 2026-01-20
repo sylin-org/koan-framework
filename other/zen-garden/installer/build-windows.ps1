@@ -6,24 +6,28 @@
     Builds garden-moss.exe and garden-rake.exe for Windows using the MSVC toolchain.
     Requires Rust with x86_64-pc-windows-msvc target installed.
 
-.PARAMETER Release
-    Build optimized release binaries (default: debug)
+.PARAMETER DebugBuild
+    Build debug binaries instead of optimized release (default: release)
 
 .PARAMETER SkipTests
     Skip running tests before build
 
 .EXAMPLE
-    .\build-windows.ps1 -Release
-    # Build release binaries for Windows
+    .\build-windows.ps1
+    # Build optimized release binaries for Windows (default)
 
 .EXAMPLE
-    .\build-windows.ps1 -Release -SkipTests
+    .\build-windows.ps1 -DebugBuild
+    # Build debug binaries (faster compile, larger size)
+
+.EXAMPLE
+    .\build-windows.ps1 -SkipTests
     # Fast build without tests
 #>
 
 [CmdletBinding()]
 param(
-    [switch]$Release,
+    [switch]$DebugBuild,
     [switch]$SkipTests
 )
 
@@ -44,9 +48,9 @@ if (-not $IsWindows) {
     exit 1
 }
 
-# Determine build type
-$buildProfile = if ($Release) { "release" } else { "debug" }
-$buildFlag = if ($Release) { "--release" } else { "" }
+# Determine build type (default: release for production)
+$buildProfile = if ($DebugBuild) { "debug" } else { "release" }
+$buildFlag = if (-not $DebugBuild) { "--release" } else { "" }
 
 # Get version from parent script or generate default
 if (-not $env:GARDEN_VERSION) {
@@ -60,7 +64,7 @@ $version = $env:GARDEN_VERSION
 Write-Host "Configuration:" -ForegroundColor Yellow
 Write-Host "  Platform: Windows"
 Write-Host "  Version: $version"
-Write-Host "  Build Type: $(if ($Release) { 'Release (optimized)' } else { 'Debug (fast)' })"
+Write-Host "  Build Type: $(if ($DebugBuild) { 'Debug (fast)' } else { 'Release (optimized)' })"
 Write-Host "  Output Dir: $WINDOWS_DIR"
 Write-Host ""
 
@@ -101,7 +105,7 @@ Push-Location $WORKSPACE_ROOT
 try {
     Write-Host "  → Building garden-moss.exe (Windows daemon)..."
     $buildArgs = @("build")
-    if ($Release) { $buildArgs += "--release" }
+    if (-not $DebugBuild) { $buildArgs += "--release" }
     $buildArgs += @("--bin", "garden-moss", "--target", "x86_64-pc-windows-msvc")
     
     cargo @buildArgs
@@ -113,7 +117,7 @@ try {
     
     Write-Host "  → Building garden-rake.exe (Windows CLI)..."
     $buildArgs = @("build")
-    if ($Release) { $buildArgs += "--release" }
+    if (-not $DebugBuild) { $buildArgs += "--release" }
     $buildArgs += @("--bin", "garden-rake", "--target", "x86_64-pc-windows-msvc")
     
     cargo @buildArgs

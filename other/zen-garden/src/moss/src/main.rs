@@ -954,6 +954,10 @@ async fn health(State(state): State<AppState>) -> (StatusCode, Json<DaemonHealth
     // Memory component
     let memory_component = build_memory_component();
     components.insert("memory".to_string(), memory_component);
+    
+    // Initialization component (shows startup progress)
+    let init_component = build_initialization_component(&state).await;
+    components.insert("initialization".to_string(), init_component);
 
     // Determine overall status based on worst component status
     let overall_status = determine_overall_status(&components);
@@ -994,6 +998,36 @@ async fn build_docker_component(state: &AppState) -> garden_common::ComponentHea
     } else {
         details.insert("available".to_string(), serde_json::json!(false));
         garden_common::ComponentHealth::unhealthy(details)
+    }
+}
+
+async fn build_initialization_component(state: &AppState) -> garden_common::ComponentHealth {
+    let mut details = HashMap::new();
+    
+    // Check hardware detection status
+    let caps_guard = state.capabilities.read().await;
+    let detection_status = if let Some(caps) = caps_guard.as_ref() {
+        match caps.detection_status {
+            garden_common::DetectionStatus::Scanning => "scanning",
+            garden_common::DetectionStatus::Partial => "partial",
+            garden_common::DetectionStatus::Complete => "complete",
+        }
+    } else {
+        "unknown"
+    };
+    details.insert("hardware_detection".to_string(), serde_json::json!(detection_status));
+    
+    // Check catalog build status
+    let catalog_guard = state.offerings_index.read().await;
+    let catalog_ready = catalog_guard.is_some();
+    details.insert("catalog_ready".to_string(), serde_json::json!(catalog_ready));
+    
+    // Determine overall initialization health
+    if detection_status == "complete" && catalog_ready {
+        garden_common::ComponentHealth::healthy(details)
+    } else {
+        details.insert("message".to_string(), serde_json::json!("Initializing..."));
+        garden_common::ComponentHealth::degraded(details)
     }
 }
 
@@ -1332,7 +1366,11 @@ async fn refresh_component(
     State(state): State<AppState>,
     Json(payload): Json<RefreshPayload>,
 ) -> (StatusCode, Json<serde_json::Value>) {
-    tracing::info!(component = %payload.component, "Binary refresh requested");
+    tracing::info!(
+        component = %payload.component,
+        base64_size = payload.binary_data.len(),
+        "Binary refresh requested - payload received successfully"
+    );
     
     // Decode base64 binary data
     let binary_data = match base64::engine::general_purpose::STANDARD.decode(&payload.binary_data) {
@@ -3182,51 +3220,8 @@ async fn main() -> anyhow::Result<()> {
         capabilities: capabilities_arc.clone(),
     };
     
-    // Start background hardware detection (progressive: CPU fast, GPU slow)
-    let bg_stone_name = stone_name.clone();
-    let bg_caps = capabilities_arc.clone();
-    let bg_console = console_printer.clone();
-    let bg_state = state.clone();
-    tokio::spawn(async move {
-        bg_console.emit(console::ConsoleEvent::new(
-            console::EventCategory::System,
-            console::EventStatus::Scanning,
-            "Hardware capabilities".to_string()
-        ));
-        
-        // Progressive detection handles its own console updates
-        detect_capabilities_background(bg_stone_name.clone(), bg_caps.clone(), bg_console.clone(), bg_state).await;
-        
-        bg_console.emit(console::ConsoleEvent::new(
-            console::EventCategory::System,
-            console::EventStatus::Updated,
-            "Hardware capabilities (complete)".to_string()
-        ));
-    });
-
-    // Load persisted registry state (best-effort)
-    match load_registry_from_disk().await {
-        Ok(mut loaded) => {
-            // Reconcile: if the container no longer exists, mark it offline rather than dropping.
-            for svc in loaded.iter_mut() {
-                if !docker.zen_container_exists(&svc.name).await.unwrap_or(false) {
-                    svc.status = ServiceStatus::Stopped;
-                    svc.health = ServiceHealthStatus::Offline;
-                }
-            }
-
-            *state.registry.write().await = loaded;
-        }
-        Err(e) => {
-            tracing::warn!(error = ?e, "Failed to load persisted moss registry; starting empty");
-        }
-    }
-
-    // Startup self-heal: adopt any existing zen-offering containers into the registry.
-    adopt_existing_containers(&state).await;
-
-    // Start singleton UDP discovery listener EARLY (runs for process lifetime)
-    // This must happen before catalog building so stones respond to discovery immediately
+    // Start singleton UDP discovery listener IMMEDIATELY (before any blocking operations)
+    // This ensures stones respond to discovery as soon as moss starts, even during initialization
     let discovery_stone_name = stone_name.clone();
     let discovery_endpoint = api_endpoint.clone();
     match discovery::ensure_udp_listener(
@@ -3265,45 +3260,96 @@ async fn main() -> anyhow::Result<()> {
             ));
         }
     }
+    
+    // Start background hardware detection (progressive: CPU fast, GPU slow)
+    let bg_stone_name = stone_name.clone();
+    let bg_caps = capabilities_arc.clone();
+    let bg_console = console_printer.clone();
+    let bg_state = state.clone();
+    tokio::spawn(async move {
+        bg_console.emit(console::ConsoleEvent::new(
+            console::EventCategory::System,
+            console::EventStatus::Scanning,
+            "Hardware capabilities".to_string()
+        ));
+        
+        // Progressive detection handles its own console updates
+        detect_capabilities_background(bg_stone_name.clone(), bg_caps.clone(), bg_console.clone(), bg_state).await;
+        
+        bg_console.emit(console::ConsoleEvent::new(
+            console::EventCategory::System,
+            console::EventStatus::Updated,
+            "Hardware capabilities (complete)".to_string()
+        ));
+    });
 
-    // Build offerings index at startup
-    tracing::info!("Building offerings catalog...");
-    
-    // Emit console event for manifest scanning
-    console_printer.emit(console::ConsoleEvent::new(
-        console::EventCategory::Manifests,
-        console::EventStatus::Scanning,
-        "Runtime templates".to_string()
-    ));
-    
-    match ensure_offerings_index(&state, false).await {
-        Ok(_) => {
-            let idx_guard = state.offerings_index.read().await;
-            if let Some(idx) = idx_guard.as_ref() {
-                tracing::info!(
-                    offerings_count = idx.offerings.len(),
-                    "Offerings catalog loaded successfully"
-                );
+    // Load persisted registry state and adopt containers in background (non-blocking)
+    let registry_state = state.clone();
+    tokio::spawn(async move {
+        // Load persisted registry state (best-effort)
+        match load_registry_from_disk().await {
+            Ok(mut loaded) => {
+                // Reconcile: if the container no longer exists, mark it offline rather than dropping.
+                for svc in loaded.iter_mut() {
+                    if !registry_state.docker.zen_container_exists(&svc.name).await.unwrap_or(false) {
+                        svc.status = ServiceStatus::Stopped;
+                        svc.health = ServiceHealthStatus::Offline;
+                    }
+                }
+
+                *registry_state.registry.write().await = loaded;
+            }
+            Err(e) => {
+                tracing::warn!(error = ?e, "Failed to load persisted moss registry; starting empty");
+            }
+        }
+
+        // Startup self-heal: adopt any existing zen-offering containers into the registry
+        adopt_existing_containers(&registry_state).await;
+    });
+
+    // Build offerings index in background (non-blocking)
+    let catalog_state = state.clone();
+    let catalog_console = console_printer.clone();
+    tokio::spawn(async move {
+        tracing::info!("Building offerings catalog...");
+        
+        // Emit console event for manifest scanning
+        catalog_console.emit(console::ConsoleEvent::new(
+            console::EventCategory::Manifests,
+            console::EventStatus::Scanning,
+            "Runtime templates".to_string()
+        ));
+        
+        match ensure_offerings_index(&catalog_state, false).await {
+            Ok(_) => {
+                let idx_guard = catalog_state.offerings_index.read().await;
+                if let Some(idx) = idx_guard.as_ref() {
+                    tracing::info!(
+                        offerings_count = idx.offerings.len(),
+                        "Offerings catalog loaded successfully"
+                    );
+                    
+                    // Emit console event for successful manifest loading
+                    catalog_console.emit(console::ConsoleEvent::new(
+                        console::EventCategory::Manifests,
+                        console::EventStatus::Loaded,
+                        format!("{} manifests", idx.offerings.len())
+                    ));
+                }
+            }
+            Err(e) => {
+                tracing::warn!(error = ?e, "Failed to build offerings catalog - API will return empty results");
                 
-                // Emit console event for successful manifest loading
-                console_printer.emit(console::ConsoleEvent::new(
+                // Emit console event for manifest loading error
+                catalog_console.emit(console::ConsoleEvent::new(
                     console::EventCategory::Manifests,
-                    console::EventStatus::Loaded,
-                    format!("{} manifests", idx.offerings.len())
+                    console::EventStatus::Invalid,
+                    "Catalog build failed".to_string()
                 ));
             }
         }
-        Err(e) => {
-            tracing::warn!(error = ?e, "Failed to build offerings catalog - API will return empty results");
-            
-            // Emit console event for manifest loading error
-            console_printer.emit(console::ConsoleEvent::new(
-                console::EventCategory::Manifests,
-                console::EventStatus::Invalid,
-                "Catalog build failed".to_string()
-            ));
-        }
-    }
+    });
 
     // Check for pre-install manifest on first boot
     if let Some(manifest) = load_preinstall_manifest().await {
@@ -3382,7 +3428,11 @@ async fn main() -> anyhow::Result<()> {
         health_monitor_task(health_state).await;
     });
 
+    tracing::info!("Setting up HTTP router with 200 MB body limit");
     let app = Router::new()
+        // IMPORTANT: Set body limit FIRST before defining routes
+        .layer(axum::extract::DefaultBodyLimit::max(200 * 1024 * 1024)) // 200 MB for binary uploads
+        
         // Standard health/monitoring endpoints (root level)
         .route("/health", get(health))
         .route("/capabilities", get(capabilities))
@@ -3436,12 +3486,16 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/v1/console/mode", get(api::v1::console::get_console_mode_v1))
         .route("/api/v1/console/mode", post(api::v1::console::set_console_mode_v1))
         
-        .layer(axum::extract::DefaultBodyLimit::max(200 * 1024 * 1024)) // 200 MB for binary uploads
         .with_state(state.clone());
 
     let addr: SocketAddr = format!("0.0.0.0:{}", port).parse()?;
     let listener = tokio::net::TcpListener::bind(addr).await?;
-    tracing::info!(?addr, api_endpoint = %api_endpoint, "Moss HTTP server ready");
+    tracing::info!(
+        ?addr,
+        api_endpoint = %api_endpoint,
+        body_limit_mb = 200,
+        "Moss HTTP server ready with 200 MB body limit configured"
+    );
     
     // Emit HTTP server ready event
     state.console.emit(console::ConsoleEvent::new(

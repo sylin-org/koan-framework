@@ -1683,8 +1683,20 @@ fn display_stone(stone: &StoneData, offering_filter: &Option<Vec<String>>) -> an
     let caps = &stone.capabilities;
     let term = ui::TerminalInfo::detect();
     
-    // Stone name with underline (matches status command format)
-    println!("\n{}", ui::section_header_v2(&caps.stone_name, true, term.supports_color));
+    // Determine stone status from detection_status
+    let status_text = match caps.detection_status {
+        garden_common::DetectionStatus::Scanning => "waking up",
+        garden_common::DetectionStatus::Partial => "initializing",
+        garden_common::DetectionStatus::Complete => "thriving",
+    };
+    
+    // Stone name with status
+    let header = if caps.detection_status == garden_common::DetectionStatus::Complete {
+        format!("{} [{}]", caps.stone_name, status_text)
+    } else {
+        format!("{} [{}]", caps.stone_name, status_text)
+    };
+    println!("\n{}", ui::section_header_v2(&header, true, term.supports_color));
     
     // === SYSTEM SECTION === (match status command)
     println!("{}", ui::kv_line("ARCH", &caps.hardware.cpu.architecture, ui::constants::DEFAULT_INDENT));
