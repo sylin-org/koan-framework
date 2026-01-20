@@ -1,7 +1,7 @@
 ﻿# Zen Garden Canonical Documentation Manifest
 
 **Last Updated:** January 20, 2026  
-**Total Files:** 55  
+**Total Files:** 56  
 **Purpose:** Authoritative list of all canonical documentation files in the Zen Garden repository.
 
 ---
@@ -121,7 +121,7 @@ Architecture Decision Records documenting design choices.
 
 ---
 
-## Proposals (9 files)
+## Proposals (10 files)
 
 Active proposals for future features and evaluations.
 
@@ -132,6 +132,7 @@ Active proposals for future features and evaluations.
 | `docs/proposals/cli-taxonomy.md` | CLI command taxonomy | Active |
 | `docs/proposals/GARDEN-NAMING-ASSESSMENT-REVIEW.md` | Naming assessment review | Active |
 | `docs/proposals/naming-assessment.md` | Naming assessment | Active |
+| `docs/proposals/offering-modes.md` | Offering modes - Planted (Docker), Adopted (native), Borrowed (external) service lifecycle | Active |
 | `docs/proposals/passphrase-generation-ux.md` | Passphrase generation UX | Active |
 | `docs/proposals/pebble-android.md` | Pebble Android app proposal | Active |
 | `docs/proposals/stone-lifecycle.md` | Stone lifecycle management | Active |

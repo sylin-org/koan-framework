@@ -111,6 +111,7 @@ Architecture decisions, proposals, and development:
 - [Proposals Directory](proposals/) - Feature proposals and evaluations
   - [Bridges](proposals/bridges.md) - Garden-to-garden federation with capability sharing
   - [Ceremonies](proposals/ceremonies.md) - Long-running distributed operations with Elder Stone coordination
+  - [Offering Modes](proposals/offering-modes.md) - Planted (Docker), Adopted (native), Borrowed (external) service lifecycle
   - [Stone Lifecycle](proposals/stone-lifecycle.md) - Stone-centric operations (retire, replace, lift)
   - [CLI Taxonomy](proposals/cli-taxonomy.md) - Dual-syntax CLI design (zen + normative)
 
