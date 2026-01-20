@@ -705,6 +705,16 @@ impl ConsolePrinter {
         
         // Format using pluggable formatter and print
         let formatted = self.formatter.format(&event);
+        
+        // In verbose (sing) mode on Linux, also write to /dev/tty1 if available
+        #[cfg(target_os = "linux")]
+        if mode == ConsoleMode::Verbose {
+            if let Ok(mut tty) = OpenOptions::new().write(true).open("/dev/tty1") {
+                let _ = writeln!(tty, "{}", formatted);
+            }
+        }
+        
+        // Always write to stdout for journal
         println!("{}", formatted);
     }
     

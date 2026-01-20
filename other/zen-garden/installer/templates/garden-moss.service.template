@@ -13,9 +13,8 @@ ExecStartPre=/usr/local/bin/moss-update-helper.sh
 ExecStart=/usr/local/bin/garden-moss
 Restart=always
 RestartSec=10
-StandardOutput=journal+console
-StandardError=journal+console
-TTYPath=/dev/tty1
+StandardOutput=journal
+StandardError=journal
 SyslogIdentifier=garden-moss
 
 # Environment
