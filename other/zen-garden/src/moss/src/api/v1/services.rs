@@ -14,8 +14,28 @@ pub async fn list_services_v1(
     headers: HeaderMap,
 ) -> Result<Json<ApiResponse<Vec<ServiceInfo>>>, (StatusCode, Json<ApiError>)> {
     let registry = state.registry.read().await;
-    let services = registry.clone();
+    let mut services = registry.clone();
     drop(registry);
+
+    // Deduplicate services by name (keep first occurrence with resources if available)
+    let mut seen = std::collections::HashSet::new();
+    let mut deduped = Vec::new();
+    
+    // First pass: collect services with resources
+    for svc in services.iter() {
+        if svc.resources.is_some() && seen.insert(svc.name.clone()) {
+            deduped.push(svc.clone());
+        }
+    }
+    
+    // Second pass: add services without resources if not already seen
+    for svc in services.iter() {
+        if svc.resources.is_none() && seen.insert(svc.name.clone()) {
+            deduped.push(svc.clone());
+        }
+    }
+    
+    services = deduped;
 
     let ctx = SuggestionContext::from_headers(&headers, "list_services");
     let suggestions = generate_suggestions(&ctx);

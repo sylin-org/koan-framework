@@ -2176,21 +2176,25 @@ async fn health_monitor_task(state: AppState) {
         // Check for containers not in registry (external changes)
         match state.docker.list_zen_containers().await {
             Ok(container_names) => {
-                let registry_names: Vec<String> = {
-                    let reg = state.registry.read().await;
-                    reg.iter().map(|s| s.name.clone()).collect()
-                };
-
                 let mut adopted_any = false;
                 
                 for container_name in &container_names {
-                    if !registry_names.iter().any(|n| n == container_name) {
+                    // Check if already in registry (acquire read lock briefly)
+                    let exists = {
+                        let reg = state.registry.read().await;
+                        reg.iter().any(|s| s.name == *container_name)
+                    };
+                    
+                    if !exists {
                         tracing::warn!(container = %container_name, "Found zen-offering container not in registry (adopting)");
                         match adopt_offering_container(&state, container_name).await {
                             Ok(Some(info)) => {
+                                // Double-check before adding (prevent race condition)
                                 let mut reg = state.registry.write().await;
-                                reg.push(info);
-                                adopted_any = true;
+                                if !reg.iter().any(|s| s.name == info.name) {
+                                    reg.push(info);
+                                    adopted_any = true;
+                                }
                             }
                             Ok(None) => {
                                 tracing::warn!(container = %container_name, "No matching template for container; leaving unregistered");
