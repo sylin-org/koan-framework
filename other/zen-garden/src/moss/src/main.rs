@@ -3430,9 +3430,6 @@ async fn main() -> anyhow::Result<()> {
 
     tracing::info!("Setting up HTTP router with 200 MB body limit");
     let app = Router::new()
-        // IMPORTANT: Set body limit FIRST before defining routes
-        .layer(axum::extract::DefaultBodyLimit::max(200 * 1024 * 1024)) // 200 MB for binary uploads
-        
         // Standard health/monitoring endpoints (root level)
         .route("/health", get(health))
         .route("/capabilities", get(capabilities))
@@ -3485,6 +3482,9 @@ async fn main() -> anyhow::Result<()> {
         // V1 API - Console control
         .route("/api/v1/console/mode", get(api::v1::console::get_console_mode_v1))
         .route("/api/v1/console/mode", post(api::v1::console::set_console_mode_v1))
+        
+        // Apply 200 MB body limit to all routes
+        .layer(axum::extract::DefaultBodyLimit::max(200 * 1024 * 1024))
         
         .with_state(state.clone());
 
