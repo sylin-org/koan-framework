@@ -1690,7 +1690,8 @@ fn display_stone(stone: &StoneData, offering_filter: &Option<Vec<String>>) -> an
         garden_common::DetectionStatus::Complete => "thriving",
     };
     
-    // Display stone name in bold, then status indicator on same line
+    // Display stone name in bold, then status indicator aligned with table status column
+    // Table has: indent(8) + name_col(24) = 32 chars before status
     let stone_name_display = if term.supports_color {
         use colored::Colorize;
         caps.stone_name.to_uppercase().bold().to_string()
@@ -1699,8 +1700,20 @@ fn display_stone(stone: &StoneData, offering_filter: &Option<Vec<String>>) -> an
     };
     let status_indicator = ui::status_indicator(status_text, term.supports_color);
     
-    println!("\n{} {}", stone_name_display, status_indicator);
-    println!("{}", "─".repeat(21));
+    // Calculate padding to align status at column 32 (matching table layout)
+    let name_visible_len = caps.stone_name.len(); // Length without ANSI codes
+    let status_start_col = ui::constants::DEFAULT_INDENT * 2 + 24; // 8 + 24 = 32
+    let padding_needed = if status_start_col > name_visible_len {
+        status_start_col - name_visible_len
+    } else {
+        1 // At least one space
+    };
+    
+    println!("\n{}{}{}", stone_name_display, " ".repeat(padding_needed), status_indicator);
+    
+    // Extend underline to match the width (status column + status width)
+    let underline_len = status_start_col + 12; // Align with end of status column
+    println!("{}", "─".repeat(underline_len));
     
     
     // === SYSTEM SECTION === (match status command)
