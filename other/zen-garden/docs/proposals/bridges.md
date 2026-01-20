@@ -1,6 +1,6 @@
-﻿# Zen Garden Bridge Specification
+# Zen Garden Federation Specification
 
-**Garden-to-garden federation for distributed capability sharing**
+**Bridges, Meadows, and community capability sharing**
 
 **Status:** Proposal  
 **Date:** January 2026  
@@ -12,25 +12,79 @@
 
 1. [Overview](#overview)
 2. [The Garden Principle](#the-garden-principle)
-3. [Why Bridges Exist](#why-bridges-exist)
-4. [Bridges vs Ponds](#bridges-vs-ponds)
-5. [The Desire Ledger](#the-desire-ledger)
+3. [Bridges](#bridges)
+4. [Meadows](#meadows)
+5. [Wishes](#wishes)
 6. [Bridge Lifecycle](#bridge-lifecycle)
-7. [Policies](#policies)
-8. [Resolution Across Bridges](#resolution-across-bridges)
-9. [Bridge Health](#bridge-health)
-10. [Security Model](#security-model)
-11. [CLI Reference](#cli-reference)
-12. [API Specification](#api-specification)
-13. [Configuration](#configuration)
+7. [Meadow Lifecycle](#meadow-lifecycle)
+8. [Policies](#policies)
+9. [Resolution Across Federation](#resolution-across-federation)
+10. [Health Monitoring](#health-monitoring)
+11. [Security Model](#security-model)
+12. [CLI Reference](#cli-reference)
+13. [API Specification](#api-specification)
+14. [Configuration](#configuration)
 
 ---
 
 ## Overview
 
+### Federation Hierarchy
+
+Zen Garden provides two levels of federation:
+
+| Level | Name | Relationship | Use Case |
+|-------|------|--------------|----------|
+| Bilateral | **Bridge** | Garden ↔ Garden | Connect to a friend |
+| Multilateral | **Meadow** | Garden ↔ Shared Space ↔ Gardens | Community resource pool |
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                                                                 │
+│                         MEADOW                                  │
+│                     ∴  ∴  ∴  ∴  ∴                              │
+│                   ∴              ∴                              │
+│      Maria's    ∴                  ∴    João's                  │
+│      Garden    ∴      shared        ∴   Garden                  │
+│       🌿      ∴     capabilities     ∴    🌿                    │
+│        │     ∴                        ∴                         │
+│        │      ∴    ai:*, storage:*   ∴                          │
+│     BRIDGE     ∴                    ∴                           │
+│        │        ∴                  ∴                            │
+│        ▼         ∴  ∴  ∴  ∴  ∴  ∴                              │
+│    Ana's Garden                          Pedro's Garden         │
+│       🌿          (not in meadow)           🌿                  │
+│                                       (borders meadow)          │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+Maria has a **bridge** to Ana (bilateral). Maria also borders the **meadow** where João and Pedro share capabilities (multilateral).
+
 ### What is a Bridge?
 
-A **Bridge** is a secure, policy-controlled connection between two Zen Gardens that allows them to share capabilities. Apps in one garden can discover and use offerings from a bridged garden as if they were local.
+A **Bridge** is a secure, policy-controlled connection between two Zen Gardens. Apps in one garden can discover and use offerings from the bridged garden as if they were local.
+
+- **Bilateral** — Two gardens, explicit agreement
+- **Intentional** — Built with ceremony, requires effort
+- **Point-to-point** — Direct connection
+
+### What is a Meadow?
+
+A **Meadow** is a shared space that multiple gardens can border. Gardens voluntarily contribute capabilities to the meadow, and any garden in the meadow can use them.
+
+- **Multilateral** — Many gardens, community agreement
+- **Voluntary** — Each garden chooses what to share
+- **Open space** — Shared pool of capabilities
+
+### Wishes
+
+**Wishes** are unfulfilled wants — capabilities that apps crave but the garden cannot yet provide. The wish ledger tracks:
+
+- Offerings apps wish for
+- Bridge requests from other gardens
+- Meadow invitations
+- Stones requesting admission
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -115,20 +169,11 @@ If you need different trust boundaries within your infrastructure, you need diff
 
 ---
 
-## Why Bridges Exist
+## Bridges
 
-### The Distributed Capability Problem
+### Why Bridges Exist
 
-Your home lab has:
-- mongodb (database)
-- redis (cache)
-- minio (storage)
-
-Your friend's setup has:
-- ollama with 70B model (AI inference)
-- 48GB VRAM GPU
-
-Your app wants semantic search. It *craves* AI embeddings. Your garden can't provide it. Your friend's garden can.
+Your home lab has mongodb, redis, minio. Your friend has a 48GB VRAM GPU running ollama. Your app wants semantic search — it *wishes* for AI embeddings. Your garden can't provide it. Your friend's garden can.
 
 **Without bridges:** You can't use your friend's GPU. You'd have to:
 - Expose their services to the internet (security nightmare)
@@ -157,9 +202,7 @@ Bridges are peer-to-peer agreements between gardens. There's no central registry
 
 Each bridge is independent. If garden-A bridges to garden-B and garden-B bridges to garden-C, garden-A does NOT automatically see garden-C. Transitive trust is explicit, not implicit.
 
----
-
-## Bridges vs Ponds
+### Bridges vs Ponds
 
 Both provide secure connections. Different scope.
 
@@ -169,13 +212,10 @@ Both provide secure connections. Different scope.
 | **Participants** | Stones | Gardens (via Keystones) |
 | **Trust model** | Full trust (same admin) | Partial trust (policy-filtered) |
 | **Setup** | `garden-rake place keystone` | `garden-rake bridge with` |
-| **Authentication** | TOTP (stone admission) | TOTP (garden pairing) |
 | **Data flow** | Unrestricted within garden | Policy-controlled |
 | **Topology** | Visible to all stones | Hidden across bridge |
 
 **Pond = internal security. Bridge = external federation.**
-
-### Relationship
 
 ```
 ┌──────────────────────────────────────┐
@@ -204,98 +244,325 @@ Both provide secure connections. Different scope.
 └──────────────────────────────────────┘
 ```
 
-A garden without a Pond can still bridge (Keystones are generated for the bridge). But a Pond provides the internal security foundation.
+---
+
+## Meadows
+
+### Why Meadows Exist
+
+Bridges are bilateral. What if a whole community wants to share?
+
+**The village GPU scenario:**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                      VILLAGE MEADOW                             │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│   Maria's Garden          João's Garden         Ana's Garden    │
+│   ┌───────────┐          ┌───────────┐         ┌───────────┐   │
+│   │ mongodb   │          │ ollama    │         │ redis     │   │
+│   │ postgres  │          │ (GPU)     │         │ minio     │   │
+│   └───────────┘          └───────────┘         └───────────┘   │
+│        ↓                      ↓                      ↓          │
+│        └──────────────────────┼──────────────────────┘          │
+│                               ▼                                 │
+│                    MEADOW ANNOUNCEMENTS                         │
+│              ─────────────────────────────────                  │
+│              Maria shares: database:*                           │
+│              João shares: ai:* (GPU idle 6pm-8am)              │
+│              Ana shares: storage:*                              │
+│                                                                 │
+│              Anyone in the meadow can use these.                │
+│              No bilateral bridges needed.                       │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+Maria's semantic search app just works. It finds João's GPU through the meadow. João's gaming rig helps the whole village while he sleeps.
+
+### Meadow Characteristics
+
+| Aspect | Bridge | Meadow |
+|--------|--------|--------|
+| **Relationship** | Bilateral (A ↔ B) | Multilateral (A ↔ Meadow ↔ B, C, D...) |
+| **Discovery** | Explicit (I know your address) | Announced (join meadow, see everyone) |
+| **Trust** | Point-to-point (I trust you) | Community (I trust the meadow) |
+| **Setup** | Per-pair ceremony | One ceremony to join |
+| **Governance** | Two parties agree | Community norms, Keepers |
+
+### Keepers
+
+A meadow isn't owned. It's *tended*. **Keepers** are gardeners who help maintain the shared space.
+
+```
+Keeper responsibilities:
+  • Invite new members (or approve requests)
+  • Establish community norms
+  • Resolve disputes (rare)
+  
+Keepers do NOT:
+  • Control what members share
+  • Have special access to capabilities
+  • Own the meadow
+```
+
+Multiple Keepers possible. Founding member is first Keeper. Keepership can be passed.
+
+```bash
+# Become a keeper
+$ garden-rake become keeper of village-tech
+
+# Step down
+$ garden-rake step down as keeper of village-tech
+
+# See keepers
+$ garden-rake meadow village-tech --keepers
+```
+
+### Planting a Meadow
+
+```bash
+$ garden-rake plant meadow village-tech
+
+PLANT MEADOW
+───────────────────────────────────────────────
+  Creating new meadow: village-tech
+  
+  You will be the founding Keeper.
+  
+  Meadow philosophy:
+    • Members share capabilities voluntarily
+    • No member is required to share everything
+    • Community sets its own norms
+    
+  Enter your TOTP to confirm: ______
+
+✓ Meadow "village-tech" planted
+✓ You are the founding Keeper
+
+Invite others: garden-rake invite to meadow village-tech
+```
+
+### Joining a Meadow
+
+```bash
+$ garden-rake join meadow village-tech
+
+JOIN MEADOW
+───────────────────────────────────────────────
+  Meadow:          village-tech
+  Members:         7 gardens
+  Shared:          ai:*, database:*, storage:*
+  Keepers:         João, Maria
+  
+  To join, you need an invitation from a Keeper.
+  
+Request invitation? [Y/n]: y
+✓ Request sent to village-tech Keepers
+```
+
+Or with an invitation:
+
+```bash
+$ garden-rake join meadow village-tech --invitation MDOW-7X9K-M2PL
+
+JOIN MEADOW
+───────────────────────────────────────────────
+  Meadow:          village-tech
+  Invited by:      João
+  
+  Enter your TOTP to confirm: ______
+
+✓ Your garden now borders the village-tech meadow
+✓ You can now access: ai:*, database:*, storage:*
+```
+
+### Sharing to a Meadow
+
+```bash
+# Share capabilities with the meadow
+$ garden-rake share database:* with meadow village-tech
+
+SHARING TO MEADOW
+───────────────────────────────────────────────
+  Meadow:          village-tech
+  Sharing:         database:*
+  Your offerings:  mongodb, postgresql
+  
+  These will be available to all 7 gardens in the meadow.
+  
+Confirm? [Y/n]: y
+✓ Now sharing database:* with village-tech
+```
+
+### Time-Based Sharing
+
+```bash
+$ garden-rake share ai:* with meadow village-tech --schedule "22:00-06:00"
+
+SCHEDULED SHARING
+───────────────────────────────────────────────
+  Capabilities:    ai:*
+  Meadow:          village-tech
+  Schedule:        22:00 - 06:00 daily
+  
+  Your AI capabilities will be:
+    • Available to meadow: 10pm - 6am
+    • Reserved for you: 6am - 10pm
+    
+  Others will see: "ai:embeddings (scheduled 22:00-06:00)"
+```
+
+### Leaving a Meadow
+
+```bash
+$ garden-rake leave meadow village-tech
+
+LEAVE MEADOW
+───────────────────────────────────────────────
+  Meadow:          village-tech
+  
+  This will:
+    • Stop sharing your capabilities with the meadow
+    • Remove access to meadow capabilities
+    • Not affect any direct bridges you have
+    
+Leave? [Y/n]: y
+✓ You have left the village-tech meadow
+```
+
+### Reciprocity
+
+Meadows can track contribution vs consumption (visible, not enforced):
+
+```bash
+$ garden-rake meadow village-tech --balance
+
+VILLAGE-TECH BALANCE
+───────────────────────────────────────────────
+  Your garden:     maria-home
+  
+  CONTRIBUTED (last 30 days)
+    database:mongodb        1,247 requests served
+    database:postgresql       892 requests served
+    
+  CONSUMED (last 30 days)
+    ai:embeddings            3,891 requests
+    storage:backup             127 requests
+    
+  Standing: Good contributor ✓
+  
+  Community average: 2.1 (consume/contribute ratio)
+  Your ratio: 2.4
+```
+
+Social norms, not code restrictions.
 
 ---
 
-## The Desire Ledger
+## Wishes
 
-### Unified Inbox for Garden Wants
+### Unified View of Unfulfilled Wants
 
-Gardens track **desires** — things that have been requested but not yet fulfilled. The desire ledger is a unified view of:
+Gardens track **wishes** — things that have been requested but not yet fulfilled:
 
-1. **Offering Desires** — Capabilities apps are craving
-2. **Bridge Desires** — Other gardens requesting federation
-3. **Stone Desires** — Devices requesting Pond admission
+1. **Offering wishes** — Capabilities apps are wishing for
+2. **Bridge wishes** — Other gardens requesting connection
+3. **Meadow wishes** — Invitations to join meadows
+4. **Stone wishes** — Devices requesting Pond admission
 
 ```bash
-$ garden-rake desires
+$ garden-rake wishes
 
-DESIRES                                    
+WISHES                                    
 ───────────────────────────────────────────────
-OFFERINGS (apps crave capabilities)
+OFFERINGS (apps wish for capabilities)
     ai:embeddings        2 apps         → semantic-search, smart-tags
     ai:vision            1 app          → image-search
     storage:s3           1 app          → cloud-backup
 
-BRIDGES (gardens want to connect)
+BRIDGES (gardens wish to connect)
     gpu-farm             pending        received 3m ago
                          wants from us: (nothing)
                          offers to us:  ai:*
-                         
-    backup-site          pending        received 1h ago
-                         wants from us: storage:*
-                         offers to us:  storage:* (offsite)
 
-STONES (devices want to join pond)
+MEADOWS (invitations)
+    village-tech         invited        João invited you
+                         members: 7 gardens
+                         sharing: ai:*, database:*, storage:*
+
+STONES (devices wish to join pond)
     unknown-device       pending        TOTP: 7X9K2M
                          192.168.1.47
                          4 cores, 8GB RAM
 ```
 
-### Desire Sources
+### Wish Sources
 
-**Offering desires** come from apps:
+**Offering wishes** come from apps:
 ```python
-# App registers what it wants
-garden.crave("ai:embeddings", unlocks="semantic-search")
-garden.crave("ai:vision", unlocks="image-search")
+# App registers what it wishes for
+garden.wish("ai:embeddings", unlocks="semantic-search")
+garden.wish("ai:vision", unlocks="image-search")
 
 # App registers what it requires (hard dependency)
 garden.require("mongodb")
 ```
 
-**Bridge desires** come from remote gardens:
+**Bridge wishes** come from remote gardens:
 ```bash
 # Remote garden initiates
 $ garden-rake bridge with home-lab
-# This creates a bridge desire in home-lab's ledger
+# This creates a bridge wish in home-lab's ledger
 ```
 
-**Stone desires** come from devices:
+**Meadow wishes** come from invitations:
+```bash
+# Keeper invites a garden
+$ garden-rake invite marias-garden to meadow village-tech
+# Creates meadow wish in Maria's ledger
+```
+
+**Stone wishes** come from devices:
 ```bash
 # New stone requests admission
 $ garden-rake place stone
-# Creates stone desire in garden's ledger, shows TOTP
+# Creates stone wish in garden's ledger
 ```
 
-### Fulfilling Desires
+### Fulfilling Wishes
 
 ```bash
-# Fulfill offering desire
+# Fulfill offering wish by adding capability locally
 $ garden-rake offer ollama
 ✓ ollama planted on stone-02
-✓ Fulfilled desires: ai:embeddings (2 apps), ai:vision (1 app)
+✓ Fulfilled wishes: ai:embeddings (2 apps), ai:vision (1 app)
   Apps notified of new capabilities
 
-# Fulfill bridge desire  
+# Fulfill offering wish via bridge
 $ garden-rake accept bridge from gpu-farm
 ✓ Bridge ceremony initiated
 ✓ Bridge active — ai:* now available via gpu-farm
-✓ Fulfilled desires: ai:embeddings (2 apps), ai:vision (1 app)
+✓ Fulfilled wishes: ai:embeddings (2 apps), ai:vision (1 app)
 
-# Fulfill stone desire
+# Fulfill offering wish via meadow
+$ garden-rake join meadow village-tech
+✓ Your garden now borders the village-tech meadow
+✓ Fulfilled wishes: ai:embeddings, storage:backup
+
+# Fulfill stone wish
 $ garden-rake accept stone 7X9K2M
 Enter your TOTP code: ______
 ✓ unknown-device admitted to pond
 ✓ Renamed to stone-04
 ```
 
-### Why Track Desires?
+### Why Track Wishes?
 
 1. **Visibility** — Know what apps are hungry for
 2. **Planning** — Prioritize hardware purchases based on demand
-3. **Automation** — Future: auto-accept bridges from trusted sources
+3. **Automation** — Future: auto-accept from trusted sources
 4. **Metrics** — Understand garden utilization and gaps
 
 ---
@@ -593,168 +860,300 @@ Burning...
 
 ---
 
+## Meadow Lifecycle
+
+### States
+
+```
+┌─────────────┐
+│  PLANTING   │ ← Founder creates the meadow
+└──────┬──────┘
+       │
+       ▼
+┌─────────────┐
+│   ACTIVE    │ ← Meadow exists, accepting members
+└──────┬──────┘
+       │
+       ├────────────────┐
+       ▼                ▼
+┌─────────────┐  ┌─────────────┐
+│  DORMANT    │  │  DISSOLVED  │
+│ (no members)│  │ (explicit)  │
+└─────────────┘  └─────────────┘
+```
+
+### Planting
+
+```bash
+$ garden-rake plant meadow village-tech
+
+PLANT MEADOW
+───────────────────────────────────────────────
+  Creating: village-tech
+  
+  You will be the founding Keeper.
+  
+  Enter your TOTP to confirm: ______
+
+✓ Meadow "village-tech" planted
+✓ You are the founding Keeper
+✓ Your garden now borders village-tech
+
+Invite others: garden-rake invite <garden> to meadow village-tech
+```
+
+### Inviting
+
+Keepers can invite other gardens:
+
+```bash
+$ garden-rake invite marias-garden to meadow village-tech
+
+INVITE TO MEADOW
+───────────────────────────────────────────────
+  Meadow:      village-tech
+  Inviting:    marias-garden
+  
+Generating invitation...
+✓ Invitation sent to marias-garden
+
+They will see this in their wishes.
+Or share this code directly: MDOW-7X9K-M2PL (expires 7d)
+```
+
+### Joining
+
+```bash
+$ garden-rake join meadow village-tech --invitation MDOW-7X9K-M2PL
+
+JOIN MEADOW
+───────────────────────────────────────────────
+  Meadow:      village-tech
+  Invited by:  João
+  Members:     7 gardens
+  Available:   ai:*, database:*, storage:*
+  
+  Enter your TOTP to confirm: ______
+
+✓ Your garden now borders village-tech
+✓ You can access: ai:*, database:*, storage:*
+
+Share your capabilities: garden-rake share <capability> with meadow village-tech
+```
+
+### Sharing
+
+```bash
+$ garden-rake share database:* with meadow village-tech
+
+SHARE TO MEADOW
+───────────────────────────────────────────────
+  Meadow:      village-tech
+  Sharing:     database:* (mongodb, postgresql)
+  
+  These offerings will be available to all 8 members.
+  
+Confirm? [Y/n]: y
+✓ Now sharing database:* with village-tech
+✓ 8 gardens can now use your databases
+```
+
+### Leaving
+
+```bash
+$ garden-rake leave meadow village-tech
+
+LEAVE MEADOW
+───────────────────────────────────────────────
+  Meadow:      village-tech
+  
+  This will:
+    • Stop sharing your capabilities
+    • Remove your access to meadow capabilities
+    • NOT affect direct bridges
+    
+  If you're the last Keeper, the meadow will need a new one.
+  
+Leave? [Y/n]: y
+✓ You have left village-tech
+```
+
+### Dissolving
+
+The last Keeper can dissolve an empty meadow:
+
+```bash
+$ garden-rake dissolve meadow village-tech
+
+DISSOLVE MEADOW
+───────────────────────────────────────────────
+  Meadow:      village-tech
+  Members:     1 (just you)
+  
+  ⚠ This will permanently end the meadow.
+  
+  Enter your TOTP to confirm: ______
+
+✓ Meadow village-tech dissolved
+```
+
+---
+
 ## Policies
 
 ### Policy Structure
 
 ```yaml
+# Bridge policy for connection to gpu-farm
 bridge:
-  garden: gpu-farm
+  to: gpu-farm
   
-  inbound:
-    # What we accept from them
+  outbound:              # What we SHARE with them
     allow:
-      - category: ai           # Accept all AI offerings
-        
-    deny:
-      - offering: sketchy-ai   # Except this specific one
-      
-    requirements:
-      # Quality gates for accepted offerings
-      - capability: ai.vision
-        min_vram_gb: 16        # Only accept high-end models
-        
-  outbound:
-    # What we share with them
-    allow:
+      - category: storage
       - category: database
-      - offering: minio        # Specific offering
-        
+        only: [mongodb]  # Only mongodb, not postgresql
     deny:
-      - offering: admin-db     # Don't share internal databases
+      - offering: secrets-manager   # Never share this specific offering
+      
+  inbound:               # What we ACCEPT from them
+    allow:
+      - category: ai
+      - capability: inference.*
+    deny:
+      - category: database   # We don't want their databases
+    requirements:
+      - capability: ai.vision
+        min_vram_gb: 16      # Only accept if sufficient VRAM
 ```
 
-### Policy Types
+### Policy Evaluation
 
-**Category-based:**
-```yaml
-allow:
-  - category: ai       # Accept all ai:* capabilities
-  - category: storage  # Accept all storage:* capabilities
+When an app resolves an offering:
+
+```python
+garden.resolve("zen-garden:nomic-embed-text")
 ```
 
-**Offering-specific:**
-```yaml
-allow:
-  - offering: mongodb      # Only this specific offering
-  - offering: postgresql
-```
-
-**Wildcard:**
-```yaml
-allow:
-  - category: "*"    # Accept everything (use with caution)
-
-deny:
-  - category: "*"    # Share nothing (secure default)
-```
-
-### Default Policies
-
-**Secure defaults:**
-```toml
-[federation.default_policy]
-inbound_allow = []         # Accept nothing by default
-inbound_deny = ["*"]       # Explicit deny-all
-
-outbound_allow = []        # Share nothing by default
-outbound_deny = ["*"]      # Explicit deny-all
-```
-
-You must explicitly allow capabilities in both directions.
+Resolution checks:
+1. **Local first** — Is it available in our garden? → Use local
+2. **Bridge check** — Is it available via bridge? 
+3. **Policy check** — Does our inbound policy allow it?
+4. **Capability check** — Does it meet our requirements?
+5. **Return** — Federated endpoint or "not found"
 
 ### Policy Negotiation
 
-During bridge ceremony, both sides propose policies:
+During bridge ceremony, policies are exchanged and intersected:
 
 ```
-home-lab proposes:
-  inbound: [ai:*]
-  outbound: [database:*, storage:*]
+home-lab wants: ai:*
+gpu-farm offers: ai:embeddings, ai:vision, ai:chat
 
-gpu-farm proposes:
-  inbound: []
-  outbound: [ai:*]
-
-Result (intersection):
-  home-lab receives: [ai:*] from gpu-farm
-  home-lab shares:   [database:*, storage:*] with gpu-farm
-  gpu-farm receives: [database:*, storage:*] from home-lab
-  gpu-farm shares:   [ai:*] with home-lab
-```
-
-If there's no intersection (neither side wants what the other offers), the bridge still succeeds but does nothing useful. Future policy updates can activate it.
-
-### Policy Updates
-
-```bash
-# Add capability to outbound policy
-$ garden-rake bridge to gpu-farm share cache:*
-
-BRIDGE POLICY UPDATE
-───────────────────────────────────────────────
-  Bridge:     gpu-farm
-  Change:     Add to outbound allow: cache:*
-  
-  Current outbound: [database:*, storage:*]
-  New outbound:     [database:*, storage:*, cache:*]
-  
-Apply? [y/N]: y
-
-Enter your TOTP code: 482910
-
-✓ Policy updated
-✓ gpu-farm notified of new capabilities
-✓ redis now available to gpu-farm apps
-```
-
-Policy updates require TOTP (security-sensitive operation).
+Intersection: ai:embeddings, ai:vision, ai:chat ✓
 
 ---
 
-## Resolution Across Bridges
+home-lab offers: database:*, storage:*
+gpu-farm wants: (nothing)
 
-### How Apps See Federated Offerings
-
-Apps use the same resolution API regardless of whether offerings are local or federated:
-
-```python
-# App code (unchanged whether local or federated)
-connection_string = garden.resolve("mongodb")
-# Returns: mongodb://stone-02.local:27017
-
-embedding_service = garden.resolve("nomic-embed-text")
-# Could return:
-#   - Local: http://stone-03.local:11435 (if we have it)
-#   - Federated: federated://gpu-farm/ollama/nomic-embed-text (if via bridge)
+Intersection: (nothing) ✓
 ```
+
+If there's no overlap (we want X, they don't offer X), the bridge can still form — it's just one-directional or limited.
+
+### Policy Updates
+
+Policies can be modified on an active bridge:
+
+```bash
+$ garden-rake bridge policy gpu-farm --add-inbound "ai:audio"
+
+Updating bridge policy...
+Negotiating with gpu-farm...
+✓ Policy updated
+✓ Now receiving: ai:embeddings, ai:vision, ai:chat, ai:audio
+```
+
+The remote garden must agree to share the additional capability.
+
+---
+
+## Resolution Across Federation
 
 ### Resolution Priority
 
-When multiple sources provide the same capability:
+Apps use the same connection string format regardless of where the offering lives:
+
+```python
+# Local offering
+garden.resolve("zen-garden:mongodb")
+# Returns: mongodb://stone-01.local:27017
+
+# Federated offering (identical syntax)
+garden.resolve("zen-garden:nomic-embed-text")
+# Returns: federated://gpu-farm/ollama/nomic-embed-text?token=xyz
+```
+
+Resolution order:
 
 ```
-1. Local offerings (lowest latency)
-2. Bridged offerings (sorted by health and latency)
-3. Fallback: return unavailable error
+1. LOCAL GARDEN
+   └─ Exact match in local offerings
+   
+2. DIRECT BRIDGES (by latency)
+   └─ Exact match in bridged gardens
+   └─ Policy permits
+   
+3. MEADOWS (by latency)
+   └─ Exact match in meadow offerings
+   └─ Policy permits
+   
+4. NOT FOUND
+   └─ Offering not available
+   └─ Logged as unfulfilled wish
 ```
 
-**Example:**
+### Conflict Resolution
 
+What if multiple sources offer the same capability?
+
+```python
+# Both local garden and gpu-farm have "redis"
+garden.resolve("zen-garden:redis")
 ```
-App requests: ai:embeddings
 
-Available sources:
-  - Local: none
-  - Bridge: gpu-farm (latency 48ms, healthy)
-  - Bridge: ai-cluster (latency 120ms, degraded)
-  
-Resolution: gpu-farm (healthiest bridge)
+**Rule: Local always wins.**
+
+If you have redis locally, you get local redis. Bridges don't override local offerings.
+
+**To explicitly use federated:**
+
+```python
+garden.resolve("zen-garden:redis", prefer="federated")
+garden.resolve("zen-garden:redis", from_garden="gpu-farm")
+```
+
+### Disambiguation
+
+When names conflict across bridges:
+
+```python
+# gpu-farm has ollama, ml-cluster also has ollama
+garden.resolve("zen-garden:ollama")
+# Error: Ambiguous — ollama available from multiple bridges
+
+garden.resolve("zen-garden:ollama", from_garden="gpu-farm")
+# Returns: federated://gpu-farm/ollama/...
+
+# Or use capability-based resolution
+garden.resolve("zen-garden:ai/embeddings")
+# Returns: first available (by latency)
 ```
 
 ### Federated Connection Strings
 
-Connection strings for federated offerings use a special protocol:
+When resolution returns a federated offering, the connection string includes routing information:
 
 ```
 federated://gpu-farm/ollama/nomic-embed-text?token=eyJ...
@@ -770,9 +1169,9 @@ federated://gpu-farm/ollama/nomic-embed-text?token=eyJ...
 
 ---
 
-## Bridge Health
+## Health Monitoring
 
-### Monitoring
+### Bridge Health
 
 ```bash
 $ garden-rake bridges --health
@@ -908,162 +1307,179 @@ No TOTP required for reconnection (Keystones already trust each other). Full re-
 
 **Inbound (what we accept):**
 - Our Lantern checks inbound policy before returning federated results
-- Apps only see capabilities we explicitly allow
-- Can't discover other garden's internal topology
+- Apps only see what we allow
+- Capability requirements enforced locally
 
 ### Threat Model
 
-**Threats bridges defend against:**
-
 | Threat | Mitigation |
-|--------|-----------|
-| Unauthorized garden connection | TOTP required on both sides |
-| Man-in-the-middle | mTLS with certificate pinning |
-| Replay attacks | Single-use nonces, short-lived tokens |
-| Capability enumeration | Policy enforcement, no free discovery |
-| Topology exposure | Gardens abstract stones, reveal only capabilities |
+|--------|------------|
+| Rogue garden | TOTP prevents automated bridge requests |
+| Man-in-middle | mTLS with certificate pinning |
+| Credential theft | Short-lived tokens, Keystone-signed |
+| Enumeration | Policies hide non-shared offerings |
+| DoS via bridge | Rate limiting on Lantern |
+| Capability exfiltration | Outbound policies, audit logging |
 
-**Threats bridges DON'T defend against:**
+### Audit Logging
 
-| Threat | Why Not Defended | Mitigation |
-|--------|------------------|------------|
-| Malicious offering behavior | Garden trusts what it accepts | Vet bridges before connecting |
-| Resource exhaustion | No rate limiting (yet) | Monitor bridge health |
-| Data exfiltration | Apps can send data anywhere | Trust the garden, audit policies |
+All bridge activity logged:
 
-### Trust Model
-
-**Three levels:**
-
-1. **Full trust (Pond)** — Stones in same garden trust each other completely
-2. **Partial trust (Bridge)** — Gardens trust each other for specific capabilities
-3. **Zero trust (Internet)** — Everything else
-
-Bridges are **not VPNs**. They don't extend your network. They extend your capability space, with explicit policy control.
+```json
+{
+  "timestamp": "2026-01-20T16:05:23Z",
+  "event": "federated_resolution",
+  "local_app": "semantic-search",
+  "requested": "ai:embeddings",
+  "resolved_via": "gpu-farm",
+  "offering": "ollama/nomic-embed-text",
+  "latency_ms": 52
+}
+```
 
 ---
 
 ## CLI Reference
 
-### Bridge Management
+### Bridge Commands (Zen)
 
 ```bash
-# Initiate bridge request
+# Request a bridge
 garden-rake bridge with <garden-name>
-garden-rake bridge with <garden-name> at <address:port>
+garden-rake bridge with <garden-name> at <address>
 
-# List desires (including pending bridge requests)
-garden-rake desires
-
-# Inspect bridge request before accepting
-garden-rake inspect bridge <garden-name>
-
-# Accept bridge request
+# Accept a pending bridge request
 garden-rake accept bridge from <garden-name>
 
-# Reject bridge request
+# Reject a pending bridge request
 garden-rake reject bridge from <garden-name>
 
-# List active bridges
+# Sever an active bridge
+garden-rake burn bridge to <garden-name>
+
+# View all bridges
 garden-rake bridges
 garden-rake bridges --health
 
-# View specific bridge details
-garden-rake bridge to <garden-name>
+# Inspect a bridge or request
+garden-rake inspect bridge <garden-name>
 
-# Update bridge policy
-garden-rake bridge to <garden-name> share <capability>
-garden-rake bridge to <garden-name> accept <capability>
-garden-rake bridge to <garden-name> stop sharing <capability>
-garden-rake bridge to <garden-name> stop accepting <capability>
-
-# Burn (sever) bridge
-garden-rake burn bridge to <garden-name>
-
-# Normative aliases
-garden-rake bridges create <garden-name>
-garden-rake bridges list
-garden-rake bridges show <garden-name>
-garden-rake bridges delete <garden-name>
+# Modify bridge policy
+garden-rake bridge policy <garden-name> --add-inbound "category:*"
+garden-rake bridge policy <garden-name> --remove-outbound "offering:secrets"
 ```
 
-### Examples
+### Meadow Commands (Zen)
 
 ```bash
-# Simple bridge request
-$ garden-rake bridge with gpu-farm
-Enter your TOTP code: ______
-✓ Request sent to gpu-farm
+# Plant a new meadow (become founding Keeper)
+garden-rake plant meadow <meadow-name>
 
-# Accept incoming request
-$ garden-rake desires
-# See pending request from home-lab
-$ garden-rake inspect bridge home-lab
-# Review details
-$ garden-rake accept bridge from home-lab
-Enter your TOTP code: ______
-✓ Bridge ceremony started
+# Join an existing meadow
+garden-rake join meadow <meadow-name>
+garden-rake join meadow <meadow-name> --invitation <code>
 
-# Monitor bridges
-$ garden-rake bridges --health
-gpu-farm    healthy ✓    48ms (p50)
-backup-site degraded ⚠   340ms (p50)
+# Leave a meadow
+garden-rake leave meadow <meadow-name>
 
-# Update policy to share cache
-$ garden-rake bridge to gpu-farm share cache:*
-Enter your TOTP code: ______
-✓ Policy updated
+# View meadow details
+garden-rake meadow <meadow-name>
+garden-rake meadow <meadow-name> --keepers
+garden-rake meadow <meadow-name> --balance
 
-# Sever bridge
-$ garden-rake burn bridge to gpu-farm
-Burn bridge? [y/N]: y
-Enter your TOTP code: ______
-✓ Bridge burned
+# Share capabilities with meadow
+garden-rake share <capability> with meadow <meadow-name>
+garden-rake share <capability> with meadow <meadow-name> --schedule "22:00-06:00"
+
+# Stop sharing with meadow
+garden-rake unshare <capability> from meadow <meadow-name>
+
+# Invite a garden to meadow (Keeper only)
+garden-rake invite <garden-name> to meadow <meadow-name>
+
+# Keeper management
+garden-rake become keeper of <meadow-name>
+garden-rake step down as keeper of <meadow-name>
+```
+
+### Wishes Command (Zen)
+
+```bash
+# View all wishes (offerings, bridges, meadows, stones)
+garden-rake wishes
+
+# View specific category
+garden-rake wishes --offerings
+garden-rake wishes --bridges
+garden-rake wishes --meadows
+garden-rake wishes --stones
+```
+
+### Normative Aliases
+
+```bash
+# Bridge commands
+garden-rake federation connect <garden-name>
+garden-rake federation accept <garden-name>
+garden-rake federation reject <garden-name>
+garden-rake federation disconnect <garden-name>
+garden-rake federation list
+
+# Meadow commands
+garden-rake community create <meadow-name>
+garden-rake community join <meadow-name>
+garden-rake community leave <meadow-name>
+garden-rake community list
+
+# Wishes
+garden-rake requests list
 ```
 
 ---
 
 ## API Specification
 
-### Bridge Request Endpoints
+### Bridge Endpoints (Lantern)
 
-**Initiate bridge request:**
+**Request bridge:**
 ```http
 POST /api/v1/bridges/request
 Content-Type: application/json
 
 {
-  "garden": "gpu-farm",
-  "address": "gpu-farm.example.com:7190",
+  "target_garden": "gpu-farm",
+  "target_address": "gpu-farm.example.com:7190",
   "proposed_policy": {
-    "inbound_allow": ["ai:*"],
-    "outbound_allow": ["database:*", "storage:*"]
+    "we_want": ["ai:*"],
+    "we_offer": ["database:*"]
   },
-  "totp": "847291"
+  "totp_proof": "..."
 }
 
-Response 202 Accepted:
+Response 202:
 {
-  "request_id": "bridge-req-home-gpu-20260120",
   "status": "pending",
-  "expires_at": "2026-01-21T15:30:00Z"
+  "request_id": "bridge-req-abc123",
+  "expires_at": "2026-01-21T15:30:00Z",
+  "message": "Request sent, awaiting acceptance"
 }
 ```
 
-**Accept bridge request:**
+**Accept bridge:**
 ```http
 POST /api/v1/bridges/accept
 Content-Type: application/json
 
 {
-  "garden": "home-lab",
-  "totp": "293847"
+  "from_garden": "home-lab",
+  "totp_proof": "..."
 }
 
-Response 200:
+Response 202:
 {
-  "ceremony_id": "bridge-homelab-gpufarm-20260120",
-  "status": "ceremony_started"
+  "status": "ceremony_started",
+  "ceremony_id": "bridge-homelab-gpufarm-...",
+  "message": "Bridge ceremony in progress"
 }
 ```
 
@@ -1077,113 +1493,194 @@ Response 200:
     {
       "garden": "gpu-farm",
       "status": "active",
-      "established_at": "2026-01-20T15:35:45Z",
-      "health": "healthy",
-      "latency_p50_ms": 48,
-      "inbound_capabilities": ["ai:embeddings", "ai:vision"],
-      "outbound_capabilities": []
+      "direction": "inbound",
+      "receiving": ["ai:embeddings", "ai:vision"],
+      "sharing": [],
+      "latency_ms": 48,
+      "connected_since": "2026-01-06T10:00:00Z"
     }
   ]
 }
 ```
 
-**Bridge health:**
-```http
-GET /api/v1/bridges/{garden}/health
-
-Response 200:
-{
-  "garden": "gpu-farm",
-  "status": "healthy",
-  "latency": {
-    "p50_ms": 48,
-    "p99_ms": 62
-  },
-  "uptime_seconds": 1234567,
-  "last_heartbeat": "2026-01-20T16:00:02Z",
-  "requests_today": 1247,
-  "errors_today": 3
-}
-```
-
-**Update policy:**
-```http
-PATCH /api/v1/bridges/{garden}/policy
-Content-Type: application/json
-
-{
-  "outbound_add": ["cache:*"],
-  "totp": "482910"
-}
-
-Response 200:
-{
-  "garden": "gpu-farm",
-  "policy_updated": true,
-  "new_outbound": ["database:*", "storage:*", "cache:*"]
-}
-```
-
 **Burn bridge:**
 ```http
-DELETE /api/v1/bridges/{garden}
+DELETE /api/v1/bridges/gpu-farm
 Content-Type: application/json
 
 {
-  "totp": "192837"
+  "totp_proof": "..."
 }
 
 Response 200:
 {
-  "garden": "gpu-farm",
   "status": "burned",
-  "message": "Bridge to gpu-farm has been severed"
+  "garden": "gpu-farm",
+  "message": "Bridge severed"
 }
 ```
 
-### Federated Resolution
+### Federated Resolution (Lantern)
 
-**Resolve capability (includes federated):**
+**Resolve with federation:**
 ```http
-GET /api/v1/resolve/nomic-embed-text
+GET /api/v1/resolve?offering=nomic-embed-text&include_federated=true
 
 Response 200:
 {
   "offering": "nomic-embed-text",
-  "capability": "ai:embeddings",
   "source": "federated",
-  "garden": "gpu-farm",
-  "connection_string": "federated://gpu-farm/ollama/nomic-embed-text?token=eyJ...",
-  "health": "healthy",
-  "latency_estimate_ms": 48
+  "via_garden": "gpu-farm",
+  "via_type": "bridge",           // or "meadow"
+  "endpoint": "federated://gpu-farm/ollama/nomic-embed-text",
+  "token": "eyJ...",
+  "token_expires": "2026-01-20T16:10:00Z",
+  "latency_estimate_ms": 50
 }
 ```
 
-### Desire Ledger
+### Meadow Endpoints (Lantern)
 
-**Get desires:**
+**Plant meadow:**
 ```http
-GET /api/v1/desires
+POST /api/v1/meadows
+Content-Type: application/json
+
+{
+  "name": "village-tech",
+  "totp_proof": "..."
+}
+
+Response 201:
+{
+  "meadow": "village-tech",
+  "status": "planted",
+  "role": "keeper",
+  "message": "Meadow planted. You are the founding Keeper."
+}
+```
+
+**Join meadow:**
+```http
+POST /api/v1/meadows/{meadow}/join
+Content-Type: application/json
+
+{
+  "invitation_code": "MDOW-7X9K-M2PL",  // optional
+  "totp_proof": "..."
+}
+
+Response 200:
+{
+  "meadow": "village-tech",
+  "status": "joined",
+  "role": "member",
+  "available_capabilities": ["ai:*", "database:*", "storage:*"]
+}
+```
+
+**Leave meadow:**
+```http
+DELETE /api/v1/meadows/{meadow}/membership
+Content-Type: application/json
+
+{
+  "totp_proof": "..."
+}
+
+Response 200:
+{
+  "meadow": "village-tech",
+  "status": "left"
+}
+```
+
+**Share to meadow:**
+```http
+POST /api/v1/meadows/{meadow}/share
+Content-Type: application/json
+
+{
+  "capabilities": ["database:*"],
+  "schedule": {
+    "start": "22:00",
+    "end": "06:00",
+    "timezone": "America/New_York"
+  }
+}
+
+Response 200:
+{
+  "meadow": "village-tech",
+  "sharing": ["database:mongodb", "database:postgresql"],
+  "schedule": "22:00-06:00"
+}
+```
+
+**List meadows:**
+```http
+GET /api/v1/meadows
+
+Response 200:
+{
+  "meadows": [
+    {
+      "name": "village-tech",
+      "role": "member",
+      "members": 7,
+      "sharing": ["database:*"],
+      "receiving": ["ai:*", "storage:*"]
+    }
+  ]
+}
+```
+
+### Wishes (Moss)
+
+**List wishes:**
+```http
+GET /api/v1/wishes
 
 Response 200:
 {
   "offerings": [
-    {
-      "capability": "ai:embeddings",
-      "requested_by": ["semantic-search", "smart-tags"],
-      "since": "2026-01-20T10:00:00Z"
-    }
+    {"capability": "ai:embeddings", "apps": 2, "unlocks": ["semantic-search"]},
+    {"capability": "ai:vision", "apps": 1, "unlocks": ["image-search"]}
   ],
   "bridges": [
-    {
-      "garden": "gpu-farm",
-      "status": "pending",
-      "received_at": "2026-01-20T15:27:00Z",
-      "wants_from_us": [],
-      "offers_to_us": ["ai:*"]
-    }
+    {"garden": "gpu-farm", "status": "pending", "wants": ["ai:*"], "offers": ["database:*"]}
   ],
-  "stones": []
+  "meadows": [
+    {"meadow": "village-tech", "status": "invited", "invited_by": "João"}
+  ],
+  "stones": [
+    {"address": "192.168.1.47", "totp_hint": "7X9K2M", "status": "pending"}
+  ]
+}
+```
+
+**Register app wish:**
+```http
+POST /api/v1/wishes
+Content-Type: application/json
+
+{
+  "app_id": "semantic-search-app",
+  "capability": "ai:embeddings",
+  "priority": "desired",
+  "unlocks": "semantic-search-feature"
+}
+
+Response 201:
+{
+  "registered": true,
+  "capability": "ai:embeddings",
+  "status": "unfulfilled",
+  "fulfillment_options": [
+    "Offer ollama locally",
+    "Bridge to a garden with AI capabilities",
+    "Join a meadow with AI capabilities"
+  ]
 }
 ```
 
@@ -1191,20 +1688,25 @@ Response 200:
 
 ## Configuration
 
-### Moss Configuration
+### Bridge Configuration
 
 ```toml
-# /etc/zen-garden/moss.toml
+# /etc/zen-garden/bridges.toml
 
 [federation]
-# Enable federation features
+# Enable bridge functionality
 enabled = true
 
-# Listen address for bridge connections
-listen = "0.0.0.0:7190"
+# Port for bridge protocol
+port = 7190
 
 # Maximum active bridges
 max_bridges = 10
+
+# Auto-reconnect settings
+reconnect_initial_delay_seconds = 5
+reconnect_max_delay_seconds = 600
+reconnect_backoff_multiplier = 3.0
 
 # Heartbeat settings
 heartbeat_interval_seconds = 30
@@ -1247,7 +1749,7 @@ bridge:
 
 ### Keystone Storage
 
-Bridge Keystones stored alongside Pond Keystone:
+Bridge and Meadow Keystones stored alongside Pond Keystone:
 
 ```
 /etc/zen-garden/
@@ -1257,17 +1759,77 @@ Bridge Keystones stored alongside Pond Keystone:
 │   ├── gpu-farm.policy.yaml # Bridge policy
 │   ├── backup-site.cert
 │   └── backup-site.policy.yaml
+├── meadows/
+│   ├── village-tech.membership.yaml  # Membership details
+│   └── village-tech.sharing.yaml     # What we share
+```
+
+### Meadow Configuration
+
+```toml
+# /etc/zen-garden/meadows.toml
+
+[meadows]
+# Enable meadow functionality
+enabled = true
+
+# Maximum meadows this garden can join
+max_meadows = 5
+
+# Default sharing policy for new meadows
+default_share = []  # Don't share anything by default
+
+# Heartbeat settings
+heartbeat_interval_seconds = 60
+```
+
+### Per-Meadow Membership Files
+
+```yaml
+# /etc/zen-garden/meadows/village-tech.membership.yaml
+
+meadow:
+  name: village-tech
+  joined: 2026-01-20T10:00:00Z
+  role: member              # or "keeper"
+  
+  # Our sharing policy for this meadow
+  sharing:
+    capabilities:
+      - database:*
+    schedule:
+      start: "00:00"
+      end: "23:59"
+      timezone: "UTC"
+      
+  # Cached info about the meadow
+  keepers:
+    - João
+    - Maria
+  members: 7
+  last_sync: 2026-01-20T16:00:00Z
 ```
 
 ---
 
 ## References
 
-- [Ceremonies Specification](ceremonies.md) — Ceremony lifecycle and coordination
-- [Security Specification](../specs/security.md) — Keystone, mTLS, TOTP authentication
-- [Discovery Protocol](../specs/discovery.md) — mDNS and service resolution
-- [Offerings Specification](../specs/offerings.md) — Capability taxonomy
-- [CLI Taxonomy Proposal](cli-taxonomy.md) — Zen vs normative command syntax
+- [Ceremony Specification](zen-garden-spec-ceremonies.md) — Ceremony lifecycle
+- [Security Specification](zen-garden-spec-security.md) — Keystone, mTLS, TOTP
+- [Lantern Decision](zen-garden-decisions-all.md#lantern-0001) — Service registry architecture
+- [Port Allocation](zen-garden-reference-config.md) — Port 7190 reserved for federation
+
+---
+
+## Glossary
+
+| Term | Meaning |
+|------|---------|
+| **Bridge** | Bilateral connection between two gardens |
+| **Meadow** | Multilateral shared space bordered by many gardens |
+| **Keeper** | Caretaker of a meadow (can invite, moderate) |
+| **Wishes** | Unfulfilled wants (offerings, bridges, meadows, stones) |
+| **Federation** | General term for cross-garden connectivity |
 
 ---
 
