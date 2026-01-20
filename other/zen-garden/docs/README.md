@@ -2,13 +2,14 @@
 audience: [visitor, developer, operator, contributor]
 doc_type: navigation
 status: current
-last_verified: 2026-01-18
+last_verified: 2026-01-20
 canonical: true
 note: "Navigation hub for Zen Garden documentation. Audience-specific routing with visual structure diagram."
 related:
   - ../README.md
   - START_HERE.md
   - glossary.md
+  - CANON_MANIFEST.md
 ---
 
 # Documentation Hub
@@ -67,6 +68,12 @@ Architecture, specifications, and API documentation:
 **API Reference:**
 - [HTTP API](reference/api.md) - Moss endpoints, request/response formats
 - [Connection Strings](reference/connection-strings.md) - Protocol details, mDNS announcement
+- [System Architecture](reference/system-architecture.md) - Technical architecture, project structure
+- [Design Patterns](reference/patterns/network-singleton-pattern.md) - Network singleton pattern
+
+**Build & Deployment:**
+- [Build Distribution](ops/build-distribution.md) - Build artifacts, commands, release packaging
+- [Build Optimization](ops/build-optimization.md) - Release vs debug, size optimization
 
 ---
 
@@ -92,8 +99,20 @@ Architecture decisions, proposals, and development:
 - [Decision Records](decisions/) - ADRs documenting design choices
 - [Decision Index](decisions/README.md) - Browse by category (DATA, WEB, MESS, etc.)
 
+- [Build Distribution](ops/build-distribution.md) - Build process and packaging
+- [Build Optimization](ops/build-optimization.md) - Optimization strategies
+- [Joy in Infrastructure](architecture/joy-in-infrastructure.md) - Design philosophy
+
+**Documentation:**
+- [Canonical Manifest](CANON_MANIFEST.md) - Authoritative list of all canonical files
+- [Coordination Report](COORDINATION_REPORT.md) - Documentation cleanup and consolidation
+- [AI Navigation](reference/ai-navigation.md) - AI-friendly documentation navigation
 **Proposals:**
 - [Proposals Directory](proposals/) - Feature proposals and evaluations
+  - [Bridges](proposals/bridges.md) - Garden-to-garden federation with capability sharing
+  - [Ceremonies](proposals/ceremonies.md) - Long-running distributed operations with Elder Stone coordination
+  - [Stone Lifecycle](proposals/stone-lifecycle.md) - Stone-centric operations (retire, replace, lift)
+  - [CLI Taxonomy](proposals/cli-taxonomy.md) - Dual-syntax CLI design (zen + normative)
 
 **Development:**
 - [Roadmap](ops/roadmap.md) - Implementation timeline
