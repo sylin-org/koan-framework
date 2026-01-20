@@ -1,6 +1,6 @@
 ﻿{
   "name": "postgresql",
-  "description": "PostgreSQL 16 relational database with pgvector",
+  "description": "PostgreSQL relational database",
   "category": "data",
   "tags": ["database", "relational", "sql"],
   "port": 5432,

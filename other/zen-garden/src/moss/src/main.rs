@@ -4,6 +4,7 @@ mod discovery;
 mod docker;
 mod mdns;
 mod metrics;
+mod network_singletons;
 mod templates;
 
 use axum::{
@@ -28,7 +29,7 @@ use tokio_stream::wrappers::BroadcastStream;
 use tokio_stream::StreamExt;
 use tracing_subscriber::EnvFilter;
 use garden_common::{
-    error_codes, ApiError, CpuCapabilities, DaemonHealthStatus, DiskCapabilities, ErrorDetails, 
+    error_codes, ApiError, CpuCapabilities, DaemonHealthStatus, DetectionStatus, DiskCapabilities, ErrorDetails, 
     HardwareCapabilities, HardwareInventory, HealthCheck, ServiceHealthStatus, 
     MemoryCapabilities, MetricsSnapshot, Ports, RuntimeInfo, ServiceInfo, 
     ServiceStatus,
@@ -90,7 +91,7 @@ fn error_response_value(
 /// File locations (first found wins):
 /// - Linux: /etc/zen-garden/moss.toml
 /// - Windows: ./moss.toml (current directory)
-#[derive(Debug, Clone, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 struct MossConfig {
     /// Stone name identifier - default: "stone-01"
     stone_name: Option<String>,
@@ -103,6 +104,41 @@ struct MossConfig {
     
     /// Fast sync timeout in seconds for rapid offering deployments - default: None (disabled)
     fast_sync_timeout: Option<u64>,
+    
+    /// Console output mode (silent/minimal/informative/verbose) - default: platform-specific
+    console_mode: Option<String>,
+    
+    /// Event deduplication TTL in seconds - default: 10
+    #[serde(default)]
+    event_dedup_ttl_secs: Option<u64>,
+    
+    /// Docker connection retry delay in seconds - default: 3
+    #[serde(default)]
+    docker_retry_delay_secs: Option<u64>,
+    
+    /// Health check interval in seconds - default: 30
+    #[serde(default)]
+    health_check_interval_secs: Option<u64>,
+    
+    /// Docker reconnect interval in seconds - default: 5
+    #[serde(default)]
+    docker_reconnect_interval_secs: Option<u64>,
+    
+    /// HTTP capabilities fetch timeout in seconds - default: 5
+    #[serde(default)]
+    http_capabilities_timeout_secs: Option<u64>,
+    
+    /// HTTP health check timeout in seconds - default: 2
+    #[serde(default)]
+    http_health_timeout_secs: Option<u64>,
+    
+    /// HTTP quick health check timeout in milliseconds - default: 200
+    #[serde(default)]
+    http_quick_health_timeout_millis: Option<u64>,
+    
+    /// HTTP long operation timeout in seconds - default: 300 (5 minutes)
+    #[serde(default)]
+    http_long_operation_timeout_secs: Option<u64>,
 }
 
 impl MossConfig {
@@ -131,22 +167,98 @@ impl MossConfig {
                         fast_sync_timeout = ?config.fast_sync_timeout,
                         "Loaded configuration from file"
                     );
+                    // Console event emitted later in main() after console printer is available
                     Some(config)
                 },
                 Err(e) => {
                     tracing::warn!(path = ?config_path, error = ?e, "Failed to parse config file");
+                    // Console event: Config | PARSE_ERROR emitted in main() as NotFound
                     None
                 }
             },
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
                 tracing::debug!(path = ?config_path, "Config file not found, using defaults");
+                // Console event: Config | NOT_FOUND emitted in main()
                 None
             },
             Err(e) => {
                 tracing::warn!(path = ?config_path, error = ?e, "Failed to read config file");
+                // Console event: Config | READ_ERROR emitted in main() as NotFound
                 None
             }
         }
+    }
+    
+    /// Get event deduplication TTL in seconds (default: 10)
+    #[allow(dead_code)]
+    fn event_dedup_ttl_secs(&self) -> u64 {
+        self.event_dedup_ttl_secs.unwrap_or(10)
+    }
+    
+    /// Get Docker retry delay in seconds (default: 3)
+    #[allow(dead_code)]
+    fn docker_retry_delay_secs(&self) -> u64 {
+        self.docker_retry_delay_secs.unwrap_or(3)
+    }
+    
+    /// Get health check interval in seconds (default: 30)
+    #[allow(dead_code)]
+    fn health_check_interval_secs(&self) -> u64 {
+        self.health_check_interval_secs.unwrap_or(30)
+    }
+    
+    /// Get Docker reconnect interval in seconds (default: 5)
+    #[allow(dead_code)]
+    fn docker_reconnect_interval_secs(&self) -> u64 {
+        self.docker_reconnect_interval_secs.unwrap_or(5)
+    }
+    
+    /// Get HTTP capabilities timeout in seconds (default: 5)
+    #[allow(dead_code)]
+    fn http_capabilities_timeout_secs(&self) -> u64 {
+        self.http_capabilities_timeout_secs.unwrap_or(5)
+    }
+    
+    /// Get HTTP health timeout in seconds (default: 2)
+    #[allow(dead_code)]
+    fn http_health_timeout_secs(&self) -> u64 {
+        self.http_health_timeout_secs.unwrap_or(2)
+    }
+    
+    /// Get HTTP quick health timeout in milliseconds (default: 200)
+    #[allow(dead_code)]
+    fn http_quick_health_timeout_millis(&self) -> u64 {
+        self.http_quick_health_timeout_millis.unwrap_or(200)
+    }
+    
+    /// Get HTTP long operation timeout in seconds (default: 300)
+    #[allow(dead_code)]
+    fn http_long_operation_timeout_secs(&self) -> u64 {
+        self.http_long_operation_timeout_secs.unwrap_or(300)
+    }
+
+    /// Save configuration to platform-specific path
+    /// 
+    /// Saves garden-moss.toml to:
+    /// - Linux: /etc/zen-garden/garden-moss.toml
+    /// - Windows: ./garden-moss.toml (current directory)
+    /// 
+    /// Returns Ok(()) on success, Err on write failure
+    #[allow(dead_code)]
+    fn save(&self) -> Result<(), std::io::Error> {
+        let config_path = if cfg!(windows) {
+            std::path::PathBuf::from(format!("./{}", garden_common::names::MOSS_CONFIG))
+        } else {
+            std::path::PathBuf::from(format!("{}/{}", garden_common::names::CONFIG_DIR, garden_common::names::MOSS_CONFIG))
+        };
+        
+        let toml_content = toml::to_string_pretty(self)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
+        
+        std::fs::write(&config_path, toml_content)?;
+        
+        tracing::info!(path = ?config_path, "Saved configuration to file");
+        Ok(())
     }
 }
 
@@ -157,6 +269,13 @@ struct CompatCheckCapabilities {
     cpu_features: Option<Vec<String>>,
     architecture: Option<String>,
     total_memory_mb: Option<u64>,
+    
+    // GPU/AI capabilities
+    has_cuda: bool,
+    has_rocm: bool,
+    has_directml: bool,
+    has_openvino: bool,
+    gpu_vram_total_mb: u64,
 }
 
 #[derive(Debug, Clone)]
@@ -212,12 +331,25 @@ fn get_current_compat_capabilities() -> CompatCheckCapabilities {
         .unwrap_or_else(|_| ("Unknown".to_string(), vec![], std::env::consts::ARCH.to_string()));
     let resources = metrics::collect_stone_resources().ok();
     let total_memory_mb = resources.as_ref().map(|r| r.memory.total_bytes / 1024 / 1024);
+    
+    // Detect GPU/AI capabilities
+    let gpus = metrics::detect_gpus();
+    let has_cuda = gpus.iter().any(|g| g.ai_runtime.as_ref().and_then(|r| r.cuda_version.as_ref()).is_some());
+    let has_rocm = gpus.iter().any(|g| g.ai_runtime.as_ref().and_then(|r| r.rocm_version.as_ref()).is_some());
+    let has_directml = gpus.iter().any(|g| g.ai_runtime.as_ref().map(|r| r.has_directml).unwrap_or(false));
+    let has_openvino = gpus.iter().any(|g| g.ai_runtime.as_ref().map(|r| r.has_openvino).unwrap_or(false));
+    let gpu_vram_total_mb: u64 = gpus.iter().filter_map(|g| g.vram_mb).sum();
 
     CompatCheckCapabilities {
         cpu_model: Some(cpu_model),
         cpu_features: Some(cpu_features),
         architecture: Some(architecture),
         total_memory_mb,
+        has_cuda,
+        has_rocm,
+        has_directml,
+        has_openvino,
+        gpu_vram_total_mb,
     }
 }
 
@@ -407,6 +539,8 @@ struct AppState {
     shutdown_tx: Arc<tokio::sync::Notify>,
     start_time: std::time::Instant,
     offerings_index: Arc<RwLock<Option<OfferingsIndexCache>>>,
+    console: Arc<console::ConsolePrinter>,
+    capabilities: Arc<RwLock<Option<HardwareCapabilities>>>,
 }
 
 fn moss_version_string() -> String {
@@ -420,11 +554,25 @@ fn blake3_hex(bytes: &[u8]) -> String {
 
 fn current_capabilities_hash() -> String {
     let caps = get_current_compat_capabilities();
+    let gpus = metrics::detect_gpus();
+    
+    // Include GPU/AI capabilities in hash so offerings re-evaluate when AI hardware is detected
+    let has_cuda = gpus.iter().any(|g| g.ai_runtime.as_ref().and_then(|r| r.cuda_version.as_ref()).is_some());
+    let has_rocm = gpus.iter().any(|g| g.ai_runtime.as_ref().and_then(|r| r.rocm_version.as_ref()).is_some());
+    let has_directml = gpus.iter().any(|g| g.ai_runtime.as_ref().map(|r| r.has_directml).unwrap_or(false));
+    let has_openvino = gpus.iter().any(|g| g.ai_runtime.as_ref().map(|r| r.has_openvino).unwrap_or(false));
+    let gpu_vram_total: u64 = gpus.iter().filter_map(|g| g.vram_mb).sum();
+    
     let payload = serde_json::json!({
         "cpu_model": caps.cpu_model,
         "cpu_features": caps.cpu_features,
         "architecture": caps.architecture,
         "total_memory_mb": caps.total_memory_mb,
+        "has_cuda": has_cuda,
+        "has_rocm": has_rocm,
+        "has_directml": has_directml,
+        "has_openvino": has_openvino,
+        "gpu_vram_total_mb": gpu_vram_total,
     });
     blake3_hex(serde_json::to_vec(&payload).unwrap_or_default().as_slice())
 }
@@ -862,10 +1010,10 @@ fn build_disk_component() -> garden_common::ComponentHealth {
             details.insert("total_gb".to_string(), serde_json::json!(format!("{:.1}", total_gb)));
             details.insert("usage_percent".to_string(), serde_json::json!(format!("{:.2}", usage_percent)));
             
-            // Thresholds: >95% unhealthy, >80% degraded, else healthy
+            // Thresholds: >95% unhealthy, >90% degraded, else healthy
             if usage_percent > 95.0 {
                 garden_common::ComponentHealth::unhealthy(details)
-            } else if usage_percent > 80.0 {
+            } else if usage_percent > 90.0 {
                 garden_common::ComponentHealth::degraded(details)
             } else {
                 garden_common::ComponentHealth::healthy(details)
@@ -931,50 +1079,45 @@ fn determine_overall_status(components: &HashMap<String, garden_common::Componen
 
 /// GET /capabilities - Static hardware inventory
 async fn capabilities(State(state): State<AppState>) -> Json<ApiResponse<HardwareCapabilities>> {
-    let (cpu_model, cpu_features, architecture) = metrics::get_cpu_info()
-        .unwrap_or_else(|_| ("Unknown".to_string(), vec![], std::env::consts::ARCH.to_string()));
+    // Read from cache - capabilities are detected in background at startup
+    let caps_guard = state.capabilities.read().await;
     
-    let resources = metrics::collect_stone_resources().ok();
-    let total_memory_mb = resources.as_ref()
-        .map(|r| r.memory.total_bytes / 1024 / 1024)
-        .unwrap_or(0);
-    
-    let gpus = metrics::detect_gpus();
-    
-    let disk = resources.as_ref().map(|r| DiskCapabilities {
-        total_gb: r.disk.total_bytes / 1024 / 1024 / 1024,
-        disk_type: metrics::detect_disk_type_for_mount(&r.disk.path),
-    });
-    
-    let cores = resources.as_ref().map(|r| r.cpu.cores).unwrap_or(1);
-    
-    let caps = HardwareCapabilities {
-        stone_name: state.stone_name.clone(),
-        hardware: HardwareInventory {
-            cpu: CpuCapabilities {
-                model: if cpu_model == "Unknown" { None } else { Some(cpu_model) },
-                cores,
-                threads: None, // TODO: Detect thread count
-                architecture,
-                features: if cpu_features.is_empty() { None } else { Some(cpu_features) },
+    if let Some(caps) = caps_guard.as_ref() {
+        Json(ApiResponse {
+            data: caps.clone(),
+            suggestions: None,
+        })
+    } else {
+        // Fallback: cache not ready yet, return minimal data
+        Json(ApiResponse {
+            data: HardwareCapabilities {
+                stone_name: state.stone_name.clone(),
+                hardware: HardwareInventory {
+                    cpu: CpuCapabilities {
+                        model: None,
+                        cores: 1,
+                        threads: None,
+                        architecture: std::env::consts::ARCH.to_string(),
+                        features: None,
+                    },
+                    memory: MemoryCapabilities { total_mb: 0 },
+                    gpus: vec![],
+                    disk: None,
+                    storage: vec![],
+                    os_version: None,
+                    kernel_version: None,
+                    swap_mb: None,
+                },
+                runtime: Some(RuntimeInfo {
+                    docker_version: None,
+                    os: std::env::consts::OS.to_string(),
+                    kernel: None,
+                }),
+                detection_status: DetectionStatus::Scanning,
             },
-            memory: MemoryCapabilities {
-                total_mb: total_memory_mb,
-            },
-            gpus,
-            disk,
-        },
-        runtime: Some(RuntimeInfo {
-            docker_version: None, // TODO: Query Docker version
-            os: std::env::consts::OS.to_string(),
-            kernel: None, // TODO: Get kernel version
-        }),
-    };
-    
-    Json(ApiResponse {
-        data: caps,
-        suggestions: None,
-    })
+            suggestions: Some(vec!["Hardware capabilities detection in progress".to_string()]),
+        })
+    }
 }
 
 /// GET /metrics - Dynamic performance snapshot
@@ -1084,6 +1227,43 @@ fn evaluate_compatibility(
                 .map(|total_memory| total_memory < max_memory_mb)
                 .unwrap_or(false);
             matches &= ok;
+        }
+        
+        // AI/GPU capability checks
+        if let Some(requires_ai_any) = &condition.requires_ai_any {
+            // Match if ANY of the specified runtimes are present (OR logic)
+            let has_match = requires_ai_any.iter().any(|runtime| {
+                match runtime.to_lowercase().as_str() {
+                    "cuda" => capabilities.has_cuda,
+                    "rocm" => capabilities.has_rocm,
+                    "directml" => capabilities.has_directml,
+                    "openvino" => capabilities.has_openvino,
+                    _ => false,
+                }
+            });
+            matches &= has_match;
+        }
+        
+        if let Some(requires_ai_all) = &condition.requires_ai_all {
+            // Match if ALL of the specified runtimes are present (AND logic)
+            let has_all = requires_ai_all.iter().all(|runtime| {
+                match runtime.to_lowercase().as_str() {
+                    "cuda" => capabilities.has_cuda,
+                    "rocm" => capabilities.has_rocm,
+                    "directml" => capabilities.has_directml,
+                    "openvino" => capabilities.has_openvino,
+                    _ => false,
+                }
+            });
+            matches &= has_all;
+        }
+        
+        if let Some(min_vram_mb) = condition.vram_mb_at_least {
+            matches &= capabilities.gpu_vram_total_mb >= min_vram_mb;
+        }
+        
+        if let Some(max_vram_mb) = condition.vram_mb_less_than {
+            matches &= capabilities.gpu_vram_total_mb < max_vram_mb;
         }
 
         if matches {
@@ -1298,52 +1478,74 @@ async fn refresh_component(
     
     tracing::info!(component = %payload.component, path = %target_path, "Binary staged successfully");
     
-    // If updating moss itself, trigger service restart
+    // If updating moss itself, trigger update mechanism
     if payload.component == garden_common::names::MOSS_BINARY {
         emit_event(
             &state,
             "info",
-            format!("{} binary staged. Restarting service to apply update...", payload.component),
+            format!("{} update staged. Initiating update process...", payload.component),
             None,
         );
         
-        // Trigger service restart (platform-specific)
-        tokio::spawn(async move {
-            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-            tracing::info!("Triggering service restart for binary update");
-            
-            #[cfg(target_os = "windows")]
-            {
-                // Try to restart via Windows Services
-                let output = std::process::Command::new("sc")
-                    .args(["stop", "ZenGardenMoss"])
-                    .output();
+        // Platform-specific update handling
+        #[cfg(target_os = "windows")]
+        {
+            // Windows: Use garden-moss-new.exe dance to replace running binary
+            let target_path_clone = target_path.clone();
+            tokio::spawn(async move {
+                tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                tracing::info!("Initiating Windows self-update");
                 
-                match output {
-                    Ok(result) if result.status.success() => {
-                        // Wait briefly then start
-                        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
-                        let _ = std::process::Command::new("sc")
-                            .args(["start", "ZenGardenMoss"])
-                            .output();
-                        tracing::info!("Windows service restart triggered");
+                let current_exe = match std::env::current_exe() {
+                    Ok(p) => p,
+                    Err(e) => {
+                        tracing::error!(error = ?e, "Failed to get current exe path");
+                        return;
                     }
-                    Ok(result) => {
-                        tracing::warn!(
-                            exit_code = ?result.status.code(),
-                            stderr = %String::from_utf8_lossy(&result.stderr),
-                            "Failed to trigger Windows service restart"
-                        );
+                };
+                
+                let exe_dir = match current_exe.parent() {
+                    Some(d) => d,
+                    None => {
+                        tracing::error!("No parent directory for current exe");
+                        return;
+                    }
+                };
+                
+                let new_exe = exe_dir.join("garden-moss-new.exe");
+                
+                // Copy staged binary to garden-moss-new.exe
+                if let Err(e) = std::fs::copy(&target_path_clone, &new_exe) {
+                    tracing::error!(error = ?e, "Failed to copy staged binary to garden-moss-new.exe");
+                    return;
+                }
+                
+                tracing::info!("Launching garden-moss-new.exe for update finalization");
+                
+                // Launch garden-moss-new.exe with --update-finalize flag
+                match std::process::Command::new(&new_exe)
+                    .arg("--update-finalize")
+                    .spawn()
+                {
+                    Ok(_) => {
+                        tracing::info!("Update process launched, shutting down current instance");
+                        // Exit current process to allow replacement
+                        std::process::exit(0);
                     }
                     Err(e) => {
-                        tracing::error!(error = ?e, "Failed to execute sc command");
+                        tracing::error!(error = ?e, "Failed to launch update process");
                     }
                 }
-            }
-            
-            #[cfg(not(target_os = "windows"))]
-            {
-                // Try to restart via systemd
+            });
+        }
+        
+        #[cfg(not(target_os = "windows"))]
+        {
+            // Linux: Traditional systemd restart
+            tokio::spawn(async move {
+                tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                tracing::info!("Triggering service restart for binary update");
+                
                 let output = std::process::Command::new("sudo")
                     .args(&["systemctl", "restart", garden_common::names::MOSS_SERVICE.trim_end_matches(".service")])
                     .output();
@@ -1363,8 +1565,8 @@ async fn refresh_component(
                         tracing::error!(error = ?e, "Failed to execute systemctl");
                     }
                 }
-            }
-        });
+            });
+        }
         
         (
             StatusCode::ACCEPTED,
@@ -1453,7 +1655,7 @@ async fn reconcile_now(
                 // "Invalid" in this context means: zen-offering-* container exists, but we have
                 // no known template/manifest mapping for that offering.
                 if payload.drop_invalid {
-                    match state.docker.remove_service(&offering).await {
+                    match state.docker.remove_service(&offering, Some(&state.console)).await {
                         Ok(_) => dropped_invalid.push(offering),
                         Err(e) => {
                             tracing::warn!(offering = %offering, error = ?e, "Failed to drop invalid container; leaving it alone");
@@ -1534,6 +1736,13 @@ async fn install_service_task(state: &AppState, job_id: &str, offering: &str) {
             job.status = JobStatus::Running;
         }
     }
+    
+    // Emit job started event
+    state.console.emit(console::ConsoleEvent::new(
+        console::EventCategory::Jobs,
+        console::EventStatus::Started,
+        format!("Install {} (job: {})", offering, &job_id[..8])
+    ));
 
     emit_event(state, "info", format!("Starting installation: {}", offering), Some(job_id.to_string()));
     tracing::info!(job_id, offering, "Starting service installation");
@@ -1548,6 +1757,11 @@ async fn install_service_task(state: &AppState, job_id: &str, offering: &str) {
     let compiled = match get_compiled_offering(state, offering).await {
         Ok(Some(o)) => o,
         Ok(None) => {
+            state.console.emit(console::ConsoleEvent::new(
+                console::EventCategory::Jobs,
+                console::EventStatus::Failed,
+                format!("Offering not found: {}", offering)
+            ));
             emit_event(
                 state,
                 "error",
@@ -1587,6 +1801,11 @@ async fn install_service_task(state: &AppState, job_id: &str, offering: &str) {
             .reason
             .clone()
             .unwrap_or_else(|| "Incompatible".to_string());
+        state.console.emit(console::ConsoleEvent::new(
+            console::EventCategory::Jobs,
+            console::EventStatus::Failed,
+            format!("Compatibility: {}", offering)
+        ));
         emit_event(
             state,
             "error",
@@ -1635,9 +1854,15 @@ async fn install_service_task(state: &AppState, job_id: &str, offering: &str) {
             ports_for_docker,
             compiled.environment,
             compiled.volumes,
+            Some(&state.console),
         )
         .await
     {
+        state.console.emit(console::ConsoleEvent::new(
+            console::EventCategory::Jobs,
+            console::EventStatus::Failed,
+            format!("Install failed: {}", offering)
+        ));
         emit_event(state, "error", format!("Installation failed for {}: {}", offering, e), Some(job_id.to_string()));
         tracing::error!(job_id, offering, error = ?e, "Docker install failed");
         let mut jobs = state.jobs.write().await;
@@ -1690,12 +1915,20 @@ async fn install_service_task(state: &AppState, job_id: &str, offering: &str) {
             job.completed_at = Some(std::time::SystemTime::now());
         }
     }
+    
+    state.console.emit(console::ConsoleEvent::new(
+        console::EventCategory::Jobs,
+        console::EventStatus::Completed,
+        format!("Install {} (job: {})", offering, &job_id[..8])
+    ));
 
     tracing::info!(job_id, offering, "Service installation completed");
 }
 
 // Background task: install multiple services
 async fn install_batch_task(state: &AppState, job_id: &str, offerings: Vec<String>) {
+    let offerings_count = offerings.len();
+    
     // Update job status to Running
     {
         let mut jobs = state.jobs.write().await;
@@ -1703,8 +1936,14 @@ async fn install_batch_task(state: &AppState, job_id: &str, offerings: Vec<Strin
             job.status = JobStatus::Running;
         }
     }
+    
+    state.console.emit(console::ConsoleEvent::new(
+        console::EventCategory::Jobs,
+        console::EventStatus::Started,
+        format!("Batch install {} services (job: {})", offerings_count, &job_id[..8])
+    ));
 
-    tracing::info!(job_id, count = offerings.len(), "Starting batch installation");
+    tracing::info!(job_id, count = offerings_count, "Starting batch installation");
 
     for offering in offerings {
         tracing::info!(job_id, offering, "Installing service");
@@ -1754,6 +1993,7 @@ async fn install_batch_task(state: &AppState, job_id: &str, offerings: Vec<Strin
                 ports_for_docker,
                 compiled.environment,
                 compiled.volumes,
+                Some(&state.console),
             )
             .await
         {
@@ -1808,12 +2048,28 @@ async fn install_batch_task(state: &AppState, job_id: &str, offerings: Vec<Strin
     {
         let mut jobs = state.jobs.write().await;
         if let Some(job) = jobs.get_mut(job_id) {
-            job.status = if job.failed.is_empty() {
-                JobStatus::Completed
-            } else {
+            let failed = !job.failed.is_empty();
+            job.status = if failed {
                 JobStatus::Failed
+            } else {
+                JobStatus::Completed
             };
             job.completed_at = Some(std::time::SystemTime::now());
+            
+            // Emit completion event
+            if failed {
+                state.console.emit(console::ConsoleEvent::new(
+                    console::EventCategory::Jobs,
+                    console::EventStatus::Failed,
+                    format!("Batch install {} failed, {} succeeded (job: {})", job.failed.len(), job.completed.len(), &job_id[..8])
+                ));
+            } else {
+                state.console.emit(console::ConsoleEvent::new(
+                    console::EventCategory::Jobs,
+                    console::EventStatus::Completed,
+                    format!("Batch install {} services (job: {})", offerings_count, &job_id[..8])
+                ));
+            }
         }
     }
 
@@ -1978,6 +2234,18 @@ struct Cli {
     /// Force start by killing existing moss processes
     #[arg(long)]
     force: bool,
+    
+    /// Install Moss as a Windows service (Windows only)
+    #[arg(long)]
+    install_service: bool,
+    
+    /// Internal: Finalize update by replacing old binary (used during self-update)
+    #[arg(long, hide = true)]
+    update_finalize: bool,
+    
+    /// Internal: Cleanup old binary after update (used during self-update)
+    #[arg(long, hide = true)]
+    cleanup_old: bool,
 }
 
 /// Run first-boot initialization sequence
@@ -2175,13 +2443,409 @@ fn kill_existing_moss_processes() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Load capabilities from disk cache
+async fn load_capabilities_cache() -> Option<HardwareCapabilities> {
+    let path = if cfg!(windows) {
+        "./stone-capabilities.json"
+    } else {
+        garden_common::names::STONE_CAPABILITIES_CACHE
+    };
+    
+    match tokio::fs::read_to_string(path).await {
+        Ok(content) => {
+            match serde_json::from_str::<HardwareCapabilities>(&content) {
+                Ok(caps) => {
+                    tracing::info!("Loaded cached hardware capabilities");
+                    Some(caps)
+                }
+                Err(e) => {
+                    tracing::warn!(error = ?e, "Failed to parse capabilities cache");
+                    None
+                }
+            }
+        }
+        Err(_) => {
+            tracing::debug!("No cached capabilities found (first boot)");
+            None
+        }
+    }
+}
+
+/// Save capabilities to disk cache
+async fn save_capabilities_cache(caps: &HardwareCapabilities) -> anyhow::Result<()> {
+    let path = if cfg!(windows) {
+        "./stone-capabilities.json"
+    } else {
+        garden_common::names::STONE_CAPABILITIES_CACHE
+    };
+    
+    let dir = if cfg!(windows) {
+        "."
+    } else {
+        garden_common::names::CONFIG_DIR
+    };
+    
+    tokio::fs::create_dir_all(dir).await?;
+    
+    let tmp_path = format!("{}.tmp", path);
+    let content = serde_json::to_string_pretty(caps)?;
+    tokio::fs::write(&tmp_path, content).await?;
+    
+    match tokio::fs::rename(&tmp_path, path).await {
+        Ok(_) => {
+            tracing::info!("Saved hardware capabilities cache to {}", path);
+            Ok(())
+        }
+        Err(e) => {
+            if cfg!(windows) {
+                let _ = tokio::fs::remove_file(path).await;
+                tokio::fs::rename(&tmp_path, path).await?;
+                tracing::info!("Saved hardware capabilities cache to {}", path);
+                Ok(())
+            } else {
+                Err(e.into())
+            }
+        }
+    }
+}
+
+/// Detect hardware capabilities in background (progressive: CPU first, GPU later)
+async fn detect_capabilities_background(
+    stone_name: String,
+    caps_arc: Arc<RwLock<Option<HardwareCapabilities>>>,
+    console: Arc<console::ConsolePrinter>,
+    state: AppState,
+) {
+    tracing::info!("Starting background hardware capability detection...");
+    
+    // === PHASE 1: CPU Detection (fast, <100ms) ===
+    console.emit(console::ConsoleEvent::new(
+        console::EventCategory::Ops,
+        console::EventStatus::Active,
+        "[CAPABILITY DETECTION] Detecting CPU features".to_string()
+    ));
+    
+    let (cpu_model, cpu_features, architecture) = match metrics::get_cpu_info() {
+        Ok(result) => result,
+        Err(e) => {
+            tracing::error!(error = ?e, "Failed to get CPU info");
+            ("Unknown".to_string(), vec![], std::env::consts::ARCH.to_string())
+        }
+    };
+    
+    let resources = metrics::collect_stone_resources().ok();
+    let cpu_cores = resources.as_ref().map(|r| r.cpu.cores).unwrap_or(1);
+    let total_memory_mb = resources.as_ref()
+        .map(|r| r.memory.total_bytes / 1024 / 1024)
+        .unwrap_or(0);
+    
+    let disk = resources.as_ref().map(|r| DiskCapabilities {
+        total_gb: r.disk.total_bytes / 1024 / 1024 / 1024,
+        disk_type: metrics::detect_disk_type_for_mount(&r.disk.path),
+    });
+    
+    tracing::info!("CPU detection complete: {} cores", cpu_cores);
+    console.emit(console::ConsoleEvent::new(
+        console::EventCategory::Ops,
+        console::EventStatus::Active,
+        format!("[CAPABILITY DETECTION] CPU: {} cores, {} features", cpu_cores, cpu_features.len())
+    ));
+    
+    // Make CPU data available immediately (partial status)
+    let partial_caps = HardwareCapabilities {
+        stone_name: stone_name.clone(),
+        hardware: HardwareInventory {
+            cpu: CpuCapabilities {
+                model: if cpu_model == "Unknown" { None } else { Some(cpu_model.clone()) },
+                cores: cpu_cores,
+                threads: None,
+                architecture: architecture.clone(),
+                features: if cpu_features.is_empty() { None } else { Some(cpu_features.clone()) },
+            },
+            memory: MemoryCapabilities { total_mb: total_memory_mb },
+            gpus: vec![],  // Empty, GPU detection still running
+            disk: disk.clone(),
+            storage: vec![],  // Will be populated with complete caps
+            os_version: None,
+            kernel_version: None,
+            swap_mb: None,
+        },
+        runtime: Some(RuntimeInfo {
+            docker_version: None,
+            os: std::env::consts::OS.to_string(),
+            kernel: None,
+        }),
+        detection_status: DetectionStatus::Partial,
+    };
+    
+    // Update in-memory cache immediately
+    {
+        let mut guard = caps_arc.write().await;
+        *guard = Some(partial_caps.clone());
+    }
+    
+    // Persist CPU data to disk (non-blocking for consumers)
+    if let Err(e) = save_capabilities_cache(&partial_caps).await {
+        tracing::warn!(error = ?e, "Failed to save partial capabilities");
+    }
+    console.emit(console::ConsoleEvent::new(
+        console::EventCategory::System,
+        console::EventStatus::Updated,
+        "Hardware capabilities (CPU ready)".to_string()
+    ));
+    
+    // === PHASE 2: GPU Detection (slow, 2-6 seconds on Windows) ===
+    tracing::info!("Starting GPU detection (may take 2-6 seconds on Windows)...");
+    console.emit(console::ConsoleEvent::new(
+        console::EventCategory::Ops,
+        console::EventStatus::Active,
+        "[CAPABILITY DETECTION] Detecting GPUs (DXDiag, 2-6 sec)".to_string()
+    ));
+    
+    let gpus = metrics::detect_gpus();
+    let gpu_count = gpus.len();
+    tracing::info!(gpu_count = gpus.len(), "GPU detection complete");
+    console.emit(console::ConsoleEvent::new(
+        console::EventCategory::Ops,
+        console::EventStatus::Completed,
+        format!("[CAPABILITY DETECTION] Found {} GPU(s)", gpu_count)
+    ));
+    
+    // === PHASE 3: Storage, OS, Kernel, Swap Detection ===
+    tracing::info!("Detecting storage and system information...");
+    let storage = metrics::detect_storage();
+    let os_version = metrics::detect_os_version();
+    let kernel_version = metrics::detect_kernel_version();
+    let swap_mb = metrics::detect_swap();
+    tracing::info!("System information detection complete");
+    
+    // Build complete capabilities with GPU data
+    let complete_caps = HardwareCapabilities {
+        stone_name,
+        hardware: HardwareInventory {
+            cpu: CpuCapabilities {
+                model: if cpu_model == "Unknown" { None } else { Some(cpu_model) },
+                cores: cpu_cores,
+                threads: None,
+                architecture,
+                features: if cpu_features.is_empty() { None } else { Some(cpu_features) },
+            },
+            memory: MemoryCapabilities { total_mb: total_memory_mb },
+            gpus,
+            disk,
+            storage,
+            os_version,
+            kernel_version,
+            swap_mb,
+        },
+        runtime: Some(RuntimeInfo {
+            docker_version: None,
+            os: std::env::consts::OS.to_string(),
+            kernel: None,
+        }),
+        detection_status: DetectionStatus::Complete,
+    };
+    
+    // Update in-memory cache with complete data
+    {
+        let mut guard = caps_arc.write().await;
+        *guard = Some(complete_caps.clone());
+    }
+    
+    // Persist complete data to disk
+    match save_capabilities_cache(&complete_caps).await {
+        Ok(_) => {
+            tracing::info!("Complete capabilities saved to disk");
+            console.emit(console::ConsoleEvent::new(
+                console::EventCategory::Ops,
+                console::EventStatus::Completed,
+                "[CAPABILITY DETECTION] Cache persisted to disk".to_string()
+            ));
+        },
+        Err(e) => tracing::warn!(error = ?e, "Failed to save complete capabilities"),
+    }
+    
+    tracing::info!("Hardware capability detection complete");
+    
+    // Re-evaluate offerings index now that complete hardware is known
+    // This ensures compatibility warnings update (e.g., no AI → no Ollama, no AVX → MongoDB warning)
+    tracing::info!("Re-evaluating offerings compatibility with detected hardware...");
+    if let Err(e) = ensure_offerings_index(&state, true).await {
+        tracing::warn!(error = ?e, "Failed to rebuild offerings index after detection");
+    } else {
+        console.emit(console::ConsoleEvent::new(
+            console::EventCategory::Ops,
+            console::EventStatus::Completed,
+            "[OFFERINGS] Compatibility re-evaluated".to_string()
+        ));
+    }
+}
+
+/// Windows service installation (Windows only)
+#[cfg(target_os = "windows")]
+async fn install_windows_service() -> anyhow::Result<()> {
+    use std::process::Command;
+    
+    println!("Installing Zen Garden Moss as Windows service...");
+    
+    let exe_path = std::env::current_exe()?;
+    let exe_path_str = exe_path.to_string_lossy();
+    
+    // Create service using sc.exe
+    let output = Command::new("sc")
+        .args([
+            "create", "ZenGardenMoss",
+            "binPath=", &exe_path_str,
+            "start=", "auto",
+            "DisplayName=", "Zen Garden Moss Daemon"
+        ])
+        .output()?;
+    
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        eprintln!("Failed to create service: {}", stderr);
+        return Err(anyhow::anyhow!("Service creation failed"));
+    }
+    
+    println!("✓ Service created successfully");
+    
+    // Start the service
+    println!("Starting service...");
+    let output = Command::new("sc")
+        .args(["start", "ZenGardenMoss"])
+        .output()?;
+    
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        eprintln!("Failed to start service: {}", stderr);
+        println!("You can start it manually with: sc start ZenGardenMoss");
+    } else {
+        println!("✓ Service started successfully");
+    }
+    
+    println!("\nMoss is now running as a Windows service.");
+    println!("  View status: sc query ZenGardenMoss");
+    println!("  Stop: sc stop ZenGardenMoss");
+    println!("  Remove: sc delete ZenGardenMoss");
+    
+    Ok(())
+}
+
+/// Finalize Windows update by replacing old binary (runs as garden-moss-new.exe)
+#[cfg(target_os = "windows")]
+async fn finalize_windows_update() -> anyhow::Result<()> {
+    use std::process::Command;
+    
+    println!("Finalizing Moss update...");
+    
+    let current_exe = std::env::current_exe()?;
+    let exe_dir = current_exe.parent().ok_or_else(|| anyhow::anyhow!("No parent directory"))?;
+    let target_exe = exe_dir.join("garden-moss.exe");
+    
+    // Wait for old process to exit (up to 30 seconds)
+    println!("Waiting for old Moss process to exit...");
+    for attempt in 1..=60 {
+        let output = Command::new("tasklist")
+            .args(["/FI", "IMAGENAME eq garden-moss.exe"])
+            .output()?;
+        
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        if !stdout.contains("garden-moss.exe") {
+            break;
+        }
+        
+        if attempt == 60 {
+            eprintln!("Timeout waiting for old process to exit");
+            return Err(anyhow::anyhow!("Old process did not exit"));
+        }
+        
+        tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+    }
+    
+    println!("Old process exited. Replacing binary...");
+    std::fs::copy(&current_exe, &target_exe)?;
+    println!("✓ Binary replaced successfully");
+    
+    // Check if running as service
+    let is_service = std::env::var("RUNNING_AS_SERVICE").is_ok();
+    
+    if is_service {
+        println!("Starting Moss service...");
+        let _ = Command::new("sc")
+            .args(["start", "ZenGardenMoss"])
+            .output()?;
+        println!("✓ Service start triggered");
+    } else {
+        println!("Launching new Moss...");
+        Command::new(&target_exe)
+            .arg("--cleanup-old")
+            .spawn()?;
+        println!("✓ New Moss launched");
+    }
+    
+    println!("Update complete. This process will now exit.");
+    Ok(())
+}
+
+/// Cleanup old binary after update
+#[cfg(target_os = "windows")]
+async fn cleanup_after_update() -> anyhow::Result<()> {
+    use std::process::Command;
+    
+    let current_exe = std::env::current_exe()?;
+    let exe_dir = current_exe.parent().ok_or_else(|| anyhow::anyhow!("No parent directory"))?;
+    let old_exe = exe_dir.join("garden-moss-new.exe");
+    
+    if old_exe.exists() {
+        // Wait for garden-moss-new.exe process to exit
+        for _ in 1..=20 {
+            let output = Command::new("tasklist")
+                .args(["/FI", "IMAGENAME eq garden-moss-new.exe"])
+                .output()?;
+            
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            if !stdout.contains("garden-moss-new.exe") {
+                break;
+            }
+            
+            tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+        }
+        
+        // Remove old binary
+        std::fs::remove_file(&old_exe).ok();
+    }
+    
+    // Continue with normal startup (fall through to main logic)
+    Ok(())
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    // Parse CLI arguments first to check for special modes
+    let cli = <Cli as clap::Parser>::parse();
+    
+    // Handle Windows service installation
+    #[cfg(target_os = "windows")]
+    if cli.install_service {
+        return install_windows_service().await;
+    }
+    
+    // Handle update finalization (runs as garden-moss-new.exe)
+    #[cfg(target_os = "windows")]
+    if cli.update_finalize {
+        return finalize_windows_update().await;
+    }
+    
+    // Handle cleanup of old binary after update
+    #[cfg(target_os = "windows")]
+    if cli.cleanup_old {
+        return cleanup_after_update().await;
+    }
+    
     // Load configuration from file first (lowest priority)
     let config = MossConfig::load();
     
-    // Parse CLI arguments (CLI and env vars handled by clap with #[arg(env)])
-    let cli = <Cli as clap::Parser>::parse();
+    // CLI already parsed above for special modes, reuse it
     
     // Merge configuration with priority: CLI > Env > Config File > Defaults
     // Note: clap already merges CLI args with env vars, so we only need to fill in from config file
@@ -2194,7 +2858,7 @@ async fn main() -> anyhow::Result<()> {
     // - Historically the systemd unit set STONE_NAME, which can drift after first-boot rename.
     //
     // Priority: explicit CLI flag (--stone-name) > config file > system hostname > STONE_NAME env > default
-    let env_stone_name = std::env::var("STONE_NAME").ok();
+    let env_stone_name = std::env::var(garden_common::ENV_STONE_NAME).ok();
     let explicit_cli_stone_name = if cli.stone_name.is_some() && env_stone_name.is_none() {
         cli.stone_name.clone()
     } else {
@@ -2216,7 +2880,7 @@ async fn main() -> anyhow::Result<()> {
         .or_else(|| config.as_ref().and_then(|c| c.stone_name.clone()))
         .or_else(|| system_hostname.clone())
         .or_else(|| env_stone_name.clone())
-        .unwrap_or_else(|| "stone-01".to_string());
+        .unwrap_or_else(|| garden_common::DEFAULT_STONE_NAME.to_string());
     
     let port = cli.port
         .or_else(|| config.as_ref().and_then(|c| c.port))
@@ -2225,14 +2889,29 @@ async fn main() -> anyhow::Result<()> {
     let fast_sync_timeout = cli.fast_sync_timeout
         .or_else(|| config.as_ref().and_then(|c| c.fast_sync_timeout));
     
+    // Determine console mode early for tracing level adjustment
+    let console_mode = config.as_ref()
+        .and_then(|c| c.console_mode.as_ref())
+        .and_then(|mode_str| mode_str.parse::<console::ConsoleMode>().ok())
+        .unwrap_or_else(|| console::detect_platform_console_mode());
+    
+    // Adjust tracing level based on console mode to avoid duplication with console events
+    // verbose mode: keep INFO for debugging
+    // all other modes: suppress to WARN to avoid spam (console events handle the rest)
+    let default_tracing_level = match console_mode {
+        console::ConsoleMode::Verbose => "info",
+        _ => "warn",  // Suppress INFO logs when console events are active
+    };
+    
     // Initialize logging with merged log level
     tracing_subscriber::fmt()
         .with_env_filter(
             EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| EnvFilter::new(&log_level))
+                .unwrap_or_else(|_| EnvFilter::new(default_tracing_level))
         )
         .init();
     
+    // Legacy structured log (keep for debugging until full migration)
     tracing::info!(
         stone_name = %stone_name,
         port = port,
@@ -2247,11 +2926,14 @@ async fn main() -> anyhow::Result<()> {
     if cfg!(target_os = "linux") && console::is_first_run() {
         tracing::info!("First run detected on Linux, spawning background initialization task");
         
+        // Emit first-boot event (will create console later in initialization)
+        tracing::info!("First boot detected - will initialize console after Docker connection");
+        
         let init_stone_name = stone_name.clone();
         let init_port = port;
+        let retry_delay_secs = config.as_ref().map(|c| c.docker_retry_delay_secs()).unwrap_or(3);
         tokio::spawn(async move {
             const MAX_ATTEMPTS: u32 = 20;
-            const RETRY_DELAY_SECS: u64 = 3;
             
             let _ = console::tty_write("");
             let _ = console::display_wait("First-boot setup: Waiting for filesystem to become writable");
@@ -2281,14 +2963,14 @@ async fn main() -> anyhow::Result<()> {
                                 tracing::error!(error = ?e, "First boot initialization failed");
                                 let _ = console::display_error(&format!("Setup failed: {}", e));
                                 if attempt < MAX_ATTEMPTS {
-                                    tokio::time::sleep(tokio::time::Duration::from_secs(RETRY_DELAY_SECS)).await;
+                                    tokio::time::sleep(tokio::time::Duration::from_secs(retry_delay_secs)).await;
                                 }
                             }
                         }
                     }
                     Ok(false) | Err(_) => {
                         if attempt < MAX_ATTEMPTS {
-                            tokio::time::sleep(tokio::time::Duration::from_secs(RETRY_DELAY_SECS)).await;
+                            tokio::time::sleep(tokio::time::Duration::from_secs(retry_delay_secs)).await;
                         } else {
                             tracing::error!("First boot initialization abandoned - filesystem never became writable");
                             let _ = console::display_error("Setup abandoned - filesystem remained read-only");
@@ -2311,7 +2993,7 @@ async fn main() -> anyhow::Result<()> {
 
     // Prefer explicit STONE_HOST, otherwise auto-detect network IP
     let api_endpoint = {
-        if let Ok(host) = std::env::var("STONE_HOST") {
+        if let Ok(host) = std::env::var(garden_common::ENV_STONE_HOST) {
             let trimmed = host.trim();
             if !trimmed.is_empty() {
                 format!("http://{}:{}", trimmed, port)
@@ -2333,17 +3015,8 @@ async fn main() -> anyhow::Result<()> {
         }
     };
 
-    // Spawn UDP discovery listener
-    let discovery_stone_name = stone_name.clone();
-    let discovery_endpoint = api_endpoint.clone();
-    tokio::spawn(async move {
-        if let Err(e) = discovery::udp_listener(discovery_stone_name, discovery_endpoint).await {
-            tracing::error!(error = ?e, "UDP discovery listener failed");
-        }
-    });
-
     // Spawn Lantern registration loop (if LANTERN_ENDPOINT is set)
-    if let Ok(lantern_endpoint) = std::env::var("LANTERN_ENDPOINT") {
+    if let Ok(lantern_endpoint) = std::env::var(garden_common::ENV_LANTERN_ENDPOINT) {
         let trimmed = lantern_endpoint.trim().to_string();
         if !trimmed.is_empty() {
             let reg_stone_name = stone_name.clone();
@@ -2356,6 +3029,46 @@ async fn main() -> anyhow::Result<()> {
         }
     }
 
+    // Initialize console printer early for Docker connection events
+    // Use console_mode from config if available, otherwise detect from platform
+    let console_mode = config.as_ref()
+        .and_then(|c| c.console_mode.as_ref())
+        .and_then(|mode_str| mode_str.parse::<console::ConsoleMode>().ok())
+        .unwrap_or_else(|| console::detect_platform_console_mode());
+    let dedup_ttl = config.as_ref().map(|c| c.event_dedup_ttl_secs()).unwrap_or(10);
+    let console_printer = Arc::new(console::ConsolePrinter::with_dedup_ttl(console_mode, dedup_ttl));
+    
+    // Emit startup event
+    console_printer.emit(console::ConsoleEvent::new(
+        console::EventCategory::System,
+        console::EventStatus::Starting,
+        format!("Moss v{}", moss_version_string())
+    ));
+    
+    // Emit config loading event (config was loaded earlier before console was available)
+    if config.is_some() {
+        console_printer.emit(console::ConsoleEvent::new(
+            console::EventCategory::Config,
+            console::EventStatus::Loaded,
+            "Configuration file".to_string()
+        ));
+        
+        console_printer.emit(console::ConsoleEvent::new(
+            console::EventCategory::Config,
+            console::EventStatus::Merged,
+            format!("Priority: CLI > Env > Config > Defaults")
+        ));
+    } else {
+        // Config file not found or parse error - emit appropriate event
+        // (We can't distinguish between not found vs parse error at this point,
+        // but NotFound is more common so we use that)
+        console_printer.emit(console::ConsoleEvent::new(
+            console::EventCategory::Config,
+            console::EventStatus::NotFound,
+            "Using defaults".to_string()
+        ));
+    }
+
     // Wait for Docker to be ready (with retries for fresh installs)
     let docker = {
         let max_retries = 30; // 30 attempts = ~60 seconds
@@ -2364,10 +3077,27 @@ async fn main() -> anyhow::Result<()> {
             match DockerManager::new() {
                 Ok(dm) => {
                     tracing::info!("Docker daemon connected successfully");
+                    
+                    // Emit Docker connected event
+                    console_printer.emit(console::ConsoleEvent::new(
+                        console::EventCategory::Docker,
+                        console::EventStatus::Connected,
+                        "Docker daemon".to_string()
+                    ));
+                    
                     break Arc::new(dm);
                 }
                 Err(e) if retries < max_retries => {
                     retries += 1;
+                    
+                    // Emit retry event (deduplicator will handle spam - retries every 2s)
+                    console_printer.emit(console::ConsoleEvent::new(
+                        console::EventCategory::Docker,
+                        console::EventStatus::Retry,
+                        format!("Attempt {}/{}", retries, max_retries)
+                    ));
+                    
+                    // Legacy tracing (keep during migration)
                     tracing::warn!(
                         error = ?e,
                         retry = retries,
@@ -2377,6 +3107,13 @@ async fn main() -> anyhow::Result<()> {
                     tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
                 }
                 Err(e) => {
+                    // Emit connection failure event
+                    console_printer.emit(console::ConsoleEvent::new(
+                        console::EventCategory::Docker,
+                        console::EventStatus::Failed,
+                        format!("After {} retries", max_retries)
+                    ));
+                    
                     tracing::error!(error = ?e, "Failed to connect to Docker daemon after {} retries", max_retries);
                     return Err(e);
                 }
@@ -2390,8 +3127,49 @@ async fn main() -> anyhow::Result<()> {
     // Create shutdown notification channel
     let shutdown_tx = Arc::new(tokio::sync::Notify::new());
 
+    // Load capabilities from disk cache (instant startup - background refresh will update)
+    let cached_capabilities = load_capabilities_cache().await;
+    let capabilities_arc = Arc::new(RwLock::new(cached_capabilities.clone()));
+    
+    // If no cache exists, write skeleton immediately so endpoints have valid data
+    if cached_capabilities.is_none() {
+        let skeleton = HardwareCapabilities {
+            stone_name: stone_name.clone(),
+            hardware: HardwareInventory {
+                cpu: CpuCapabilities {
+                    model: None,
+                    cores: 0,
+                    threads: None,
+                    architecture: std::env::consts::ARCH.to_string(),
+                    features: None,
+                },
+                memory: MemoryCapabilities { total_mb: 0 },
+                gpus: vec![],  // CRITICAL: Must be present, even if empty
+                disk: None,
+                storage: vec![],
+                os_version: None,
+                kernel_version: None,
+                swap_mb: None,
+            },
+            runtime: Some(RuntimeInfo {
+                docker_version: None,
+                os: std::env::consts::OS.to_string(),
+                kernel: None,
+            }),
+            detection_status: DetectionStatus::Scanning,
+        };
+        *capabilities_arc.write().await = Some(skeleton.clone());
+        let _ = save_capabilities_cache(&skeleton).await;
+    } else {
+        console_printer.emit(console::ConsoleEvent::new(
+            console::EventCategory::System,
+            console::EventStatus::Loaded,
+            "Hardware capabilities".to_string()
+        ));
+    }
+
     let state = AppState {
-        stone_name,
+        stone_name: stone_name.clone(),
         registry: Arc::new(RwLock::new(Vec::new())),
         docker: docker.clone(),
         templates: Arc::new(TemplateLoader::new()),
@@ -2400,7 +3178,31 @@ async fn main() -> anyhow::Result<()> {
         shutdown_tx: shutdown_tx.clone(),
         start_time: std::time::Instant::now(),
         offerings_index: Arc::new(RwLock::new(None)),
+        console: console_printer.clone(),
+        capabilities: capabilities_arc.clone(),
     };
+    
+    // Start background hardware detection (progressive: CPU fast, GPU slow)
+    let bg_stone_name = stone_name.clone();
+    let bg_caps = capabilities_arc.clone();
+    let bg_console = console_printer.clone();
+    let bg_state = state.clone();
+    tokio::spawn(async move {
+        bg_console.emit(console::ConsoleEvent::new(
+            console::EventCategory::System,
+            console::EventStatus::Scanning,
+            "Hardware capabilities".to_string()
+        ));
+        
+        // Progressive detection handles its own console updates
+        detect_capabilities_background(bg_stone_name.clone(), bg_caps.clone(), bg_console.clone(), bg_state).await;
+        
+        bg_console.emit(console::ConsoleEvent::new(
+            console::EventCategory::System,
+            console::EventStatus::Updated,
+            "Hardware capabilities (complete)".to_string()
+        ));
+    });
 
     // Load persisted registry state (best-effort)
     match load_registry_from_disk().await {
@@ -2423,8 +3225,57 @@ async fn main() -> anyhow::Result<()> {
     // Startup self-heal: adopt any existing zen-offering containers into the registry.
     adopt_existing_containers(&state).await;
 
+    // Start singleton UDP discovery listener EARLY (runs for process lifetime)
+    // This must happen before catalog building so stones respond to discovery immediately
+    let discovery_stone_name = stone_name.clone();
+    let discovery_endpoint = api_endpoint.clone();
+    match discovery::ensure_udp_listener(
+        discovery_stone_name,
+        discovery_endpoint,
+    )
+    .await
+    {
+        Ok(receiver) => {
+            // Spawn discovery event monitor (consumes from broadcast pipeline)
+            let mut discovery_rx = receiver;
+            tokio::spawn(async move {
+                while let Ok(event) = discovery_rx.recv().await {
+                    tracing::debug!(
+                        request_id = %event.request.request_id,
+                        from = %event.from_addr,
+                        "Discovery request received via broadcast"
+                    );
+                    // Future: could emit metrics, update dashboards, log analytics, etc.
+                }
+                tracing::info!("Discovery event monitor stopped");
+            });
+            
+            console_printer.emit(console::ConsoleEvent::new(
+                console::EventCategory::Network,
+                console::EventStatus::Started,
+                format!("UDP discovery on port {}", garden_common::ports::DISCOVERY_UDP)
+            ));
+        }
+        Err(e) => {
+            tracing::error!(error = ?e, "Failed to start UDP discovery listener");
+            console_printer.emit(console::ConsoleEvent::new(
+                console::EventCategory::Network,
+                console::EventStatus::Failed,
+                format!("UDP discovery: {}", e)
+            ));
+        }
+    }
+
     // Build offerings index at startup
     tracing::info!("Building offerings catalog...");
+    
+    // Emit console event for manifest scanning
+    console_printer.emit(console::ConsoleEvent::new(
+        console::EventCategory::Manifests,
+        console::EventStatus::Scanning,
+        "Runtime templates".to_string()
+    ));
+    
     match ensure_offerings_index(&state, false).await {
         Ok(_) => {
             let idx_guard = state.offerings_index.read().await;
@@ -2433,10 +3284,24 @@ async fn main() -> anyhow::Result<()> {
                     offerings_count = idx.offerings.len(),
                     "Offerings catalog loaded successfully"
                 );
+                
+                // Emit console event for successful manifest loading
+                console_printer.emit(console::ConsoleEvent::new(
+                    console::EventCategory::Manifests,
+                    console::EventStatus::Loaded,
+                    format!("{} manifests", idx.offerings.len())
+                ));
             }
         }
         Err(e) => {
             tracing::warn!(error = ?e, "Failed to build offerings catalog - API will return empty results");
+            
+            // Emit console event for manifest loading error
+            console_printer.emit(console::ConsoleEvent::new(
+                console::EventCategory::Manifests,
+                console::EventStatus::Invalid,
+                "Catalog build failed".to_string()
+            ));
         }
     }
 
@@ -2566,6 +3431,11 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/v1/pond/join", post(api::v1::pond::pond_join_v1))
         .route("/api/v1/pond/stones/:stone_name", axum::routing::delete(api::v1::pond::pond_untrust_v1))
         .route("/api/v1/pond/status", get(api::v1::pond::pond_status_v1))
+        
+        // V1 API - Console control
+        .route("/api/v1/console/mode", get(api::v1::console::get_console_mode_v1))
+        .route("/api/v1/console/mode", post(api::v1::console::set_console_mode_v1))
+        
         .layer(axum::extract::DefaultBodyLimit::max(200 * 1024 * 1024)) // 200 MB for binary uploads
         .with_state(state.clone());
 
@@ -2573,11 +3443,21 @@ async fn main() -> anyhow::Result<()> {
     let listener = tokio::net::TcpListener::bind(addr).await?;
     tracing::info!(?addr, api_endpoint = %api_endpoint, "Moss HTTP server ready");
     
+    // Emit HTTP server ready event
+    state.console.emit(console::ConsoleEvent::new(
+        console::EventCategory::System,
+        console::EventStatus::Ready,
+        format!("HTTP server → {}", api_endpoint)
+    ));
+    
     // Create server with graceful shutdown
     let server = axum::serve(listener, app)
         .with_graceful_shutdown(async move {
             shutdown_signal().await;
             tracing::info!("Shutdown signal received, initiating graceful shutdown");
+            
+            // Emit shutdown event (note: console_printer needs to be cloned earlier)
+            // This will be added when we refactor shutdown signal handling
         });
     
     // Run server with shutdown coordination
@@ -2590,14 +3470,36 @@ async fn main() -> anyhow::Result<()> {
         }
         _ = shutdown_tx.notified() => {
             tracing::info!("Admin shutdown requested");
+            
+            // Emit shutdown event
+            state.console.emit(console::ConsoleEvent::new(
+                console::EventCategory::System,
+                console::EventStatus::Shutting,
+                "Admin requested".to_string()
+            ));
         }
     }
     
     // Allow in-flight requests to complete (5s timeout)
     tracing::info!("Waiting up to 5s for in-flight requests to complete");
+    
+    // Emit draining event
+    state.console.emit(console::ConsoleEvent::new(
+        console::EventCategory::System,
+        console::EventStatus::Draining,
+        "In-flight requests".to_string()
+    ));
     tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
     
     tracing::info!("Moss daemon shutdown complete");
+    
+    // Emit stopped event
+    state.console.emit(console::ConsoleEvent::new(
+        console::EventCategory::System,
+        console::EventStatus::Stopped,
+        "Shutdown complete".to_string()
+    ));
+    
     Ok(())
 }
 

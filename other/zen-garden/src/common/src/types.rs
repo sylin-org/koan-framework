@@ -105,14 +105,57 @@ pub struct DaemonHealthStatus {
 // Resource Types
 // ============================================================================
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum DiskType {
+    NVMe,
+    SSD,
+    HDD,
+    Unknown,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StorageDevice {
+    pub identifier: String,  // e.g., "sda", "nvme0n1", "C:"
+    pub size_gb: u64,
+    pub disk_type: DiskType,
+    pub partition_count: usize,
+    pub used_percent: f32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AiRuntime {
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub cuda_version: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub rocm_version: Option<String>,
+    #[serde(default)]
+    pub has_directml: bool,
+    #[serde(default)]
+    pub has_openvino: bool,
+}
+
+impl Default for AiRuntime {
+    fn default() -> Self {
+        Self {
+            cuda_version: None,
+            rocm_version: None,
+            has_directml: false,
+            has_openvino: false,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GpuInfo {
     pub vendor: String,
     pub model: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub vram_mb: Option<u64>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub capabilities: Vec<String>,  // "cuda", "rocm", "vulkan", "directml", "opencl"
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub ai_runtime: Option<AiRuntime>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -154,22 +197,43 @@ pub struct DiskMetrics {
     pub available_friendly: String,
 }
 
+/// Hardware capability detection status
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum DetectionStatus {
+    /// Detection not yet started or in early stages
+    Scanning,
+    /// CPU and memory detected, GPU detection in progress
+    Partial,
+    /// All hardware detection complete
+    Complete,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HardwareCapabilities {
     pub stone_name: String,
     pub hardware: HardwareInventory,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub runtime: Option<RuntimeInfo>,
+    pub detection_status: DetectionStatus,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HardwareInventory {
     pub cpu: CpuCapabilities,
     pub memory: MemoryCapabilities,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub gpus: Vec<GpuInfo>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub disk: Option<DiskCapabilities>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub storage: Vec<StorageDevice>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub os_version: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub kernel_version: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub swap_mb: Option<u64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -400,6 +464,18 @@ pub struct RuleCondition {
     pub cpu_features_missing: Option<Vec<String>>,
     pub architectures: Option<Vec<String>>,
     pub memory_mb_less_than: Option<u64>,
+    
+    // AI/GPU requirements
+    /// Match if ANY of the listed AI runtimes are present (OR logic: ['cuda', 'rocm'])
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub requires_ai_any: Option<Vec<String>>,
+    /// Match if ALL of the listed AI runtimes are present (AND logic: ['cuda', 'directml'])
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub requires_ai_all: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub vram_mb_less_than: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub vram_mb_at_least: Option<u64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

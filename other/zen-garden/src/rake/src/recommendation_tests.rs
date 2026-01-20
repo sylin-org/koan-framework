@@ -25,8 +25,13 @@ fn caps_with_disk_type(disk_type: &str) -> HardwareCapabilities {
                 total_gb: 128,
                 disk_type: Some(disk_type.to_string()),
             }),
+            storage: vec![],
+            os_version: None,
+            kernel_version: None,
+            swap_mb: None,
         },
         runtime: None,
+        detection_status: garden_common::DetectionStatus::Complete,
     }
 }
 

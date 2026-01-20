@@ -1,6 +1,6 @@
 ﻿{
   "name": "opensearch",
-  "description": "OpenSearch 2.x search and analytics",
+  "description": "OpenSearch search and analytics",
   "category": "search",
   "tags": ["search", "database", "document", "analytics"],
   "port": 9200,

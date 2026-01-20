@@ -6,7 +6,7 @@
 use crate::api::responses::{GardenOverview, StoneInfo, ApiResponse};
 use crate::api::suggestions::{generate_suggestions, SuggestionContext};
 use crate::{error_response, AppState, metrics};
-use garden_common::{ApiError, CpuCapabilities, DiskCapabilities, HardwareCapabilities, HardwareInventory, MemoryCapabilities};
+use garden_common::{ApiError, CpuCapabilities, DetectionStatus, DiskCapabilities, HardwareCapabilities, HardwareInventory, MemoryCapabilities};
 
 /// GET /api/v1/garden - Get garden overview (all stones)
 pub async fn get_garden_v1(
@@ -95,6 +95,11 @@ async fn get_capabilities(state: &AppState) -> HardwareCapabilities {
     
     let cores = resources.as_ref().map(|r| r.cpu.cores).unwrap_or(1);
     
+    let storage = metrics::detect_storage();
+    let os_version = metrics::detect_os_version();
+    let kernel_version = metrics::detect_kernel_version();
+    let swap_mb = metrics::detect_swap();
+    
     HardwareCapabilities {
         stone_name: state.stone_name.clone(),
         hardware: HardwareInventory {
@@ -110,8 +115,13 @@ async fn get_capabilities(state: &AppState) -> HardwareCapabilities {
             },
             gpus,
             disk,
+            storage,
+            os_version,
+            kernel_version,
+            swap_mb,
         },
         runtime: None, // TODO: Add runtime info (docker version, OS, kernel)
+        detection_status: DetectionStatus::Complete, // Synchronous detection
     }
 }
 

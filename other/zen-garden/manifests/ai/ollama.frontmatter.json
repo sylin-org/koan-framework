@@ -1,6 +1,6 @@
 ﻿{
   "name": "ollama",
-  "description": "Ollama local LLM runtime",
+  "description": "Ollama local AI models",
   "category": "ai",
   "tags": ["ai", "llm", "inference", "models"],
   "port": 11434,

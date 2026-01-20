@@ -1,6 +1,6 @@
 ﻿{
   "name": "couchbase",
-  "description": "Couchbase Server Community Edition",
+  "description": "Couchbase NoSQL database",
   "category": "data",
   "tags": ["database", "document", "nosql", "cache"],
   "port": 8091,

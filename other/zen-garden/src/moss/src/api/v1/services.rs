@@ -207,7 +207,7 @@ pub async fn rest_service_v1(
         })?;
 
     // Stop the Docker container
-    if let Err(e) = state.docker.stop_service(&service).await {
+    if let Err(e) = state.docker.stop_service(&service, Some(&state.console)).await {
         tracing::error!(error = ?e, service = %service, "Failed to stop container");
         return Err(error_response(
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -261,7 +261,7 @@ pub async fn wake_service_v1(
         })?;
 
     // Start the Docker container
-    if let Err(e) = state.docker.start_service(&service).await {
+    if let Err(e) = state.docker.start_service(&service, Some(&state.console)).await {
         tracing::error!(error = ?e, service = %service, "Failed to start container");
         return Err(error_response(
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -361,6 +361,7 @@ pub async fn nourish_service_v1(
             template.ports,
             template.environment,
             template.volumes,
+            Some(&state.console),
         )
         .await
     {
@@ -425,7 +426,7 @@ pub async fn delete_service_v1(
         })?;
 
     // Remove from Docker
-    if let Err(e) = state.docker.remove_service(&service).await {
+    if let Err(e) = state.docker.remove_service(&service, Some(&state.console)).await {
         tracing::error!(error = ?e, service = %service, "Docker remove failed");
         return Err(error_response(
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -515,7 +516,7 @@ pub async fn restart_service_v1(
     Path(service): Path<String>,
 ) -> Result<(StatusCode, Json<serde_json::Value>), (StatusCode, Json<ApiError>)> {
     // Stop then start
-    state.docker.stop_service(&service).await.map_err(|e| {
+    state.docker.stop_service(&service, Some(&state.console)).await.map_err(|e| {
         error_response(
             StatusCode::INTERNAL_SERVER_ERROR,
             "RESTART_FAILED",
@@ -524,7 +525,7 @@ pub async fn restart_service_v1(
         )
     })?;
     
-    state.docker.start_service(&service).await.map_err(|e| {
+    state.docker.start_service(&service, Some(&state.console)).await.map_err(|e| {
         error_response(
             StatusCode::INTERNAL_SERVER_ERROR,
             "RESTART_FAILED",

@@ -19,11 +19,11 @@ impl AuthMiddleware {
     ) -> Result<Response, (StatusCode, String)> {
         // Extract bearer token
         let auth_header = headers
-            .get("authorization")
+            .get(garden_common::HEADER_AUTHORIZATION)
             .and_then(|h| h.to_str().ok())
             .ok_or((StatusCode::UNAUTHORIZED, "Missing authorization header".to_string()))?;
 
-        if !auth_header.starts_with("Bearer ") {
+        if !auth_header.starts_with(garden_common::AUTH_BEARER_PREFIX) {
             return Err((
                 StatusCode::UNAUTHORIZED,
                 "Invalid authorization format".to_string(),

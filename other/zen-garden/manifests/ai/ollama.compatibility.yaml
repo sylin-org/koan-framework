@@ -3,6 +3,18 @@
 version: "1"
 
 compatibility_rules:
+  - name: "no-ai-runtime"
+    condition:
+      requires_ai_any: ['cuda', 'rocm', 'directml', 'openvino']
+    reason: "Ollama requires GPU acceleration for optimal performance"
+    suggestion: "This stone has no AI-capable GPU (CUDA/ROCm/DirectML/OpenVINO). Ollama will run in CPU-only mode with significantly degraded performance. Consider installing on a stone with GPU support."
+
+  - name: "insufficient-vram"
+    condition:
+      vram_mb_at_least: 4096
+    reason: "Most Ollama models require at least 4GB VRAM for GPU acceleration"
+    suggestion: "Available VRAM is below 4GB. Larger models may fall back to CPU or fail to load. Consider using smaller quantized models or upgrading GPU."
+
   - name: "insufficient-memory"
     condition:
       memory_mb_less_than: 4096

@@ -1,6 +1,6 @@
 ﻿{
   "name": "redis",
-  "description": "Redis Stack with RedisJSON and RediSearch",
+  "description": "Redis in-memory data store",
   "category": "cache",
   "tags": ["database", "cache", "keyvalue", "inmemory", "search"],
   "port": 6379,

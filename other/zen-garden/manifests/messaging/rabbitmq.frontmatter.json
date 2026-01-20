@@ -1,6 +1,6 @@
 ﻿{
   "name": "rabbitmq",
-  "description": "RabbitMQ 3.x message broker with management UI",
+  "description": "RabbitMQ message broker",
   "category": "messaging",
   "tags": ["messaging", "queue", "broker", "amqp"],
   "port": 5672,

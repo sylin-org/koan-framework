@@ -228,9 +228,39 @@ pub fn section_header(title: &str, term: &TerminalInfo) -> String {
     format!("{}{}{}{}", prefix, title, suffix, dashes)
 }
 
+/// Render section header with short underline (21 chars)
+/// Zen Garden UI Standard for grouped key-value displays
+/// Format:
+/// SECTION_NAME
+/// ─────────────────────
+pub fn section_header_v2(title: &str, bold: bool, color: bool) -> String {
+    const UNDERLINE_LENGTH: usize = 21;
+    let underline = "─".repeat(UNDERLINE_LENGTH);
+    
+    let title_display = if color && bold {
+        title.to_uppercase().bold().to_string()
+    } else if bold {
+        title.to_uppercase()
+    } else {
+        title.to_uppercase()
+    };
+    
+    format!("{}\n{}", title_display, underline)
+}
+
+/// Render key-value line with proper alignment
+/// Label width: 16 chars (left-aligned), value starts at column 21
+/// Format: "    LABEL            value"
+pub fn kv_line(label: &str, value: &str, indent_spaces: usize) -> String {
+    const LABEL_WIDTH: usize = 16;
+    let indent = " ".repeat(indent_spaces);
+    format!("{}{:<width$} {}", indent, label.to_uppercase(), value, width = LABEL_WIDTH)
+}
+
 /// Render indented label: value line
+#[allow(dead_code)]
 pub fn label_value_line(label: &str, value: &str, indent: usize) -> String {
-    format!("{}{:<12}{}", " ".repeat(indent), label, value)
+    format!("{}{:<12} {}", " ".repeat(indent), label, value)
 }
 
 /// Format number with specified precision (Phase 3)
@@ -245,6 +275,24 @@ pub fn truncate_name(name: &str, max_len: usize) -> String {
         format!("{}...", &name[..max_len - 3])
     } else {
         name.to_string()
+    }
+}
+
+/// Render text with specified color (respects terminal color support)
+pub fn colored_text(text: &str, color: &str, term: &TerminalInfo) -> String {
+    if !term.supports_color {
+        return text.to_string();
+    }
+    
+    match color {
+        "red" => text.red().to_string(),
+        "green" => text.green().to_string(),
+        "yellow" => text.yellow().to_string(),
+        "blue" => text.blue().to_string(),
+        "magenta" => text.magenta().to_string(),
+        "cyan" => text.cyan().to_string(),
+        "white" => text.white().to_string(),
+        _ => text.to_string(),
     }
 }
 
@@ -282,6 +330,12 @@ impl TableBuilder {
     /// Add a column with specified width and alignment
     pub fn add_column(mut self, width: usize, align: Align) -> Self {
         self.columns.push(Column { width, align });
+        self
+    }
+    
+    /// Set custom indentation (default is DEFAULT_INDENT)
+    pub fn with_indent(mut self, indent: usize) -> Self {
+        self.indent = indent;
         self
     }
     

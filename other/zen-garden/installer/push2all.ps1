@@ -33,7 +33,6 @@
 #>
 
 param(
-    [string]$BinaryPath = "$PSScriptRoot/../dist/linux/garden-moss",
     [int]$Timeout = 3,
     [switch]$Parallel,
     [int]$Port = 0,  # Override port (0 = use discovered port)
@@ -44,11 +43,11 @@ $ErrorActionPreference = "Stop"
 
 # Always build release binaries unless explicitly skipped
 if (-not $SkipBuild) {
-    Write-Host "🔨 Building release binaries..." -ForegroundColor Cyan
+    Write-Host "🔨 Building release binaries for all platforms..." -ForegroundColor Cyan
     Write-Host ""
     
-    $buildScript = Join-Path $PSScriptRoot "build-linux.ps1"
-    & $buildScript -Release
+    $buildScript = Join-Path $PSScriptRoot "dist.ps1"
+    & $buildScript
     
     if ($LASTEXITCODE -ne 0) {
         Write-Host "✗ Build failed" -ForegroundColor Red
@@ -58,8 +57,18 @@ if (-not $SkipBuild) {
     Write-Host ""
 }
 
-# Convert to absolute path
-$BinaryPath = Resolve-Path $BinaryPath -ErrorAction Stop
+# Define binary paths
+$distRoot = Resolve-Path "$PSScriptRoot/../dist"
+$linuxMoss = Join-Path $distRoot "linux/garden-moss"
+$linuxRake = Join-Path $distRoot "linux/garden-rake"
+$windowsMoss = Join-Path $distRoot "windows/garden-moss.exe"
+$windowsRake = Join-Path $distRoot "windows/garden-rake.exe"
+
+# Validate binaries exist
+if (-not (Test-Path $linuxMoss)) { throw "Linux moss binary not found: $linuxMoss" }
+if (-not (Test-Path $linuxRake)) { throw "Linux rake binary not found: $linuxRake" }
+if (-not (Test-Path $windowsMoss)) { throw "Windows moss binary not found: $windowsMoss" }
+if (-not (Test-Path $windowsRake)) { throw "Windows rake binary not found: $windowsRake" }
 
 function Write-Status {
     param([string]$Message, [string]$Type = "Info")
@@ -138,10 +147,50 @@ function Discover-AllStones {
     return $stones
 }
 
-function Test-BinaryFile {
-    param([string]$Path)
+function Get-StoneInfo {
+    param([PSCustomObject]$Stone)
     
-    Write-Status "📦 Validating binary file..."
+    try {
+        $url = "$($Stone.Endpoint.TrimEnd('/'))/health"
+        $health = Invoke-RestMethod -Uri $url -Method Get -TimeoutSec 3
+        
+        return [PSCustomObject]@{
+            OS = if ($health.os) { $health.os } else { "linux" }  # Default to linux for older versions
+            Architecture = if ($health.architecture) { $health.architecture } else { "x86_64" }
+        }
+    }
+    catch {
+        Write-Status "   Warning: Could not query $($Stone.Name) health endpoint, assuming Linux x86_64" -Type "Warning"
+        return [PSCustomObject]@{
+            OS = "linux"
+            Architecture = "x86_64"
+        }
+    }
+}
+
+function Get-BinariesForPlatform {
+    param([string]$OS, [string]$Architecture)
+    
+    if ($OS -match "windows") {
+        return [PSCustomObject]@{
+            Moss = $windowsMoss
+            Rake = $windowsRake
+            Platform = "Windows"
+        }
+    }
+    else {
+        return [PSCustomObject]@{
+            Moss = $linuxMoss
+            Rake = $linuxRake
+            Platform = "Linux"
+        }
+    }
+}
+
+function Test-BinaryFile {
+    param([string]$Path, [bool]$AllowPE = $false)
+    
+    Write-Status "📦 Validating binary file: $(Split-Path -Leaf $Path)..."
     
     if (-not (Test-Path $Path)) {
         throw "Binary file not found: $Path"
@@ -150,44 +199,58 @@ function Test-BinaryFile {
     $bytes = [System.IO.File]::ReadAllBytes($Path)
     $sizeMb = [math]::Round($bytes.Length / 1MB, 2)
     
-    # Check ELF header
-    if ($bytes.Length -lt 4 -or $bytes[0] -ne 0x7f -or $bytes[1] -ne 0x45 -or $bytes[2] -ne 0x4c -or $bytes[3] -ne 0x46) {
-        throw "Not a valid ELF binary (expected Linux executable)"
+    # Check binary format
+    $format = "Unknown"
+    if ($bytes.Length -ge 4) {
+        # ELF header: 0x7f 'E' 'L' 'F'
+        if ($bytes[0] -eq 0x7f -and $bytes[1] -eq 0x45 -and $bytes[2] -eq 0x4c -and $bytes[3] -eq 0x46) {
+            $format = "ELF (Linux)"
+        }
+        # PE header: 'M' 'Z' (DOS stub)
+        elseif ($bytes[0] -eq 0x4d -and $bytes[1] -eq 0x5a) {
+            $format = "PE (Windows)"
+            if (-not $AllowPE) {
+                throw "Windows PE binary not expected for this platform"
+            }
+        }
+        else {
+            throw "Not a valid executable binary"
+        }
+    }
+    else {
+        throw "File too small to be a valid binary"
     }
     
-    Write-Status "   ✓ Path: $Path" -Type "Success"
     Write-Status "   ✓ Size: $sizeMb MB" -Type "Success"
-    Write-Status "   ✓ Format: ELF" -Type "Success"
+    Write-Status "   ✓ Format: $format" -Type "Success"
     
     return $bytes
 }
 
-function Push-MossToStone {
+function Push-BinariesToStone {
     param(
         [PSCustomObject]$Stone,
-        [byte[]]$BinaryData
+        [byte[]]$MossBinaryData,
+        [byte[]]$RakeBinaryData,
+        [string]$Platform
     )
     
-    Write-Status "`n🚀 Pushing moss to $($Stone.Name)..."
+    Write-Status "`n🚀 Pushing binaries to $($Stone.Name) ($Platform)..."
     
-    # Encode to base64
-    Write-Status "   Encoding binary..."
-    $base64 = [Convert]::ToBase64String($BinaryData)
-    
-    # Prepare payload
-    $payload = @{
+    # Push moss first
+    Write-Status "   [1/2] Uploading garden-moss..."
+    $mossBase64 = [Convert]::ToBase64String($MossBinaryData)
+    $mossPayload = @{
         component = "garden-moss"
-        binary_data = $base64
+        binary_data = $mossBase64
     } | ConvertTo-Json
     
-    # Send upgrade request
-    Write-Status "   Uploading to $($Stone.Endpoint)..."
     $url = "$($Stone.Endpoint.TrimEnd('/'))/api/v1/stone/upgrade"
     
     try {
         $response = Invoke-RestMethod -Uri $url -Method Post -Body $payload -ContentType "application/json" -TimeoutSec 30
         
-        Write-Status "   ✅ Upload successful" -Type "Success"
+        Write-Status "   ✅ Moss upload successful" -Type "Success"
         if ($response.architecture) {
             Write-Status "      Architecture: $($response.architecture)"
         }
@@ -217,11 +280,30 @@ function Push-MossToStone {
         }
         
         if (-not $online) {
-            Write-Status "`n   ⚠️  $($Stone.Name) did not respond after restart" -Type "Warning"
-            Write-Status "      Check status: ssh stone@$($Stone.Address) 'sudo systemctl status garden-moss.service'" -Type "Warning"
+            Write-Status "   ⚠️  $($Stone.Name) moss did not respond after restart" -Type "Warning"
+            Write-Status "      Skipping rake push" -Type "Warning"
+            return $false
         }
         
-        return $online
+        # Push rake
+        Write-Status "   [2/2] Uploading garden-rake..."
+        $rakeBase64 = [Convert]::ToBase64String($RakeBinaryData)
+        $rakePayload = @{
+            component = "garden-rake"
+            binary_data = $rakeBase64
+        } | ConvertTo-Json
+        
+        try {
+            $rakeResponse = Invoke-RestMethod -Uri $url -Method Post -Body $rakePayload -ContentType "application/json" -TimeoutSec 30
+            Write-Status "   ✅ Rake upload successful" -Type "Success"
+            Write-Status "   ✅ $($Stone.Name) fully updated" -Type "Success"
+            return $true
+        }
+        catch {
+            Write-Status "   ⚠️  Rake push failed but moss is updated" -Type "Warning"
+            Write-Status "      Error: $_" -Type "Warning"
+            return $true  # Still count as success since moss updated
+        }
         
     }
     catch {
@@ -234,11 +316,8 @@ function Push-MossToStone {
 # Main execution
 try {
     Write-Status "`n═══════════════════════════════════════════════════════════════"
-    Write-Status "  Push Moss Binary to All Stones"
+    Write-Status "  Push Garden Binaries to All Stones"
     Write-Status "═══════════════════════════════════════════════════════════════`n"
-    
-    # Validate binary
-    $binaryData = Test-BinaryFile -Path $BinaryPath
     
     # Discover stones
     $stones = Discover-AllStones -TimeoutSeconds $Timeout
@@ -249,8 +328,45 @@ try {
         exit 1
     }
     
+    # Detect platform for each stone and prepare binaries
+    Write-Status "`n🔍 Detecting platform for each stone..."
+    $stoneConfigs = @()
+    foreach ($stone in $stones) {
+        Write-Status "   $($stone.Name): " -NoNewline
+        $info = Get-StoneInfo -Stone $stone
+        $binaries = Get-BinariesForPlatform -OS $info.OS -Architecture $info.Architecture
+        Write-Status "$($binaries.Platform) $($info.Architecture)" -Type "Success"
+        
+        $stoneConfigs += [PSCustomObject]@{
+            Stone = $stone
+            Platform = $binaries.Platform
+            MossPath = $binaries.Moss
+            RakePath = $binaries.Rake
+        }
+    }
+    
+    # Validate all binaries
+    Write-Status "`n📦 Validating binaries..."
+    $mossLinuxData = $null
+    $rakeLinuxData = $null
+    $mossWindowsData = $null
+    $rakeWindowsData = $null
+    
+    $needsLinux = @($stoneConfigs | Where-Object { $_.Platform -eq "Linux" }).Count -gt 0
+    $needsWindows = @($stoneConfigs | Where-Object { $_.Platform -eq "Windows" }).Count -gt 0
+    
+    if ($needsLinux) {
+        $mossLinuxData = Test-BinaryFile -Path $linuxMoss -AllowPE $false
+        $rakeLinuxData = Test-BinaryFile -Path $linuxRake -AllowPE $false
+    }
+    
+    if ($needsWindows) {
+        $mossWindowsData = Test-BinaryFile -Path $windowsMoss -AllowPE $true
+        $rakeWindowsData = Test-BinaryFile -Path $windowsRake -AllowPE $true
+    }
+    
     # Push to all stones
-    Write-Status "`n📡 Pushing moss binary to $($stones.Count) stone(s)..."
+    Write-Status "`n📡 Pushing binaries to $($stones.Count) stone(s)..."
     
     $results = @()
     
@@ -258,42 +374,66 @@ try {
         Write-Status "   Mode: Parallel deployment`n"
         
         $jobs = @()
-        foreach ($stone in $stones) {
+        foreach ($config in $stoneConfigs) {
+            $mossBinary = if ($config.Platform -eq "Windows") { $mossWindowsData } else { $mossLinuxData }
+            $rakeBinary = if ($config.Platform -eq "Windows") { $rakeWindowsData } else { $rakeLinuxData }
+            
             $jobs += Start-Job -ScriptBlock {
-                param($StoneName, $StoneEndpoint, $BinaryData)
+                param($StoneName, $StoneEndpoint, $MossBinary, $RakeBinary, $Platform)
                 
-                $base64 = [Convert]::ToBase64String($BinaryData)
-                $payload = @{
+                $mossBase64 = [Convert]::ToBase64String($MossBinary)
+                $mossPayload = @{
                     component = "garden-moss"
-                    binary_data = $base64
+                    binary_data = $mossBase64
                 } | ConvertTo-Json
                 
-                $url = "$($StoneEndpoint.TrimEnd('/'))/api/system/refresh"
+                $url = "$($StoneEndpoint.TrimEnd('/'))/api/v1/stone/upgrade"
                 
                 try {
-                    $response = Invoke-RestMethod -Uri $url -Method Post -Body $payload -ContentType "application/json" -TimeoutSec 30
+                    # Push moss
+                    $response = Invoke-RestMethod -Uri $url -Method Post -Body $mossPayload -ContentType "application/json" -TimeoutSec 30
                     
                     # Wait and check health
                     Start-Sleep -Seconds 4
                     $healthUrl = "$($StoneEndpoint.TrimEnd('/'))/health"
                     
+                    $online = $false
                     for ($i = 1; $i -le 10; $i++) {
                         Start-Sleep -Seconds 1
                         try {
                             $health = Invoke-RestMethod -Uri $healthUrl -Method Get -TimeoutSec 2
                             if ($health.status) {
-                                return @{ Success = $true; Name = $StoneName }
+                                $online = $true
+                                break
                             }
                         }
                         catch {}
                     }
                     
-                    return @{ Success = $false; Name = $StoneName; Error = "Did not come back online" }
+                    if (-not $online) {
+                        return @{ Success = $false; Name = $StoneName; Error = "Moss did not come back online" }
+                    }
+                    
+                    # Push rake
+                    $rakeBase64 = [Convert]::ToBase64String($RakeBinary)
+                    $rakePayload = @{
+                        component = "garden-rake"
+                        binary_data = $rakeBase64
+                    } | ConvertTo-Json
+                    
+                    try {
+                        Invoke-RestMethod -Uri $url -Method Post -Body $rakePayload -ContentType "application/json" -TimeoutSec 30 | Out-Null
+                        return @{ Success = $true; Name = $StoneName; Platform = $Platform }
+                    }
+                    catch {
+                        # Moss updated, rake failed - still success
+                        return @{ Success = $true; Name = $StoneName; Platform = $Platform; Warning = "Rake push failed" }
+                    }
                 }
                 catch {
                     return @{ Success = $false; Name = $StoneName; Error = $_.Exception.Message }
                 }
-            } -ArgumentList $stone.Name, $stone.Endpoint, $binaryData
+            } -ArgumentList $config.Stone.Name, $config.Stone.Endpoint, $mossBinary, $rakeBinary, $config.Platform
         }
         
         # Wait for all jobs
@@ -305,11 +445,15 @@ try {
     else {
         Write-Status "   Mode: Sequential deployment`n"
         
-        foreach ($stone in $stones) {
-            $success = Push-MossToStone -Stone $stone -BinaryData $binaryData
+        foreach ($config in $stoneConfigs) {
+            $mossBinary = if ($config.Platform -eq "Windows") { $mossWindowsData } else { $mossLinuxData }
+            $rakeBinary = if ($config.Platform -eq "Windows") { $rakeWindowsData } else { $rakeLinuxData }
+            
+            $success = Push-BinariesToStone -Stone $config.Stone -MossBinaryData $mossBinary -RakeBinaryData $rakeBinary -Platform $config.Platform
             $results += @{
                 Success = $success
-                Name = $stone.Name
+                Name = $config.Stone.Name
+                Platform = $config.Platform
             }
         }
     }

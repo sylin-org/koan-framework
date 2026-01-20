@@ -39,9 +39,9 @@ async fn create_test_app() -> Router {
     // Simplified router with just the endpoints we want to test
     Router::new()
         .route("/health", axum::routing::get(health_handler))
-        .route("/api/register", axum::routing::post(register_handler))
-        .route("/api/resolve", axum::routing::get(resolve_handler))
-        .route("/api/stones", axum::routing::get(list_stones_handler))
+        .route("/api/v1/register", axum::routing::post(register_handler))
+        .route("/api/v1/resolve", axum::routing::get(resolve_handler))
+        .route("/api/v1/stones", axum::routing::get(list_stones_handler))
         .with_state(state)
 }
 

@@ -14,7 +14,7 @@ use clap::{Parser, Subcommand};
 use std::collections::BTreeMap;
 use std::time::Duration;
 use tracing_subscriber::EnvFilter;
-use garden_common::{GardenApiResponse, HardwareCapabilities, ServiceInfo, GardenHttpClient};
+use garden_common::{GardenApiResponse, HardwareCapabilities, ServiceInfo, GardenHttpClient, DetectionStatus};
 use garden_rake::client::{resolve_target_endpoint, CachedStoneOps, CachedStoneInfo};
 use garden_rake::discovery;
 use stone_cache::StoneCache;
@@ -168,7 +168,7 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Get Stone status (DEPRECATED: use 'observe' or 'tend' instead)
+    /// Get Stone status (alias for stone details)
     #[command(hide = false)]
     Status {
         /// Moss endpoint (omit to auto-discover)
@@ -447,6 +447,48 @@ enum Commands {
         #[arg(long)]
         at: Option<String>,
     },
+
+    /// Control stone console output (zen syntax)
+    #[command(
+        long_about = "Control stone console output verbosity.\n\n\
+        Examples:\n  \
+        garden-rake make stone sing              # Verbose output temporarily (30min timeout)\n  \
+        garden-rake make stone sing forever      # Verbose output permanently\n  \
+        garden-rake make stone quiet             # Reset to default (informative)\n  \
+        garden-rake make stone silent            # No console output\n\n\
+        Modes:\n  \
+        silent       - No console output (systemd/service use)\n  \
+        minimal      - Critical events only\n  \
+        informative  - Major lifecycle events (default)\n  \
+        verbose      - Full debug output (sing mode)"
+    )]
+    Make {
+        /// Target: 'stone'
+        target: String,
+
+        #[command(subcommand)]
+        action: MakeAction,
+
+        /// Moss endpoint (omit to auto-discover)
+        #[arg(long)]
+        at: Option<String>,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+enum MakeAction {
+    /// Set stone to verbose mode (sing)
+    Sing {
+        /// Make verbose mode permanent (no timeout)
+        #[arg(long = "forever", short = 'f')]
+        forever: bool,
+    },
+    /// Set stone to default/informative mode (quiet)
+    Quiet,
+    /// Set stone to silent mode (no output)
+    Silent,
+    /// Set stone to minimal mode (critical only)
+    Minimal,
 }
 
 #[derive(Debug, Subcommand)]
@@ -1378,20 +1420,32 @@ async fn observe_garden(
             .collect()
     });
 
-    // Try to discover Lantern first for enhanced topology view
+    // Start background Lantern discovery immediately (non-blocking)
+    discovery::discover_lantern_background();
+    
+    // Display header immediately (no waiting for discovery)
     let term = ui::TerminalInfo::detect();
-    let lantern_endpoint = discovery::discover_lantern();
+    let supports_unicode = term.supports_unicode;
+    if let Some(ref filter) = offerings_filter {
+        println!("{}", ui::section_header(&format!("GARDEN OVERVIEW (filtered: {})", filter.join(", ")), &term));
+    } else {
+        println!("{}", ui::section_header("GARDEN OVERVIEW", &term));
+    }
+    println!();
+
+    // Check if Lantern was discovered in background (will be instant if cached)
+    let lantern_endpoint = discovery::get_cached_lantern();
     
     if let Some(ref lantern) = lantern_endpoint {
-        tracing::info!(endpoint = %lantern, "Discovered Lantern - using for topology queries");
+        tracing::info!(endpoint = %lantern, "Using cached Lantern endpoint for topology queries");
         
         // Fetch topology from Lantern
-        let topology_url = format!("{}/api/stones", lantern);
+        let topology_url = format!("{}/api/v1/stones", lantern);
         match client.get(&topology_url).timeout(Duration::from_secs(5)).send().await {
             Ok(resp) if resp.status().is_success() => {
                 if let Ok(topology) = resp.json::<garden_common::LanternTopology>().await {
                     // Display Lantern-sourced topology
-                    display_lantern_topology(&topology, offering_filter.as_deref(), term.supports_unicode);
+                    display_lantern_topology(&topology, offering_filter.as_deref(), supports_unicode);
                     return Ok(());
                 }
             }
@@ -1404,26 +1458,20 @@ async fn observe_garden(
         }
     }
 
-    // Display header first
-    let supports_unicode = term.supports_unicode; // Capture for closures
-    if let Some(ref filter) = offerings_filter {
-        println!("{}", ui::section_header(&format!("GARDEN OVERVIEW (filtered: {})", filter.join(", ")), &term));
-    } else {
-        println!("{}", ui::section_header("GARDEN OVERVIEW", &term));
-    }
-    println!();
-
-    let discovery_start = std::time::Instant::now();
-    let mut stone_data = Vec::new();
+    let _discovery_start = std::time::Instant::now();
     
     // Fallback: Hot cache architecture - Check cache FIRST (zero discovery for common case)
     let cached_stones = STONE_CACHE.get_all();
     
+    let mut found_any_stone = false;
+    
     if !cached_stones.is_empty() {
         tracing::info!(count = cached_stones.len(), "Using cached stone discovery (cache hit)");
         
-        // ✅ Stream cached results progressively (Container Infrastructure: "cache hits should also stream")
-        for cached in &cached_stones {
+        // ✅ Stream cached results progressively - spawn concurrent fetch tasks
+        let mut fetch_handles = vec![];
+        
+        for cached in cached_stones {
             // Filter by name if specified
             if let Some(ref filter_name) = stone_filter {
                 if cached.capabilities.stone_name.to_lowercase() != filter_name.to_lowercase() {
@@ -1431,93 +1479,128 @@ async fn observe_garden(
                 }
             }
             
-            let elapsed = discovery_start.elapsed();
-            println!("{}{} {} [{}]", 
-                " ".repeat(ui::constants::DEFAULT_INDENT),
-                ui::bullet(supports_unicode),
-                cached.capabilities.stone_name,
-                ui::format_elapsed_time(elapsed)
-            );
-            
-            // Fetch services for cached stone
-            let services_url = format!("{}/api/v1/services", cached.endpoint.trim_end_matches('/'));
-            if let Ok(resp) = client.get(&services_url).timeout(Duration::from_secs(5)).send().await {
-                if let Ok(services_json) = resp.json::<serde_json::Value>().await {
-                    let services: Vec<ServiceInfo> = serde_json::from_value(
-                        services_json.get("data").cloned().unwrap_or(services_json)
-                    ).unwrap_or_default();
-                    
-                    stone_data.push(StoneData {
-                        capabilities: cached.capabilities.clone(),
-                        services,
-                    });
+            // Spawn concurrent fetch task - display as data arrives (no announcement)
+            let client_clone = client.clone();
+            let offerings_filter_clone = offerings_filter.clone();
+            let handle = tokio::spawn(async move {
+                let services_url = format!("{}/api/v1/services", cached.endpoint.trim_end_matches('/'));
+                if let Ok(resp) = client_clone.get(&services_url).timeout(Duration::from_secs(5)).send().await {
+                    if let Ok(services_json) = resp.json::<serde_json::Value>().await {
+                        let services: Vec<ServiceInfo> = serde_json::from_value(
+                            services_json.get("data").cloned().unwrap_or(services_json)
+                        ).unwrap_or_default();
+                        
+                        let stone_data = StoneData {
+                            capabilities: cached.capabilities.clone(),
+                            services,
+                        };
+                        
+                        // Display as soon as data arrives
+                        let _ = display_stone(&stone_data, &offerings_filter_clone);
+                        return true;
+                    }
+                }
+                false
+            });
+            fetch_handles.push(handle);
+        }
+        
+        // Wait for all concurrent fetches to complete
+        for handle in fetch_handles {
+            if let Ok(success) = handle.await {
+                if success {
+                    found_any_stone = true;
                 }
             }
         }
         
-        if stone_filter.is_some() && stone_data.is_empty() {
+        if stone_filter.is_some() && !found_any_stone {
             println!("{}✗ Stone '{}' not found in cache", " ".repeat(ui::constants::DEFAULT_INDENT), stone_filter.as_ref().unwrap());
             return Ok(());
         }
     } else {
         tracing::info!("Cache miss - performing stone discovery");
         
-        // Collect discovered responses for later fetching
-        let mut discovered_responses = Vec::new();
+        // Create channel for streaming discovered stones
+        let (stone_tx, mut stone_rx) = tokio::sync::mpsc::unbounded_channel();
         
-        // ✅ PROGRESSIVE DISCLOSURE - Stream as stones respond (5 seconds for network discovery)
-        let stone_count = discovery::discover_all_moss_stream(
-            Duration::from_secs(5),
-            |response, discovery_instant| {
-                // Filter by name if specified
-                if let Some(ref filter_name) = stone_filter {
-                    if response.stone_name.to_lowercase() != filter_name.to_lowercase() {
-                        return;
+        // Spawn discovery in blocking task (UDP operations are sync)
+        let mut discovery_handle = tokio::task::spawn_blocking(move || {
+            discovery::discover_all_moss_stream(
+                Duration::from_secs(5),
+                move |response, _discovery_instant| {
+                    // Filter by name if specified
+                    if let Some(ref filter_name) = stone_filter {
+                        if response.stone_name.to_lowercase() != filter_name.to_lowercase() {
+                            return;
+                        }
                     }
+                    
+                    // Send to async channel for immediate processing (no announcement printed)
+                    let _ = stone_tx.send(response);
                 }
-                
-                let elapsed = discovery_instant.duration_since(discovery_start);
-                println!("{}{} {} [{}]", 
-                    " ".repeat(ui::constants::DEFAULT_INDENT),
-                    ui::bullet(supports_unicode),
-                    response.stone_name,
-                    ui::format_elapsed_time(elapsed)
-                );
-                
-                // Collect for later fetching
-                discovered_responses.push(response);
-            }
-        );
+            )
+        });
         
         println!();
         
-        // Fetch full data for discovered stones
-        for response in discovered_responses {
-            let caps_url = format!("{}/capabilities", response.stone_endpoint.trim_end_matches('/'));
-            if let Ok(resp) = client.get(&caps_url).timeout(Duration::from_secs(5)).send().await {
-                if let Ok(caps_response) = resp.json::<GardenApiResponse<HardwareCapabilities>>().await {
-                    let services_url = format!("{}/api/v1/services", response.stone_endpoint.trim_end_matches('/'));
-                    if let Ok(svc_resp) = client.get(&services_url).timeout(Duration::from_secs(5)).send().await {
-                        if let Ok(services_json) = svc_resp.json::<serde_json::Value>().await {
-                            let services: Vec<ServiceInfo> = serde_json::from_value(
-                                services_json.get("data").cloned().unwrap_or(services_json)
-                            ).unwrap_or_default();
-                            
-                            stone_data.push(StoneData {
-                                capabilities: caps_response.data,
-                                services,
-                            });
+        // Process stones as they arrive - spawn concurrent fetch tasks immediately
+        let mut fetch_handles = vec![];
+        
+        loop {
+            tokio::select! {
+                Some(response) = stone_rx.recv() => {
+                    // Spawn fetch task immediately when stone discovered
+                    let client_clone = client.clone();
+                    let offerings_filter_clone = offerings_filter.clone();
+                    
+                    let handle = tokio::spawn(async move {
+                        let caps_url = format!("{}/capabilities", response.stone_endpoint.trim_end_matches('/'));
+                        if let Ok(resp) = client_clone.get(&caps_url).timeout(Duration::from_secs(5)).send().await {
+                            if let Ok(caps_response) = resp.json::<GardenApiResponse<HardwareCapabilities>>().await {
+                                let services_url = format!("{}/api/v1/services", response.stone_endpoint.trim_end_matches('/'));
+                                if let Ok(svc_resp) = client_clone.get(&services_url).timeout(Duration::from_secs(5)).send().await {
+                                    if let Ok(services_json) = svc_resp.json::<serde_json::Value>().await {
+                                        let services: Vec<ServiceInfo> = serde_json::from_value(
+                                            services_json.get("data").cloned().unwrap_or(services_json)
+                                        ).unwrap_or_default();
+                                        
+                                        let stone_data = StoneData {
+                                            capabilities: caps_response.data,
+                                            services,
+                                        };
+                                        
+                                        // Display as soon as data arrives
+                                        let _ = display_stone(&stone_data, &offerings_filter_clone);
+                                        return true;
+                                    }
+                                }
+                            }
                         }
-                    }
+                        false
+                    });
+                    fetch_handles.push(handle);
+                }
+                _ = &mut discovery_handle => {
+                    // Discovery finished
+                    break;
                 }
             }
         }
         
-        if stone_count.is_err() || stone_count.as_ref().ok() == Some(&0) {
-            // Fallback to localhost (silent attempt first)
+        // Wait for all concurrent fetches to complete
+        for handle in fetch_handles {
+            if let Ok(success) = handle.await {
+                if success {
+                    found_any_stone = true;
+                }
+            }
+        }
+        
+        // Fallback to localhost if no stones discovered
+        if !found_any_stone {
             let localhost = format!("http://127.0.0.1:{}", garden_common::ports::MOSS_HTTP);
             
-            // Fetch localhost capabilities and services
             let caps_url = format!("{}/capabilities", localhost);
             if let Ok(resp) = client.get(&caps_url).timeout(Duration::from_secs(5)).send().await {
                 if let Ok(caps_response) = resp.json::<GardenApiResponse<HardwareCapabilities>>().await {
@@ -1528,10 +1611,13 @@ async fn observe_garden(
                                 services_json.get("data").cloned().unwrap_or(services_json)
                             ).unwrap_or_default();
                             
-                            stone_data.push(StoneData {
+                            let stone_data = StoneData {
                                 capabilities: caps_response.data,
                                 services,
-                            });
+                            };
+                            
+                            display_stone(&stone_data, &offerings_filter)?;
+                            found_any_stone = true;
                         }
                     }
                 }
@@ -1539,14 +1625,8 @@ async fn observe_garden(
         }
     }
 
-    if stone_data.is_empty() {
+    if !found_any_stone {
         println!("{}No reachable stones found", " ".repeat(ui::constants::DEFAULT_INDENT));
-        return Ok(());
-    }
-
-    // Display detailed stone information
-    for stone in &stone_data {
-        display_stone(stone, &offerings_filter)?;
     }
 
     Ok(())
@@ -1603,17 +1683,26 @@ fn display_stone(stone: &StoneData, offering_filter: &Option<Vec<String>>) -> an
     let caps = &stone.capabilities;
     let term = ui::TerminalInfo::detect();
     
-    // Stone banner
-    println!("{}", ui::stone_banner(&caps.stone_name, "online", term.supports_color));
+    // Stone name with underline (matches status command format)
+    println!("\n{}", ui::section_header_v2(&caps.stone_name, true, term.supports_color));
     
-    // System info
-    println!("{}", ui::label_value_line("ARCH", &caps.hardware.cpu.architecture, ui::constants::DEFAULT_INDENT));
-    println!("{}", ui::label_value_line("CPU", &format!("{} cores", caps.hardware.cpu.cores), ui::constants::DEFAULT_INDENT));
-    println!("{}", ui::label_value_line("MEMORY", &format!("{} MB", caps.hardware.memory.total_mb), ui::constants::DEFAULT_INDENT));
-    if !caps.hardware.gpus.is_empty() {
-        println!("{}", ui::label_value_line("GPU", &format!("{} device(s)", caps.hardware.gpus.len()), ui::constants::DEFAULT_INDENT));
+    // === SYSTEM SECTION === (match status command)
+    println!("{}", ui::kv_line("ARCH", &caps.hardware.cpu.architecture, ui::constants::DEFAULT_INDENT));
+    println!("{}", ui::kv_line("CPU", &format!("{} cores", caps.hardware.cpu.cores), ui::constants::DEFAULT_INDENT));
+    println!("{}", ui::kv_line("MEMORY", &format!("{} GB", caps.hardware.memory.total_mb / 1024), ui::constants::DEFAULT_INDENT));
+    
+    // === AI SECTION === (replaces GPU, matches status command)
+    // Only show devices with AI runtime or AI-relevant capabilities
+    let ai_devices: Vec<&garden_common::GpuInfo> = caps.hardware.gpus.iter()
+        .filter(|gpu| {
+            gpu.ai_runtime.is_some() || 
+            gpu.capabilities.iter().any(|c| c == "cuda" || c == "rocm" || c == "vulkan" || c == "directml")
+        })
+        .collect();
+    
+    if !ai_devices.is_empty() {
+        println!("{}", ui::kv_line("AI", &format!("{} device(s)", ai_devices.len()), ui::constants::DEFAULT_INDENT));
     }
-    println!();
 
     // Filter services if needed
     let filtered_services: Vec<&ServiceInfo> = if let Some(ref filters) = offering_filter {
@@ -1633,11 +1722,11 @@ fn display_stone(stone: &StoneData, offering_filter: &Option<Vec<String>>) -> an
     } else if filtered_services.is_empty() {
         println!("{}", ui::empty_state("No offerings", None));
     } else {
-        // Display offerings table
-        println!("{}", ui::section_header("OFFERINGS", &term));
-        println!();
+        // Display offerings as bracketed category
+        println!("\n{}[offerings]", " ".repeat(ui::constants::DEFAULT_INDENT));
         
         let mut table = ui::TableBuilder::new()
+            .with_indent(ui::constants::DEFAULT_INDENT * 2)  // Double indent for nested items
             .add_column(24, ui::Align::Left)
             .add_column(12, ui::Align::Left)
             .add_column(10, ui::Align::Right)
@@ -1944,6 +2033,10 @@ fn normalize_zen_to_clap(parsed: &parser::ParsedCommand) -> anyhow::Result<Vec<S
             // garden = observe all
             args.push("observe".to_string());
         }
+        "make" => {
+            args.push("make".to_string());
+            args.extend(parsed.args.clone());
+        }
         _ => {
             return Err(anyhow::anyhow!("Unknown zen verb: {}", parsed.verb));
         }
@@ -2023,10 +2116,9 @@ async fn main() -> anyhow::Result<()> {
 
     match cli.command {
         Commands::Status { at } => {
-            // Deprecation notice (unless quiet mode)
+            // Info notice (unless quiet mode)
             if !quiet_mode {
-                eprintln!("{}⚠️  'status' command is deprecated", " ".repeat(ui::constants::DEFAULT_INDENT));
-                eprintln!("{}Use 'observe' for garden overview or 'tend' to set default stone", " ".repeat(ui::constants::DEFAULT_INDENT));
+                eprintln!("{}ℹ️  Tip: Use 'observe' for garden overview or 'tend' to set default stone", " ".repeat(ui::constants::DEFAULT_INDENT));
                 eprintln!();
             }
             
@@ -2040,37 +2132,171 @@ async fn main() -> anyhow::Result<()> {
             
             // Parse health response
             let health_json: serde_json::Value = serde_json::from_str(&health_resp).unwrap_or_else(|_| serde_json::json!({}));
-            let health_status = health_json.get("status").and_then(|v| v.as_str()).unwrap_or("unknown");
             
-            // Display stone banner
             let term = ui::TerminalInfo::detect();
-            println!("{}", ui::stone_banner(&caps.stone_name, health_status, term.supports_color));
-            println!();
             
-            // System info section
-            println!("{}", ui::section_header("SYSTEM", &term));
-            println!("{}", ui::label_value_line("ARCH", &caps.hardware.cpu.architecture, ui::constants::DEFAULT_INDENT));
-            println!("{}", ui::label_value_line("CPU", &format!("{} cores", caps.hardware.cpu.cores), ui::constants::DEFAULT_INDENT));
-            println!("{}", ui::label_value_line("MEMORY", &format!("{} MB", caps.hardware.memory.total_mb), ui::constants::DEFAULT_INDENT));
+            // Show detection status if not complete
+            if caps.detection_status != DetectionStatus::Complete {
+                let status_msg = match caps.detection_status {
+                    DetectionStatus::Scanning => "    ⚙️  Hardware detection in progress...",
+                    DetectionStatus::Partial => "    ⚙️  GPU detection in progress (CPU data ready)...",
+                    DetectionStatus::Complete => "", // Won't reach here
+                };
+                println!("{}\n", ui::colored_text(status_msg, "yellow", &term));
+            }
             
-            // GPU section
-            if !caps.hardware.gpus.is_empty() {
-                println!();
-                println!("{}", ui::section_header("GPU", &term));
-                for gpu in &caps.hardware.gpus {
-                    println!("{}", ui::label_value_line("DEVICE", &format!("{} {}", gpu.vendor, gpu.model), ui::constants::DEFAULT_INDENT));
-                    println!("{}", ui::label_value_line("CAPABILITIES", &gpu.capabilities.join(", "), ui::constants::DEFAULT_INDENT));
+            // === SYSTEM SECTION ===
+            println!("{}", ui::section_header_v2("SYSTEM", false, term.supports_color));
+            println!("{}", ui::kv_line("ARCH", &caps.hardware.cpu.architecture, ui::constants::DEFAULT_INDENT));
+            println!("{}", ui::kv_line("CPU", &format!("{} cores", caps.hardware.cpu.cores), ui::constants::DEFAULT_INDENT));
+            
+            // CPU flags - filter to important ones for AI/performance
+            if let Some(features) = &caps.hardware.cpu.features {
+                let important_flags = ["avx", "avx2", "avx512f", "sse4_2", "fma", "f16c"];
+                let relevant: Vec<&str> = features.iter()
+                    .filter_map(|f| {
+                        let lower = f.to_lowercase();
+                        if important_flags.iter().any(|flag| lower.contains(flag)) {
+                            Some(f.as_str())
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+                if !relevant.is_empty() {
+                    println!("{}", ui::kv_line("FLAGS", &relevant.join(", "), ui::constants::DEFAULT_INDENT));
                 }
             }
             
-            // Health details if available
+            println!("{}", ui::kv_line("MEMORY", &format!("{} GB", caps.hardware.memory.total_mb / 1024), ui::constants::DEFAULT_INDENT));
+            
+            // OS and Kernel
+            if let Some(ref os_ver) = caps.hardware.os_version {
+                println!("{}", ui::kv_line("OS", os_ver, ui::constants::DEFAULT_INDENT));
+            }
+            if let Some(ref kernel_ver) = caps.hardware.kernel_version {
+                println!("{}", ui::kv_line("KERNEL", kernel_ver, ui::constants::DEFAULT_INDENT));
+            }
+            
+            // === STORAGE SECTION ===
+            if !caps.hardware.storage.is_empty() {
+                println!();
+                println!("{}", ui::section_header_v2("STORAGE", false, term.supports_color));
+                for disk in &caps.hardware.storage {
+                    let disk_type_str = match disk.disk_type {
+                        garden_common::DiskType::NVMe => "NVMe",
+                        garden_common::DiskType::SSD => "SSD",
+                        garden_common::DiskType::HDD => "HDD",
+                        garden_common::DiskType::Unknown => "Unknown",
+                    };
+                    let partition_info = if disk.partition_count == 1 {
+                        "1 partition".to_string()
+                    } else {
+                        format!("{} partitions", disk.partition_count)
+                    };
+                    let value = format!("{} GB {} ({}, {:.0}% used)", 
+                        disk.size_gb, disk_type_str, partition_info, disk.used_percent);
+                    println!("{}", ui::kv_line(&disk.identifier, &value, ui::constants::DEFAULT_INDENT));
+                }
+            }
+            
+            // === AI SECTION === (replaces GPU section)
+            // Only show devices that have AI runtime or AI-relevant capabilities
+            let ai_devices: Vec<&garden_common::GpuInfo> = caps.hardware.gpus.iter()
+                .filter(|gpu| {
+                    gpu.ai_runtime.is_some() || 
+                    gpu.capabilities.iter().any(|c| c == "cuda" || c == "rocm" || c == "vulkan" || c == "directml")
+                })
+                .collect();
+            
+            if !ai_devices.is_empty() {
+                println!();
+                println!("{}", ui::section_header_v2("AI", false, term.supports_color));
+                for gpu in ai_devices {
+                    // Device name without vendor (vendor implied by runtime)
+                    // Strip common vendor prefixes (case-insensitive)
+                    let mut device_name = gpu.model.clone();
+                    let prefixes = ["AMD ", "NVIDIA ", "Intel ", "RADEON ", "Radeon ", "GeForce ", "GTX ", "RTX "];
+                    for prefix in &prefixes {
+                        if device_name.starts_with(prefix) {
+                            device_name = device_name[prefix.len()..].to_string();
+                        }
+                    }
+                    let device_name = device_name.trim().to_string();
+                    
+                    // VRAM
+                    let vram_str = if let Some(vram_mb) = gpu.vram_mb {
+                        format!("{} GB", vram_mb / 1024)
+                    } else {
+                        "Unknown".to_string()
+                    };
+                    
+                    // Runtime details
+                    let runtime_str = if let Some(ref runtime) = gpu.ai_runtime {
+                        let mut parts = Vec::new();
+                        if let Some(ref cuda_ver) = runtime.cuda_version {
+                            parts.push(format!("CUDA {}", cuda_ver));
+                        }
+                        if let Some(ref rocm_ver) = runtime.rocm_version {
+                            parts.push(format!("ROCm {}", rocm_ver));
+                        }
+                        if runtime.has_directml {
+                            parts.push("DirectML".to_string());
+                        }
+                        if runtime.has_openvino {
+                            parts.push("OpenVINO".to_string());
+                        }
+                        if parts.is_empty() {
+                            // Fallback to capabilities
+                            gpu.capabilities.join(", ")
+                        } else {
+                            parts.join(", ")
+                        }
+                    } else {
+                        // Fallback to capabilities if runtime not detected
+                        gpu.capabilities.join(", ")
+                    };
+                    
+                    // Format: device_name (20 chars) | vram | runtime
+                    let device_display = format!("{:<20}", if device_name.len() > 20 {
+                        format!("{}...", &device_name[..17])
+                    } else {
+                        device_name
+                    });
+                    let value = format!("{} - {}", vram_str, runtime_str);
+                    println!("{}", ui::kv_line(&device_display, &value, ui::constants::DEFAULT_INDENT));
+                }
+            }
+            
+            // === HEALTH SECTION ===
             if let Some(checks) = health_json.get("checks").and_then(|v| v.as_object()) {
                 println!();
-                println!("{}", ui::section_header("HEALTH", &term));
+                println!("{}", ui::section_header_v2("HEALTH", false, term.supports_color));
+                
+                let mut passing = Vec::new();
+                let mut failing = Vec::new();
+                
                 for (check_name, check_data) in checks {
                     let status = check_data.get("status").and_then(|v| v.as_str()).unwrap_or("unknown");
-                    let indicator = ui::status_indicator(status, term.supports_color);
-                    println!("{}{} {}", " ".repeat(ui::constants::DEFAULT_INDENT), indicator, check_name.to_uppercase());
+                    // Convert to proper case (first letter uppercase)
+                    let proper_case = if !check_name.is_empty() {
+                        let mut chars = check_name.chars();
+                        chars.next().unwrap().to_uppercase().collect::<String>() + chars.as_str()
+                    } else {
+                        check_name.to_string()
+                    };
+                    
+                    match status {
+                        "pass" => passing.push(proper_case),
+                        _ => failing.push(proper_case),
+                    }
+                }
+                
+                if !passing.is_empty() {
+                    println!("{}", ui::kv_line("PASS", &passing.join(", "), ui::constants::DEFAULT_INDENT));
+                }
+                if !failing.is_empty() {
+                    println!("{}", ui::kv_line("FAIL", &failing.join(", "), ui::constants::DEFAULT_INDENT));
                 }
             }
         }
@@ -3139,6 +3365,143 @@ async fn main() -> anyhow::Result<()> {
             }
         }
 
+        Commands::Make { target, action, at } => {
+            if target != "stone" {
+                eprintln!("{}{} Invalid target: '{}'. Use 'stone'", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), target);
+                eprintln!("{}Example: garden-rake make stone sing", " ".repeat(ui::constants::DEFAULT_INDENT));
+                return Ok(());
+            }
+
+            let endpoint = resolve_endpoint(&client, at).await?;
+            let url = format!("{}/api/v1/console/mode", endpoint.trim_end_matches('/'));
+
+            match action {
+                MakeAction::Sing { forever } => {
+                    let timeout_minutes = if forever { 0 } else { 30 };
+                    let persist = forever;
+
+                    let payload = serde_json::json!({
+                        "mode": "verbose",
+                        "persist": persist,
+                        "timeout_minutes": timeout_minutes
+                    });
+
+                    match client.post(&url)
+                        .header("Content-Type", "application/json")
+                        .json(&payload)
+                        .send()
+                        .await
+                    {
+                        Ok(response) if response.status().is_success() => {
+                            if forever {
+                                println!("{}{} Stone singing (verbose mode, permanent)", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("ok", term.supports_color));
+                            } else {
+                                println!("{}{} Stone singing (verbose mode, 30min timeout)", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("ok", term.supports_color));
+                            }
+                        }
+                        Ok(response) => {
+                            let status = response.status();
+                            if let Ok(body) = response.text().await {
+                                eprintln!("{}{} Failed to set mode: {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), body);
+                            } else {
+                                eprintln!("{}{} Failed to set mode: {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), status);
+                            }
+                        }
+                        Err(e) => {
+                            eprintln!("{}{} Request failed: {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), e);
+                        }
+                    }
+                }
+                MakeAction::Quiet => {
+                    let payload = serde_json::json!({
+                        "mode": "informative",
+                        "persist": true,
+                        "timeout_minutes": 0
+                    });
+
+                    match client.post(&url)
+                        .header("Content-Type", "application/json")
+                        .json(&payload)
+                        .send()
+                        .await
+                    {
+                        Ok(response) if response.status().is_success() => {
+                            println!("{}{} Stone quieted (informative mode, permanent)", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("ok", term.supports_color));
+                        }
+                        Ok(response) => {
+                            let status = response.status();
+                            if let Ok(body) = response.text().await {
+                                eprintln!("{}{} Failed to set mode: {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), body);
+                            } else {
+                                eprintln!("{}{} Failed to set mode: {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), status);
+                            }
+                        }
+                        Err(e) => {
+                            eprintln!("{}{} Request failed: {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), e);
+                        }
+                    }
+                }
+                MakeAction::Silent => {
+                    let payload = serde_json::json!({
+                        "mode": "silent",
+                        "persist": true,
+                        "timeout_minutes": 0
+                    });
+
+                    match client.post(&url)
+                        .header("Content-Type", "application/json")
+                        .json(&payload)
+                        .send()
+                        .await
+                    {
+                        Ok(response) if response.status().is_success() => {
+                            println!("{}{} Stone silenced (silent mode, permanent)", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("ok", term.supports_color));
+                        }
+                        Ok(response) => {
+                            let status = response.status();
+                            if let Ok(body) = response.text().await {
+                                eprintln!("{}{} Failed to set mode: {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), body);
+                            } else {
+                                eprintln!("{}{} Failed to set mode: {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), status);
+                            }
+                        }
+                        Err(e) => {
+                            eprintln!("{}{} Request failed: {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), e);
+                        }
+                    }
+                }
+                MakeAction::Minimal => {
+                    let payload = serde_json::json!({
+                        "mode": "minimal",
+                        "persist": true,
+                        "timeout_minutes": 0
+                    });
+
+                    match client.post(&url)
+                        .header("Content-Type", "application/json")
+                        .json(&payload)
+                        .send()
+                        .await
+                    {
+                        Ok(response) if response.status().is_success() => {
+                            println!("{}{} Stone set to minimal mode (critical only, permanent)", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("ok", term.supports_color));
+                        }
+                        Ok(response) => {
+                            let status = response.status();
+                            if let Ok(body) = response.text().await {
+                                eprintln!("{}{} Failed to set mode: {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), body);
+                            } else {
+                                eprintln!("{}{} Failed to set mode: {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), status);
+                            }
+                        }
+                        Err(e) => {
+                            eprintln!("{}{} Request failed: {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), e);
+                        }
+                    }
+                }
+            }
+        }
+
         Commands::Refresh { component, from, at } => {
             let endpoint = resolve_endpoint(&client, at).await?;
             println!("Refreshing {}...", component);
@@ -3276,7 +3639,7 @@ async fn watch_events(
 ) -> anyhow::Result<()> {
     use futures_util::StreamExt;
 
-    let url = format!("{}/api/events", endpoint.trim_end_matches('/'));
+    let url = format!("{}/api/v1/events", endpoint.trim_end_matches('/'));
     println!("📡 Watching events from {}\n", endpoint);
 
     if let Some(ref pattern) = until_pattern {

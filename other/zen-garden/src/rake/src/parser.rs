@@ -73,7 +73,7 @@ fn is_zen_verb(verb: &str) -> bool {
         verb,
         "offer" | "rest" | "wake" | "nourish" | "release" |
         "observe" | "watch" | "touch" | "tend" | "place" |
-        "lift" | "invite" | "explore" | "garden"
+        "lift" | "invite" | "explore" | "garden" | "make"
     )
 }
 

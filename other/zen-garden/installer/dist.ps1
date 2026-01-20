@@ -174,8 +174,8 @@ Write-Host "╚═════════════════════�
 
 if ($buildErrors.Count -gt 0) {
     Write-Host "Build completed with errors:" -ForegroundColor Yellow
-    foreach ($error in $buildErrors) {
-        Write-Host "  ✗ $error" -ForegroundColor Red
+    foreach ($buildError in $buildErrors) {
+        Write-Host "  ✗ $buildError" -ForegroundColor Red
     }
     Write-Host ""
 }

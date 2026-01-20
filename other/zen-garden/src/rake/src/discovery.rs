@@ -1,11 +1,32 @@
 use anyhow::Result;
 use std::net::UdpSocket;
 use std::time::Duration;
+use std::sync::{Arc, Mutex};
 use garden_common::{DiscoveryRequest, DiscoveryResponse, ports};
 
-/// Attempt to discover a Lantern service registry via UDP broadcast
-/// Returns the Lantern HTTP endpoint if found, None if only Moss stones are discovered
-pub fn discover_lantern() -> Option<String> {
+/// Cached Lantern discovery result
+static LANTERN_CACHE: once_cell::sync::Lazy<Arc<Mutex<Option<Option<String>>>>> =
+    once_cell::sync::Lazy::new(|| Arc::new(Mutex::new(None)));
+
+/// Start background Lantern discovery (non-blocking)
+/// Returns immediately, result will be cached for future use
+pub fn discover_lantern_background() {
+    std::thread::spawn(|| {
+        let result = discover_lantern_sync();
+        if let Ok(mut cache) = LANTERN_CACHE.lock() {
+            *cache = Some(result);
+        }
+    });
+}
+
+/// Get cached Lantern endpoint (non-blocking)
+/// Returns None if discovery is still in progress or no Lantern found
+pub fn get_cached_lantern() -> Option<String> {
+    LANTERN_CACHE.lock().ok()?.as_ref()?.clone()
+}
+
+/// Synchronous Lantern discovery (blocks for up to 2 seconds)
+fn discover_lantern_sync() -> Option<String> {
     let socket = match UdpSocket::bind("0.0.0.0:0") {
         Ok(s) => s,
         Err(_) => return None,
@@ -35,6 +56,13 @@ pub fn discover_lantern() -> Option<String> {
     }
 
     None
+}
+
+/// Attempt to discover a Lantern service registry via UDP broadcast (deprecated - use background version)
+/// Returns the Lantern HTTP endpoint if found, None if only Moss stones are discovered
+#[deprecated(note = "Use discover_lantern_background() and get_cached_lantern() instead")]
+pub fn discover_lantern() -> Option<String> {
+    discover_lantern_sync()
 }
 
 pub fn discover_moss() -> Result<String> {

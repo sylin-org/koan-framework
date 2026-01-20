@@ -110,8 +110,9 @@ async fn resolve_stone_name_to_endpoint(client: &reqwest::Client, stone_name: &s
 	}
 
 	// 4) Lantern fallback (cross-subnet / Windows-friendly).
-	if let Some(lantern) = crate::discovery::discover_lantern() {
-		let url = format!("{}/api/stones", lantern.trim_end_matches('/'));
+	crate::discovery::discover_lantern_background();
+	if let Some(lantern) = crate::discovery::get_cached_lantern() {
+		let url = format!("{}/api/v1/stones", lantern.trim_end_matches('/'));
 		match client
 			.get(&url)
 			.timeout(Duration::from_secs(3))
@@ -126,7 +127,7 @@ async fn resolve_stone_name_to_endpoint(client: &reqwest::Client, stone_name: &s
 				}
 			}
 			Ok(resp) => {
-				tracing::warn!(status = ?resp.status(), "Lantern returned non-success for /api/stones");
+				tracing::warn!(status = ?resp.status(), "Lantern returned non-success for /api/v1/stones");
 			}
 			Err(e) => {
 				tracing::warn!(error = ?e, "Failed to query Lantern for stone name resolution");

@@ -1,6 +1,6 @@
 ﻿{
   "name": "elasticsearch",
-  "description": "Elasticsearch 8.x search and analytics engine",
+  "description": "Elasticsearch search and analytics",
   "category": "search",
   "tags": ["search", "database", "document", "analytics"],
   "port": 9200,

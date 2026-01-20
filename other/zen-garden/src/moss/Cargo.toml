@@ -34,6 +34,10 @@ uuid = { version = "1.6", features = ["v7"] }
 rand = "0.8"
 async-stream = "0.3"
 blake3 = "1.5"
+socket2 = "0.5"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.52", features = ["Win32_Networking_WinSock"] }
 
 [target.'cfg(unix)'.dependencies]
 nix = { version = "0.27", features = ["process", "signal"] }

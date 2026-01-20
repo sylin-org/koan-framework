@@ -9,7 +9,9 @@ use bollard::Docker;
 use futures_util::stream::{Stream, StreamExt, TryStreamExt};
 use std::collections::HashMap;
 use std::pin::Pin;
+use std::sync::Arc;
 use garden_common::{ServiceHealthStatus, ServiceStatus};
+use crate::console::{self, ConsolePrinter};
 
 pub struct DockerManager {
     docker: Docker,
@@ -40,8 +42,16 @@ impl DockerManager {
     }
 
     /// Stop a service container
-    pub async fn stop_service(&self, name: &str) -> Result<()> {
+    pub async fn stop_service(&self, name: &str, console: Option<&Arc<ConsolePrinter>>) -> Result<()> {
         let container_name = format!("zen-offering-{}", name);
+        
+        if let Some(console) = console {
+            console.emit(console::ConsoleEvent::new(
+                console::EventCategory::Services,
+                console::EventStatus::Stopping,
+                name.to_string()
+            ));
+        }
         tracing::info!(service = %name, "Stopping service via Docker API");
 
         self.docker
@@ -49,13 +59,28 @@ impl DockerManager {
             .await
             .context("Failed to stop container")?;
 
+        if let Some(console) = console {
+            console.emit(console::ConsoleEvent::new(
+                console::EventCategory::Services,
+                console::EventStatus::Stopped,
+                name.to_string()
+            ));
+        }
         tracing::info!(service = %name, "Service stopped successfully");
         Ok(())
     }
 
     /// Start a service container
-    pub async fn start_service(&self, name: &str) -> Result<()> {
+    pub async fn start_service(&self, name: &str, console: Option<&Arc<ConsolePrinter>>) -> Result<()> {
         let container_name = format!("zen-offering-{}", name);
+        
+        if let Some(console) = console {
+            console.emit(console::ConsoleEvent::new(
+                console::EventCategory::Services,
+                console::EventStatus::Starting,
+                name.to_string()
+            ));
+        }
         tracing::info!(service = %name, "Starting service via Docker API");
 
         self.docker
@@ -63,6 +88,13 @@ impl DockerManager {
             .await
             .context("Failed to start container")?;
 
+        if let Some(console) = console {
+            console.emit(console::ConsoleEvent::new(
+                console::EventCategory::Services,
+                console::EventStatus::Running,
+                name.to_string()
+            ));
+        }
         tracing::info!(service = %name, "Service started successfully");
         Ok(())
     }
@@ -74,7 +106,15 @@ impl DockerManager {
         ports: Vec<(u16, u16)>,
         env: Vec<String>,
         volumes: Vec<(String, String)>,
+        console: Option<&Arc<ConsolePrinter>>,
     ) -> Result<()> {
+        if let Some(console) = console {
+            console.emit(console::ConsoleEvent::new(
+                console::EventCategory::Services,
+                console::EventStatus::Requesting,
+                format!("{} → {}", name, image)
+            ));
+        }
         tracing::info!(service = %name, image = %image, "Installing service via Docker API");
 
         // Prefix container name with "zen-offering-" to identify as Zen Garden offering
@@ -87,7 +127,7 @@ impl DockerManager {
         }
 
         // Pull image if not present
-        self.pull_image(image).await?;
+        self.pull_image(image, console).await?;
 
         // Configure port bindings
         let mut port_bindings = HashMap::new();
@@ -140,16 +180,38 @@ impl DockerManager {
         tracing::info!(container_id = %response.id, container_name = %container_name, "Container created");
 
         // Start container
+        if let Some(console) = console {
+            console.emit(console::ConsoleEvent::new(
+                console::EventCategory::Services,
+                console::EventStatus::Creating,
+                name.to_string()
+            ));
+        }
+        
         self.docker
             .start_container(&container_name, None::<StartContainerOptions<String>>)
             .await
             .context("Failed to start container")?;
 
+        if let Some(console) = console {
+            console.emit(console::ConsoleEvent::new(
+                console::EventCategory::Services,
+                console::EventStatus::Running,
+                name.to_string()
+            ));
+        }
         tracing::info!(service = %name, container_name = %container_name, "Service started successfully");
         Ok(())
     }
 
-    pub async fn remove_service(&self, name: &str) -> Result<()> {
+    pub async fn remove_service(&self, name: &str, console: Option<&Arc<ConsolePrinter>>) -> Result<()> {
+        if let Some(console) = console {
+            console.emit(console::ConsoleEvent::new(
+                console::EventCategory::Services,
+                console::EventStatus::Removing,
+                name.to_string()
+            ));
+        }
         tracing::info!(service = %name, "Removing service via Docker API");
 
         let container_name = format!("zen-offering-{}", name);
@@ -163,6 +225,14 @@ impl DockerManager {
             .stop_container(&container_name, None::<StopContainerOptions>)
             .await
             .context("Failed to stop container")?;
+        
+        if let Some(console) = console {
+            console.emit(console::ConsoleEvent::new(
+                console::EventCategory::Services,
+                console::EventStatus::Stopped,
+                name.to_string()
+            ));
+        }
 
         // Remove container
         self.docker
@@ -189,20 +259,36 @@ impl DockerManager {
         ports: Vec<(u16, u16)>,
         env: Vec<String>,
         volumes: Vec<(String, String)>,
+        console: Option<&Arc<ConsolePrinter>>,
     ) -> Result<()> {
         let container_name = format!("zen-offering-{}", name);
+        
+        if let Some(console) = console {
+            console.emit(console::ConsoleEvent::new(
+                console::EventCategory::Services,
+                console::EventStatus::Upgrading,
+                format!("{} → {}", name, new_image)
+            ));
+        }
         tracing::info!(service = %name, new_image = %new_image, "Upgrading service");
 
         // Pull new image
-        self.pull_image(new_image).await?;
+        self.pull_image(new_image, console).await?;
 
         // Stop and remove old container
-        self.remove_service(name).await?;
+        self.remove_service(name, console).await?;
 
         // Create and start new container
-        self.install_service(name, new_image, ports, env, volumes)
+        self.install_service(name, new_image, ports, env, volumes, console)
             .await?;
 
+        if let Some(console) = console {
+            console.emit(console::ConsoleEvent::new(
+                console::EventCategory::Services,
+                console::EventStatus::Upgraded,
+                name.to_string()
+            ));
+        }
         tracing::info!(service = %name, container_name = %container_name, "Service upgraded successfully");
         Ok(())
     }
@@ -249,7 +335,14 @@ impl DockerManager {
         Ok(image)
     }
 
-    async fn pull_image(&self, image: &str) -> Result<()> {
+    async fn pull_image(&self, image: &str, console: Option<&Arc<ConsolePrinter>>) -> Result<()> {
+        if let Some(console) = console {
+            console.emit(console::ConsoleEvent::new(
+                console::EventCategory::Services,
+                console::EventStatus::Pulling,
+                image.to_string()
+            ));
+        }
         tracing::info!(image = %image, "Pulling Docker image");
 
         let options = CreateImageOptions {
@@ -263,6 +356,16 @@ impl DockerManager {
             match result {
                 Ok(info) => {
                     if let Some(status) = info.status {
+                        // Emit progress events (deduplicator will handle spam)
+                        if let Some(console) = console {
+                            if let Some(progress) = &info.progress {
+                                console.emit(console::ConsoleEvent::new(
+                                    console::EventCategory::Services,
+                                    console::EventStatus::PullProgress,
+                                    format!("{} → {}", image, progress)
+                                ));
+                            }
+                        }
                         tracing::debug!(image = %image, status = %status, "Pull progress");
                     }
                 }
@@ -272,6 +375,13 @@ impl DockerManager {
             }
         }
 
+        if let Some(console) = console {
+            console.emit(console::ConsoleEvent::new(
+                console::EventCategory::Services,
+                console::EventStatus::PullComplete,
+                image.to_string()
+            ));
+        }
         tracing::info!(image = %image, "Image pulled successfully");
         Ok(())
     }

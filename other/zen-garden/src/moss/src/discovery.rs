@@ -1,20 +1,82 @@
 use anyhow::Result;
-use std::net::UdpSocket;
-use std::time::Duration;
+use tokio::sync::{broadcast, OnceCell};
 use garden_common::{DiscoveryRequest, DiscoveryResponse, ports};
 
-pub async fn udp_listener(stone_name: String, api_endpoint: String) -> Result<()> {
-    let socket = UdpSocket::bind(format!("0.0.0.0:{}", ports::DISCOVERY_UDP))?;
-    socket.set_read_timeout(Some(Duration::from_secs(1)))?;
+use crate::network_singletons;
 
-    tracing::info!("UDP discovery listener started on port {}", ports::DISCOVERY_UDP);
+/// Discovery event propagated to consumers
+#[derive(Debug, Clone)]
+pub struct DiscoveryEvent {
+    pub request: DiscoveryRequest,
+    pub from_addr: std::net::SocketAddr,
+}
+
+/// Singleton holder for UDP discovery listener and broadcast channel
+static UDP_LISTENER_CELL: OnceCell<broadcast::Sender<DiscoveryEvent>> = OnceCell::const_new();
+
+/// Start or get reference to singleton UDP discovery listener
+/// Returns a receiver for subscribing to discovery events
+/// 
+/// IMPORTANT: This binds the UDP socket synchronously before spawning the listener task,
+/// ensuring the port is immediately available for incoming requests.
+pub async fn ensure_udp_listener(
+    stone_name: String,
+    api_endpoint: String,
+) -> Result<broadcast::Receiver<DiscoveryEvent>> {
+    let tx = UDP_LISTENER_CELL
+        .get_or_init(|| async {
+            // Create broadcast channel with capacity for 100 events
+            let (tx, _rx) = broadcast::channel(100);
+            let broadcast_tx = tx.clone();
+            
+            // Bind socket BEFORE spawning to ensure immediate availability
+            let addr = format!("0.0.0.0:{}", ports::DISCOVERY_UDP);
+            let socket = match network_singletons::create_reusable_udp_socket(&addr).await {
+                Ok(s) => {
+                    tracing::info!("UDP discovery socket bound on port {}", ports::DISCOVERY_UDP);
+                    s
+                }
+                Err(e) => {
+                    tracing::error!(error = ?e, "Failed to bind UDP discovery socket");
+                    // Return sender anyway - subscribers will get no events but won't block startup
+                    return tx;
+                }
+            };
+            
+            tokio::spawn(async move {
+                if let Err(e) = udp_listener_inner(stone_name, api_endpoint, broadcast_tx, socket).await {
+                    tracing::error!(error = ?e, "UDP discovery listener failed");
+                }
+            });
+            
+            tx
+        })
+        .await;
+    
+    Ok(tx.subscribe())
+}
+
+/// Internal UDP listener implementation with async socket
+/// Runs for process lifetime, broadcasting discovery events to subscribers
+async fn udp_listener_inner(
+    stone_name: String,
+    api_endpoint: String,
+    broadcast_tx: broadcast::Sender<DiscoveryEvent>,
+    socket: tokio::net::UdpSocket,
+) -> Result<()> {
 
     let mut buf = [0u8; 1024];
     loop {
-        match socket.recv_from(&mut buf) {
+        match socket.recv_from(&mut buf).await {
             Ok((len, addr)) => {
                 if let Ok(request) = serde_json::from_slice::<DiscoveryRequest>(&buf[..len]) {
                     tracing::debug!(?addr, request_id = %request.request_id, "Discovery request");
+                    
+                    // Broadcast event to consumers (ignore if no subscribers)
+                    let _ = broadcast_tx.send(DiscoveryEvent {
+                        request: request.clone(),
+                        from_addr: addr,
+                    });
 
                     // Calculate election delay based on stone name + request ID
                     let delay_ms = calculate_election_delay(&stone_name, &request.request_id);
@@ -30,18 +92,19 @@ pub async fn udp_listener(stone_name: String, api_endpoint: String) -> Result<()
                         lantern_endpoint: None,
                     };
 
-                    let response_bytes = serde_json::to_vec(&response)?;
-                    socket.send_to(&response_bytes, addr)?;
-
-                    tracing::info!(?addr, endpoint = %response_endpoint, "Sent discovery response");
+                    if let Ok(response_bytes) = serde_json::to_vec(&response) {
+                        if let Err(e) = socket.send_to(&response_bytes, addr).await {
+                            tracing::warn!(error = ?e, "Failed to send discovery response");
+                        } else {
+                            tracing::info!(?addr, endpoint = %response_endpoint, "Sent discovery response");
+                        }
+                    }
                 }
             }
-            Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock || e.kind() == std::io::ErrorKind::TimedOut => {
-                // Timeout, continue loop (expected behavior)
-                tokio::task::yield_now().await;
-            }
             Err(e) => {
-                tracing::warn!(error = ?e, "UDP recv error (non-timeout)");
+                // Log but continue - UDP listener must not die on transient errors
+                tracing::warn!(error = ?e, "UDP recv error, continuing");
+                continue;
             }
         }
     }

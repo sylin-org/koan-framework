@@ -79,7 +79,7 @@ impl TemplateLoader {
         // Check for runtime templates directory
         let templates_dir = Path::new(RUNTIME_TEMPLATES_DIR);
         let runtime_templates_dir = if templates_dir.exists() {
-            tracing::info!(path = %templates_dir.display(), "Runtime templates directory available");
+            // Note: Console event emitted from main.rs where console printer is available
             Some(templates_dir.to_path_buf())
         } else {
             tracing::warn!("Runtime templates directory missing: {}", RUNTIME_TEMPLATES_DIR);
@@ -104,7 +104,7 @@ impl TemplateLoader {
         }
 
         let templates = self.collect_runtime_templates(dir)?;
-        tracing::info!(count = templates.len(), "Listed runtime templates");
+        // Console event: Manifests | FOUND emitted from main.rs
         Ok(templates)
     }
 
@@ -184,22 +184,9 @@ impl TemplateLoader {
     }
 
     fn extract_description(&self, offering: &str) -> String {
-        match offering {
-            "mongodb" => "MongoDB NoSQL database".to_string(),
-            "postgresql" => "PostgreSQL relational database".to_string(),
-            "redis" => "Redis in-memory data store".to_string(),
-            "rabbitmq" => "RabbitMQ message broker".to_string(),
-            "ollama" => "Ollama local AI models".to_string(),
-            "weaviate" => "Weaviate vector database".to_string(),
-            "milvus" => "Milvus vector database".to_string(),
-            "elasticsearch" => "Elasticsearch search and analytics".to_string(),
-            "opensearch" => "OpenSearch search and analytics".to_string(),
-            "couchbase" => "Couchbase NoSQL database".to_string(),
-            "sqlserver" => "Microsoft SQL Server database".to_string(),
-            "vault" => "HashiCorp Vault secrets management".to_string(),
-            "aspire" => "Aspire dashboard observability".to_string(),
-            _ => format!("{} service", offering),
-        }
+        // Fallback description when frontmatter is missing
+        // All services should have proper frontmatter with descriptions
+        format!("{} service", offering)
     }
 
     fn load_frontmatter(&self, category_dir: &std::path::Path, offering: &str) -> Option<Frontmatter> {
@@ -225,7 +212,7 @@ impl TemplateLoader {
         let yaml = self
             .load_from_runtime_filesystem(dir, offering)
             .context(format!("Template '{}' not found in runtime filesystem", offering))?;
-        tracing::info!(offering = offering, source = "filesystem", "Loaded template");
+        // Console event: Manifests | LOADED emitted from main.rs
 
         let compatibility = self.load_compatibility_from_runtime(offering);
         self.parse_template(offering, &yaml, compatibility)
@@ -350,7 +337,7 @@ impl TemplateLoader {
         // Try parsing as snippet format first (direct service config)
         match serde_yaml::from_str::<ServiceConfig>(&yaml) {
             Ok(service_config) => {
-                tracing::info!(service = service_name, "Parsed as snippet format");
+                // Console event: Manifests | PARSED emitted from main.rs
                 return Ok(self.service_config_to_template(service_config, compatibility));
             }
             Err(e) => {
@@ -460,7 +447,6 @@ impl TemplateLoader {
             if let Ok(yaml) = std::fs::read_to_string(&path) {
                 match serde_yaml::from_str::<CompatibilityRules>(&yaml) {
                     Ok(rules) => {
-                        tracing::info!(service = service_name, path = %path.display(), "Loaded compatibility rules from runtime");
                         return Some(rules);
                     }
                     Err(e) => {

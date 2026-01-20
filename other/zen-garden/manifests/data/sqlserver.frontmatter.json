@@ -1,6 +1,6 @@
 ﻿{
   "name": "sqlserver",
-  "description": "SQL Server 2022 Express Edition",
+  "description": "Microsoft SQL Server database",
   "category": "data",
   "tags": ["database", "relational", "sql", "microsoft"],
   "port": 1433,
