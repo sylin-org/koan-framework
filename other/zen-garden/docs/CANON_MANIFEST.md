@@ -1,7 +1,7 @@
 ﻿# Zen Garden Canonical Documentation Manifest
 
 **Last Updated:** January 20, 2026  
-**Total Files:** 57  
+**Total Files:** 58  
 **Purpose:** Authoritative list of all canonical documentation files in the Zen Garden repository.
 
 ---
@@ -121,7 +121,7 @@ Architecture Decision Records documenting design choices.
 
 ---
 
-## Proposals (11 files)
+## Proposals (12 files)
 
 Active proposals for future features and evaluations.
 
@@ -130,6 +130,7 @@ Active proposals for future features and evaluations.
 | `docs/proposals/bridges.md` | Bridge specification - garden-to-garden federation with capability sharing | Active |
 | `docs/proposals/ceremonies.md` | Ceremony specification - long-running distributed operations with Elder Stone coordination | Active |
 | `docs/proposals/cli-taxonomy.md` | CLI command taxonomy | Active |
+| `docs/proposals/firefly.md` | Firefly specification - physical LED status indicator for ambient Stone health awareness | Active |
 | `docs/proposals/GARDEN-NAMING-ASSESSMENT-REVIEW.md` | Naming assessment review | Active |
 | `docs/proposals/naming-assessment.md` | Naming assessment | Active |
 | `docs/proposals/offering-modes.md` | Offering modes - Planted (Docker), Adopted (native), Borrowed (external) service lifecycle | Active |

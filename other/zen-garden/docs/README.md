@@ -111,6 +111,7 @@ Architecture decisions, proposals, and development:
 - [Proposals Directory](proposals/) - Feature proposals and evaluations
   - [Bridges](proposals/bridges.md) - Garden-to-garden federation with capability sharing
   - [Ceremonies](proposals/ceremonies.md) - Long-running distributed operations with Elder Stone coordination
+  - [Firefly](proposals/firefly.md) - Physical LED status indicator for ambient Stone health awareness
   - [Offering Modes](proposals/offering-modes.md) - Planted (Docker), Adopted (native), Borrowed (external) service lifecycle
   - [Stone Profiles](proposals/stone-profiles.md) - Hearth, Workbench, Gateway, Full hardware role configurations
   - [Stone Lifecycle](proposals/stone-lifecycle.md) - Stone-centric operations (retire, replace, lift)
