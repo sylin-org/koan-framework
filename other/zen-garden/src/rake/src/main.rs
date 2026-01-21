@@ -1,5 +1,6 @@
 mod parser;
 mod stone_cache;
+mod suggestions;
 mod tending;
 mod ui;
 mod command_manifest;
@@ -520,6 +521,20 @@ enum Commands {
     Template {
         #[command(subcommand)]
         command: TemplateCommands,
+    },
+
+    /// Run guided workflows (scaffolded - not yet implemented)
+    #[command(
+        long_about = "Run guided workflows for common operations.\n\n\
+        This command is scaffolded but not yet implemented.\n\n\
+        Future ceremonies may include:\n  \
+        - garden-rake ceremony bootstrap      # First-time setup wizard\n  \
+        - garden-rake ceremony migrate        # Service migration workflow\n  \
+        - garden-rake ceremony backup         # Guided backup configuration"
+    )]
+    Ceremony {
+        /// Ceremony name to run
+        name: Option<String>,
     },
 
     /// Manage tending state (which stone rake commands target)
@@ -2385,6 +2400,15 @@ fn normalize_zen_to_clap(parsed: &parser::ParsedCommand) -> anyhow::Result<Vec<S
             args.extend(parsed.args.clone());
         }
 
+        // === ADMIN ===
+        "template" => {
+            args.push("template".to_string());
+            args.extend(parsed.args.clone());
+        }
+        "ceremony" => {
+            args.push("ceremony".to_string());
+            args.extend(parsed.args.clone());
+        }
         _ => {
             return Err(anyhow::anyhow!("Unknown zen verb: {}", parsed.verb));
         }
@@ -2945,6 +2969,9 @@ async fn main() -> anyhow::Result<()> {
                 println!();
                 render_services_table(&services, &term);
             }
+
+            // Self-teaching suggestions
+            suggestions::print_suggestions(command_manifest::cmd::LIST, quiet_mode);
         }
 
         Commands::Remove { service, at, force } => {
@@ -3161,6 +3188,9 @@ async fn main() -> anyhow::Result<()> {
                     } else {
                         eprintln!("{}{} Failed to list strays: {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), response.status());
                     }
+
+                    // Self-teaching suggestions
+                    suggestions::print_suggestions(command_manifest::cmd::FIND, quiet_mode);
                 }
             }
         }
@@ -3196,6 +3226,9 @@ async fn main() -> anyhow::Result<()> {
             } else {
                 eprintln!("{}{} Failed to list adopted services: {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), response.status());
             }
+
+            // Self-teaching suggestions
+            suggestions::print_suggestions(command_manifest::cmd::ADOPTED, quiet_mode);
         }
 
         Commands::Borrowed { at } => {
@@ -3229,6 +3262,9 @@ async fn main() -> anyhow::Result<()> {
             } else {
                 eprintln!("{}{} Failed to list borrowed services: {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), response.status());
             }
+
+            // Self-teaching suggestions
+            suggestions::print_suggestions(command_manifest::cmd::BORROWED, quiet_mode);
         }
 
         Commands::Borrow { name, from, at } => {
@@ -3651,16 +3687,32 @@ async fn main() -> anyhow::Result<()> {
             match command {
                 TemplateCommands::List { at } => {
                     let endpoint = resolve_endpoint(&client, at).await?;
-                    
+
                     list_templates(&client, &endpoint).await?;
                 }
-                
+
                 TemplateCommands::Show { name, at } => {
                     let endpoint = resolve_endpoint(&client, at).await?;
-                    
+
                     show_template(&client, &endpoint, &name).await?;
                 }
             }
+        }
+
+        Commands::Ceremony { name } => {
+            println!();
+            println!("  ⏳ Ceremony workflows are not yet implemented.");
+            println!();
+            if let Some(ceremony_name) = name {
+                println!("  Requested ceremony: {}", ceremony_name);
+            }
+            println!("  Future ceremonies may include:");
+            println!("    • ceremony bootstrap    - First-time setup wizard");
+            println!("    • ceremony migrate      - Service migration workflow");
+            println!("    • ceremony backup       - Guided backup configuration");
+
+            // Self-teaching suggestions
+            suggestions::print_suggestions(command_manifest::cmd::CEREMONY, quiet_mode);
         }
 
         Commands::Tend { target, clear, verbose } => {
@@ -4317,6 +4369,8 @@ async fn main() -> anyhow::Result<()> {
                 // Show all commands grouped by category
                 display_all_commands(zen, normative);
             }
+
+            // BrowseCommands is a meta-command, no suggestions needed
         }
 
         Commands::Refresh { component, from, at } => {
@@ -4370,7 +4424,7 @@ async fn watch_offering_logs(
     use futures_util::StreamExt;
 
     let url = format!(
-        "{}/api/services/{}/logs{}",
+        "{}/api/v1/services/{}/logs{}",
         endpoint.trim_end_matches('/'),
         offering,
         if timestamps { "?timestamps=true" } else { "" }
@@ -4588,7 +4642,7 @@ async fn refresh_component(
     
     // Send to moss
     println!("🚀 Uploading to stone...");
-    let url = format!("{}/api/system/refresh", endpoint.trim_end_matches('/'));
+    let url = format!("{}/api/v1/system/refresh", endpoint.trim_end_matches('/'));
     let response = client
         .post(&url)
         .json(&serde_json::json!({
@@ -4675,7 +4729,7 @@ async fn reconcile_system(
 ) -> anyhow::Result<serde_json::Value> {
     use anyhow::Context;
 
-    let url = format!("{}/api/system/reconcile", endpoint.trim_end_matches('/'));
+    let url = format!("{}/api/v1/system/reconcile", endpoint.trim_end_matches('/'));
     let payload = serde_json::json!({ "drop_invalid": drop_invalid });
     let response = client
         .post(&url)
@@ -4804,29 +4858,19 @@ fn display_all_commands(_zen_only: bool, normative_only: bool) {
     
     let indent = " ".repeat(ui::constants::DEFAULT_INDENT);
     
+    let command_count = MANIFEST.all().len();
+
     println!();
-    println!("{}GARDEN-RAKE                            [ready]", indent);
+    println!("{}GARDEN-RAKE", indent);
     println!("{}{}", indent, "─".repeat(47));
-    println!("{}16 commands available", indent);
+    println!("{}{} commands available", indent, command_count);
     println!();
-    
-    // ESSENTIALS section
-    println!("{}ESSENTIALS", indent);
-    println!("{}{}", indent, "─".repeat(47));
-    let essentials = [
-        ("observe", "View all stones and offerings"),
-        ("tend", "Set which stone to target"),
-        ("offer", "Install services"),
-    ];
-    for (cmd, desc) in essentials {
-        println!("{}    {:<20} {}", indent, cmd, desc);
-    }
-    println!();
-    
-    // Category-based sections
+
+    // Category-based sections (no ESSENTIALS to avoid duplication)
     let categories = [
-        (command_manifest::CommandCategory::Discovery, "OBSERVING"),
+        (command_manifest::CommandCategory::Discovery, "DISCOVERY"),
         (command_manifest::CommandCategory::Lifecycle, "SERVICES"),
+        (command_manifest::CommandCategory::Adoption, "ADOPTION"),
         (command_manifest::CommandCategory::Management, "MANAGEMENT"),
         (command_manifest::CommandCategory::System, "SYSTEM"),
         (command_manifest::CommandCategory::Pond, "POND (Multi-Stone Security)"),
@@ -4836,8 +4880,6 @@ fn display_all_commands(_zen_only: bool, normative_only: bool) {
         let commands = MANIFEST.by_category(&category);
         if !commands.is_empty() {
             println!("{}{}", indent, display_name);
-            println!("{}{}", indent, "─".repeat(47));
-            
             for cmd in commands {
                 if !normative_only {
                     println!("{}    {:<20} {}", indent, cmd.zen_name, cmd.description);
@@ -4850,7 +4892,7 @@ fn display_all_commands(_zen_only: bool, normative_only: bool) {
     
     // Footer
     println!("{}{}", indent, "─".repeat(47));
-    println!("{}For detailed examples: garden-rake <command>?", indent);
-    println!("{}Full directory view:   garden-rake commands", indent);
+    println!("{}For detailed examples:   garden-rake <command>?", indent);
+    println!("{}Full directory view:     garden-rake commands", indent);
     println!();
 }

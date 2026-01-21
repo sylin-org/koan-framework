@@ -9,6 +9,52 @@
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
 
+/// Command name constants - single source of truth for command identifiers.
+/// Use these constants instead of string literals when referencing commands.
+#[allow(dead_code)]
+pub mod cmd {
+    // Discovery
+    pub const OBSERVE: &str = "observe";
+    pub const WATCH: &str = "watch";
+    pub const LIST: &str = "list";
+    pub const STATUS: &str = "status";
+
+    // Lifecycle
+    pub const OFFER: &str = "offer";
+    pub const REST: &str = "rest";
+    pub const WAKE: &str = "wake";
+    pub const REMOVE: &str = "remove";
+    pub const UPROOT: &str = "uproot";
+    pub const NOURISH: &str = "nourish";
+
+    // Adoption
+    pub const ADOPT: &str = "adopt";
+    pub const RELEASE: &str = "release";
+    pub const FIND: &str = "find";
+    pub const ADOPTED: &str = "adopted";
+    pub const BORROWED: &str = "borrowed";
+    pub const BORROW: &str = "borrow";
+    pub const RETURN: &str = "return";
+
+    // Management
+    pub const TEND: &str = "tend";
+    pub const RECONCILE: &str = "reconcile";
+    pub const REFRESH: &str = "refresh";
+
+    // System
+    pub const TAKE_ROOT: &str = "take-root";
+    pub const MAKE: &str = "make";
+
+    // Pond
+    pub const PLACE: &str = "place";
+    pub const INVITE: &str = "invite";
+    pub const LIFT: &str = "lift";
+
+    // Scaffolded
+    pub const CEREMONY: &str = "ceremony";
+    pub const TEMPLATE: &str = "template";
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CommandCategory {
     /// Discovery commands: explore, observe, watch, list, status
@@ -1310,6 +1356,71 @@ pub static MANIFEST: Lazy<CommandManifest> = Lazy::new(|| {
         see_also: vec!["place", "invite"],
     });
 
+    // === SCAFFOLDED COMMANDS ===
+    // These commands are recognized but output placeholder messages until fully implemented
+
+    manifest.add(CommandDef {
+        name: cmd::CEREMONY,
+        zen_name: "ceremony",
+        normative_name: None,
+        category: CommandCategory::Management,
+        description: "Run guided workflows (coming soon)",
+        long_description: "Ceremony provides guided workflows for common multi-step operations.\n\n\
+            Scaffolded - implementation pending. Will include:\n\
+            - ceremony bootstrap: First-time setup wizard\n\
+            - ceremony migrate: Service migration workflow\n\
+            - ceremony backup: Guided backup configuration",
+        remote_capable: false,
+        params: vec![
+            CommandParam {
+                name: "workflow",
+                zen_syntax: "<workflow>",
+                normative_syntax: None,
+                description: "Workflow name (bootstrap, migrate, backup)",
+                required: false,
+            },
+        ],
+        examples: vec![
+            CommandExample {
+                description: "Run bootstrap ceremony",
+                zen_syntax: Some("garden-rake ceremony bootstrap"),
+                normative_syntax: None,
+            },
+        ],
+        see_also: vec!["offer", "tend"],
+    });
+
+    manifest.add(CommandDef {
+        name: cmd::TEMPLATE,
+        zen_name: "template",
+        normative_name: None,
+        category: CommandCategory::Management,
+        description: "Manage offering templates (coming soon)",
+        long_description: "Template operations for custom offering definitions.\n\n\
+            Scaffolded - implementation pending. Will include:\n\
+            - template list: List available templates\n\
+            - template show: Display template details\n\
+            - template create: Create custom template",
+        remote_capable: true,
+        params: vec![
+            CommandParam {
+                name: "action",
+                zen_syntax: "<action>",
+                normative_syntax: None,
+                description: "Action (list, show, create)",
+                required: false,
+            },
+        ],
+        examples: vec![
+            CommandExample {
+                description: "List templates",
+                zen_syntax: Some("garden-rake template list"),
+                normative_syntax: None,
+            },
+        ],
+        see_also: vec!["offer"],
+    });
+
     manifest
 });
 
@@ -1325,7 +1436,7 @@ pub fn validate_manifest() {
         // Adoption
         "adopt", "release", "find", "adopted", "borrowed", "borrow", "return",
         // Management
-        "tend", "reconcile", "refresh",
+        "tend", "reconcile", "refresh", "ceremony", "template",
         // System
         "take-root", "make",
         // Pond

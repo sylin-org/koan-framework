@@ -2558,18 +2558,22 @@ garden-rake list  # Auto-discovers and uses first stone found
 | `remove <name>` | `services delete --name <name>` | Soft delete (container → stray) |
 | `uproot <name>` | `services destroy --name <name>` | Hard delete (destroy container) |
 | **Adoption** | | |
-| `adopt <name>` | `adoption claim --name <name>` | Adopt stray container |
-| `release <name>` | `adoption release --name <name>` | Release adopted service |
-| `find strays` | `adoption find strays` | List adoptable containers |
-| `adopted` | `adoption list` | List adopted services |
-| `borrowed` | `adoption list-borrowed` | List borrowed services |
+| `adopt <name>` | `offerings adopt --name <name>` | Adopt stray container |
+| `release <name>` | `offerings unadopt --name <name>` | Release adopted service |
+| `find strays` | `offerings list-adoptable` | List adoptable containers |
+| `adopted` | `offerings list-adopted` | List adopted services |
+| `borrowed` | `offerings list-borrowed` | List borrowed services |
 | `borrow <svc> from <url>` | `adoption borrow --name <svc> --url <url>` | Register external service |
 | `return <name>` | `adoption unborrow --name <name>` | Unregister external service |
 | **Discovery** | | |
 | `list` | `services list` | List services on stone |
-| `status <name>` | `services status --name <name>` | Show service status |
+| `status` | `stones status` | Show stone status |
 | `observe` | `stones list` | View garden |
 | `watch` | `events stream` | Stream events |
+| **Aliases** | | |
+| `explore` | `offerings list` | Browse catalog (alias for `offer` with no args) |
+| `touch` | `stones status` | Deep diagnostics (alias for `status`) |
+| `garden` | `stones list` | Multi-stone view (alias for `observe`) |
 | **Management** | | |
 | `tend` | `context show` | Show context |
 | `tend <target>` | `context set --target <target>` | Set context |
@@ -2586,20 +2590,22 @@ garden-rake list  # Auto-discovers and uses first stone found
 | `take-root` | `install-service` | Install as system service |
 | `template list` | `templates list` | List templates |
 | `ceremony <name>` | `ceremonies start --name <name>` | Run ceremony |
+| `browse-commands` | `browse-commands` | Interactive command reference |
 
 ### Command Scope Reference
 
 | Command | Scope | Description |
 |---------|-------|-------------|
-| offer, rest, wake, remove, uproot | Stone-scoped | Service lifecycle management |
+| offer, rest, wake, nourish, remove, uproot | Stone-scoped | Service lifecycle management |
 | list, status, watch | Stone-scoped | Service and stone monitoring |
 | adopt, release, find strays | Stone-scoped | Container adoption |
 | borrow, return, borrowed, adopted | Stone-scoped | External service management |
 | place, invite, lift | Stone-scoped | Pond security |
 | make, refresh, take-root, reconcile | Stone-scoped | Stone operations |
 | template, ceremony | Stone-scoped | Templates and workflows |
-| observe, explore | Garden-wide | Multi-stone visibility |
+| observe, explore, garden | Garden-wide | Multi-stone visibility |
 | tend | Local-only | Context management |
+| touch | Stone-scoped | Alias for status |
 
 ---
 

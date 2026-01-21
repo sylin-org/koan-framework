@@ -93,8 +93,8 @@ fn is_zen_verb(verb: &str) -> bool {
         "make" | "refresh" | "reconcile" | "template" | "ceremony" |
         // Installation (zen alias)
         "take-root" |
-        // Discovery (proposed)
-        "explore"
+        // Discovery/aliases (zen)
+        "explore" | "touch" | "garden"
     )
 }
 
@@ -304,5 +304,47 @@ mod tests {
         assert_eq!(parsed.style, CommandStyle::Zen);
         assert_eq!(parsed.verb, "nourish");
         assert_eq!(parsed.args, vec!["mongodb"]);
+    }
+
+    #[test]
+    fn test_zen_touch_alias() {
+        let args = vec![
+            "touch".to_string(),
+        ];
+        let parsed = parse_args(args).unwrap();
+        assert_eq!(parsed.style, CommandStyle::Zen);
+        assert_eq!(parsed.verb, "touch");
+    }
+
+    #[test]
+    fn test_zen_garden_alias() {
+        let args = vec![
+            "garden".to_string(),
+        ];
+        let parsed = parse_args(args).unwrap();
+        assert_eq!(parsed.style, CommandStyle::Zen);
+        assert_eq!(parsed.verb, "garden");
+    }
+
+    #[test]
+    fn test_zen_template() {
+        let args = vec![
+            "template".to_string(),
+            "list".to_string(),
+        ];
+        let parsed = parse_args(args).unwrap();
+        assert_eq!(parsed.style, CommandStyle::Zen);
+        assert_eq!(parsed.verb, "template");
+        assert_eq!(parsed.args, vec!["list"]);
+    }
+
+    #[test]
+    fn test_zen_explore_alias() {
+        let args = vec![
+            "explore".to_string(),
+        ];
+        let parsed = parse_args(args).unwrap();
+        assert_eq!(parsed.style, CommandStyle::Zen);
+        assert_eq!(parsed.verb, "explore");
     }
 }
