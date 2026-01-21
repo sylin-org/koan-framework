@@ -2,6 +2,7 @@ mod parser;
 mod stone_cache;
 mod tending;
 mod ui;
+mod command_manifest;
 
 #[cfg(test)]
 mod discovery_tests;
@@ -155,7 +156,7 @@ async fn print_stone_header(client: &reqwest::Client, endpoint: &str) {
 
 #[derive(Parser)]
 #[command(name = "garden-rake")]
-#[command(about = "Zen Garden management CLI")]
+#[command(about = "Zen Garden management CLI - run without arguments to see command directory")]
 #[command(version = concat!(env!("CARGO_PKG_VERSION"), ".", env!("BUILD_NUMBER")))]
 struct Cli {
     /// Suppress suggestions (zen: quietly, env: GARDEN_QUIET)
@@ -163,7 +164,7 @@ struct Cli {
     quiet: bool,
 
     #[command(subcommand)]
-    command: Commands,
+    command: Option<Commands>,
 }
 
 #[derive(Subcommand)]
@@ -211,7 +212,7 @@ enum Commands {
         at: Option<String>,
     },
 
-    /// Remove a service
+    /// Remove a service (soft delete - container preserved as stray)
     Remove {
         /// Service name to remove
         service: String,
@@ -221,7 +222,144 @@ enum Commands {
         force: bool,
 
         /// Moss endpoint (omit to auto-discover)
+        #[arg(long, visible_alias = "on")]
+        at: Option<String>,
+    },
+
+    /// Uproot a service (hard delete - destroy container completely)
+    #[command(
+        long_about = "Permanently destroy a service and its container.\n\n\
+        Unlike 'remove' which preserves the container as a stray, 'uproot' completely\n\
+        destroys the container and cannot be recovered.\n\n\
+        Examples:\n  \
+        garden-rake uproot mongodb              # Destroy mongodb container\n  \
+        garden-rake uproot mongodb --force      # Skip confirmation"
+    )]
+    Uproot {
+        /// Service name to destroy
+        service: String,
+
+        /// Skip confirmation prompt
         #[arg(long)]
+        force: bool,
+
+        /// Moss endpoint (omit to auto-discover)
+        #[arg(long, visible_alias = "on")]
+        at: Option<String>,
+    },
+
+    /// Adopt an existing container into Zen Garden management
+    #[command(
+        long_about = "Adopt an existing container into Zen Garden management.\n\n\
+        Adopted containers are ones that already exist on the stone but weren't\n\
+        created by Zen Garden (e.g., created manually or by other tooling).\n\n\
+        Examples:\n  \
+        garden-rake adopt my-mongodb-container  # Adopt a specific container\n  \
+        garden-rake find strays                 # List adoptable containers first"
+    )]
+    Adopt {
+        /// Container name to adopt
+        container: String,
+
+        /// Moss endpoint (omit to auto-discover)
+        #[arg(long, visible_alias = "on")]
+        at: Option<String>,
+    },
+
+    /// Release an adopted service (stop managing, keep container running)
+    #[command(
+        long_about = "Release an adopted service back to the wild.\n\n\
+        This removes the service from Zen Garden's management but leaves the\n\
+        container running. Use this when you want to stop managing a service\n\
+        without destroying it.\n\n\
+        Examples:\n  \
+        garden-rake release mongodb             # Release adopted mongodb"
+    )]
+    Release {
+        /// Service name to release
+        service: String,
+
+        /// Moss endpoint (omit to auto-discover)
+        #[arg(long, visible_alias = "on")]
+        at: Option<String>,
+    },
+
+    /// Find strays or other discoverable items
+    #[command(
+        long_about = "Find adoptable containers (strays) or other discoverable items.\n\n\
+        Examples:\n  \
+        garden-rake find strays                 # List containers not managed by Zen Garden"
+    )]
+    Find {
+        #[command(subcommand)]
+        target: FindTarget,
+
+        /// Moss endpoint (omit to auto-discover)
+        #[arg(long, visible_alias = "on")]
+        at: Option<String>,
+    },
+
+    /// List adopted services
+    #[command(
+        long_about = "List services that were adopted from existing containers.\n\n\
+        Example:\n  \
+        garden-rake adopted                     # List all adopted services"
+    )]
+    Adopted {
+        /// Moss endpoint (omit to auto-discover)
+        #[arg(long, visible_alias = "on")]
+        at: Option<String>,
+    },
+
+    /// List borrowed services
+    #[command(
+        long_about = "List external services that have been borrowed (registered but not managed).\n\n\
+        Example:\n  \
+        garden-rake borrowed                    # List all borrowed services"
+    )]
+    Borrowed {
+        /// Moss endpoint (omit to auto-discover)
+        #[arg(long, visible_alias = "on")]
+        at: Option<String>,
+    },
+
+    /// Borrow an external service (register for reference/discovery)
+    #[command(
+        long_about = "Register an external network service for reference and discovery.\n\n\
+        Borrowed services are external services (not on this stone) that you want\n\
+        to include in service discovery and configuration.\n\n\
+        Examples:\n  \
+        garden-rake borrow redis from redis://company-cache:6379\n  \
+        garden-rake borrow postgres --from postgresql://db-server:5432"
+    )]
+    Borrow {
+        /// Name for this borrowed service
+        name: String,
+
+        /// URL/connection string for the external service
+        #[arg(long)]
+        from: Option<String>,
+
+        /// Moss endpoint (omit to auto-discover)
+        #[arg(long, visible_alias = "on")]
+        at: Option<String>,
+    },
+
+    /// Return (unregister) a borrowed service
+    #[command(
+        name = "return",
+        long_about = "Unregister a borrowed external service.\n\n\
+        This removes the service from the registry but doesn't affect the\n\
+        external service itself.\n\n\
+        Example:\n  \
+        garden-rake return redis                # Unregister borrowed redis"
+    )]
+    Return {
+        /// Name of the borrowed service to unregister
+        name: String,
+
+        /// Moss endpoint (omit to auto-discover)
+        #[arg(long, visible_alias = "on")]
         at: Option<String>,
     },
 
@@ -473,6 +611,68 @@ enum Commands {
         #[arg(long)]
         at: Option<String>,
     },
+
+    /// Install moss as a system service (zen syntax)
+    #[command(
+        long_about = "Install moss as a Windows system service (zen: take-root).\n\n\
+        Examples:\n  \
+        garden-rake take-root                     # Install service on tended stone\n  \
+        garden-rake take-root at windows-01       # Install on specific stone\n\n\
+        The stone will install itself as a system service and start automatically.\n\
+        Requires administrator privileges on the target Windows machine.\n\n\
+        To uninstall: sc delete ZenGardenMoss"
+    )]
+    TakeRoot {
+        /// Target stone (positional zen syntax: "at stone-name")
+        at: Option<String>,
+        
+        /// Explicit stone name (follows "at" in zen syntax)
+        stone: Option<String>,
+    },
+
+    /// Install moss as a system service (normative syntax)
+    #[command(
+        name = "install-service",
+        long_about = "Install moss as a Windows system service (normative: install-service).\n\n\
+        Examples:\n  \
+        garden-rake install-service               # Install service on tended stone\n  \
+        garden-rake install-service --at windows-01  # Install on specific stone\n\n\
+        The stone will install itself as a system service and start automatically.\n\
+        Requires administrator privileges on the target Windows machine.\n\n\
+        To uninstall: sc delete ZenGardenMoss"
+    )]
+    InstallService {
+        /// Moss endpoint (omit to auto-discover)
+        #[arg(long)]
+        at: Option<String>,
+    },
+
+    /// Browse command directory (interactive command reference)
+    #[command(
+        long_about = "Browse the command directory with descriptions and examples.\n\n\
+        Examples:\n  \
+        garden-rake commands                    # Show all commands by category\n  \
+        garden-rake commands take-root          # Show detailed command info\n  \
+        garden-rake commands --category system  # Filter by category\n  \
+        garden-rake commands --zen              # Show only zen syntax\n  \
+        garden-rake commands --normative        # Show only normative syntax"
+    )]
+    BrowseCommands {
+        /// Specific command name to show details for
+        name: Option<String>,
+
+        /// Filter by command category
+        #[arg(long)]
+        category: Option<String>,
+
+        /// Show only zen syntax
+        #[arg(long)]
+        zen: bool,
+
+        /// Show only normative syntax
+        #[arg(long)]
+        normative: bool,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -521,6 +721,12 @@ enum PondAction {
         /// Stone name to remove
         stone_name: String,
     },
+}
+
+#[derive(Debug, Subcommand)]
+enum FindTarget {
+    /// Find adoptable containers (strays - running containers not managed by Zen Garden)
+    Strays,
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -1690,8 +1896,7 @@ fn display_stone(stone: &StoneData, offering_filter: &Option<Vec<String>>) -> an
         garden_common::DetectionStatus::Complete => "thriving",
     };
     
-    // Display stone name in bold, then status indicator aligned with table status column
-    // Table has: indent(8) + name_col(24) = 32 chars before status
+    // Stone name with status aligned at column 35 (matching offerings table)
     let stone_name_display = if term.supports_color {
         use colored::Colorize;
         caps.stone_name.to_uppercase().bold().to_string()
@@ -1700,19 +1905,19 @@ fn display_stone(stone: &StoneData, offering_filter: &Option<Vec<String>>) -> an
     };
     let status_indicator = ui::status_indicator(status_text, term.supports_color);
     
-    // Calculate padding to align status at column 32 (matching table layout)
-    let name_visible_len = caps.stone_name.len(); // Length without ANSI codes
-    let status_start_col = ui::constants::DEFAULT_INDENT * 2 + 24; // 8 + 24 = 32
-    let padding_needed = if status_start_col > name_visible_len {
-        status_start_col - name_visible_len
+    // Pad stone name to 35 characters, then add status at column 35
+    let name_visible_len = caps.stone_name.len();
+    let status_col = 35;
+    let padding_needed = if status_col > name_visible_len {
+        status_col - name_visible_len
     } else {
         1 // At least one space
     };
     
     println!("\n{}{}{}", stone_name_display, " ".repeat(padding_needed), status_indicator);
     
-    // Extend underline to match the width (status column + status width)
-    let underline_len = status_start_col + 12; // Align with end of status column
+    // Underline: 35 chars for name area + 12 for status column
+    let underline_len = status_col + 12;
     println!("{}", "─".repeat(underline_len));
     
     
@@ -1722,16 +1927,60 @@ fn display_stone(stone: &StoneData, offering_filter: &Option<Vec<String>>) -> an
     println!("{}", ui::kv_line("MEMORY", &format!("{} GB", caps.hardware.memory.total_mb / 1024), ui::constants::DEFAULT_INDENT));
     
     // === AI SECTION === (replaces GPU, matches status command)
-    // Only show devices with AI runtime or AI-relevant capabilities
-    let ai_devices: Vec<&garden_common::GpuInfo> = caps.hardware.gpus.iter()
-        .filter(|gpu| {
-            gpu.ai_runtime.is_some() || 
-            gpu.capabilities.iter().any(|c| c == "cuda" || c == "rocm" || c == "vulkan" || c == "directml")
-        })
-        .collect();
-    
-    if !ai_devices.is_empty() {
-        println!("{}", ui::kv_line("AI", &format!("{} device(s)", ai_devices.len()), ui::constants::DEFAULT_INDENT));
+    // Show AI capabilities summary if available
+    if let Some(ref ai_caps) = caps.hardware.ai_capabilities {
+        if ai_caps.gpu_count > 0 {
+            // Build AI summary: "1 GPU (24 GB) - DirectML"
+            let gpu_text = if ai_caps.gpu_count == 1 {
+                format!("1 GPU")
+            } else {
+                format!("{} GPUs", ai_caps.gpu_count)
+            };
+
+            let vram_text = if ai_caps.total_vram_mb >= 1024 {
+                format!(" ({} GB)", ai_caps.total_vram_mb / 1024)
+            } else if ai_caps.total_vram_mb > 0 {
+                format!(" ({} MB)", ai_caps.total_vram_mb)
+            } else {
+                String::new()
+            };
+
+            let runtime_text = if !ai_caps.runtimes.is_empty() {
+                // Format runtimes: filter to show only base names (no versions) for compact display
+                let base_runtimes: Vec<String> = ai_caps.runtimes.iter()
+                    .filter(|r| !r.contains(':'))  // Skip versioned runtimes
+                    .map(|r| match r.as_str() {
+                        "cuda" => "CUDA".to_string(),
+                        "rocm" => "ROCm".to_string(),
+                        "directml" => "DirectML".to_string(),
+                        "openvino" => "OpenVINO".to_string(),
+                        _ => r.to_uppercase(),
+                    })
+                    .collect();
+
+                if !base_runtimes.is_empty() {
+                    format!(" - {}", base_runtimes.join(", "))
+                } else {
+                    String::new()
+                }
+            } else {
+                String::new()
+            };
+
+            println!("{}", ui::kv_line("AI", &format!("{}{}{}", gpu_text, vram_text, runtime_text), ui::constants::DEFAULT_INDENT));
+        }
+    } else {
+        // Fallback to old behavior if ai_capabilities not available
+        let ai_devices: Vec<&garden_common::GpuInfo> = caps.hardware.gpus.iter()
+            .filter(|gpu| {
+                !gpu.ai_runtimes.is_empty() ||
+                gpu.capabilities.iter().any(|c| c == "cuda" || c == "rocm" || c == "vulkan" || c == "directml")
+            })
+            .collect();
+
+        if !ai_devices.is_empty() {
+            println!("{}", ui::kv_line("AI", &format!("{} device(s)", ai_devices.len()), ui::constants::DEFAULT_INDENT));
+        }
     }
 
     // Filter services if needed
@@ -2003,7 +2252,9 @@ fn normalize_zen_to_clap(parsed: &parser::ParsedCommand) -> anyhow::Result<Vec<S
     let mut args = Vec::new();
 
     // Map zen verbs to Commands
+    // Commands that have same zen/normative name pass through directly
     match parsed.verb.as_str() {
+        // === SERVICE LIFECYCLE ===
         "offer" => {
             args.push("offer".to_string());
             args.extend(parsed.args.clone());
@@ -2017,13 +2268,54 @@ fn normalize_zen_to_clap(parsed: &parser::ParsedCommand) -> anyhow::Result<Vec<S
             args.extend(parsed.args.clone());
         }
         "nourish" => {
+            // nourish (zen) → upgrade (clap command)
             args.push("upgrade".to_string());
             args.extend(parsed.args.clone());
         }
-        "release" => {
+        "remove" => {
+            // remove (zen) = soft delete, container becomes stray
             args.push("remove".to_string());
             args.extend(parsed.args.clone());
         }
+        "uproot" => {
+            // uproot (zen) = hard delete, destroy container
+            args.push("uproot".to_string());
+            args.extend(parsed.args.clone());
+        }
+
+        // === ADOPTION ===
+        "adopt" => {
+            args.push("adopt".to_string());
+            args.extend(parsed.args.clone());
+        }
+        "release" => {
+            // release (zen) = release adopted service from management
+            // NOT the same as remove (which is soft delete)
+            args.push("release".to_string());
+            args.extend(parsed.args.clone());
+        }
+        "find" => {
+            args.push("find".to_string());
+            args.extend(parsed.args.clone());
+        }
+        "adopted" => {
+            args.push("adopted".to_string());
+            args.extend(parsed.args.clone());
+        }
+        "borrowed" => {
+            args.push("borrowed".to_string());
+            args.extend(parsed.args.clone());
+        }
+        "borrow" => {
+            args.push("borrow".to_string());
+            args.extend(parsed.args.clone());
+        }
+        "return" => {
+            args.push("return".to_string());
+            args.extend(parsed.args.clone());
+        }
+
+        // === DISCOVERY ===
         "observe" => {
             args.push("observe".to_string());
             args.extend(parsed.args.clone());
@@ -2032,27 +2324,17 @@ fn normalize_zen_to_clap(parsed: &parser::ParsedCommand) -> anyhow::Result<Vec<S
             args.push("watch".to_string());
             args.extend(parsed.args.clone());
         }
-        "touch" => {
-            // touch = inspect (deep inspection)
+        "list" => {
+            args.push("list".to_string());
+            args.extend(parsed.args.clone());
+        }
+        "status" => {
             args.push("status".to_string());
             args.extend(parsed.args.clone());
         }
-        "tend" => {
-            args.push("tend".to_string());
-            args.extend(parsed.args.clone());
-        }
-        "place" => {
-            args.push("place".to_string());
-            args.extend(parsed.args.clone());
-        }
-        "lift" => {
-            // lift = remove stone from pond or remove keystone
-            // For now, map to place (Phase 3)
-            args.push("place".to_string());
-            args.extend(parsed.args.clone());
-        }
-        "invite" => {
-            args.push("invite".to_string());
+        "touch" => {
+            // touch = inspect (deep inspection) - legacy alias for status
+            args.push("status".to_string());
             args.extend(parsed.args.clone());
         }
         "explore" => {
@@ -2063,19 +2345,61 @@ fn normalize_zen_to_clap(parsed: &parser::ParsedCommand) -> anyhow::Result<Vec<S
             // garden = observe all
             args.push("observe".to_string());
         }
+
+        // === MANAGEMENT ===
+        "tend" => {
+            args.push("tend".to_string());
+            args.extend(parsed.args.clone());
+        }
+        "reconcile" => {
+            args.push("reconcile".to_string());
+            args.extend(parsed.args.clone());
+        }
+        "refresh" => {
+            args.push("refresh".to_string());
+            args.extend(parsed.args.clone());
+        }
+
+        // === POND ===
+        "place" => {
+            args.push("place".to_string());
+            args.extend(parsed.args.clone());
+        }
+        "lift" => {
+            // lift = remove stone from pond or remove keystone
+            args.push("lift".to_string());
+            args.extend(parsed.args.clone());
+        }
+        "invite" => {
+            args.push("invite".to_string());
+            args.extend(parsed.args.clone());
+        }
+
+        // === SYSTEM ===
         "make" => {
             args.push("make".to_string());
             args.extend(parsed.args.clone());
         }
+        "take-root" => {
+            args.push("take-root".to_string());
+            args.extend(parsed.args.clone());
+        }
+
         _ => {
             return Err(anyhow::anyhow!("Unknown zen verb: {}", parsed.verb));
         }
     }
 
-    // Add --at flag if at_stone keyword was used
-    if let Some(stone) = &parsed.keywords.at_stone {
-        args.push("--at".to_string());
+    // Add --on flag if on/at keyword was used (--at is also accepted for legacy support)
+    if let Some(stone) = &parsed.keywords.on_stone {
+        args.push("--on".to_string());
         args.push(stone.clone());
+    }
+
+    // Add --from flag if from keyword was used (for borrow command)
+    if let Some(url) = &parsed.keywords.from_url {
+        args.push("--from".to_string());
+        args.push(url.clone());
     }
 
     // Note: quietly is handled via quiet_mode in main, not passed to Clap
@@ -2086,12 +2410,52 @@ fn normalize_zen_to_clap(parsed: &parser::ParsedCommand) -> anyhow::Result<Vec<S
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    // Validate command manifest in debug builds
+    #[cfg(debug_assertions)]
+    command_manifest::validate_manifest();
+
     tracing_subscriber::fmt()
         .with_env_filter(EnvFilter::from_default_env())
         .init();
 
     // Pre-parse for zen syntax (before Clap)
     let raw_args: Vec<String> = std::env::args().skip(1).collect();
+    
+    // Check for help query syntax: command? or ?command
+    if !raw_args.is_empty() {
+        let first_arg = &raw_args[0];
+        
+        // Handle: garden-rake ?command
+        if first_arg.starts_with('?') {
+            let cmd_name = first_arg.trim_start_matches('?');
+            if !cmd_name.is_empty() {
+                use command_manifest::MANIFEST;
+                if let Some(cmd) = MANIFEST.get(cmd_name) {
+                    display_command_detail(cmd, false, false);
+                    return Ok(());
+                } else {
+                    eprintln!("Unknown command: {}", cmd_name);
+                    std::process::exit(1);
+                }
+            }
+        }
+        
+        // Handle: garden-rake command?
+        if first_arg.ends_with('?') {
+            let cmd_name = first_arg.trim_end_matches('?');
+            if !cmd_name.is_empty() {
+                use command_manifest::MANIFEST;
+                if let Some(cmd) = MANIFEST.get(cmd_name) {
+                    display_command_detail(cmd, false, false);
+                    return Ok(());
+                } else {
+                    eprintln!("Unknown command: {}", cmd_name);
+                    std::process::exit(1);
+                }
+            }
+        }
+    }
+    
     let (cli, parsed_keywords) = if !raw_args.is_empty() {
         match parser::parse_args(raw_args.clone()) {
             Ok(parsed) if parsed.style == parser::CommandStyle::Zen => {
@@ -2145,6 +2509,13 @@ async fn main() -> anyhow::Result<()> {
     let term = ui::TerminalInfo::detect();
 
     match cli.command {
+        None => {
+            // No command provided - show command directory
+            display_all_commands(false, false);
+            return Ok(());
+        }
+        
+        Some(command) => match command {
         Commands::Status { at } => {
             // Info notice (unless quiet mode)
             if !quiet_mode {
@@ -2234,7 +2605,7 @@ async fn main() -> anyhow::Result<()> {
             // Only show devices that have AI runtime or AI-relevant capabilities
             let ai_devices: Vec<&garden_common::GpuInfo> = caps.hardware.gpus.iter()
                 .filter(|gpu| {
-                    gpu.ai_runtime.is_some() || 
+                    !gpu.ai_runtimes.is_empty() ||
                     gpu.capabilities.iter().any(|c| c == "cuda" || c == "rocm" || c == "vulkan" || c == "directml")
                 })
                 .collect();
@@ -2262,25 +2633,43 @@ async fn main() -> anyhow::Result<()> {
                     };
                     
                     // Runtime details
-                    let runtime_str = if let Some(ref runtime) = gpu.ai_runtime {
-                        let mut parts = Vec::new();
-                        if let Some(ref cuda_ver) = runtime.cuda_version {
-                            parts.push(format!("CUDA {}", cuda_ver));
-                        }
-                        if let Some(ref rocm_ver) = runtime.rocm_version {
-                            parts.push(format!("ROCm {}", rocm_ver));
-                        }
-                        if runtime.has_directml {
-                            parts.push("DirectML".to_string());
-                        }
-                        if runtime.has_openvino {
-                            parts.push("OpenVINO".to_string());
-                        }
-                        if parts.is_empty() {
+                    let runtime_str = if !gpu.ai_runtimes.is_empty() {
+                        // Use detected AI runtimes, format them nicely
+                        // Filter to show only versioned runtimes (skip base names like "cuda")
+                        let versioned: Vec<String> = gpu.ai_runtimes.iter()
+                            .filter(|r| r.contains(':'))
+                            .map(|r| {
+                                // Format "cuda:12.2" -> "CUDA 12.2"
+                                let parts: Vec<&str> = r.split(':').collect();
+                                if parts.len() == 2 {
+                                    format!("{} {}", parts[0].to_uppercase(), parts[1])
+                                } else {
+                                    r.to_uppercase()
+                                }
+                            })
+                            .collect();
+
+                        // Also include non-versioned runtimes (directml, openvino, etc.)
+                        let simple: Vec<String> = gpu.ai_runtimes.iter()
+                            .filter(|r| !r.contains(':'))
+                            .map(|r| {
+                                // Special case formatting
+                                match r.as_str() {
+                                    "directml" => "DirectML".to_string(),
+                                    "openvino" => "OpenVINO".to_string(),
+                                    _ => r.to_uppercase(),
+                                }
+                            })
+                            .collect();
+
+                        let mut all = versioned;
+                        all.extend(simple);
+
+                        if all.is_empty() {
                             // Fallback to capabilities
                             gpu.capabilities.join(", ")
                         } else {
-                            parts.join(", ")
+                            all.join(", ")
                         }
                     } else {
                         // Fallback to capabilities if runtime not detected
@@ -2622,6 +3011,279 @@ async fn main() -> anyhow::Result<()> {
                 }
                 _ => {
                     eprintln!("{}{} Failed: {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), status);
+                }
+            }
+        }
+
+        Commands::Uproot { service, at, force } => {
+            let endpoint = resolve_endpoint(&client, at).await?;
+            print_stone_header(&client, &endpoint).await;
+
+            // Confirmation prompt (unless --force or quiet mode)
+            if !force && !quiet_mode {
+                println!("{}⚠️  WARNING: This will PERMANENTLY DESTROY service '{}' and its container", " ".repeat(ui::constants::DEFAULT_INDENT), service);
+                println!("{}This action cannot be undone. The container will be deleted with all volumes.", " ".repeat(ui::constants::DEFAULT_INDENT));
+                print!("{}Continue? [y/N]: ", " ".repeat(ui::constants::DEFAULT_INDENT));
+                use std::io::Write;
+                std::io::stdout().flush()?;
+
+                let mut input = String::new();
+                std::io::stdin().read_line(&mut input)?;
+
+                if !input.trim().eq_ignore_ascii_case("y") {
+                    println!("{}Cancelled", " ".repeat(ui::constants::DEFAULT_INDENT));
+                    return Ok(());
+                }
+                println!();
+            }
+
+            // v1 API: POST /api/v1/services/:service/destroy
+            let url = format!(
+                "{}/api/v1/services/{}/destroy",
+                endpoint.trim_end_matches('/'),
+                service
+            );
+            let response = client.post(url).send().await?;
+            let status = response.status();
+
+            match status {
+                s if s.is_success() => {
+                    if let Ok(body) = response.json::<serde_json::Value>().await {
+                        let message = body.get("data").and_then(|d| d.get("message")).and_then(|v| v.as_str()).unwrap_or("");
+                        println!("{}{} Uprooted {} (container destroyed)", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("ok", term.supports_color), service);
+                        if !message.is_empty() {
+                            println!("{}   {}", " ".repeat(ui::constants::DEFAULT_INDENT), message);
+                        }
+                    }
+                }
+                reqwest::StatusCode::NOT_FOUND => {
+                    eprintln!("{}{} Service '{}' not found", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), service);
+                }
+                _ => {
+                    eprintln!("{}{} Failed to destroy: {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), status);
+                }
+            }
+        }
+
+        Commands::Adopt { container, at } => {
+            let endpoint = resolve_endpoint(&client, at).await?;
+            print_stone_header(&client, &endpoint).await;
+
+            // v1 API: POST /api/v1/offerings/:offering/adopt
+            let url = format!(
+                "{}/api/v1/offerings/{}/adopt",
+                endpoint.trim_end_matches('/'),
+                container
+            );
+            let response = client.post(&url)
+                .json(&serde_json::json!({}))
+                .send()
+                .await?;
+            let status = response.status();
+
+            match status {
+                s if s.is_success() => {
+                    if let Ok(body) = response.json::<serde_json::Value>().await {
+                        let name = body.get("data").and_then(|d| d.get("name")).and_then(|v| v.as_str()).unwrap_or(&container);
+                        println!("{}{} Adopted container '{}' as '{}'", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("ok", term.supports_color), container, name);
+                    }
+                }
+                reqwest::StatusCode::CONFLICT => {
+                    eprintln!("{}{} Container '{}' is already adopted", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("warn", term.supports_color), container);
+                }
+                reqwest::StatusCode::NOT_FOUND => {
+                    eprintln!("{}{} Container '{}' not found or not adoptable", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), container);
+                }
+                _ => {
+                    eprintln!("{}{} Failed to adopt: {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), status);
+                }
+            }
+        }
+
+        Commands::Release { service, at } => {
+            let endpoint = resolve_endpoint(&client, at).await?;
+            print_stone_header(&client, &endpoint).await;
+
+            // v1 API: DELETE /api/v1/offerings/:offering/adopt
+            let url = format!(
+                "{}/api/v1/offerings/{}/adopt",
+                endpoint.trim_end_matches('/'),
+                service
+            );
+            let response = client.delete(url).send().await?;
+            let status = response.status();
+
+            match status {
+                s if s.is_success() => {
+                    println!("{}{} Released service '{}' (container still running)", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("ok", term.supports_color), service);
+                }
+                reqwest::StatusCode::NOT_FOUND => {
+                    eprintln!("{}{} Service '{}' is not currently adopted", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), service);
+                }
+                _ => {
+                    eprintln!("{}{} Failed to release: {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), status);
+                }
+            }
+        }
+
+        Commands::Find { target, at } => {
+            let endpoint = resolve_endpoint(&client, at).await?;
+            print_stone_header(&client, &endpoint).await;
+
+            match target {
+                FindTarget::Strays => {
+                    // v1 API: GET /api/v1/offerings/adoptable
+                    let url = format!("{}/api/v1/offerings/adoptable", endpoint.trim_end_matches('/'));
+                    let response = client.get(&url).send().await?;
+
+                    if response.status().is_success() {
+                        let body: serde_json::Value = response.json().await?;
+                        let strays = body.get("data").and_then(|d| d.as_array());
+
+                        if let Some(list) = strays {
+                            if list.is_empty() {
+                                println!("{}No stray containers found", " ".repeat(ui::constants::DEFAULT_INDENT));
+                            } else {
+                                println!("{}Adoptable containers (strays):", " ".repeat(ui::constants::DEFAULT_INDENT));
+                                for stray in list {
+                                    let name = stray.get("name").and_then(|v| v.as_str()).unwrap_or("unknown");
+                                    let category = stray.get("category").and_then(|v| v.as_str()).unwrap_or("Unknown");
+                                    let version = stray.get("version").and_then(|v| v.as_str()).unwrap_or("");
+                                    if version.is_empty() {
+                                        println!("{}  {} ({})", " ".repeat(ui::constants::DEFAULT_INDENT), name, category);
+                                    } else {
+                                        println!("{}  {} ({}) - v{}", " ".repeat(ui::constants::DEFAULT_INDENT), name, category, version);
+                                    }
+                                }
+                                println!("\n{}Use 'garden-rake adopt <name>' to adopt a container", " ".repeat(ui::constants::DEFAULT_INDENT));
+                            }
+                        }
+                    } else {
+                        eprintln!("{}{} Failed to list strays: {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), response.status());
+                    }
+                }
+            }
+        }
+
+        Commands::Adopted { at } => {
+            let endpoint = resolve_endpoint(&client, at).await?;
+            print_stone_header(&client, &endpoint).await;
+
+            // v1 API: GET /api/v1/offerings/adopted
+            let url = format!("{}/api/v1/offerings/adopted", endpoint.trim_end_matches('/'));
+            let response = client.get(&url).send().await?;
+
+            if response.status().is_success() {
+                let body: serde_json::Value = response.json().await?;
+                let adopted = body.get("data").and_then(|d| d.as_array());
+
+                if let Some(list) = adopted {
+                    if list.is_empty() {
+                        println!("{}No adopted services", " ".repeat(ui::constants::DEFAULT_INDENT));
+                    } else {
+                        println!("{}Adopted services:", " ".repeat(ui::constants::DEFAULT_INDENT));
+                        for svc in list {
+                            let name = svc.get("name").and_then(|v| v.as_str()).unwrap_or("unknown");
+                            let offering = svc.get("offering").and_then(|v| v.as_str()).unwrap_or("");
+                            if !offering.is_empty() && offering != name {
+                                println!("{}  {} (from: {})", " ".repeat(ui::constants::DEFAULT_INDENT), name, offering);
+                            } else {
+                                println!("{}  {}", " ".repeat(ui::constants::DEFAULT_INDENT), name);
+                            }
+                        }
+                    }
+                }
+            } else {
+                eprintln!("{}{} Failed to list adopted services: {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), response.status());
+            }
+        }
+
+        Commands::Borrowed { at } => {
+            let endpoint = resolve_endpoint(&client, at).await?;
+            print_stone_header(&client, &endpoint).await;
+
+            // v1 API: GET /api/v1/offerings/borrowed
+            let url = format!("{}/api/v1/offerings/borrowed", endpoint.trim_end_matches('/'));
+            let response = client.get(&url).send().await?;
+
+            if response.status().is_success() {
+                let body: serde_json::Value = response.json().await?;
+                let borrowed = body.get("data").and_then(|d| d.as_array());
+
+                if let Some(list) = borrowed {
+                    if list.is_empty() {
+                        println!("{}No borrowed services", " ".repeat(ui::constants::DEFAULT_INDENT));
+                    } else {
+                        println!("{}Borrowed services:", " ".repeat(ui::constants::DEFAULT_INDENT));
+                        for svc in list {
+                            let name = svc.get("name").and_then(|v| v.as_str()).unwrap_or("unknown");
+                            let url = svc.get("connection_template").and_then(|v| v.as_str()).unwrap_or("");
+                            if !url.is_empty() {
+                                println!("{}  {} ({})", " ".repeat(ui::constants::DEFAULT_INDENT), name, url);
+                            } else {
+                                println!("{}  {}", " ".repeat(ui::constants::DEFAULT_INDENT), name);
+                            }
+                        }
+                    }
+                }
+            } else {
+                eprintln!("{}{} Failed to list borrowed services: {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), response.status());
+            }
+        }
+
+        Commands::Borrow { name, from, at } => {
+            let endpoint = resolve_endpoint(&client, at).await?;
+            print_stone_header(&client, &endpoint).await;
+
+            let url_str = from.ok_or_else(|| anyhow::anyhow!(
+                "Missing URL. Use: garden-rake borrow {} from <url>", name
+            ))?;
+
+            // v1 API: POST /api/v1/adoption/borrow
+            let url = format!("{}/api/v1/adoption/borrow", endpoint.trim_end_matches('/'));
+            let response = client.post(&url)
+                .json(&serde_json::json!({
+                    "name": name,
+                    "url": url_str
+                }))
+                .send()
+                .await?;
+            let status = response.status();
+
+            match status {
+                s if s.is_success() => {
+                    println!("{}{} Borrowed service '{}' from {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("ok", term.supports_color), name, url_str);
+                }
+                reqwest::StatusCode::CONFLICT => {
+                    eprintln!("{}{} Service '{}' is already borrowed", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("warn", term.supports_color), name);
+                }
+                reqwest::StatusCode::BAD_REQUEST => {
+                    eprintln!("{}{} Invalid URL: {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), url_str);
+                }
+                _ => {
+                    eprintln!("{}{} Failed to borrow: {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), status);
+                }
+            }
+        }
+
+        Commands::Return { name, at } => {
+            let endpoint = resolve_endpoint(&client, at).await?;
+            print_stone_header(&client, &endpoint).await;
+
+            // v1 API: DELETE /api/v1/adoption/borrow/:name
+            let url = format!("{}/api/v1/adoption/borrow/{}", endpoint.trim_end_matches('/'), name);
+            let response = client.delete(url).send().await?;
+            let status = response.status();
+
+            match status {
+                s if s.is_success() => {
+                    println!("{}{} Returned borrowed service '{}'", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("ok", term.supports_color), name);
+                }
+                reqwest::StatusCode::NOT_FOUND => {
+                    eprintln!("{}{} Service '{}' is not currently borrowed", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), name);
+                }
+                _ => {
+                    eprintln!("{}{} Failed to return: {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), status);
                 }
             }
         }
@@ -3532,6 +4194,131 @@ async fn main() -> anyhow::Result<()> {
             }
         }
 
+        Commands::TakeRoot { at: at_keyword, stone } => {
+            // Zen syntax: "garden-rake take-root at windows-01"
+            // at_keyword is Some("at"), stone is Some("windows-01")
+            let target = if at_keyword.as_deref() == Some("at") {
+                stone.clone()
+            } else {
+                // If at_keyword is not "at", treat it as the stone name (backward compat)
+                at_keyword.clone()
+            };
+            
+            let endpoint = resolve_endpoint(&client, target).await?;
+            let url = format!("{}/admin/take-root", endpoint.trim_end_matches('/'));
+            
+            println!("{}{} Instructing stone to take root as system service...", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("info", term.supports_color));
+            println!();
+            
+            match client.post(&url)
+                .timeout(Duration::from_secs(30))
+                .send()
+                .await
+            {
+                Ok(response) if response.status().is_success() => {
+                    if let Ok(body) = response.json::<serde_json::Value>().await {
+                        if let Some(message) = body.get("message").and_then(|v| v.as_str()) {
+                            println!("{}{} {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("ok", term.supports_color), message);
+                        } else {
+                            println!("{}{} Stone has taken root as a system service", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("ok", term.supports_color));
+                        }
+                    } else {
+                        println!("{}{} Stone has taken root as a system service", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("ok", term.supports_color));
+                    }
+                }
+                Ok(response) => {
+                    let status = response.status();
+                    if let Ok(body) = response.text().await {
+                        eprintln!("{}{} Failed to install service: {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), body);
+                    } else {
+                        eprintln!("{}{} Failed to install service: HTTP {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), status);
+                    }
+                }
+                Err(e) => {
+                    eprintln!("{}{} Request failed: {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), e);
+                    eprintln!("{}Ensure the target stone is running and accessible", " ".repeat(ui::constants::DEFAULT_INDENT));
+                }
+            }
+        }
+
+        Commands::InstallService { at } => {
+            // Normative syntax: "garden-rake install-service --at windows-01"
+            let endpoint = resolve_endpoint(&client, at).await?;
+            let url = format!("{}/admin/take-root", endpoint.trim_end_matches('/'));
+            
+            println!("{}{} Instructing stone to install as system service...", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("info", term.supports_color));
+            println!();
+            
+            match client.post(&url)
+                .timeout(Duration::from_secs(30))
+                .send()
+                .await
+            {
+                Ok(response) if response.status().is_success() => {
+                    if let Ok(body) = response.json::<serde_json::Value>().await {
+                        if let Some(message) = body.get("message").and_then(|v| v.as_str()) {
+                            println!("{}{} {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("ok", term.supports_color), message);
+                        } else {
+                            println!("{}{} Service installed successfully", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("ok", term.supports_color));
+                        }
+                    } else {
+                        println!("{}{} Service installed successfully", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("ok", term.supports_color));
+                    }
+                }
+                Ok(response) => {
+                    let status = response.status();
+                    if let Ok(body) = response.text().await {
+                        eprintln!("{}{} Failed to install service: {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), body);
+                    } else {
+                        eprintln!("{}{} Failed to install service: HTTP {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), status);
+                    }
+                }
+                Err(e) => {
+                    eprintln!("{}{} Request failed: {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), e);
+                    eprintln!("{}Ensure the target stone is running and accessible", " ".repeat(ui::constants::DEFAULT_INDENT));
+                }
+            }
+        }
+
+        Commands::BrowseCommands { name, category, zen, normative } => {
+            use command_manifest::MANIFEST;
+            
+            if let Some(cmd_name) = name {
+                // Show detailed info for specific command
+                if let Some(cmd) = MANIFEST.get(&cmd_name) {
+                    display_command_detail(cmd, zen, normative);
+                } else {
+                    eprintln!("{}{} Command '{}' not found", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), cmd_name);
+                    println!();
+                    println!("{}Available commands:", " ".repeat(ui::constants::DEFAULT_INDENT));
+                    for c in MANIFEST.all() {
+                        println!("{}  {}", " ".repeat(ui::constants::DEFAULT_INDENT), c.name);
+                    }
+                }
+            } else if let Some(cat_name) = category {
+                // Filter by category
+                let category = match cat_name.to_lowercase().as_str() {
+                    "discovery" => command_manifest::CommandCategory::Discovery,
+                    "lifecycle" => command_manifest::CommandCategory::Lifecycle,
+                    "management" => command_manifest::CommandCategory::Management,
+                    "system" => command_manifest::CommandCategory::System,
+                    "pond" => command_manifest::CommandCategory::Pond,
+                    _ => {
+                        eprintln!("{}{} Unknown category: {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), cat_name);
+                        println!();
+                        println!("{}Available categories: discovery, lifecycle, management, system, pond", " ".repeat(ui::constants::DEFAULT_INDENT));
+                        return Ok(());
+                    }
+                };
+                
+                let cmds = MANIFEST.by_category(&category);
+                display_command_category(&category, &cmds, zen, normative);
+            } else {
+                // Show all commands grouped by category
+                display_all_commands(zen, normative);
+            }
+        }
+
         Commands::Refresh { component, from, at } => {
             let endpoint = resolve_endpoint(&client, at).await?;
             println!("Refreshing {}...", component);
@@ -3567,6 +4354,7 @@ async fn main() -> anyhow::Result<()> {
             if left > 0 {
                 println!("  Left unregistered: {}", left);
             }
+        }
         }
     }
 
@@ -3904,4 +4692,165 @@ async fn reconcile_system(
     let status = response.status();
     let text = response.text().await.unwrap_or_default();
     anyhow::bail!("Reconcile failed with status {}: {}", status, text);
+}
+
+/// Display detailed information for a specific command
+fn display_command_detail(cmd: &command_manifest::CommandDef, zen_only: bool, normative_only: bool) {
+    let _term = ui::TerminalInfo::detect();
+    let indent = " ".repeat(ui::constants::DEFAULT_INDENT);
+    
+    // Title
+    println!();
+    println!("{}{}", indent, cmd.zen_name.to_uppercase());
+    if let Some(norm) = cmd.normative_name {
+        println!("{}(Normative: {})", indent, norm);
+    }
+    println!("{}{}", indent, "─".repeat(60));
+    println!();
+    
+    // Description
+    println!("{}{}", indent, cmd.description);
+    println!();
+    
+    // Category and remote capability
+    println!("{}Category: {}", indent, cmd.category.as_str());
+    println!("{}Remote Capable: {}", indent, if cmd.remote_capable { "Yes" } else { "No" });
+    println!();
+    
+    // Long description
+    println!("{}{}", indent, cmd.long_description.replace('\n', &format!("\n{}", indent)));
+    println!();
+    
+    // Parameters
+    if !cmd.params.is_empty() {
+        println!("{}PARAMETERS:", indent);
+        for param in &cmd.params {
+            let required = if param.required { " (required)" } else { "" };
+            if !normative_only {
+                println!("{}  Zen: {}{}", indent, param.zen_syntax, required);
+            }
+            if let Some(norm_syntax) = param.normative_syntax {
+                if !zen_only {
+                    println!("{}  Normative: {}{}", indent, norm_syntax, required);
+                }
+            }
+            println!("{}    {}", indent, param.description);
+            println!();
+        }
+    }
+    
+    // Examples
+    if !cmd.examples.is_empty() {
+        if !normative_only && cmd.examples.iter().any(|e| e.zen_syntax.is_some()) {
+            println!("{}EXAMPLES (Zen Syntax):", indent);
+            for example in &cmd.examples {
+                if let Some(zen_syntax) = example.zen_syntax {
+                    println!("{}  {}", indent, zen_syntax);
+                    println!("{}    → {}", indent, example.description);
+                    println!();
+                }
+            }
+        }
+        
+        if !zen_only && cmd.examples.iter().any(|e| e.normative_syntax.is_some()) {
+            println!("{}EXAMPLES (Normative Syntax):", indent);
+            for example in &cmd.examples {
+                if let Some(norm_syntax) = example.normative_syntax {
+                    println!("{}  {}", indent, norm_syntax);
+                    println!("{}    → {}", indent, example.description);
+                    println!();
+                }
+            }
+        }
+    }
+    
+    // See also
+    if !cmd.see_also.is_empty() {
+        println!("{}See also: {}", indent, cmd.see_also.join(", "));
+        println!();
+    }
+}
+
+/// Display commands in a specific category
+fn display_command_category(category: &command_manifest::CommandCategory, commands: &[&command_manifest::CommandDef], zen_only: bool, normative_only: bool) {
+    let indent = " ".repeat(ui::constants::DEFAULT_INDENT);
+    
+    println!();
+    println!("{}{} COMMANDS", indent, category.as_str().to_uppercase());
+    println!("{}{}", indent, "═".repeat(60));
+    println!();
+    
+    for cmd in commands {
+        // Command name(s)
+        if !normative_only {
+            println!("{}  {}", indent, cmd.zen_name);
+        }
+        if let Some(norm) = cmd.normative_name {
+            if !zen_only {
+                println!("{}  {} (normative)", indent, norm);
+            }
+        }
+        println!("{}    {}", indent, cmd.description);
+        println!();
+    }
+    
+    println!("{}Use 'garden-rake commands <name>' for detailed information", indent);
+    println!();
+}
+
+/// Display all commands grouped by category
+fn display_all_commands(_zen_only: bool, normative_only: bool) {
+    use command_manifest::MANIFEST;
+    
+    let indent = " ".repeat(ui::constants::DEFAULT_INDENT);
+    
+    println!();
+    println!("{}GARDEN-RAKE                            [ready]", indent);
+    println!("{}{}", indent, "─".repeat(47));
+    println!("{}16 commands available", indent);
+    println!();
+    
+    // ESSENTIALS section
+    println!("{}ESSENTIALS", indent);
+    println!("{}{}", indent, "─".repeat(47));
+    let essentials = [
+        ("observe", "View all stones and offerings"),
+        ("tend", "Set which stone to target"),
+        ("offer", "Install services"),
+    ];
+    for (cmd, desc) in essentials {
+        println!("{}    {:<20} {}", indent, cmd, desc);
+    }
+    println!();
+    
+    // Category-based sections
+    let categories = [
+        (command_manifest::CommandCategory::Discovery, "OBSERVING"),
+        (command_manifest::CommandCategory::Lifecycle, "SERVICES"),
+        (command_manifest::CommandCategory::Management, "MANAGEMENT"),
+        (command_manifest::CommandCategory::System, "SYSTEM"),
+        (command_manifest::CommandCategory::Pond, "POND (Multi-Stone Security)"),
+    ];
+    
+    for (category, display_name) in categories {
+        let commands = MANIFEST.by_category(&category);
+        if !commands.is_empty() {
+            println!("{}{}", indent, display_name);
+            println!("{}{}", indent, "─".repeat(47));
+            
+            for cmd in commands {
+                if !normative_only {
+                    println!("{}    {:<20} {}", indent, cmd.zen_name, cmd.description);
+                }
+                // Normative variants hidden by default to reduce clutter
+            }
+            println!();
+        }
+    }
+    
+    // Footer
+    println!("{}{}", indent, "─".repeat(47));
+    println!("{}For detailed examples: garden-rake <command>?", indent);
+    println!("{}Full directory view:   garden-rake commands", indent);
+    println!();
 }

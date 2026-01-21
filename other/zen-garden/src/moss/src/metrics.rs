@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 use sysinfo::System;
+#[cfg(not(target_os = "windows"))]
 use std::fs;
 use std::process::Command;
 use garden_common::{format_bytes, format_uptime, AiRuntime, CpuMetrics, DiskMetrics, GpuInfo, MemoryMetrics, StoneResources};
@@ -263,9 +264,41 @@ pub fn detect_gpus() -> Vec<GpuInfo> {
     
     // Detect actual AI runtime installations for each GPU
     for gpu in &mut gpus {
-        gpu.ai_runtime = detect_ai_runtime(&gpu.vendor, &gpu.capabilities);
+        // Detect runtime and convert directly to dual-format strings
+        if let Some(runtime) = detect_ai_runtime(&gpu.vendor, &gpu.capabilities) {
+            gpu.ai_runtimes = ai_runtime_to_strings(&runtime);
+        }
     }
-    
+
+    // Scan for containerized AI runtimes (Docker/Podman images)
+    // This validates against hardware: ROCm requires AMD, CUDA requires NVIDIA
+    let container_runtimes = scan_ai_runtime_containers(&gpus);
+
+    // Merge containerized runtimes into each GPU's runtime list
+    // Container runtimes are system-wide but hardware-validated
+    if !container_runtimes.is_empty() {
+        for gpu in &mut gpus {
+            // Only add containerized runtimes that match this GPU's vendor
+            for runtime in &container_runtimes {
+                let runtime_lower = runtime.to_lowercase();
+
+                // Vendor-specific runtime matching
+                let matches_vendor = if runtime_lower.starts_with("rocm") {
+                    gpu.vendor.to_lowercase() == "amd"
+                } else if runtime_lower.starts_with("cuda") {
+                    gpu.vendor.to_lowercase() == "nvidia"
+                } else {
+                    // Generic runtimes (tensorflow, pytorch) available to all GPUs
+                    true
+                };
+
+                if matches_vendor && !gpu.ai_runtimes.contains(runtime) {
+                    gpu.ai_runtimes.push(runtime.clone());
+                }
+            }
+        }
+    }
+
     gpus
 }
 
@@ -300,7 +333,7 @@ fn detect_nvidia_gpus() -> Result<Vec<GpuInfo>> {
                     model,
                     vram_mb,
                     capabilities,
-                    ai_runtime: None,
+                    ai_runtimes: Vec::new(),
                 })
             } else {
                 None
@@ -334,7 +367,7 @@ fn detect_amd_gpus() -> Result<Vec<GpuInfo>> {
                         model,
                         vram_mb: None, // Would need additional query
                         capabilities,
-                        ai_runtime: None,
+                        ai_runtimes: Vec::new(),
                     })
                 })
                 .collect();
@@ -365,7 +398,7 @@ fn detect_amd_gpus() -> Result<Vec<GpuInfo>> {
                         model,
                         vram_mb: None,
                         capabilities: vec!["vulkan".to_string()], // Unknown without rocm-smi
-                        ai_runtime: None,
+                        ai_runtimes: Vec::new(),
                     }
                 })
                 .collect();
@@ -399,7 +432,7 @@ fn detect_intel_gpus() -> Result<Vec<GpuInfo>> {
                         model,
                         vram_mb: None,
                         capabilities: vec!["vulkan".to_string()],
-                        ai_runtime: None,
+                        ai_runtimes: Vec::new(),
                     }
                 })
                 .collect();
@@ -429,10 +462,18 @@ fn detect_windows_gpus() -> Result<Vec<GpuInfo>> {
     }
     
     let stdout = String::from_utf8_lossy(&output.stdout);
-    
-    // Get accurate VRAM from DXDiag (WMI caps at 4GB)
-    let dxdiag_vram = get_vram_from_dxdiag();
-    
+
+    // Get accurate VRAM using DXGI (native DirectX API - most reliable)
+    // Falls back to WMI+Registry if DXGI fails
+    let dxgi_vram = get_vram_from_dxgi();
+    let wmi_vram = if dxgi_vram.is_empty() {
+        tracing::info!("DXGI VRAM detection failed, falling back to WMI");
+        get_vram_from_wmi()
+    } else {
+        tracing::info!("Using DXGI for accurate VRAM detection");
+        dxgi_vram
+    };
+
     // Parse JSON output
     if let Ok(json) = serde_json::from_str::<serde_json::Value>(&stdout) {
         let gpu_array: Vec<&serde_json::Value> = if json.is_array() {
@@ -440,13 +481,13 @@ fn detect_windows_gpus() -> Result<Vec<GpuInfo>> {
         } else {
             vec![&json]
         };
-        
+
         let gpus: Vec<GpuInfo> = gpu_array.iter()
         .filter_map(|gpu| {
             let name = gpu["Name"].as_str()?.to_string();
             let pnp_id = gpu["PNPDeviceID"].as_str().unwrap_or("");
             let adapter_compat = gpu["AdapterCompatibility"].as_str().unwrap_or("");
-            
+
             // Filter out non-compute GPUs:
             // - USB devices (DisplayLink, etc.)
             // - Microsoft Basic Display Adapter
@@ -459,16 +500,22 @@ fn detect_windows_gpus() -> Result<Vec<GpuInfo>> {
                 tracing::debug!("Skipping virtual/display-only adapter: {}", name);
                 return None;
             }
-            
+
             let vram_bytes = gpu["AdapterRAM"].as_u64();
             let mut vram_mb = vram_bytes.map(|b| b / 1024 / 1024);
-            
-            // If WMI reports <8GB but DXDiag has data for this GPU, use DXDiag (more accurate)
-            if let Some(wmi_vram) = vram_mb {
-                if wmi_vram < 8192 {  // Less than 8GB suggests WMI truncation
-                    if let Some(dxdiag_mb) = dxdiag_vram.get(&name) {
-                        vram_mb = Some(*dxdiag_mb);
-                    }
+
+            // If WMI AdapterRAM is unreliable, try to get from enhanced WMI detection
+            // Trigger fallback if: None, < 1GB, or 4000-4096 MB (indicates 32-bit truncation at 4GB)
+            // Try both exact and normalized name matching
+            let needs_fallback = vram_mb.is_none()
+                || vram_mb.unwrap() < 1024
+                || (vram_mb.unwrap() >= 4000 && vram_mb.unwrap() <= 4096);
+
+            if needs_fallback {
+                let normalized_name = normalize_gpu_name(&name);
+                if let Some(enhanced_vram) = wmi_vram.get(&name)
+                    .or_else(|| wmi_vram.get(&normalized_name)) {
+                    vram_mb = Some(*enhanced_vram);
                 }
             }
             
@@ -497,7 +544,7 @@ fn detect_windows_gpus() -> Result<Vec<GpuInfo>> {
                 model: name,
                 vram_mb,
                 capabilities,
-                ai_runtime: None,
+                ai_runtimes: Vec::new(),
             })
         })
         .collect();
@@ -510,59 +557,176 @@ fn detect_windows_gpus() -> Result<Vec<GpuInfo>> {
     anyhow::bail!("No compute-capable GPUs detected")
 }
 
-/// Get accurate VRAM sizes from DXDiag (WMI often caps at 4GB)
+/// Normalize GPU name for consistent matching between detection methods
 #[cfg(target_os = "windows")]
-fn get_vram_from_dxdiag() -> std::collections::HashMap<String, u64> {
+fn normalize_gpu_name(name: &str) -> String {
+    // Remove extra whitespace, lowercase, and normalize vendor prefixes
+    name.to_lowercase()
+        .split_whitespace()
+        .filter(|s| !s.is_empty())
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+/// Get accurate VRAM sizes using WMI + PowerShell (more reliable than DXDiag)
+#[cfg(target_os = "windows")]
+fn get_vram_from_wmi() -> std::collections::HashMap<String, u64> {
     use std::collections::HashMap;
-    
+
     let mut vram_map = HashMap::new();
-    
-    // Run dxdiag and parse output
-    let temp_file = std::env::temp_dir().join("dxdiag_moss_temp.txt");
-    let temp_path = temp_file.to_string_lossy();
-    
-    let result = Command::new("dxdiag")
-        .args(["/t", &temp_path])
-        .output();
-    
-    if result.is_err() {
-        return vram_map;
-    }
-    
-    // Wait a moment for dxdiag to finish writing
-    std::thread::sleep(std::time::Duration::from_secs(2));
-    
-    if let Ok(content) = fs::read_to_string(&temp_file) {
-        let mut current_card: Option<String> = None;
-        
-        for line in content.lines() {
-            let trimmed = line.trim();
-            
-            // Detect card name
-            if trimmed.starts_with("Card name:") {
-                if let Some(card_name) = trimmed.split(':').nth(1) {
-                    current_card = Some(card_name.trim().to_string());
+
+    // Use WMI to get video controller information with dedicated memory
+    // This approach is faster and more reliable than DXDiag text parsing
+    let output = Command::new("powershell")
+        .args([
+            "-NoProfile",
+            "-Command",
+            r#"
+            Get-CimInstance -ClassName Win32_VideoController | Where-Object {
+                $_.PNPDeviceID -like "PCI\VEN*" -and
+                $_.Name -notlike "*Basic*" -and
+                $_.Name -notlike "*DisplayLink*"
+            } | ForEach-Object {
+                $vramBytes = $_.AdapterRAM
+
+                # WMI AdapterRAM can be unreliable (32-bit field capped at ~4GB), try to get from device properties
+                # Trigger fallback if: null, zero, < 1GB, or suspiciously close to 4GB (4000-4096 MB indicates truncation)
+                $vramMB = [Math]::Round($vramBytes / 1MB)
+                if ($vramBytes -eq $null -or $vramBytes -eq 0 -or $vramBytes -lt 1GB -or ($vramMB -ge 4000 -and $vramMB -le 4096)) {
+                    # Try to read from registry for more accurate VRAM info
+                    $pnpId = $_.PNPDeviceID
+                    $regPath = "HKLM:\SYSTEM\CurrentControlSet\Enum\$pnpId"
+                    if (Test-Path $regPath) {
+                        try {
+                            $hwInfo = Get-ItemProperty -Path $regPath -ErrorAction SilentlyContinue
+                            if ($hwInfo.'HardwareInformation.qwMemorySize') {
+                                $vramBytes = $hwInfo.'HardwareInformation.qwMemorySize'
+                            }
+                        } catch {}
+                    }
                 }
-            }
-            
-            // Parse dedicated memory for the current card
-            if trimmed.starts_with("Dedicated Memory:") {
-                if let Some(card) = &current_card {
-                    if let Some(mem_str) = trimmed.split(':').nth(1) {
-                        // Parse "24560 MB" format
-                        let mem_str = mem_str.trim().replace(" MB", "");
-                        if let Ok(mb) = mem_str.parse::<u64>() {
-                            vram_map.insert(card.clone(), mb);
+
+                # If still no valid VRAM and AdapterRAM is capped at 4GB, it's likely truncated
+                # Use a heuristic: if it's exactly 4095 MB, the actual value is likely higher
+                if ($vramBytes -gt 0) {
+                    [PSCustomObject]@{
+                        Name = $_.Name
+                        VramMB = [Math]::Round($vramBytes / 1MB)
+                    }
+                }
+            } | ConvertTo-Json
+            "#
+        ])
+        .output();
+
+    if let Ok(output) = output {
+        if let Ok(stdout) = String::from_utf8(output.stdout) {
+            // Parse JSON output
+            if let Ok(json) = serde_json::from_str::<serde_json::Value>(&stdout) {
+                let gpu_array: Vec<&serde_json::Value> = if json.is_array() {
+                    json.as_array().unwrap().iter().collect()
+                } else {
+                    vec![&json]
+                };
+
+                for gpu in gpu_array {
+                    if let (Some(name), Some(vram)) = (
+                        gpu["Name"].as_str(),
+                        gpu["VramMB"].as_u64()
+                    ) {
+                        // Only add if VRAM is reasonable (> 0)
+                        if vram > 0 {
+                            let normalized = normalize_gpu_name(name);
+                            vram_map.insert(normalized, vram);
+
+                            // Also store original name for fallback matching
+                            vram_map.insert(name.to_string(), vram);
                         }
                     }
                 }
             }
         }
-        
-        // Clean up temp file
-        let _ = fs::remove_file(&temp_file);
     }
-    
+
+    vram_map
+}
+
+/// Get accurate VRAM using native DXGI API (most reliable on Windows)
+///
+/// Returns HashMap of GPU description -> VRAM in MB
+/// Uses DirectX Graphics Infrastructure to query dedicated video memory directly
+#[cfg(target_os = "windows")]
+fn get_vram_from_dxgi() -> std::collections::HashMap<String, u64> {
+    use std::collections::HashMap;
+    use std::mem::MaybeUninit;
+    use windows::Win32::Graphics::Dxgi::{
+        CreateDXGIFactory, IDXGIFactory, DXGI_ADAPTER_DESC, DXGI_ERROR_NOT_FOUND,
+    };
+
+    let mut vram_map = HashMap::new();
+
+    // Create DXGI Factory
+    let factory: Result<IDXGIFactory, _> = unsafe { CreateDXGIFactory() };
+
+    let Ok(factory) = factory else {
+        tracing::debug!("Failed to create DXGI factory");
+        return vram_map;
+    };
+
+    // Enumerate adapters
+    let mut adapter_index = 0;
+    loop {
+        let adapter = unsafe { factory.EnumAdapters(adapter_index) };
+
+        match adapter {
+            Ok(adapter) => {
+                // Get adapter description using mutable pointer
+                let mut desc = MaybeUninit::<DXGI_ADAPTER_DESC>::uninit();
+                let result = unsafe { adapter.GetDesc(desc.as_mut_ptr()) };
+
+                if result.is_ok() {
+                    let desc = unsafe { desc.assume_init() };
+
+                    // Convert wide string to Rust String
+                    let description = String::from_utf16_lossy(&desc.Description)
+                        .trim_end_matches('\0')
+                        .to_string();
+
+                    // Get dedicated video memory (in bytes, 64-bit value - no truncation!)
+                    let vram_bytes = desc.DedicatedVideoMemory as u64;
+                    let vram_mb: u64 = vram_bytes / (1024 * 1024);
+
+                    if vram_mb > 0 {
+                        tracing::debug!(
+                            "DXGI Adapter {}: {} - {} MB VRAM",
+                            adapter_index,
+                            description,
+                            vram_mb
+                        );
+
+                        // Store both original and normalized names
+                        vram_map.insert(description.clone(), vram_mb);
+                        vram_map.insert(normalize_gpu_name(&description), vram_mb);
+                    }
+                }
+
+                adapter_index += 1;
+            }
+            Err(e) => {
+                // DXGI_ERROR_NOT_FOUND means we've enumerated all adapters
+                if e.code() == DXGI_ERROR_NOT_FOUND {
+                    break;
+                }
+                tracing::debug!("Error enumerating DXGI adapter {}: {:?}", adapter_index, e);
+                break;
+            }
+        }
+    }
+
+    if !vram_map.is_empty() {
+        tracing::info!("DXGI detected {} GPU(s) with accurate VRAM data", vram_map.len() / 2);
+    }
+
     vram_map
 }
 
@@ -610,6 +774,36 @@ fn detect_ai_runtime(vendor: &str, capabilities: &[String]) -> Option<AiRuntime>
     } else {
         None
     }
+}
+
+/// Convert AiRuntime struct to dual-format runtime strings
+/// Returns both simple ("cuda") and versioned ("cuda:12.2") formats
+fn ai_runtime_to_strings(runtime: &AiRuntime) -> Vec<String> {
+    let mut runtimes = Vec::new();
+
+    // CUDA
+    if let Some(cuda_version) = &runtime.cuda_version {
+        runtimes.push("cuda".to_string());
+        runtimes.push(format!("cuda:{}", cuda_version));
+    }
+
+    // ROCm
+    if let Some(rocm_version) = &runtime.rocm_version {
+        runtimes.push("rocm".to_string());
+        runtimes.push(format!("rocm:{}", rocm_version));
+    }
+
+    // DirectML (no version tracking)
+    if runtime.has_directml {
+        runtimes.push("directml".to_string());
+    }
+
+    // OpenVINO (no version tracking)
+    if runtime.has_openvino {
+        runtimes.push("openvino".to_string());
+    }
+
+    runtimes
 }
 
 /// Detect CUDA toolkit installation (not just driver)
@@ -698,6 +892,7 @@ fn detect_directml() -> bool {
 }
 
 #[cfg(not(target_os = "windows"))]
+#[allow(dead_code)]
 fn detect_directml() -> bool {
     false
 }
@@ -1053,6 +1248,198 @@ fn detect_windows_gpus() -> Result<Vec<GpuInfo>> {
     anyhow::bail!("Windows GPU detection not available on this platform")
 }
 
+/// Detect which container runtime is available (Docker or Podman)
+pub fn detect_container_runtime() -> Option<String> {
+    // Try Docker first (most common)
+    if Command::new("docker")
+        .arg("--version")
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false)
+    {
+        return Some("docker".to_string());
+    }
+
+    // Try Podman
+    if Command::new("podman")
+        .arg("--version")
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false)
+    {
+        return Some("podman".to_string());
+    }
+
+    None
+}
+
+/// Scan container images for AI runtimes
+///
+/// Returns detected runtimes in dual format (e.g., ["rocm", "rocm:5.7"])
+///
+/// # Hardware Validation
+/// - ROCm runtimes are only included if AMD GPU is present
+/// - CUDA runtimes are only included if NVIDIA GPU is present
+/// - Generic AI frameworks (TensorFlow, PyTorch) are included if they have GPU tags
+pub fn scan_ai_runtime_containers(gpus: &[GpuInfo]) -> Vec<String> {
+    let mut container_runtimes = Vec::new();
+
+    // Determine which GPUs are present
+    let has_amd = gpus.iter().any(|g| g.vendor.to_lowercase() == "amd");
+    let has_nvidia = gpus.iter().any(|g| g.vendor.to_lowercase() == "nvidia");
+
+    // Detect container runtime
+    let runtime_cmd = match detect_container_runtime() {
+        Some(cmd) => cmd,
+        None => {
+            tracing::debug!("No container runtime detected (Docker/Podman)");
+            return container_runtimes;
+        }
+    };
+
+    tracing::info!("Scanning {} images for AI runtimes...", runtime_cmd);
+
+    // Query images
+    let output = Command::new(&runtime_cmd)
+        .args(["images", "--format", "{{.Repository}}:{{.Tag}}"])
+        .output();
+
+    let Ok(output) = output else {
+        tracing::warn!("Failed to query {} images", runtime_cmd);
+        return container_runtimes;
+    };
+
+    if !output.status.success() {
+        tracing::warn!("{} images command failed", runtime_cmd);
+        return container_runtimes;
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    for line in stdout.lines() {
+        let image = line.trim();
+        if image.is_empty() || image == "<none>:<none>" {
+            continue;
+        }
+
+        // Extract runtime information from image name
+        if let Some(runtime_info) = extract_ai_runtime_from_image(image) {
+            // Validate against hardware
+            let (runtime_name, version) = runtime_info;
+
+            match runtime_name.as_str() {
+                "rocm" => {
+                    if !has_amd {
+                        tracing::debug!(
+                            "Skipping ROCm container '{}' - no AMD GPU detected",
+                            image
+                        );
+                        continue;
+                    }
+                }
+                "cuda" => {
+                    if !has_nvidia {
+                        tracing::debug!(
+                            "Skipping CUDA container '{}' - no NVIDIA GPU detected",
+                            image
+                        );
+                        continue;
+                    }
+                }
+                _ => {
+                    // Other runtimes (TensorFlow, PyTorch) are vendor-agnostic
+                }
+            }
+
+            // Add runtime in dual format
+            if !container_runtimes.contains(&runtime_name) {
+                container_runtimes.push(runtime_name.clone());
+            }
+
+            if let Some(ver) = version {
+                let versioned = format!("{}:{}", runtime_name, ver);
+                if !container_runtimes.contains(&versioned) {
+                    container_runtimes.push(versioned);
+                }
+            }
+        }
+    }
+
+    if !container_runtimes.is_empty() {
+        tracing::info!(
+            "Found {} containerized AI runtimes: {:?}",
+            container_runtimes.len(),
+            container_runtimes
+        );
+    }
+
+    container_runtimes
+}
+
+/// Extract AI runtime information from container image name
+///
+/// Returns (runtime_name, optional_version)
+///
+/// # Examples
+/// - `rocm/pytorch:rocm5.7_ubuntu22.04_py3.10` → Some(("rocm", Some("5.7")))
+/// - `nvidia/cuda:12.2.0-base` → Some(("cuda", Some("12.2")))
+/// - `tensorflow/tensorflow:latest-gpu` → Some(("tensorflow", None))
+fn extract_ai_runtime_from_image(image: &str) -> Option<(String, Option<String>)> {
+    let image_lower = image.to_lowercase();
+
+    // ROCm images
+    if image_lower.contains("rocm") {
+        // Try to extract version from tag (e.g., rocm5.7, rocm/pytorch:rocm5.7_...)
+        let version = if let Some(tag) = image.split(':').nth(1) {
+            // Extract version like "rocm5.7" → "5.7"
+            if let Some(rocm_part) = tag.split('_').find(|s| s.starts_with("rocm")) {
+                rocm_part.trim_start_matches("rocm").split('_').next()
+                    .filter(|v| !v.is_empty())
+                    .map(|v| v.to_string())
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        return Some(("rocm".to_string(), version));
+    }
+
+    // CUDA images
+    if image_lower.contains("cuda") {
+        let version = if let Some(tag) = image.split(':').nth(1) {
+            // Extract version like "12.2.0-base" → "12.2"
+            tag.split('-').next()
+                .and_then(|v| {
+                    // Take major.minor from semver (12.2.0 → 12.2)
+                    let parts: Vec<&str> = v.split('.').collect();
+                    if parts.len() >= 2 {
+                        Some(format!("{}.{}", parts[0], parts[1]))
+                    } else {
+                        Some(v.to_string())
+                    }
+                })
+        } else {
+            None
+        };
+
+        return Some(("cuda".to_string(), version));
+    }
+
+    // TensorFlow GPU images
+    if image_lower.contains("tensorflow") && (image_lower.contains("gpu") || image_lower.contains("cuda")) {
+        return Some(("tensorflow".to_string(), None));
+    }
+
+    // PyTorch GPU images (if not ROCm-specific)
+    if image_lower.contains("pytorch") && (image_lower.contains("gpu") || image_lower.contains("cuda")) {
+        return Some(("pytorch".to_string(), None));
+    }
+
+    None
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1063,5 +1450,32 @@ mod tests {
         assert!(resources.cpu.cores > 0);
         assert!(resources.memory.total_bytes > 0);
         assert!(resources.disk.total_bytes > 0);
+    }
+
+    #[test]
+    fn test_extract_ai_runtime_from_image() {
+        // ROCm images
+        assert_eq!(
+            extract_ai_runtime_from_image("rocm/pytorch:rocm5.7_ubuntu22.04_py3.10"),
+            Some(("rocm".to_string(), Some("5.7".to_string())))
+        );
+
+        // CUDA images
+        assert_eq!(
+            extract_ai_runtime_from_image("nvidia/cuda:12.2.0-base-ubuntu22.04"),
+            Some(("cuda".to_string(), Some("12.2".to_string())))
+        );
+
+        // TensorFlow GPU
+        assert_eq!(
+            extract_ai_runtime_from_image("tensorflow/tensorflow:latest-gpu"),
+            Some(("tensorflow".to_string(), None))
+        );
+
+        // Non-AI image
+        assert_eq!(
+            extract_ai_runtime_from_image("nginx:latest"),
+            None
+        );
     }
 }

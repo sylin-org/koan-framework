@@ -25,6 +25,7 @@ chrono = "0.4"
 clap = { version = "4.4", features = ["derive", "env"] }
 futures-util = "0.3"
 reqwest = { version = "0.11", default-features = false, features = ["json", "rustls-tls"] }
+regex = "1.10"
 toml = "0.8"
 tower-http = { version = "0.5", features = ["trace", "cors"] }
 tokio-stream = { version = "0.1", features = ["sync"] }
@@ -35,9 +36,23 @@ rand = "0.8"
 async-stream = "0.3"
 blake3 = "1.5"
 socket2 = "0.5"
+async-trait = "0.1"
+dashmap = "5.5"
+chacha20poly1305 = "0.10"
+argon2 = "0.5"
+walkdir = "2.4"
+url = "2.5"
 
 [target.'cfg(windows)'.dependencies]
-windows-sys = { version = "0.52", features = ["Win32_Networking_WinSock"] }
+windows-sys = { version = "0.52", features = [
+    "Win32_Networking_WinSock",
+    "Win32_Storage_FileSystem",
+    "Win32_Foundation"
+] }
+windows = { version = "0.52", features = [
+    "Win32_Graphics_Dxgi",
+    "Win32_Graphics_Dxgi_Common"
+] }
 
 [target.'cfg(unix)'.dependencies]
 nix = { version = "0.27", features = ["process", "signal"] }

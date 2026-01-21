@@ -1,7 +1,11 @@
 ﻿/// Zen parser for positional keyword extraction
-/// 
+///
 /// Parses command-line arguments to detect zen syntax and extract positional keywords
-/// before they reach Clap. Supports: `at <stone>`, `quietly`, `until <condition>`
+/// before they reach Clap. Supports:
+/// - `on <stone>` / `at <stone>` - target stone (on is preferred, at is legacy alias)
+/// - `from <url>` - source URL for borrow command
+/// - `quietly` - suppress non-essential output
+/// - `until <condition>` - stream termination condition
 
 use anyhow::{Result, anyhow};
 
@@ -13,10 +17,12 @@ pub enum CommandStyle {
 
 #[derive(Debug, Clone, Default)]
 pub struct ParsedKeywords {
-    pub at_stone: Option<String>,
+    pub on_stone: Option<String>,    // `on <stone>` or `at <stone>` (legacy)
+    pub from_url: Option<String>,    // `from <url>` for borrow
     pub quietly: bool,
     pub until_condition: Option<String>,
 }
+
 
 #[derive(Debug, Clone)]
 pub struct ParsedCommand {
@@ -71,26 +77,45 @@ pub fn parse_args(args: Vec<String>) -> Result<ParsedCommand> {
 fn is_zen_verb(verb: &str) -> bool {
     matches!(
         verb,
-        "offer" | "rest" | "wake" | "nourish" | "release" |
-        "observe" | "watch" | "touch" | "tend" | "place" |
-        "lift" | "invite" | "explore" | "garden" | "make"
+        // Service lifecycle (zen)
+        "offer" | "rest" | "wake" | "nourish" | "remove" | "uproot" |
+        // Adoption (zen)
+        "adopt" | "release" | "find" | "adopted" | "borrowed" |
+        // External services (zen)
+        "borrow" | "return" |
+        // Observation (zen)
+        "observe" | "watch" | "list" | "status" |
+        // Context (zen)
+        "tend" |
+        // Pond (zen)
+        "place" | "lift" | "invite" |
+        // Admin (zen)
+        "make" | "refresh" | "reconcile" | "template" | "ceremony" |
+        // Installation (zen alias)
+        "take-root" |
+        // Discovery (proposed)
+        "explore"
     )
 }
 
-/// Check if a verb is a normative verb
+/// Check if a verb is a normative verb (resource-first pattern)
 fn is_normative_verb(verb: &str) -> bool {
     matches!(
         verb,
-        "services" | "status" | "logs" | "inspect" | "list" | "remove" | "upgrade" | 
-        "refresh" | "reconcile" | "template" | "help" |
-        "pond" | "context" | "topology"
+        // Resource commands (normative)
+        "services" | "offerings" | "stones" | "adoption" | "templates" |
+        "ceremonies" | "console" | "context" | "pond" | "events" | "jobs" |
+        // Admin/utility (normative)
+        "help" | "browse-commands" |
+        // Installation (normative)
+        "install-service"
     )
 }
 
 /// Check if args contain zen positional keywords
 fn has_zen_keywords(args: &[String]) -> bool {
     args.iter().any(|arg| {
-        matches!(arg.as_str(), "at" | "quietly" | "until")
+        matches!(arg.as_str(), "on" | "at" | "from" | "quietly" | "until")
     })
 }
 
@@ -104,13 +129,23 @@ fn extract_keywords(args: &[String], style: &CommandStyle) -> Result<(ParsedKeyw
         let arg = &args[i];
 
         match arg.as_str() {
-            "at" if *style == CommandStyle::Zen => {
+            // "on" is the preferred keyword, "at" is legacy alias
+            "on" | "at" if *style == CommandStyle::Zen => {
                 // Next arg is stone name
                 i += 1;
                 if i >= args.len() {
-                    return Err(anyhow!("'at' keyword requires stone name"));
+                    return Err(anyhow!("'{}' keyword requires stone name", arg));
                 }
-                keywords.at_stone = Some(args[i].clone());
+                keywords.on_stone = Some(args[i].clone());
+            }
+            // "from" for borrow command
+            "from" if *style == CommandStyle::Zen => {
+                // Next arg is URL
+                i += 1;
+                if i >= args.len() {
+                    return Err(anyhow!("'from' keyword requires URL"));
+                }
+                keywords.from_url = Some(args[i].clone());
             }
             "quietly" if *style == CommandStyle::Zen => {
                 keywords.quietly = true;
@@ -140,7 +175,23 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_zen_offer_with_at() {
+    fn test_zen_offer_with_on() {
+        let args = vec![
+            "offer".to_string(),
+            "mongodb".to_string(),
+            "on".to_string(),
+            "stone-02".to_string(),
+        ];
+        let parsed = parse_args(args).unwrap();
+        assert_eq!(parsed.style, CommandStyle::Zen);
+        assert_eq!(parsed.verb, "offer");
+        assert_eq!(parsed.args, vec!["mongodb"]);
+        assert_eq!(parsed.keywords.on_stone, Some("stone-02".to_string()));
+    }
+
+    #[test]
+    fn test_zen_offer_with_at_legacy() {
+        // "at" is legacy alias for "on"
         let args = vec![
             "offer".to_string(),
             "mongodb".to_string(),
@@ -148,10 +199,22 @@ mod tests {
             "stone-02".to_string(),
         ];
         let parsed = parse_args(args).unwrap();
+        assert_eq!(parsed.keywords.on_stone, Some("stone-02".to_string()));
+    }
+
+    #[test]
+    fn test_zen_borrow_with_from() {
+        let args = vec![
+            "borrow".to_string(),
+            "redis".to_string(),
+            "from".to_string(),
+            "redis://cache:6379".to_string(),
+        ];
+        let parsed = parse_args(args).unwrap();
         assert_eq!(parsed.style, CommandStyle::Zen);
-        assert_eq!(parsed.verb, "offer");
-        assert_eq!(parsed.args, vec!["mongodb"]);
-        assert_eq!(parsed.keywords.at_stone, Some("stone-02".to_string()));
+        assert_eq!(parsed.verb, "borrow");
+        assert_eq!(parsed.args, vec!["redis"]);
+        assert_eq!(parsed.keywords.from_url, Some("redis://cache:6379".to_string()));
     }
 
     #[test]
@@ -189,6 +252,38 @@ mod tests {
     }
 
     #[test]
+    fn test_zen_list() {
+        // "list" should now be a zen verb
+        let args = vec![
+            "list".to_string(),
+        ];
+        let parsed = parse_args(args).unwrap();
+        assert_eq!(parsed.style, CommandStyle::Zen);
+    }
+
+    #[test]
+    fn test_zen_uproot() {
+        let args = vec![
+            "uproot".to_string(),
+            "mongodb".to_string(),
+        ];
+        let parsed = parse_args(args).unwrap();
+        assert_eq!(parsed.style, CommandStyle::Zen);
+        assert_eq!(parsed.verb, "uproot");
+    }
+
+    #[test]
+    fn test_zen_adopt() {
+        let args = vec![
+            "adopt".to_string(),
+            "my-container".to_string(),
+        ];
+        let parsed = parse_args(args).unwrap();
+        assert_eq!(parsed.style, CommandStyle::Zen);
+        assert_eq!(parsed.verb, "adopt");
+    }
+
+    #[test]
     fn test_mixing_rejected() {
         let args = vec![
             "services".to_string(),
@@ -197,5 +292,17 @@ mod tests {
         ];
         let result = parse_args(args);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_zen_nourish() {
+        let args = vec![
+            "nourish".to_string(),
+            "mongodb".to_string(),
+        ];
+        let parsed = parse_args(args).unwrap();
+        assert_eq!(parsed.style, CommandStyle::Zen);
+        assert_eq!(parsed.verb, "nourish");
+        assert_eq!(parsed.args, vec!["mongodb"]);
     }
 }

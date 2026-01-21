@@ -53,6 +53,13 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+# Detect if running on Windows (works in both Windows PowerShell 5.x and PowerShell Core 6+)
+$RunningOnWindows = if ($null -ne (Get-Variable -Name IsWindows -ValueOnly -ErrorAction SilentlyContinue)) {
+    $IsWindows
+} else {
+    $env:OS -eq "Windows_NT"
+}
+
 $WORKSPACE_ROOT = (Get-Item $PSScriptRoot).Parent.FullName
 $DIST_DIR = Join-Path $WORKSPACE_ROOT "dist"
 $LINUX_DIR = Join-Path $DIST_DIR "linux"
@@ -62,13 +69,17 @@ Write-Host "`n╔═════════════════════
 Write-Host "║   Zen Garden Distribution Build                   ║" -ForegroundColor Cyan
 Write-Host "╚════════════════════════════════════════════════════╝`n" -ForegroundColor Cyan
 
-# Detect platform
-$IsLinuxHost = $PSVersionTable.Platform -eq "Unix" -and $PSVersionTable.OS -match "Linux"
-$IsWslHost = $env:WSL_DISTRO_NAME -ne $null
+# Detect platform (handle Windows PowerShell which lacks $PSVersionTable.Platform)
+$IsLinuxHost = $false
+if ($PSVersionTable.PSVersion.Major -ge 6) {
+    # PowerShell Core has Platform property
+    $IsLinuxHost = $PSVersionTable.Platform -eq "Unix" -and $PSVersionTable.OS -match "Linux"
+}
+$IsWslHost = $null -ne $env:WSL_DISTRO_NAME
 $UseDocker = -not ($IsLinuxHost -and $Native)
 
 Write-Host "Platform Detection:" -ForegroundColor Yellow
-Write-Host "  OS: $(if ($IsWindows) { 'Windows' } elseif ($IsLinuxHost) { 'Linux' } else { 'Unix' })"
+Write-Host "  OS: $(if ($RunningOnWindows) { 'Windows' } elseif ($IsLinuxHost) { 'Linux' } else { 'Unix' })"
 if ($IsWslHost) { Write-Host "  Environment: WSL ($env:WSL_DISTRO_NAME)" }
 Write-Host "  Build Method: $(if ($UseDocker) { 'Docker Container' } else { 'Native' })"
 Write-Host ""
@@ -94,7 +105,7 @@ if ($UseDocker) {
         docker version | Out-Null
     } catch {
         Write-Host "✗ Docker not available." -ForegroundColor Red
-        if ($IsWindows) {
+        if ($RunningOnWindows) {
             Write-Host "  Install Docker Desktop: https://www.docker.com/products/docker-desktop/" -ForegroundColor Yellow
         } else {
             Write-Host "  Install Docker Engine or use -Native flag for native build" -ForegroundColor Yellow
@@ -104,8 +115,7 @@ if ($UseDocker) {
     
     # Check if perennial build image exists
     $existingImage = docker images -q $IMAGE_NAME 2>$null
-    $needsBuild = $ForceRebuild -or (-not $existingImage)
-    
+
     if ($existingImage -and -not $ForceRebuild) {
         Write-Host "Build Container:" -ForegroundColor Yellow
         Write-Host "  ✓ Using existing image: $IMAGE_NAME" -ForegroundColor Green
@@ -127,13 +137,12 @@ if ($UseDocker) {
     
     # Determine build type (default: release for production)
     $buildProfile = if ($DebugBuild) { "debug" } else { "release" }
-    $buildFlag = if (-not $DebugBuild) { "--release" } else { "" }
-    
+
     # Docker-based build
     Write-Host "Building binaries in container..." -ForegroundColor Cyan
     
     # Determine volume mount path (Windows uses /drive/path format)
-    if ($IsWindows) {
+    if ($RunningOnWindows) {
         $driveLetter = $WORKSPACE_ROOT.Substring(0,1).ToLower()
         $unixPath = "/$driveLetter" + $WORKSPACE_ROOT.Substring(2).Replace('\', '/')
     } else {
@@ -200,11 +209,10 @@ if ($UseDocker) {
         if ($LASTEXITCODE -ne 0) { throw "Build failed" }
         
         # Copy binaries from target to dist/linux/
-        $srcDir = Join-Path $WORKSPACE_ROOT "target" $buildProfile
+        $srcDir = Join-Path (Join-Path $WORKSPACE_ROOT "target") $buildProfile
         Copy-Item "$srcDir\garden-lantern" "$LINUX_DIR\garden-lantern" -Force
         Copy-Item "$srcDir\garden-moss" "$LINUX_DIR\garden-moss" -Force
         Copy-Item "$srcDir\garden-rake" "$LINUX_DIR\garden-rake" -Force
-        Copy-Item "$srcDir\garden-lantern" "$LINUX_DIR\garden-lantern" -Force
         
         Write-Host "  ✓ Linux binaries built`n" -ForegroundColor Green
         
@@ -218,8 +226,7 @@ if ($UseDocker) {
     
     # Determine build type (default: release for production)
     $buildProfile = if ($DebugBuild) { "debug" } else { "release" }
-    $buildFlag = if (-not $DebugBuild) { "--release" } else { "" }
-    
+
     Push-Location $WORKSPACE_ROOT
     try {
         Write-Host "  → Building garden-moss (Linux daemon)..."
@@ -235,7 +242,7 @@ if ($UseDocker) {
         if ($LASTEXITCODE -ne 0) { throw "Build failed" }
         
         # Copy binaries from target to dist/linux/
-        $srcDir = Join-Path $WORKSPACE_ROOT "target" $buildProfile
+        $srcDir = Join-Path (Join-Path $WORKSPACE_ROOT "target") $buildProfile
         Copy-Item "$srcDir/garden-lantern" "$LINUX_DIR/garden-lantern-$version" -Force
         Copy-Item "$srcDir/garden-moss" "$LINUX_DIR/garden-moss-$version" -Force
         Copy-Item "$srcDir/garden-rake" "$LINUX_DIR/garden-rake-$version" -Force
@@ -273,15 +280,15 @@ if ($artifacts) {
         if ($UseDocker -and $existingImage) {
             try {
                 $fileType = docker run --rm -v "${LINUX_DIR}:/check" $IMAGE_NAME file "/check/$($_.Name)" 2>$null
-                $isLinux = $fileType -match "ELF.*Linux"
-                $marker = if ($isLinux) { "✓" } else { "?" }
+                $isLinuxBinary = $fileType -match "ELF.*Linux"
+                $marker = if ($isLinuxBinary) { "✓" } else { "?" }
             } catch {
                 $marker = "-"
             }
         } elseif ($IsLinuxHost) {
             $fileType = file $_.FullName 2>$null
-            $isLinux = $fileType -match "ELF"
-            $marker = if ($isLinux) { "✓" } else { "?" }
+            $isLinuxBinary = $fileType -match "ELF"
+            $marker = if ($isLinuxBinary) { "✓" } else { "?" }
         }
         
         Write-Host ("  {0} {1,-20} {2,10}" -f $marker, $_.Name, $sizeStr) -ForegroundColor $(if ($marker -eq "✓") { "Green" } else { "White" })

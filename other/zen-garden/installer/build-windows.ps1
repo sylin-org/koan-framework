@@ -34,6 +34,13 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+# Detect if running on Windows (works in both Windows PowerShell 5.x and PowerShell Core 6+)
+$RunningOnWindows = if ($null -ne (Get-Variable -Name IsWindows -ValueOnly -ErrorAction SilentlyContinue)) {
+    $IsWindows
+} else {
+    $env:OS -eq "Windows_NT"
+}
+
 $WORKSPACE_ROOT = (Get-Item $PSScriptRoot).Parent.FullName
 $DIST_DIR = Join-Path $WORKSPACE_ROOT "dist"
 $WINDOWS_DIR = Join-Path $DIST_DIR "windows"
@@ -42,7 +49,7 @@ Write-Host "`n╔═════════════════════
 Write-Host "║   Zen Garden Windows Build                         ║" -ForegroundColor Cyan
 Write-Host "╚════════════════════════════════════════════════════╝`n" -ForegroundColor Cyan
 
-if (-not $IsWindows) {
+if (-not $RunningOnWindows) {
     Write-Host "✗ This script must run on Windows." -ForegroundColor Red
     Write-Host "  For Linux builds, use build-linux.ps1" -ForegroundColor Yellow
     exit 1
@@ -50,7 +57,6 @@ if (-not $IsWindows) {
 
 # Determine build type (default: release for production)
 $buildProfile = if ($DebugBuild) { "debug" } else { "release" }
-$buildFlag = if (-not $DebugBuild) { "--release" } else { "" }
 
 # Get version from parent script or generate default
 if (-not $env:GARDEN_VERSION) {

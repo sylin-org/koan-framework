@@ -5,14 +5,14 @@
 };
 use crate::api::responses::{CreateServiceRequest, ServiceActionResponse, ApiResponse};
 use crate::api::suggestions::{generate_suggestions, SuggestionContext};
-use crate::{error_response, AppState, persist_registry_to_disk};
-use garden_common::{ApiError, ServiceInfo, ServiceStatus};
+use crate::{error_response, AppState};
+use garden_common::{api_utils::ApiErrorResponse, ServiceInfo, ServiceStatus};
 
 /// GET /api/v1/services - List all services
 pub async fn list_services_v1(
     State(state): State<AppState>,
     headers: HeaderMap,
-) -> Result<Json<ApiResponse<Vec<ServiceInfo>>>, (StatusCode, Json<ApiError>)> {
+) -> Result<Json<ApiResponse<Vec<ServiceInfo>>>, (StatusCode, Json<ApiErrorResponse>)> {
     let registry = state.registry.read().await;
     let mut services = registry.clone();
     drop(registry);
@@ -51,7 +51,7 @@ pub async fn get_service_v1(
     State(state): State<AppState>,
     Path(service): Path<String>,
     headers: HeaderMap,
-) -> Result<Json<ApiResponse<ServiceInfo>>, (StatusCode, Json<ApiError>)> {
+) -> Result<Json<ApiResponse<ServiceInfo>>, (StatusCode, Json<ApiErrorResponse>)> {
     let registry = state.registry.read().await;
     let service_info = registry
         .iter()
@@ -81,7 +81,7 @@ pub async fn create_service_v1(
     State(state): State<AppState>,
     headers: HeaderMap,
     Json(payload): Json<CreateServiceRequest>,
-) -> Result<Json<ApiResponse<ServiceActionResponse>>, (StatusCode, Json<ApiError>)> {
+) -> Result<Json<ApiResponse<ServiceActionResponse>>, (StatusCode, Json<ApiErrorResponse>)> {
     let offering = payload.offering.clone();
 
     // Self-heal: if the container exists but registry forgot it (e.g. after restart), adopt it.
@@ -97,11 +97,11 @@ pub async fn create_service_v1(
         };
 
         if !in_registry {
-            if let Ok(Some(info)) = crate::adopt_offering_container(&state, &offering).await {
+            if let Ok(Some(info)) = crate::adopt_offering_container(&state.docker, &state.templates, &offering).await {
                 let mut reg = state.registry.write().await;
                 reg.push(info);
                 drop(reg);
-                crate::persist_registry_state(&state).await;
+                let _ = crate::persist_registry_state(&state).await;
 
                 let ctx = SuggestionContext::from_headers(&headers, "create_service");
                 let suggestions = generate_suggestions(&ctx);
@@ -205,13 +205,12 @@ pub async fn create_service_v1(
     }))
 }
 
-/// POST /api/v1/services/:service/rest - Rest (stop) service (not yet routed)
-#[allow(dead_code)]
+/// POST /api/v1/services/:service/rest - Rest (stop) service
 pub async fn rest_service_v1(
     State(state): State<AppState>,
     Path(service): Path<String>,
     headers: HeaderMap,
-) -> Result<Json<ApiResponse<ServiceActionResponse>>, (StatusCode, Json<ApiError>)> {
+) -> Result<Json<ApiResponse<ServiceActionResponse>>, (StatusCode, Json<ApiErrorResponse>)> {
     let mut registry = state.registry.write().await;
     
     let service_info = registry
@@ -238,10 +237,9 @@ pub async fn rest_service_v1(
     }
 
     service_info.status = ServiceStatus::Stopped;
-    let snapshot = registry.clone();
     drop(registry);
 
-    if let Err(e) = persist_registry_to_disk(&snapshot).await {
+    if let Err(e) = crate::persist_registry_state(&state).await {
         tracing::warn!(error = ?e, "Failed to persist registry after rest");
     }
 
@@ -259,13 +257,12 @@ pub async fn rest_service_v1(
     }))
 }
 
-/// POST /api/v1/services/:service/wake - Wake (start) service (not yet routed)
-#[allow(dead_code)]
+/// POST /api/v1/services/:service/wake - Wake (start) service
 pub async fn wake_service_v1(
     State(state): State<AppState>,
     Path(service): Path<String>,
     headers: HeaderMap,
-) -> Result<Json<ApiResponse<ServiceActionResponse>>, (StatusCode, Json<ApiError>)> {
+) -> Result<Json<ApiResponse<ServiceActionResponse>>, (StatusCode, Json<ApiErrorResponse>)> {
     let mut registry = state.registry.write().await;
     
     let service_info = registry
@@ -292,10 +289,9 @@ pub async fn wake_service_v1(
     }
 
     service_info.status = ServiceStatus::Running;
-    let snapshot = registry.clone();
     drop(registry);
 
-    if let Err(e) = persist_registry_to_disk(&snapshot).await {
+    if let Err(e) = crate::persist_registry_state(&state).await {
         tracing::warn!(error = ?e, "Failed to persist registry after wake");
     }
 
@@ -313,13 +309,12 @@ pub async fn wake_service_v1(
     }))
 }
 
-/// POST /api/v1/services/:service/nourish - Nourish (upgrade) service (not yet routed)
-#[allow(dead_code)]
+/// POST /api/v1/services/:service/nourish - Nourish (upgrade) service
 pub async fn nourish_service_v1(
     State(state): State<AppState>,
     Path(service): Path<String>,
     headers: HeaderMap,
-) -> Result<Json<ApiResponse<ServiceActionResponse>>, (StatusCode, Json<ApiError>)> {
+) -> Result<Json<ApiResponse<ServiceActionResponse>>, (StatusCode, Json<ApiErrorResponse>)> {
     let service_name = service.clone();
     let mut registry = state.registry.write().await;
 
@@ -404,10 +399,9 @@ pub async fn nourish_service_v1(
         svc.version = template.image.split(':').next_back().unwrap_or("latest").into();
     }
 
-    let snapshot = registry.clone();
     drop(registry);
 
-    if let Err(e) = persist_registry_to_disk(&snapshot).await {
+    if let Err(e) = crate::persist_registry_state(&state).await {
         tracing::warn!(error = ?e, "Failed to persist registry after nourish");
     }
 
@@ -425,12 +419,14 @@ pub async fn nourish_service_v1(
     }))
 }
 
-/// DELETE /api/v1/services/:service - Delete (release) service
+/// DELETE /api/v1/services/:service - Soft delete (remove from registry, preserve container)
+/// The container becomes a "stray" that can be re-adopted later.
+/// Use POST /api/v1/services/:service/destroy for hard delete (uproot).
 pub async fn delete_service_v1(
     State(state): State<AppState>,
     Path(service): Path<String>,
     headers: HeaderMap,
-) -> Result<Json<ApiResponse<ServiceActionResponse>>, (StatusCode, Json<ApiError>)> {
+) -> Result<Json<ApiResponse<ServiceActionResponse>>, (StatusCode, Json<ApiErrorResponse>)> {
     let mut registry = state.registry.write().await;
 
     let pos = registry
@@ -445,22 +441,11 @@ pub async fn delete_service_v1(
             )
         })?;
 
-    // Remove from Docker
-    if let Err(e) = state.docker.remove_service(&service, Some(&state.console)).await {
-        tracing::error!(error = ?e, service = %service, "Docker remove failed");
-        return Err(error_response(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "REMOVE_FAILED",
-            format!("Failed to remove service: {}", e),
-            None,
-        ));
-    }
-
+    // Soft delete: remove from registry only, container remains (becomes stray)
     registry.remove(pos);
-    let snapshot = registry.clone();
     drop(registry);
 
-    if let Err(e) = persist_registry_to_disk(&snapshot).await {
+    if let Err(e) = crate::persist_registry_state(&state).await {
         tracing::warn!(error = ?e, "Failed to persist registry after delete");
     }
 
@@ -472,7 +457,60 @@ pub async fn delete_service_v1(
             service,
             action: "delete".to_string(),
             status: "removed".to_string(),
-            message: "Service removed successfully".to_string(),
+            message: "Service removed from registry (container preserved as stray)".to_string(),
+        },
+        suggestions,
+    }))
+}
+
+/// POST /api/v1/services/:service/destroy - Hard delete (uproot: remove from registry AND destroy container)
+pub async fn destroy_service_v1(
+    State(state): State<AppState>,
+    Path(service): Path<String>,
+    headers: HeaderMap,
+) -> Result<Json<ApiResponse<ServiceActionResponse>>, (StatusCode, Json<ApiErrorResponse>)> {
+    let mut registry = state.registry.write().await;
+
+    let pos = registry
+        .iter()
+        .position(|svc| svc.name == service)
+        .ok_or_else(|| {
+            error_response(
+                StatusCode::NOT_FOUND,
+                "SERVICE_NOT_FOUND",
+                format!("Service '{}' not found", service),
+                None,
+            )
+        })?;
+
+    // Hard delete: destroy Docker container first
+    if let Err(e) = state.docker.remove_service(&service, Some(&state.console)).await {
+        tracing::error!(error = ?e, service = %service, "Docker remove failed");
+        return Err(error_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "DESTROY_FAILED",
+            format!("Failed to destroy service container: {}", e),
+            None,
+        ));
+    }
+
+    // Then remove from registry
+    registry.remove(pos);
+    drop(registry);
+
+    if let Err(e) = crate::persist_registry_state(&state).await {
+        tracing::warn!(error = ?e, "Failed to persist registry after destroy");
+    }
+
+    let ctx = SuggestionContext::from_headers(&headers, "destroy_service");
+    let suggestions = generate_suggestions(&ctx);
+
+    Ok(Json(ApiResponse {
+        data: ServiceActionResponse {
+            service,
+            action: "destroy".to_string(),
+            status: "uprooted".to_string(),
+            message: "Service destroyed (container removed)".to_string(),
         },
         suggestions,
     }))
@@ -485,7 +523,7 @@ pub async fn delete_service_v1(
 /// GET /api/v1/services/manifests - List all service manifests
 pub async fn list_manifests_v1(
     State(state): State<AppState>,
-) -> Result<(StatusCode, Json<ApiResponse<Vec<crate::templates::TemplateInfo>>>), (StatusCode, Json<ApiError>)> {
+) -> Result<(StatusCode, Json<ApiResponse<Vec<crate::templates::TemplateInfo>>>), (StatusCode, Json<ApiErrorResponse>)> {
     let manifests = state.templates.list_templates().map_err(|e| {
         error_response(
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -508,7 +546,7 @@ pub async fn list_manifests_v1(
 pub async fn get_manifest_v1(
     State(state): State<AppState>,
     Path(name): Path<String>,
-) -> Result<(StatusCode, String), (StatusCode, Json<ApiError>)> {
+) -> Result<(StatusCode, String), (StatusCode, Json<ApiErrorResponse>)> {
     let content = state.templates.get_template_content(&name).map_err(|e| {
         error_response(
             StatusCode::NOT_FOUND,
@@ -525,16 +563,16 @@ pub async fn get_manifest_v1(
 pub async fn stream_service_logs_v1(
     Path(service): Path<String>,
     State(state): State<AppState>,
-) -> Result<axum::response::sse::Sse<impl futures_util::stream::Stream<Item = Result<axum::response::sse::Event, std::convert::Infallible>>>, (StatusCode, Json<ApiError>)> {
+) -> Result<axum::response::sse::Sse<impl futures_util::stream::Stream<Item = Result<axum::response::sse::Event, std::convert::Infallible>>>, (StatusCode, Json<ApiErrorResponse>)> {
     // Forward to existing stream_logs implementation
-    crate::stream_logs(Path(service), State(state)).await
+    crate::stream_logs(service, state).await
 }
 
 /// POST /api/v1/services/:service:restart - Restart service
 pub async fn restart_service_v1(
     State(state): State<AppState>,
     Path(service): Path<String>,
-) -> Result<(StatusCode, Json<serde_json::Value>), (StatusCode, Json<ApiError>)> {
+) -> Result<(StatusCode, Json<serde_json::Value>), (StatusCode, Json<ApiErrorResponse>)> {
     // Stop then start
     state.docker.stop_service(&service, Some(&state.console)).await.map_err(|e| {
         error_response(
@@ -591,23 +629,34 @@ pub struct ReconcileRequest {
 pub async fn reconcile_inventory_v1(
     State(state): State<AppState>,
     Json(payload): Json<ReconcileRequest>,
-) -> Result<(StatusCode, Json<serde_json::Value>), (StatusCode, Json<ApiError>)> {
-    // Forward to existing reconcile_now implementation
-    let (status, json) = crate::reconcile_now(
-        State(state),
-        Json(crate::ReconcileRequest {
-            drop_invalid: payload.drop_invalid,
-        }),
-    )
-    .await;
-    
-    Ok((status, json))
+) -> Result<(StatusCode, Json<serde_json::Value>), (StatusCode, Json<ApiErrorResponse>)> {
+    use crate::domain::reconcile_services;
+    use crate::persist_registry_state;
+
+    let result = reconcile_services(&state, payload.drop_invalid).await;
+
+    // Persist changes if any adoptions or drops occurred
+    if result.has_changes() {
+        let _ = persist_registry_state(&state).await;
+    }
+
+    Ok((
+        StatusCode::OK,
+        Json(serde_json::json!({
+            "status": "ok",
+            "adopted": result.adopted,
+            "dropped_invalid": result.dropped_invalid,
+            "skipped_existing": result.skipped_existing,
+            "left_unregistered": result.left_unregistered,
+            "error": result.error,
+        })),
+    ))
 }
 
 /// POST /api/v1/services:refresh - Refresh manifests catalog
 pub async fn refresh_manifests_v1(
     State(state): State<AppState>,
-) -> Result<(StatusCode, Json<serde_json::Value>), (StatusCode, Json<ApiError>)> {
+) -> Result<(StatusCode, Json<serde_json::Value>), (StatusCode, Json<ApiErrorResponse>)> {
     // Rebuild offerings index (which includes manifest validation)
     crate::ensure_offerings_index(&state, true).await.map_err(|e| {
         error_response(
