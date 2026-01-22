@@ -267,12 +267,24 @@ pub fn discover_moss_mdns(timeout: Duration) -> Result<Vec<DiscoveryResponse>> {
     while start.elapsed() < timeout {
         match receiver.recv_timeout(Duration::from_millis(100)) {
             Ok(ServiceEvent::ServiceResolved(info)) => {
-                // Extract stone name from service instance name
-                let stone_name = info.get_fullname()
-                    .split('.')
-                    .next()
-                    .unwrap_or("unknown")
-                    .to_string();
+                // Extract stone_id from TXT record properties (if present)
+                let stone_id: Option<String> = info.get_properties()
+                    .iter()
+                    .find(|p| p.key() == "stone_id")
+                    .map(|p| p.val_str().to_string());
+
+                // Extract stone name from TXT record, or fall back to instance name
+                let stone_name: String = info.get_properties()
+                    .iter()
+                    .find(|p| p.key() == "stone_name")
+                    .map(|p| p.val_str().to_string())
+                    .unwrap_or_else(|| {
+                        info.get_fullname()
+                            .split('.')
+                            .next()
+                            .unwrap_or("unknown")
+                            .to_string()
+                    });
 
                 // Get the first address (prefer any available)
                 if let Some(ip) = info.get_addresses().iter().next() {
@@ -280,14 +292,16 @@ pub fn discover_moss_mdns(timeout: Duration) -> Result<Vec<DiscoveryResponse>> {
 
                     tracing::info!(
                         stone = %stone_name,
+                        stone_id = ?stone_id,
                         endpoint = %endpoint,
                         "Discovered Moss via mDNS"
                     );
 
                     stones.push(DiscoveryResponse {
+                        stone_id,
                         stone_name,
                         stone_endpoint: endpoint,
-                        moss_version: String::new(), // Not available via mDNS
+                        moss_version: String::new(),
                         lantern_endpoint: None,
                     });
                 }
@@ -342,11 +356,24 @@ where
     while start.elapsed() < timeout {
         match receiver.recv_timeout(Duration::from_millis(100)) {
             Ok(ServiceEvent::ServiceResolved(info)) => {
-                let stone_name = info.get_fullname()
-                    .split('.')
-                    .next()
-                    .unwrap_or("unknown")
-                    .to_string();
+                // Extract stone_id from TXT record properties (if present)
+                let stone_id: Option<String> = info.get_properties()
+                    .iter()
+                    .find(|p| p.key() == "stone_id")
+                    .map(|p| p.val_str().to_string());
+
+                // Extract stone name from TXT record, or fall back to instance name
+                let stone_name: String = info.get_properties()
+                    .iter()
+                    .find(|p| p.key() == "stone_name")
+                    .map(|p| p.val_str().to_string())
+                    .unwrap_or_else(|| {
+                        info.get_fullname()
+                            .split('.')
+                            .next()
+                            .unwrap_or("unknown")
+                            .to_string()
+                    });
 
                 // Get the first address (prefer any available)
                 if let Some(ip) = info.get_addresses().iter().next() {
@@ -359,6 +386,7 @@ where
 
                         tracing::info!(
                             stone = %stone_name,
+                            stone_id = ?stone_id,
                             endpoint = %endpoint,
                             elapsed_ms = discovery_instant.duration_since(start).as_millis(),
                             "Discovered Moss via mDNS (streaming)"
@@ -366,9 +394,10 @@ where
 
                         on_discovered(
                             DiscoveryResponse {
+                                stone_id,
                                 stone_name,
                                 stone_endpoint: endpoint.clone(),
-                                moss_version: String::new(), // Not available via mDNS
+                                moss_version: String::new(),
                                 lantern_endpoint: None,
                             },
                             discovery_instant,
