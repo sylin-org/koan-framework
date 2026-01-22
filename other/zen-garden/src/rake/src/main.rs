@@ -1,10 +1,13 @@
+mod api;
 mod commands;
+mod command_manifest;
+mod context;
+mod dispatch;
 mod parser;
 mod stone_cache;
 mod suggestions;
 mod tending;
 mod ui;
-mod command_manifest;
 
 #[cfg(test)]
 mod discovery_tests;
@@ -3022,24 +3025,8 @@ async fn async_main() -> anyhow::Result<()> {
         }
 
         Commands::List { at } => {
-            let endpoint = resolve_endpoint(&client, at).await?;
-            
-            let url = format!("{}/api/v1/services", endpoint.trim_end_matches('/'));
-            let response: serde_json::Value = client.get(url).send().await?.json().await?;
-            let services: Vec<ServiceInfo> = serde_json::from_value(response.get("data").cloned().unwrap_or(response))?;
-            
-            let term = ui::TerminalInfo::detect();
-            
-            if services.is_empty() {
-                println!("{}", ui::empty_state("No services installed", Some("Use: garden-rake offer <service>")));
-            } else {
-                println!("{}", ui::section_header("SERVICES", &term));
-                println!();
-                render_services_table(&services, &term);
-            }
-
-            // Self-teaching suggestions
-            suggestions::print_suggestions(command_manifest::cmd::LIST, quiet_mode);
+            let cmd = commands::discovery::ListCommand::new(quiet_mode);
+            dispatch::dispatch(&cmd, &client, at, quiet_mode, fresh_mode, Some(&*STONE_CACHE)).await?;
         }
 
         Commands::Remove { service, at, force } => {
@@ -3264,75 +3251,13 @@ async fn async_main() -> anyhow::Result<()> {
         }
 
         Commands::Adopted { at } => {
-            let endpoint = resolve_endpoint(&client, at).await?;
-            print_stone_header(&client, &endpoint).await;
-
-            // v1 API: GET /api/v1/offerings/adopted
-            let url = format!("{}/api/v1/offerings/adopted", endpoint.trim_end_matches('/'));
-            let response = client.get(&url).send().await?;
-
-            if response.status().is_success() {
-                let body: serde_json::Value = response.json().await?;
-                let adopted = body.get("data").and_then(|d| d.as_array());
-
-                if let Some(list) = adopted {
-                    if list.is_empty() {
-                        println!("{}No adopted services", " ".repeat(ui::constants::DEFAULT_INDENT));
-                    } else {
-                        println!("{}Adopted services:", " ".repeat(ui::constants::DEFAULT_INDENT));
-                        for svc in list {
-                            let name = svc.get("name").and_then(|v| v.as_str()).unwrap_or("unknown");
-                            let offering = svc.get("offering").and_then(|v| v.as_str()).unwrap_or("");
-                            if !offering.is_empty() && offering != name {
-                                println!("{}  {} (from: {})", " ".repeat(ui::constants::DEFAULT_INDENT), name, offering);
-                            } else {
-                                println!("{}  {}", " ".repeat(ui::constants::DEFAULT_INDENT), name);
-                            }
-                        }
-                    }
-                }
-            } else {
-                eprintln!("{}{} Failed to list adopted services: {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), response.status());
-            }
-
-            // Self-teaching suggestions
-            suggestions::print_suggestions(command_manifest::cmd::ADOPTED, quiet_mode);
+            let cmd = commands::discovery::AdoptedCommand::new(quiet_mode);
+            dispatch::dispatch(&cmd, &client, at, quiet_mode, fresh_mode, Some(&*STONE_CACHE)).await?;
         }
 
         Commands::Borrowed { at } => {
-            let endpoint = resolve_endpoint(&client, at).await?;
-            print_stone_header(&client, &endpoint).await;
-
-            // v1 API: GET /api/v1/offerings/borrowed
-            let url = format!("{}/api/v1/offerings/borrowed", endpoint.trim_end_matches('/'));
-            let response = client.get(&url).send().await?;
-
-            if response.status().is_success() {
-                let body: serde_json::Value = response.json().await?;
-                let borrowed = body.get("data").and_then(|d| d.as_array());
-
-                if let Some(list) = borrowed {
-                    if list.is_empty() {
-                        println!("{}No borrowed services", " ".repeat(ui::constants::DEFAULT_INDENT));
-                    } else {
-                        println!("{}Borrowed services:", " ".repeat(ui::constants::DEFAULT_INDENT));
-                        for svc in list {
-                            let name = svc.get("name").and_then(|v| v.as_str()).unwrap_or("unknown");
-                            let url = svc.get("connection_template").and_then(|v| v.as_str()).unwrap_or("");
-                            if !url.is_empty() {
-                                println!("{}  {} ({})", " ".repeat(ui::constants::DEFAULT_INDENT), name, url);
-                            } else {
-                                println!("{}  {}", " ".repeat(ui::constants::DEFAULT_INDENT), name);
-                            }
-                        }
-                    }
-                }
-            } else {
-                eprintln!("{}{} Failed to list borrowed services: {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), response.status());
-            }
-
-            // Self-teaching suggestions
-            suggestions::print_suggestions(command_manifest::cmd::BORROWED, quiet_mode);
+            let cmd = commands::discovery::BorrowedCommand::new(quiet_mode);
+            dispatch::dispatch(&cmd, &client, at, quiet_mode, fresh_mode, Some(&*STONE_CACHE)).await?;
         }
 
         Commands::Borrow { name, from, at } => {
@@ -3495,101 +3420,13 @@ async fn async_main() -> anyhow::Result<()> {
         }
 
         Commands::Rest { service, at } => {
-            let endpoint = resolve_endpoint(&client, at).await?;
-            // v1 API: POST /api/v1/services/:service/rest
-            let url = format!(
-                "{}/api/v1/services/{}/rest",
-                endpoint.trim_end_matches('/'),
-                service
-            );
-            let response = client.post(url).send().await?;
-            let status = response.status();
-            
-            match status {
-                s if s.is_success() => {
-                    // Parse v1 API response
-                    if let Ok(body) = response.json::<serde_json::Value>().await {
-                        let message = body.get("message").and_then(|v| v.as_str()).unwrap_or("");
-                        let api_status = body.get("status").and_then(|v| v.as_str()).unwrap_or("stopped");
-                        
-                        println!("{}{} Stopped {} ({})", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("ok", term.supports_color), service, api_status);
-                        if !message.is_empty() {
-                            println!("{}   {}", " ".repeat(ui::constants::DEFAULT_INDENT), message);
-                        }
-                        
-                        // Display suggestions if present and not in quiet mode
-                        if !quiet_mode {
-                            if let Some(suggestions) = body.get("suggestions").and_then(|v| v.as_array()) {
-                                if !suggestions.is_empty() {
-                                    println!("\nSuggestions:");
-                                    for suggestion in suggestions {
-                                        if let Some(s) = suggestion.as_str() {
-                                            println!("  • {}", s);
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    } else {
-                        println!("{}{} Stopped {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("ok", term.supports_color), service);
-                    }
-                }
-                reqwest::StatusCode::NOT_FOUND => {
-                    eprintln!("{}{} Service '{}' not found", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), service);
-                }
-                _ => {
-                    eprintln!("{}{} Failed: {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), status);
-                }
-            }
+            let cmd = commands::lifecycle::RestCommand::new(service, quiet_mode);
+            dispatch::dispatch(&cmd, &client, at, quiet_mode, fresh_mode, Some(&*STONE_CACHE)).await?;
         }
 
         Commands::Wake { service, at } => {
-            let endpoint = resolve_endpoint(&client, at).await?;
-            // v1 API: POST /api/v1/services/:service/wake
-            let url = format!(
-                "{}/api/v1/services/{}/wake",
-                endpoint.trim_end_matches('/'),
-                service
-            );
-            let response = client.post(url).send().await?;
-            let status = response.status();
-            
-            match status {
-                s if s.is_success() => {
-                    // Parse v1 API response
-                    if let Ok(body) = response.json::<serde_json::Value>().await {
-                        let message = body.get("message").and_then(|v| v.as_str()).unwrap_or("");
-                        let api_status = body.get("status").and_then(|v| v.as_str()).unwrap_or("running");
-                        
-                        println!("{}{} Started {} ({})", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("ok", term.supports_color), service, api_status);
-                        if !message.is_empty() {
-                            println!("{}   {}", " ".repeat(ui::constants::DEFAULT_INDENT), message);
-                        }
-                        
-                        // Display suggestions if present and not in quiet mode
-                        if !quiet_mode {
-                            if let Some(suggestions) = body.get("suggestions").and_then(|v| v.as_array()) {
-                                if !suggestions.is_empty() {
-                                    println!("\nSuggestions:");
-                                    for suggestion in suggestions {
-                                        if let Some(s) = suggestion.as_str() {
-                                            println!("  • {}", s);
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    } else {
-                        println!("{}{} Started {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("ok", term.supports_color), service);
-                    }
-                }
-                reqwest::StatusCode::NOT_FOUND => {
-                    eprintln!("{}{} Service '{}' not found", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), service);
-                }
-                _ => {
-                    eprintln!("{}{} Failed: {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), status);
-                }
-            }
+            let cmd = commands::lifecycle::WakeCommand::new(service, quiet_mode);
+            dispatch::dispatch(&cmd, &client, at, quiet_mode, fresh_mode, Some(&*STONE_CACHE)).await?;
         }
 
         Commands::Place {

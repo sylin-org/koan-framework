@@ -63,6 +63,14 @@ impl OutputWriter {
         }
     }
 
+    /// Create output writer with pre-detected terminal info
+    pub fn with_term(term: TerminalInfo) -> Self {
+        Self {
+            term,
+            indent: constants::DEFAULT_INDENT,
+        }
+    }
+
     /// Success message (green OK indicator)
     pub fn success(&self, msg: impl std::fmt::Display) {
         println!(
