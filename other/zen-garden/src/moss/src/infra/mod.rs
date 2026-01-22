@@ -5,9 +5,11 @@
 //! - File system operations
 //! - Authentication implementation (NoAuth for v0.1.0)
 //! - Platform-specific utilities
+//! - API response helpers
 //!
 //! No business logic here - pure I/O adapters.
 
+pub mod api_helpers;
 pub mod auth;
 pub mod config;
 pub mod container;
@@ -22,6 +24,7 @@ pub mod process;
 pub mod secrets;
 pub mod service;
 
+pub use api_helpers::{error_response, error_codes};
 pub use auth::NoAuth;
 pub use config::MossConfig;
 pub use container::ContainerRuntime;
@@ -32,6 +35,6 @@ pub use service::{install_windows_service, finalize_service_update, cleanup_afte
 pub use filesystem::FileSystem;
 pub use hardware::{detect_hardware, load_cached_capabilities, save_capabilities_cache, create_skeleton};
 pub use manifest_loader::{load_offerings, default_offerings_dir};
-pub use persistence::{load_registry, save_registry, load_offerings_cache, save_offerings_cache};
+pub use persistence::{load_registry, save_registry, save_registry_vec, load_offerings_cache, save_offerings_cache, load_or_generate_stone_id};
 pub use platform::{is_running_from_removable_media, shutdown_signal};
 pub use secrets::SecretsManager;

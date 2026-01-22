@@ -14,6 +14,7 @@ fn dict(pairs: &[(&str, &str)]) -> TaxonomyDictionary {
 
 fn caps_with_disk_type(disk_type: &str) -> HardwareCapabilities {
     HardwareCapabilities {
+        stone_id: None,
         stone_name: "stone-01".to_string(),
         hardware: garden_common::HardwareInventory {
             cpu: garden_common::CpuCapabilities {

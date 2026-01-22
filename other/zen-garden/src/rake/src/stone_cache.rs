@@ -11,6 +11,7 @@ const CACHE_TTL: Duration = Duration::from_secs(90);
 ///
 /// Provides zero-discovery for common case by caching stone discovery results.
 /// TTL is 90 seconds to balance freshness with performance.
+/// Cache is keyed by stone_id (GUID v7) when available, falling back to stone_name.
 pub static GLOBAL_CACHE: Lazy<StoneCache> = Lazy::new(StoneCache::new);
 
 #[derive(Clone)]
@@ -18,6 +19,14 @@ pub struct CachedStone {
     pub endpoint: String,
     pub capabilities: HardwareCapabilities,
     pub last_seen: Instant,
+}
+
+impl CachedStone {
+    /// Get the cache key for this stone (stone_id if available, otherwise stone_name)
+    pub fn cache_key(&self) -> String {
+        self.capabilities.stone_id.clone()
+            .unwrap_or_else(|| self.capabilities.stone_name.clone())
+    }
 }
 
 pub struct StoneCache {
@@ -51,17 +60,28 @@ impl StoneCache {
         None
     }
 
-    pub fn insert(&self, stone_name: String, endpoint: String, capabilities: HardwareCapabilities) {
+    /// Insert a stone into the cache
+    ///
+    /// Uses stone_id as the cache key when available, falling back to stone_name.
+    /// This ensures stable caching even when hostname changes.
+    pub fn insert(&self, endpoint: String, capabilities: HardwareCapabilities) {
         let mut cache = self.stones.lock().unwrap();
+
+        // Use stone_id as key when available, otherwise use stone_name
+        let cache_key = capabilities.stone_id.clone()
+            .unwrap_or_else(|| capabilities.stone_name.clone());
+
+        let stone_name = capabilities.stone_name.clone();
+
         cache.insert(
-            stone_name.clone(),
+            cache_key.clone(),
             CachedStone {
                 endpoint,
                 capabilities,
                 last_seen: Instant::now(),
             },
         );
-        tracing::debug!(stone = %stone_name, "Cached stone discovery");
+        tracing::debug!(stone = %stone_name, key = %cache_key, "Cached stone discovery");
     }
 
     pub fn get_all(&self) -> Vec<CachedStone> {
@@ -127,10 +147,9 @@ pub async fn fetch_and_cache_stone(
         .json()
         .await?;
     let capabilities = response.data;
-    
-    let stone_name = capabilities.stone_name.clone();
-    cache.insert(stone_name.clone(), endpoint.to_string(), capabilities.clone());
-    
+
+    cache.insert(endpoint.to_string(), capabilities.clone());
+
     Ok(CachedStone {
         endpoint: endpoint.to_string(),
         capabilities,

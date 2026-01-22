@@ -120,6 +120,7 @@ pub async fn detect_hardware(stone_name: String) -> Result<HardwareCapabilities>
     };
 
     let capabilities = HardwareCapabilities {
+        stone_id: None, // Set externally after detection
         stone_name,
         hardware,
         runtime: Some(RuntimeInfo {
@@ -167,6 +168,7 @@ pub fn create_skeleton(stone_name: String) -> HardwareCapabilities {
     };
 
     HardwareCapabilities {
+        stone_id: None, // Set externally after creation
         stone_name,
         hardware,
         runtime: None,

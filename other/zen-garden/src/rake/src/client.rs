@@ -4,7 +4,8 @@ use garden_common::LanternTopology;
 /// Trait for stone cache operations
 pub trait CachedStoneOps: Send + Sync {
 	fn get(&self, stone_name: &str) -> Option<CachedStoneInfo>;
-	fn insert(&self, stone_name: String, endpoint: String, capabilities: garden_common::HardwareCapabilities);
+	/// Insert a stone into cache using stone_id (when available) or stone_name as key
+	fn insert(&self, endpoint: String, capabilities: garden_common::HardwareCapabilities);
 }
 
 #[derive(Clone)]
@@ -97,11 +98,11 @@ async fn resolve_stone_name_to_endpoint(client: &reqwest::Client, stone_name: &s
 		if let Ok(resp) = client.get(&caps_url).timeout(Duration::from_secs(2)).send().await {
 			if let Ok(api_response) = resp.json::<GardenApiResponse<HardwareCapabilities>>().await {
 				let stone_name_from_api = &api_response.data.stone_name;
-				// Cache this stone for future lookups
+				// Cache this stone for future lookups (keyed by stone_id when available)
 				if let Some(cache) = cache {
-					cache.insert(stone_name_from_api.clone(), endpoint.clone(), api_response.data.clone());
+					cache.insert(endpoint.clone(), api_response.data.clone());
 				}
-				
+
 				if stone_name_from_api == requested_name {
 					return Ok(endpoint);
 				}
