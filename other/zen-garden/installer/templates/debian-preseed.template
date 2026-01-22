@@ -92,8 +92,9 @@ d-i preseed/late_command string \
     test -f /cdrom/docker-compose.yml && cp /cdrom/docker-compose.yml /target/home/{{USERNAME}}/docker-compose.yml && in-target chown {{USERNAME}}:{{USERNAME}} /home/{{USERNAME}}/docker-compose.yml || true; \
     test -f /cdrom/zen-garden-services.service && cp /cdrom/zen-garden-services.service /target/etc/systemd/system/zen-garden-services.service && in-target systemctl enable zen-garden-services.service || true; \
     test -d /cdrom/stone-root && cp -r /cdrom/stone-root/* /target/ && echo "✓ Copied stone-root to target filesystem" || echo "⚠ stone-root not found"; \
-    in-target mkdir -p /etc/zen-garden /var/lib/zen-garden /home/{{USERNAME}}/bin; \
+    in-target mkdir -p /etc/zen-garden /var/lib/zen-garden /var/lib/zen-garden/staging /home/{{USERNAME}}/bin; \
     in-target chmod +x /usr/local/bin/garden-moss /usr/local/bin/garden-rake /usr/local/bin/moss-update-helper.sh || true; \
     in-target chmod 0440 /etc/sudoers.d/moss || true; \
-    in-target chown -R {{USERNAME}}:{{USERNAME}} /home/{{USERNAME}} /etc/zen-garden /var/lib/zen-garden; \
+    in-target chown -R {{USERNAME}}:{{USERNAME}} /home/{{USERNAME}} /etc/zen-garden; \
+    in-target chown {{USERNAME}}:{{USERNAME}} /var/lib/zen-garden; \
     in-target systemctl enable garden-moss.service || true

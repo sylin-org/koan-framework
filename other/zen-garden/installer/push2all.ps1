@@ -1,48 +1,128 @@
 ﻿#!/usr/bin/env pwsh
 <#
 .SYNOPSIS
-    Push a new moss binary to all discovered stones on the network.
+    Push new garden-moss and garden-rake binaries to all discovered stones on the network.
 
 .DESCRIPTION
     This script:
-    1. Discovers all stones via UDP broadcast (port 7184)
-    2. Uploads the moss binary to each stone via POST /api/system/refresh
-    3. Waits for each stone to restart and come back online
-    4. Reports success/failure for each stone
-
-.PARAMETER BinaryPath
-    Path to the moss binary to deploy (default: ../dist/linux/garden-moss)
+    1. Builds release binaries for all platforms (unless -SkipBuild is used)
+    2. Discovers all stones via UDP broadcast (port 7184)
+    3. Deploys binaries using either HTTP API or SSH method
+    4. Waits for each stone to restart and come back online
+    5. Reports success/failure for each stone
 
 .PARAMETER Timeout
     Discovery timeout in seconds (default: 3)
 
 .PARAMETER Parallel
-    Push to stones in parallel instead of sequentially
+    Push to stones in parallel instead of sequentially (HTTP method only)
 
 .PARAMETER Port
     Override the port number (default: 0 = use discovered port, typically 7185)
 
-.EXAMPLE
-    .\push-moss-to-all-stones.ps1
-    
-.EXAMPLE
-    .\push-moss-to-all-stones.ps1 -BinaryPath ./target/release/garden-moss -Parallel
+.PARAMETER SkipBuild
+    Skip the automatic build step (useful for testing)
+
+.PARAMETER Method
+    Deployment method: 'HTTP' (via API) or 'SSH' (direct file transfer)
+    - HTTP: Uses /api/v1/stone/upgrade endpoint (requires API to be working)
+    - SSH: Transfers files via pscp and restarts service (workaround when API unavailable)
+    Default: HTTP
+
+.PARAMETER SSHUser
+    SSH username for SSH method (default: stone)
+
+.PARAMETER SSHPassword
+    SSH password for SSH method (default: stone)
 
 .EXAMPLE
-    .\push-moss-to-all-stones.ps1 -Port 7185
+    .\push2all.ps1
+    Build and deploy via HTTP API to all discovered stones
+    
+.EXAMPLE
+    .\push2all.ps1 -Method SSH
+    Build and deploy via SSH to all discovered stones
+
+.EXAMPLE
+    .\push2all.ps1 -Method SSH -SSHUser admin -SSHPassword mypassword
+    Deploy via SSH with custom credentials
+
+.EXAMPLE
+    .\push2all.ps1 -Parallel
+    Deploy via HTTP API in parallel mode
+
+.EXAMPLE
+    .\push2all.ps1 -SkipBuild -Method SSH
+    Deploy via SSH without rebuilding binaries
 #>
 
 param(
-    [int]$Timeout = 3,
+    [int]$Timeout = 5,
     [switch]$Parallel,
     [int]$Port = 0,  # Override port (0 = use discovered port)
-    [switch]$SkipBuild  # Skip automatic build (for testing)
+    [switch]$SkipBuild,  # Skip automatic build (for testing)
+    [switch]$Build,  # Force build
+    [ValidateSet('HTTP', 'SSH', '')]
+    [string]$Method = '',  # Deployment method: HTTP (API) or SSH (direct file copy) - empty prompts menu
+    [string]$SSHUser = 'stone',  # SSH username
+    [string]$SSHPassword = 'stone'  # SSH password
 )
 
 $ErrorActionPreference = "Stop"
 
-# Always build release binaries unless explicitly skipped
-if (-not $SkipBuild) {
+# Show build menu if not explicitly specified
+$shouldBuild = $false
+if (-not $SkipBuild -and -not $Build) {
+    Write-Host "`n╔════════════════════════════════════════════════════╗" -ForegroundColor Cyan
+    Write-Host "║  Build Binaries?                                   ║" -ForegroundColor Cyan
+    Write-Host "╚════════════════════════════════════════════════════╝`n" -ForegroundColor Cyan
+    
+    Write-Host "  [1] Yes, build now (recommended)" -ForegroundColor White
+    Write-Host "      Compiles latest code for all platforms" -ForegroundColor Gray
+    Write-Host ""
+    Write-Host "  [2] No, use existing binaries" -ForegroundColor White
+    Write-Host "      Uses binaries from previous build" -ForegroundColor Gray
+    Write-Host ""
+    
+    $buildChoice = Read-Host "Enter choice (1 or 2)"
+    
+    $shouldBuild = ($buildChoice -eq "1")
+    Write-Host ""
+} elseif ($Build) {
+    $shouldBuild = $true
+}
+
+# Show deployment method menu if not specified
+if ([string]::IsNullOrEmpty($Method)) {
+    Write-Host "`n╔════════════════════════════════════════════════════╗" -ForegroundColor Cyan
+    Write-Host "║  Select Deployment Method (applies to all stones)  ║" -ForegroundColor Cyan
+    Write-Host "╚════════════════════════════════════════════════════╝`n" -ForegroundColor Cyan
+    
+    Write-Host "  [1] HTTP API (default)" -ForegroundColor White
+    Write-Host "      Uses /api/v1/stone/upgrade endpoint" -ForegroundColor Gray
+    Write-Host "      Requires moss API to be working" -ForegroundColor Gray
+    Write-Host ""
+    Write-Host "  [2] SSH File Transfer" -ForegroundColor White
+    Write-Host "      Direct file copy via SSH + service restart" -ForegroundColor Gray
+    Write-Host "      Fallback when API is unavailable" -ForegroundColor Gray
+    Write-Host ""
+    
+    $choice = Read-Host "Enter choice (1 or 2)"
+    
+    switch ($choice) {
+        "1" { $Method = "HTTP" }
+        "2" { $Method = "SSH" }
+        default { 
+            Write-Host "Invalid choice, using HTTP" -ForegroundColor Yellow
+            $Method = "HTTP"
+        }
+    }
+    
+    Write-Host ""
+}
+
+# Build release binaries if requested
+if ($shouldBuild) {
     Write-Host "🔨 Building release binaries for all platforms..." -ForegroundColor Cyan
     Write-Host ""
     
@@ -81,22 +161,89 @@ function Write-Status {
     Write-Host $Message -ForegroundColor $color
 }
 
+function Get-LanBindAddress {
+    <#
+    .SYNOPSIS
+        Get a LAN-suitable local IP address for binding UDP sockets.
+        Prioritizes: 192.168.x.x > 10.x.x.x > 172.16-23.x.x
+        This ensures broadcasts go out the correct interface on multi-homed systems.
+
+        Mirrors the logic in discovery.rs get_lan_bind_address()
+    #>
+
+    $candidates = @()
+
+    # Get all IPv4 addresses from network adapters
+    $adapters = Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue
+
+    foreach ($adapter in $adapters) {
+        $ip = $adapter.IPAddress
+        $octets = $ip.Split('.')
+
+        if ($octets.Count -ne 4) { continue }
+
+        $first = [int]$octets[0]
+        $second = [int]$octets[1]
+
+        # Skip loopback
+        if ($first -eq 127) { continue }
+
+        # Skip link-local (169.254.x.x)
+        if ($first -eq 169) { continue }
+
+        # Skip Docker bridge (172.17.x.x) and WSL/Hyper-V ranges (172.24+)
+        if ($first -eq 172 -and ($second -eq 17 -or $second -ge 24)) { continue }
+
+        # Prioritize by network type
+        $priority = switch ($first) {
+            192 { if ($second -eq 168) { 1 } else { 4 } }  # 192.168.x.x - home/small office
+            10 { 2 }                                        # 10.x.x.x - enterprise
+            172 { if ($second -ge 16 -and $second -le 23) { 3 } else { 4 } }  # 172.16-23.x.x
+            default { 4 }
+        }
+
+        $candidates += [PSCustomObject]@{
+            Priority = $priority
+            IP = $ip
+        }
+    }
+
+    # Sort by priority (lower is better)
+    # Note: Sort-Object returns a single object (not array) when there's only one item
+    $sorted = @($candidates | Sort-Object Priority)
+
+    if ($sorted.Count -gt 0) {
+        return $sorted[0].IP
+    }
+
+    return $null  # Fall back to default binding
+}
+
 function Discover-AllStones {
     param([int]$TimeoutSeconds)
-    
+
     Write-Status "🔍 Discovering stones on network (timeout: ${TimeoutSeconds}s)..."
-    
-    # Create UDP socket
-    $udpClient = New-Object System.Net.Sockets.UdpClient
+
+    # Get best LAN interface for reliable broadcast on multi-homed systems
+    $lanIP = Get-LanBindAddress
+
+    if ($lanIP) {
+        Write-Status "   Binding to LAN interface: $lanIP"
+        $localEndpoint = New-Object System.Net.IPEndPoint([System.Net.IPAddress]::Parse($lanIP), 0)
+        $udpClient = New-Object System.Net.Sockets.UdpClient $localEndpoint
+    } else {
+        Write-Status "   No LAN interface found, using default binding" -Type "Warning"
+        $udpClient = New-Object System.Net.Sockets.UdpClient 0
+    }
+
     $udpClient.EnableBroadcast = $true
-    $udpClient.Client.ReceiveTimeout = $TimeoutSeconds * 1000
     
     # Prepare discovery request
     $requestId = [guid]::NewGuid().ToString()
     $request = @{
         discover = "moss"
         request_id = $requestId
-        requester = "push-moss-script"
+        requester = "push2all-script"
     } | ConvertTo-Json -Compress
     
     $requestBytes = [System.Text.Encoding]::UTF8.GetBytes($request)
@@ -104,11 +251,14 @@ function Discover-AllStones {
     # Send broadcast
     $broadcastEndpoint = New-Object System.Net.IPEndPoint([System.Net.IPAddress]::Broadcast, 7184)
     $sent = $udpClient.Send($requestBytes, $requestBytes.Length, $broadcastEndpoint)
-    Write-Status "   Sent broadcast: $sent bytes to 255.255.255.255:7184"
+    $boundAddr = if ($lanIP) { $lanIP } else { "0.0.0.0" }
+    Write-Status "   Sent broadcast: $sent bytes from $boundAddr to 255.255.255.255:7184"
     
-    # Collect responses
+    # Collect responses with shorter individual timeout but keep trying for full duration
     [System.Collections.ArrayList]$stones = @()
     $remoteEP = New-Object System.Net.IPEndPoint([System.Net.IPAddress]::Any, 0)
+    
+    $udpClient.Client.ReceiveTimeout = 1000  # 1 second timeout per receive attempt
     
     $startTime = Get-Date
     while (((Get-Date) - $startTime).TotalSeconds -lt $TimeoutSeconds) {
@@ -133,8 +283,8 @@ function Discover-AllStones {
             Write-Status "   ✓ Found: $($response.stone_name) at $endpoint" -Type "Success"
         }
         catch [System.Net.Sockets.SocketException] {
-            # Timeout or no more responses
-            break
+            # Timeout on this receive - continue waiting if time remains
+            continue
         }
         catch {
             Write-Status "   Warning: Failed to parse response from $($remoteEP.Address): $_" -Type "Warning"
@@ -313,6 +463,107 @@ function Push-BinariesToStone {
     }
 }
 
+function Push-BinariesViaSSH {
+    param(
+        [PSCustomObject]$Stone,
+        [string]$MossPath,
+        [string]$RakePath,
+        [string]$SSHUser,
+        [string]$SSHPassword,
+        [string]$Platform
+    )
+    
+    Write-Status "`n🚀 Pushing binaries to $($Stone.Name) via SSH ($Platform)..."
+    
+    $targetHost = $Stone.Address
+    
+    # Auto-accept SSH host key if not cached
+    Write-Status "   🔑 Ensuring SSH host key is cached..."
+    $keyCheck = echo y | plink -ssh "${SSHUser}@${targetHost}" -pw $SSHPassword "echo OK" 2>&1
+    if ($keyCheck -notmatch "OK") {
+        Write-Status "   ⚠️  Host key acceptance may have failed, continuing anyway..." -Type "Warning"
+    }
+    
+    # Test SSH connectivity
+    Write-Status "   🔍 Testing SSH connectivity..."
+    try {
+        $testResult = & plink -batch -ssh "${SSHUser}@${targetHost}" -pw $SSHPassword "echo OK" 2>&1
+        if ($testResult -notmatch "OK") {
+            Write-Status "   ✗ SSH connection test failed" -Type "Error"
+            return $false
+        }
+    }
+    catch {
+        Write-Status "   ✗ SSH connection failed: $_" -Type "Error"
+        return $false
+    }
+    
+    try {
+        # Ensure staging directory exists
+        Write-Status "   📁 Preparing staging directory..."
+        & plink -batch -ssh "${SSHUser}@${targetHost}" -pw $SSHPassword "mkdir -p /home/stone/bin" 2>&1 | Out-Null
+
+        # Clean up any existing staged files (may be root-owned from previous runs)
+        Write-Status "   🧹 Cleaning up existing staged files..."
+        & plink -batch -ssh "${SSHUser}@${targetHost}" -pw $SSHPassword "sudo rm -f /home/stone/bin/*.staged" 2>&1 | Out-Null
+
+        # Transfer moss binary
+        Write-Status "   [1/2] Transferring garden-moss..."
+        $pscpResult = & pscp -batch -pw $SSHPassword "$MossPath" "${SSHUser}@${targetHost}:/home/stone/bin/garden-moss.staged" 2>&1
+        if ($LASTEXITCODE -ne 0) {
+            Write-Status "   ✗ Failed to transfer moss binary" -Type "Error"
+            Write-Status "      $pscpResult" -Type "Error"
+            # Diagnose: show directory permissions and any existing files
+            Write-Status "   🔍 Diagnosing staging directory..." -Type "Warning"
+            $diagResult = & plink -batch -ssh "${SSHUser}@${targetHost}" -pw $SSHPassword "ls -la /home/stone/bin/ 2>&1; stat /home/stone/bin 2>&1" 2>&1
+            foreach ($line in $diagResult) {
+                Write-Status "      $line" -Type "Warning"
+            }
+            return $false
+        }
+        Write-Status "   ✅ Moss transferred" -Type "Success"
+
+        # Transfer rake binary
+        Write-Status "   [2/2] Transferring garden-rake..."
+        $pscpResult = & pscp -batch -pw $SSHPassword "$RakePath" "${SSHUser}@${targetHost}:/home/stone/bin/garden-rake.staged" 2>&1
+        if ($LASTEXITCODE -ne 0) {
+            Write-Status "   ✗ Failed to transfer rake binary" -Type "Error"
+            Write-Status "      $pscpResult" -Type "Error"
+            return $false
+        }
+        Write-Status "   ✅ Rake transferred" -Type "Success"
+        
+        # Restart moss service to apply updates
+        Write-Status "   🔄 Restarting garden-moss service..."
+        & plink -batch -ssh "${SSHUser}@${targetHost}" -pw $SSHPassword "sudo systemctl restart garden-moss" 2>&1 | Out-Null
+        
+        if ($LASTEXITCODE -ne 0) {
+            Write-Status "   ⚠️  Service restart command returned error, but staged files are in place" -Type "Warning"
+            return $true  # Files are staged, so partial success
+        }
+        
+        # Wait for service to come online
+        Write-Status "   ⏳ Waiting for service to restart..."
+        Start-Sleep -Seconds 5
+        
+        # Verify service is running
+        $serviceStatus = & plink -batch -ssh "${SSHUser}@${targetHost}" -pw $SSHPassword "systemctl is-active garden-moss 2>/dev/null" 2>&1
+        
+        if ($serviceStatus -match "active") {
+            Write-Status "   ✅ $($Stone.Name) fully updated via SSH" -Type "Success"
+            return $true
+        }
+        else {
+            Write-Status "   ⚠️  Service status unclear, but binaries transferred" -Type "Warning"
+            return $true
+        }
+    }
+    catch {
+        Write-Status "   ✗ SSH deployment failed: $_" -Type "Error"
+        return $false
+    }
+}
+
 # Main execution
 try {
     Write-Status "`n═══════════════════════════════════════════════════════════════"
@@ -366,11 +617,43 @@ try {
     }
     
     # Push to all stones
-    Write-Status "`n📡 Pushing binaries to $($stones.Count) stone(s)..."
+    Write-Status "`n📡 Pushing binaries to $($stones.Count) stone(s) via $Method..."
+    
+    if ($Method -eq 'SSH') {
+        # Check for required tools
+        if (-not (Get-Command pscp -ErrorAction SilentlyContinue)) {
+            Write-Status "✗ pscp not found. Please install PuTTY tools." -Type "Error"
+            exit 1
+        }
+        if (-not (Get-Command plink -ErrorAction SilentlyContinue)) {
+            Write-Status "✗ plink not found. Please install PuTTY tools." -Type "Error"
+            exit 1
+        }
+    }
     
     $results = @()
     
-    if ($Parallel) {
+    if ($Method -eq 'SSH') {
+        # SSH deployment (sequential only for now)
+        Write-Status "   Mode: SSH file transfer + service restart`n"
+        
+        foreach ($config in $stoneConfigs) {
+            $success = Push-BinariesViaSSH `
+                -Stone $config.Stone `
+                -MossPath $config.MossPath `
+                -RakePath $config.RakePath `
+                -SSHUser $SSHUser `
+                -SSHPassword $SSHPassword `
+                -Platform $config.Platform
+            
+            $results += @{
+                Success = $success
+                Name = $config.Stone.Name
+                Platform = $config.Platform
+            }
+        }
+    }
+    elseif ($Parallel) {
         Write-Status "   Mode: Parallel deployment`n"
         
         $jobs = @()
