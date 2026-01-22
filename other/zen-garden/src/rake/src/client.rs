@@ -2,7 +2,7 @@ use std::time::Duration;
 use garden_common::LanternTopology;
 
 /// Trait for stone cache operations
-pub trait CachedStoneOps {
+pub trait CachedStoneOps: Send + Sync {
 	fn get(&self, stone_name: &str) -> Option<CachedStoneInfo>;
 	fn insert(&self, stone_name: String, endpoint: String, capabilities: garden_common::HardwareCapabilities);
 }

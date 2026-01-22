@@ -1,10 +1,17 @@
 use anyhow::Result;
+use once_cell::sync::Lazy;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use garden_common::{GardenApiResponse, HardwareCapabilities};
 
 const CACHE_TTL: Duration = Duration::from_secs(90);
+
+/// Global stone cache singleton (hot cache architecture)
+///
+/// Provides zero-discovery for common case by caching stone discovery results.
+/// TTL is 90 seconds to balance freshness with performance.
+pub static GLOBAL_CACHE: Lazy<StoneCache> = Lazy::new(StoneCache::new);
 
 #[derive(Clone)]
 pub struct CachedStone {

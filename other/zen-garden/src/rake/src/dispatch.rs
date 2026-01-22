@@ -5,13 +5,13 @@
 //! - Stone header display (if requested)
 //! - Error handling and formatting
 
-use crate::commands::Command;
-use crate::context::CommandContext;
-use crate::tending;
-use crate::ui::{self, TerminalInfo};
 use garden_common::{GardenApiResponse, HardwareCapabilities};
 use garden_rake::client::{resolve_target_endpoint, CachedStoneOps};
+use garden_rake::commands::Command;
+use garden_rake::context::CommandContext;
 use garden_rake::discovery;
+use garden_rake::tending;
+use garden_rake::ui::{self, TerminalInfo};
 use std::time::Duration;
 
 /// Dispatch a command with standard middleware

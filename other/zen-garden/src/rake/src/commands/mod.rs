@@ -17,18 +17,22 @@
 //!
 //! ## Module Structure
 //! - `help` - Command catalog and help display
+//! - `admin/` - take-root, install-service
 //! - `discovery/` - observe, watch, list, status
 //! - `lifecycle/` - offer, rest, wake, remove, upgrade
 //! - `adoption/` - adopt, release, borrow, return, find
-//! - `management/` - tend, reconcile, refresh
-//! - `pond/` - place, invite
+//! - `management/` - tend, reconcile, refresh, pond, place, invite, lift, make
 
 pub mod help;
 
 // Command categories (to be extracted incrementally)
+pub mod admin;
 pub mod adoption;
 pub mod discovery;
 pub mod lifecycle;
+pub mod local;
+pub mod management;
+pub mod offering;
 
 use crate::context::CommandContext;
 use async_trait::async_trait;

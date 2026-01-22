@@ -11,7 +11,13 @@
 pub mod adopted;
 pub mod borrowed;
 pub mod list;
+pub mod observe;
+pub mod status;
+pub mod watch;
 
 pub use adopted::AdoptedCommand;
 pub use borrowed::BorrowedCommand;
 pub use list::ListCommand;
+pub use observe::ObserveCommand;
+pub use status::StatusCommand;
+pub use watch::{WatchCommand, WatchTargetType};

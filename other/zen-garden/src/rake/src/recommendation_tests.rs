@@ -1,4 +1,8 @@
 ﻿use super::*;
+use crate::commands::offering::{
+    TaxonomyDictionary, OfferingEntry, OfferingCompatibility,
+    normalize_tokens, token_matches_category, offering_relevance_score, stone_prefer_score
+};
 
 fn dict(pairs: &[(&str, &str)]) -> TaxonomyDictionary {
     let mut map = std::collections::HashMap::new();

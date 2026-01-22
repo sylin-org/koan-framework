@@ -43,9 +43,11 @@ pub mod cmd {
 
     // System
     pub const TAKE_ROOT: &str = "take-root";
+    pub const INSTALL_SERVICE: &str = "install-service";
     pub const MAKE: &str = "make";
 
     // Pond
+    pub const POND: &str = "pond";
     pub const PLACE: &str = "place";
     pub const INVITE: &str = "invite";
     pub const LIFT: &str = "lift";
