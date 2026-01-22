@@ -129,7 +129,7 @@ pub async fn health_monitor_task(state: AppState) {
                 }
 
                 if adopted_any {
-                    let _ = crate::persist_registry_state(&state).await;
+                    let _ = state.persist_registry().await;
                 }
             }
             Err(e) => {

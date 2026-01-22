@@ -157,6 +157,7 @@ pub async fn detect_capabilities_background(
     let updated_caps = {
         let mut guard = caps_arc.write().await;
         let mut caps = guard.take().unwrap_or_else(|| HardwareCapabilities {
+            stone_id: None, // Will be set from AppState
             stone_name: stone_name.clone(),
             hardware: HardwareInventory {
                 cpu: CpuCapabilities {

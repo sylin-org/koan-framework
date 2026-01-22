@@ -15,7 +15,7 @@ pub mod tasks;
 pub mod bootstrap;
 pub mod cli;
 
-// Legacy modules (will be removed/migrated incrementally)
+// Core modules
 pub mod docker;
 pub mod discovery;
 pub mod mdns;
@@ -27,16 +27,14 @@ pub mod network_singletons;
 // App state for HTTP handlers
 pub mod app_state;
 
-// Legacy API helpers (for backwards compatibility during migration)
-pub mod api_legacy;
-pub mod legacy_helpers;
-
 // Re-export AppState and related types
 pub use app_state::{
     AppState, MossEvent, Job, JobStatus,
     CompiledOffering, OfferingsFingerprint, OfferingsIndexCache,
 };
-pub use api_legacy::{error_response, ApiError, persist_registry_to_disk, error_codes};
+
+// Re-export API helpers from infra
+pub use infra::{error_response, error_codes};
 
 // Re-export commonly used API utilities
 pub use api::v1::events::emit_event;
@@ -50,13 +48,6 @@ pub use domain::{
     ensure_offerings_index, get_compiled_offering,
     reconcile_services,
     compatibility::CompiledCompatibility,
-};
-
-// Re-export legacy helper types and functions
-pub use legacy_helpers::{
-    ReconcileRequest, RefreshPayload,
-    persist_registry_state, stream_logs,
-    admin_shutdown, refresh_component,
 };
 
 // Re-export tasks for background execution
@@ -85,6 +76,8 @@ pub use bootstrap::{
     DockerConfig, connect_docker, init_capabilities,
     // Configuration
     DaemonConfig, init_tracing,
+    // Main orchestration
+    run_daemon,
 };
 
 // Re-export CLI utilities

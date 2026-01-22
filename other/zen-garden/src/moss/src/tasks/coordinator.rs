@@ -30,11 +30,12 @@ use crate::tasks::network_monitor::{NetworkMonitor, NetworkEvent};
 /// Enables stone discovery via UDP broadcast.
 /// Returns immediately after spawning the listener.
 pub async fn start_discovery_listener(
+    stone_id: String,
     stone_name: String,
     api_endpoint: String,
     console: &ConsolePrinter,
 ) {
-    match discovery::ensure_udp_listener(stone_name, api_endpoint).await {
+    match discovery::ensure_udp_listener(stone_id, stone_name, api_endpoint).await {
         Ok(receiver) => {
             // Spawn discovery event monitor
             let mut discovery_rx = receiver;
@@ -239,6 +240,7 @@ pub fn start_auto_adoption(
 ///
 /// Console parameter is optional - pass None if console isn't available yet.
 pub async fn start_lantern_registration(
+    stone_id: &str,
     stone_name: &str,
     api_endpoint: &str,
     port: u16,
@@ -266,18 +268,20 @@ pub async fn start_lantern_registration(
     }
 
     // Main registration loop
+    let reg_stone_id = stone_id.to_string();
     let reg_stone_name = stone_name.to_string();
     let reg_endpoint = api_endpoint.to_string();
     let lantern_url = lantern_endpoint.clone();
 
     tokio::spawn(async move {
-        if let Err(e) = lantern_registration_loop(reg_stone_name, reg_endpoint, lantern_url).await {
+        if let Err(e) = lantern_registration_loop(reg_stone_id, reg_stone_name, reg_endpoint, lantern_url).await {
             tracing::error!(error = ?e, "Lantern registration loop failed");
         }
     });
 
     // If using dynamic IP (not STONE_HOST), spawn IP change handler
     if !use_static_host {
+        let change_stone_id = stone_id.to_string();
         let change_stone_name = stone_name.to_string();
         let change_lantern = lantern_endpoint.clone();
         let change_port = port;
@@ -299,6 +303,7 @@ pub async fn start_lantern_registration(
                         let client = reqwest::Client::new();
                         let register_url = format!("{}/api/register", change_lantern);
                         let request = garden_common::RegisterRequest {
+                            stone_id: Some(change_stone_id.clone()),
                             stone_name: change_stone_name.clone(),
                             endpoint: new_endpoint,
                             services: vec![],
@@ -328,6 +333,7 @@ pub async fn start_lantern_registration(
                         let client = reqwest::Client::new();
                         let register_url = format!("{}/api/register", change_lantern);
                         let request = garden_common::RegisterRequest {
+                            stone_id: Some(change_stone_id.clone()),
                             stone_name: change_stone_name.clone(),
                             endpoint: new_endpoint,
                             services: vec![],
@@ -381,6 +387,7 @@ pub async fn start_all_background_tasks(
 
     // Start UDP discovery (immediate - critical for stone visibility)
     start_discovery_listener(
+        state.stone_id.clone(),
         stone_name.to_string(),
         api_endpoint.to_string(),
         &console,

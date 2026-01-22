@@ -218,7 +218,7 @@ pub async fn install_service_task(state: &AppState, job_id: &str, offering: &str
         }
     }
 
-    let _ = crate::persist_registry_state(state).await;
+    let _ = state.persist_registry().await;
 
     emit_event(state, "info", format!("✓ Service {} started successfully", offering), Some(job_id.to_string()));
 
@@ -369,7 +369,7 @@ pub async fn install_batch_task(state: &AppState, job_id: &str, offerings: Vec<S
             }
         }
 
-        let _ = crate::persist_registry_state(state).await;
+        let _ = state.persist_registry().await;
 
         // Mark offering as completed
         {

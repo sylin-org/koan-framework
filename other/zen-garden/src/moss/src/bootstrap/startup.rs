@@ -92,15 +92,48 @@ pub async fn connect_docker(
 /// Loads cached capabilities from disk, or creates a skeleton if no cache exists.
 /// Returns the capabilities wrapped in Arc<RwLock> for shared access.
 pub async fn init_capabilities(
+    stone_id: &str,
     stone_name: &str,
     console: &ConsolePrinter,
 ) -> Arc<RwLock<Option<HardwareCapabilities>>> {
-    let cached = infra::load_cached_capabilities().await;
+    let mut cached = infra::load_cached_capabilities().await;
+    let mut needs_save = false;
+
+    // Update stone_id and stone_name if they have changed
+    // This fixes stale values from before first-boot initialization
+    if let Some(ref mut caps) = cached {
+        // Update stone_id if missing or different
+        if caps.stone_id.as_deref() != Some(stone_id) {
+            tracing::info!(
+                old_id = ?caps.stone_id,
+                new_id = %stone_id,
+                "Stone ID updated in cached capabilities"
+            );
+            caps.stone_id = Some(stone_id.to_string());
+            needs_save = true;
+        }
+
+        // Update stone_name if changed (e.g., after hostname was set during first boot)
+        if caps.stone_name != stone_name {
+            tracing::info!(
+                old_name = %caps.stone_name,
+                new_name = %stone_name,
+                "Stone name changed - updating cached capabilities"
+            );
+            caps.stone_name = stone_name.to_string();
+            needs_save = true;
+        }
+
+        if needs_save {
+            let _ = infra::save_capabilities_cache(caps).await;
+        }
+    }
+
     let capabilities = Arc::new(RwLock::new(cached.clone()));
 
     if cached.is_none() {
         // Create skeleton for immediate API availability
-        let skeleton = create_capabilities_skeleton(stone_name);
+        let skeleton = create_capabilities_skeleton(stone_id, stone_name);
         *capabilities.write().await = Some(skeleton.clone());
         let _ = infra::save_capabilities_cache(&skeleton).await;
 
@@ -117,8 +150,9 @@ pub async fn init_capabilities(
 }
 
 /// Create a minimal capabilities skeleton for immediate API availability
-fn create_capabilities_skeleton(stone_name: &str) -> HardwareCapabilities {
+fn create_capabilities_skeleton(stone_id: &str, stone_name: &str) -> HardwareCapabilities {
     HardwareCapabilities {
+        stone_id: Some(stone_id.to_string()),
         stone_name: stone_name.to_string(),
         hardware: HardwareInventory {
             cpu: CpuCapabilities {

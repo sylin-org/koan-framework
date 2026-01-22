@@ -62,8 +62,8 @@ pub async fn run_first_boot_initialization(old_name: &str, port: u16) -> anyhow:
     console::display_header("Setup Complete")?;
     console::display_item("Stone Name", &new_name)?;
     console::display_item("Management URL", &url)?;
-    console::display_item("Username", "stone")?;
-    console::display_item("Password", "garden")?;
+    console::display_item("Username", garden_common::constants::STONE_USER)?;
+    console::display_item("Password", garden_common::constants::STONE_PASSWORD)?;
     console::tty_write("")?;
     console::display_success("Stone is ready for use")?;
     console::tty_write("")?;
