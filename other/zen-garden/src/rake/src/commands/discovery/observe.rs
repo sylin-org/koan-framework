@@ -11,10 +11,15 @@ use crate::context::CommandContext;
 use crate::discovery;
 use crate::stone_cache::{CachedStone, GLOBAL_CACHE};
 use crate::suggestions;
+use crate::tending;
 use crate::ui;
 use async_trait::async_trait;
-use garden_common::{DiscoveryResponse, GardenApiResponse, HardwareCapabilities, ServiceInfo};
+use garden_common::{CliFormatter, DiscoveryResponse, GardenApiResponse, HardwareCapabilities, ServiceInfo};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
+
+/// Global counter for stones displayed (for footer)
+static STONE_COUNT: AtomicUsize = AtomicUsize::new(0);
 
 /// Internal struct for stone data during observation
 struct StoneData {
@@ -66,6 +71,9 @@ async fn observe_garden(
     stone_filter: Option<String>,
     offering_filter: Option<String>,
 ) -> anyhow::Result<()> {
+    // Reset stone counter
+    STONE_COUNT.store(0, Ordering::SeqCst);
+
     // Keep offering_filter as-is for Lantern call, create offerings_filter for legacy code
     let offerings_filter: Option<Vec<String>> = offering_filter.as_ref().map(|s| {
         s.split(',')
@@ -73,16 +81,26 @@ async fn observe_garden(
             .collect()
     });
 
+    // Get currently tended stone endpoint for marking
+    let tended_endpoint = tending::read_tending()
+        .ok()
+        .filter(|s| s.is_valid())
+        .map(|s| s.endpoint);
+
     // Start background Lantern discovery immediately (non-blocking)
     discovery::discover_lantern_background();
 
     // Display header immediately (no waiting for discovery)
-    let term = &ctx.term;
-    let supports_unicode = term.supports_unicode;
+    let fmt = CliFormatter::new();
+    let indent = " ".repeat(ui::constants::DEFAULT_INDENT);
+
+    println!();
+    println!("{}{}", indent, fmt.title("GARDEN OBSERVE"));
+    println!("{}{}", indent, fmt.divider(&"─".repeat(47)));
     if let Some(ref filter) = offerings_filter {
-        println!("{}", ui::section_header(&format!("GARDEN OVERVIEW (filtered: {})", filter.join(", ")), term));
+        println!("{}discovering stones (filtered: {})...", indent, filter.join(", "));
     } else {
-        println!("{}", ui::section_header("GARDEN OVERVIEW", term));
+        println!("{}discovering stones...", indent);
     }
     println!();
 
@@ -98,7 +116,8 @@ async fn observe_garden(
             Ok(resp) if resp.status().is_success() => {
                 if let Ok(topology) = resp.json::<garden_common::LanternTopology>().await {
                     // Display Lantern-sourced topology
-                    display_lantern_topology(&topology, offering_filter.as_deref(), supports_unicode);
+                    display_lantern_topology(&topology, offering_filter.as_deref(), tended_endpoint.as_deref());
+                    display_footer();
                     return Ok(());
                 }
             }
@@ -133,8 +152,9 @@ async fn observe_garden(
             // Spawn concurrent fetch task - display as data arrives
             let client_clone = ctx.client.clone();
             let offerings_filter_clone = offerings_filter.clone();
+            let tended_clone = tended_endpoint.clone();
             let handle = tokio::spawn(async move {
-                fetch_and_display_stone(&client_clone, &cached, &offerings_filter_clone).await
+                fetch_and_display_stone(&client_clone, &cached, &offerings_filter_clone, tended_clone.as_deref()).await
             });
             fetch_handles.push(handle);
         }
@@ -189,9 +209,10 @@ async fn observe_garden(
                     // Spawn fetch task immediately when stone discovered
                     let client_clone = client.clone();
                     let offerings_filter_clone = offerings_filter.clone();
+                    let tended_clone = tended_endpoint.clone();
 
                     let handle = tokio::spawn(async move {
-                        fetch_and_display_discovered_stone(&client_clone, &response, &offerings_filter_clone).await
+                        fetch_and_display_discovered_stone(&client_clone, &response, &offerings_filter_clone, tended_clone.as_deref()).await
                     });
                     fetch_handles.push(handle);
                 }
@@ -213,7 +234,7 @@ async fn observe_garden(
 
         // Fallback to localhost if no stones discovered
         if !found_any_stone {
-            found_any_stone = try_localhost_fallback(&ctx.client, &offerings_filter).await;
+            found_any_stone = try_localhost_fallback(&ctx.client, &offerings_filter, tended_endpoint.as_deref()).await;
         }
     }
 
@@ -221,6 +242,7 @@ async fn observe_garden(
         println!("{}No reachable stones found", " ".repeat(ui::constants::DEFAULT_INDENT));
     }
 
+    display_footer();
     Ok(())
 }
 
@@ -229,6 +251,7 @@ async fn fetch_and_display_stone(
     client: &reqwest::Client,
     cached: &CachedStone,
     offerings_filter: &Option<Vec<String>>,
+    tended_endpoint: Option<&str>,
 ) -> bool {
     let services_url = format!("{}/api/v1/services", cached.endpoint.trim_end_matches('/'));
     if let Ok(resp) = client.get(&services_url).timeout(Duration::from_secs(5)).send().await {
@@ -244,7 +267,11 @@ async fn fetch_and_display_stone(
             };
 
             // Display as soon as data arrives
-            let _ = display_stone(&stone_data, offerings_filter);
+            // Normalize endpoints for comparison (strip trailing slashes)
+            let is_tended = tended_endpoint
+                .map(|t| t.trim_end_matches('/') == cached.endpoint.trim_end_matches('/'))
+                .unwrap_or(false);
+            let _ = display_stone(&stone_data, offerings_filter, is_tended);
             return true;
         }
     }
@@ -256,6 +283,7 @@ async fn fetch_and_display_discovered_stone(
     client: &reqwest::Client,
     response: &DiscoveryResponse,
     offerings_filter: &Option<Vec<String>>,
+    tended_endpoint: Option<&str>,
 ) -> bool {
     let caps_url = format!("{}/capabilities", response.stone_endpoint.trim_end_matches('/'));
     if let Ok(resp) = client.get(&caps_url).timeout(Duration::from_secs(5)).send().await {
@@ -274,7 +302,11 @@ async fn fetch_and_display_discovered_stone(
                     };
 
                     // Display as soon as data arrives
-                    let _ = display_stone(&stone_data, offerings_filter);
+                    // Normalize endpoints for comparison (strip trailing slashes)
+                    let is_tended = tended_endpoint
+                        .map(|t| t.trim_end_matches('/') == response.stone_endpoint.trim_end_matches('/'))
+                        .unwrap_or(false);
+                    let _ = display_stone(&stone_data, offerings_filter, is_tended);
                     return true;
                 }
             }
@@ -287,6 +319,7 @@ async fn fetch_and_display_discovered_stone(
 async fn try_localhost_fallback(
     client: &reqwest::Client,
     offerings_filter: &Option<Vec<String>>,
+    tended_endpoint: Option<&str>,
 ) -> bool {
     let localhost = format!("http://127.0.0.1:{}", garden_common::ports::MOSS_HTTP);
 
@@ -303,10 +336,13 @@ async fn try_localhost_fallback(
                     let stone_data = StoneData {
                         capabilities: caps_response.data,
                         services,
-                        endpoint: localhost,
+                        endpoint: localhost.clone(),
                     };
 
-                    let _ = display_stone(&stone_data, offerings_filter);
+                    let is_tended = tended_endpoint
+                        .map(|t| t.trim_end_matches('/') == localhost.trim_end_matches('/'))
+                        .unwrap_or(false);
+                    let _ = display_stone(&stone_data, offerings_filter, is_tended);
                     return true;
                 }
             }
@@ -316,24 +352,54 @@ async fn try_localhost_fallback(
 }
 
 /// Display topology from Lantern registry
-fn display_lantern_topology(topology: &garden_common::LanternTopology, offering_filter: Option<&str>, supports_unicode: bool) {
-    println!("\n=== GARDEN OVERVIEW (via Lantern) ===\n");
+fn display_lantern_topology(topology: &garden_common::LanternTopology, offering_filter: Option<&str>, tended_endpoint: Option<&str>) {
+    let fmt = CliFormatter::new();
+    let indent = " ".repeat(ui::constants::DEFAULT_INDENT);
+    let term = ui::TerminalInfo::detect();
 
     if topology.stones.is_empty() {
-        println!("No stones registered");
+        println!("{}No stones registered", indent);
         return;
     }
 
     for stone in &topology.stones {
-        let status_marker = match stone.status.as_str() {
-            "online" => ui::bullet(supports_unicode),
-            "offline" => ui::hollow_bullet(supports_unicode),
-            _ => if supports_unicode { "o" } else { "~" },
+        STONE_COUNT.fetch_add(1, Ordering::SeqCst);
+
+        // Normalize endpoints for comparison (strip trailing slashes)
+        let stone_ep_normalized = stone.endpoint.trim_end_matches('/');
+        let is_tended = tended_endpoint
+            .map(|t| t.trim_end_matches('/') == stone_ep_normalized)
+            .unwrap_or(false);
+        let tended_marker = if is_tended { " [tended]" } else { "" };
+
+        // Stone name with status and tended marker on same line
+        let stone_name_upper = stone.name.to_uppercase();
+        let status_indicator = ui::status_indicator(&stone.status, term.supports_color);
+
+        // Calculate padding to align status at column 26
+        let name_width = 26;
+        let name_display = fmt.title(&stone_name_upper);
+        let padding = if stone_name_upper.len() < name_width {
+            " ".repeat(name_width - stone_name_upper.len())
+        } else {
+            " ".to_string()
         };
 
-        // Display endpoint without http:// prefix for cleaner output
+        println!("{}{}{}{}{}", indent, name_display, padding, status_indicator, tended_marker);
+
+        // Stone ID if available
+        if let Some(ref stone_id) = stone.stone_id {
+            println!("{}{}", indent, fmt.hint(&format!("id: {}", stone_id)));
+        }
+
+        println!("{}{}", indent, fmt.divider(&"─".repeat(47)));
+
+        // ACCESS section
+        println!();
+        println!("{}{}", indent, fmt.group("ACCESS"));
         let endpoint_display = stone.endpoint.trim_start_matches("http://").trim_end_matches('/');
-        println!("{}  {} ({})  {}", status_marker, stone.name, endpoint_display, stone.status);
+        println!("{}    {:<16} {}", indent, "ENDPOINT", endpoint_display);
+        println!();
 
         // Filter services if needed
         let filtered_services: Vec<_> = if let Some(filter) = offering_filter {
@@ -345,29 +411,32 @@ fn display_lantern_topology(topology: &garden_common::LanternTopology, offering_
             stone.services.iter().collect()
         };
 
+        // OFFERINGS section
+        println!("{}{}", indent, fmt.group("OFFERINGS"));
         if filtered_services.is_empty() && offering_filter.is_some() {
-            println!("   +-- No matching offerings");
+            println!("{}    No matching offerings", indent);
         } else if filtered_services.is_empty() {
-            println!("   +-- No offerings");
+            println!("{}    No offerings installed", indent);
         } else {
-            println!("   OFFERINGS:");
-            for (idx, svc) in filtered_services.iter().enumerate() {
-                let is_last = idx == filtered_services.len() - 1;
-                let branch = if is_last { "+--" } else { "|--" };
-                println!("   {} {:<12}  {} ({})", branch, svc.name, svc.status, svc.service_type);
+            for svc in filtered_services.iter() {
+                let status = ui::status_indicator(&svc.status, term.supports_color);
+                println!("{}    {:<20} {}", indent, svc.name, status);
             }
         }
 
         println!(); // Blank line between stones
     }
-
-    println!("Last updated: {}", topology.last_updated);
 }
 
 /// Display a single stone with its offerings
-fn display_stone(stone: &StoneData, offering_filter: &Option<Vec<String>>) -> anyhow::Result<()> {
+fn display_stone(stone: &StoneData, offering_filter: &Option<Vec<String>>, is_tended: bool) -> anyhow::Result<()> {
     let caps = &stone.capabilities;
     let term = ui::TerminalInfo::detect();
+    let fmt = CliFormatter::new();
+    let indent = " ".repeat(ui::constants::DEFAULT_INDENT);
+
+    // Increment stone counter
+    STONE_COUNT.fetch_add(1, Ordering::SeqCst);
 
     // Determine stone status from detection_status
     let status_text = match caps.detection_status {
@@ -376,36 +445,55 @@ fn display_stone(stone: &StoneData, offering_filter: &Option<Vec<String>>) -> an
         garden_common::DetectionStatus::Complete => "thriving",
     };
 
-    // Stone name with status aligned at column 35
-    let stone_name_display = if term.supports_color {
-        use colored::Colorize;
-        caps.stone_name.to_uppercase().bold().to_string()
-    } else {
-        caps.stone_name.to_uppercase()
-    };
+    // Stone name with status and tended marker on same line
+    // Align status at column 26 (matching offerings table)
+    let stone_name_upper = caps.stone_name.to_uppercase();
     let status_indicator = ui::status_indicator(status_text, term.supports_color);
+    let tended_marker = if is_tended { " [tended]" } else { "" };
 
-    // Pad stone name to 35 characters, then add status
-    let name_visible_len = caps.stone_name.len();
-    let status_col = 35;
-    let padding_needed = if status_col > name_visible_len {
-        status_col - name_visible_len
+    // Calculate padding to align status
+    let name_width = 26;
+    let name_display = fmt.title(&stone_name_upper);
+    let padding = if stone_name_upper.len() < name_width {
+        " ".repeat(name_width - stone_name_upper.len())
     } else {
-        1
+        " ".to_string()
     };
 
-    println!("\n{}{}{}", stone_name_display, " ".repeat(padding_needed), status_indicator);
+    println!("{}{}{}{}{}", indent, name_display, padding, status_indicator, tended_marker);
 
-    // Underline
-    let underline_len = status_col + 12;
-    println!("{}", "-".repeat(underline_len));
+    // Stone ID (if available)
+    if let Some(ref stone_id) = caps.stone_id {
+        println!("{}{}", indent, fmt.hint(&format!("id: {}", stone_id)));
+    }
 
-    // === SYSTEM SECTION ===
-    let endpoint_display = stone.endpoint.trim_start_matches("http://").trim_end_matches('/');
-    println!("{}", ui::kv_line("ADDRESS", endpoint_display, ui::constants::DEFAULT_INDENT));
-    println!("{}", ui::kv_line("ARCH", &caps.hardware.cpu.architecture, ui::constants::DEFAULT_INDENT));
-    println!("{}", ui::kv_line("CPU", &format!("{} cores", caps.hardware.cpu.cores), ui::constants::DEFAULT_INDENT));
-    println!("{}", ui::kv_line("MEMORY", &format!("{} GB", caps.hardware.memory.total_mb / 1024), ui::constants::DEFAULT_INDENT));
+    println!("{}{}", indent, fmt.divider(&"─".repeat(47)));
+
+    // === ACCESS SECTION ===
+    println!();
+    println!("{}{}", indent, fmt.group("ACCESS"));
+
+    // Parse endpoint to extract IP and port
+    let endpoint_clean = stone.endpoint.trim_start_matches("http://").trim_end_matches('/');
+    let (ip_addr, port) = if let Some(colon_pos) = endpoint_clean.rfind(':') {
+        (&endpoint_clean[..colon_pos], &endpoint_clean[colon_pos + 1..])
+    } else {
+        (endpoint_clean, "7185")
+    };
+
+    // mDNS name is stone_name.local
+    let mdns_name = format!("{}.local", caps.stone_name.to_lowercase());
+
+    println!("{}    {:<16} http://{}:{}", indent, "HTTP", ip_addr, port);
+    println!("{}    {:<16} {}", indent, "MDNS", mdns_name);
+    println!("{}    {:<16} {}", indent, "IP", ip_addr);
+
+    // === HARDWARE SECTION ===
+    println!();
+    println!("{}{}", indent, fmt.group("HARDWARE"));
+    println!("{}    {:<16} {}", indent, "ARCH", caps.hardware.cpu.architecture);
+    println!("{}    {:<16} {} cores", indent, "CPU", caps.hardware.cpu.cores);
+    println!("{}    {:<16} {} GB", indent, "MEMORY", caps.hardware.memory.total_mb / 1024);
 
     // Show primary storage if available
     if !caps.hardware.storage.is_empty() {
@@ -421,11 +509,11 @@ fn display_stone(stone: &StoneData, offering_filter: &Option<Vec<String>>) -> an
             } else {
                 format!("{} GB {} ({:.0}% used)", largest.size_gb, disk_type_str, largest.used_percent)
             };
-            println!("{}", ui::kv_line("STORAGE", &storage_value, ui::constants::DEFAULT_INDENT));
+            println!("{}    {:<16} {}", indent, "STORAGE", storage_value);
         }
     }
 
-    // === AI SECTION ===
+    // Show AI capabilities if available
     if let Some(ref ai_caps) = caps.hardware.ai_capabilities {
         if ai_caps.gpu_count > 0 {
             let gpu_text = if ai_caps.gpu_count == 1 {
@@ -463,10 +551,10 @@ fn display_stone(stone: &StoneData, offering_filter: &Option<Vec<String>>) -> an
                 String::new()
             };
 
-            println!("{}", ui::kv_line("AI", &format!("{}{}{}", gpu_text, vram_text, runtime_text), ui::constants::DEFAULT_INDENT));
+            println!("{}    {:<16} {}{}{}", indent, "AI", gpu_text, vram_text, runtime_text);
         }
     } else {
-        // Fallback to old behavior
+        // Fallback to old GPU detection
         let ai_devices: Vec<&garden_common::GpuInfo> = caps.hardware.gpus.iter()
             .filter(|gpu| {
                 !gpu.ai_runtimes.is_empty() ||
@@ -475,7 +563,7 @@ fn display_stone(stone: &StoneData, offering_filter: &Option<Vec<String>>) -> an
             .collect();
 
         if !ai_devices.is_empty() {
-            println!("{}", ui::kv_line("AI", &format!("{} device(s)", ai_devices.len()), ui::constants::DEFAULT_INDENT));
+            println!("{}    {:<16} {} device(s)", indent, "AI", ai_devices.len());
         }
     }
 
@@ -488,22 +576,24 @@ fn display_stone(stone: &StoneData, offering_filter: &Option<Vec<String>>) -> an
         stone.services.iter().collect()
     };
 
+    // === OFFERINGS SECTION ===
+    println!();
+    println!("{}{}", indent, fmt.group("OFFERINGS"));
+
     if filtered_services.is_empty() && offering_filter.is_some() {
-        println!("{}", ui::empty_state("No matching offerings", None));
+        println!("{}    No matching offerings", indent);
         let hidden = stone.services.len();
         if hidden > 0 {
-            println!("{}  {} other service{}", " ".repeat(ui::constants::DEFAULT_INDENT), hidden, if hidden == 1 { "" } else { "s" });
+            println!("{}    ({} other service{})", indent, hidden, if hidden == 1 { "" } else { "s" });
         }
     } else if filtered_services.is_empty() {
-        println!("{}", ui::empty_state("No offerings", None));
+        println!("{}    No offerings installed", indent);
     } else {
-        // Display offerings as bracketed category
-        println!("\n{}[offerings]", " ".repeat(ui::constants::DEFAULT_INDENT));
-
+        // Build offerings table
         let mut table = ui::TableBuilder::new()
             .with_indent(ui::constants::DEFAULT_INDENT * 2)
             .add_column(24, ui::Align::Left)
-            .add_column(12, ui::Align::Left)
+            .add_column(14, ui::Align::Left)
             .add_column(10, ui::Align::Right)
             .add_column(10, ui::Align::Right)
             .add_column(10, ui::Align::Right)
@@ -539,11 +629,25 @@ fn display_stone(stone: &StoneData, offering_filter: &Option<Vec<String>>) -> an
         if offering_filter.is_some() {
             let hidden = stone.services.len() - filtered_services.len();
             if hidden > 0 {
-                println!("      + {} other service{}", hidden, if hidden == 1 { "" } else { "s" });
+                println!("{}    + {} other service{}", indent, hidden, if hidden == 1 { "" } else { "s" });
             }
         }
     }
 
     println!(); // Blank line between stones
     Ok(())
+}
+
+/// Display footer with stone count and related commands
+fn display_footer() {
+    let fmt = CliFormatter::new();
+    let indent = " ".repeat(ui::constants::DEFAULT_INDENT);
+    let count = STONE_COUNT.load(Ordering::SeqCst);
+
+    println!("{}{}", indent, fmt.divider(&"─".repeat(47)));
+    println!("{}{} stone{} discovered", indent, count, if count == 1 { "" } else { "s" });
+    println!();
+    println!("{}{}", indent, fmt.hint("For stone details:      garden-rake <stone>?"));
+    println!("{}{}", indent, fmt.hint("To tend a stone:        garden-rake tend <stone>"));
+    println!();
 }

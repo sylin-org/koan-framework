@@ -35,9 +35,9 @@ impl CachedStoneOps for StoneCache {
             endpoint: cached.endpoint,
         })
     }
-    
-    fn insert(&self, stone_name: String, endpoint: String, capabilities: HardwareCapabilities) {
-        self.insert(stone_name, endpoint, capabilities);
+
+    fn insert(&self, endpoint: String, capabilities: HardwareCapabilities) {
+        self.insert(endpoint, capabilities);
     }
 }
 
@@ -55,7 +55,7 @@ async fn resolve_endpoint(client: &reqwest::Client, at: Option<String>) -> anyho
     // Priority 1: --at flag (explicit override, deterministic)
     if let Some(explicit) = at {
         let endpoint = resolve_target_endpoint(client, &explicit, Some(&*STONE_CACHE)).await?;
-        print_stone_header(client, &endpoint).await;
+        // Note: Stone header is printed by dispatch.rs if cmd.show_stone_header() is true
         return Ok(endpoint);
     }
 
@@ -63,7 +63,6 @@ async fn resolve_endpoint(client: &reqwest::Client, at: Option<String>) -> anyho
     if let Ok(env_endpoint) = std::env::var(garden_common::ENV_GARDEN_STONE) {
         tracing::info!(endpoint = %env_endpoint, "Using GARDEN_STONE environment variable");
         let endpoint = resolve_target_endpoint(client, &env_endpoint, Some(&*STONE_CACHE)).await?;
-        print_stone_header(client, &endpoint).await;
         return Ok(endpoint);
     }
 
@@ -76,7 +75,6 @@ async fn resolve_endpoint(client: &reqwest::Client, at: Option<String>) -> anyho
                 age_secs = tending.age_seconds(),
                 "Using cached tending state"
             );
-            print_stone_header(client, &tending.endpoint).await;
             return Ok(tending.endpoint);
         } else {
             tracing::debug!("Tending state expired, clearing cache");
@@ -90,7 +88,7 @@ async fn resolve_endpoint(client: &reqwest::Client, at: Option<String>) -> anyho
     match discovery::discover_moss() {
         Ok(endpoint) => {
             tracing::info!(endpoint = %endpoint, "Auto-discovered stone");
-            
+
             // Fetch capabilities to get stone name for cache
             let caps_url = format!("{}/capabilities", endpoint.trim_end_matches('/'));
             if let Ok(resp) = client.get(&caps_url).timeout(Duration::from_secs(5)).send().await {
@@ -98,8 +96,7 @@ async fn resolve_endpoint(client: &reqwest::Client, at: Option<String>) -> anyho
                     let _ = tending::write_tending(response.data.stone_name.clone(), endpoint.clone());
                 }
             }
-            
-            print_stone_header(client, &endpoint).await;
+
             Ok(endpoint)
         }
         Err(_) => {
@@ -116,45 +113,6 @@ async fn resolve_endpoint(client: &reqwest::Client, at: Option<String>) -> anyho
                   • Or use a stone name: garden-rake <command> --at <stone-name>\n\
                   • Check stone status: ssh stone@<ip> systemctl status garden-moss.service"
             ))
-        }
-    }
-}
-
-/// Print stone header banner if tending to a valid stone
-/// This should be called at the start of every command
-async fn print_stone_header(client: &reqwest::Client, endpoint: &str) {
-    let term = ui::TerminalInfo::detect();
-    
-    // Fetch stone capabilities to get name and health
-    let caps_url = format!("{}/capabilities", endpoint.trim_end_matches('/'));
-    if let Ok(resp) = client.get(&caps_url).timeout(Duration::from_secs(3)).send().await {
-        if let Ok(response) = resp.json::<GardenApiResponse<HardwareCapabilities>>().await {
-            let stone_name = &response.data.stone_name;
-            
-            // Fetch health to get status
-            let health_url = format!("{}/health", endpoint.trim_end_matches('/'));
-            let health_status = if let Ok(health_resp) = client.get(&health_url).timeout(Duration::from_secs(2)).send().await {
-                if let Ok(health_json) = health_resp.json::<serde_json::Value>().await {
-                    // Map health to vitality language
-                    if let Some(status) = health_json.get("status").and_then(|v| v.as_str()) {
-                        match status {
-                            garden_common::HEALTH_HEALTHY => garden_common::VITALITY_THRIVING,
-                            garden_common::HEALTH_DEGRADED => garden_common::VITALITY_NEEDS_ATTENTION,
-                            garden_common::HEALTH_UNHEALTHY => garden_common::VITALITY_WITHERING,
-                            _ => garden_common::VITALITY_DORMANT
-                        }
-                    } else {
-                        garden_common::VITALITY_THRIVING
-                    }
-                } else {
-                    garden_common::VITALITY_DORMANT
-                }
-            } else {
-                garden_common::VITALITY_DORMANT
-            };
-            
-            println!("{}", ui::stone_banner(stone_name, health_status, term.supports_color));
-            println!();
         }
     }
 }

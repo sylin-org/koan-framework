@@ -59,18 +59,42 @@ impl Command for StatusCommand {
             );
         }
 
+        // === ACCESS SECTION ===
+        println!(
+            "{}",
+            ui::section_header_v2("ACCESS", false, ctx.term.supports_color)
+        );
+        // Parse endpoint to extract IP and port
+        let endpoint_clean = endpoint
+            .trim_start_matches("http://")
+            .trim_end_matches('/');
+        let (ip_addr, port) = if let Some(colon_pos) = endpoint_clean.rfind(':') {
+            (&endpoint_clean[..colon_pos], &endpoint_clean[colon_pos + 1..])
+        } else {
+            (endpoint_clean, "7185")
+        };
+
+        // mDNS name is stone_name.local (lowercase)
+        let mdns_name = format!("{}.local", caps.stone_name.to_lowercase());
+
+        println!(
+            "{}",
+            ui::kv_line("HTTP", &format!("http://{}:{}", ip_addr, port), ui::constants::DEFAULT_INDENT)
+        );
+        println!(
+            "{}",
+            ui::kv_line("mDNS", &mdns_name, ui::constants::DEFAULT_INDENT)
+        );
+        println!(
+            "{}",
+            ui::kv_line("IP", ip_addr, ui::constants::DEFAULT_INDENT)
+        );
+
         // === SYSTEM SECTION ===
+        println!();
         println!(
             "{}",
             ui::section_header_v2("SYSTEM", false, ctx.term.supports_color)
-        );
-        // Show stone endpoint address
-        let endpoint_display = endpoint
-            .trim_start_matches("http://")
-            .trim_end_matches('/');
-        println!(
-            "{}",
-            ui::kv_line("ADDRESS", endpoint_display, ui::constants::DEFAULT_INDENT)
         );
         println!(
             "{}",

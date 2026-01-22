@@ -10,7 +10,7 @@ use std::collections::BTreeMap;
 use std::time::Duration;
 use anyhow::Result;
 use async_trait::async_trait;
-use garden_common::{GardenApiResponse, GardenHttpClient, HardwareCapabilities, ServiceInfo};
+use garden_common::{CliFormatter, GardenApiResponse, GardenHttpClient, HardwareCapabilities, ServiceInfo};
 use crate::commands::Command;
 use crate::context::CommandContext;
 use crate::discovery;
@@ -902,6 +902,11 @@ impl Command for OfferCommand {
         !matches!(self.action, OfferAction::QueryAnywhere { .. })
     }
 
+    fn show_stone_header(&self) -> bool {
+        // Offer command manages its own display
+        false
+    }
+
     fn name(&self) -> &'static str {
         "offer"
     }
@@ -976,13 +981,20 @@ impl Command for OfferCommand {
                 match status {
                     reqwest::StatusCode::ACCEPTED | reqwest::StatusCode::OK => {
                         if let Some(body) = body {
+                            let fmt = CliFormatter::new();
+                            let indent = " ".repeat(ui::constants::DEFAULT_INDENT);
+
                             let service_name = body.get("service").and_then(|v| v.as_str()).unwrap_or(name);
                             let action = body.get("action").and_then(|v| v.as_str()).unwrap_or("create");
                             let api_status = body.get("status").and_then(|v| v.as_str()).unwrap_or("pending");
                             let message = body.get("message").and_then(|v| v.as_str()).unwrap_or("");
 
-                            println!("{}", ui::stone_banner(service_name, api_status, term.supports_color));
+                            // New visual language: offering name with status
                             println!();
+                            println!("{}{}", indent, fmt.title(&service_name.to_uppercase()));
+                            let status_indicator = ui::status_indicator(api_status, term.supports_color);
+                            println!("{}{} {}", indent, status_indicator, action);
+                            println!("{}{}", indent, fmt.divider(&"─".repeat(47)));
 
                             // Extract job_id from message if present
                             let job_id = if message.contains("Job ID:") || message.contains("job:") {
@@ -998,15 +1010,12 @@ impl Command for OfferCommand {
                             if let Some(job_id) = job_id {
                                 stream_job_progress(&ctx.client, endpoint, &job_id, service_name, self.quiet_mode).await?;
                             } else if message.contains("Adopted") {
-                                println!("{}{} Service already exists (adopted)", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("ok", term.supports_color));
-                                println!("{}{}", " ".repeat(ui::constants::DEFAULT_INDENT), message);
+                                println!("{}{} Service already exists (adopted)", indent, ui::status_indicator("ok", term.supports_color));
+                                println!("{}{}", indent, message);
                             } else if message.contains("maintenance") {
-                                println!("{}{} Under maintenance, retry later", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("pending", term.supports_color));
-                            } else {
-                                println!("{}{} {} ({})", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("ok", term.supports_color), action, api_status);
-                                if !message.is_empty() {
-                                    println!("{}{}", " ".repeat(ui::constants::DEFAULT_INDENT), message);
-                                }
+                                println!("{}{} Under maintenance, retry later", indent, ui::status_indicator("pending", term.supports_color));
+                            } else if !message.is_empty() {
+                                println!("{}{}", indent, message);
                             }
 
                             // Display suggestions from v1 API (if not quiet)
@@ -1014,15 +1023,17 @@ impl Command for OfferCommand {
                                 if let Some(suggestions) = body.get("suggestions").and_then(|v| v.as_array()) {
                                     if !suggestions.is_empty() {
                                         println!();
-                                        println!("{}", ui::section_header("SUGGESTIONS", &term));
+                                        println!("{}{}", indent, fmt.divider(&"─".repeat(47)));
+                                        println!("{}{}", indent, fmt.group("SUGGESTIONS"));
                                         for suggestion in suggestions {
                                             if let Some(s) = suggestion.as_str() {
-                                                println!("{}  • {}", " ".repeat(ui::constants::DEFAULT_INDENT), s);
+                                                println!("{}    • {}", indent, s);
                                             }
                                         }
                                     }
                                 }
                             }
+                            println!();
                         }
                     }
                     reqwest::StatusCode::BAD_REQUEST => {
