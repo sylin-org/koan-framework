@@ -5,6 +5,16 @@ pub mod timeouts;
 pub mod paths;
 pub mod limits;
 
+/// Configuration directory path (platform-specific)
+///
+/// - Linux: `/etc/zen-garden`
+/// - Windows: `.zen-garden` (relative to current working directory)
+#[cfg(target_os = "windows")]
+pub const CONFIG_DIR: &str = ".zen-garden";
+
+#[cfg(not(target_os = "windows"))]
+pub const CONFIG_DIR: &str = "/etc/zen-garden";
+
 // ============================================================================
 // Network Ports
 // ============================================================================
@@ -39,14 +49,10 @@ pub const LANTERN_SERVICE: &str = "garden-lantern.service";
 // File System Paths
 // ============================================================================
 
-/// Common paths
-pub const CONFIG_DIR: &str = "/etc/zen-garden";
+/// Common paths (Linux-only)
 pub const STONE_USER: &str = "stone";
 pub const STONE_HOME: &str = "/home/stone";
 pub const FIRST_RUN_FLAG: &str = "/etc/zen-garden/.first-run-complete";
-pub const MOSS_REGISTRY: &str = "/etc/zen-garden/moss-registry.json";
-pub const MOSS_OFFERINGS_INDEX: &str = "/etc/zen-garden/moss-offerings-index.json";
-pub const STONE_CAPABILITIES_CACHE: &str = "/etc/zen-garden/stone-capabilities.json";
 
 // ============================================================================
 // Standard Error Codes

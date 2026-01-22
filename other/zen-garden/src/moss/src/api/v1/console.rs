@@ -5,7 +5,7 @@
 };
 use serde::{Deserialize, Serialize};
 use crate::{AppState, console::ConsoleMode, error_response};
-use garden_common::ApiError;
+use garden_common::api_utils::ApiErrorResponse;
 
 #[derive(Debug, Deserialize)]
 pub struct ConsoleModeRequest {
@@ -32,7 +32,7 @@ pub struct ConsoleModeResponse {
 pub async fn set_console_mode_v1(
     State(state): State<AppState>,
     Json(request): Json<ConsoleModeRequest>,
-) -> Result<(StatusCode, Json<ConsoleModeResponse>), (StatusCode, Json<ApiError>)> {
+) -> Result<(StatusCode, Json<ConsoleModeResponse>), (StatusCode, Json<ApiErrorResponse>)> {
     // Parse requested mode
     let new_mode: ConsoleMode = request.mode.parse().map_err(|_| {
         error_response(
@@ -121,7 +121,7 @@ pub async fn set_console_mode_v1(
 /// GET /api/v1/console/mode - Get current console mode
 pub async fn get_console_mode_v1(
     State(state): State<AppState>,
-) -> Result<(StatusCode, Json<serde_json::Value>), (StatusCode, Json<ApiError>)> {
+) -> Result<(StatusCode, Json<serde_json::Value>), (StatusCode, Json<ApiErrorResponse>)> {
     let current_mode = state.console.get_mode();
     
     Ok((

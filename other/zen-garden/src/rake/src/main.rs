@@ -1,3 +1,4 @@
+mod commands;
 mod parser;
 mod stone_cache;
 mod suggestions;
@@ -163,6 +164,10 @@ struct Cli {
     /// Suppress suggestions (zen: quietly, env: GARDEN_QUIET)
     #[arg(short, long, global = true)]
     quiet: bool,
+
+    /// Clear cached tending and force fresh discovery (zen: fresh)
+    #[arg(long, global = true)]
+    fresh: bool,
 
     #[command(subcommand)]
     command: Option<Commands>,
@@ -1582,6 +1587,7 @@ enum WatchStoneMode {
 struct StoneData {
     capabilities: HardwareCapabilities,
     services: Vec<ServiceInfo>,
+    endpoint: String,
 }
 
 /// Auto-discover a stone and set up tending relationship
@@ -1714,8 +1720,9 @@ async fn observe_garden(
                         let stone_data = StoneData {
                             capabilities: cached.capabilities.clone(),
                             services,
+                            endpoint: cached.endpoint.clone(),
                         };
-                        
+
                         // Display as soon as data arrives
                         let _ = display_stone(&stone_data, &offerings_filter_clone);
                         return true;
@@ -1789,8 +1796,9 @@ async fn observe_garden(
                                         let stone_data = StoneData {
                                             capabilities: caps_response.data,
                                             services,
+                                            endpoint: response.stone_endpoint.clone(),
                                         };
-                                        
+
                                         // Display as soon as data arrives
                                         let _ = display_stone(&stone_data, &offerings_filter_clone);
                                         return true;
@@ -1835,8 +1843,9 @@ async fn observe_garden(
                             let stone_data = StoneData {
                                 capabilities: caps_response.data,
                                 services,
+                                endpoint: localhost.clone(),
                             };
-                            
+
                             display_stone(&stone_data, &offerings_filter)?;
                             found_any_stone = true;
                         }
@@ -1868,8 +1877,10 @@ fn display_lantern_topology(topology: &garden_common::LanternTopology, offering_
             "offline" => ui::hollow_bullet(supports_unicode),
             _ => if supports_unicode { "◐" } else { "~" },
         };
-        
-        println!("{}  {} ({})", status_marker, stone.name, stone.status);
+
+        // Display endpoint without http:// prefix for cleaner output
+        let endpoint_display = stone.endpoint.trim_start_matches("http://").trim_end_matches('/');
+        println!("{}  {} ({})  {}", status_marker, stone.name, endpoint_display, stone.status);
 
         // Filter services if needed
         let filtered_services: Vec<_> = if let Some(filter) = offering_filter {
@@ -1937,9 +1948,31 @@ fn display_stone(stone: &StoneData, offering_filter: &Option<Vec<String>>) -> an
     
     
     // === SYSTEM SECTION === (match status command)
+    // Show stone endpoint address
+    let endpoint_display = stone.endpoint.trim_start_matches("http://").trim_end_matches('/');
+    println!("{}", ui::kv_line("ADDRESS", endpoint_display, ui::constants::DEFAULT_INDENT));
     println!("{}", ui::kv_line("ARCH", &caps.hardware.cpu.architecture, ui::constants::DEFAULT_INDENT));
     println!("{}", ui::kv_line("CPU", &format!("{} cores", caps.hardware.cpu.cores), ui::constants::DEFAULT_INDENT));
     println!("{}", ui::kv_line("MEMORY", &format!("{} GB", caps.hardware.memory.total_mb / 1024), ui::constants::DEFAULT_INDENT));
+
+    // Show primary storage (largest disk) if available
+    if !caps.hardware.storage.is_empty() {
+        // Find largest disk by size
+        if let Some(largest) = caps.hardware.storage.iter().max_by_key(|d| d.size_gb) {
+            let disk_type_str = match largest.disk_type {
+                garden_common::DiskType::NVMe => "NVMe",
+                garden_common::DiskType::SSD => "SSD",
+                garden_common::DiskType::HDD => "HDD",
+                garden_common::DiskType::Unknown => "",
+            };
+            let storage_value = if disk_type_str.is_empty() {
+                format!("{} GB ({:.0}% used)", largest.size_gb, largest.used_percent)
+            } else {
+                format!("{} GB {} ({:.0}% used)", largest.size_gb, disk_type_str, largest.used_percent)
+            };
+            println!("{}", ui::kv_line("STORAGE", &storage_value, ui::constants::DEFAULT_INDENT));
+        }
+    }
     
     // === AI SECTION === (replaces GPU, matches status command)
     // Show AI capabilities summary if available
@@ -2432,8 +2465,30 @@ fn normalize_zen_to_clap(parsed: &parser::ParsedCommand) -> anyhow::Result<Vec<S
     Ok(args)
 }
 
+// Windows debug builds need larger stack for async/clap combination
+#[cfg(all(windows, debug_assertions))]
+fn main() -> anyhow::Result<()> {
+    // Spawn with 4MB stack to avoid stack overflow in debug builds
+    std::thread::Builder::new()
+        .stack_size(4 * 1024 * 1024)
+        .spawn(|| {
+            tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .build()
+                .unwrap()
+                .block_on(async_main())
+        })?
+        .join()
+        .map_err(|_| anyhow::anyhow!("Thread panic"))?
+}
+
+#[cfg(not(all(windows, debug_assertions)))]
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    async_main().await
+}
+
+async fn async_main() -> anyhow::Result<()> {
     // Validate command manifest in debug builds
     #[cfg(debug_assertions)]
     command_manifest::validate_manifest();
@@ -2502,10 +2557,20 @@ async fn main() -> anyhow::Result<()> {
     };
 
     // Determine if quiet mode is active
-    let quiet_mode = cli.quiet 
+    let quiet_mode = cli.quiet
         || parsed_keywords.as_ref().map(|k| k.quietly).unwrap_or(false)
         || std::env::var("GARDEN_QUIET").is_ok();
-    
+
+    // Determine if fresh mode is active (--fresh flag or zen "fresh" keyword)
+    let fresh_mode = cli.fresh
+        || parsed_keywords.as_ref().map(|k| k.fresh).unwrap_or(false);
+
+    // Clear tending cache if fresh mode is active
+    if fresh_mode {
+        let _ = tending::clear_tending();
+        tracing::debug!("Cleared tending cache (fresh mode)");
+    }
+
     // Create pooled HTTP client with connection reuse (hot cache architecture)
     // Configuration optimized for long-running commands (watch/observe):
     // - pool_idle_timeout: 90 seconds (matches stone cache TTL)
@@ -2572,6 +2637,9 @@ async fn main() -> anyhow::Result<()> {
             
             // === SYSTEM SECTION ===
             println!("{}", ui::section_header_v2("SYSTEM", false, term.supports_color));
+            // Show stone endpoint address
+            let endpoint_display = endpoint.trim_start_matches("http://").trim_end_matches('/');
+            println!("{}", ui::kv_line("ADDRESS", endpoint_display, ui::constants::DEFAULT_INDENT));
             println!("{}", ui::kv_line("ARCH", &caps.hardware.cpu.architecture, ui::constants::DEFAULT_INDENT));
             println!("{}", ui::kv_line("CPU", &format!("{} cores", caps.hardware.cpu.cores), ui::constants::DEFAULT_INDENT));
             
@@ -4748,151 +4816,5 @@ async fn reconcile_system(
     anyhow::bail!("Reconcile failed with status {}: {}", status, text);
 }
 
-/// Display detailed information for a specific command
-fn display_command_detail(cmd: &command_manifest::CommandDef, zen_only: bool, normative_only: bool) {
-    let _term = ui::TerminalInfo::detect();
-    let indent = " ".repeat(ui::constants::DEFAULT_INDENT);
-    
-    // Title
-    println!();
-    println!("{}{}", indent, cmd.zen_name.to_uppercase());
-    if let Some(norm) = cmd.normative_name {
-        println!("{}(Normative: {})", indent, norm);
-    }
-    println!("{}{}", indent, "─".repeat(60));
-    println!();
-    
-    // Description
-    println!("{}{}", indent, cmd.description);
-    println!();
-    
-    // Category and remote capability
-    println!("{}Category: {}", indent, cmd.category.as_str());
-    println!("{}Remote Capable: {}", indent, if cmd.remote_capable { "Yes" } else { "No" });
-    println!();
-    
-    // Long description
-    println!("{}{}", indent, cmd.long_description.replace('\n', &format!("\n{}", indent)));
-    println!();
-    
-    // Parameters
-    if !cmd.params.is_empty() {
-        println!("{}PARAMETERS:", indent);
-        for param in &cmd.params {
-            let required = if param.required { " (required)" } else { "" };
-            if !normative_only {
-                println!("{}  Zen: {}{}", indent, param.zen_syntax, required);
-            }
-            if let Some(norm_syntax) = param.normative_syntax {
-                if !zen_only {
-                    println!("{}  Normative: {}{}", indent, norm_syntax, required);
-                }
-            }
-            println!("{}    {}", indent, param.description);
-            println!();
-        }
-    }
-    
-    // Examples
-    if !cmd.examples.is_empty() {
-        if !normative_only && cmd.examples.iter().any(|e| e.zen_syntax.is_some()) {
-            println!("{}EXAMPLES (Zen Syntax):", indent);
-            for example in &cmd.examples {
-                if let Some(zen_syntax) = example.zen_syntax {
-                    println!("{}  {}", indent, zen_syntax);
-                    println!("{}    → {}", indent, example.description);
-                    println!();
-                }
-            }
-        }
-        
-        if !zen_only && cmd.examples.iter().any(|e| e.normative_syntax.is_some()) {
-            println!("{}EXAMPLES (Normative Syntax):", indent);
-            for example in &cmd.examples {
-                if let Some(norm_syntax) = example.normative_syntax {
-                    println!("{}  {}", indent, norm_syntax);
-                    println!("{}    → {}", indent, example.description);
-                    println!();
-                }
-            }
-        }
-    }
-    
-    // See also
-    if !cmd.see_also.is_empty() {
-        println!("{}See also: {}", indent, cmd.see_also.join(", "));
-        println!();
-    }
-}
-
-/// Display commands in a specific category
-fn display_command_category(category: &command_manifest::CommandCategory, commands: &[&command_manifest::CommandDef], zen_only: bool, normative_only: bool) {
-    let indent = " ".repeat(ui::constants::DEFAULT_INDENT);
-    
-    println!();
-    println!("{}{} COMMANDS", indent, category.as_str().to_uppercase());
-    println!("{}{}", indent, "═".repeat(60));
-    println!();
-    
-    for cmd in commands {
-        // Command name(s)
-        if !normative_only {
-            println!("{}  {}", indent, cmd.zen_name);
-        }
-        if let Some(norm) = cmd.normative_name {
-            if !zen_only {
-                println!("{}  {} (normative)", indent, norm);
-            }
-        }
-        println!("{}    {}", indent, cmd.description);
-        println!();
-    }
-    
-    println!("{}Use 'garden-rake commands <name>' for detailed information", indent);
-    println!();
-}
-
-/// Display all commands grouped by category
-fn display_all_commands(_zen_only: bool, normative_only: bool) {
-    use command_manifest::MANIFEST;
-    
-    let indent = " ".repeat(ui::constants::DEFAULT_INDENT);
-    
-    let command_count = MANIFEST.all().len();
-
-    println!();
-    println!("{}GARDEN-RAKE", indent);
-    println!("{}{}", indent, "─".repeat(47));
-    println!("{}{} commands available", indent, command_count);
-    println!();
-
-    // Category-based sections (no ESSENTIALS to avoid duplication)
-    let categories = [
-        (command_manifest::CommandCategory::Discovery, "DISCOVERY"),
-        (command_manifest::CommandCategory::Lifecycle, "SERVICES"),
-        (command_manifest::CommandCategory::Adoption, "ADOPTION"),
-        (command_manifest::CommandCategory::Management, "MANAGEMENT"),
-        (command_manifest::CommandCategory::System, "SYSTEM"),
-        (command_manifest::CommandCategory::Pond, "POND (Multi-Stone Security)"),
-    ];
-    
-    for (category, display_name) in categories {
-        let commands = MANIFEST.by_category(&category);
-        if !commands.is_empty() {
-            println!("{}{}", indent, display_name);
-            for cmd in commands {
-                if !normative_only {
-                    println!("{}    {:<20} {}", indent, cmd.zen_name, cmd.description);
-                }
-                // Normative variants hidden by default to reduce clutter
-            }
-            println!();
-        }
-    }
-    
-    // Footer
-    println!("{}{}", indent, "─".repeat(47));
-    println!("{}For detailed examples:   garden-rake <command>?", indent);
-    println!("{}Full directory view:     garden-rake commands", indent);
-    println!();
-}
+// Display functions extracted to commands/help.rs
+use commands::help::{display_all_commands, display_command_category, display_command_detail};

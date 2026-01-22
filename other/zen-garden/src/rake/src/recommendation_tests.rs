@@ -29,6 +29,7 @@ fn caps_with_disk_type(disk_type: &str) -> HardwareCapabilities {
             os_version: None,
             kernel_version: None,
             swap_mb: None,
+            ai_capabilities: None,
         },
         runtime: None,
         detection_status: garden_common::DetectionStatus::Complete,
@@ -116,12 +117,12 @@ fn clap_parses_offer_prefer_and_anywhere_on_fail() {
     ]);
 
     match cli.command {
-        Commands::Offer {
+        Some(Commands::Offer {
             offering,
             prefer,
             anywhere_on_fail,
             ..
-        } => {
+        }) => {
             assert_eq!(offering.as_deref(), Some("database,document"));
             assert_eq!(prefer, vec!["ssd".to_string(), "nvme".to_string()]);
             assert!(anywhere_on_fail);
@@ -135,11 +136,11 @@ fn clap_parses_offer_info_subcommand() {
     let cli = Cli::parse_from(["garden-rake", "offer", "mongodb", "info"]);
 
     match cli.command {
-        Commands::Offer {
+        Some(Commands::Offer {
             offering,
             action,
             ..
-        } => {
+        }) => {
             assert_eq!(offering.as_deref(), Some("mongodb"));
             assert!(matches!(action, Some(OfferAction::Info)));
         }

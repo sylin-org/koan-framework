@@ -154,8 +154,12 @@ pub struct GpuInfo {
     pub vram_mb: Option<u64>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub capabilities: Vec<String>,  // "cuda", "rocm", "vulkan", "directml", "opencl"
-    #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub ai_runtime: Option<AiRuntime>,
+
+    /// Detected AI runtimes in dual format
+    /// Supports both simple ("cuda") and versioned ("cuda:12.2") formats
+    /// Example: ["cuda", "cuda:12.2", "directml"]
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub ai_runtimes: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -209,6 +213,51 @@ pub enum DetectionStatus {
     Complete,
 }
 
+/// AI capabilities summary aggregated across all GPUs
+///
+/// This provides a quick overview of available AI acceleration without
+/// needing to iterate through individual GPUs. Useful for:
+/// - Fast capability checks ("has any AI runtime?")
+/// - Service placement decisions
+/// - Lantern service discovery
+/// - Health monitoring
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct AiCapabilitiesSummary {
+    /// All available runtimes (deduplicated across GPUs)
+    /// Supports both simple format ("cuda") and versioned format ("cuda:12.2")
+    pub runtimes: Vec<String>,
+
+    /// All GPU vendors present (lowercase)
+    pub vendors: Vec<String>,
+
+    /// Total VRAM across all GPUs (MB)
+    pub total_vram_mb: u64,
+
+    /// Number of AI-capable GPUs
+    pub gpu_count: usize,
+
+    /// Whether hardware detection is complete
+    pub detection_complete: bool,
+}
+
+impl AiCapabilitiesSummary {
+    /// Check if any AI acceleration is available
+    pub fn has_any_acceleration(&self) -> bool {
+        !self.runtimes.is_empty()
+    }
+
+    /// Check if a specific runtime is available (case-insensitive)
+    /// Supports both "cuda" and "cuda:12.2" format checks
+    pub fn supports_runtime(&self, runtime: &str) -> bool {
+        let runtime_lower = runtime.to_lowercase();
+        self.runtimes.iter().any(|r| {
+            let r_lower = r.to_lowercase();
+            // Match either exact or base runtime (e.g., "cuda" matches "cuda:12.2")
+            r_lower == runtime_lower || r_lower.starts_with(&format!("{}:", runtime_lower))
+        })
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HardwareCapabilities {
     pub stone_name: String,
@@ -234,6 +283,11 @@ pub struct HardwareInventory {
     pub kernel_version: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub swap_mb: Option<u64>,
+
+    /// AI capabilities summary (NEW - backwards compatible)
+    /// Aggregated view of AI acceleration across all GPUs
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub ai_capabilities: Option<AiCapabilitiesSummary>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -500,6 +554,109 @@ pub struct HealthcheckPattern {
 }
 
 // ============================================================================
+// Offering Modes Types (Multi-deployment patterns)
+// ============================================================================
+
+/// Deployment mode for an offering
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum OfferingMode {
+    /// Container-based offering managed by Moss (default, current system)
+    Managed,
+    /// Existing service (native or containerized) adopted by Moss
+    Adopted,
+    /// External network service announced by Moss
+    Borrowed,
+}
+
+/// Control level for adopted offerings
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum AdoptedControlLevel {
+    /// Moss manages lifecycle (start/stop/restart)
+    Full,
+    /// Moss monitors health only (default - safe)
+    Monitor,
+    /// Moss announces existence only (discovery)
+    Announce,
+}
+
+impl Default for AdoptedControlLevel {
+    fn default() -> Self {
+        Self::Monitor
+    }
+}
+
+/// Service network location
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ServiceLocation {
+    pub host: String,
+    pub port: u16,
+    pub protocol: String,  // "http", "tcp", "mongodb", "postgres", etc.
+}
+
+/// Adopted offering information
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AdoptedOfferingInfo {
+    pub name: String,
+    pub offering: String,
+    pub mode: OfferingMode,
+    pub location: ServiceLocation,
+    pub control_level: AdoptedControlLevel,
+    pub health: ServiceHealthStatus,
+    pub detected_at: String,  // ISO 8601
+
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub version: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub start_command: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub stop_command: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub restart_command: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub health_check_url: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub container_name: Option<String>,
+}
+
+/// Borrowed offering information (external service)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BorrowedOfferingInfo {
+    pub name: String,
+    pub offering: String,
+    pub mode: OfferingMode,
+    pub location: ServiceLocation,
+    pub announced_at: String,  // ISO 8601
+
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub health_method: Option<HealthMethod>,
+
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub credentials_key: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub connection_template: Option<String>,
+}
+
+/// Health check method for borrowed offerings
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum HealthMethod {
+    /// HTTP endpoint probe
+    Http,
+    /// TCP socket connectivity
+    Tcp,
+    /// No health check (always assume healthy)
+    None,
+}
+
+// ============================================================================
 // API Error Types
 // ============================================================================
 
@@ -601,5 +758,110 @@ mod tests {
         };
         let json = serde_json::to_string(&req).unwrap();
         assert!(json.contains("stone-02"));
+    }
+
+    #[test]
+    fn test_offering_mode_serde() {
+        let mode = OfferingMode::Adopted;
+        let json = serde_json::to_string(&mode).unwrap();
+        assert_eq!(json, "\"adopted\"");
+        let deserialized: OfferingMode = serde_json::from_str(&json).unwrap();
+        assert_eq!(mode, deserialized);
+    }
+
+    #[test]
+    fn test_adopted_control_level_default() {
+        let default = AdoptedControlLevel::default();
+        assert_eq!(default, AdoptedControlLevel::Monitor);
+    }
+
+    #[test]
+    fn test_adopted_control_level_serde() {
+        let level = AdoptedControlLevel::Full;
+        let json = serde_json::to_string(&level).unwrap();
+        assert_eq!(json, "\"full\"");
+        let deserialized: AdoptedControlLevel = serde_json::from_str(&json).unwrap();
+        assert_eq!(level, deserialized);
+    }
+
+    #[test]
+    fn test_service_location_serde() {
+        let location = ServiceLocation {
+            host: "localhost".into(),
+            port: 27017,
+            protocol: "mongodb".into(),
+        };
+        let json = serde_json::to_string(&location).unwrap();
+        let deserialized: ServiceLocation = serde_json::from_str(&json).unwrap();
+        assert_eq!(location.host, deserialized.host);
+        assert_eq!(location.port, deserialized.port);
+        assert_eq!(location.protocol, deserialized.protocol);
+    }
+
+    #[test]
+    fn test_adopted_offering_minimal() {
+        // Test minimal adopted offering (all optional fields omitted)
+        let info = AdoptedOfferingInfo {
+            name: "my-mongodb".into(),
+            offering: "mongodb".into(),
+            mode: OfferingMode::Adopted,
+            location: ServiceLocation {
+                host: "localhost".into(),
+                port: 27017,
+                protocol: "mongodb".into(),
+            },
+            control_level: AdoptedControlLevel::Monitor,
+            health: ServiceHealthStatus::Healthy,
+            detected_at: "2024-01-01T00:00:00Z".into(),
+            version: None,
+            start_command: None,
+            stop_command: None,
+            restart_command: None,
+            health_check_url: None,
+            container_name: None,
+        };
+        let json = serde_json::to_string(&info).unwrap();
+        // Ensure optional fields are not present in JSON
+        assert!(!json.contains("version"));
+        assert!(!json.contains("start_command"));
+        assert!(!json.contains("stop_command"));
+        let deserialized: AdoptedOfferingInfo = serde_json::from_str(&json).unwrap();
+        assert_eq!(info.name, deserialized.name);
+        assert_eq!(info.offering, deserialized.offering);
+    }
+
+    #[test]
+    fn test_borrowed_offering_minimal() {
+        // Test minimal borrowed offering
+        let info = BorrowedOfferingInfo {
+            name: "nas-storage".into(),
+            offering: "storage".into(),
+            mode: OfferingMode::Borrowed,
+            location: ServiceLocation {
+                host: "nas.local".into(),
+                port: 445,
+                protocol: "smb".into(),
+            },
+            announced_at: "2024-01-01T00:00:00Z".into(),
+            health_method: None,
+            credentials_key: None,
+            connection_template: None,
+        };
+        let json = serde_json::to_string(&info).unwrap();
+        // Ensure optional fields are not present in JSON
+        assert!(!json.contains("health_method"));
+        assert!(!json.contains("credentials_key"));
+        assert!(!json.contains("connection_template"));
+        let deserialized: BorrowedOfferingInfo = serde_json::from_str(&json).unwrap();
+        assert_eq!(info.name, deserialized.name);
+    }
+
+    #[test]
+    fn test_health_method_serde() {
+        let method = HealthMethod::Http;
+        let json = serde_json::to_string(&method).unwrap();
+        assert_eq!(json, "\"http\"");
+        let deserialized: HealthMethod = serde_json::from_str(&json).unwrap();
+        assert_eq!(method, deserialized);
     }
 }

@@ -1,0 +1,21 @@
+# NAS Storage - Borrowed Offering (External Network Service)
+name: nas-storage
+category: storage
+description: Network attached storage (SMB/NFS)
+modes:
+  - borrowed
+
+# Location configuration for borrowed service
+location:
+  host: nas.local
+  port: 445
+  protocol: smb
+
+# Health monitoring
+health:
+  method: tcp
+  endpoint: nas.local:445
+  interval_secs: 60
+
+# Connection template for client configuration
+connection_template: "smb://{{host}}/share"

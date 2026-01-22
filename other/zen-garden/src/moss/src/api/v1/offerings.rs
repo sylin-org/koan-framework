@@ -53,7 +53,7 @@ pub struct CompatibilityView {
 pub async fn list_offerings_v1(
     State(state): State<AppState>,
     Query(query): Query<OfferingsQuery>,
-) -> Result<(StatusCode, Json<ApiResponse<Vec<OfferingView>>>), (StatusCode, Json<crate::ApiError>)> {
+) -> Result<(StatusCode, Json<ApiResponse<Vec<OfferingView>>>), (StatusCode, Json<garden_common::api_utils::ApiErrorResponse>)> {
     // Get installed services from registry
     let registry = state.registry.read().await;
     let installed: HashMap<String, &crate::ServiceInfo> = registry
@@ -130,7 +130,7 @@ pub async fn list_offerings_v1(
 pub async fn get_offering_v1(
     State(state): State<AppState>,
     Path(name): Path<String>,
-) -> Result<(StatusCode, Json<ApiResponse<serde_json::Value>>), (StatusCode, Json<crate::ApiError>)> {
+) -> Result<(StatusCode, Json<ApiResponse<serde_json::Value>>), (StatusCode, Json<garden_common::api_utils::ApiErrorResponse>)> {
     // Check if installed
     let registry = state.registry.read().await;
     if let Some(service) = registry.iter().find(|s| s.name == name) {
@@ -196,7 +196,7 @@ pub async fn get_offering_v1(
 pub async fn get_offering_manifest_v1(
     State(state): State<AppState>,
     Path(name): Path<String>,
-) -> Result<(StatusCode, String), (StatusCode, Json<crate::ApiError>)> {
+) -> Result<(StatusCode, String), (StatusCode, Json<garden_common::api_utils::ApiErrorResponse>)> {
     match state.templates.get_template_content(&name) {
         Ok(content) => Ok((StatusCode::OK, content)),
         Err(e) => {
@@ -224,7 +224,7 @@ pub struct PlantOfferingRequest {
 pub async fn plant_offering_v1(
     State(_state): State<AppState>,
     Json(payload): Json<PlantOfferingRequest>,
-) -> Result<(StatusCode, Json<serde_json::Value>), (StatusCode, Json<crate::ApiError>)> {
+) -> Result<(StatusCode, Json<serde_json::Value>), (StatusCode, Json<garden_common::api_utils::ApiErrorResponse>)> {
     // Forward to services API with simplified configuration
     // TODO: Transform simplified config to full service creation request
     tracing::info!(offering = %payload.name, "Planting offering (simplified)");
@@ -244,7 +244,7 @@ pub async fn plant_offering_v1(
 pub async fn take_away_offering_v1(
     State(state): State<AppState>,
     Path(name): Path<String>,
-) -> Result<(StatusCode, Json<serde_json::Value>), (StatusCode, Json<crate::ApiError>)> {
+) -> Result<(StatusCode, Json<serde_json::Value>), (StatusCode, Json<garden_common::api_utils::ApiErrorResponse>)> {
     use axum::http::HeaderMap;
     // Forward to services delete
     let result = crate::api::v1::services::delete_service_v1(State(state), Path(name), HeaderMap::new()).await;
@@ -265,7 +265,7 @@ pub struct HealRequest {
 pub async fn heal_garden_v1(
     State(state): State<AppState>,
     Json(payload): Json<HealRequest>,
-) -> Result<(StatusCode, Json<serde_json::Value>), (StatusCode, Json<crate::ApiError>)> {
+) -> Result<(StatusCode, Json<serde_json::Value>), (StatusCode, Json<garden_common::api_utils::ApiErrorResponse>)> {
     // Forward to services reconcile (same operation, zen terminology)
     crate::api::v1::services::reconcile_inventory_v1(
         State(state),
@@ -280,7 +280,7 @@ pub async fn heal_garden_v1(
 /// Refresh the offerings catalog from disk
 pub async fn refresh_catalog_v1(
     State(state): State<AppState>,
-) -> Result<(StatusCode, Json<serde_json::Value>), (StatusCode, Json<crate::ApiError>)> {
+) -> Result<(StatusCode, Json<serde_json::Value>), (StatusCode, Json<garden_common::api_utils::ApiErrorResponse>)> {
     // Rebuild offerings index
     crate::ensure_offerings_index(&state, true).await.map_err(|e| {
         tracing::error!(error = ?e, "Failed to rebuild offerings catalog");

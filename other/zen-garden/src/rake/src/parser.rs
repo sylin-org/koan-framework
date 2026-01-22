@@ -5,6 +5,7 @@
 /// - `on <stone>` / `at <stone>` - target stone (on is preferred, at is legacy alias)
 /// - `from <url>` - source URL for borrow command
 /// - `quietly` - suppress non-essential output
+/// - `fresh` - clear cache and force fresh discovery
 /// - `until <condition>` - stream termination condition
 
 use anyhow::{Result, anyhow};
@@ -20,6 +21,7 @@ pub struct ParsedKeywords {
     pub on_stone: Option<String>,    // `on <stone>` or `at <stone>` (legacy)
     pub from_url: Option<String>,    // `from <url>` for borrow
     pub quietly: bool,
+    pub fresh: bool,                 // clear cache and force fresh discovery
     pub until_condition: Option<String>,
 }
 
@@ -115,7 +117,7 @@ fn is_normative_verb(verb: &str) -> bool {
 /// Check if args contain zen positional keywords
 fn has_zen_keywords(args: &[String]) -> bool {
     args.iter().any(|arg| {
-        matches!(arg.as_str(), "on" | "at" | "from" | "quietly" | "until")
+        matches!(arg.as_str(), "on" | "at" | "from" | "quietly" | "fresh" | "until")
     })
 }
 
@@ -149,6 +151,9 @@ fn extract_keywords(args: &[String], style: &CommandStyle) -> Result<(ParsedKeyw
             }
             "quietly" if *style == CommandStyle::Zen => {
                 keywords.quietly = true;
+            }
+            "fresh" if *style == CommandStyle::Zen => {
+                keywords.fresh = true;
             }
             "until" if *style == CommandStyle::Zen => {
                 // Next arg is condition
@@ -346,5 +351,27 @@ mod tests {
         let parsed = parse_args(args).unwrap();
         assert_eq!(parsed.style, CommandStyle::Zen);
         assert_eq!(parsed.verb, "explore");
+    }
+
+    #[test]
+    fn test_zen_fresh() {
+        let args = vec![
+            "observe".to_string(),
+            "fresh".to_string(),
+        ];
+        let parsed = parse_args(args).unwrap();
+        assert!(parsed.keywords.fresh);
+        assert_eq!(parsed.args, Vec::<String>::new());
+    }
+
+    #[test]
+    fn test_zen_fresh_with_target() {
+        let args = vec![
+            "list".to_string(),
+            "fresh".to_string(),
+        ];
+        let parsed = parse_args(args).unwrap();
+        assert!(parsed.keywords.fresh);
+        assert_eq!(parsed.style, CommandStyle::Zen);
     }
 }

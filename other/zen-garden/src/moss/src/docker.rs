@@ -479,6 +479,46 @@ impl DockerManager {
         Ok(names)
     }
 
+    /// List all containers with detailed information (for detection)
+    pub async fn list_all_containers(&self) -> Result<Vec<crate::infra::detection::container_inspect::ContainerInfo>> {
+        let options = ListContainersOptions::<String> {
+            all: true,
+            ..Default::default()
+        };
+
+        let containers = self
+            .docker
+            .list_containers(Some(options))
+            .await
+            .context("Failed to list containers")?;
+
+        let infos = containers
+            .into_iter()
+            .filter_map(|c| {
+                let name = c.names
+                    .as_ref()
+                    .and_then(|names| names.first())
+                    .unwrap_or(&String::new())
+                    .to_string();
+
+                let image = c.image.unwrap_or_default();
+                let state = c.state.unwrap_or_else(|| "unknown".to_string());
+
+                if !name.is_empty() {
+                    Some(crate::infra::detection::container_inspect::ContainerInfo {
+                        name,
+                        image,
+                        state,
+                    })
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        Ok(infos)
+    }
+
     /// Get resource metrics for a specific container
     pub async fn get_container_stats(&self, name: &str) -> Result<garden_common::ContainerResources> {
         let container_name = format!("zen-offering-{}", name);

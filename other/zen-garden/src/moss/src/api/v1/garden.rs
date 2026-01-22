@@ -6,13 +6,13 @@
 use crate::api::responses::{GardenOverview, StoneInfo, ApiResponse};
 use crate::api::suggestions::{generate_suggestions, SuggestionContext};
 use crate::{error_response, AppState, metrics};
-use garden_common::{ApiError, CpuCapabilities, DetectionStatus, DiskCapabilities, HardwareCapabilities, HardwareInventory, MemoryCapabilities};
+use garden_common::{api_utils::ApiErrorResponse, CpuCapabilities, DetectionStatus, DiskCapabilities, HardwareCapabilities, HardwareInventory, MemoryCapabilities};
 
 /// GET /api/v1/garden - Get garden overview (all stones)
 pub async fn get_garden_v1(
     State(state): State<AppState>,
     headers: HeaderMap,
-) -> Result<Json<ApiResponse<GardenOverview>>, (StatusCode, Json<ApiError>)> {
+) -> Result<Json<ApiResponse<GardenOverview>>, (StatusCode, Json<ApiErrorResponse>)> {
     // For now, return just local stone (multi-stone discovery in future phase)
     let local_stone = get_local_stone_info(&state).await?;
     
@@ -38,7 +38,7 @@ pub async fn get_stone_v1(
     State(state): State<AppState>,
     Path(stone_name): Path<String>,
     headers: HeaderMap,
-) -> Result<Json<ApiResponse<HardwareCapabilities>>, (StatusCode, Json<ApiError>)> {
+) -> Result<Json<ApiResponse<HardwareCapabilities>>, (StatusCode, Json<ApiErrorResponse>)> {
     // For now, only support local stone
     if state.stone_name != stone_name {
         return Err(error_response(
@@ -64,7 +64,7 @@ pub async fn get_stone_v1(
 pub async fn get_local_stone_v1(
     State(state): State<AppState>,
     headers: HeaderMap,
-) -> Result<Json<ApiResponse<HardwareCapabilities>>, (StatusCode, Json<ApiError>)> {
+) -> Result<Json<ApiResponse<HardwareCapabilities>>, (StatusCode, Json<ApiErrorResponse>)> {
     let caps = get_capabilities(&state).await;
 
     let ctx = SuggestionContext::from_headers(&headers, "observe_stone");
@@ -119,6 +119,7 @@ async fn get_capabilities(state: &AppState) -> HardwareCapabilities {
             os_version,
             kernel_version,
             swap_mb,
+            ai_capabilities: None,
         },
         runtime: None, // TODO: Add runtime info (docker version, OS, kernel)
         detection_status: DetectionStatus::Complete, // Synchronous detection
@@ -126,14 +127,15 @@ async fn get_capabilities(state: &AppState) -> HardwareCapabilities {
 }
 
 // Helper function to get stone info summary
-async fn get_local_stone_info(state: &AppState) -> Result<StoneInfo, (StatusCode, Json<ApiError>)> {
+async fn get_local_stone_info(state: &AppState) -> Result<StoneInfo, (StatusCode, Json<ApiErrorResponse>)> {
     // Use registry instead of docker.list_services
     let registry = state.registry.read().await;
     let services_count = registry.len() as u32;
     drop(registry);
 
-    // TODO: Get actual endpoint from config
-    let endpoint = "http://localhost:7185".to_string();
+    // Get current IP from network monitor (dynamically updated)
+    let current_ip = state.network_monitor.get_ip().await;
+    let endpoint = format!("http://{}:{}", current_ip, state.api_port);
 
     Ok(StoneInfo {
         name: state.stone_name.clone(),

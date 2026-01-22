@@ -7,6 +7,8 @@ use garden_moss::{
     health_monitor_task,
     detect_capabilities_background,
     lantern_registration_loop,
+    // Network monitoring
+    NetworkMonitor, NetworkMonitorConfig, NetworkEvent,
     // Bootstrap functions
     load_preinstall_manifest,
     run_first_boot_initialization,
@@ -18,7 +20,6 @@ use garden_moss::{
 };
 use garden_moss::infra::{
     MossConfig,
-    get_local_ip,
     kill_existing_moss_processes_graceful,
 };
 #[cfg(target_os = "windows")]
@@ -329,19 +330,24 @@ async fn main() -> anyhow::Result<()> {
         tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
     }
 
-    // Prefer explicit STONE_HOST, otherwise auto-detect network IP
-    let api_endpoint = {
-        if let Ok(host) = std::env::var(garden_common::ENV_STONE_HOST) {
-            let trimmed = host.trim();
-            if !trimmed.is_empty() {
-                format!("http://{}:{}", trimmed, port)
-            } else {
-                format!("http://{}:{}", get_local_ip(), port)
-            }
-        } else {
-            // Auto-detect local network IP for UDP discovery responses
-            format!("http://{}:{}", get_local_ip(), port)
-        }
+    // Start network monitor for IP change detection
+    // This runs in background and polls every 5s when disconnected, 30s when connected
+    let network_monitor = NetworkMonitor::start_with_config(
+        NetworkMonitorConfig::default()
+            .with_disconnect_retry(5)  // Retry every 5s when no valid LAN IP
+            .with_connected_poll(30)   // Poll every 30s when connected
+    ).await;
+
+    // Prefer explicit STONE_HOST, otherwise use monitored network IP
+    let use_static_host = std::env::var(garden_common::ENV_STONE_HOST)
+        .ok()
+        .filter(|h| !h.trim().is_empty());
+
+    let api_endpoint = if let Some(host) = &use_static_host {
+        format!("http://{}:{}", host.trim(), port)
+    } else {
+        // Use network monitor's current IP (auto-detected)
+        format!("http://{}:{}", network_monitor.get_ip().await, port)
     };
 
     // Start mDNS announcer (Linux only)
@@ -354,16 +360,101 @@ async fn main() -> anyhow::Result<()> {
     };
 
     // Spawn Lantern registration loop (if LANTERN_ENDPOINT is set)
+    // Also spawns IP change handler to re-register when network changes
     if let Ok(lantern_endpoint) = std::env::var(garden_common::ENV_LANTERN_ENDPOINT) {
         let trimmed = lantern_endpoint.trim().to_string();
         if !trimmed.is_empty() {
             let reg_stone_name = stone_name.clone();
             let reg_endpoint = api_endpoint.clone();
+            let lantern_url = trimmed.clone();
+
+            // Main registration loop
             tokio::spawn(async move {
-                if let Err(e) = lantern_registration_loop(reg_stone_name, reg_endpoint, trimmed).await {
+                if let Err(e) = lantern_registration_loop(reg_stone_name, reg_endpoint, lantern_url).await {
                     tracing::error!(error = ?e, "Lantern registration loop failed");
                 }
             });
+
+            // If using dynamic IP (not STONE_HOST), spawn IP change handler
+            if use_static_host.is_none() {
+                let change_stone_name = stone_name.clone();
+                let change_lantern = trimmed.clone();
+                let change_port = port;
+                let mut network_rx = network_monitor.subscribe();
+
+                tokio::spawn(async move {
+                    while let Ok(event) = network_rx.recv().await {
+                        match event {
+                            NetworkEvent::IpChanged { ref old, ref new } => {
+                                let new_endpoint = format!("http://{}:{}", new, change_port);
+                                tracing::info!(
+                                    old = %old,
+                                    new = %new,
+                                    endpoint = %new_endpoint,
+                                    "Network IP changed, triggering immediate Lantern re-registration"
+                                );
+
+                                // Immediate re-registration (don't wait for next heartbeat)
+                                let client = reqwest::Client::new();
+                                let register_url = format!("{}/api/register", change_lantern);
+                                let request = garden_common::RegisterRequest {
+                                    stone_name: change_stone_name.clone(),
+                                    endpoint: new_endpoint,
+                                    services: vec![],
+                                };
+
+                                match client.post(&register_url).json(&request).send().await {
+                                    Ok(resp) if resp.status().is_success() => {
+                                        tracing::info!("Re-registered with Lantern after IP change");
+                                    }
+                                    Ok(resp) => {
+                                        tracing::warn!(status = ?resp.status(), "Lantern re-registration returned non-success");
+                                    }
+                                    Err(e) => {
+                                        tracing::warn!(error = ?e, "Failed to re-register with Lantern after IP change");
+                                    }
+                                }
+                            }
+                            NetworkEvent::Reconnected { ref new } => {
+                                let new_endpoint = format!("http://{}:{}", new, change_port);
+                                tracing::info!(
+                                    new = %new,
+                                    endpoint = %new_endpoint,
+                                    "Network reconnected, triggering immediate Lantern re-registration"
+                                );
+
+                                // Immediate re-registration (don't wait for next heartbeat)
+                                let client = reqwest::Client::new();
+                                let register_url = format!("{}/api/register", change_lantern);
+                                let request = garden_common::RegisterRequest {
+                                    stone_name: change_stone_name.clone(),
+                                    endpoint: new_endpoint,
+                                    services: vec![],
+                                };
+
+                                match client.post(&register_url).json(&request).send().await {
+                                    Ok(resp) if resp.status().is_success() => {
+                                        tracing::info!("Re-registered with Lantern after IP change");
+                                    }
+                                    Ok(resp) => {
+                                        tracing::warn!(status = ?resp.status(), "Lantern re-registration returned non-success");
+                                    }
+                                    Err(e) => {
+                                        tracing::warn!(error = ?e, "Failed to re-register with Lantern after IP change");
+                                    }
+                                }
+                            }
+                            NetworkEvent::Disconnected { current, reason } => {
+                                tracing::warn!(
+                                    ip = %current,
+                                    reason = %reason,
+                                    "Network disconnected, Lantern registration suspended until reconnect"
+                                );
+                            }
+                        }
+                    }
+                });
+            }
         }
     }
 
@@ -522,6 +613,8 @@ async fn main() -> anyhow::Result<()> {
         offerings_index: Arc::new(RwLock::new(None)),
         console: console_printer.clone(),
         capabilities: capabilities_arc.clone(),
+        network_monitor: Arc::new(network_monitor),
+        api_port: port,
     };
     
     // Start singleton UDP discovery listener IMMEDIATELY (before any blocking operations)

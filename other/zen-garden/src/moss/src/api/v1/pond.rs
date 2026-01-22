@@ -5,7 +5,7 @@
 };
 use crate::{error_response, AppState};
 use crate::api::responses::ApiResponse;
-use garden_common::ApiError;
+use garden_common::api_utils::ApiErrorResponse;
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize)]
@@ -65,7 +65,7 @@ pub async fn pond_init_v1(
     State(_state): State<AppState>,
     _headers: HeaderMap,
     Json(_payload): Json<PondInitRequest>,
-) -> Result<Json<ApiResponse<PondInitResponse>>, (StatusCode, Json<ApiError>)> {
+) -> Result<Json<ApiResponse<PondInitResponse>>, (StatusCode, Json<ApiErrorResponse>)> {
     Err(error_response(
         StatusCode::NOT_IMPLEMENTED,
         "POND_NOT_IMPLEMENTED",
@@ -84,7 +84,7 @@ pub async fn pond_init_v1(
 pub async fn pond_remove_v1(
     State(_state): State<AppState>,
     _headers: HeaderMap,
-) -> Result<Json<ApiResponse<serde_json::Value>>, (StatusCode, Json<ApiError>)> {
+) -> Result<Json<ApiResponse<serde_json::Value>>, (StatusCode, Json<ApiErrorResponse>)> {
     Err(error_response(
         StatusCode::NOT_IMPLEMENTED,
         "POND_NOT_IMPLEMENTED",
@@ -97,7 +97,7 @@ pub async fn pond_remove_v1(
 pub async fn pond_invite_v1(
     State(_state): State<AppState>,
     _headers: HeaderMap,
-) -> Result<Json<ApiResponse<PondInviteResponse>>, (StatusCode, Json<ApiError>)> {
+) -> Result<Json<ApiResponse<PondInviteResponse>>, (StatusCode, Json<ApiErrorResponse>)> {
     Err(error_response(
         StatusCode::NOT_IMPLEMENTED,
         "POND_NOT_IMPLEMENTED",
@@ -111,7 +111,7 @@ pub async fn pond_join_v1(
     State(_state): State<AppState>,
     _headers: HeaderMap,
     Json(_payload): Json<PondJoinRequest>,
-) -> Result<Json<ApiResponse<PondJoinResponse>>, (StatusCode, Json<ApiError>)> {
+) -> Result<Json<ApiResponse<PondJoinResponse>>, (StatusCode, Json<ApiErrorResponse>)> {
     Err(error_response(
         StatusCode::NOT_IMPLEMENTED,
         "POND_NOT_IMPLEMENTED",
@@ -125,7 +125,7 @@ pub async fn pond_untrust_v1(
     State(_state): State<AppState>,
     Path(_stone_name): Path<String>,
     _headers: HeaderMap,
-) -> Result<Json<ApiResponse<serde_json::Value>>, (StatusCode, Json<ApiError>)> {
+) -> Result<Json<ApiResponse<serde_json::Value>>, (StatusCode, Json<ApiErrorResponse>)> {
     Err(error_response(
         StatusCode::NOT_IMPLEMENTED,
         "POND_NOT_IMPLEMENTED",
@@ -138,7 +138,7 @@ pub async fn pond_untrust_v1(
 pub async fn pond_status_v1(
     State(_state): State<AppState>,
     _headers: HeaderMap,
-) -> Result<Json<ApiResponse<PondStatusResponse>>, (StatusCode, Json<ApiError>)> {
+) -> Result<Json<ApiResponse<PondStatusResponse>>, (StatusCode, Json<ApiErrorResponse>)> {
     // Return inactive status (pond not implemented yet)
     let response = PondStatusResponse {
         active: false,

@@ -6,21 +6,15 @@
 /// - Async tokio socket operations
 /// 
 /// ## Usage Example
-/// 
-/// ```rust
-/// // Start singleton UDP listener with broadcast channel
-/// let receiver = discovery::ensure_udp_listener(
-///     "stone-name".to_string(),
-///     "http://localhost:7185".to_string(),
-/// ).await?;
-/// 
-/// // Subscribe to discovery events
-/// let mut rx = receiver;
-/// tokio::spawn(async move {
-///     while let Ok(event) = rx.recv().await {
-///         // Process discovery events
-///     }
-/// });
+///
+/// ```rust,no_run
+/// use garden_moss::network_singletons;
+///
+/// # async fn example() -> anyhow::Result<()> {
+/// // Create UDP socket with SO_REUSEADDR for port reuse
+/// let socket = network_singletons::create_reusable_udp_socket("127.0.0.1:0").await?;
+/// # Ok(())
+/// # }
 /// ```
 
 use anyhow::Result;

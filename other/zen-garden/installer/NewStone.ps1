@@ -1504,14 +1504,14 @@ function Main {
                     $startCreation = $true
                 }
                 "b" {
-                    # Build Linux binaries
+                    # Build Linux binaries (release is default, no flag needed)
                     Write-Host ""
                     Write-Step "Building Linux binaries..." "..."
                     $buildScript = Join-Path $PSScriptRoot "build-linux.ps1"
-                    
+
                     if (Test-Path $buildScript) {
                         try {
-                            & $buildScript -Release
+                            & $buildScript
                             Write-Host ""
                             Write-Step "✓ Binaries built successfully" "OK"
                             Write-Host "  Updated: ..\dist\linux\moss, ..\dist\linux\garden-rake" -ForegroundColor Gray

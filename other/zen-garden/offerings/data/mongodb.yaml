@@ -1,0 +1,56 @@
+# MongoDB Database - Multi-Mode Offering (Managed + Adopted)
+name: mongodb
+category: database
+description: MongoDB document database
+modes:
+  - managed
+  - adopted
+
+# Managed mode configuration (container-based)
+image: mongo:7
+ports:
+  - host: 27017
+    container: 27017
+
+environment:
+  - name: MONGO_INITDB_ROOT_USERNAME
+    value: admin
+  - name: MONGO_INITDB_ROOT_PASSWORD
+    value: admin
+
+volumes:
+  - host: mongodb-data
+    container: /data/db
+
+# Detection configuration for adopted mode
+detection:
+  - method: command
+    config:
+      command: mongod --version
+      expected_pattern: "db version v(\\d+\\.\\d+\\.\\d+)"
+
+  - method: command
+    config:
+      command: mongosh --version
+      expected_pattern: "(\\d+\\.\\d+\\.\\d+)"
+
+  - method: container_inspect
+    config:
+      container_pattern: "mongo"
+      image_pattern: "mongo:.*"
+
+  - method: http_probe
+    config:
+      url: http://localhost:27017
+      expected_status: 200
+
+# Control configuration for adopted mode
+control:
+  level: monitor
+  health_check_url: mongodb://localhost:27017
+
+# Health monitoring
+health:
+  method: tcp
+  endpoint: localhost:27017
+  interval_secs: 30

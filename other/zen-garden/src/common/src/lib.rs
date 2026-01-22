@@ -9,6 +9,13 @@ pub mod constants;
 pub mod responses;
 pub mod jobs;
 pub mod client;
+pub mod traits;
+pub mod events;
+pub mod persistence;
+pub mod discovery;
+pub mod api_utils;
+pub mod manifests;
+pub mod cli_colors;
 
 // Re-export commonly used items
 pub use types::*;
@@ -16,6 +23,7 @@ pub use utils::*;
 pub use responses::*;
 pub use jobs::*;
 pub use client::{GardenHttpClient, GardenApiResponse};
+pub use cli_colors::{CliFormatter, AnsiColor, ColorSupport};
 
 // Re-export health and vitality constants for easy access
 pub use constants::{
@@ -42,7 +50,7 @@ pub mod names {
         MOSS_BINARY, RAKE_BINARY, LANTERN_BINARY,
         MOSS_CONFIG, LANTERN_CONFIG,
         MOSS_SERVICE, LANTERN_SERVICE,
-        CONFIG_DIR, STONE_USER, STONE_HOME, FIRST_RUN_FLAG, MOSS_REGISTRY, MOSS_OFFERINGS_INDEX, STONE_CAPABILITIES_CACHE,
+        CONFIG_DIR, STONE_USER, STONE_HOME, FIRST_RUN_FLAG,
     };
 }
 

@@ -1218,21 +1218,10 @@ pub async fn update_moss_config(new_name: &str) -> Result<()> {
 }
 
 /// Get local IP address synchronously (for use in non-async contexts)
+///
+/// Delegates to infra::network::get_local_ip() for consistent behavior.
+/// Prefers LAN addresses (192.168.x.x, 10.x.x.x) over Docker bridge (172.17.x.x).
 pub fn get_local_ip_sync() -> String {
-    use std::net::IpAddr;
-    
-    if let Ok(addrs) = local_ip_address::list_afinet_netifas() {
-        for (_, ip) in addrs {
-            if let IpAddr::V4(ipv4) = ip {
-                // Skip loopback and link-local addresses
-                if !ipv4.is_loopback() && !ipv4.is_link_local() {
-                    return ipv4.to_string();
-                }
-            }
-        }
-    }
-    
-    // Fallback to hostname-based lookup
-    "127.0.0.1".to_string()
+    crate::infra::network::get_local_ip()
 }
 

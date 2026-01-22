@@ -53,6 +53,11 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+# Fix for Windows PowerShell (doesn't have $IsWindows automatic variable)
+if ($null -eq (Get-Variable -Name IsWindows -ErrorAction SilentlyContinue)) {
+    $IsWindows = $env:OS -eq "Windows_NT"
+}
+
 $WORKSPACE_ROOT = (Get-Item $PSScriptRoot).Parent.FullName
 $DIST_DIR = Join-Path $WORKSPACE_ROOT "dist"
 $INSTALLER_DIR = $PSScriptRoot
@@ -188,8 +193,8 @@ Write-Host "Distribution artifacts:" -ForegroundColor Cyan
 
 $linuxDir = Join-Path $DIST_DIR "linux"
 $windowsDir = Join-Path $DIST_DIR "windows"
-$linuxArtifacts = Get-ChildItem $linuxDir -ErrorAction SilentlyContinue
-$windowsArtifacts = Get-ChildItem $windowsDir -ErrorAction SilentlyContinue
+$linuxArtifacts = Get-ChildItem $linuxDir -File -ErrorAction SilentlyContinue
+$windowsArtifacts = Get-ChildItem $windowsDir -File -ErrorAction SilentlyContinue
 
 $artifacts = @($linuxArtifacts) + @($windowsArtifacts)
 if ($artifacts) {

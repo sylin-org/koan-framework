@@ -1,0 +1,13 @@
+{
+  "stone_name": "test-stone",
+  "hardware": {
+    "cpu": {
+      "cores": 0,
+      "architecture": "x86_64"
+    },
+    "memory": {
+      "total_mb": 0
+    }
+  },
+  "detection_status": "scanning"
+}
