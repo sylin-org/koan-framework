@@ -1,8 +1,10 @@
 ﻿# Intelligent Offering Placement Specification
 
-**Status**: Proposal  
+**Status**: Implemented ✅  
 **Author**: Architecture Team  
 **Date**: 2026-01-22  
+**Implementation Date**: 2026-01-23  
+**Commits**: cff030b (Moss backend), 3753165 (Rake client)  
 **Relates to**: `zen-garden-spec-topology-caching.md`, `zen-garden-spec-discovery.md`
 
 ## Overview
@@ -1075,6 +1077,43 @@ avoid = ["arm64"]
 - ✅ Error cases handled gracefully (no stones, no compatible, timeout)
 - ✅ Integration tests pass on heterogeneous garden (x86_64 + ARM)
 - ✅ Documentation updated (CLI reference, API reference, guides)
+
+---
+
+## Implementation Summary
+
+### Status: ✅ Complete (2026-01-23)
+
+**Backend (Moss) - Commit cff030b:**
+- `src/moss/src/domain/placement.rs` (426 lines) - Full placement orchestration
+- `src/moss/src/api/v1/garden.rs` - Added `recommend_placement_v1` endpoint
+- `src/moss/src/bootstrap/router.rs` - Wired `POST /api/v1/garden/recommend`
+
+**Frontend (Rake) - Commit 3753165:**
+- `src/rake/src/commands/offering/mod.rs` - Added `OfferAction::PlacementRecommend`, interactive/quiet handlers
+- `src/rake/src/parser.rs` - Added "somewhere" keyword detection and `ParsedKeywords.somewhere` field  
+- `src/rake/src/main.rs` - Added `--somewhere` flag, routing to placement handler
+
+**Key Features Delivered:**
+- ✅ Zen syntax: `garden-rake offer <name> somewhere`
+- ✅ Quiet mode: `garden-rake offer <name> somewhere quietly`
+- ✅ Full remote compatibility checking (parallel fetch of remote offerings + metrics)
+- ✅ Multi-factor scoring: compatibility, memory, CPU, storage, hardware type, service distribution
+- ✅ Locality bonus: +3 pts for tended stone
+- ✅ Interactive menu with top 3 recommendations
+- ✅ Auto-select in quiet mode (pick rank 1)
+- ✅ Discovery via `discover_moss_auto()` with stone cache integration
+
+**Architecture Compliance:**
+- No corners cut: Full remote compatibility evaluation as required
+- Parallel data fetching: Offerings and metrics fetched concurrently
+- Separation of concerns: placement.rs orchestrates, delegates to existing domain modules
+- Reusable patterns: scoring functions isolated, metrics collection generalized
+
+**Testing:**
+- Compiles clean (Rust 1.85.0)
+- Parser correctly detects "somewhere" keyword
+- Handler delegates to existing `OfferCommand::install()` after selection
 
 ---
 
