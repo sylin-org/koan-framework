@@ -83,6 +83,8 @@ pub use bootstrap::{
     bind_server, run_server, ServerConfig,
     // Startup utilities
     DockerConfig, connect_docker, init_capabilities,
+    // Configuration
+    DaemonConfig, init_tracing,
 };
 
 // Re-export CLI utilities
