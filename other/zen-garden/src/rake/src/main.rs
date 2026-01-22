@@ -17,7 +17,7 @@ mod discovery_tests;
 mod recommendation_tests;
 
 use base64::Engine;
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 use std::time::Duration;
 use tracing_subscriber::EnvFilter;
 use garden_common::{GardenApiResponse, HardwareCapabilities};
@@ -117,6 +117,14 @@ async fn resolve_endpoint(client: &reqwest::Client, at: Option<String>) -> anyho
     }
 }
 
+#[derive(Debug, Clone, ValueEnum)]
+enum PlacementMode {
+    /// Show interactive menu with top recommendations
+    Interactive,
+    /// Automatically select the best stone without prompting
+    Auto,
+}
+
 #[derive(Parser)]
 #[command(name = "garden-rake")]
 #[command(about = "Zen Garden management CLI - run without arguments to see command directory")]
@@ -151,6 +159,7 @@ enum Commands {
     ///   garden-rake offer                # List validated offerings by category
     ///   garden-rake offer mongodb        # Install mongodb (with compatibility fallback if needed)
     ///   garden-rake offer mongodb info   # Show offering details + compatibility decision
+    ///   garden-rake offer mongo somewhere # Get intelligent placement recommendation
     Offer {
         /// Offering name (omit to list all offerings)
         offering: Option<String>,
@@ -170,6 +179,10 @@ enum Commands {
         /// If an install fails due to compatibility, automatically recommend across all discovered stones.
         #[arg(long)]
         anywhere_on_fail: bool,
+        
+        /// Use intelligent placement recommendation (zen: somewhere, somewhere quietly)
+        #[arg(long, value_enum)]
+        placement_mode: Option<PlacementMode>,
     },
 
     /// List services
@@ -926,8 +939,17 @@ fn normalize_zen_to_clap(parsed: &parser::ParsedCommand) -> anyhow::Result<Vec<S
 
     // Add --on flag if on/at keyword was used (--at is also accepted for legacy support)
     if let Some(stone) = &parsed.keywords.on_stone {
-        args.push("--on".to_string());
+        args.push("--at".to_string());
         args.push(stone.clone());
+    }
+    
+    // Handle "somewhere" keyword for intelligent placement
+    // This triggers placement recommendation instead of direct install
+    if parsed.keywords.somewhere {
+        // Determine mode based on "quietly" modifier
+        let mode = if parsed.keywords.quietly { "auto" } else { "interactive" };
+        args.push("--placement-mode".to_string());
+        args.push(mode.to_string());
     }
 
     // Add --from flag if from keyword was used (for borrow command)
@@ -1087,7 +1109,19 @@ async fn async_main() -> anyhow::Result<()> {
             dispatch::dispatch(&cmd, &client, at, quiet_mode, fresh_mode, Some(&*STONE_CACHE)).await?;
         }
 
-        Commands::Offer { offering, action, at, prefer, anywhere_on_fail } => {
+        Commands::Offer { offering, action, at, prefer, anywhere_on_fail, placement_mode } => {
+            // Handle intelligent placement with "somewhere" keyword or --placement-mode
+            if let Some(mode) = placement_mode {
+                if let Some(name) = offering {
+                    let is_quiet = matches!(mode, PlacementMode::Auto) || quiet_mode;
+                    let cmd = commands::offering::OfferCommand::placement_recommend(name.to_string(), is_quiet);
+                    dispatch::dispatch_local(&cmd, &client, quiet_mode, fresh_mode).await?;
+                } else {
+                    anyhow::bail!("Usage: garden-rake offer <offering> --placement-mode <interactive|auto>");
+                }
+                return Ok(());
+            }
+            
             // Handle --at anywhere (query across all stones)
             if at.as_deref() == Some("anywhere") {
                 match (offering.as_deref(), action) {
