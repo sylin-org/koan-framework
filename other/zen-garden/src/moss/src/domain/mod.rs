@@ -20,6 +20,8 @@ pub mod health;
 pub mod adoption;
 pub mod reconciliation;
 pub mod modes;
+pub mod scoring;
+pub mod metrics_collection;
 
 pub use service_manager::ServiceManager;
 pub use registry::Registry;
