@@ -33,5 +33,5 @@ pub use filesystem::FileSystem;
 pub use hardware::{detect_hardware, load_cached_capabilities, save_capabilities_cache, create_skeleton};
 pub use manifest_loader::{load_offerings, default_offerings_dir};
 pub use persistence::{load_registry, save_registry, load_offerings_cache, save_offerings_cache};
-pub use platform::is_running_from_removable_media;
+pub use platform::{is_running_from_removable_media, shutdown_signal};
 pub use secrets::SecretsManager;

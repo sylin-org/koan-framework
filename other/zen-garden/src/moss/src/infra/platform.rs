@@ -63,3 +63,48 @@ pub fn is_running_from_removable_media(exe_path: &std::path::Path) -> anyhow::Re
 pub fn is_running_from_removable_media(_exe_path: &std::path::Path) -> anyhow::Result<bool> {
     Ok(false)
 }
+
+/// Cross-platform shutdown signal handler
+///
+/// Waits for shutdown signals:
+/// - **Unix**: SIGTERM or SIGINT
+/// - **Windows**: Ctrl+C
+///
+/// # Example
+/// ```rust,no_run
+/// use garden_moss::infra::platform::shutdown_signal;
+///
+/// # async fn example() {
+/// // axum::serve(listener, app)
+/// //     .with_graceful_shutdown(shutdown_signal())
+/// //     .await;
+/// # }
+/// ```
+pub async fn shutdown_signal() {
+    #[cfg(unix)]
+    {
+        use tokio::signal::unix::{signal, SignalKind};
+
+        let mut sigterm = signal(SignalKind::terminate())
+            .expect("Failed to install SIGTERM handler");
+        let mut sigint = signal(SignalKind::interrupt())
+            .expect("Failed to install SIGINT handler");
+
+        tokio::select! {
+            _ = sigterm.recv() => {
+                tracing::info!("SIGTERM received");
+            }
+            _ = sigint.recv() => {
+                tracing::info!("SIGINT received");
+            }
+        }
+    }
+
+    #[cfg(windows)]
+    {
+        tokio::signal::ctrl_c()
+            .await
+            .expect("Failed to install Ctrl+C handler");
+        tracing::info!("Ctrl+C received");
+    }
+}

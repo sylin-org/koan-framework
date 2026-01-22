@@ -13,6 +13,7 @@ pub mod infra;
 pub mod api;
 pub mod tasks;
 pub mod bootstrap;
+pub mod cli;
 
 // Legacy modules (will be removed/migrated incrementally)
 pub mod docker;
@@ -66,10 +67,23 @@ pub use tasks::{
     detect_capabilities_background,
     lantern_registration_loop,
     NetworkMonitor, NetworkMonitorConfig, NetworkEvent,
+    // Task coordination
+    start_all_background_tasks,
+    start_discovery_listener, start_hardware_detection,
+    start_registry_loader, start_catalog_builder,
+    start_manifest_loader, start_health_monitor, start_auto_adoption,
+    start_lantern_registration,
 };
 
 // Re-export bootstrap utilities
 pub use bootstrap::{
     load_preinstall_manifest, PreInstallManifest,
     run_first_boot_initialization,
+    router,
+    bind_server, run_server, ServerConfig,
+    // Startup utilities
+    DockerConfig, connect_docker, init_capabilities,
 };
+
+// Re-export CLI utilities
+pub use cli::{Cli, Commands, parse as parse_cli, version_string};

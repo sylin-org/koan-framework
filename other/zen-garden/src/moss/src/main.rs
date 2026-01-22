@@ -6,17 +6,21 @@ use garden_moss::{
     install_batch_task,
     health_monitor_task,
     detect_capabilities_background,
-    lantern_registration_loop,
+    start_lantern_registration,
     // Network monitoring
-    NetworkMonitor, NetworkMonitorConfig, NetworkEvent,
+    NetworkMonitor, NetworkMonitorConfig,
     // Bootstrap functions
     load_preinstall_manifest,
     run_first_boot_initialization,
+    router,
+    bind_server, run_server, ServerConfig,
     // Domain functions
     adopt_existing_containers,
     ensure_offerings_index,
     // Infra functions
     infra,
+    // CLI
+    Cli, Commands, version_string,
 };
 use garden_moss::infra::{
     MossConfig,
@@ -26,16 +30,10 @@ use garden_moss::infra::{
 use garden_moss::infra::{install_windows_service, finalize_service_update, cleanup_after_service_update};
 
 // All modules are now part of the library (lib.rs)
-use garden_moss::{console, docker, templates, api, discovery, mdns};
+use garden_moss::{console, docker, templates, discovery, mdns};
 use docker::DockerManager;
 use templates::TemplateLoader;
-
-use axum::{
-    routing::{get, post},
-    Router,
-};
 use std::collections::HashMap;
-use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing_subscriber::EnvFilter;
@@ -63,11 +61,7 @@ use garden_common::{
 
 // adopt_offering_container and adopt_existing_containers extracted to domain/adoption.rs
 // JobStatus, Job, MossEvent, AppState now imported from library
-
-fn moss_version_string() -> String {
-    // build.rs injects BUILD_NUMBER (see src/moss/src/discovery.rs)
-    format!("{}.{}", env!("CARGO_PKG_VERSION"), env!("BUILD_NUMBER"))
-}
+// moss_version_string() extracted to cli.rs - use garden_moss::version_string
 
 // All compatibility and offerings utility functions removed - now in domain modules:
 // - blake3_hex(), current_capabilities_hash(), templates_hash() → Would be in domain/offerings if needed
@@ -88,59 +82,7 @@ fn moss_version_string() -> String {
 // install_service_task and install_batch_task extracted to tasks/job_executors.rs
 // health_monitor_task extracted to tasks/health_monitor.rs
 // load_preinstall_manifest extracted to bootstrap/preinstall.rs
-
-#[derive(clap::Parser)]
-#[command(name = "garden-moss")]
-#[command(about = "Zen Garden Moss - Service orchestration daemon")]
-#[command(version = concat!(env!("CARGO_PKG_VERSION"), ".", env!("BUILD_NUMBER")))]
-struct Cli {
-    #[command(subcommand)]
-    command: Option<Commands>,
-    
-    /// Stone name identifier
-    /// Priority: CLI arg > STONE_NAME env var > config file > default
-    #[arg(long, env = "STONE_NAME")]
-    stone_name: Option<String>,
-    
-    /// HTTP server port
-    /// Priority: CLI arg > PORT env var > config file > default (7185)
-    #[arg(long, env = "PORT")]
-    port: Option<u16>,
-    
-    /// Log level (trace, debug, info, warn, error)
-    /// Priority: CLI arg > RUST_LOG env var > config file > default (info)
-    #[arg(long, env = "RUST_LOG")]
-    log_level: Option<String>,
-    
-    /// Fast sync timeout in seconds for rapid offering deployments
-    /// Priority: CLI arg > FAST_SYNC_TIMEOUT env var > config file > default (disabled)
-    #[arg(long, env = "FAST_SYNC_TIMEOUT")]
-    fast_sync_timeout: Option<u64>,
-    
-    /// Force start by killing existing moss processes
-    #[arg(long)]
-    force: bool,
-    
-    /// Internal: Finalize update by replacing old binary (used during self-update)
-    #[arg(long, hide = true)]
-    update_finalize: bool,
-    
-    /// Internal: Cleanup old binary after update (used during self-update)
-    #[arg(long, hide = true)]
-    cleanup_old: bool,
-}
-
-#[derive(clap::Subcommand)]
-enum Commands {
-    /// Install moss as a system service and start it (Zen: take-root)
-    #[cfg(target_os = "windows")]
-    TakeRoot,
-    
-    /// Install moss as a system service and start it (Normative: install-service)
-    #[cfg(target_os = "windows")]
-    #[command(name = "install-service")]
-    InstallService,
-}
+// Cli and Commands extracted to cli.rs - use garden_moss::{Cli, Commands}
 
 // run_first_boot_initialization() extracted to bootstrap/first_boot.rs
 
@@ -359,104 +301,17 @@ async fn main() -> anyhow::Result<()> {
         }
     };
 
-    // Spawn Lantern registration loop (if LANTERN_ENDPOINT is set)
-    // Also spawns IP change handler to re-register when network changes
-    if let Ok(lantern_endpoint) = std::env::var(garden_common::ENV_LANTERN_ENDPOINT) {
-        let trimmed = lantern_endpoint.trim().to_string();
-        if !trimmed.is_empty() {
-            let reg_stone_name = stone_name.clone();
-            let reg_endpoint = api_endpoint.clone();
-            let lantern_url = trimmed.clone();
-
-            // Main registration loop
-            tokio::spawn(async move {
-                if let Err(e) = lantern_registration_loop(reg_stone_name, reg_endpoint, lantern_url).await {
-                    tracing::error!(error = ?e, "Lantern registration loop failed");
-                }
-            });
-
-            // If using dynamic IP (not STONE_HOST), spawn IP change handler
-            if use_static_host.is_none() {
-                let change_stone_name = stone_name.clone();
-                let change_lantern = trimmed.clone();
-                let change_port = port;
-                let mut network_rx = network_monitor.subscribe();
-
-                tokio::spawn(async move {
-                    while let Ok(event) = network_rx.recv().await {
-                        match event {
-                            NetworkEvent::IpChanged { ref old, ref new } => {
-                                let new_endpoint = format!("http://{}:{}", new, change_port);
-                                tracing::info!(
-                                    old = %old,
-                                    new = %new,
-                                    endpoint = %new_endpoint,
-                                    "Network IP changed, triggering immediate Lantern re-registration"
-                                );
-
-                                // Immediate re-registration (don't wait for next heartbeat)
-                                let client = reqwest::Client::new();
-                                let register_url = format!("{}/api/register", change_lantern);
-                                let request = garden_common::RegisterRequest {
-                                    stone_name: change_stone_name.clone(),
-                                    endpoint: new_endpoint,
-                                    services: vec![],
-                                };
-
-                                match client.post(&register_url).json(&request).send().await {
-                                    Ok(resp) if resp.status().is_success() => {
-                                        tracing::info!("Re-registered with Lantern after IP change");
-                                    }
-                                    Ok(resp) => {
-                                        tracing::warn!(status = ?resp.status(), "Lantern re-registration returned non-success");
-                                    }
-                                    Err(e) => {
-                                        tracing::warn!(error = ?e, "Failed to re-register with Lantern after IP change");
-                                    }
-                                }
-                            }
-                            NetworkEvent::Reconnected { ref new } => {
-                                let new_endpoint = format!("http://{}:{}", new, change_port);
-                                tracing::info!(
-                                    new = %new,
-                                    endpoint = %new_endpoint,
-                                    "Network reconnected, triggering immediate Lantern re-registration"
-                                );
-
-                                // Immediate re-registration (don't wait for next heartbeat)
-                                let client = reqwest::Client::new();
-                                let register_url = format!("{}/api/register", change_lantern);
-                                let request = garden_common::RegisterRequest {
-                                    stone_name: change_stone_name.clone(),
-                                    endpoint: new_endpoint,
-                                    services: vec![],
-                                };
-
-                                match client.post(&register_url).json(&request).send().await {
-                                    Ok(resp) if resp.status().is_success() => {
-                                        tracing::info!("Re-registered with Lantern after IP change");
-                                    }
-                                    Ok(resp) => {
-                                        tracing::warn!(status = ?resp.status(), "Lantern re-registration returned non-success");
-                                    }
-                                    Err(e) => {
-                                        tracing::warn!(error = ?e, "Failed to re-register with Lantern after IP change");
-                                    }
-                                }
-                            }
-                            NetworkEvent::Disconnected { current, reason } => {
-                                tracing::warn!(
-                                    ip = %current,
-                                    reason = %reason,
-                                    "Network disconnected, Lantern registration suspended until reconnect"
-                                );
-                            }
-                        }
-                    }
-                });
-            }
-        }
-    }
+    // Start Lantern registration if LANTERN_ENDPOINT is configured
+    // Uses extracted coordinator function for cleaner main.rs
+    // Console is None here since console_printer is created later
+    start_lantern_registration(
+        &stone_name,
+        &api_endpoint,
+        port,
+        use_static_host.is_some(),
+        &network_monitor,
+        None,
+    ).await;
 
     // Initialize console printer early for Docker connection events
     // Use console_mode from config if available, otherwise detect from platform
@@ -471,7 +326,7 @@ async fn main() -> anyhow::Result<()> {
     console_printer.emit(console::ConsoleEvent::new(
         console::EventCategory::System,
         console::EventStatus::Starting,
-        format!("Moss v{}", moss_version_string())
+        format!("Moss v{}", version_string())
     ));
     
     // Emit config loading event (config was loaded earlier before console was available)
@@ -904,210 +759,25 @@ async fn main() -> anyhow::Result<()> {
         ));
     }
 
+    // Configure HTTP router (routes defined in bootstrap/router.rs)
     tracing::info!("Setting up HTTP router with 200 MB body limit");
-    let app = Router::new()
-        // Standard health/monitoring endpoints (root level)
-        .route("/health", get(api::v1::health::get_health))
-        .route("/capabilities", get(api::v1::capabilities::get_capabilities))
-        .route("/metrics", get(api::v1::metrics::get_metrics))
-        
-        // V1 API - Offerings (Human Layer)
-        .route("/api/v1/offerings", get(api::v1::offerings::list_offerings_v1))
-        .route("/api/v1/offerings", post(api::v1::offerings::plant_offering_v1))
-        .route("/api/v1/offerings/:name", get(api::v1::offerings::get_offering_v1))
-        .route("/api/v1/offerings/:name", axum::routing::delete(api::v1::offerings::take_away_offering_v1))
-        .route("/api/v1/offerings/:name/manifest", get(api::v1::offerings::get_offering_manifest_v1))
-        .route("/api/v1/offerings/heal", post(api::v1::offerings::heal_garden_v1))
-        .route("/api/v1/offerings/refresh", post(api::v1::offerings::refresh_catalog_v1))
+    let app = router::configure(state.clone());
 
-        // V1 API - Adoption (Multi-mode offerings)
-        .route("/api/v1/offerings/adoptable", get(api::v1::adoption::list_adoptable_v1))
-        .route("/api/v1/offerings/adopted", get(api::v1::adoption::list_adopted_v1))
-        .route("/api/v1/offerings/borrowed", get(api::v1::adoption::list_borrowed_v1))
-        .route("/api/v1/offerings/:offering/adopt", post(api::v1::adoption::adopt_offering_v1))
-        .route("/api/v1/offerings/:offering/adopt", axum::routing::delete(api::v1::adoption::unadopt_offering_v1))
-        .route("/api/v1/adoption/borrow", post(api::v1::adoption::borrow_service_v1))
-        .route("/api/v1/adoption/borrow/:name", axum::routing::delete(api::v1::adoption::unborrow_service_v1))
+    // Bind HTTP server (with user-friendly error messages)
+    let listener = bind_server(port, &console_printer).await?;
 
-        // V1 API - Services (Technical Layer)
-        .route("/api/v1/services/manifests", get(api::v1::services::list_manifests_v1))
-        .route("/api/v1/services/:name/manifest", get(api::v1::services::get_manifest_v1))
-        .route("/api/v1/services", get(api::v1::services::list_services_v1))
-        .route("/api/v1/services", post(api::v1::services::create_service_v1))
-        .route("/api/v1/services/:service", get(api::v1::services::get_service_v1))
-        .route("/api/v1/services/:service", axum::routing::delete(api::v1::services::delete_service_v1))
-        .route("/api/v1/services/:service/logs", get(api::v1::services::stream_service_logs_v1))
-        .route("/api/v1/services/:service/restart", post(api::v1::services::restart_service_v1))
-        .route("/api/v1/services/:service/rest", post(api::v1::services::rest_service_v1))
-        .route("/api/v1/services/:service/wake", post(api::v1::services::wake_service_v1))
-        .route("/api/v1/services/:service/nourish", post(api::v1::services::nourish_service_v1))
-        .route("/api/v1/services/:service/destroy", post(api::v1::services::destroy_service_v1))
-        .route("/api/v1/services/:service/cordon", post(api::v1::services::cordon_service_v1))
-        .route("/api/v1/services/reconcile", post(api::v1::services::reconcile_inventory_v1))
-        .route("/api/v1/services/refresh", post(api::v1::services::refresh_manifests_v1))
-        
-        // V1 API - Stone operations
-        .route("/api/v1/stone/upgrade", post(api::v1::stone::upgrade_stone_v1))
-        .route("/api/v1/stone/shutdown", post(api::v1::stone::shutdown_stone_v1))
-        
-        // V1 API - Events & Jobs
-        .route("/api/v1/events", get(api::v1::events::stream_events))
-        .route("/api/v1/jobs", get(api::v1::jobs::list_jobs))
-        .route("/api/v1/jobs/:job_id", get(api::v1::jobs::get_job_status))
-        
-        // V1 API - Garden topology
-        .route("/api/v1/garden", get(api::v1::garden::get_garden_v1))
-        .route("/api/v1/garden/stones/:stone_name", get(api::v1::garden::get_stone_v1))
-        .route("/api/v1/stone", get(api::v1::garden::get_local_stone_v1))
-        
-        // V1 API - Pond security
-        .route("/api/v1/pond/init", post(api::v1::pond::pond_init_v1))
-        .route("/api/v1/pond", axum::routing::delete(api::v1::pond::pond_remove_v1))
-        .route("/api/v1/pond/invite", post(api::v1::pond::pond_invite_v1))
-        .route("/api/v1/pond/join", post(api::v1::pond::pond_join_v1))
-        .route("/api/v1/pond/stones/:stone_name", axum::routing::delete(api::v1::pond::pond_untrust_v1))
-        .route("/api/v1/pond/status", get(api::v1::pond::pond_status_v1))
-        
-        // V1 API - Console control
-        .route("/api/v1/console/mode", get(api::v1::console::get_console_mode_v1))
-        .route("/api/v1/console/mode", post(api::v1::console::set_console_mode_v1))
-        
-        // Admin endpoints
-        .route("/admin/take-root", post(api::v1::admin::admin_take_root))
-        
-        // Apply 200 MB body limit to all routes
-        .layer(axum::extract::DefaultBodyLimit::max(200 * 1024 * 1024))
-        
-        .with_state(state.clone());
-
-    let addr: SocketAddr = format!("0.0.0.0:{}", port).parse()?;
-    let listener = match tokio::net::TcpListener::bind(addr).await {
-        Ok(listener) => listener,
-        Err(e) => {
-            let error_msg = if e.kind() == std::io::ErrorKind::AddrInUse {
-                format!(
-                    "Port {} is already in use. Another garden-moss instance may be running.\n\
-                    Try: Stop-Process -Name garden-moss -Force\n\
-                    Or use a different port: garden-moss --port <port>",
-                    port
-                )
-            } else {
-                format!(
-                    "Failed to bind HTTP server to {}:{}: {}\n\
-                    Check firewall settings and ensure the port is available.",
-                    addr.ip(), addr.port(), e
-                )
-            };
-            
-            state.console.emit(console::ConsoleEvent::new(
-                console::EventCategory::System,
-                console::EventStatus::Failed,
-                error_msg.clone()
-            ));
-            
-            anyhow::bail!(error_msg);
-        }
-    };
-    
-    tracing::info!(
-        ?addr,
-        api_endpoint = %api_endpoint,
-        body_limit_mb = 200,
-        "Moss HTTP server ready with 200 MB body limit configured"
-    );
-    
-    // Emit HTTP server ready event
-    state.console.emit(console::ConsoleEvent::new(
-        console::EventCategory::System,
-        console::EventStatus::Ready,
-        format!("HTTP server → {}", api_endpoint)
-    ));
-    
-    // Create server with graceful shutdown
-    let server = axum::serve(listener, app)
-        .with_graceful_shutdown(async move {
-            shutdown_signal().await;
-            tracing::info!("Shutdown signal received, initiating graceful shutdown");
-            
-            // Emit shutdown event (note: console_printer needs to be cloned earlier)
-            // This will be added when we refactor shutdown signal handling
-        });
-    
-    // Run server with shutdown coordination
-    tokio::select! {
-        result = server => {
-            if let Err(e) = result {
-                tracing::error!(error = ?e, "Server error");
-                return Err(e.into());
-            }
-        }
-        _ = shutdown_tx.notified() => {
-            tracing::info!("Admin shutdown requested");
-            
-            // Emit shutdown event
-            state.console.emit(console::ConsoleEvent::new(
-                console::EventCategory::System,
-                console::EventStatus::Shutting,
-                "Admin requested".to_string()
-            ));
-        }
-    }
-    
-    // Allow in-flight requests to complete (5s timeout)
-    tracing::info!("Waiting up to 5s for in-flight requests to complete");
-    
-    // Emit draining event
-    state.console.emit(console::ConsoleEvent::new(
-        console::EventCategory::System,
-        console::EventStatus::Draining,
-        "In-flight requests".to_string()
-    ));
-    tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
-    
-    tracing::info!("Moss daemon shutdown complete");
-    
-    // Emit stopped event
-    state.console.emit(console::ConsoleEvent::new(
-        console::EventCategory::System,
-        console::EventStatus::Stopped,
-        "Shutdown complete".to_string()
-    ));
-    
-    Ok(())
+    // Run server with graceful shutdown support
+    run_server(
+        listener,
+        app,
+        &api_endpoint,
+        console_printer,
+        shutdown_tx,
+        ServerConfig::default(),
+    ).await
 }
 
-/// POST /admin/shutdown - Trigger graceful shutdown
 // admin_shutdown and admin_take_root extracted to api/v1/admin.rs
-
-/// Cross-platform shutdown signal handler
-async fn shutdown_signal() {
-    #[cfg(unix)]
-    {
-        use tokio::signal::unix::{signal, SignalKind};
-        
-        let mut sigterm = signal(SignalKind::terminate())
-            .expect("Failed to install SIGTERM handler");
-        let mut sigint = signal(SignalKind::interrupt())
-            .expect("Failed to install SIGINT handler");
-        
-        tokio::select! {
-            _ = sigterm.recv() => {
-                tracing::info!("SIGTERM received");
-            }
-            _ = sigint.recv() => {
-                tracing::info!("SIGINT received");
-            }
-        }
-    }
-    
-    #[cfg(windows)]
-    {
-        tokio::signal::ctrl_c()
-            .await
-            .expect("Failed to install Ctrl+C handler");
-        tracing::info!("Ctrl+C received");
-    }
-}
-
+// shutdown_signal() extracted to infra/platform.rs
 // get_local_ip() extracted to infra/network.rs
 // lantern_registration_loop() extracted to tasks/discovery.rs
