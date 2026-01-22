@@ -6,6 +6,7 @@
 use crate::api::responses::{GardenOverview, StoneInfo, ApiResponse};
 use crate::api::suggestions::{generate_suggestions, SuggestionContext};
 use crate::{error_response, AppState, metrics};
+use crate::domain::placement::{PlacementRequest, PlacementResponse};
 use garden_common::{api_utils::ApiErrorResponse, CpuCapabilities, DetectionStatus, DiskCapabilities, HardwareCapabilities, HardwareInventory, MemoryCapabilities};
 
 /// GET /api/v1/garden - Get garden overview (all stones)
@@ -75,7 +76,38 @@ pub async fn get_local_stone_v1(
         suggestions,
     }))
 }
-
+/// POST /api/v1/garden/recommend - Get intelligent placement recommendation
+pub async fn recommend_placement_v1(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(request): Json<PlacementRequest>,
+) -> Result<Json<ApiResponse<PlacementResponse>>, (StatusCode, Json<ApiErrorResponse>)> {
+    match crate::domain::placement::recommend_placement(request.clone(), &state).await {
+        Ok(response) => {
+            let ctx = SuggestionContext::from_headers(&headers, "placement_success");
+            let suggestions = generate_suggestions(&ctx);
+            
+            Ok(Json(ApiResponse {
+                data: response,
+                suggestions,
+            }))
+        }
+        Err(e) => {
+            tracing::error!(
+                offering = %request.offering,
+                error = ?e,
+                "Placement recommendation failed"
+            );
+            
+            Err(error_response(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "PLACEMENT_ERROR",
+                format!("Failed to generate placement recommendation: {}", e),
+                None,
+            ))
+        }
+    }
+}
 // Helper function to build consolidated capabilities (based on main.rs capabilities handler)
 async fn get_capabilities(state: &AppState) -> HardwareCapabilities {
     let (cpu_model, cpu_features, architecture) = metrics::get_cpu_info()
@@ -101,6 +133,7 @@ async fn get_capabilities(state: &AppState) -> HardwareCapabilities {
     let swap_mb = metrics::detect_swap();
     
     HardwareCapabilities {
+        stone_id: Some(state.stone_id.clone()),
         stone_name: state.stone_name.clone(),
         hardware: HardwareInventory {
             cpu: CpuCapabilities {

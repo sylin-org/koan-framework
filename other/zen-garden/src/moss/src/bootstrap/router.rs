@@ -74,6 +74,7 @@ pub fn configure(state: AppState) -> Router {
 
         // V1 API - Garden topology
         .route("/api/v1/garden", get(api::v1::garden::get_garden_v1))
+        .route("/api/v1/garden/recommend", post(api::v1::garden::recommend_placement_v1))
         .route("/api/v1/garden/stones/:stone_name", get(api::v1::garden::get_stone_v1))
         .route("/api/v1/stone", get(api::v1::garden::get_local_stone_v1))
 

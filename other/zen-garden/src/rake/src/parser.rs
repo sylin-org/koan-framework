@@ -23,6 +23,7 @@ pub struct ParsedKeywords {
     pub quietly: bool,
     pub fresh: bool,                 // clear cache and force fresh discovery
     pub until_condition: Option<String>,
+    pub somewhere: bool,             // intelligent placement
 }
 
 
@@ -117,7 +118,7 @@ fn is_normative_verb(verb: &str) -> bool {
 /// Check if args contain zen positional keywords
 fn has_zen_keywords(args: &[String]) -> bool {
     args.iter().any(|arg| {
-        matches!(arg.as_str(), "on" | "at" | "from" | "quietly" | "fresh" | "until")
+        matches!(arg.as_str(), "on" | "at" | "from" | "quietly" | "fresh" | "until" | "somewhere")
     })
 }
 
@@ -151,6 +152,9 @@ fn extract_keywords(args: &[String], style: &CommandStyle) -> Result<(ParsedKeyw
             }
             "quietly" if *style == CommandStyle::Zen => {
                 keywords.quietly = true;
+            }
+            "somewhere" if *style == CommandStyle::Zen => {
+                keywords.somewhere = true;
             }
             "fresh" if *style == CommandStyle::Zen => {
                 keywords.fresh = true;

@@ -48,6 +48,46 @@ pub struct TaxonomyDictionary {
     pub map: std::collections::HashMap<String, String>,
 }
 
+#[derive(Debug, serde::Deserialize)]
+pub struct PlacementResponse {
+    pub recommendations: Vec<PlacementRecommendation>,
+    pub evaluated_stones: usize,
+    pub timestamp: String,
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct PlacementRecommendation {
+    pub stone_id: String,
+    pub hostname: String,
+    pub score: i32,
+    pub is_local: bool,
+    pub compatibility: String,
+    pub metrics: PlacementMetrics,
+    pub services_count: usize,
+    pub breakdown: ScoreBreakdown,
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct PlacementMetrics {
+    pub memory_free_mb: u64,
+    pub memory_total_mb: u64,
+    pub cpu_load_percent: u8,
+    pub storage_free_gb: u64,
+    pub storage_total_gb: u64,
+    pub storage_type: String,
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct ScoreBreakdown {
+    pub compatibility: i32,
+    pub memory: i32,
+    pub cpu: i32,
+    pub storage: i32,
+    pub hardware: i32,
+    pub distribution: i32,
+    pub tended_bonus: i32,
+}
+
 /// Action for offer command
 #[derive(Debug, Clone)]
 pub enum OfferAction {
@@ -63,6 +103,8 @@ pub enum OfferAction {
     Query { query: String },
     /// Query across all stones
     QueryAnywhere { query: String },
+    /// Get intelligent placement recommendation
+    PlacementRecommend { name: String, quiet: bool },
 }
 
 pub struct OfferCommand {
@@ -823,6 +865,196 @@ async fn stream_job_progress(
     Ok(())
 }
 
+/// Handle intelligent placement recommendation
+/// 
+/// Interactive mode: Show recommendations, let user select
+/// Quiet mode: Auto-select top stone and install
+async fn handle_placement_recommendation(
+    client: &reqwest::Client,
+    offering: &str,
+    quiet: bool,
+) -> Result<()> {
+    let term = ui::TerminalInfo::detect();
+    let indent = " ".repeat(ui::constants::DEFAULT_INDENT);
+    
+    // Show waiting message (placement evaluation takes time)
+    if !quiet {
+        println!("{}⏳ Evaluating placement options for '{}'...", indent, offering);
+        println!();
+    }
+    
+    // Discover available stones
+    let stones = discovery::discover_moss_auto(Duration::from_secs(3))?;
+    
+    if stones.is_empty() {
+        println!("{}{} No stones discovered on network", indent, ui::status_indicator("error", term.supports_color));
+        println!("{}Try: garden-rake status", indent);
+        return Ok(());
+    }
+    
+    // Try to get placement recommendation from first available stone
+    // (In multi-stone setups, any stone can coordinate placement)
+    let mut placement_response: Option<PlacementResponse> = None;
+    
+    for stone in &stones {
+        let url = format!("{}/api/v1/garden/recommend", stone.stone_endpoint.trim_end_matches('/'));
+        let payload = serde_json::json!({
+            "offering": offering,
+            "preferences": [],
+            "top_n": 3
+        });
+        
+        match client.post(&url).json(&payload).timeout(Duration::from_secs(5)).send().await {
+            Ok(response) if response.status().is_success() => {
+                if let Ok(json) = response.json::<serde_json::Value>().await {
+                    if let Ok(data) = serde_json::from_value::<GardenApiResponse<PlacementResponse>>(json.clone()) {
+                        placement_response = Some(data.data);
+                        break;
+                    } else if let Ok(data) = serde_json::from_value::<PlacementResponse>(json) {
+                        placement_response = Some(data);
+                        break;
+                    }
+                }
+            }
+            _ => continue,
+        }
+    }
+    
+    let placement = match placement_response {
+        Some(p) => p,
+        None => {
+            println!("{}{} Could not get placement recommendations from any stone", indent, ui::status_indicator("error", term.supports_color));
+            println!("{}Verify that Moss is running on at least one stone", indent);
+            return Ok(());
+        }
+    };
+    
+    if placement.recommendations.is_empty() {
+        println!("{}{} No compatible stones found for '{}'", indent, ui::status_indicator("error", term.supports_color), offering);
+        println!("{}This offering may not be available or compatible with your network", indent);
+        return Ok(());
+    }
+    
+    // Quiet mode: Auto-select top recommendation
+    if quiet {
+        let top = &placement.recommendations[0];
+        println!("{}Installing '{}' on {}...", indent, offering, top.hostname);
+        
+        // Find the stone's endpoint
+        if let Some(stone) = stones.iter().find(|s| s.stone_name == top.hostname) {
+            return install_on_stone(client, &stone.stone_endpoint, offering, quiet).await;
+        } else {
+            println!("{}{} Could not find endpoint for stone '{}'", indent, ui::status_indicator("error", term.supports_color), top.hostname);
+            return Ok(());
+        }
+    }
+    
+    // Interactive mode: Show recommendations
+    let fmt = CliFormatter::new();
+    println!("{}{}", indent, fmt.title(&format!("PLACEMENT RECOMMENDATIONS FOR '{}'", offering.to_uppercase())));
+    println!("{}{}", indent, fmt.divider(&"─".repeat(60)));
+    println!();
+    
+    let top_n = placement.recommendations.len().min(3);
+    for (idx, rec) in placement.recommendations.iter().take(top_n).enumerate() {
+        let rank = idx + 1;
+        let compat_icon = match rec.compatibility.as_str() {
+            "compatible" => if term.supports_color { "✅" } else { "[OK]" },
+            "fallback" => if term.supports_color { "⚠️" } else { "[WARN]" },
+            _ => if term.supports_color { "❌" } else { "[FAIL]" },
+        };
+        
+        println!("{}{}. {} {} (score: {})", indent, rank, compat_icon, rec.hostname, rec.score);
+        println!("{}   Stone: {}", indent, rec.stone_id);
+        
+        // Show key metrics
+        let mem_pct = (rec.metrics.memory_free_mb as f64 / rec.metrics.memory_total_mb as f64 * 100.0) as u8;
+        let storage_pct = (rec.metrics.storage_free_gb as f64 / rec.metrics.storage_total_gb as f64 * 100.0) as u8;
+        println!("{}   Resources: {}% mem free, {}% CPU load, {}% storage free",
+            indent, mem_pct, rec.metrics.cpu_load_percent, storage_pct);
+        println!("{}   Services: {} running", indent, rec.services_count);
+        
+        if rec.is_local {
+            println!("{}   {} (tended stone)", indent, if term.supports_color { "🏠" } else { "[LOCAL]" });
+        }
+        
+        println!();
+    }
+    
+    println!("{}{}", indent, fmt.divider(&"─".repeat(60)));
+    
+    if placement.recommendations.len() == 1 {
+        // Single option: ask for confirmation
+        println!("{}Proceed with installation on '{}'? [Y/n]: ", indent, placement.recommendations[0].hostname);
+        let mut input = String::new();
+        std::io::stdin().read_line(&mut input)?;
+        let input = input.trim().to_lowercase();
+        
+        if input.is_empty() || input == "y" || input == "yes" {
+            let stone = &placement.recommendations[0];
+            if let Some(stone_info) = stones.iter().find(|s| s.stone_name == stone.hostname) {
+                return install_on_stone(client, &stone_info.stone_endpoint, offering, quiet).await;
+            }
+        } else {
+            println!("{}Installation cancelled", indent);
+        }
+    } else {
+        // Multiple options: let user select
+        println!("{}Select stone (1-{}) or 'q' to quit: ", indent, top_n);
+        let mut input = String::new();
+        std::io::stdin().read_line(&mut input)?;
+        let input = input.trim().to_lowercase();
+        
+        if input == "q" || input == "quit" || input == "exit" {
+            println!("{}Installation cancelled", indent);
+            return Ok(());
+        }
+        
+        if let Ok(choice) = input.parse::<usize>() {
+            if choice >= 1 && choice <= top_n {
+                let stone = &placement.recommendations[choice - 1];
+                if let Some(stone_info) = stones.iter().find(|s| s.stone_name == stone.hostname) {
+                    return install_on_stone(client, &stone_info.stone_endpoint, offering, quiet).await;
+                } else {
+                    println!("{}{} Could not find endpoint for '{}'", indent, ui::status_indicator("error", term.supports_color), stone.hostname);
+                }
+            } else {
+                println!("{}{} Invalid selection", indent, ui::status_indicator("error", term.supports_color));
+            }
+        } else {
+            println!("{}{} Invalid input", indent, ui::status_indicator("error", term.supports_color));
+        }
+    }
+    
+    Ok(())
+}
+
+/// Install offering on a specific stone
+async fn install_on_stone(
+    client: &reqwest::Client,
+    endpoint: &str,
+    offering: &str,
+    quiet: bool,
+) -> Result<()> {
+    // Delegate to existing install logic by creating a context
+    let ctx = crate::context::CommandContext::with_endpoint(
+        client.clone(),
+        endpoint.to_string(),
+        None,
+        quiet,
+        false,
+    );
+    
+    let install_cmd = OfferCommand::install(
+        offering.to_string(),
+        vec![],
+        false,
+        quiet,
+    );
+    
+    install_cmd.execute(&ctx).await
+}
+
 // ============================================================================
 // Command Implementation
 // ============================================================================
@@ -882,6 +1114,15 @@ impl OfferCommand {
         }
     }
 
+    pub fn placement_recommend(name: String, quiet: bool) -> Self {
+        Self {
+            action: OfferAction::PlacementRecommend { name, quiet },
+            prefer: vec![],
+            anywhere_on_fail: false,
+            quiet_mode: quiet,
+        }
+    }
+
     /// Check if the given name is a known offering (for query detection)
     pub async fn is_known_offering(
         client: &reqwest::Client,
@@ -899,7 +1140,7 @@ impl OfferCommand {
 #[async_trait]
 impl Command for OfferCommand {
     fn requires_endpoint(&self) -> bool {
-        !matches!(self.action, OfferAction::QueryAnywhere { .. })
+        !matches!(self.action, OfferAction::QueryAnywhere { .. } | OfferAction::PlacementRecommend { .. })
     }
 
     fn show_stone_header(&self) -> bool {
@@ -933,6 +1174,9 @@ impl Command for OfferCommand {
             }
             OfferAction::QueryAnywhere { query } => {
                 print_offer_anywhere_recommendations(&ctx.client, query, &self.prefer).await?;
+            }
+            OfferAction::PlacementRecommend { name, quiet } => {
+                handle_placement_recommendation(&ctx.client, name, *quiet).await?;
             }
             OfferAction::Install { name } => {
                 let endpoint = ctx.endpoint.as_ref().expect("endpoint required for install");
