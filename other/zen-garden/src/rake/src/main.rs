@@ -3030,182 +3030,23 @@ async fn async_main() -> anyhow::Result<()> {
         }
 
         Commands::Remove { service, at, force } => {
-            let endpoint = resolve_endpoint(&client, at).await?;
-            print_stone_header(&client, &endpoint).await;
-            
-            // Confirmation prompt (unless --force or quiet mode)
-            if !force && !quiet_mode {
-                println!("{}⚠️  This will permanently remove service '{}'", " ".repeat(ui::constants::DEFAULT_INDENT), service);
-                println!("{}Container and any associated volumes will be deleted.", " ".repeat(ui::constants::DEFAULT_INDENT));
-                print!("{}Continue? [y/N]: ", " ".repeat(ui::constants::DEFAULT_INDENT));
-                use std::io::Write;
-                std::io::stdout().flush()?;
-                
-                let mut input = String::new();
-                std::io::stdin().read_line(&mut input)?;
-                
-                if !input.trim().eq_ignore_ascii_case("y") {
-                    println!("{}Cancelled", " ".repeat(ui::constants::DEFAULT_INDENT));
-                    return Ok(());
-                }
-                println!();
-            }
-            
-            // v1 API: DELETE /api/v1/services/:service
-            let url = format!(
-                "{}/api/v1/services/{}",
-                endpoint.trim_end_matches('/'),
-                service
-            );
-            let response = client.delete(url).send().await?;
-            let status = response.status();
-            
-            match status {
-                s if s.is_success() => {
-                    // Parse v1 API response
-                    if let Ok(body) = response.json::<serde_json::Value>().await {
-                        let message = body.get("message").and_then(|v| v.as_str()).unwrap_or("");
-                        
-                        println!("{}{} Removed {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("ok", term.supports_color), service);
-                        if !message.is_empty() {
-                            println!("{}   {}", " ".repeat(ui::constants::DEFAULT_INDENT), message);
-                        }
-                        
-                        // Display suggestions if present and not in quiet mode
-                        if !quiet_mode {
-                            if let Some(suggestions) = body.get("suggestions").and_then(|v| v.as_array()) {
-                                if !suggestions.is_empty() {
-                                    println!("\nSuggestions:");
-                                    for suggestion in suggestions {
-                                        if let Some(s) = suggestion.as_str() {
-                                            println!("  • {}", s);
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    } else {
-                        println!("{}{} Removed {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("ok", term.supports_color), service);
-                    }
-                }
-                reqwest::StatusCode::NOT_FOUND => {
-                    eprintln!("{}{} Service '{}' not found", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), service);
-                }
-                _ => {
-                    eprintln!("{}{} Failed: {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), status);
-                }
-            }
+            let cmd = commands::lifecycle::RemoveCommand::new(service, force, quiet_mode);
+            dispatch::dispatch(&cmd, &client, at, quiet_mode, fresh_mode, Some(&*STONE_CACHE)).await?;
         }
 
         Commands::Uproot { service, at, force } => {
-            let endpoint = resolve_endpoint(&client, at).await?;
-            print_stone_header(&client, &endpoint).await;
-
-            // Confirmation prompt (unless --force or quiet mode)
-            if !force && !quiet_mode {
-                println!("{}⚠️  WARNING: This will PERMANENTLY DESTROY service '{}' and its container", " ".repeat(ui::constants::DEFAULT_INDENT), service);
-                println!("{}This action cannot be undone. The container will be deleted with all volumes.", " ".repeat(ui::constants::DEFAULT_INDENT));
-                print!("{}Continue? [y/N]: ", " ".repeat(ui::constants::DEFAULT_INDENT));
-                use std::io::Write;
-                std::io::stdout().flush()?;
-
-                let mut input = String::new();
-                std::io::stdin().read_line(&mut input)?;
-
-                if !input.trim().eq_ignore_ascii_case("y") {
-                    println!("{}Cancelled", " ".repeat(ui::constants::DEFAULT_INDENT));
-                    return Ok(());
-                }
-                println!();
-            }
-
-            // v1 API: POST /api/v1/services/:service/destroy
-            let url = format!(
-                "{}/api/v1/services/{}/destroy",
-                endpoint.trim_end_matches('/'),
-                service
-            );
-            let response = client.post(url).send().await?;
-            let status = response.status();
-
-            match status {
-                s if s.is_success() => {
-                    if let Ok(body) = response.json::<serde_json::Value>().await {
-                        let message = body.get("data").and_then(|d| d.get("message")).and_then(|v| v.as_str()).unwrap_or("");
-                        println!("{}{} Uprooted {} (container destroyed)", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("ok", term.supports_color), service);
-                        if !message.is_empty() {
-                            println!("{}   {}", " ".repeat(ui::constants::DEFAULT_INDENT), message);
-                        }
-                    }
-                }
-                reqwest::StatusCode::NOT_FOUND => {
-                    eprintln!("{}{} Service '{}' not found", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), service);
-                }
-                _ => {
-                    eprintln!("{}{} Failed to destroy: {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), status);
-                }
-            }
+            let cmd = commands::lifecycle::UprootCommand::new(service, force, quiet_mode);
+            dispatch::dispatch(&cmd, &client, at, quiet_mode, fresh_mode, Some(&*STONE_CACHE)).await?;
         }
 
         Commands::Adopt { container, at } => {
-            let endpoint = resolve_endpoint(&client, at).await?;
-            print_stone_header(&client, &endpoint).await;
-
-            // v1 API: POST /api/v1/offerings/:offering/adopt
-            let url = format!(
-                "{}/api/v1/offerings/{}/adopt",
-                endpoint.trim_end_matches('/'),
-                container
-            );
-            let response = client.post(&url)
-                .json(&serde_json::json!({}))
-                .send()
-                .await?;
-            let status = response.status();
-
-            match status {
-                s if s.is_success() => {
-                    if let Ok(body) = response.json::<serde_json::Value>().await {
-                        let name = body.get("data").and_then(|d| d.get("name")).and_then(|v| v.as_str()).unwrap_or(&container);
-                        println!("{}{} Adopted container '{}' as '{}'", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("ok", term.supports_color), container, name);
-                    }
-                }
-                reqwest::StatusCode::CONFLICT => {
-                    eprintln!("{}{} Container '{}' is already adopted", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("warn", term.supports_color), container);
-                }
-                reqwest::StatusCode::NOT_FOUND => {
-                    eprintln!("{}{} Container '{}' not found or not adoptable", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), container);
-                }
-                _ => {
-                    eprintln!("{}{} Failed to adopt: {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), status);
-                }
-            }
+            let cmd = commands::adoption::AdoptCommand::new(container, quiet_mode);
+            dispatch::dispatch(&cmd, &client, at, quiet_mode, fresh_mode, Some(&*STONE_CACHE)).await?;
         }
 
         Commands::Release { service, at } => {
-            let endpoint = resolve_endpoint(&client, at).await?;
-            print_stone_header(&client, &endpoint).await;
-
-            // v1 API: DELETE /api/v1/offerings/:offering/adopt
-            let url = format!(
-                "{}/api/v1/offerings/{}/adopt",
-                endpoint.trim_end_matches('/'),
-                service
-            );
-            let response = client.delete(url).send().await?;
-            let status = response.status();
-
-            match status {
-                s if s.is_success() => {
-                    println!("{}{} Released service '{}' (container still running)", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("ok", term.supports_color), service);
-                }
-                reqwest::StatusCode::NOT_FOUND => {
-                    eprintln!("{}{} Service '{}' is not currently adopted", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), service);
-                }
-                _ => {
-                    eprintln!("{}{} Failed to release: {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), status);
-                }
-            }
+            let cmd = commands::adoption::ReleaseCommand::new(service, quiet_mode);
+            dispatch::dispatch(&cmd, &client, at, quiet_mode, fresh_mode, Some(&*STONE_CACHE)).await?;
         }
 
         Commands::Find { target, at } => {
@@ -3261,60 +3102,16 @@ async fn async_main() -> anyhow::Result<()> {
         }
 
         Commands::Borrow { name, from, at } => {
-            let endpoint = resolve_endpoint(&client, at).await?;
-            print_stone_header(&client, &endpoint).await;
-
             let url_str = from.ok_or_else(|| anyhow::anyhow!(
                 "Missing URL. Use: garden-rake borrow {} from <url>", name
             ))?;
-
-            // v1 API: POST /api/v1/adoption/borrow
-            let url = format!("{}/api/v1/adoption/borrow", endpoint.trim_end_matches('/'));
-            let response = client.post(&url)
-                .json(&serde_json::json!({
-                    "name": name,
-                    "url": url_str
-                }))
-                .send()
-                .await?;
-            let status = response.status();
-
-            match status {
-                s if s.is_success() => {
-                    println!("{}{} Borrowed service '{}' from {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("ok", term.supports_color), name, url_str);
-                }
-                reqwest::StatusCode::CONFLICT => {
-                    eprintln!("{}{} Service '{}' is already borrowed", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("warn", term.supports_color), name);
-                }
-                reqwest::StatusCode::BAD_REQUEST => {
-                    eprintln!("{}{} Invalid URL: {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), url_str);
-                }
-                _ => {
-                    eprintln!("{}{} Failed to borrow: {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), status);
-                }
-            }
+            let cmd = commands::adoption::BorrowCommand::new(name, url_str, quiet_mode);
+            dispatch::dispatch(&cmd, &client, at, quiet_mode, fresh_mode, Some(&*STONE_CACHE)).await?;
         }
 
         Commands::Return { name, at } => {
-            let endpoint = resolve_endpoint(&client, at).await?;
-            print_stone_header(&client, &endpoint).await;
-
-            // v1 API: DELETE /api/v1/adoption/borrow/:name
-            let url = format!("{}/api/v1/adoption/borrow/{}", endpoint.trim_end_matches('/'), name);
-            let response = client.delete(url).send().await?;
-            let status = response.status();
-
-            match status {
-                s if s.is_success() => {
-                    println!("{}{} Returned borrowed service '{}'", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("ok", term.supports_color), name);
-                }
-                reqwest::StatusCode::NOT_FOUND => {
-                    eprintln!("{}{} Service '{}' is not currently borrowed", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), name);
-                }
-                _ => {
-                    eprintln!("{}{} Failed to return: {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), status);
-                }
-            }
+            let cmd = commands::adoption::ReturnCommand::new(name, quiet_mode);
+            dispatch::dispatch(&cmd, &client, at, quiet_mode, fresh_mode, Some(&*STONE_CACHE)).await?;
         }
 
         Commands::Upgrade { service, all, at } => {

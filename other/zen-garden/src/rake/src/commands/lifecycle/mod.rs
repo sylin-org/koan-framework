@@ -8,8 +8,12 @@
 //! - uproot - Destroy a service completely
 //! - upgrade/nourish - Update a service
 
+pub mod remove;
 pub mod rest;
+pub mod uproot;
 pub mod wake;
 
+pub use remove::RemoveCommand;
 pub use rest::RestCommand;
+pub use uproot::UprootCommand;
 pub use wake::WakeCommand;

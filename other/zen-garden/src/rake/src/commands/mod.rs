@@ -26,6 +26,7 @@
 pub mod help;
 
 // Command categories (to be extracted incrementally)
+pub mod adoption;
 pub mod discovery;
 pub mod lifecycle;
 
