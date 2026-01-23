@@ -101,7 +101,7 @@ pub async fn create_service_v1(
                 let mut reg = state.registry.write().await;
                 reg.push(info);
                 drop(reg);
-                let _ = crate::persist_registry_state(&state).await;
+                let _ = state.persist_registry().await;
 
                 let ctx = SuggestionContext::from_headers(&headers, "create_service");
                 let suggestions = generate_suggestions(&ctx);
@@ -239,7 +239,7 @@ pub async fn rest_service_v1(
     service_info.status = ServiceStatus::Stopped;
     drop(registry);
 
-    if let Err(e) = crate::persist_registry_state(&state).await {
+    if let Err(e) = state.persist_registry().await {
         tracing::warn!(error = ?e, "Failed to persist registry after rest");
     }
 
@@ -291,7 +291,7 @@ pub async fn wake_service_v1(
     service_info.status = ServiceStatus::Running;
     drop(registry);
 
-    if let Err(e) = crate::persist_registry_state(&state).await {
+    if let Err(e) = state.persist_registry().await {
         tracing::warn!(error = ?e, "Failed to persist registry after wake");
     }
 
@@ -401,7 +401,7 @@ pub async fn nourish_service_v1(
 
     drop(registry);
 
-    if let Err(e) = crate::persist_registry_state(&state).await {
+    if let Err(e) = state.persist_registry().await {
         tracing::warn!(error = ?e, "Failed to persist registry after nourish");
     }
 
@@ -445,7 +445,7 @@ pub async fn delete_service_v1(
     registry.remove(pos);
     drop(registry);
 
-    if let Err(e) = crate::persist_registry_state(&state).await {
+    if let Err(e) = state.persist_registry().await {
         tracing::warn!(error = ?e, "Failed to persist registry after delete");
     }
 
@@ -498,7 +498,7 @@ pub async fn destroy_service_v1(
     registry.remove(pos);
     drop(registry);
 
-    if let Err(e) = crate::persist_registry_state(&state).await {
+    if let Err(e) = state.persist_registry().await {
         tracing::warn!(error = ?e, "Failed to persist registry after destroy");
     }
 
@@ -562,10 +562,17 @@ pub async fn get_manifest_v1(
 /// GET /api/v1/services/:service/logs - Stream service logs (SSE)
 pub async fn stream_service_logs_v1(
     Path(service): Path<String>,
-    State(state): State<AppState>,
+    State(_state): State<AppState>,
 ) -> Result<axum::response::sse::Sse<impl futures_util::stream::Stream<Item = Result<axum::response::sse::Event, std::convert::Infallible>>>, (StatusCode, Json<ApiErrorResponse>)> {
-    // Forward to existing stream_logs implementation
-    crate::stream_logs(service, state).await
+    // TODO: Implement log streaming from Docker container
+    use axum::response::sse::{Event, KeepAlive, Sse};
+    use async_stream::stream;
+
+    let log_stream = stream! {
+        yield Ok(Event::default().data(format!("Log streaming for '{}' not yet implemented", service)));
+    };
+
+    Ok(Sse::new(log_stream).keep_alive(KeepAlive::default()))
 }
 
 /// POST /api/v1/services/:service:restart - Restart service
@@ -631,13 +638,12 @@ pub async fn reconcile_inventory_v1(
     Json(payload): Json<ReconcileRequest>,
 ) -> Result<(StatusCode, Json<serde_json::Value>), (StatusCode, Json<ApiErrorResponse>)> {
     use crate::domain::reconcile_services;
-    use crate::persist_registry_state;
 
     let result = reconcile_services(&state, payload.drop_invalid).await;
 
     // Persist changes if any adoptions or drops occurred
     if result.has_changes() {
-        let _ = persist_registry_state(&state).await;
+        let _ = state.persist_registry().await;
     }
 
     Ok((

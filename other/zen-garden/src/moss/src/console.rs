@@ -705,15 +705,21 @@ impl ConsolePrinter {
         
         // Format using pluggable formatter and print
         let formatted = self.formatter.format(&event);
-        
-        // In verbose (sing) mode on Linux, also write to /dev/tty1 if available
+
+        // On Linux, write critical events to /dev/tty1 regardless of mode
+        // In verbose mode, write ALL events to tty1
         #[cfg(target_os = "linux")]
-        if mode == ConsoleMode::Verbose {
-            if let Ok(mut tty) = OpenOptions::new().write(true).open("/dev/tty1") {
-                let _ = writeln!(tty, "{}", formatted);
+        {
+            let should_write_tty = mode == ConsoleMode::Verbose ||
+                Self::is_critical_tty_event(&event);
+
+            if should_write_tty {
+                if let Ok(mut tty) = OpenOptions::new().write(true).open("/dev/tty1") {
+                    let _ = writeln!(tty, "{}", formatted);
+                }
             }
         }
-        
+
         // Always write to stdout for journal
         println!("{}", formatted);
     }
@@ -744,6 +750,34 @@ impl ConsolePrinter {
             }
             ConsoleMode::Verbose => true, // Show everything
         }
+    }
+
+    /// Check if this event should always be visible on physical console (tty1)
+    /// regardless of console mode. Used for critical startup/restart visibility.
+    #[cfg(target_os = "linux")]
+    fn is_critical_tty_event(event: &ConsoleEvent) -> bool {
+        // System lifecycle events (startup, restart, ready)
+        if matches!(event.category, EventCategory::System) {
+            return matches!(event.status,
+                EventStatus::Starting | EventStatus::Ready | EventStatus::Stopped |
+                EventStatus::FirstBoot | EventStatus::FirstBootDone
+            );
+        }
+
+        // Jobs starting/completing (auto-install visibility)
+        if matches!(event.category, EventCategory::Jobs) {
+            return matches!(event.status,
+                EventStatus::Started | EventStatus::Completed | EventStatus::Failed
+            );
+        }
+
+        // Docker connection (critical for understanding service readiness)
+        if matches!(event.category, EventCategory::Docker) &&
+           matches!(event.status, EventStatus::Connected) {
+            return true;
+        }
+
+        false
     }
 }
 
