@@ -1,0 +1,9 @@
+{
+  "$schema": "../category.schema.json",
+  "name": "automation",
+  "description": "Workflow automation and integration platforms",
+  "aliases": ["workflow", "integration", "orchestration", "pipelines", "etl"],
+  "default_protocol": "http",
+  "connection_template": "http://{host}:{port}",
+  "tags": ["automation", "workflow", "integration"]
+}

@@ -70,6 +70,7 @@ pub fn configure(state: AppState) -> Router {
         // V1 API - Stone operations
         .route("/api/v1/stone/upgrade", post(api::v1::stone::upgrade_stone_v1))
         .route("/api/v1/stone/shutdown", post(api::v1::stone::shutdown_stone_v1))
+        .route("/api/v1/stone/deploy", post(api::v1::stone::deploy_stone_v1))
 
         // V1 API - Events & Jobs
         .route("/api/v1/events", get(api::v1::events::stream_events))

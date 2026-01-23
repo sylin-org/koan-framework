@@ -36,6 +36,7 @@ uuid = { version = "1.6", features = ["v7"] }
 rand = "0.8"
 async-stream = "0.3"
 blake3 = "1.5"
+sha2 = "0.10"
 socket2 = "0.5"
 async-trait = "0.1"
 dashmap = "5.5"

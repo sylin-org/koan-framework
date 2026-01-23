@@ -1,0 +1,9 @@
+{
+  "$schema": "../category.schema.json",
+  "name": "observability",
+  "description": "Monitoring, metrics, logging, and tracing tools",
+  "aliases": ["monitoring", "monitor", "metrics", "tracing", "logging", "logs"],
+  "default_protocol": "http",
+  "connection_template": "http://{host}:{port}",
+  "tags": ["observability", "monitoring", "metrics"]
+}

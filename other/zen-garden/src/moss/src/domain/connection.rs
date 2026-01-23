@@ -3,6 +3,7 @@
 //! Provides reusable functions for resolving service connection URIs.
 //! Supports hostname-first resolution with IP fallback for resilience.
 
+use garden_common::manifests::get_category_registry;
 use serde::{Deserialize, Serialize};
 
 /// Resolved connection information for a service
@@ -42,8 +43,11 @@ pub fn default_template(protocol: &str) -> String {
 /// Infer protocol from offering category and name
 ///
 /// Used when protocol isn't explicitly specified.
+/// NOTE: Per-offering protocols (mongodb, postgresql, etc.) should eventually
+/// move to offering frontmatter. Category defaults come from category.json.
 pub fn infer_protocol(offering_name: &str, category: &str) -> String {
     // First try by name (more specific)
+    // TODO: Move these to offering frontmatter (protocol field)
     match offering_name.to_lowercase().as_str() {
         "mongodb" | "mongo" => "mongodb".to_string(),
         "postgresql" | "postgres" => "postgresql".to_string(),
@@ -55,16 +59,11 @@ pub fn infer_protocol(offering_name: &str, category: &str) -> String {
         "nats" => "nats".to_string(),
         "rabbitmq" => "amqp".to_string(),
         _ => {
-            // Fall back to category
-            match category.to_lowercase().as_str() {
-                "database" => "tcp".to_string(),
-                "cache" => "redis".to_string(),
-                "search" => "http".to_string(),
-                "messaging" => "tcp".to_string(),
-                "storage" => "http".to_string(),
-                "monitoring" => "http".to_string(),
-                _ => "tcp".to_string(),
-            }
+            // Fall back to category's default_protocol from category.json
+            get_category_registry()
+                .default_protocol(category)
+                .map(|s| s.to_string())
+                .unwrap_or_else(|| "tcp".to_string())
         }
     }
 }

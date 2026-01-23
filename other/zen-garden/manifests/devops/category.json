@@ -1,0 +1,9 @@
+{
+  "$schema": "../category.schema.json",
+  "name": "devops",
+  "description": "Developer tools, CI/CD, and container registries",
+  "aliases": ["cicd", "ci-cd", "registry", "containers", "development"],
+  "default_protocol": "http",
+  "connection_template": "http://{host}:{port}",
+  "tags": ["devops", "development", "containers"]
+}

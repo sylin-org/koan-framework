@@ -10,18 +10,8 @@ use std::time::Duration;
 use crate::domain::connection::{self, ResolvedConnection};
 use crate::domain::topology;
 use crate::AppState;
+use garden_common::manifests::get_category_registry;
 use garden_common::ServiceStatus;
-
-/// Known service categories for implicit detection
-pub const KNOWN_CATEGORIES: &[&str] = &[
-    "database",
-    "cache",
-    "search",
-    "monitoring",
-    "messaging",
-    "storage",
-    "ai",
-];
 
 /// Search criteria for service discovery
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -92,8 +82,9 @@ impl ServiceSearchCriteria {
         }
 
         // Check if it's a known category (implicit category search)
+        // Uses data-driven category registry instead of hardcoded list
         let lower = query.to_lowercase();
-        if KNOWN_CATEGORIES.contains(&lower.as_str()) {
+        if get_category_registry().resolve_token(&lower).is_some() {
             return Self::by_category(&lower);
         }
 
@@ -385,7 +376,12 @@ async fn find_services_in_topology_cache(
 }
 
 /// Infer default port for an offering (fallback when port not in chirp)
+///
+/// NOTE: This data duplicates offering frontmatter `port` fields.
+/// Eventually, load from offering registry instead of hardcoding.
+/// Kept as fallback for topology chirps that don't include port info.
 fn infer_default_port(offering: &str) -> u16 {
+    // TODO: Load from offering frontmatter (manifests/<category>/<offering>.frontmatter.json)
     match offering.to_lowercase().as_str() {
         "mongodb" | "mongo" => 27017,
         "redis" => 6379,

@@ -343,12 +343,19 @@ mod tests {
             .await
             .unwrap();
 
-        // Wait for execution
-        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+        // Poll for completion with timeout (up to 2 seconds)
+        let mut completed = false;
+        for _ in 0..20 {
+            tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+            if let Ok(Some(job)) = manager.get_job(&job_id).await {
+                if job.status == JobStatus::Completed {
+                    completed = true;
+                    break;
+                }
+            }
+        }
 
-        // Check job status
-        let job = manager.get_job(&job_id).await.unwrap().unwrap();
-        assert_eq!(job.status, JobStatus::Completed);
+        assert!(completed, "Job should complete within timeout");
     }
 
     #[tokio::test]
@@ -379,20 +386,34 @@ mod tests {
         });
         manager.register_executor(executor).await;
 
-        // Submit multiple jobs with delay to avoid concurrent persistence conflicts
-        manager.submit("test-job", json!({"a": 1}), None).await.unwrap();
-        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+        // Submit first job and wait for it to be persisted
+        let job_id1 = manager.submit("test-job", json!({"a": 1}), None).await.unwrap();
 
-        manager.submit("test-job", json!({"b": 2}), None).await.unwrap();
+        // Wait for first job to complete before submitting second
+        for _ in 0..20 {
+            tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+            if let Ok(Some(job)) = manager.get_job(&job_id1).await {
+                if job.status == JobStatus::Completed {
+                    break;
+                }
+            }
+        }
 
-        // Wait for execution and persistence to complete
-        tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+        // Submit second job
+        let job_id2 = manager.submit("test-job", json!({"b": 2}), None).await.unwrap();
 
-        // List jobs
+        // Wait for second job to complete
+        for _ in 0..20 {
+            tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+            if let Ok(Some(job)) = manager.get_job(&job_id2).await {
+                if job.status == JobStatus::Completed {
+                    break;
+                }
+            }
+        }
+
+        // List jobs - should have both
         let jobs = manager.list_jobs().await.unwrap();
         assert_eq!(jobs.len(), 2);
-
-        // Keep temp_dir alive until all async operations complete
-        drop(temp_dir);
     }
 }

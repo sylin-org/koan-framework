@@ -64,11 +64,49 @@ param(
     [switch]$Build,  # Force build
     [ValidateSet('HTTP', 'SSH', '')]
     [string]$Method = '',  # Deployment method: HTTP (API) or SSH (direct file copy) - empty prompts menu
+    [ValidateSet('Package', 'MossRake', 'MossOnly', '')]
+    [string]$PublishMode = '',  # What to publish: Package (full), MossRake (legacy), MossOnly - empty prompts menu
     [string]$SSHUser = 'stone',  # SSH username
     [string]$SSHPassword = 'stone'  # SSH password
 )
 
 $ErrorActionPreference = "Stop"
+
+function Read-SingleKey {
+    <#
+    .SYNOPSIS
+        Read a single keypress without requiring Enter. Returns the key char or $null if Esc.
+    #>
+    param(
+        [string[]]$ValidKeys,
+        [string]$DefaultKey = $null
+    )
+
+    Write-Host "Press a key (Esc to abort): " -NoNewline -ForegroundColor DarkGray
+
+    while ($true) {
+        $key = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+
+        # Esc to abort
+        if ($key.VirtualKeyCode -eq 27) {
+            Write-Host "Aborted" -ForegroundColor Yellow
+            exit 0
+        }
+
+        # Enter for default
+        if ($key.VirtualKeyCode -eq 13 -and $DefaultKey) {
+            Write-Host $DefaultKey
+            return $DefaultKey
+        }
+
+        # Check if valid key
+        $char = $key.Character.ToString()
+        if ($ValidKeys -contains $char) {
+            Write-Host $char
+            return $char
+        }
+    }
+}
 
 # Show build menu if not explicitly specified
 $shouldBuild = $false
@@ -84,7 +122,7 @@ if (-not $SkipBuild -and -not $Build) {
     Write-Host "      Uses binaries from previous build" -ForegroundColor Gray
     Write-Host ""
 
-    $buildChoice = Read-Host "Enter choice (1 or 2, default=2)"
+    $buildChoice = Read-SingleKey -ValidKeys @("1", "2") -DefaultKey "2"
 
     $shouldBuild = ($buildChoice -eq "1")
     Write-Host ""
@@ -107,11 +145,40 @@ if ([string]::IsNullOrEmpty($Method)) {
     Write-Host "      Fallback when API is unavailable" -ForegroundColor Gray
     Write-Host ""
 
-    $choice = Read-Host "Enter choice (1 or 2, default=1)"
+    $choice = Read-SingleKey -ValidKeys @("1", "2") -DefaultKey "1"
 
     switch ($choice) {
         "2" { $Method = "SSH" }
         default { $Method = "HTTP" }
+    }
+
+    Write-Host ""
+}
+
+# Show "What to publish?" menu if not specified
+if ([string]::IsNullOrEmpty($PublishMode)) {
+    Write-Host "`n╔════════════════════════════════════════════════════╗" -ForegroundColor Cyan
+    Write-Host "║  What to Publish?                                  ║" -ForegroundColor Cyan
+    Write-Host "╚════════════════════════════════════════════════════╝`n" -ForegroundColor Cyan
+
+    Write-Host "  [1] Full Package (default)" -ForegroundColor White
+    Write-Host "      Complete deployment package with all binaries" -ForegroundColor Gray
+    Write-Host "      Uses /api/v1/stone/deploy endpoint" -ForegroundColor Gray
+    Write-Host ""
+    Write-Host "  [2] moss + rake" -ForegroundColor White
+    Write-Host "      Individual binary deployment (legacy)" -ForegroundColor Gray
+    Write-Host "      Uses /api/v1/stone/upgrade endpoint" -ForegroundColor Gray
+    Write-Host ""
+    Write-Host "  [3] just moss" -ForegroundColor White
+    Write-Host "      Deploy only the moss daemon" -ForegroundColor Gray
+    Write-Host ""
+
+    $publishChoice = Read-SingleKey -ValidKeys @("1", "2", "3") -DefaultKey "1"
+
+    switch ($publishChoice) {
+        "2" { $PublishMode = "MossRake" }
+        "3" { $PublishMode = "MossOnly" }
+        default { $PublishMode = "Package" }
     }
 
     Write-Host ""
@@ -133,18 +200,49 @@ if ($shouldBuild) {
     Write-Host ""
 }
 
-# Define binary paths
+# Define binary and package paths
 $distRoot = Resolve-Path "$PSScriptRoot/../dist"
 $linuxMoss = Join-Path $distRoot "linux/garden-moss"
 $linuxRake = Join-Path $distRoot "linux/garden-rake"
 $windowsMoss = Join-Path $distRoot "windows/garden-moss.exe"
 $windowsRake = Join-Path $distRoot "windows/garden-rake.exe"
+$packagesDir = Join-Path $distRoot "packages"
 
-# Validate binaries exist
-if (-not (Test-Path $linuxMoss)) { throw "Linux moss binary not found: $linuxMoss" }
-if (-not (Test-Path $linuxRake)) { throw "Linux rake binary not found: $linuxRake" }
-if (-not (Test-Path $windowsMoss)) { throw "Windows moss binary not found: $windowsMoss" }
-if (-not (Test-Path $windowsRake)) { throw "Windows rake binary not found: $windowsRake" }
+# Find latest packages (if using package mode)
+$linuxPackage = $null
+$windowsPackage = $null
+
+if ($PublishMode -eq "Package") {
+    # Find the latest packages
+    if (Test-Path $packagesDir) {
+        $linuxPackages = Get-ChildItem $packagesDir -Filter "zen-garden-*-linux-amd64.tar.gz" | Sort-Object LastWriteTime -Descending
+        $windowsPackages = Get-ChildItem $packagesDir -Filter "zen-garden-*-windows-amd64.zip" | Sort-Object LastWriteTime -Descending
+
+        if ($linuxPackages.Count -gt 0) { $linuxPackage = $linuxPackages[0].FullName }
+        if ($windowsPackages.Count -gt 0) { $windowsPackage = $windowsPackages[0].FullName }
+    }
+
+    if (-not $linuxPackage -or -not $windowsPackage) {
+        Write-Host "⚠️  No deployment packages found in $packagesDir" -ForegroundColor Yellow
+        Write-Host "   Run dist.ps1 first to create packages, or choose a different publish mode." -ForegroundColor Yellow
+        exit 1
+    }
+
+    Write-Host "📦 Using packages:" -ForegroundColor Cyan
+    Write-Host "   Linux:   $(Split-Path -Leaf $linuxPackage)" -ForegroundColor Gray
+    Write-Host "   Windows: $(Split-Path -Leaf $windowsPackage)" -ForegroundColor Gray
+    Write-Host ""
+} else {
+    # Validate individual binaries exist for legacy modes
+    if (-not (Test-Path $linuxMoss)) { throw "Linux moss binary not found: $linuxMoss" }
+    if ($PublishMode -ne "MossOnly") {
+        if (-not (Test-Path $linuxRake)) { throw "Linux rake binary not found: $linuxRake" }
+    }
+    if (-not (Test-Path $windowsMoss)) { throw "Windows moss binary not found: $windowsMoss" }
+    if ($PublishMode -ne "MossOnly") {
+        if (-not (Test-Path $windowsRake)) { throw "Windows rake binary not found: $windowsRake" }
+    }
+}
 
 function Write-Status {
     param([string]$Message, [string]$Type = "Info")
@@ -373,6 +471,70 @@ function Test-BinaryFile {
     return $bytes
 }
 
+function Push-MossOnlyToStone {
+    param(
+        [PSCustomObject]$Stone,
+        [byte[]]$MossBinaryData,
+        [string]$Platform
+    )
+
+    Write-Status "`n🚀 Pushing moss to $($Stone.Name) ($Platform)..."
+
+    $mossBase64 = [Convert]::ToBase64String($MossBinaryData)
+    $mossPayload = @{
+        component = "garden-moss"
+        binary_data = $mossBase64
+    } | ConvertTo-Json -Depth 10 -Compress
+
+    $url = "$($Stone.Endpoint.TrimEnd('/'))/api/v1/stone/upgrade"
+
+    try {
+        $response = Invoke-RestMethod -Uri $url -Method Post -Body $mossPayload -ContentType "application/json; charset=utf-8" -TimeoutSec 30
+
+        Write-Status "   ✅ Moss upload successful" -Type "Success"
+        if ($response.architecture) {
+            Write-Status "      Architecture: $($response.architecture)"
+        }
+
+        # Wait for moss to restart
+        Write-Status "   ⏳ Waiting for moss to restart..."
+        Start-Sleep -Seconds 3
+
+        # Poll health endpoint
+        $healthUrl = "$($Stone.Endpoint.TrimEnd('/'))/health"
+        $maxAttempts = 10
+        $online = $false
+
+        for ($i = 1; $i -le $maxAttempts; $i++) {
+            Start-Sleep -Seconds 1
+            try {
+                $health = Invoke-RestMethod -Uri $healthUrl -Method Get -TimeoutSec 2
+                if ($health.status) {
+                    Write-Status "   ✅ $($Stone.Name) is back online" -Type "Success"
+                    $online = $true
+                    break
+                }
+            }
+            catch {
+                Write-Host "." -NoNewline
+            }
+        }
+
+        if (-not $online) {
+            Write-Status "   ⚠️  $($Stone.Name) moss did not respond after restart" -Type "Warning"
+            return $false
+        }
+
+        Write-Status "   ✅ $($Stone.Name) moss updated" -Type "Success"
+        return $true
+    }
+    catch {
+        Write-Status "   ✗ Failed to push moss to $($Stone.Name)" -Type "Error"
+        Write-Status "      Error: $_" -Type "Error"
+        return $false
+    }
+}
+
 function Push-BinariesToStone {
     param(
         [PSCustomObject]$Stone,
@@ -380,7 +542,7 @@ function Push-BinariesToStone {
         [byte[]]$RakeBinaryData,
         [string]$Platform
     )
-    
+
     Write-Status "`n🚀 Pushing binaries to $($Stone.Name) ($Platform)..."
     
     # Push moss first
@@ -504,7 +666,9 @@ function Push-BinariesViaSSH {
         & plink -batch -ssh "${SSHUser}@${targetHost}" -pw $SSHPassword "sudo rm -f /home/stone/bin/*.staged" 2>&1 | Out-Null
 
         # Transfer moss binary
-        Write-Status "   [1/2] Transferring garden-moss..."
+        $mossOnly = [string]::IsNullOrEmpty($RakePath)
+        $stepPrefix = if ($mossOnly) { "" } else { "[1/2] " }
+        Write-Status "   ${stepPrefix}Transferring garden-moss..."
         $pscpResult = & pscp -batch -pw $SSHPassword "$MossPath" "${SSHUser}@${targetHost}:/home/stone/bin/garden-moss.staged" 2>&1
         if ($LASTEXITCODE -ne 0) {
             Write-Status "   ✗ Failed to transfer moss binary" -Type "Error"
@@ -519,15 +683,17 @@ function Push-BinariesViaSSH {
         }
         Write-Status "   ✅ Moss transferred" -Type "Success"
 
-        # Transfer rake binary
-        Write-Status "   [2/2] Transferring garden-rake..."
-        $pscpResult = & pscp -batch -pw $SSHPassword "$RakePath" "${SSHUser}@${targetHost}:/home/stone/bin/garden-rake.staged" 2>&1
-        if ($LASTEXITCODE -ne 0) {
-            Write-Status "   ✗ Failed to transfer rake binary" -Type "Error"
-            Write-Status "      $pscpResult" -Type "Error"
-            return $false
+        # Transfer rake binary (if provided)
+        if (-not $mossOnly) {
+            Write-Status "   [2/2] Transferring garden-rake..."
+            $pscpResult = & pscp -batch -pw $SSHPassword "$RakePath" "${SSHUser}@${targetHost}:/home/stone/bin/garden-rake.staged" 2>&1
+            if ($LASTEXITCODE -ne 0) {
+                Write-Status "   ✗ Failed to transfer rake binary" -Type "Error"
+                Write-Status "      $pscpResult" -Type "Error"
+                return $false
+            }
+            Write-Status "   ✅ Rake transferred" -Type "Success"
         }
-        Write-Status "   ✅ Rake transferred" -Type "Success"
         
         # Restart moss service to apply updates
         Write-Status "   🔄 Restarting garden-moss service..."
@@ -560,22 +726,210 @@ function Push-BinariesViaSSH {
     }
 }
 
+function Push-PackageToStone {
+    param(
+        [PSCustomObject]$Stone,
+        [string]$PackagePath,
+        [string]$Platform
+    )
+
+    Write-Status "`n📦 Pushing package to $($Stone.Name) ($Platform)..."
+
+    $url = "$($Stone.Endpoint.TrimEnd('/'))/api/v1/stone/deploy"
+    $packageName = Split-Path -Leaf $PackagePath
+
+    # Compute SHA256 hash
+    Write-Status "   Computing package checksum..."
+    $hash = (Get-FileHash $PackagePath -Algorithm SHA256).Hash.ToLower()
+
+    try {
+        Write-Status "   Uploading $packageName..."
+
+        # Read package file
+        $packageBytes = [System.IO.File]::ReadAllBytes($PackagePath)
+        $sizeMb = [math]::Round($packageBytes.Length / 1MB, 2)
+        Write-Status "   Package size: $sizeMb MB"
+
+        # Send package with hash header
+        $headers = @{
+            "X-Package-SHA256" = $hash
+        }
+
+        $response = Invoke-RestMethod -Uri $url -Method Post -Body $packageBytes -ContentType "application/octet-stream" -Headers $headers -TimeoutSec 120
+
+        if ($response.status -eq "accepted") {
+            Write-Status "   ✅ Package uploaded and staged" -Type "Success"
+            Write-Status "      Version: $($response.version)"
+
+            # Wait for moss to restart (package deployment triggers auto-restart)
+            Write-Status "   ⏳ Waiting for service to restart..."
+            Start-Sleep -Seconds 5
+
+            # Poll health endpoint
+            $healthUrl = "$($Stone.Endpoint.TrimEnd('/'))/health"
+            $maxAttempts = 15
+            $online = $false
+
+            for ($i = 1; $i -le $maxAttempts; $i++) {
+                Start-Sleep -Seconds 2
+                try {
+                    $health = Invoke-RestMethod -Uri $healthUrl -Method Get -TimeoutSec 3
+                    if ($health.status) {
+                        Write-Status "   ✅ $($Stone.Name) is back online" -Type "Success"
+                        $online = $true
+                        break
+                    }
+                }
+                catch {
+                    Write-Host "." -NoNewline
+                }
+            }
+
+            if (-not $online) {
+                Write-Status "   ⚠️  $($Stone.Name) did not respond after restart" -Type "Warning"
+                return $false
+            }
+
+            Write-Status "   ✅ $($Stone.Name) fully updated via package" -Type "Success"
+            return $true
+        }
+        else {
+            Write-Status "   ✗ Unexpected response: $($response | ConvertTo-Json -Compress)" -Type "Error"
+            return $false
+        }
+    }
+    catch {
+        Write-Status "   ✗ Failed to deploy package to $($Stone.Name)" -Type "Error"
+        Write-Status "      Error: $_" -Type "Error"
+        return $false
+    }
+}
+
+function Push-PackageViaSSH {
+    param(
+        [PSCustomObject]$Stone,
+        [string]$PackagePath,
+        [string]$SSHUser,
+        [string]$SSHPassword,
+        [string]$Platform
+    )
+
+    Write-Status "`n📦 Pushing package to $($Stone.Name) via SSH ($Platform)..."
+
+    $targetHost = $Stone.Address
+    $packageName = Split-Path -Leaf $PackagePath
+
+    # Determine staging path based on platform
+    if ($Platform -eq "Windows") {
+        $stagingPath = "C:/ProgramData/ZenGarden/staging/pending-upgrade.zip"
+    } else {
+        $stagingPath = "/var/lib/zen-garden/staging/pending-upgrade.tar.gz"
+    }
+
+    # Auto-accept SSH host key if not cached
+    Write-Status "   🔑 Ensuring SSH host key is cached..."
+    $keyCheck = echo y | plink -ssh "${SSHUser}@${targetHost}" -pw $SSHPassword "echo OK" 2>&1
+    if ($keyCheck -notmatch "OK") {
+        Write-Status "   ⚠️  Host key acceptance may have failed, continuing anyway..." -Type "Warning"
+    }
+
+    # Test SSH connectivity
+    Write-Status "   🔍 Testing SSH connectivity..."
+    try {
+        $testResult = & plink -batch -ssh "${SSHUser}@${targetHost}" -pw $SSHPassword "echo OK" 2>&1
+        if ($testResult -notmatch "OK") {
+            Write-Status "   ✗ SSH connection test failed" -Type "Error"
+            return $false
+        }
+    }
+    catch {
+        Write-Status "   ✗ SSH connection failed: $_" -Type "Error"
+        return $false
+    }
+
+    try {
+        # Ensure staging directory exists
+        Write-Status "   📁 Preparing staging directory..."
+        if ($Platform -eq "Windows") {
+            & plink -batch -ssh "${SSHUser}@${targetHost}" -pw $SSHPassword "mkdir -p 'C:/ProgramData/ZenGarden/staging'" 2>&1 | Out-Null
+        } else {
+            & plink -batch -ssh "${SSHUser}@${targetHost}" -pw $SSHPassword "sudo mkdir -p /var/lib/zen-garden/staging && sudo chown root:root /var/lib/zen-garden/staging" 2>&1 | Out-Null
+        }
+
+        # Transfer package
+        Write-Status "   📤 Transferring $packageName..."
+        $pscpResult = & pscp -batch -pw $SSHPassword "$PackagePath" "${SSHUser}@${targetHost}:$stagingPath" 2>&1
+        if ($LASTEXITCODE -ne 0) {
+            Write-Status "   ✗ Failed to transfer package" -Type "Error"
+            Write-Status "      $pscpResult" -Type "Error"
+            return $false
+        }
+        Write-Status "   ✅ Package transferred" -Type "Success"
+
+        # Restart service to apply upgrade
+        Write-Status "   🔄 Restarting garden-moss service..."
+        if ($Platform -eq "Windows") {
+            & plink -batch -ssh "${SSHUser}@${targetHost}" -pw $SSHPassword "Restart-Service garden-moss" 2>&1 | Out-Null
+        } else {
+            & plink -batch -ssh "${SSHUser}@${targetHost}" -pw $SSHPassword "sudo systemctl restart garden-moss" 2>&1 | Out-Null
+        }
+
+        if ($LASTEXITCODE -ne 0) {
+            Write-Status "   ⚠️  Service restart command returned error, but package is staged" -Type "Warning"
+            return $true  # Package is staged, so partial success
+        }
+
+        # Wait for service to come online
+        Write-Status "   ⏳ Waiting for service to restart..."
+        Start-Sleep -Seconds 8
+
+        # Verify service is running
+        if ($Platform -eq "Windows") {
+            $serviceStatus = & plink -batch -ssh "${SSHUser}@${targetHost}" -pw $SSHPassword "(Get-Service garden-moss).Status" 2>&1
+            $isActive = $serviceStatus -match "Running"
+        } else {
+            $serviceStatus = & plink -batch -ssh "${SSHUser}@${targetHost}" -pw $SSHPassword "systemctl is-active garden-moss 2>/dev/null" 2>&1
+            $isActive = $serviceStatus -match "active"
+        }
+
+        if ($isActive) {
+            Write-Status "   ✅ $($Stone.Name) fully updated via SSH package" -Type "Success"
+            return $true
+        }
+        else {
+            Write-Status "   ⚠️  Service status unclear, but package transferred" -Type "Warning"
+            return $true
+        }
+    }
+    catch {
+        Write-Status "   ✗ SSH package deployment failed: $_" -Type "Error"
+        return $false
+    }
+}
+
 # Main execution
 try {
+    $publishDesc = switch ($PublishMode) {
+        "Package" { "Full Package" }
+        "MossRake" { "moss + rake" }
+        "MossOnly" { "moss only" }
+        default { "binaries" }
+    }
+
     Write-Status "`n═══════════════════════════════════════════════════════════════"
-    Write-Status "  Push Garden Binaries to All Stones"
+    Write-Status "  Push Zen Garden ($publishDesc) to All Stones"
     Write-Status "═══════════════════════════════════════════════════════════════`n"
-    
+
     # Discover stones
     $stones = Discover-AllStones -TimeoutSeconds $Timeout
-    
+
     if ($stones.Count -eq 0) {
         Write-Status "`n⚠️  No stones discovered on the network" -Type "Warning"
         Write-Status "   Make sure stones are running and reachable" -Type "Warning"
         exit 1
     }
-    
-    # Detect platform for each stone and prepare binaries
+
+    # Detect platform for each stone and prepare configs
     Write-Status "`n🔍 Detecting platform for each stone..."
     $stoneConfigs = @()
     foreach ($stone in $stones) {
@@ -583,37 +937,48 @@ try {
         $info = Get-StoneInfo -Stone $stone
         $binaries = Get-BinariesForPlatform -OS $info.OS -Architecture $info.Architecture
         Write-Status "$($binaries.Platform) $($info.Architecture)" -Type "Success"
-        
+
+        # Determine package path for this platform
+        $packagePath = if ($binaries.Platform -eq "Windows") { $windowsPackage } else { $linuxPackage }
+
         $stoneConfigs += [PSCustomObject]@{
             Stone = $stone
             Platform = $binaries.Platform
             MossPath = $binaries.Moss
             RakePath = $binaries.Rake
+            PackagePath = $packagePath
         }
     }
-    
-    # Validate all binaries
-    Write-Status "`n📦 Validating binaries..."
+
+    # Validate binaries if not using package mode
     $mossLinuxData = $null
     $rakeLinuxData = $null
     $mossWindowsData = $null
     $rakeWindowsData = $null
-    
-    $needsLinux = @($stoneConfigs | Where-Object { $_.Platform -eq "Linux" }).Count -gt 0
-    $needsWindows = @($stoneConfigs | Where-Object { $_.Platform -eq "Windows" }).Count -gt 0
-    
-    if ($needsLinux) {
-        $mossLinuxData = Test-BinaryFile -Path $linuxMoss -AllowPE $false
-        $rakeLinuxData = Test-BinaryFile -Path $linuxRake -AllowPE $false
+
+    if ($PublishMode -ne "Package") {
+        Write-Status "`n📦 Validating binaries..."
+
+        $needsLinux = @($stoneConfigs | Where-Object { $_.Platform -eq "Linux" }).Count -gt 0
+        $needsWindows = @($stoneConfigs | Where-Object { $_.Platform -eq "Windows" }).Count -gt 0
+
+        if ($needsLinux) {
+            $mossLinuxData = Test-BinaryFile -Path $linuxMoss -AllowPE $false
+            if ($PublishMode -ne "MossOnly") {
+                $rakeLinuxData = Test-BinaryFile -Path $linuxRake -AllowPE $false
+            }
+        }
+
+        if ($needsWindows) {
+            $mossWindowsData = Test-BinaryFile -Path $windowsMoss -AllowPE $true
+            if ($PublishMode -ne "MossOnly") {
+                $rakeWindowsData = Test-BinaryFile -Path $windowsRake -AllowPE $true
+            }
+        }
     }
-    
-    if ($needsWindows) {
-        $mossWindowsData = Test-BinaryFile -Path $windowsMoss -AllowPE $true
-        $rakeWindowsData = Test-BinaryFile -Path $windowsRake -AllowPE $true
-    }
-    
+
     # Push to all stones
-    Write-Status "`n📡 Pushing binaries to $($stones.Count) stone(s) via $Method..."
+    Write-Status "`n📡 Pushing $publishDesc to $($stones.Count) stone(s) via $Method..."
     
     if ($Method -eq 'SSH') {
         # Check for required tools
@@ -626,22 +991,30 @@ try {
             exit 1
         }
     }
-    
+
     $results = @()
-    
-    if ($Method -eq 'SSH') {
-        # SSH deployment (sequential only for now)
-        Write-Status "   Mode: SSH file transfer + service restart`n"
-        
+
+    # Deployment based on PublishMode and Method
+    if ($PublishMode -eq "Package") {
+        # Package-based deployment
+        Write-Status "   Mode: Package deployment via $Method`n"
+
         foreach ($config in $stoneConfigs) {
-            $success = Push-BinariesViaSSH `
-                -Stone $config.Stone `
-                -MossPath $config.MossPath `
-                -RakePath $config.RakePath `
-                -SSHUser $SSHUser `
-                -SSHPassword $SSHPassword `
-                -Platform $config.Platform
-            
+            if ($Method -eq 'SSH') {
+                $success = Push-PackageViaSSH `
+                    -Stone $config.Stone `
+                    -PackagePath $config.PackagePath `
+                    -SSHUser $SSHUser `
+                    -SSHPassword $SSHPassword `
+                    -Platform $config.Platform
+            }
+            else {
+                $success = Push-PackageToStone `
+                    -Stone $config.Stone `
+                    -PackagePath $config.PackagePath `
+                    -Platform $config.Platform
+            }
+
             $results += @{
                 Success = $success
                 Name = $config.Stone.Name
@@ -649,33 +1022,54 @@ try {
             }
         }
     }
-    elseif ($Parallel) {
-        Write-Status "   Mode: Parallel deployment`n"
-        
+    elseif ($Method -eq 'SSH') {
+        # SSH binary deployment (legacy modes)
+        Write-Status "   Mode: SSH file transfer + service restart`n"
+
+        foreach ($config in $stoneConfigs) {
+            $success = Push-BinariesViaSSH `
+                -Stone $config.Stone `
+                -MossPath $config.MossPath `
+                -RakePath $(if ($PublishMode -eq "MossOnly") { $null } else { $config.RakePath }) `
+                -SSHUser $SSHUser `
+                -SSHPassword $SSHPassword `
+                -Platform $config.Platform
+
+            $results += @{
+                Success = $success
+                Name = $config.Stone.Name
+                Platform = $config.Platform
+            }
+        }
+    }
+    elseif ($Parallel -and $PublishMode -ne "MossOnly") {
+        # Parallel HTTP deployment (moss + rake only)
+        Write-Status "   Mode: Parallel HTTP deployment`n"
+
         $jobs = @()
         foreach ($config in $stoneConfigs) {
             $mossBinary = if ($config.Platform -eq "Windows") { $mossWindowsData } else { $mossLinuxData }
             $rakeBinary = if ($config.Platform -eq "Windows") { $rakeWindowsData } else { $rakeLinuxData }
-            
+
             $jobs += Start-Job -ScriptBlock {
                 param($StoneName, $StoneEndpoint, $MossBinary, $RakeBinary, $Platform)
-                
+
                 $mossBase64 = [Convert]::ToBase64String($MossBinary)
                 $mossPayload = @{
                     component = "garden-moss"
                     binary_data = $mossBase64
                 } | ConvertTo-Json -Depth 10 -Compress
-                
+
                 $url = "$($StoneEndpoint.TrimEnd('/'))/api/v1/stone/upgrade"
-                
+
                 try {
                     # Push moss
                     $response = Invoke-RestMethod -Uri $url -Method Post -Body $mossPayload -ContentType "application/json; charset=utf-8" -TimeoutSec 30
-                    
+
                     # Wait and check health
                     Start-Sleep -Seconds 4
                     $healthUrl = "$($StoneEndpoint.TrimEnd('/'))/health"
-                    
+
                     $online = $false
                     for ($i = 1; $i -le 10; $i++) {
                         Start-Sleep -Seconds 1
@@ -688,18 +1082,18 @@ try {
                         }
                         catch {}
                     }
-                    
+
                     if (-not $online) {
                         return @{ Success = $false; Name = $StoneName; Error = "Moss did not come back online" }
                     }
-                    
+
                     # Push rake
                     $rakeBase64 = [Convert]::ToBase64String($RakeBinary)
                     $rakePayload = @{
                         component = "garden-rake"
                         binary_data = $rakeBase64
                     } | ConvertTo-Json -Depth 10 -Compress
-                    
+
                     try {
                         Invoke-RestMethod -Uri $url -Method Post -Body $rakePayload -ContentType "application/json; charset=utf-8" -TimeoutSec 30 | Out-Null
                         return @{ Success = $true; Name = $StoneName; Platform = $Platform }
@@ -714,21 +1108,27 @@ try {
                 }
             } -ArgumentList $config.Stone.Name, $config.Stone.Endpoint, $mossBinary, $rakeBinary, $config.Platform
         }
-        
+
         # Wait for all jobs
         $jobs | Wait-Job | Out-Null
         $results = $jobs | Receive-Job
         $jobs | Remove-Job
-        
     }
     else {
-        Write-Status "   Mode: Sequential deployment`n"
-        
+        # Sequential HTTP deployment (legacy modes)
+        Write-Status "   Mode: Sequential HTTP deployment`n"
+
         foreach ($config in $stoneConfigs) {
             $mossBinary = if ($config.Platform -eq "Windows") { $mossWindowsData } else { $mossLinuxData }
             $rakeBinary = if ($config.Platform -eq "Windows") { $rakeWindowsData } else { $rakeLinuxData }
-            
-            $success = Push-BinariesToStone -Stone $config.Stone -MossBinaryData $mossBinary -RakeBinaryData $rakeBinary -Platform $config.Platform
+
+            if ($PublishMode -eq "MossOnly") {
+                # Push only moss
+                $success = Push-MossOnlyToStone -Stone $config.Stone -MossBinaryData $mossBinary -Platform $config.Platform
+            }
+            else {
+                $success = Push-BinariesToStone -Stone $config.Stone -MossBinaryData $mossBinary -RakeBinaryData $rakeBinary -Platform $config.Platform
+            }
             $results += @{
                 Success = $success
                 Name = $config.Stone.Name

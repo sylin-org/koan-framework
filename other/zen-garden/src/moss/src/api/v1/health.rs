@@ -64,6 +64,7 @@ pub async fn get_health(
         http_status,
         Json(DaemonHealthStatus {
             status: overall_status,
+            version: crate::cli::VERSION.to_string(),
             timestamp: chrono::Utc::now().to_rfc3339(),
             components,
             docker_available: docker_ok,

@@ -105,6 +105,7 @@ if (-not $env:GARDEN_VERSION) {
     $revision = (Get-Date).ToString("yyyyMMddHHmm")
     $env:GARDEN_VERSION = "0.1.$revision"
     $env:BUILD_NUMBER = $revision
+    $env:CARGO_BUILD_NUMBER = $revision  # For Rust build.rs
     Write-Host "⚠ Version not set by parent, using default: $env:GARDEN_VERSION" -ForegroundColor Yellow
     Write-Host ""
 }
@@ -239,7 +240,7 @@ if ($UseDocker) {
         }
         
         # Execute build in the persistent container with build number
-        docker exec -e BUILD_NUMBER=$env:BUILD_NUMBER $containerName $buildArgs
+        docker exec -e CARGO_BUILD_NUMBER=$env:CARGO_BUILD_NUMBER $containerName $buildArgs
         
         if ($LASTEXITCODE -ne 0) { throw "Build failed" }
         

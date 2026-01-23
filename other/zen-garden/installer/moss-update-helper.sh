@@ -1,14 +1,22 @@
 #!/bin/bash
-# Moss Update Helper - Copies staged binaries to final location
+# Moss Update Helper - Processes staged upgrades before moss starts
 # This script runs as root via systemd ExecStartPre
 #
-# Supports two staging locations to avoid permission conflicts:
+# Handles two upgrade methods:
+# 1. Package-based: pending-upgrade.tar.gz (new unified method)
+# 2. Binary-based: *.staged files (legacy method for backwards compatibility)
+#
+# Staging locations:
 # - /var/lib/zen-garden/staging/ : HTTP API deployments (root writes here)
 # - /home/stone/bin/             : SSH deployments (stone user writes here)
 
 set -euo pipefail
 
-# Staging locations (checked in priority order)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+STAGING_DIR="/var/lib/zen-garden/staging"
+PACKAGE_FILE="$STAGING_DIR/pending-upgrade.tar.gz"
+
+# Legacy staging locations for individual binaries
 STAGING_DIRS=(
     "/var/lib/zen-garden/staging"  # HTTP API (root-owned)
     "/home/stone/bin"               # SSH (stone-owned)
@@ -90,14 +98,108 @@ cleanup_stale_staged() {
     done
 }
 
+# Process package-based upgrade
+process_package_upgrade() {
+    if [[ -f "$PACKAGE_FILE" ]]; then
+        log "Found upgrade package: $PACKAGE_FILE"
+
+        # Try to run garden-upgrade.sh from known locations
+        local upgrade_script=""
+        for location in "/usr/local/bin/garden-upgrade.sh" "$SCRIPT_DIR/garden-upgrade.sh"; do
+            if [[ -x "$location" ]]; then
+                upgrade_script="$location"
+                break
+            fi
+        done
+
+        if [[ -n "$upgrade_script" ]]; then
+            log "Running package upgrade via $upgrade_script"
+            if "$upgrade_script"; then
+                log "Package upgrade completed successfully"
+                return 0
+            else
+                log "ERROR: Package upgrade failed"
+                return 1
+            fi
+        else
+            # Inline package processing if garden-upgrade.sh not found
+            log "garden-upgrade.sh not found, processing package inline..."
+            process_package_inline
+        fi
+    fi
+    return 0
+}
+
+# Inline package processing (fallback if garden-upgrade.sh not installed)
+process_package_inline() {
+    local work_dir
+    work_dir=$(mktemp -d)
+    trap 'rm -rf "$work_dir"' RETURN
+
+    # Extract package
+    if ! tar -xzf "$PACKAGE_FILE" -C "$work_dir"; then
+        log "ERROR: Failed to extract package"
+        rm -f "$PACKAGE_FILE"
+        return 1
+    fi
+
+    # Find package directory
+    local pkg_dir
+    pkg_dir=$(find "$work_dir" -maxdepth 1 -type d -name "zen-garden-*" | head -1)
+    if [[ -z "$pkg_dir" ]]; then
+        log "ERROR: Invalid package structure"
+        rm -f "$PACKAGE_FILE"
+        return 1
+    fi
+
+    # Deploy binaries
+    if [[ -d "$pkg_dir/bin" ]]; then
+        for binary in "$pkg_dir/bin/"*; do
+            if [[ -f "$binary" ]]; then
+                local name
+                name=$(basename "$binary")
+                cp "$binary" "$TARGET_DIR/$name"
+                chmod 755 "$TARGET_DIR/$name"
+                log "Installed $name"
+            fi
+        done
+    fi
+
+    # Deploy manifests
+    if [[ -d "$pkg_dir/manifests" ]]; then
+        mkdir -p /var/lib/zen-garden/manifests
+        cp -r "$pkg_dir/manifests/"* /var/lib/zen-garden/manifests/
+        log "Updated manifests"
+    fi
+
+    # Deploy scripts (install to /usr/local/bin, make executable)
+    if [[ -d "$pkg_dir/scripts" ]]; then
+        for script in "$pkg_dir/scripts/"*.sh; do
+            if [[ -f "$script" ]]; then
+                local name
+                name=$(basename "$script")
+                cp "$script" "$TARGET_DIR/$name"
+                chmod 755 "$TARGET_DIR/$name"
+                log "Installed script $name"
+            fi
+        done
+    fi
+
+    rm -f "$PACKAGE_FILE"
+    log "Package upgrade complete"
+}
+
 # Main
 main() {
     log "Starting update check..."
 
     ensure_staging_dirs
-    cleanup_stale_staged
 
-    # Process each component
+    # First, process package-based upgrades (new method)
+    process_package_upgrade
+
+    # Then, process legacy staged binaries (backwards compatibility)
+    cleanup_stale_staged
     process_staged_binary "garden-moss"
     process_staged_binary "garden-rake"
 

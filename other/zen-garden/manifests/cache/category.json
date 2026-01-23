@@ -1,0 +1,9 @@
+{
+  "$schema": "../category.schema.json",
+  "name": "cache",
+  "description": "In-memory caching and key-value stores",
+  "aliases": ["caching", "kv", "key-value"],
+  "default_protocol": "redis",
+  "connection_template": "redis://{host}:{port}",
+  "tags": ["cache", "memory", "performance"]
+}

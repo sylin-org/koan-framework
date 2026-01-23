@@ -1,15 +1,17 @@
 // Stone Operations API
 //
 // Purpose: System-level operations on the stone itself
-// Custom actions using single-colon format: :upgrade, :shutdown
+// Custom actions using single-colon format: :upgrade, :shutdown, :deploy
 
 use axum::{
+    body::Bytes,
     extract::{Json, State},
-    http::StatusCode,
+    http::{HeaderMap, StatusCode},
 };
 use base64::Engine;
 use serde::Deserialize;
 use serde_json::json;
+use sha2::{Sha256, Digest};
 
 use crate::AppState;
 use crate::domain::validate_binary_architecture;
@@ -226,4 +228,183 @@ pub async fn shutdown_stone_v1(
             "message": "Shutdown initiated"
         })),
     )
+}
+
+/// POST /api/v1/stone:deploy
+/// Deploy a complete upgrade package (.tar.gz for Linux, .zip for Windows)
+///
+/// Headers:
+///   X-Package-SHA256: Expected SHA256 hash of the package
+///
+/// Body: Raw package bytes (application/octet-stream)
+///
+/// The package is staged and will be processed on next restart.
+/// If the package contains garden-moss, a restart is initiated automatically.
+pub async fn deploy_stone_v1(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> (StatusCode, Json<serde_json::Value>) {
+    tracing::info!(size = body.len(), "Package deploy requested");
+
+    // Get expected hash from header
+    let expected_hash = match headers.get("x-package-sha256") {
+        Some(v) => match v.to_str() {
+            Ok(s) => s.to_lowercase(),
+            Err(_) => {
+                return (
+                    StatusCode::BAD_REQUEST,
+                    Json(json!({
+                        "status": "error",
+                        "message": "Invalid X-Package-SHA256 header encoding",
+                    })),
+                );
+            }
+        },
+        None => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({
+                    "status": "error",
+                    "message": "Missing X-Package-SHA256 header",
+                })),
+            );
+        }
+    };
+
+    // Compute actual hash
+    let mut hasher = Sha256::new();
+    hasher.update(&body);
+    let actual_hash = format!("{:x}", hasher.finalize());
+
+    if expected_hash != actual_hash {
+        tracing::error!(
+            expected = %expected_hash,
+            actual = %actual_hash,
+            "Package checksum mismatch"
+        );
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({
+                "status": "error",
+                "message": "Package checksum mismatch",
+                "expected": expected_hash,
+                "actual": actual_hash,
+            })),
+        );
+    }
+
+    tracing::info!(hash = %actual_hash, size = body.len(), "Package checksum verified");
+
+    // Determine staging path based on platform
+    let (staging_dir, package_name) = if cfg!(windows) {
+        (
+            std::env::var("GARDEN_STAGING_DIR")
+                .unwrap_or_else(|_| "C:\\ProgramData\\ZenGarden\\staging".to_string()),
+            "pending-upgrade.zip",
+        )
+    } else {
+        (
+            std::env::var("GARDEN_STAGING_DIR")
+                .unwrap_or_else(|_| "/var/lib/zen-garden/staging".to_string()),
+            "pending-upgrade.tar.gz",
+        )
+    };
+
+    // Ensure staging directory exists
+    if let Err(e) = std::fs::create_dir_all(&staging_dir) {
+        tracing::error!(error = ?e, dir = %staging_dir, "Failed to create staging directory");
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({
+                "status": "error",
+                "message": "Failed to create staging directory",
+                "error": format!("{}", e),
+            })),
+        );
+    }
+
+    let target_path = if cfg!(windows) {
+        format!("{}\\{}", staging_dir, package_name)
+    } else {
+        format!("{}/{}", staging_dir, package_name)
+    };
+
+    // Write to temporary location first
+    let temp_path = format!("{}.tmp", target_path);
+    if let Err(e) = std::fs::write(&temp_path, &body) {
+        tracing::error!(error = ?e, path = %temp_path, "Failed to write package");
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({
+                "status": "error",
+                "message": "Failed to write package file",
+                "error": format!("{}", e),
+            })),
+        );
+    }
+
+    // Atomic rename to final location
+    if let Err(e) = std::fs::rename(&temp_path, &target_path) {
+        tracing::error!(error = ?e, path = %target_path, "Failed to stage package");
+        let _ = std::fs::remove_file(&temp_path);
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({
+                "status": "error",
+                "message": "Failed to stage package",
+                "error": format!("{}", e),
+            })),
+        );
+    }
+
+    tracing::info!(path = %target_path, "Package staged successfully");
+
+    // Check if package contains moss by peeking at package.json
+    // For simplicity, we always trigger a restart since the upgrade script
+    // will determine what to do based on package contents
+    let contains_moss = peek_package_for_moss(&target_path);
+
+    if contains_moss {
+        tracing::info!("Package contains garden-moss, initiating graceful shutdown for upgrade");
+        state.shutdown_tx.notify_one();
+
+        (
+            StatusCode::ACCEPTED,
+            Json(json!({
+                "status": "accepted",
+                "message": "Package staged successfully. Service restart initiated.",
+                "staged_path": target_path,
+                "sha256": actual_hash,
+                "size": body.len(),
+            })),
+        )
+    } else {
+        (
+            StatusCode::OK,
+            Json(json!({
+                "status": "success",
+                "message": "Package staged successfully. Restart required to apply.",
+                "staged_path": target_path,
+                "sha256": actual_hash,
+                "size": body.len(),
+            })),
+        )
+    }
+}
+
+/// Peek into a package to check if it contains garden-moss
+fn peek_package_for_moss(package_path: &str) -> bool {
+    // For .tar.gz, we could parse the archive, but for simplicity
+    // we'll just assume packages with moss should trigger restart.
+    // The upgrade script will handle the actual extraction and validation.
+    //
+    // A more robust implementation would:
+    // 1. Extract package.json from the archive
+    // 2. Parse it and check if components.garden-moss exists
+    //
+    // For now, we always return true to trigger restart,
+    // letting the upgrade script decide what to do.
+    let _ = package_path;
+    true
 }

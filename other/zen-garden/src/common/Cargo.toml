@@ -7,8 +7,8 @@ rust-version = "1.75"
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-# Reduced from "full" - library only needs: sync primitives, time utilities
-tokio = { version = "1.35", features = ["sync", "time", "macros"] }
+# Reduced from "full" - library needs: sync, time, fs (for atomic file ops)
+tokio = { version = "1.35", features = ["sync", "time", "macros", "fs", "io-util"] }
 mdns-sd = "0.11"
 chrono = { version = "0.4", features = ["serde"] }
 thiserror = "1.0"

@@ -1,0 +1,9 @@
+{
+  "$schema": "../category.schema.json",
+  "name": "dashboard",
+  "description": "Home dashboards and service aggregators",
+  "aliases": ["home", "portal", "startpage", "homepage"],
+  "default_protocol": "http",
+  "connection_template": "http://{host}:{port}",
+  "tags": ["dashboard", "ui", "portal"]
+}

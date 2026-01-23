@@ -1,0 +1,9 @@
+{
+  "$schema": "../category.schema.json",
+  "name": "auth",
+  "description": "Authentication and authorization services",
+  "aliases": ["authentication", "authorization", "identity", "sso", "oauth", "oidc"],
+  "default_protocol": "http",
+  "connection_template": "http://{host}:{port}",
+  "tags": ["auth", "security", "identity"]
+}

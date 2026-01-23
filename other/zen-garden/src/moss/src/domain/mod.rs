@@ -62,5 +62,6 @@ pub use connection::{
 };
 pub use service_discovery::{
     ServiceSearchCriteria, FoundService, StoneRef, ServiceDiscoveryResponse,
-    find_services, find_local_services, list_all_local_services, KNOWN_CATEGORIES,
+    find_services, find_local_services, list_all_local_services,
 };
+// Categories are now data-driven via garden_common::manifests::get_category_registry()

@@ -35,6 +35,9 @@
 .PARAMETER Jobs
     Number of parallel cargo jobs (default: number of CPUs)
 
+.PARAMETER SkipPackages
+    Skip creating deployment packages after build
+
 .EXAMPLE
     .\dist.ps1
     # Default: fast-release, skip tests, all platforms
@@ -65,6 +68,7 @@ param(
     [switch]$SkipLinux,
     [switch]$SkipWindows,
     [switch]$ForceRebuild,
+    [switch]$SkipPackages,
     [int]$Jobs = 0
 )
 
@@ -110,6 +114,7 @@ Write-Host ""
 # Set version for build scripts
 $env:GARDEN_VERSION = $version
 $env:BUILD_NUMBER = $revision
+$env:CARGO_BUILD_NUMBER = $revision  # For Rust build.rs
 
 # Update Cargo.toml files with version
 Write-Host "Updating Cargo.toml files with version $major.$minor..." -ForegroundColor DarkGray
@@ -200,6 +205,190 @@ if (-not $SkipWindows) {
     Write-Host "Skipping Windows build (use -SkipWindows=`$false to enable)`n" -ForegroundColor DarkGray
 }
 
+# Create deployment packages
+if (-not $SkipPackages -and $buildErrors.Count -eq 0) {
+    Write-Host "═══════════════════════════════════════════════════" -ForegroundColor Cyan
+    Write-Host " Phase 3: Create Deployment Packages" -ForegroundColor Cyan
+    Write-Host "═══════════════════════════════════════════════════`n" -ForegroundColor Cyan
+
+    $packagesDir = Join-Path $DIST_DIR "packages"
+    New-Item -ItemType Directory -Force -Path $packagesDir | Out-Null
+
+    # Clean up old packages (keep only latest)
+    Get-ChildItem $packagesDir -File -ErrorAction SilentlyContinue | Remove-Item -Force
+
+    $manifestsDir = Join-Path $WORKSPACE_ROOT "manifests"
+    $linuxDir = Join-Path $DIST_DIR "linux"
+    $windowsDir = Join-Path $DIST_DIR "windows"
+
+    # Helper function to create package manifest
+    function New-PackageManifest {
+        param(
+            [string]$Platform,
+            [string]$BinDir,
+            [string]$ManifestsDir,
+            [string]$ScriptsDir,
+            [string]$Version,
+            [string]$Description
+        )
+
+        $components = @{}
+        $binExt = if ($Platform -eq "windows") { ".exe" } else { "" }
+
+        foreach ($name in @("garden-moss", "garden-rake", "garden-lantern")) {
+            $binaryPath = Join-Path $BinDir "$name$binExt"
+            if (Test-Path $binaryPath) {
+                $hash = (Get-FileHash $binaryPath -Algorithm SHA256).Hash.ToLower()
+                $size = (Get-Item $binaryPath).Length
+                $components[$name] = @{
+                    path = "bin/$name$binExt"
+                    sha256 = $hash
+                    size = $size
+                    required = $name -in @("garden-moss", "garden-rake")
+                }
+            }
+        }
+
+        $manifests = @{}
+        if (Test-Path $ManifestsDir) {
+            # Include all manifest files
+            Get-ChildItem $ManifestsDir -Recurse -File | ForEach-Object {
+                $relativePath = $_.FullName.Replace("$ManifestsDir\", "").Replace("\", "/")
+                $hash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower()
+                $manifests[$relativePath] = $hash
+            }
+        }
+
+        $scripts = @{}
+        if ($ScriptsDir -and (Test-Path $ScriptsDir)) {
+            # Include deployment scripts (Linux only)
+            foreach ($scriptName in @("moss-update-helper.sh", "garden-upgrade.sh")) {
+                $scriptPath = Join-Path $ScriptsDir $scriptName
+                if (Test-Path $scriptPath) {
+                    $hash = (Get-FileHash $scriptPath -Algorithm SHA256).Hash.ToLower()
+                    $size = (Get-Item $scriptPath).Length
+                    $scripts[$scriptName] = @{
+                        path = "scripts/$scriptName"
+                        sha256 = $hash
+                        size = $size
+                        target = "/usr/local/bin/$scriptName"
+                    }
+                }
+            }
+        }
+
+        return @{
+            version = $Version
+            platform = $Platform
+            architecture = "amd64"
+            created = (Get-Date).ToUniversalTime().ToString("o")
+            components = $components
+            manifests = $manifests
+            scripts = $scripts
+            minimumVersion = $null
+            notes = $Description
+        }
+    }
+
+    # Create Linux package
+    if ((Test-Path $linuxDir) -and (Get-ChildItem $linuxDir -File -ErrorAction SilentlyContinue)) {
+        Write-Host "Creating Linux package..." -ForegroundColor DarkGray
+
+        $packageName = "zen-garden-$version-linux-amd64"
+        $packageDir = Join-Path $env:TEMP $packageName
+        $tarPath = Join-Path $packagesDir "$packageName.tar.gz"
+        $scriptsDir = $INSTALLER_DIR  # Scripts are in the installer directory
+
+        # Clean and create package directory
+        if (Test-Path $packageDir) { Remove-Item $packageDir -Recurse -Force }
+        New-Item -ItemType Directory -Path $packageDir -Force | Out-Null
+        New-Item -ItemType Directory -Path (Join-Path $packageDir "bin") -Force | Out-Null
+
+        # Copy binaries
+        Get-ChildItem $linuxDir -File | ForEach-Object {
+            Copy-Item $_.FullName (Join-Path $packageDir "bin")
+        }
+
+        # Copy manifests if they exist
+        if (Test-Path $manifestsDir) {
+            Copy-Item $manifestsDir (Join-Path $packageDir "manifests") -Recurse
+        }
+
+        # Copy deployment scripts (Linux only)
+        $scriptsPackageDir = Join-Path $packageDir "scripts"
+        New-Item -ItemType Directory -Path $scriptsPackageDir -Force | Out-Null
+        foreach ($scriptName in @("moss-update-helper.sh", "garden-upgrade.sh")) {
+            $scriptPath = Join-Path $scriptsDir $scriptName
+            if (Test-Path $scriptPath) {
+                Copy-Item $scriptPath $scriptsPackageDir
+            }
+        }
+
+        # Create manifest
+        $manifest = New-PackageManifest -Platform "linux" -BinDir $linuxDir -ManifestsDir $manifestsDir -ScriptsDir $scriptsDir -Version $version -Description $versionData.description
+        $manifest | ConvertTo-Json -Depth 10 | Set-Content (Join-Path $packageDir "package.json") -Encoding UTF8
+
+        # Create tar.gz using tar (available on Windows 10+)
+        # Use -C to change directory and relative paths to avoid Windows path issues
+        try {
+            $tarFile = "$packageName.tar.gz"
+            & tar -czf $tarFile -C $env:TEMP $packageName 2>&1 | Out-Null
+            if ($LASTEXITCODE -eq 0 -and (Test-Path $tarFile)) {
+                Move-Item $tarFile $tarPath -Force
+                $sizeMB = [math]::Round((Get-Item $tarPath).Length / 1MB, 2)
+                Write-Host "  ✓ $packageName.tar.gz ($sizeMB MB)" -ForegroundColor Green
+            } else {
+                Write-Host "  ✗ Failed to create Linux package (tar error: $LASTEXITCODE)" -ForegroundColor Red
+                $buildErrors += "Linux package creation failed"
+            }
+        } finally {
+            Remove-Item $packageDir -Recurse -Force -ErrorAction SilentlyContinue
+            Remove-Item $tarFile -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    # Create Windows package
+    if ((Test-Path $windowsDir) -and (Get-ChildItem $windowsDir -File -ErrorAction SilentlyContinue)) {
+        Write-Host "Creating Windows package..." -ForegroundColor DarkGray
+
+        $packageName = "zen-garden-$version-windows-amd64"
+        $packageDir = Join-Path $env:TEMP $packageName
+        $zipPath = Join-Path $packagesDir "$packageName.zip"
+
+        # Clean and create package directory
+        if (Test-Path $packageDir) { Remove-Item $packageDir -Recurse -Force }
+        New-Item -ItemType Directory -Path $packageDir -Force | Out-Null
+        New-Item -ItemType Directory -Path (Join-Path $packageDir "bin") -Force | Out-Null
+
+        # Copy binaries
+        Get-ChildItem $windowsDir -File | ForEach-Object {
+            Copy-Item $_.FullName (Join-Path $packageDir "bin")
+        }
+
+        # Copy manifests if they exist
+        if (Test-Path $manifestsDir) {
+            Copy-Item $manifestsDir (Join-Path $packageDir "manifests") -Recurse
+        }
+
+        # Create manifest (no scripts for Windows packages)
+        $manifest = New-PackageManifest -Platform "windows" -BinDir $windowsDir -ManifestsDir $manifestsDir -ScriptsDir "" -Version $version -Description $versionData.description
+        $manifest | ConvertTo-Json -Depth 10 | Set-Content (Join-Path $packageDir "package.json") -Encoding UTF8
+
+        # Create zip
+        if (Test-Path $zipPath) { Remove-Item $zipPath -Force }
+        Compress-Archive -Path $packageDir -DestinationPath $zipPath -Force
+
+        $sizeMB = [math]::Round((Get-Item $zipPath).Length / 1MB, 2)
+        Write-Host "  ✓ $packageName.zip ($sizeMB MB)" -ForegroundColor Green
+
+        Remove-Item $packageDir -Recurse -Force -ErrorAction SilentlyContinue
+    }
+
+    Write-Host ""
+} elseif ($SkipPackages) {
+    Write-Host "Skipping package creation (use -SkipPackages:`$false to enable)`n" -ForegroundColor DarkGray
+}
+
 # Summary
 Write-Host "`n╔════════════════════════════════════════════════════╗" -ForegroundColor $(if ($buildErrors.Count -gt 0) { "Yellow" } else { "Green" })
 Write-Host "║   Build Summary                                    ║" -ForegroundColor $(if ($buildErrors.Count -gt 0) { "Yellow" } else { "Green" })
@@ -217,10 +406,12 @@ Write-Host "Distribution artifacts:" -ForegroundColor Cyan
 
 $linuxDir = Join-Path $DIST_DIR "linux"
 $windowsDir = Join-Path $DIST_DIR "windows"
+$packagesDir = Join-Path $DIST_DIR "packages"
 $linuxArtifacts = Get-ChildItem $linuxDir -File -ErrorAction SilentlyContinue
 $windowsArtifacts = Get-ChildItem $windowsDir -File -ErrorAction SilentlyContinue
+$packageArtifacts = Get-ChildItem $packagesDir -File -ErrorAction SilentlyContinue
 
-$artifacts = @($linuxArtifacts) + @($windowsArtifacts)
+$artifacts = @($linuxArtifacts) + @($windowsArtifacts) + @($packageArtifacts)
 if ($artifacts) {
     if ($linuxArtifacts) {
         Write-Host "`n  Linux ($linuxDir):" -ForegroundColor Cyan
@@ -234,7 +425,7 @@ if ($artifacts) {
             Write-Host ("    ✓ {0,-18} {1,10}" -f $_.Name, $sizeStr) -ForegroundColor Green
         }
     }
-    
+
     if ($windowsArtifacts) {
         Write-Host "`n  Windows ($windowsDir):" -ForegroundColor Cyan
         $windowsArtifacts | ForEach-Object {
@@ -247,13 +438,30 @@ if ($artifacts) {
             Write-Host ("    ✓ {0,-18} {1,10}" -f $_.Name, $sizeStr) -ForegroundColor Green
         }
     }
+
+    if ($packageArtifacts) {
+        Write-Host "`n  Packages ($packagesDir):" -ForegroundColor Cyan
+        $packageArtifacts | ForEach-Object {
+            $sizeMB = [math]::Round($_.Length / 1MB, 2)
+            $sizeStr = if ($sizeMB -lt 1) {
+                "$([math]::Round($_.Length / 1KB, 0)) KB"
+            } else {
+                "$sizeMB MB"
+            }
+            Write-Host ("    ✓ {0,-35} {1,10}" -f $_.Name, $sizeStr) -ForegroundColor Green
+        }
+    }
 } else {
     Write-Host "  (no artifacts found)" -ForegroundColor DarkGray
 }
 
 Write-Host "`nNext steps:" -ForegroundColor Yellow
+if ($packageArtifacts) {
+    Write-Host "  Package deployment:" -ForegroundColor Cyan
+    Write-Host "    cd installer; .\push2all.ps1 -UsePackage"
+}
 if ($linuxArtifacts) {
-    Write-Host "  Linux deployment:" -ForegroundColor Cyan
+    Write-Host "  Linux USB installer:" -ForegroundColor Cyan
     Write-Host "    cd installer; .\NewStone.ps1 -UsbDrive G:"
 }
 if ($windowsArtifacts) {

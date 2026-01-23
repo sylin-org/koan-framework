@@ -83,6 +83,7 @@ if (-not $env:GARDEN_VERSION) {
     $revision = (Get-Date).ToString("yyyyMMddHHmm")
     $env:GARDEN_VERSION = "0.1.$revision"
     $env:BUILD_NUMBER = $revision
+    $env:CARGO_BUILD_NUMBER = $revision  # For Rust build.rs
     Write-Host "⚠ Version not set by parent, using default: $env:GARDEN_VERSION" -ForegroundColor Yellow
 }
 $version = $env:GARDEN_VERSION

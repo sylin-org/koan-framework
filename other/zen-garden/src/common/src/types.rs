@@ -86,6 +86,7 @@ impl ComponentHealth {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DaemonHealthStatus {
     pub status: String,  // "healthy", "degraded", or "unhealthy"
+    pub version: String,  // Software version (e.g., "0.1.202601231053")
     pub timestamp: String,  // ISO 8601 timestamp
     pub components: HashMap<String, ComponentHealth>,
     // Legacy fields for backward compatibility

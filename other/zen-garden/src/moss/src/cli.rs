@@ -64,7 +64,12 @@ pub fn parse() -> Cli {
     Cli::parse()
 }
 
+/// Moss version string (compile-time constant)
+/// Format: {major}.{minor}.{moment} e.g., "0.1.202601231053"
+pub const VERSION: &str = concat!(env!("CARGO_PKG_VERSION"), ".", env!("BUILD_NUMBER"));
+
 /// Get the moss version string (version.build)
+/// Prefer using VERSION const directly when possible to avoid allocation.
 pub fn version_string() -> String {
-    format!("{}.{}", env!("CARGO_PKG_VERSION"), env!("BUILD_NUMBER"))
+    VERSION.to_string()
 }
