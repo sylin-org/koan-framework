@@ -81,11 +81,11 @@ async fn observe_garden(
             .collect()
     });
 
-    // Get currently tended stone endpoint for marking
-    let tended_endpoint = tending::read_tending()
+    // Get currently tended stone name for marking (compare by name, not endpoint)
+    let tended_stone_name = tending::read_tending()
         .ok()
         .filter(|s| s.is_valid())
-        .map(|s| s.endpoint);
+        .map(|s| s.stone_name);
 
     // Start background Lantern discovery immediately (non-blocking)
     discovery::discover_lantern_background();
@@ -116,7 +116,7 @@ async fn observe_garden(
             Ok(resp) if resp.status().is_success() => {
                 if let Ok(topology) = resp.json::<garden_common::LanternTopology>().await {
                     // Display Lantern-sourced topology
-                    display_lantern_topology(&topology, offering_filter.as_deref(), tended_endpoint.as_deref());
+                    display_lantern_topology(&topology, offering_filter.as_deref(), tended_stone_name.as_deref());
                     display_footer();
                     return Ok(());
                 }
@@ -152,7 +152,7 @@ async fn observe_garden(
             // Spawn concurrent fetch task - display as data arrives
             let client_clone = ctx.client.clone();
             let offerings_filter_clone = offerings_filter.clone();
-            let tended_clone = tended_endpoint.clone();
+            let tended_clone = tended_stone_name.clone();
             let handle = tokio::spawn(async move {
                 fetch_and_display_stone(&client_clone, &cached, &offerings_filter_clone, tended_clone.as_deref()).await
             });
@@ -209,7 +209,7 @@ async fn observe_garden(
                     // Spawn fetch task immediately when stone discovered
                     let client_clone = client.clone();
                     let offerings_filter_clone = offerings_filter.clone();
-                    let tended_clone = tended_endpoint.clone();
+                    let tended_clone = tended_stone_name.clone();
 
                     let handle = tokio::spawn(async move {
                         fetch_and_display_discovered_stone(&client_clone, &response, &offerings_filter_clone, tended_clone.as_deref()).await
@@ -234,7 +234,7 @@ async fn observe_garden(
 
         // Fallback to localhost if no stones discovered
         if !found_any_stone {
-            found_any_stone = try_localhost_fallback(&ctx.client, &offerings_filter, tended_endpoint.as_deref()).await;
+            found_any_stone = try_localhost_fallback(&ctx.client, &offerings_filter, tended_stone_name.as_deref()).await;
         }
     }
 
@@ -251,7 +251,7 @@ async fn fetch_and_display_stone(
     client: &reqwest::Client,
     cached: &CachedStone,
     offerings_filter: &Option<Vec<String>>,
-    tended_endpoint: Option<&str>,
+    tended_stone_name: Option<&str>,
 ) -> bool {
     let services_url = format!("{}/api/v1/services", cached.endpoint.trim_end_matches('/'));
     if let Ok(resp) = client.get(&services_url).timeout(Duration::from_secs(5)).send().await {
@@ -267,9 +267,9 @@ async fn fetch_and_display_stone(
             };
 
             // Display as soon as data arrives
-            // Normalize endpoints for comparison (strip trailing slashes)
-            let is_tended = tended_endpoint
-                .map(|t| t.trim_end_matches('/') == cached.endpoint.trim_end_matches('/'))
+            // Compare stone names case-insensitively
+            let is_tended = tended_stone_name
+                .map(|t| t.eq_ignore_ascii_case(&cached.capabilities.stone_name))
                 .unwrap_or(false);
             let _ = display_stone(&stone_data, offerings_filter, is_tended);
             return true;
@@ -283,7 +283,7 @@ async fn fetch_and_display_discovered_stone(
     client: &reqwest::Client,
     response: &DiscoveryResponse,
     offerings_filter: &Option<Vec<String>>,
-    tended_endpoint: Option<&str>,
+    tended_stone_name: Option<&str>,
 ) -> bool {
     let caps_url = format!("{}/capabilities", response.stone_endpoint.trim_end_matches('/'));
     if let Ok(resp) = client.get(&caps_url).timeout(Duration::from_secs(5)).send().await {
@@ -302,9 +302,9 @@ async fn fetch_and_display_discovered_stone(
                     };
 
                     // Display as soon as data arrives
-                    // Normalize endpoints for comparison (strip trailing slashes)
-                    let is_tended = tended_endpoint
-                        .map(|t| t.trim_end_matches('/') == response.stone_endpoint.trim_end_matches('/'))
+                    // Compare stone names case-insensitively
+                    let is_tended = tended_stone_name
+                        .map(|t| t.eq_ignore_ascii_case(&stone_data.capabilities.stone_name))
                         .unwrap_or(false);
                     let _ = display_stone(&stone_data, offerings_filter, is_tended);
                     return true;
@@ -319,7 +319,7 @@ async fn fetch_and_display_discovered_stone(
 async fn try_localhost_fallback(
     client: &reqwest::Client,
     offerings_filter: &Option<Vec<String>>,
-    tended_endpoint: Option<&str>,
+    tended_stone_name: Option<&str>,
 ) -> bool {
     let localhost = format!("http://127.0.0.1:{}", garden_common::ports::MOSS_HTTP);
 
@@ -339,8 +339,9 @@ async fn try_localhost_fallback(
                         endpoint: localhost.clone(),
                     };
 
-                    let is_tended = tended_endpoint
-                        .map(|t| t.trim_end_matches('/') == localhost.trim_end_matches('/'))
+                    // Compare stone names case-insensitively
+                    let is_tended = tended_stone_name
+                        .map(|t| t.eq_ignore_ascii_case(&stone_data.capabilities.stone_name))
                         .unwrap_or(false);
                     let _ = display_stone(&stone_data, offerings_filter, is_tended);
                     return true;
@@ -352,7 +353,7 @@ async fn try_localhost_fallback(
 }
 
 /// Display topology from Lantern registry
-fn display_lantern_topology(topology: &garden_common::LanternTopology, offering_filter: Option<&str>, tended_endpoint: Option<&str>) {
+fn display_lantern_topology(topology: &garden_common::LanternTopology, offering_filter: Option<&str>, tended_stone_name: Option<&str>) {
     let fmt = CliFormatter::new();
     let indent = " ".repeat(ui::constants::DEFAULT_INDENT);
     let term = ui::TerminalInfo::detect();
@@ -365,10 +366,9 @@ fn display_lantern_topology(topology: &garden_common::LanternTopology, offering_
     for stone in &topology.stones {
         STONE_COUNT.fetch_add(1, Ordering::SeqCst);
 
-        // Normalize endpoints for comparison (strip trailing slashes)
-        let stone_ep_normalized = stone.endpoint.trim_end_matches('/');
-        let is_tended = tended_endpoint
-            .map(|t| t.trim_end_matches('/') == stone_ep_normalized)
+        // Compare stone names case-insensitively
+        let is_tended = tended_stone_name
+            .map(|t| t.eq_ignore_ascii_case(&stone.name))
             .unwrap_or(false);
         let tended_marker = if is_tended { " [tended]" } else { "" };
 
@@ -377,7 +377,7 @@ fn display_lantern_topology(topology: &garden_common::LanternTopology, offering_
         let status_indicator = ui::status_indicator(&stone.status, term.supports_color);
 
         // Calculate padding to align status at column 26
-        let name_width = 26;
+        let name_width = 28;
         let name_display = fmt.title(&stone_name_upper);
         let padding = if stone_name_upper.len() < name_width {
             " ".repeat(name_width - stone_name_upper.len())
@@ -452,7 +452,7 @@ fn display_stone(stone: &StoneData, offering_filter: &Option<Vec<String>>, is_te
     let tended_marker = if is_tended { " [tended]" } else { "" };
 
     // Calculate padding to align status
-    let name_width = 26;
+    let name_width = 28;
     let name_display = fmt.title(&stone_name_upper);
     let padding = if stone_name_upper.len() < name_width {
         " ".repeat(name_width - stone_name_upper.len())
