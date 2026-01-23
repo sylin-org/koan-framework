@@ -6,11 +6,13 @@
 //! - Hardware capability detection
 //! - Service discovery (Lantern registration)
 //! - Network monitoring (IP change detection)
+//! - Topology announcements (periodic stone presence)
 //! - Task coordination (orchestrates all background tasks)
 //!
 //! All tasks are non-blocking and composable.
 //! Spawn with tokio::spawn() and communicate via channels/shared state.
 
+pub mod announcer;
 pub mod auto_adoption;
 pub mod coordinator;
 pub mod discovery;
@@ -19,6 +21,7 @@ pub mod health_monitor;
 pub mod job_executors;
 pub mod network_monitor;
 
+pub use announcer::start_periodic_announcer;
 pub use auto_adoption::auto_adoption_task;
 pub use coordinator::{
     start_all_background_tasks,

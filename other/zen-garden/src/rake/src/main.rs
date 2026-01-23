@@ -6,7 +6,6 @@ mod parser;
 use garden_rake::command_manifest;
 use garden_rake::commands;
 use garden_rake::commands::Command;
-use garden_rake::tending;
 use garden_rake::ui;
 
 #[cfg(test)]
@@ -19,9 +18,6 @@ use base64::Engine;
 use clap::{Parser, Subcommand, ValueEnum};
 use std::time::Duration;
 use tracing_subscriber::EnvFilter;
-use garden_common::{GardenApiResponse, HardwareCapabilities};
-use garden_rake::client::resolve_target_endpoint;
-use garden_rake::discovery;
 
 // Use the single global cache from library's stone_cache module
 // This ensures observe.rs and dispatch.rs share the same cache instance
@@ -36,72 +32,7 @@ pub struct TemplateInfo {
     pub tags: Vec<String>,
 }
 
-async fn resolve_endpoint(client: &reqwest::Client, at: Option<String>) -> anyhow::Result<String> {
-    let term = ui::TerminalInfo::detect();
-    // Priority 1: --at flag (explicit override, deterministic)
-    if let Some(explicit) = at {
-        let endpoint = resolve_target_endpoint(client, &explicit, Some(&*GLOBAL_CACHE)).await?;
-        // Note: Stone header is printed by dispatch.rs if cmd.show_stone_header() is true
-        return Ok(endpoint);
-    }
-
-    // Priority 2: GARDEN_STONE environment variable
-    if let Ok(env_endpoint) = std::env::var(garden_common::ENV_GARDEN_STONE) {
-        tracing::info!(endpoint = %env_endpoint, "Using GARDEN_STONE environment variable");
-        let endpoint = resolve_target_endpoint(client, &env_endpoint, Some(&*GLOBAL_CACHE)).await?;
-        return Ok(endpoint);
-    }
-
-    // Priority 3: Cached tending state (90s TTL)
-    if let Ok(tending) = tending::read_tending() {
-        if tending.is_valid() {
-            tracing::info!(
-                stone = %tending.stone_name,
-                endpoint = %tending.endpoint,
-                age_secs = tending.age_seconds(),
-                "Using cached tending state"
-            );
-            return Ok(tending.endpoint);
-        } else {
-            tracing::debug!("Tending state expired, clearing cache");
-            let _ = tending::clear_tending();
-        }
-    }
-
-    // Priority 4: Auto-discover via UDP broadcast + cache result
-    tracing::debug!("No cached tending, attempting auto-discovery");
-    println!("{}{} Discovering stones...", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("info", term.supports_color));
-    match discovery::discover_moss() {
-        Ok(endpoint) => {
-            tracing::info!(endpoint = %endpoint, "Auto-discovered stone");
-
-            // Fetch capabilities to get stone name for cache
-            let caps_url = format!("{}/capabilities", endpoint.trim_end_matches('/'));
-            if let Ok(resp) = client.get(&caps_url).timeout(Duration::from_secs(5)).send().await {
-                if let Ok(response) = resp.json::<GardenApiResponse<HardwareCapabilities>>().await {
-                    let _ = tending::write_tending(response.data.stone_name.clone(), endpoint.clone());
-                }
-            }
-
-            Ok(endpoint)
-        }
-        Err(_) => {
-            Err(anyhow::anyhow!(
-                "No Zen Garden stones discovered.\n\n\
-                Possible causes:\n\
-                  • No stones present on your network\n\
-                  • Firewall is blocking UDP broadcast (port 7184)\n\
-                  • Stone's garden-moss service is not running\n\n\
-                To fix:\n\
-                  • Create a new stone: Run installer/NewStone.ps1\n\
-                  • Set tending: garden-rake tend <endpoint>\n\
-                  • Specify endpoint manually: garden-rake <command> --at http://<IP>:7185\n\
-                  • Or use a stone name: garden-rake <command> --at <stone-name>\n\
-                  • Check stone status: ssh stone@<ip> systemctl status garden-moss.service"
-            ))
-        }
-    }
-}
+// Note: resolve_endpoint logic is in dispatch::resolve_endpoint (DRY)
 
 #[derive(Debug, Clone, ValueEnum)]
 enum PlacementMode {
@@ -1132,11 +1063,8 @@ async fn async_main() -> anyhow::Result<()> {
     let fresh_mode = cli.fresh
         || parsed_keywords.as_ref().map(|k| k.fresh).unwrap_or(false);
 
-    // Clear tending cache if fresh mode is active
-    if fresh_mode {
-        let _ = tending::clear_tending();
-        tracing::debug!("Cleared tending cache (fresh mode)");
-    }
+    // Note: fresh_mode is passed to Moss API to request fresh topology scan.
+    // It does NOT clear tending state - Rake stays connected to the same stone.
 
     // Create pooled HTTP client with connection reuse (hot cache architecture)
     // Configuration optimized for long-running commands (watch/observe):
@@ -1224,7 +1152,7 @@ async fn async_main() -> anyhow::Result<()> {
                 (Some(name), None) => {
                     // Could be install or query - need to check if known offering
                     // First resolve endpoint to check
-                    let endpoint = resolve_endpoint(&client, at.clone()).await?;
+                    let endpoint = dispatch::resolve_endpoint(&client, at.clone(), Some(&*GLOBAL_CACHE)).await?;
                     let is_known = commands::offering::OfferCommand::is_known_offering(&client, &endpoint, name).await;
 
                     if name != "refresh" && !is_known {
@@ -1477,7 +1405,7 @@ async fn async_main() -> anyhow::Result<()> {
         }
 
         Commands::Refresh { component, from, at } => {
-            let endpoint = resolve_endpoint(&client, at).await?;
+            let endpoint = dispatch::resolve_endpoint(&client, at, Some(&*GLOBAL_CACHE)).await?;
             println!("Refreshing {}...", component);
             refresh_component(&client, &endpoint, &component, &from).await?;
         }

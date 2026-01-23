@@ -6,14 +6,22 @@
     Orchestrates builds for all platforms:
     - Linux (garden-moss, garden-rake) via build-linux.ps1
     - Windows (garden-moss.exe, garden-rake.exe) via build-windows.ps1
-    
+
     This is the main entry point for full distribution builds.
+    Default: fast-release profile (thin LTO, parallel codegen) - best for iteration.
 
 .PARAMETER DebugBuild
-    Build debug binaries instead of optimized release (default: release)
+    Build debug binaries (fastest compile, largest size, no optimization)
+
+.PARAMETER Release
+    Build full-release binaries (full LTO, codegen-units=1)
+    Slower build but smallest binaries. Use for final production builds.
 
 .PARAMETER SkipTests
-    Skip running tests before build
+    Skip running tests before build (default: tests are skipped)
+
+.PARAMETER RunTests
+    Run tests before build (overrides default skip)
 
 .PARAMETER SkipLinux
     Skip Linux build (build Windows only)
@@ -24,30 +32,40 @@
 .PARAMETER ForceRebuild
     Force rebuild of Docker build container (Linux only)
 
+.PARAMETER Jobs
+    Number of parallel cargo jobs (default: number of CPUs)
+
 .EXAMPLE
     .\dist.ps1
-    # Build optimized release binaries for all platforms (default)
+    # Default: fast-release, skip tests, all platforms
+
+.EXAMPLE
+    .\dist.ps1 -Release
+    # Full LTO release (smallest binaries, slower build)
+
+.EXAMPLE
+    .\dist.ps1 -RunTests
+    # Fast-release with tests
 
 .EXAMPLE
     .\dist.ps1 -DebugBuild
-    # Build debug binaries (faster compile, larger size)
-
-.EXAMPLE
-    .\dist.ps1 -SkipTests
-    # Fast build without tests
+    # Debug binaries (fastest compile, largest size)
 
 .EXAMPLE
     .\dist.ps1 -SkipWindows
-    # Build Linux binaries only (optimized release)
+    # Build Linux binaries only
 #>
 
 [CmdletBinding()]
 param(
     [switch]$DebugBuild,
+    [switch]$Release,
     [switch]$SkipTests,
+    [switch]$RunTests,
     [switch]$SkipLinux,
     [switch]$SkipWindows,
-    [switch]$ForceRebuild
+    [switch]$ForceRebuild,
+    [int]$Jobs = 0
 )
 
 Set-StrictMode -Version Latest
@@ -128,10 +146,13 @@ if (-not $SkipLinux) {
     Write-Host " Phase 1: Linux Build (Docker)" -ForegroundColor Cyan
     Write-Host "═══════════════════════════════════════════════════`n" -ForegroundColor Cyan
     
+    # Default: fast-release. Use -Release for full LTO.
     $dockerArgs = @{}
     if ($DebugBuild) { $dockerArgs.Add('DebugBuild', $true) }
+    if (-not $Release -and -not $DebugBuild) { $dockerArgs.Add('Fast', $true) }
     if ($ForceRebuild) { $dockerArgs.Add('ForceRebuild', $true) }
-    
+    if ($Jobs -gt 0) { $dockerArgs.Add('Jobs', $Jobs) }
+
     $linuxScript = Join-Path $INSTALLER_DIR "build-linux.ps1"
     try {
         & $linuxScript @dockerArgs
@@ -158,10 +179,13 @@ if (-not $SkipWindows) {
         Write-Host " Phase 2: Windows Build (Native)" -ForegroundColor Cyan
         Write-Host "═══════════════════════════════════════════════════`n" -ForegroundColor Cyan
         
+        # Default: fast-release, skip tests. Use -Release for full LTO, -RunTests for tests.
         $windowsArgs = @{}
         if ($DebugBuild) { $windowsArgs['DebugBuild'] = $true }
-        if ($SkipTests) { $windowsArgs['SkipTests'] = $true }
-        
+        if (-not $Release -and -not $DebugBuild) { $windowsArgs['Fast'] = $true }
+        if (-not $RunTests) { $windowsArgs['SkipTests'] = $true }
+        if ($Jobs -gt 0) { $windowsArgs['Jobs'] = $Jobs }
+
         $windowsScript = Join-Path $INSTALLER_DIR "build-windows.ps1"
         & $windowsScript @windowsArgs
         

@@ -4,6 +4,7 @@
 //! No disk persistence - rebuilt from mDNS/UDP discovery on each startup.
 
 use chrono::{DateTime, Utc};
+use garden_common::ChirpServiceInfo;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -15,6 +16,8 @@ pub struct TopologyEntry {
     pub stone_name: String,
     pub endpoint: String,
     pub moss_version: String,
+    /// Services running on this stone (from chirps)
+    pub services: Vec<ChirpServiceInfo>,
     pub discovered_at: DateTime<Utc>,
     pub last_seen: DateTime<Utc>,
 }
@@ -25,7 +28,9 @@ pub struct TopologyEntry {
 /// Populated from UDP discovery responses and mDNS announcements.
 pub type TopologyCache = Arc<RwLock<HashMap<String, TopologyEntry>>>;
 
-/// Add or update a stone in the topology cache
+/// Add or update a stone in the topology cache (without services)
+///
+/// Use `upsert_stone_with_services` when service info is available from chirps.
 pub async fn upsert_stone(
     cache: &TopologyCache,
     stone_id: String,
@@ -33,14 +38,29 @@ pub async fn upsert_stone(
     endpoint: String,
     moss_version: String,
 ) {
+    upsert_stone_with_services(cache, stone_id, stone_name, endpoint, moss_version, vec![]).await;
+}
+
+/// Add or update a stone in the topology cache with service information
+///
+/// Called when processing stone chirps that include service inventory.
+pub async fn upsert_stone_with_services(
+    cache: &TopologyCache,
+    stone_id: String,
+    stone_name: String,
+    endpoint: String,
+    moss_version: String,
+    services: Vec<ChirpServiceInfo>,
+) {
     let mut map = cache.write().await;
     let now = Utc::now();
-    
+
     if let Some(entry) = map.get_mut(&stone_id) {
         // Update existing entry
         entry.stone_name = stone_name;
         entry.endpoint = endpoint;
         entry.moss_version = moss_version;
+        entry.services = services;
         entry.last_seen = now;
     } else {
         // Insert new entry
@@ -49,6 +69,7 @@ pub async fn upsert_stone(
             stone_name,
             endpoint,
             moss_version,
+            services,
             discovered_at: now,
             last_seen: now,
         });

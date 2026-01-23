@@ -29,13 +29,32 @@ reqwest = { version = "0.11", default-features = false, features = ["json", "rus
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 thiserror = "1.0"
-tokio = { version = "1.35", features = ["full"] }
+# Minimal tokio features - each crate adds what it needs
+tokio = { version = "1.35", features = ["sync", "time", "macros"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
 uuid = { version = "1.6", features = ["v7"] }
 # zen-common = { path = "src/linux/common" }  # Moved to src/common
 
+# Dev profile: faster iteration
+[profile.dev]
+opt-level = 1              # Light optimization (faster than 0, still fast compile)
+split-debuginfo = "packed" # Reduce linker work on incremental builds
+
+# Optimize dependencies even in dev (they don't change often)
+[profile.dev.package."*"]
+opt-level = 2
+
 [profile.release]
 strip = true      # Remove symbols for smaller binaries
-lto = true        # Link-time optimization
+lto = true        # Link-time optimization (full - slowest, smallest)
 codegen-units = 1 # Better optimization (slower compile, smaller binary)
+
+# Fast release profile for development iteration
+# Usage: cargo build --profile fast-release
+# Trade-off: ~5-10% larger binaries, ~1-3% slower runtime, ~40% faster compile
+[profile.fast-release]
+inherits = "release"
+lto = "thin"      # Thin LTO: 80% of full LTO benefit, much faster compile
+codegen-units = 4 # Parallel codegen: 4x faster than codegen-units=1
+strip = true      # Still strip symbols

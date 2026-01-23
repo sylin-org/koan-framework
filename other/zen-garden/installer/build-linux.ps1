@@ -12,6 +12,10 @@
 .PARAMETER DebugBuild
     Build debug binaries instead of optimized release (default: release)
 
+.PARAMETER Fast
+    Use fast-release profile (~40% faster compile, ~5-10% larger binaries)
+    Uses thin LTO and parallel codegen for faster iteration
+
 .PARAMETER ForceRebuild
     Force rebuild of Docker build container
 
@@ -21,9 +25,16 @@
 .PARAMETER CheckUpdates
     Check for outdated dependencies before building
 
+.PARAMETER Jobs
+    Number of parallel cargo jobs (default: number of CPUs)
+
 .EXAMPLE
     .\build-linux.ps1
     # Build optimized release binaries using Docker (default, reuses existing image)
+
+.EXAMPLE
+    .\build-linux.ps1 -Fast
+    # Build with fast-release profile (~40% faster, slightly larger binaries)
 
 .EXAMPLE
     .\build-linux.ps1 -DebugBuild
@@ -45,9 +56,11 @@
 [CmdletBinding()]
 param(
     [switch]$DebugBuild,
+    [switch]$Fast,
     [switch]$ForceRebuild,
     [switch]$Native,
-    [switch]$CheckUpdates
+    [switch]$CheckUpdates,
+    [int]$Jobs = 0
 )
 
 Set-StrictMode -Version Latest
@@ -136,10 +149,26 @@ if ($UseDocker) {
     }
     
     # Determine build type (default: release for production)
-    $buildProfile = if ($DebugBuild) { "debug" } else { "release" }
+    # Priority: DebugBuild > Fast > Release
+    $buildProfile = if ($DebugBuild) {
+        "debug"
+    } elseif ($Fast) {
+        "fast-release"  # Custom profile in Cargo.toml
+    } else {
+        "release"
+    }
+
+    # Determine parallel jobs (Docker container typically sees host CPUs)
+    $parallelJobs = if ($Jobs -gt 0) { $Jobs } else { [Environment]::ProcessorCount }
 
     # Docker-based build
     Write-Host "Building binaries in container..." -ForegroundColor Cyan
+    $buildTypeDesc = switch ($buildProfile) {
+        "debug" { "Debug" }
+        "fast-release" { "Fast-Release (thin LTO)" }
+        default { "Release (full LTO)" }
+    }
+    Write-Host "  Build Type: $buildTypeDesc, Jobs: $parallelJobs" -ForegroundColor DarkGray
     
     # Determine volume mount path (Windows uses /drive/path format)
     if ($RunningOnWindows) {
@@ -162,8 +191,14 @@ if ($UseDocker) {
         }
         
         # Build all three binaries in one container run for efficiency
-        $buildArgs = @("cargo", "build")
-        if (-not $DebugBuild) { $buildArgs += "--release" }
+        $buildArgs = @("cargo", "build", "-j", "$parallelJobs")
+        if ($buildProfile -eq "debug") {
+            # Debug build - no profile flag needed
+        } elseif ($buildProfile -eq "fast-release") {
+            $buildArgs += @("--profile", "fast-release")
+        } else {
+            $buildArgs += "--release"
+        }
         $buildArgs += @("--bin", "garden-moss", "--bin", "garden-lantern", "--bin", "garden-rake")
         
         $containerName = "zen-garden-builder-container"
@@ -223,20 +258,43 @@ if ($UseDocker) {
 } else {
     # Native Linux build
     Write-Host "Building binaries natively..." -ForegroundColor Cyan
-    
+
     # Determine build type (default: release for production)
-    $buildProfile = if ($DebugBuild) { "debug" } else { "release" }
+    # Priority: DebugBuild > Fast > Release
+    $buildProfile = if ($DebugBuild) {
+        "debug"
+    } elseif ($Fast) {
+        "fast-release"  # Custom profile in Cargo.toml
+    } else {
+        "release"
+    }
+
+    # Determine parallel jobs
+    $parallelJobs = if ($Jobs -gt 0) { $Jobs } else { [Environment]::ProcessorCount }
+
+    $buildTypeDesc = switch ($buildProfile) {
+        "debug" { "Debug" }
+        "fast-release" { "Fast-Release (thin LTO)" }
+        default { "Release (full LTO)" }
+    }
+    Write-Host "  Build Type: $buildTypeDesc, Jobs: $parallelJobs" -ForegroundColor DarkGray
 
     Push-Location $WORKSPACE_ROOT
     try {
         Write-Host "  → Building garden-moss (Linux daemon)..."
         Write-Host "  → Building garden-lantern (Linux service registry)..."
         Write-Host "  → Building garden-rake (Linux CLI)..."
-        
-        $buildArgs = @("build")
-        if (-not $DebugBuild) { $buildArgs += "--release" }
+
+        $buildArgs = @("build", "-j", "$parallelJobs")
+        if ($buildProfile -eq "debug") {
+            # Debug build - no profile flag needed
+        } elseif ($buildProfile -eq "fast-release") {
+            $buildArgs += @("--profile", "fast-release")
+        } else {
+            $buildArgs += "--release"
+        }
         $buildArgs += @("--bin", "garden-moss", "--bin", "garden-lantern", "--bin", "garden-rake")
-        
+
         cargo @buildArgs
         
         if ($LASTEXITCODE -ne 0) { throw "Build failed" }

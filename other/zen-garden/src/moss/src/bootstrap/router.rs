@@ -7,6 +7,7 @@ use axum::{
     routing::{get, post, delete},
     Router,
 };
+use tower_http::trace::TraceLayer;
 use crate::{api, AppState};
 
 /// Configure the HTTP router with all API endpoints
@@ -47,6 +48,9 @@ pub fn configure(state: AppState) -> Router {
         .route("/api/v1/adoption/borrow/:name", delete(api::v1::adoption::unborrow_service_v1))
 
         // V1 API - Services (Technical Layer)
+        // Note: /api/v1/services is a unified endpoint:
+        //   - No params: lists all local services
+        //   - With ?q=, ?name=, etc.: searches/filters across garden
         .route("/api/v1/services/manifests", get(api::v1::services::list_manifests_v1))
         .route("/api/v1/services/:name/manifest", get(api::v1::services::get_manifest_v1))
         .route("/api/v1/services", get(api::v1::services::list_services_v1))
@@ -74,6 +78,7 @@ pub fn configure(state: AppState) -> Router {
 
         // V1 API - Garden topology
         .route("/api/v1/garden", get(api::v1::garden::get_garden_v1))
+        .route("/api/v1/garden/topology", get(api::v1::garden::get_topology_v1))
         .route("/api/v1/garden/recommend", post(api::v1::garden::recommend_placement_v1))
         .route("/api/v1/garden/stones/:stone_name", get(api::v1::garden::get_stone_v1))
         .route("/api/v1/stone", get(api::v1::garden::get_local_stone_v1))
@@ -95,6 +100,9 @@ pub fn configure(state: AppState) -> Router {
 
         // Apply 200 MB body limit to all routes
         .layer(axum::extract::DefaultBodyLimit::max(200 * 1024 * 1024))
+
+        // Request tracing layer - logs method, uri, and status
+        .layer(TraceLayer::new_for_http())
 
         .with_state(state)
 }

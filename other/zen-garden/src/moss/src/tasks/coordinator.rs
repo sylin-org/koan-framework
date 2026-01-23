@@ -16,6 +16,8 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use garden_common::{HardwareCapabilities, ServiceHealthStatus, ServiceStatus};
 use crate::console::{ConsolePrinter, ConsoleEvent, EventCategory, EventStatus};
+use crate::discovery::UdpEvent;
+use crate::domain::topology::{TopologyCache, upsert_stone_with_services};
 use crate::{
     AppState,
     adopt_existing_containers, ensure_offerings_index,
@@ -25,43 +27,67 @@ use crate::{
 };
 use crate::tasks::network_monitor::{NetworkMonitor, NetworkEvent};
 
-/// Start UDP discovery listener
+/// Start UDP discovery listener with topology cache integration
 ///
 /// Enables stone discovery via UDP broadcast.
+/// Handles both discovery requests (logging) and stone chirps (topology updates).
 /// Returns immediately after spawning the listener.
 pub async fn start_discovery_listener(
     stone_id: String,
     stone_name: String,
     api_endpoint: String,
+    topology_cache: TopologyCache,
     console: &ConsolePrinter,
 ) {
     match discovery::ensure_udp_listener(stone_id, stone_name, api_endpoint).await {
         Ok(receiver) => {
-            // Spawn discovery event monitor
-            let mut discovery_rx = receiver;
+            // Spawn UDP event monitor that handles both requests and chirps
+            let mut udp_rx = receiver;
             tokio::spawn(async move {
-                while let Ok(event) = discovery_rx.recv().await {
-                    tracing::debug!(
-                        request_id = %event.request.request_id,
-                        from = %event.from_addr,
-                        "Discovery request received via broadcast"
-                    );
+                while let Ok(event) = udp_rx.recv().await {
+                    match event {
+                        UdpEvent::Request { request, from_addr } => {
+                            tracing::debug!(
+                                request_id = %request.request_id,
+                                from = %from_addr,
+                                "Discovery request received via broadcast"
+                            );
+                        }
+                        UdpEvent::Chirp { chirp, from_addr } => {
+                            tracing::debug!(
+                                stone = %chirp.stone_name,
+                                services = chirp.services.len(),
+                                from = %from_addr,
+                                "Stone chirp received, updating topology cache"
+                            );
+                            // Update topology cache with chirp data including services
+                            upsert_stone_with_services(
+                                &topology_cache,
+                                chirp.stone_id,
+                                chirp.stone_name,
+                                chirp.endpoint,
+                                chirp.moss_version,
+                                chirp.services,
+                            )
+                            .await;
+                        }
+                    }
                 }
-                tracing::info!("Discovery event monitor stopped");
+                tracing::info!("UDP event monitor stopped");
             });
 
             console.emit(ConsoleEvent::new(
                 EventCategory::Network,
                 EventStatus::Started,
-                format!("UDP discovery on port {}", garden_common::ports::DISCOVERY_UDP)
+                format!("UDP listener on port {}", garden_common::ports::DISCOVERY_UDP),
             ));
         }
         Err(e) => {
-            tracing::error!(error = ?e, "Failed to start UDP discovery listener");
+            tracing::error!(error = ?e, "Failed to start UDP listener");
             console.emit(ConsoleEvent::new(
                 EventCategory::Network,
                 EventStatus::Failed,
-                format!("UDP discovery: {}", e)
+                format!("UDP listener: {}", e),
             ));
         }
     }
@@ -390,8 +416,10 @@ pub async fn start_all_background_tasks(
         state.stone_id.clone(),
         stone_name.to_string(),
         api_endpoint.to_string(),
+        state.topology_cache.clone(),
         &console,
-    ).await;
+    )
+    .await;
 
     // Start hardware detection (progressive)
     start_hardware_detection(

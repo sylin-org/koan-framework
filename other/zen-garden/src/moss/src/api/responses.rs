@@ -1,29 +1,7 @@
-﻿use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
-/// Standard API response wrapper with optional suggestions
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct ApiResponse<T> {
-    pub data: T,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub suggestions: Option<Vec<String>>,
-}
-
-impl<T> ApiResponse<T> {
-    pub fn new(data: T) -> Self {
-        Self {
-            data,
-            suggestions: None,
-        }
-    }
-
-    #[allow(dead_code)]
-    pub fn with_suggestions(data: T, suggestions: Vec<String>) -> Self {
-        Self {
-            data,
-            suggestions: Some(suggestions),
-        }
-    }
-}
+// Re-export shared ApiResponse from garden-common
+pub use garden_common::api_utils::ApiResponse;
 
 /// Service creation request
 #[derive(Deserialize, Debug)]

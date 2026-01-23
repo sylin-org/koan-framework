@@ -1,13 +1,14 @@
 ﻿use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::{HeaderMap, StatusCode},
     Json,
 };
 use crate::api::responses::{GardenOverview, StoneInfo, ApiResponse};
 use crate::api::suggestions::{generate_suggestions, SuggestionContext};
 use crate::{error_response, AppState, metrics};
-use crate::domain::placement::{PlacementRequest, PlacementResponse};
-use garden_common::{api_utils::ApiErrorResponse, CpuCapabilities, DetectionStatus, DiskCapabilities, HardwareCapabilities, HardwareInventory, MemoryCapabilities};
+use crate::domain::{placement::{PlacementRequest, PlacementResponse}, topology};
+use garden_common::{api_utils::ApiErrorResponse, ChirpServiceInfo, CpuCapabilities, DetectionStatus, DiskCapabilities, HardwareCapabilities, HardwareInventory, MemoryCapabilities};
+use serde::{Deserialize, Serialize};
 
 /// GET /api/v1/garden - Get garden overview (all stones)
 pub async fn get_garden_v1(
@@ -178,4 +179,97 @@ async fn get_local_stone_info(state: &AppState) -> Result<StoneInfo, (StatusCode
         cpu_usage: 0.0, // TODO: Get from metrics
         memory_usage: 0.0, // TODO: Get from metrics
     })
+}
+
+// === TOPOLOGY API ===
+
+/// Query parameters for topology endpoint
+#[derive(Debug, Deserialize, Default)]
+pub struct TopologyQueryParams {
+    /// If true, include the local stone in the response
+    #[serde(default)]
+    pub include_local: bool,
+}
+
+/// Stone entry in topology response
+#[derive(Debug, Clone, Serialize)]
+pub struct TopologyStone {
+    pub stone_id: String,
+    pub stone_name: String,
+    pub endpoint: String,
+    pub moss_version: String,
+    pub services: Vec<ChirpServiceInfo>,
+    pub last_seen: String,
+}
+
+/// Topology response containing all known stones
+#[derive(Debug, Serialize)]
+pub struct TopologyResponse {
+    pub stones: Vec<TopologyStone>,
+    pub local_stone_id: String,
+    pub local_stone_name: String,
+}
+
+/// GET /api/v1/garden/topology - Get topology cache (all known stones from chirps)
+///
+/// Returns the list of stones discovered via UDP chirps.
+/// Use ?include_local=true to also include the local stone in the response.
+pub async fn get_topology_v1(
+    State(state): State<AppState>,
+    Query(params): Query<TopologyQueryParams>,
+    headers: HeaderMap,
+) -> Result<Json<ApiResponse<TopologyResponse>>, (StatusCode, Json<ApiErrorResponse>)> {
+    let mut stones: Vec<TopologyStone> = topology::get_all_stones(&state.topology_cache)
+        .await
+        .into_iter()
+        .map(|entry| TopologyStone {
+            stone_id: entry.stone_id,
+            stone_name: entry.stone_name,
+            endpoint: entry.endpoint,
+            moss_version: entry.moss_version,
+            services: entry.services,
+            last_seen: entry.last_seen.to_rfc3339(),
+        })
+        .collect();
+
+    // Optionally include local stone
+    if params.include_local {
+        // Get local stone's services from registry
+        let local_services: Vec<ChirpServiceInfo> = {
+            let registry = state.registry.read().await;
+            registry.iter().map(|svc| ChirpServiceInfo {
+                name: svc.name.clone(),
+                offering: svc.offering.clone(),
+                category: svc.offering.clone(), // Use offering as category fallback
+                status: format!("{:?}", svc.status),
+            }).collect()
+        };
+
+        // Get local endpoint
+        let current_ip = state.network_monitor.get_ip().await;
+        let local_endpoint = format!("http://{}:{}", current_ip, state.api_port);
+
+        stones.push(TopologyStone {
+            stone_id: state.stone_id.clone(),
+            stone_name: state.stone_name.clone(),
+            endpoint: local_endpoint,
+            moss_version: format!("{}.{}", env!("CARGO_PKG_VERSION"), env!("BUILD_NUMBER")),
+            services: local_services,
+            last_seen: chrono::Utc::now().to_rfc3339(),
+        });
+    }
+
+    let response = TopologyResponse {
+        stones,
+        local_stone_id: state.stone_id.clone(),
+        local_stone_name: state.stone_name.clone(),
+    };
+
+    let ctx = SuggestionContext::from_headers(&headers, "topology_query");
+    let suggestions = generate_suggestions(&ctx);
+
+    Ok(Json(ApiResponse {
+        data: response,
+        suggestions,
+    }))
 }

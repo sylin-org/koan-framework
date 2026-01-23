@@ -76,16 +76,16 @@ if (-not $SkipBuild -and -not $Build) {
     Write-Host "`n╔════════════════════════════════════════════════════╗" -ForegroundColor Cyan
     Write-Host "║  Build Binaries?                                   ║" -ForegroundColor Cyan
     Write-Host "╚════════════════════════════════════════════════════╝`n" -ForegroundColor Cyan
-    
-    Write-Host "  [1] Yes, build now (recommended)" -ForegroundColor White
+
+    Write-Host "  [1] Yes, build now" -ForegroundColor White
     Write-Host "      Compiles latest code for all platforms" -ForegroundColor Gray
     Write-Host ""
-    Write-Host "  [2] No, use existing binaries" -ForegroundColor White
+    Write-Host "  [2] No, use existing binaries (default)" -ForegroundColor White
     Write-Host "      Uses binaries from previous build" -ForegroundColor Gray
     Write-Host ""
-    
-    $buildChoice = Read-Host "Enter choice (1 or 2)"
-    
+
+    $buildChoice = Read-Host "Enter choice (1 or 2, default=2)"
+
     $shouldBuild = ($buildChoice -eq "1")
     Write-Host ""
 } elseif ($Build) {
@@ -97,7 +97,7 @@ if ([string]::IsNullOrEmpty($Method)) {
     Write-Host "`n╔════════════════════════════════════════════════════╗" -ForegroundColor Cyan
     Write-Host "║  Select Deployment Method (applies to all stones)  ║" -ForegroundColor Cyan
     Write-Host "╚════════════════════════════════════════════════════╝`n" -ForegroundColor Cyan
-    
+
     Write-Host "  [1] HTTP API (default)" -ForegroundColor White
     Write-Host "      Uses /api/v1/stone/upgrade endpoint" -ForegroundColor Gray
     Write-Host "      Requires moss API to be working" -ForegroundColor Gray
@@ -106,18 +106,14 @@ if ([string]::IsNullOrEmpty($Method)) {
     Write-Host "      Direct file copy via SSH + service restart" -ForegroundColor Gray
     Write-Host "      Fallback when API is unavailable" -ForegroundColor Gray
     Write-Host ""
-    
-    $choice = Read-Host "Enter choice (1 or 2)"
-    
+
+    $choice = Read-Host "Enter choice (1 or 2, default=1)"
+
     switch ($choice) {
-        "1" { $Method = "HTTP" }
         "2" { $Method = "SSH" }
-        default { 
-            Write-Host "Invalid choice, using HTTP" -ForegroundColor Yellow
-            $Method = "HTTP"
-        }
+        default { $Method = "HTTP" }
     }
-    
+
     Write-Host ""
 }
 

@@ -40,7 +40,7 @@ param(
     [string]$UsbDrive,
 
     [switch]$Force,
-    
+
     [Parameter(Mandatory = $false)]
     [switch]$UpdateOnly
 )

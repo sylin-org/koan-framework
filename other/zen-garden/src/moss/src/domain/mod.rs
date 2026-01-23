@@ -7,6 +7,7 @@
 //! - Compatibility checking
 //! - Container adoption
 //! - Service reconciliation
+//! - Service discovery
 //!
 //! Domain layer is pure business logic - no I/O.
 //! All I/O goes through infra layer.
@@ -25,6 +26,8 @@ pub mod metrics_collection;
 pub mod topology;
 pub mod services;
 pub mod placement;
+pub mod connection;
+pub mod service_discovery;
 
 pub use service_manager::ServiceManager;
 pub use registry::Registry;
@@ -52,4 +55,12 @@ pub use reconciliation::{
 };
 pub use modes::{
     DetectionOrchestrator, AggregatedDetectionResult,
+};
+pub use connection::{
+    ResolvedConnection, resolve_connection, extract_ip, build_hostname,
+    default_template, infer_protocol, resolve_uris,
+};
+pub use service_discovery::{
+    ServiceSearchCriteria, FoundService, StoneRef, ServiceDiscoveryResponse,
+    find_services, find_local_services, list_all_local_services, KNOWN_CATEGORIES,
 };

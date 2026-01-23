@@ -30,11 +30,14 @@ pub mod cmd {
     // Adoption
     pub const ADOPT: &str = "adopt";
     pub const RELEASE: &str = "release";
-    pub const FIND: &str = "find";
+    pub const LOCATE: &str = "locate";
     pub const ADOPTED: &str = "adopted";
     pub const BORROWED: &str = "borrowed";
     pub const BORROW: &str = "borrow";
     pub const RETURN: &str = "return";
+
+    // Discovery (service find)
+    pub const FIND: &str = "find";
 
     // Management
     pub const TEND: &str = "tend";
@@ -678,21 +681,21 @@ pub static MANIFEST: Lazy<CommandManifest> = Lazy::new(|| {
     });
 
     manifest.add(CommandDef {
-        name: "find",
-        zen_name: "find",
-        normative_name: Some("adoption find"),
+        name: "locate",
+        zen_name: "locate",
+        normative_name: Some("adoption locate"),
         category: CommandCategory::Adoption,
-        description: "Find adoptable services",
-        long_description: "Find services available for adoption.\n\n\
-            'find strays' - Find containers not in moss registry (strays).\n\
-            Future: 'find services' - Detect external services that could be adopted.",
+        description: "Locate adoptable containers (strays)",
+        long_description: "Locate containers that are not managed by Zen Garden (strays).\n\n\
+            Strays are containers running on the stone but not in moss registry.\n\
+            Use 'adopt <name>' to claim a stray container.",
         remote_capable: true,
         params: vec![
             CommandParam {
                 name: "target",
                 zen_syntax: "<strays>",
                 normative_syntax: None,
-                description: "'strays' to find unmanaged containers",
+                description: "'strays' to locate unmanaged containers",
                 required: true,
             },
             CommandParam {
@@ -705,17 +708,83 @@ pub static MANIFEST: Lazy<CommandManifest> = Lazy::new(|| {
         ],
         examples: vec![
             CommandExample {
-                description: "Find stray containers",
-                zen_syntax: Some("garden-rake find strays"),
-                normative_syntax: Some("garden-rake adoption find strays"),
+                description: "Locate stray containers",
+                zen_syntax: Some("garden-rake locate strays"),
+                normative_syntax: Some("garden-rake adoption locate strays"),
             },
             CommandExample {
-                description: "Find strays on specific stone",
-                zen_syntax: Some("garden-rake find strays on stone-01"),
-                normative_syntax: Some("garden-rake adoption find strays --at stone-01"),
+                description: "Locate strays on specific stone",
+                zen_syntax: Some("garden-rake locate strays on stone-01"),
+                normative_syntax: Some("garden-rake adoption locate strays --at stone-01"),
             },
         ],
         see_also: vec!["adopt", "adopted"],
+    });
+
+    manifest.add(CommandDef {
+        name: "find",
+        zen_name: "find",
+        normative_name: Some("services find"),
+        category: CommandCategory::Discovery,
+        description: "Find running services and get connection URIs",
+        long_description: "Find running services across the garden and return connection URIs.\n\n\
+            Supports search by name, category (c:prefix), or tags (t:prefix).\n\
+            Results are returned instantly from topology cache.\n\n\
+            Use 'wishfully' modifier to auto-provision if service not found.",
+        remote_capable: true,
+        params: vec![
+            CommandParam {
+                name: "query",
+                zen_syntax: "<query>",
+                normative_syntax: None,
+                description: "Service name, c:category, or t:tag",
+                required: true,
+            },
+            CommandParam {
+                name: "format",
+                zen_syntax: "--format <format>",
+                normative_syntax: None,
+                description: "Output format: human, json, uri, uri-ip",
+                required: false,
+            },
+            CommandParam {
+                name: "wishfully",
+                zen_syntax: "wishfully",
+                normative_syntax: Some("--wishful"),
+                description: "Auto-provision if not found",
+                required: false,
+            },
+            CommandParam {
+                name: "at",
+                zen_syntax: "at <stone>",
+                normative_syntax: Some("--at <stone>"),
+                description: "Target stone (omit to use tended stone)",
+                required: false,
+            },
+        ],
+        examples: vec![
+            CommandExample {
+                description: "Find mongodb service",
+                zen_syntax: Some("garden-rake find mongodb"),
+                normative_syntax: Some("garden-rake services find --name mongodb"),
+            },
+            CommandExample {
+                description: "Find any database",
+                zen_syntax: Some("garden-rake find c:database"),
+                normative_syntax: Some("garden-rake services find --category database"),
+            },
+            CommandExample {
+                description: "Get connection URI only",
+                zen_syntax: Some("garden-rake find mongodb --format uri"),
+                normative_syntax: Some("garden-rake services find --name mongodb --format uri"),
+            },
+            CommandExample {
+                description: "Auto-provision if not found",
+                zen_syntax: Some("garden-rake find mongodb wishfully"),
+                normative_syntax: Some("garden-rake services find --name mongodb --wishful"),
+            },
+        ],
+        see_also: vec!["observe", "list", "offer"],
     });
 
     manifest.add(CommandDef {
@@ -1432,11 +1501,11 @@ pub static MANIFEST: Lazy<CommandManifest> = Lazy::new(|| {
 pub fn validate_manifest() {
     let expected_commands = vec![
         // Discovery
-        "observe", "watch", "list", "status",
+        "observe", "watch", "list", "status", "find",
         // Lifecycle
         "offer", "rest", "wake", "remove", "uproot", "nourish",
         // Adoption
-        "adopt", "release", "find", "adopted", "borrowed", "borrow", "return",
+        "adopt", "release", "locate", "adopted", "borrowed", "borrow", "return",
         // Management
         "tend", "reconcile", "refresh", "ceremony", "template",
         // System

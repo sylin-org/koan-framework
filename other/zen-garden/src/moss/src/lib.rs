@@ -16,6 +16,7 @@ pub mod bootstrap;
 pub mod cli;
 
 // Core modules
+pub mod announcement;
 pub mod docker;
 pub mod discovery;
 pub mod mdns;

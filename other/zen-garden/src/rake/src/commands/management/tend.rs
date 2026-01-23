@@ -187,8 +187,8 @@ impl Command for TendCommand {
             // Show current tending state - auto-discover if needed
             let tending_result: anyhow::Result<TendingState> = tending::read_tending();
             match tending_result {
-                Ok(state) if state.is_valid() => {
-                    // Valid cached state - verify stone is still reachable
+                Ok(state) => {
+                    // Tending persists until cleared or stone unreachable - verify stone is reachable
                     let health_url = format!("{}/health", state.endpoint.trim_end_matches('/'));
                     match ctx
                         .client
@@ -203,11 +203,8 @@ impl Command for TendCommand {
                                     "Tending to: {}.local ({})",
                                     state.stone_name, state.endpoint
                                 );
-                                println!("Last seen: {} seconds ago", state.age_seconds());
-                                println!(
-                                    "Status: Active ({} seconds remaining in cache)",
-                                    state.ttl_remaining_seconds()
-                                );
+                                println!("Last activity: {} seconds ago", state.age_seconds());
+                                println!("Status: Active (persistent, no TTL)");
                             } else {
                                 println!(
                                     "{}.local ({})",
@@ -233,20 +230,6 @@ impl Command for TendCommand {
                                 ));
                             }
                         }
-                    }
-                }
-                Ok(state) => {
-                    // Expired state - try to rediscover
-                    tracing::debug!("Tending state expired, attempting rediscovery");
-                    if let Err(e) = auto_discover_and_tend(&ctx.client).await {
-                        return Err(anyhow::anyhow!(
-                            "Tending state expired (last tended: {}).\n\n{}\n\n\
-                            Options:\n\
-                            • Auto-discover stone: garden-rake tend auto\n\
-                            • Explicit endpoint: garden-rake tend http://<ip>:7185",
-                            state.stone_name,
-                            e
-                        ));
                     }
                 }
                 Err(_) => {

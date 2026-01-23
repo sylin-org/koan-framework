@@ -178,22 +178,13 @@ pub async fn upgrade_stone_v1(
 
     tracing::info!(component = %payload.component, path = %target_path, "Binary staged successfully");
 
-    // If updating moss itself, trigger update mechanism
+    // If updating moss itself, trigger graceful shutdown for restart
     if payload.component == MOSS_BINARY {
-        // Platform-specific update handling
-        #[cfg(unix)]
-        {
-            // Linux: systemd service watches for .staged files and handles restart
-            // The systemd unit will detect the .staged file and trigger restart
-            tracing::info!("Moss binary staged, systemd will handle restart");
-        }
+        tracing::info!("Moss binary staged, initiating graceful shutdown for upgrade");
 
-        #[cfg(windows)]
-        {
-            // Windows: Service will need to restart itself
-            // The staged file will be picked up on next service restart
-            tracing::info!("Moss binary staged for Windows, service restart needed");
-        }
+        // Signal graceful shutdown - systemd will restart us (Restart=always)
+        // and ExecStartPre will run moss-update-helper.sh to copy the staged binary
+        _state.shutdown_tx.notify_one();
 
         (
             StatusCode::ACCEPTED,

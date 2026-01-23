@@ -2,10 +2,10 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
-use std::time::{Duration, SystemTime};
+use std::time::SystemTime;
 
-const TENDING_TTL: Duration = Duration::from_secs(90);
-
+/// Tending state - persists indefinitely until explicitly changed or stone goes offline.
+/// No TTL - Rake stays connected to the same stone across sessions.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TendingState {
     pub stone_name: String,
@@ -43,24 +43,15 @@ mod iso8601 {
 }
 
 impl TendingState {
+    /// Tending is always valid once set - no TTL expiration.
+    /// Validity now depends on reachability (checked at use time in dispatch).
     pub fn is_valid(&self) -> bool {
-        self.last_seen
-            .elapsed()
-            .map(|elapsed| elapsed < TENDING_TTL)
-            .unwrap_or(false)
+        true
     }
 
+    /// Age in seconds since tending was last written (informational only)
     pub fn age_seconds(&self) -> u64 {
         self.last_seen.elapsed().unwrap_or_default().as_secs()
-    }
-
-    pub fn ttl_remaining_seconds(&self) -> u64 {
-        let age = self.age_seconds();
-        if age < TENDING_TTL.as_secs() {
-            TENDING_TTL.as_secs() - age
-        } else {
-            0
-        }
     }
 }
 
@@ -110,9 +101,11 @@ pub fn clear_tending() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::Duration;
 
     #[test]
-    fn test_tending_state_validity() {
+    fn test_tending_state_always_valid() {
+        // Tending is always valid - no TTL expiration
         let state = TendingState {
             stone_name: "test-stone".to_string(),
             endpoint: "http://127.0.0.1:7185".to_string(),
@@ -122,12 +115,14 @@ mod tests {
     }
 
     #[test]
-    fn test_tending_state_expired() {
+    fn test_tending_state_valid_even_when_old() {
+        // Even old tending state is valid - reachability is checked at use time
         let state = TendingState {
             stone_name: "test-stone".to_string(),
             endpoint: "http://127.0.0.1:7185".to_string(),
-            last_seen: SystemTime::now() - Duration::from_secs(100),
+            last_seen: SystemTime::now() - Duration::from_secs(86400), // 24 hours old
         };
-        assert!(!state.is_valid());
+        assert!(state.is_valid());
+        assert!(state.age_seconds() >= 86400);
     }
 }

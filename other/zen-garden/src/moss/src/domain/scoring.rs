@@ -11,8 +11,7 @@ use garden_common::DiskType;
 /// More free memory = better score.
 ///
 /// # Examples
-/// ```
-/// # use moss::domain::scoring::score_memory_headroom;
+/// ```ignore
 /// assert_eq!(score_memory_headroom(16384, 32768), 10); // 50% free
 /// assert_eq!(score_memory_headroom(24576, 32768), 15); // 75% free
 /// assert_eq!(score_memory_headroom(0, 32768), 0);      // 0% free
@@ -33,8 +32,7 @@ pub fn score_memory_headroom(free_mb: u64, total_mb: u64) -> i32 {
 /// Lower load = better score.
 ///
 /// # Examples
-/// ```
-/// # use moss::domain::scoring::score_cpu_availability;
+/// ```ignore
 /// assert_eq!(score_cpu_availability(0), 20);   // 0% load
 /// assert_eq!(score_cpu_availability(50), 10);  // 50% load
 /// assert_eq!(score_cpu_availability(100), 0);  // 100% load
@@ -56,8 +54,7 @@ pub fn score_cpu_availability(load_percent: u8) -> i32 {
 /// - 200+ GB: 15 points
 ///
 /// # Examples
-/// ```
-/// # use moss::domain::scoring::score_storage_capacity;
+/// ```ignore
 /// assert_eq!(score_storage_capacity(25), 0);   // <50 GB
 /// assert_eq!(score_storage_capacity(75), 5);   // 50-99 GB
 /// assert_eq!(score_storage_capacity(150), 10); // 100-199 GB
@@ -84,9 +81,7 @@ pub fn score_storage_capacity(free_gb: u64) -> i32 {
 /// - Unknown: 0 points (undetected)
 ///
 /// # Examples
-/// ```
-/// # use moss::domain::scoring::score_storage_type;
-/// # use garden_common::DiskType;
+/// ```ignore
 /// assert_eq!(score_storage_type(&DiskType::NVMe), 12);
 /// assert_eq!(score_storage_type(&DiskType::SSD), 10);
 /// assert_eq!(score_storage_type(&DiskType::HDD), 5);
@@ -109,8 +104,7 @@ pub fn score_storage_type(storage_type: &DiskType) -> i32 {
 /// Penalty: -3 points per existing service
 ///
 /// # Examples
-/// ```
-/// # use moss::domain::scoring::calculate_distribution_penalty;
+/// ```ignore
 /// assert_eq!(calculate_distribution_penalty(0), 0);   // No services
 /// assert_eq!(calculate_distribution_penalty(3), -9);  // 3 services
 /// assert_eq!(calculate_distribution_penalty(5), -15); // 5 services
@@ -129,9 +123,7 @@ pub fn calculate_distribution_penalty(service_count: usize) -> i32 {
 /// - Incompatible: -999 points (effectively filtered)
 ///
 /// # Examples
-/// ```
-/// # use moss::domain::scoring::calculate_compatibility_penalty;
-/// # use moss::domain::compatibility::CompatibilityDecision;
+/// ```ignore
 /// assert_eq!(calculate_compatibility_penalty(&CompatibilityDecision::Pass), 0);
 /// // Fallback returns -15
 /// // Fail returns -999

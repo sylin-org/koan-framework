@@ -388,6 +388,63 @@ pub struct DiscoveryResponse {
 }
 
 // ============================================================================
+// UDP Announcement Envelope (unified message format)
+// ============================================================================
+
+/// UDP Announcement envelope for type-safe message routing
+///
+/// All UDP broadcasts use this envelope format. Consumers filter by `announcement_type`
+/// and deserialize `data` into the appropriate typed payload.
+///
+/// # Example
+/// ```ignore
+/// let announcement = UdpAnnouncement {
+///     announcement_type: announcement_types::STONE_CHIRP.to_string(),
+///     data: serde_json::to_value(&chirp_payload)?,
+/// };
+/// ```
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UdpAnnouncement {
+    /// Announcement type discriminator
+    #[serde(rename = "type")]
+    pub announcement_type: String,
+    /// Typed payload (deserialize based on announcement_type)
+    pub data: serde_json::Value,
+}
+
+/// Known announcement type constants
+pub mod announcement_types {
+    /// Discovery request from a stone looking for peers
+    pub const DISCOVERY_REQUEST: &str = "discovery_request";
+    /// Discovery response to a request
+    pub const DISCOVERY_RESPONSE: &str = "discovery_response";
+    /// Periodic stone chirp with full state (services, capabilities)
+    pub const STONE_CHIRP: &str = "stone_chirp";
+}
+
+/// Stone chirp payload - full state announcement including services
+///
+/// Sent every 30 seconds (or on service state change) to announce
+/// stone presence and current service inventory to the network.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StoneChirpPayload {
+    pub stone_id: String,
+    pub stone_name: String,
+    pub endpoint: String,
+    pub moss_version: String,
+    pub services: Vec<ChirpServiceInfo>,
+}
+
+/// Service info included in chirps
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChirpServiceInfo {
+    pub name: String,
+    pub offering: String,
+    pub category: String,
+    pub status: String,
+}
+
+// ============================================================================
 // Lantern Service Registry Types
 // ============================================================================
 

@@ -6,42 +6,119 @@
 use crate::api::responses::{CreateServiceRequest, ServiceActionResponse, ApiResponse};
 use crate::api::suggestions::{generate_suggestions, SuggestionContext};
 use crate::{error_response, AppState};
-use garden_common::{api_utils::ApiErrorResponse, ServiceInfo, ServiceStatus};
+use garden_common::{
+    api_utils::{ApiErrorResponse, sanitize_query, sanitize_name, sanitize_tag, is_suspicious},
+    ServiceInfo, ServiceStatus,
+};
 
-/// GET /api/v1/services - List all services
+/// Query parameters for GET /api/v1/services
+///
+/// Unified endpoint behavior:
+/// - No params: lists all local services (fast, local-only)
+/// - With params: searches/filters across garden (may query remote stones)
+///
+/// Query parameters:
+/// - `q`: Search query (supports prefixes: c:, cat:, category:, t:, tag:, tags:)
+/// - `name`: Search by exact service name
+/// - `category`: Search by category
+/// - `tag`: Search by tag
+/// - `fresh`: Force fresh discovery (bypass cache)
+#[derive(Debug, serde::Deserialize)]
+pub struct ServicesQuery {
+    /// Search query with optional prefix
+    #[serde(default)]
+    pub q: Option<String>,
+
+    /// Filter by name
+    #[serde(default)]
+    pub name: Option<String>,
+
+    /// Filter by category
+    #[serde(default)]
+    pub category: Option<String>,
+
+    /// Filter by tag
+    #[serde(default)]
+    pub tag: Option<String>,
+
+    /// Force fresh discovery
+    #[serde(default)]
+    pub fresh: bool,
+}
+
+impl ServicesQuery {
+    /// Check if any search/filter params are provided
+    fn has_search_params(&self) -> bool {
+        self.q.is_some() || self.name.is_some() || self.category.is_some() || self.tag.is_some()
+    }
+}
+
+/// GET /api/v1/services - List or search services
+///
+/// Unified endpoint:
+/// - No params: returns all local services (backward compatible with list)
+/// - With ?q=, ?name=, etc.: searches/filters across garden (replaces /find)
+///
+/// Response: ServiceDiscoveryResponse with found services
 pub async fn list_services_v1(
     State(state): State<AppState>,
+    axum::extract::Query(query): axum::extract::Query<ServicesQuery>,
     headers: HeaderMap,
-) -> Result<Json<ApiResponse<Vec<ServiceInfo>>>, (StatusCode, Json<ApiErrorResponse>)> {
-    let registry = state.registry.read().await;
-    let mut services = registry.clone();
-    drop(registry);
+) -> Result<Json<ApiResponse<crate::domain::ServiceDiscoveryResponse>>, (StatusCode, Json<ApiErrorResponse>)> {
+    use crate::domain::{ServiceSearchCriteria, find_services, list_all_local_services};
 
-    // Deduplicate services by name (keep first occurrence with resources if available)
-    let mut seen = std::collections::HashSet::new();
-    let mut deduped = Vec::new();
-    
-    // First pass: collect services with resources
-    for svc in services.iter() {
-        if svc.resources.is_some() && seen.insert(svc.name.clone()) {
-            deduped.push(svc.clone());
+    tracing::debug!(
+        q = ?query.q,
+        name = ?query.name,
+        category = ?query.category,
+        tag = ?query.tag,
+        fresh = query.fresh,
+        has_params = query.has_search_params(),
+        "list_services_v1: unified handler invoked"
+    );
+
+    // Sanitize and validate inputs - reject suspicious patterns
+    if let Some(ref q) = query.q {
+        if is_suspicious(q) {
+            tracing::warn!(query = %q, "Suspicious query pattern detected");
+            return Err(error_response(
+                StatusCode::BAD_REQUEST,
+                "INVALID_QUERY",
+                "Query contains invalid patterns".to_string(),
+                None,
+            ));
         }
     }
-    
-    // Second pass: add services without resources if not already seen
-    for svc in services.iter() {
-        if svc.resources.is_none() && seen.insert(svc.name.clone()) {
-            deduped.push(svc.clone());
-        }
-    }
-    
-    services = deduped;
+
+    let response = if query.has_search_params() {
+        // Search mode: filter/search across garden
+        let criteria = if let Some(ref q) = query.q {
+            let sanitized = sanitize_query(q).into_value();
+            ServiceSearchCriteria::parse(&sanitized)
+        } else if let Some(ref name) = query.name {
+            let sanitized = sanitize_name(name).into_value();
+            ServiceSearchCriteria::by_name(&sanitized)
+        } else if let Some(ref category) = query.category {
+            let sanitized = sanitize_tag(category).into_value();
+            ServiceSearchCriteria::by_category(&sanitized)
+        } else if let Some(ref tag) = query.tag {
+            let sanitized = sanitize_tag(tag).into_value();
+            ServiceSearchCriteria::by_tag(&sanitized)
+        } else {
+            unreachable!("has_search_params() returned true but no params found")
+        };
+
+        find_services(&criteria, &state, query.fresh).await
+    } else {
+        // List mode: return all local services
+        list_all_local_services(&state).await
+    };
 
     let ctx = SuggestionContext::from_headers(&headers, "list_services");
     let suggestions = generate_suggestions(&ctx);
 
     Ok(Json(ApiResponse {
-        data: services,
+        data: response,
         suggestions,
     }))
 }
@@ -52,12 +129,21 @@ pub async fn get_service_v1(
     Path(service): Path<String>,
     headers: HeaderMap,
 ) -> Result<Json<ApiResponse<ServiceInfo>>, (StatusCode, Json<ApiErrorResponse>)> {
+    tracing::debug!(
+        service = %service,
+        "get_service_v1: handler invoked for /api/v1/services/:service"
+    );
+
     let registry = state.registry.read().await;
     let service_info = registry
         .iter()
         .find(|s| s.name == service)
         .cloned()
         .ok_or_else(|| {
+            tracing::warn!(
+                service = %service,
+                "get_service_v1: service not found in registry"
+            );
             error_response(
                 StatusCode::NOT_FOUND,
                 "SERVICE_NOT_FOUND",

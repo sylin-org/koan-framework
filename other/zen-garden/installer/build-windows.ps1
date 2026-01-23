@@ -9,12 +9,23 @@
 .PARAMETER DebugBuild
     Build debug binaries instead of optimized release (default: release)
 
+.PARAMETER Fast
+    Use fast-release profile (~40% faster compile, ~5-10% larger binaries)
+    Uses thin LTO and parallel codegen for faster iteration
+
 .PARAMETER SkipTests
     Skip running tests before build
+
+.PARAMETER Jobs
+    Number of parallel cargo jobs (default: number of CPUs)
 
 .EXAMPLE
     .\build-windows.ps1
     # Build optimized release binaries for Windows (default)
+
+.EXAMPLE
+    .\build-windows.ps1 -Fast
+    # Build with fast-release profile (~40% faster, slightly larger binaries)
 
 .EXAMPLE
     .\build-windows.ps1 -DebugBuild
@@ -28,7 +39,9 @@
 [CmdletBinding()]
 param(
     [switch]$DebugBuild,
-    [switch]$SkipTests
+    [switch]$Fast,
+    [switch]$SkipTests,
+    [int]$Jobs = 0
 )
 
 Set-StrictMode -Version Latest
@@ -56,7 +69,14 @@ if (-not $RunningOnWindows) {
 }
 
 # Determine build type (default: release for production)
-$buildProfile = if ($DebugBuild) { "debug" } else { "release" }
+# Priority: DebugBuild > Fast > Release
+$buildProfile = if ($DebugBuild) {
+    "debug"
+} elseif ($Fast) {
+    "fast-release"  # Custom profile in Cargo.toml
+} else {
+    "release"
+}
 
 # Get version from parent script or generate default
 if (-not $env:GARDEN_VERSION) {
@@ -67,10 +87,19 @@ if (-not $env:GARDEN_VERSION) {
 }
 $version = $env:GARDEN_VERSION
 
+# Determine parallel jobs
+$parallelJobs = if ($Jobs -gt 0) { $Jobs } else { [Environment]::ProcessorCount }
+
 Write-Host "Configuration:" -ForegroundColor Yellow
 Write-Host "  Platform: Windows"
 Write-Host "  Version: $version"
-Write-Host "  Build Type: $(if ($DebugBuild) { 'Debug (fast)' } else { 'Release (optimized)' })"
+$buildTypeDesc = switch ($buildProfile) {
+    "debug" { "Debug (fastest compile, largest binary)" }
+    "fast-release" { "Fast-Release (thin LTO, ~40% faster compile)" }
+    default { "Release (full LTO, smallest binary)" }
+}
+Write-Host "  Build Type: $buildTypeDesc"
+Write-Host "  Parallel Jobs: $parallelJobs"
 Write-Host "  Output Dir: $WINDOWS_DIR"
 Write-Host ""
 
@@ -109,25 +138,31 @@ Write-Host "Building Windows binaries..." -ForegroundColor Cyan
 
 Push-Location $WORKSPACE_ROOT
 try {
+    # Build common args: profile and parallel jobs
+    $commonArgs = @("-j", "$parallelJobs")
+    if ($buildProfile -eq "debug") {
+        # Debug build - no profile flag needed
+    } elseif ($buildProfile -eq "fast-release") {
+        $commonArgs += @("--profile", "fast-release")
+    } else {
+        $commonArgs += "--release"
+    }
+
     Write-Host "  → Building garden-moss.exe (Windows daemon)..."
-    $buildArgs = @("build")
-    if (-not $DebugBuild) { $buildArgs += "--release" }
-    $buildArgs += @("--bin", "garden-moss", "--target", "x86_64-pc-windows-msvc")
-    
+    $buildArgs = @("build") + $commonArgs + @("--bin", "garden-moss", "--target", "x86_64-pc-windows-msvc")
+
     cargo @buildArgs
-    
-    if ($LASTEXITCODE -ne 0) { 
+
+    if ($LASTEXITCODE -ne 0) {
         Write-Host "  ⚠ garden-moss.exe build failed" -ForegroundColor Yellow
         Write-Host "    Cross-platform support may not be fully implemented yet." -ForegroundColor DarkYellow
     }
-    
+
     Write-Host "  → Building garden-rake.exe (Windows CLI)..."
-    $buildArgs = @("build")
-    if (-not $DebugBuild) { $buildArgs += "--release" }
-    $buildArgs += @("--bin", "garden-rake", "--target", "x86_64-pc-windows-msvc")
-    
+    $buildArgs = @("build") + $commonArgs + @("--bin", "garden-rake", "--target", "x86_64-pc-windows-msvc")
+
     cargo @buildArgs
-    
+
     if ($LASTEXITCODE -ne 0) { throw "garden-rake.exe build failed" }
     
     # Copy binaries from target to dist/windows/

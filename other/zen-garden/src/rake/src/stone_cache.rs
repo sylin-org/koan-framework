@@ -4,14 +4,15 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use garden_common::{GardenApiResponse, HardwareCapabilities};
+use crate::client::{CachedStoneOps, CachedStoneInfo};
 
 const CACHE_TTL: Duration = Duration::from_secs(90);
 
 /// Global stone cache singleton (hot cache architecture)
 ///
-/// Provides zero-discovery for common case by caching stone discovery results.
+/// Single source of truth for stone discovery caching across all commands.
+/// Used by observe, dispatch, and any command needing cached stone lookups.
 /// TTL is 90 seconds to balance freshness with performance.
-/// Cache is keyed by stone_id (GUID v7) when available, falling back to stone_name.
 pub static GLOBAL_CACHE: Lazy<StoneCache> = Lazy::new(StoneCache::new);
 
 #[derive(Clone)]
@@ -40,7 +41,6 @@ impl StoneCache {
         }
     }
 
-    #[allow(dead_code)]
     pub fn get(&self, stone_name: &str) -> Option<CachedStone> {
         let mut cache = self.stones.lock().unwrap();
         
@@ -99,7 +99,6 @@ impl StoneCache {
         cache.values().cloned().collect()
     }
 
-    #[allow(dead_code)]
     pub fn refresh_stone(&self, stone_name: &str) -> bool {
         let mut cache = self.stones.lock().unwrap();
         if let Some(cached) = cache.get_mut(stone_name) {
@@ -111,14 +110,12 @@ impl StoneCache {
         }
     }
 
-    #[allow(dead_code)]
     pub fn clear(&self) {
         let mut cache = self.stones.lock().unwrap();
         cache.clear();
         tracing::debug!("Cleared stone cache");
     }
 
-    #[allow(dead_code)]
     pub fn count(&self) -> usize {
         let cache = self.stones.lock().unwrap();
         cache.len()
@@ -131,8 +128,21 @@ impl Default for StoneCache {
     }
 }
 
+// Implement CachedStoneOps trait for StoneCache
+// This allows GLOBAL_CACHE to be used via the trait interface in dispatch/client
+impl CachedStoneOps for StoneCache {
+    fn get(&self, stone_name: &str) -> Option<CachedStoneInfo> {
+        StoneCache::get(self, stone_name).map(|cached| CachedStoneInfo {
+            endpoint: cached.endpoint,
+        })
+    }
+
+    fn insert(&self, endpoint: String, capabilities: HardwareCapabilities) {
+        StoneCache::insert(self, endpoint, capabilities);
+    }
+}
+
 /// Fetch stone capabilities from endpoint and cache them
-#[allow(dead_code)]
 pub async fn fetch_and_cache_stone(
     client: &reqwest::Client,
     endpoint: &str,

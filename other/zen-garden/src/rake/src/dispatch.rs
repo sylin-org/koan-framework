@@ -30,7 +30,7 @@ pub async fn dispatch(
 ) -> anyhow::Result<()> {
     // Resolve endpoint if command requires it
     let (endpoint, stone_name) = if cmd.requires_endpoint() {
-        let ep = resolve_endpoint_inner(client, at, cache).await?;
+        let ep = resolve_endpoint(client, at, cache).await?;
 
         // Show stone header if requested
         if cmd.show_stone_header() {
@@ -75,7 +75,10 @@ pub async fn dispatch_local(
 }
 
 /// Resolve endpoint with priority: --at > env var > cached tending > auto-discover
-async fn resolve_endpoint_inner(
+///
+/// This is the authoritative endpoint resolution logic used throughout rake.
+/// Includes reachability checking for cached tending and automatic fallback.
+pub async fn resolve_endpoint(
     client: &reqwest::Client,
     at: Option<String>,
     cache: Option<&dyn CachedStoneOps>,
@@ -95,19 +98,37 @@ async fn resolve_endpoint_inner(
         return Ok(endpoint);
     }
 
-    // Priority 3: Cached tending state (90s TTL)
+    // Priority 3: Cached tending state (no TTL - persists until stone unreachable)
     if let Ok(tending) = tending::read_tending() {
-        if tending.is_valid() {
+        tracing::debug!(
+            stone = %tending.stone_name,
+            endpoint = %tending.endpoint,
+            age_secs = tending.age_seconds(),
+            "Checking cached tending state"
+        );
+
+        // Check if stone is reachable before using cached endpoint
+        if is_stone_reachable(client, &tending.endpoint).await {
             tracing::info!(
                 stone = %tending.stone_name,
                 endpoint = %tending.endpoint,
-                age_secs = tending.age_seconds(),
                 "Using cached tending state"
             );
             return Ok(tending.endpoint);
         } else {
-            tracing::debug!("Tending state expired, clearing cache");
-            let _ = tending::clear_tending();
+            // Stone is offline - warn user and fall through to discovery
+            println!(
+                "{}{} Stone \"{}\" is sleeping (offline). Picking a new stone...",
+                " ".repeat(ui::constants::DEFAULT_INDENT),
+                ui::status_indicator("warn", term.supports_color),
+                tending.stone_name
+            );
+            tracing::warn!(
+                stone = %tending.stone_name,
+                endpoint = %tending.endpoint,
+                "Tended stone unreachable, falling back to discovery"
+            );
+            // Don't clear tending - user might want to return to this stone later
         }
     }
 
@@ -123,7 +144,7 @@ async fn resolve_endpoint_inner(
         Ok(endpoint) => {
             tracing::info!(endpoint = %endpoint, "Auto-discovered stone");
 
-            // Fetch capabilities to get stone name for cache
+            // Fetch capabilities to get stone name for cache and display
             let caps_url = format!("{}/capabilities", endpoint.trim_end_matches('/'));
             if let Ok(resp) = client
                 .get(&caps_url)
@@ -132,7 +153,16 @@ async fn resolve_endpoint_inner(
                 .await
             {
                 if let Ok(response) = resp.json::<GardenApiResponse<HardwareCapabilities>>().await {
-                    let _ = tending::write_tending(response.data.stone_name.clone(), endpoint.clone());
+                    let stone_name = &response.data.stone_name;
+                    let _ = tending::write_tending(stone_name.clone(), endpoint.clone());
+
+                    // Show which stone was picked
+                    println!(
+                        "{}{} Now tending to \"{}\"",
+                        " ".repeat(ui::constants::DEFAULT_INDENT),
+                        ui::status_indicator("success", term.supports_color),
+                        stone_name
+                    );
                 }
             }
 
@@ -151,6 +181,20 @@ async fn resolve_endpoint_inner(
               • Or use a stone name: garden-rake <command> --at <stone-name>\n\
               • Check stone status: ssh stone@<ip> systemctl status garden-moss.service"
         )),
+    }
+}
+
+/// Check if a stone is reachable (quick health check)
+async fn is_stone_reachable(client: &reqwest::Client, endpoint: &str) -> bool {
+    let health_url = format!("{}/health", endpoint.trim_end_matches('/'));
+    match client
+        .get(&health_url)
+        .timeout(Duration::from_secs(2))
+        .send()
+        .await
+    {
+        Ok(resp) => resp.status().is_success(),
+        Err(_) => false,
     }
 }
 

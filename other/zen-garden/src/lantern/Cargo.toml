@@ -18,7 +18,8 @@ reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "sqlite"] }
-tokio = { workspace = true }
+# Server needs multi-thread runtime and networking (extends workspace minimal)
+tokio = { version = "1.35", features = ["rt-multi-thread", "io-util", "net", "sync", "time", "macros"] }
 toml = "0.8"
 tower = "0.4"
 tower-http = { version = "0.5", features = ["trace"] }

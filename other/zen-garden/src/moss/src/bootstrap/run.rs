@@ -135,8 +135,15 @@ pub async fn run(config: DaemonConfig) -> anyhow::Result<()> {
         topology_cache: Arc::new(RwLock::new(std::collections::HashMap::new())),
     };
 
-    // Phase 11: Start background tasks
-    start_discovery_listener(stone_id.clone(), stone_name.clone(), api_endpoint.clone(), &console_printer).await;
+    // Phase 11: Start background tasks (including UDP chirp listener for topology updates)
+    start_discovery_listener(
+        stone_id.clone(),
+        stone_name.clone(),
+        api_endpoint.clone(),
+        state.topology_cache.clone(),
+        &console_printer,
+    )
+    .await;
     start_hardware_detection(stone_name.clone(), capabilities_arc.clone(), console_printer.clone(), state.clone());
     start_registry_loader(state.clone());
     start_catalog_builder(state.clone(), console_printer.clone());
@@ -179,16 +186,63 @@ pub async fn run(config: DaemonConfig) -> anyhow::Result<()> {
         });
     }
 
-    // Phase 12: Pre-install manifest handling
+    // Phase 12: Active peer discovery (send discovery request at startup)
+    tracing::info!("Discovering peer stones...");
+    let discovered_peers = crate::discovery::discover_peers(&stone_id, 3).await;
+    for peer in discovered_peers {
+        if let Some(peer_id) = peer.stone_id {
+            crate::domain::topology::upsert_stone(
+                &state.topology_cache,
+                peer_id,
+                peer.stone_name,
+                peer.stone_endpoint,
+                peer.moss_version,
+            ).await;
+        }
+    }
+
+    // Phase 13: Initial announcement (announce ourselves)
+    tracing::info!("Sending initial announcement...");
+    let payload = crate::announcement::build_payload(&state).await;
+    if let Err(e) = crate::announcement::announce(payload).await {
+        tracing::warn!(error = ?e, "Initial announcement failed");
+    }
+
+    // Phase 14: Start periodic announcer (30s background task)
+    crate::tasks::start_periodic_announcer(state.clone());
+
+    // Phase 15: Subscribe to service change events for immediate announcements
+    let state_for_events = state.clone();
+    let mut event_rx = state.event_tx.subscribe();
+    tokio::spawn(async move {
+        loop {
+            match event_rx.recv().await {
+                Ok(event) if event.message.contains("service") || event.message.contains("offering") => {
+                    tracing::debug!(message = %event.message, "Service-related event detected, announcing");
+                    let payload = crate::announcement::build_payload(&state_for_events).await;
+                    if let Err(e) = crate::announcement::announce(payload).await {
+                        tracing::warn!(error = ?e, "Event-driven announcement failed");
+                    }
+                }
+                Ok(_) => {},
+                Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                    tracing::warn!(missed = n, "Event subscription lagged");
+                }
+                Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
+            }
+        }
+    });
+
+    // Phase 16: Pre-install manifest handling
     start_preinstall_handler(&state).await;
 
-    // Phase 13: Health monitoring and auto-adoption
+    // Phase 17: Health monitoring and auto-adoption
     start_health_monitor(state.clone());
     if let Some(cfg) = config.file_config.clone() {
         start_auto_adoption(state.clone(), cfg, &console_printer);
     }
 
-    // Phase 14: HTTP server
+    // Phase 18: HTTP server
     tracing::info!("Setting up HTTP router with 200 MB body limit");
     let app = router::configure(state.clone());
     let listener = bind_server(port, &console_printer).await?;

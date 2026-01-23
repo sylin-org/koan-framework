@@ -59,11 +59,9 @@ pub async fn fetch_remote_service_count(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    
     // Note: get_local_service_count requires AppState, so we test it via integration tests
     // fetch_remote_service_count requires a live HTTP server, so we test it manually
-    
+
     #[test]
     fn test_service_counting_compiles() {
         // This test just ensures the module compiles correctly

@@ -1,4 +1,4 @@
-//! Find strays command - list adoptable containers
+//! Locate strays command - list adoptable containers
 //!
 //! Lists containers that are not managed by Zen Garden (strays).
 
@@ -9,19 +9,19 @@ use crate::suggestions;
 use crate::ui;
 use async_trait::async_trait;
 
-/// Find stray (adoptable) containers
-pub struct FindStraysCommand {
+/// Locate stray (adoptable) containers
+pub struct LocateStraysCommand {
     pub quiet_mode: bool,
 }
 
-impl FindStraysCommand {
+impl LocateStraysCommand {
     pub fn new(quiet_mode: bool) -> Self {
         Self { quiet_mode }
     }
 }
 
 #[async_trait]
-impl Command for FindStraysCommand {
+impl Command for LocateStraysCommand {
     async fn execute(&self, ctx: &CommandContext) -> CommandResult {
         let url = ctx.api_v1_url("offerings/adoptable")?;
         let response = ctx.client.get(&url).send().await?;
@@ -81,12 +81,12 @@ impl Command for FindStraysCommand {
         }
 
         // Self-teaching suggestions
-        suggestions::print_suggestions(cmd::FIND, self.quiet_mode);
+        suggestions::print_suggestions(cmd::LOCATE, self.quiet_mode);
 
         Ok(())
     }
 
     fn name(&self) -> &'static str {
-        cmd::FIND
+        cmd::LOCATE
     }
 }

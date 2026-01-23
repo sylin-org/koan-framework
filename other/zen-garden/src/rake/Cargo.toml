@@ -6,7 +6,8 @@ rust-version = "1.75"
 
 [dependencies]
 garden-common = { path = "../common" }
-tokio = { version = "1.35", features = ["full"] }
+# Reduced from "full" - CLI only needs: basic runtime, process spawning
+tokio = { version = "1.35", features = ["rt", "io-util", "sync", "time", "process", "macros"] }
 clap = { version = "4.4", features = ["derive"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
@@ -25,6 +26,7 @@ reqwest = { version = "0.11", default-features = false, features = ["json", "rus
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 uuid = { version = "1.6", features = ["v7"] }
+urlencoding = "2.1"
 colored = "2.1"
 terminal_size = "0.3"
 supports-color = "3.0"

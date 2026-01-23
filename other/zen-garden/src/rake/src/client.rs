@@ -51,28 +51,25 @@ pub async fn resolve_target_endpoint(client: &reqwest::Client, target: &str, cac
 
 async fn resolve_stone_name_to_endpoint(client: &reqwest::Client, stone_name: &str, cache: Option<&dyn CachedStoneOps>) -> anyhow::Result<String> {
 	use garden_common::{GardenApiResponse, HardwareCapabilities};
-	
-	// Normalize the requested name (remove .local suffix if present)
-	let requested_name = stone_name.trim_end_matches(".local");
-	
-	// 1) Check cache first (90s TTL)
+
+	// Normalize the requested identifier (remove .local suffix if present)
+	// This could be a stone_name OR a stone_id
+	let requested = stone_name.trim_end_matches(".local");
+	let requested_lower = requested.to_lowercase();
+
+	// 1) Check cache first - try both name and id (case-insensitive)
 	if let Some(cache) = cache {
-		if let Some(cached) = cache.get(requested_name) {
-			// Verify it's still reachable
+		// Try exact match first, then lowercase
+		if let Some(cached) = cache.get(requested).or_else(|| cache.get(&requested_lower)) {
 			if probe_moss_health(client, &cached.endpoint).await {
 				return Ok(cached.endpoint);
 			}
-			// If not reachable, continue to other methods
-			tracing::debug!(stone = %requested_name, "Cached endpoint unreachable, trying other methods");
+			tracing::debug!(stone = %requested, "Cached endpoint unreachable, trying other methods");
 		}
 	}
-	
-	// 2) Try mDNS-style hostname: stone-01.local:7185
-	let mdns_host = if stone_name.ends_with(".local") {
-		stone_name.to_string()
-	} else {
-		format!("{}.local", stone_name)
-	};
+
+	// 2) Try mDNS-style hostname: stone-01.local:7185 (use lowercase for mDNS)
+	let mdns_host = format!("{}.local", requested_lower);
 	let mdns_endpoint = format!(
 		"http://{}:{}",
 		mdns_host,
@@ -82,7 +79,7 @@ async fn resolve_stone_name_to_endpoint(client: &reqwest::Client, stone_name: &s
 		return Ok(mdns_endpoint);
 	}
 
-	// 3) UDP Discovery - find stone by name on the network
+	// 3) UDP Discovery - find stone by name OR id on the network (case-insensitive)
 	let mut discovered_responses = Vec::new();
 	let _stone_count = crate::discovery::discover_all_moss_stream(
 		Duration::from_secs(3),
@@ -90,27 +87,36 @@ async fn resolve_stone_name_to_endpoint(client: &reqwest::Client, stone_name: &s
 			discovered_responses.push(response);
 		},
 	);
-	
-	// Check each discovered stone's name and cache it
+
+	// Check each discovered stone's name AND id (case-insensitive)
 	for response in discovered_responses {
 		let endpoint = response.stone_endpoint.trim_end_matches('/').to_string();
 		let caps_url = format!("{}/capabilities", endpoint);
 		if let Ok(resp) = client.get(&caps_url).timeout(Duration::from_secs(2)).send().await {
 			if let Ok(api_response) = resp.json::<GardenApiResponse<HardwareCapabilities>>().await {
-				let stone_name_from_api = &api_response.data.stone_name;
-				// Cache this stone for future lookups (keyed by stone_id when available)
+				let caps = &api_response.data;
+
+				// Cache this stone for future lookups
 				if let Some(cache) = cache {
-					cache.insert(endpoint.clone(), api_response.data.clone());
+					cache.insert(endpoint.clone(), caps.clone());
 				}
 
-				if stone_name_from_api == requested_name {
+				// Match by name (case-insensitive)
+				if caps.stone_name.eq_ignore_ascii_case(requested) {
 					return Ok(endpoint);
+				}
+
+				// Match by stone_id (case-insensitive)
+				if let Some(ref stone_id) = caps.stone_id {
+					if stone_id.eq_ignore_ascii_case(requested) {
+						return Ok(endpoint);
+					}
 				}
 			}
 		}
 	}
 
-	// 4) Lantern fallback (cross-subnet / Windows-friendly).
+	// 4) Lantern fallback (cross-subnet / Windows-friendly)
 	crate::discovery::discover_lantern_background();
 	if let Some(lantern) = crate::discovery::get_cached_lantern() {
 		let url = format!("{}/api/v1/stones", lantern.trim_end_matches('/'));
@@ -122,7 +128,11 @@ async fn resolve_stone_name_to_endpoint(client: &reqwest::Client, stone_name: &s
 		{
 			Ok(resp) if resp.status().is_success() => {
 				if let Ok(topology) = resp.json::<LanternTopology>().await {
-					if let Some(stone) = topology.stones.iter().find(|s| s.name == requested_name) {
+					// Match by name or stone_id (case-insensitive)
+					if let Some(stone) = topology.stones.iter().find(|s| {
+						s.name.eq_ignore_ascii_case(requested) ||
+						s.stone_id.as_ref().map(|id| id.eq_ignore_ascii_case(requested)).unwrap_or(false)
+					}) {
 						return Ok(stone.endpoint.trim_end_matches('/').to_string());
 					}
 				}
@@ -137,7 +147,7 @@ async fn resolve_stone_name_to_endpoint(client: &reqwest::Client, stone_name: &s
 	}
 
 	Err(anyhow::anyhow!(
-		"Could not resolve stone name '{}' to a moss endpoint.\n\n\
+		"Could not resolve '{}' to a moss endpoint.\n\n\
 		Try one of:\n\
 		  • garden-rake tend auto (auto-discover)\n\
 		  • garden-rake observe (to see discovered endpoints)\n\
