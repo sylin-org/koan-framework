@@ -21,8 +21,13 @@ impl Registry {
         Ok(Self { db_path, topology })
     }
 
+    /// Register a stone with Lantern
+    ///
+    /// Uses stone_id as the cache key when available, falling back to stone_name.
+    /// This ensures stable topology caching even when hostname changes.
     pub async fn register_stone(
         &self,
+        stone_id: Option<&str>,
         stone_name: &str,
         endpoint: &str,
         services: Vec<garden_common::RegisterServiceInfo>,
@@ -31,16 +36,30 @@ impl Registry {
         use crate::state::{InternalStoneState, InternalServiceState, StoneStatus};
 
         let mut topology = self.topology.write().await;
-        
-        let now = Utc::now();
-        let stone_exists = topology.stones.contains_key(stone_name);
 
-        if let Some(stone) = topology.stones.get_mut(stone_name) {
+        let now = Utc::now();
+
+        // Use stone_id as cache key when available, otherwise fall back to stone_name
+        let cache_key = stone_id.unwrap_or(stone_name).to_string();
+        let stone_exists = topology.stones.contains_key(&cache_key);
+
+        if let Some(stone) = topology.stones.get_mut(&cache_key) {
             // Update existing stone
             stone.last_seen = now;
             stone.status = StoneStatus::Online;
             stone.offline_since = None;
             stone.endpoint = endpoint.to_string();
+
+            // Update stone_name if it changed (hostname was updated)
+            if stone.name != stone_name {
+                tracing::info!(
+                    stone_id = ?stone_id,
+                    old_name = %stone.name,
+                    new_name = %stone_name,
+                    "Stone hostname changed"
+                );
+                stone.name = stone_name.to_string();
+            }
 
             // Update services
             stone.services.clear();
@@ -71,8 +90,9 @@ impl Registry {
             }
 
             topology.stones.insert(
-                stone_name.to_string(),
+                cache_key.clone(),
                 InternalStoneState {
+                    stone_id: stone_id.map(|s| s.to_string()),
                     name: stone_name.to_string(),
                     endpoint: endpoint.to_string(),
                     status: StoneStatus::Online,
@@ -87,7 +107,9 @@ impl Registry {
         topology.last_updated = now;
 
         tracing::info!(
+            stone_id = ?stone_id,
             stone_name = %stone_name,
+            cache_key = %cache_key,
             endpoint = %endpoint,
             is_new = !stone_exists,
             "Stone registered"

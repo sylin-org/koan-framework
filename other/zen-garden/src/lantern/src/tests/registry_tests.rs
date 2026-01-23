@@ -18,18 +18,20 @@ async fn test_register_new_stone() {
         connection_string: "mongodb://localhost:27017".to_string(),
     }];
 
-    // Register a new stone
+    // Register a new stone with stone_id
+    let stone_id = "01234567-89ab-cdef-0123-456789abcdef";
     registry
-        .register_stone("test-stone", "http://192.168.1.100:7185", services)
+        .register_stone(Some(stone_id), "test-stone", "http://192.168.1.100:7185", services)
         .await
         .expect("Registration failed");
 
-    // Verify stone was added
+    // Verify stone was added (keyed by stone_id)
     let topo = topology.read().await;
     assert_eq!(topo.stones.len(), 1);
-    assert!(topo.stones.contains_key("test-stone"));
+    assert!(topo.stones.contains_key(stone_id));
 
-    let stone = topo.stones.get("test-stone").unwrap();
+    let stone = topo.stones.get(stone_id).unwrap();
+    assert_eq!(stone.stone_id, Some(stone_id.to_string()));
     assert_eq!(stone.name, "test-stone");
     assert_eq!(stone.endpoint, "http://192.168.1.100:7185");
     assert_eq!(stone.services.len(), 1);
@@ -43,9 +45,12 @@ async fn test_register_update_existing_stone() {
         .await
         .expect("Failed to create registry");
 
+    let stone_id = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
+
     // Initial registration
     registry
         .register_stone(
+            Some(stone_id),
             "test-stone",
             "http://192.168.1.100:7185",
             vec![RegisterServiceInfo {
@@ -60,7 +65,7 @@ async fn test_register_update_existing_stone() {
 
     let first_seen = {
         let topo = topology.read().await;
-        topo.stones.get("test-stone").unwrap().first_seen
+        topo.stones.get(stone_id).unwrap().first_seen
     };
 
     tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
@@ -68,6 +73,7 @@ async fn test_register_update_existing_stone() {
     // Update registration with new service
     registry
         .register_stone(
+            Some(stone_id),
             "test-stone",
             "http://192.168.1.100:7185",
             vec![
@@ -92,7 +98,7 @@ async fn test_register_update_existing_stone() {
     let topo = topology.read().await;
     assert_eq!(topo.stones.len(), 1);
 
-    let stone = topo.stones.get("test-stone").unwrap();
+    let stone = topo.stones.get(stone_id).unwrap();
     assert_eq!(stone.services.len(), 2);
     assert!(stone.services.contains_key("mongodb"));
     assert!(stone.services.contains_key("redis"));
@@ -111,9 +117,10 @@ async fn test_resolve_service_found() {
         .await
         .expect("Failed to create registry");
 
-    // Register stone with mongodb
+    // Register stone with mongodb (using None for stone_id to test fallback)
     registry
         .register_stone(
+            None,
             "test-stone",
             "http://192.168.1.100:7185",
             vec![RegisterServiceInfo {
@@ -153,6 +160,7 @@ async fn test_resolve_service_not_found() {
     // Register stone without postgres
     registry
         .register_stone(
+            None,
             "test-stone",
             "http://192.168.1.100:7185",
             vec![RegisterServiceInfo {
@@ -184,6 +192,7 @@ async fn test_resolve_service_prefers_online_stones() {
     // Register online stone
     registry
         .register_stone(
+            None,
             "stone-online",
             "http://192.168.1.100:7185",
             vec![RegisterServiceInfo {
@@ -198,13 +207,13 @@ async fn test_resolve_service_prefers_online_stones() {
 
     // Manually mark a stone offline
     {
-        
         use crate::state::InternalServiceState;
 
         let mut topo = topology.write().await;
         topo.stones.insert(
             "stone-offline".to_string(),
             InternalStoneState {
+                stone_id: None,
                 name: "stone-offline".to_string(),
                 endpoint: "http://192.168.1.101:7185".to_string(),
                 status: StoneStatus::Offline,
@@ -255,6 +264,7 @@ async fn test_ttl_cleanup() {
         topo.stones.insert(
             "old-stone".to_string(),
             InternalStoneState {
+                stone_id: None,
                 name: "old-stone".to_string(),
                 endpoint: "http://192.168.1.200:7185".to_string(),
                 status: StoneStatus::Online,
@@ -299,10 +309,11 @@ async fn test_multiple_stones_with_same_service() {
         .await
         .expect("Failed to create registry");
 
-    // Register multiple stones with mongodb
+    // Register multiple stones with mongodb (no stone_id to use name as key)
     for i in 1..=3 {
         registry
             .register_stone(
+                None,
                 &format!("stone-{}", i),
                 &format!("http://192.168.1.{}:7185", 100 + i),
                 vec![RegisterServiceInfo {

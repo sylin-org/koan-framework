@@ -37,6 +37,7 @@ impl GardenTopology {
     pub fn to_json(&self) -> LanternTopology {
         let stones: Vec<LanternStoneState> = self.stones.values().map(|s| {
             LanternStoneState {
+                stone_id: s.stone_id.clone(),
                 name: s.name.clone(),
                 endpoint: s.endpoint.clone(),
                 status: if s.status == StoneStatus::Online { "online" } else { "offline" }.to_string(),
@@ -60,6 +61,8 @@ impl GardenTopology {
 }
 
 pub struct InternalStoneState {
+    /// Unique stone identifier (GUID v7) - stable across hostname changes
+    pub stone_id: Option<String>,
     pub name: String,
     pub endpoint: String,
     pub status: StoneStatus,

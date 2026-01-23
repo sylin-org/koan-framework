@@ -24,6 +24,7 @@ async fn test_peer_stone_filtering() {
         topo.stones.insert(
             "stone-1".to_string(),
             InternalStoneState {
+                stone_id: Some("11111111-1111-1111-1111-111111111111".to_string()),
                 name: "stone-1".to_string(),
                 endpoint: "http://192.168.1.100:7185".to_string(),
                 status: StoneStatus::Online,
@@ -48,6 +49,7 @@ async fn test_peer_stone_filtering() {
         topo.stones.insert(
             "stone-2".to_string(),
             InternalStoneState {
+                stone_id: Some("22222222-2222-2222-2222-222222222222".to_string()),
                 name: "stone-2".to_string(),
                 endpoint: "http://192.168.1.101:7185".to_string(),
                 status: StoneStatus::Online,
@@ -72,6 +74,7 @@ async fn test_peer_stone_filtering() {
         topo.stones.insert(
             "stone-3".to_string(),
             InternalStoneState {
+                stone_id: Some("33333333-3333-3333-3333-333333333333".to_string()),
                 name: "stone-3".to_string(),
                 endpoint: "http://192.168.1.102:7185".to_string(),
                 status: StoneStatus::Online,
@@ -131,6 +134,7 @@ async fn test_peer_discovery_excludes_offline_stones() {
         topo.stones.insert(
             "stone-online".to_string(),
             InternalStoneState {
+                stone_id: Some("aaaa1111-aaaa-1111-aaaa-111111111111".to_string()),
                 name: "stone-online".to_string(),
                 endpoint: "http://192.168.1.100:7185".to_string(),
                 status: StoneStatus::Online,
@@ -155,6 +159,7 @@ async fn test_peer_discovery_excludes_offline_stones() {
         topo.stones.insert(
             "stone-offline".to_string(),
             InternalStoneState {
+                stone_id: Some("bbbb2222-bbbb-2222-bbbb-222222222222".to_string()),
                 name: "stone-offline".to_string(),
                 endpoint: "http://192.168.1.101:7185".to_string(),
                 status: StoneStatus::Offline,

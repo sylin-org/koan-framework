@@ -65,7 +65,12 @@ async fn register_handler(
     axum::Json(req): axum::Json<garden_common::RegisterRequest>,
 ) -> Result<axum::Json<serde_json::Value>, (StatusCode, axum::Json<serde_json::Value>)> {
     state
-        .register_stone(&req.stone_name, &req.endpoint, req.services)
+        .register_stone(
+            req.stone_id.as_deref(),
+            &req.stone_name,
+            &req.endpoint,
+            req.services,
+        )
         .await
         .map_err(|e| {
             (

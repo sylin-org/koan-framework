@@ -183,7 +183,12 @@ mod handlers {
     ) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
         state
             .registry
-            .register_stone(&req.stone_name, &req.endpoint, req.services)
+            .register_stone(
+                req.stone_id.as_deref(),
+                &req.stone_name,
+                &req.endpoint,
+                req.services,
+            )
             .await
             .map_err(|e| {
                 (
