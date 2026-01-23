@@ -125,12 +125,14 @@ pub fn calculate_distribution_penalty(service_count: usize) -> i32 {
 /// # Examples
 /// ```ignore
 /// assert_eq!(calculate_compatibility_penalty(&CompatibilityDecision::Pass), 0);
+/// // Warning returns -50 (proceed with caution)
 /// // Fallback returns -15
 /// // Fail returns -999
 /// ```
 pub fn calculate_compatibility_penalty(decision: &crate::domain::compatibility::CompatibilityDecision) -> i32 {
     match decision {
         crate::domain::compatibility::CompatibilityDecision::Pass => 0,
+        crate::domain::compatibility::CompatibilityDecision::Warning { .. } => -50, // Significant penalty but still viable
         crate::domain::compatibility::CompatibilityDecision::Fallback { .. } => -15,
         crate::domain::compatibility::CompatibilityDecision::Fail { .. } => -999,
     }

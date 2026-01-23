@@ -1,8 +1,10 @@
 ﻿{
   "name": "ollama",
-  "description": "Ollama local AI models",
+  "description": "Ollama local LLM runtime (MIT licensed)",
   "category": "ai",
-  "tags": ["ai", "llm", "inference", "models"],
+  "tags": ["ai", "llm", "inference", "models", "gpu", "cuda", "local-ai"],
   "port": 11434,
-  "volumes": ["ollama-data"]
+  "volumes": ["ollama-data"],
+  "gpu_recommended": true,
+  "minimum_memory_gb": 4
 }

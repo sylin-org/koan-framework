@@ -1,0 +1,17 @@
+container_name: authelia
+image: authelia/authelia:4.38
+ports:
+  - "9091:9091"
+environment:
+  TZ: "UTC"
+volumes:
+  - authelia-config:/config
+healthcheck:
+  test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9091/api/health"]
+  interval: 30s
+  timeout: 10s
+  retries: 3
+  start_period: 15s
+restart: unless-stopped
+networks:
+  - zen-garden

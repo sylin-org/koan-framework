@@ -1,0 +1,8 @@
+{
+  "name": "minio",
+  "description": "S3-compatible object storage (Apache 2.0)",
+  "category": "storage",
+  "tags": ["s3", "object-storage", "backup", "artifacts", "blob"],
+  "ports": [9000, 9001],
+  "volumes": ["minio-data"]
+}

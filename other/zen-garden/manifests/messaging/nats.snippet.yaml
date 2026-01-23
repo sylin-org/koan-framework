@@ -1,0 +1,17 @@
+container_name: nats
+image: nats:2.10-alpine
+ports:
+  - "4222:4222"
+  - "8222:8222"
+command: ["-js", "-m", "8222"]
+volumes:
+  - nats-data:/data
+healthcheck:
+  test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8222/healthz"]
+  interval: 10s
+  timeout: 5s
+  retries: 5
+  start_period: 10s
+restart: unless-stopped
+networks:
+  - zen-garden

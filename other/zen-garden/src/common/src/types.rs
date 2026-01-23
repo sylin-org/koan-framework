@@ -579,6 +579,11 @@ pub struct CompatibilityRule {
     pub reason: String,
     pub suggestion: Option<String>,
     pub fallback: Option<FallbackConfig>,
+    /// If true, this rule produces a warning instead of failing installation.
+    /// Use for "proceed with caution" scenarios where the offering may work
+    /// but has known issues on certain hardware.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub warn_only: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

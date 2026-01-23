@@ -1,0 +1,46 @@
+# Grafana Compatibility Rules
+# AGPL v3 licensed visualization platform
+# Good multi-arch support: amd64, arm64, armv7
+# No AVX/SSE requirements
+version: "1"
+
+compatibility_rules:
+  - name: "arm32v6-not-supported"
+    condition:
+      architectures: ["armv6l"]
+    reason: "Grafana does not provide ARM32v6 Docker images"
+    suggestion: "Use armv7 or arm64 hardware (Pi 2 or newer)"
+
+  - name: "insufficient-memory"
+    condition:
+      memory_mb_less_than: 256
+    reason: "Grafana requires at least 256MB RAM for stable operation"
+    suggestion: "Increase stone memory"
+
+  - name: "low-memory-warning"
+    condition:
+      memory_mb_less_than: 512
+    reason: "Grafana with multiple dashboards benefits from 512MB+ RAM"
+    suggestion: "Consider increasing RAM for heavy dashboard usage"
+    warn_only: true
+
+post_install_healthcheck:
+  enabled: true
+  scan_log_lines: 150
+  timeout_seconds: 45
+  patterns:
+    - pattern: "Cannot allocate memory|OOM"
+      reason: "Insufficient memory for Grafana"
+      suggestion: "Increase stone RAM"
+
+    - pattern: "database is locked|sqlite.*error"
+      reason: "SQLite database lock or corruption"
+      suggestion: "Check data volume permissions and disk space"
+
+    - pattern: "failed to initialize.*plugin"
+      reason: "Plugin initialization failed"
+      suggestion: "Check plugin compatibility and dependencies"
+
+    - pattern: "bind:.*address already in use"
+      reason: "Port 3000 already in use"
+      suggestion: "Stop conflicting service or change Grafana port"

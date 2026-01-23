@@ -1,8 +1,36 @@
-﻿# Redis Stack Compatibility Rules
+# Redis Stack Compatibility Rules
+# Note: redis/redis-stack:latest does NOT have multi-arch support
+# ARM64 devices require architecture-specific tags
 
 version: "1"
 
 compatibility_rules:
+  # ARM64 architecture - Redis Stack requires specific tags
+  # The :latest tag only supports amd64, causing silent failures on ARM
+  - name: "arm64-redis-stack"
+    condition:
+      architectures: ["aarch64"]
+    reason: "redis/redis-stack:latest only supports amd64; ARM64 requires specific tag"
+    fallback:
+      image: "redis/redis-stack-server:7.4.0-v0-arm64"
+
+  # ARMv7 (32-bit ARM) - Redis Stack has no ARM32 builds, use standard Redis
+  - name: "arm32-no-stack"
+    condition:
+      architectures: ["armv7l"]
+    reason: "Redis Stack has no ARM32 builds; falling back to standard Redis"
+    fallback:
+      image: "redis:7-alpine"
+
+  # ARMv6 (Pi Zero/1) - Use lightweight Redis
+  - name: "arm32v6-lightweight"
+    condition:
+      architectures: ["armv6l"]
+    reason: "Redis Stack unavailable on ARMv6; using standard Redis"
+    fallback:
+      image: "redis:7-alpine"
+
+  # Memory constraint
   - name: "insufficient-memory"
     condition:
       memory_mb_less_than: 256

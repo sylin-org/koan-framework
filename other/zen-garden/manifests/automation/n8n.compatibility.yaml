@@ -1,0 +1,58 @@
+# n8n Compatibility Rules
+# Sustainable Use License (source-available, self-host friendly)
+# Multi-arch support: amd64, arm64
+# ARM32 not officially supported
+# No AVX/SSE requirements (Node.js)
+version: "1"
+
+compatibility_rules:
+  - name: "arm32-not-supported"
+    condition:
+      architectures: ["armv7l", "armv6l"]
+    reason: "n8n does not officially support ARM32 architectures"
+    suggestion: "Use ARM64 device (Pi 4+, Pi Zero 2 W) or x86_64"
+
+  - name: "insufficient-memory"
+    condition:
+      memory_mb_less_than: 512
+    reason: "n8n requires at least 512MB RAM for basic operation"
+    suggestion: "Increase stone memory allocation"
+
+  - name: "low-memory-warning"
+    condition:
+      memory_mb_less_than: 1024
+    reason: "n8n recommends 1GB+ RAM to avoid memory errors during workflow execution"
+    suggestion: "Consider increasing RAM for reliable workflow execution"
+    warn_only: true
+
+  - name: "recommended-memory"
+    condition:
+      memory_mb_less_than: 2048
+    reason: "n8n performs best with 2GB+ RAM for complex workflows"
+    suggestion: "For production use with complex workflows, consider 2GB+ RAM"
+    warn_only: true
+
+post_install_healthcheck:
+  enabled: true
+  scan_log_lines: 150
+  timeout_seconds: 60
+  patterns:
+    - pattern: "Cannot allocate memory|OOM|heap out of memory|FATAL ERROR.*JavaScript heap"
+      reason: "Insufficient memory for n8n"
+      suggestion: "Increase RAM allocation or reduce workflow complexity"
+
+    - pattern: "address already in use"
+      reason: "Port 5678 already in use"
+      suggestion: "Stop conflicting service or change n8n port"
+
+    - pattern: "SQLITE_BUSY|database is locked"
+      reason: "SQLite database lock error"
+      suggestion: "Consider using PostgreSQL for concurrent workflow execution"
+
+    - pattern: "ECONNREFUSED|connection refused"
+      reason: "External service connection failed"
+      suggestion: "Check network connectivity and service availability"
+
+    - pattern: "Execution.*timed out|timeout.*exceeded"
+      reason: "Workflow execution timeout"
+      suggestion: "Increase timeout settings or optimize workflow"

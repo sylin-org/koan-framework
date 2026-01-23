@@ -1,0 +1,44 @@
+# MariaDB Compatibility Rules
+# GPL licensed MySQL-compatible database
+# Excellent multi-arch support: amd64, arm64, arm32v7, i386, ppc64le, s390x
+# No AVX/SSE requirements
+version: "1"
+
+compatibility_rules:
+  - name: "insufficient-memory"
+    condition:
+      memory_mb_less_than: 512
+    reason: "MariaDB requires at least 512MB RAM for stable operation"
+    suggestion: "Increase stone memory or use SQLite for minimal deployments"
+
+  - name: "low-memory-warning"
+    condition:
+      memory_mb_less_than: 1024
+    reason: "MariaDB performs best with 1GB+ RAM for InnoDB buffer pool"
+    suggestion: "Consider increasing RAM for production workloads"
+    warn_only: true
+
+post_install_healthcheck:
+  enabled: true
+  scan_log_lines: 200
+  timeout_seconds: 60
+  patterns:
+    - pattern: "Cannot allocate memory|OOM"
+      reason: "Insufficient memory for MariaDB"
+      suggestion: "Increase RAM or reduce innodb_buffer_pool_size"
+
+    - pattern: "Can't connect to local MySQL server|socket"
+      reason: "MariaDB socket not ready or misconfigured"
+      suggestion: "Wait for startup to complete or check socket path"
+
+    - pattern: "Access denied for user"
+      reason: "Authentication failed"
+      suggestion: "Check MARIADB_ROOT_PASSWORD environment variable"
+
+    - pattern: "InnoDB:.*Unable to lock"
+      reason: "Data directory lock issue"
+      suggestion: "Check that only one instance is using the data volume"
+
+    - pattern: "Table.*is marked as crashed"
+      reason: "Table corruption detected"
+      suggestion: "Run REPAIR TABLE or restore from backup"

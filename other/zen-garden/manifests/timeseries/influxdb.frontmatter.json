@@ -1,0 +1,8 @@
+{
+  "name": "influxdb",
+  "description": "Time series database for metrics and IoT (MIT)",
+  "category": "timeseries",
+  "tags": ["timeseries", "metrics", "iot", "monitoring", "database"],
+  "ports": [8086],
+  "volumes": ["influxdb-data", "influxdb-config"]
+}

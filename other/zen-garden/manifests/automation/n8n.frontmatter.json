@@ -1,0 +1,8 @@
+{
+  "name": "n8n",
+  "description": "Workflow automation platform with 400+ integrations (Sustainable Use License)",
+  "category": "automation",
+  "tags": ["workflow", "automation", "integration", "zapier-alternative", "low-code"],
+  "ports": [5678],
+  "volumes": ["n8n-data"]
+}

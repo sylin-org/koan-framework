@@ -1,18 +1,33 @@
 ﻿# OpenSearch Compatibility Rules
-
+# Apache 2.0 licensed (Linux Foundation governance since Sept 2024)
+# Supported architectures: amd64, arm64 (NO arm32)
+# Requires host sysctl: vm.max_map_count=262144
 version: "1"
 
 compatibility_rules:
+  - name: "arm32-not-supported"
+    condition:
+      architectures: ["armv7l", "armv6l"]
+    reason: "OpenSearch does not provide ARM32 Docker images"
+    suggestion: "Use PostgreSQL with full-text search on ARM32 devices"
+
   - name: "insufficient-memory"
     condition:
       memory_mb_less_than: 2048
-    reason: "OpenSearch typically needs >= 2GB RAM on the host for reliable operation"
-    suggestion: "Increase stone memory or choose a lighter offering"
+    reason: "OpenSearch JVM requires at least 2GB RAM for stable operation"
+    suggestion: "Increase stone memory or use PostgreSQL with full-text search"
+
+  - name: "low-memory-warning"
+    condition:
+      memory_mb_less_than: 4096
+    reason: "OpenSearch performs best with 4GB+ RAM (2GB heap + filesystem cache)"
+    suggestion: "Consider increasing RAM for production workloads"
+    warn_only: true
 
 post_install_healthcheck:
   enabled: true
   scan_log_lines: 250
-  timeout_seconds: 45
+  timeout_seconds: 90
   patterns:
     - pattern: "max virtual memory areas vm\\.max_map_count \\[\\d+\\] is too low"
       reason: "Host kernel setting vm.max_map_count is too low"
@@ -21,3 +36,19 @@ post_install_healthcheck:
     - pattern: "OutOfMemoryError|Cannot allocate memory|OOM"
       reason: "Insufficient memory for OpenSearch"
       suggestion: "Increase stone RAM and/or reduce JVM heap (OPENSEARCH_JAVA_OPTS), then retry"
+
+    - pattern: "max file descriptors \\[\\d+\\] for opensearch process is too low"
+      reason: "File descriptor limit too low"
+      suggestion: "Increase ulimit -n to at least 65536"
+
+    - pattern: "memory locking requested for opensearch process but memory is not locked"
+      reason: "Memory lock failed"
+      suggestion: "Set memlock ulimit to unlimited or disable bootstrap.memory_lock"
+
+    - pattern: "master not discovered yet|no master"
+      reason: "Single-node cluster not configured correctly"
+      suggestion: "Ensure discovery.type=single-node is set"
+
+    - pattern: "OpenSearchSecurityException|security plugin"
+      reason: "Security plugin configuration issue"
+      suggestion: "Set DISABLE_SECURITY_PLUGIN=true for development or configure security properly"

@@ -1,35 +1,71 @@
 ﻿# Ollama Compatibility Rules
-
+# MIT licensed local LLM runtime
+# Supported architectures: amd64, arm64 (NO arm32)
+# GPU optional but recommended: CUDA (NVIDIA), ROCm (AMD), Metal (Apple)
 version: "1"
 
 compatibility_rules:
-  - name: "no-ai-runtime"
+  - name: "arm32-not-supported"
     condition:
-      requires_ai_any: ['cuda', 'rocm', 'directml', 'openvino']
-    reason: "Ollama requires GPU acceleration for optimal performance"
-    suggestion: "This stone has no AI-capable GPU (CUDA/ROCm/DirectML/OpenVINO). Ollama will run in CPU-only mode with significantly degraded performance. Consider installing on a stone with GPU support."
+      architectures: ["armv7l", "armv6l"]
+    reason: "Ollama does not provide ARM32 Docker images"
+    suggestion: "Use amd64 or arm64 hardware for Ollama"
 
-  - name: "insufficient-vram"
+  - name: "no-gpu-warning"
     condition:
-      vram_mb_at_least: 4096
-    reason: "Most Ollama models require at least 4GB VRAM for GPU acceleration"
-    suggestion: "Available VRAM is below 4GB. Larger models may fall back to CPU or fail to load. Consider using smaller quantized models or upgrading GPU."
+      requires_ai_any: ['cuda', 'rocm', 'metal']
+    reason: "Ollama performs best with GPU acceleration"
+    suggestion: "No GPU detected. Ollama will run in CPU-only mode with degraded performance. Small models (tinyllama, phi) work on CPU."
+    warn_only: true
+
+  - name: "low-vram-warning"
+    condition:
+      vram_mb_less_than: 4096
+    reason: "Most useful LLM models require 4GB+ VRAM"
+    suggestion: "Limited VRAM. Use small quantized models (Q4) or CPU mode. Consider tinyllama, phi-2, or gemma:2b."
+    warn_only: true
 
   - name: "insufficient-memory"
     condition:
       memory_mb_less_than: 4096
-    reason: "Ollama runs large models; <4GB RAM is likely insufficient for most use"
-    suggestion: "Increase stone memory or use smaller models / a remote inference service"
+    reason: "Ollama with most models requires at least 4GB RAM"
+    suggestion: "Increase stone memory or use tiny models (tinyllama ~2GB)"
+
+  - name: "marginal-memory-warning"
+    condition:
+      memory_mb_less_than: 8192
+    reason: "8GB+ RAM recommended for running 7B parameter models"
+    suggestion: "Consider using smaller models or increasing RAM for better performance"
+    warn_only: true
+
+  - name: "celeron-avx-warning"
+    condition:
+      processor_patterns: ["J4105", "J3455", "J3160", "J4005", "N4100", "N5000"]
+    reason: "Celeron J/N-series CPUs lack AVX; Ollama performance will be significantly degraded"
+    suggestion: "CPU-only inference will be slow. Consider a GPU-equipped stone or remote inference."
+    warn_only: true
 
 post_install_healthcheck:
   enabled: true
   scan_log_lines: 250
-  timeout_seconds: 45
+  timeout_seconds: 60
   patterns:
-    - pattern: "Illegal instruction"
-      reason: "CPU instruction set incompatibility"
-      suggestion: "Use newer CPU hardware or a different runtime/build"
+    - pattern: "Illegal instruction|SIGILL"
+      reason: "CPU instruction set incompatibility (may need AVX)"
+      suggestion: "Your CPU may not support required instructions. Try older Ollama version or different hardware."
 
-    - pattern: "Cannot allocate memory|OOM"
-      reason: "Insufficient memory for Ollama"
-      suggestion: "Increase stone RAM or load smaller models"
+    - pattern: "Cannot allocate memory|OOM|out of memory"
+      reason: "Insufficient memory for model"
+      suggestion: "Use smaller model or increase RAM. Try tinyllama (~2GB) or phi (~3GB)."
+
+    - pattern: "CUDA.*error|cuda.*fail"
+      reason: "NVIDIA GPU initialization failed"
+      suggestion: "Check NVIDIA drivers and nvidia-container-toolkit installation"
+
+    - pattern: "no suitable GPU|GPU not found"
+      reason: "No compatible GPU detected"
+      suggestion: "Running in CPU-only mode. Install GPU drivers if GPU is present."
+
+    - pattern: "model.*not found|pull.*failed"
+      reason: "Model download failed"
+      suggestion: "Check network connectivity and model name. Try: ollama pull llama3.2"

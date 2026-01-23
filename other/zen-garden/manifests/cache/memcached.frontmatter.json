@@ -1,0 +1,8 @@
+{
+  "name": "memcached",
+  "description": "Memcached distributed memory caching system",
+  "category": "cache",
+  "tags": ["cache", "inmemory", "keyvalue", "distributed"],
+  "port": 11211,
+  "volumes": []
+}

@@ -1,13 +1,21 @@
 ﻿# RabbitMQ Compatibility Rules
-
+# Erlang VM is highly portable - no AVX/SSE requirements
+# Supported architectures: amd64, arm64v8, arm32v7, arm32v6, i386, ppc64le, riscv64, s390x
 version: "1"
 
 compatibility_rules:
   - name: "insufficient-memory"
     condition:
       memory_mb_less_than: 512
-    reason: "RabbitMQ (Erlang VM) is typically unstable under 512MB RAM"
+    reason: "RabbitMQ (Erlang VM) requires 128MB base plus ~100KB per connection; 512MB minimum for practical use"
     suggestion: "Increase stone memory or run fewer services"
+
+  - name: "low-memory-warning"
+    condition:
+      memory_mb_less_than: 1024
+    reason: "RabbitMQ performs best with 1GB+ RAM; memory watermark and GC overhead may cause issues"
+    suggestion: "Consider increasing RAM for production workloads"
+    warn_only: true
 
 post_install_healthcheck:
   enabled: true
@@ -17,3 +25,12 @@ post_install_healthcheck:
     - pattern: "Cannot allocate memory|OOM"
       reason: "Insufficient memory for RabbitMQ"
       suggestion: "Increase stone RAM or reduce service count"
+    - pattern: "memory resource limit alarm"
+      reason: "Memory watermark exceeded"
+      suggestion: "Increase RAM or adjust vm_memory_high_watermark setting"
+    - pattern: "epmd error|ERLANG_COOKIE"
+      reason: "Erlang distribution configuration issue"
+      suggestion: "Check RABBITMQ_ERLANG_COOKIE environment variable"
+    - pattern: "mnesia.*failed to start|badarg.*mnesia"
+      reason: "Mnesia database corruption or startup failure"
+      suggestion: "Check data volume permissions or clear mnesia data"

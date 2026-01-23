@@ -1,0 +1,8 @@
+{
+  "name": "registry",
+  "description": "Private Docker container registry (Apache 2.0)",
+  "category": "devops",
+  "tags": ["docker", "container", "registry", "oci", "images"],
+  "ports": [5000],
+  "volumes": ["registry-data"]
+}

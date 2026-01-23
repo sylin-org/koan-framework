@@ -1,0 +1,8 @@
+{
+  "name": "mariadb",
+  "description": "MariaDB relational database (MySQL-compatible, GPL licensed)",
+  "category": "data",
+  "tags": ["database", "relational", "sql", "mysql-compatible", "acid"],
+  "port": 3306,
+  "volumes": ["mariadb-data"]
+}

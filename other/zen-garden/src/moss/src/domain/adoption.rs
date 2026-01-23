@@ -49,6 +49,9 @@ pub async fn adopt_offering_container(
         let capabilities = get_current_compat_capabilities();
         match evaluate_compatibility(rules, &capabilities) {
             CompatibilityDecision::Pass => {}
+            CompatibilityDecision::Warning { .. } => {
+                // Warning: proceed with caution, but don't change image
+            }
             CompatibilityDecision::Fallback { image, .. } => template.image = image,
             CompatibilityDecision::Fail { .. } => {
                 // Leave container alone, but adopt it as degraded/incompatible.

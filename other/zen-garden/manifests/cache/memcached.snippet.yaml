@@ -1,0 +1,12 @@
+container_name: memcached
+image: memcached:1.6
+ports:
+  - "11211:11211"
+healthcheck:
+  test: ["CMD", "sh", "-c", "echo stats | nc localhost 11211 | grep -q STAT"]
+  interval: 10s
+  timeout: 3s
+  retries: 5
+restart: unless-stopped
+networks:
+  - zen-garden

@@ -1,0 +1,8 @@
+{
+  "name": "wireguard",
+  "description": "Fast, modern VPN for secure remote access (GPL v2)",
+  "category": "networking",
+  "tags": ["vpn", "tunnel", "security", "remote-access", "network"],
+  "ports": [51820],
+  "volumes": ["wireguard-config"]
+}

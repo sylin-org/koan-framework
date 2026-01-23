@@ -1,18 +1,32 @@
 ﻿# Elasticsearch Compatibility Rules
-
+# Supported architectures: amd64, arm64 only (NO arm32 support)
+# Requires host sysctl: vm.max_map_count=262144
 version: "1"
 
 compatibility_rules:
+  - name: "arm32-not-supported"
+    condition:
+      architectures: ["armv7l", "armv6l"]
+    reason: "Elasticsearch does not provide official ARM32 Docker images"
+    suggestion: "Use OpenSearch (has ARM32 community images) or PostgreSQL with full-text search"
+
   - name: "insufficient-memory"
     condition:
       memory_mb_less_than: 2048
-    reason: "Elasticsearch typically needs >= 2GB RAM on the host for reliable operation"
+    reason: "Elasticsearch JVM requires at least 2GB RAM for stable operation"
     suggestion: "Increase stone memory, or use OpenSearch/PostgreSQL depending on the use-case"
+
+  - name: "low-memory-warning"
+    condition:
+      memory_mb_less_than: 4096
+    reason: "Elasticsearch performs best with 4GB+ RAM (2GB heap + filesystem cache)"
+    suggestion: "Consider increasing RAM for production workloads"
+    warn_only: true
 
 post_install_healthcheck:
   enabled: true
   scan_log_lines: 250
-  timeout_seconds: 45
+  timeout_seconds: 90
   patterns:
     - pattern: "vm\\.max_map_count \\[\\d+\\] is too low, increase to at least \\[262144\\]"
       reason: "Host kernel setting vm.max_map_count is too low"
@@ -21,3 +35,19 @@ post_install_healthcheck:
     - pattern: "OutOfMemoryError|Cannot allocate memory|OOM"
       reason: "Insufficient memory for Elasticsearch"
       suggestion: "Increase stone RAM and/or reduce JVM heap (ES_JAVA_OPTS), then retry"
+
+    - pattern: "max file descriptors \\[\\d+\\] for elasticsearch process is too low"
+      reason: "File descriptor limit too low"
+      suggestion: "Increase ulimit -n to at least 65535"
+
+    - pattern: "bootstrap check failure|failed to pass bootstrap check"
+      reason: "Elasticsearch bootstrap checks failed"
+      suggestion: "Check logs for specific bootstrap check that failed"
+
+    - pattern: "ElasticsearchSecurityException.*missing authentication credentials"
+      reason: "Security enabled but credentials not provided"
+      suggestion: "Set xpack.security.enabled=false for development or configure credentials"
+
+    - pattern: "master not discovered yet|no master"
+      reason: "Single-node cluster not configured correctly"
+      suggestion: "Ensure discovery.type=single-node is set for single-node deployments"

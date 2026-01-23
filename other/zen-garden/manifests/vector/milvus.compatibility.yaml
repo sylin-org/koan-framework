@@ -1,30 +1,64 @@
 ﻿# Milvus Compatibility Rules (standalone)
-
+# CRITICAL: Requires SIMD instructions (SSE4.2/AVX/AVX2/AVX512)
+# Supported architectures: amd64, arm64 (NO arm32)
+# Resource-heavy: 8GB RAM minimum
 version: "1"
 
 compatibility_rules:
-  - name: "x86_64-missing-sse42"
+  - name: "arm32-not-supported"
+    condition:
+      architectures: ["armv7l", "armv6l"]
+    reason: "Milvus does not provide ARM32 Docker images"
+    suggestion: "Use Weaviate, Qdrant, or pgvector on ARM32 devices"
+
+  - name: "x86_64-missing-simd"
     condition:
       architectures: ["x86_64"]
-      cpu_features_missing: ["sse4_2"]
-    reason: "Milvus requires SIMD instructions; SSE4.2 (or better) is required on x86_64"
-    suggestion: "Use a newer x86_64 CPU with SSE4.2+, or move to ARM64 hardware"
+      cpu_features_missing_all: ["sse4_2", "avx", "avx2", "avx512"]
+    reason: "Milvus requires at least one SIMD instruction set: SSE4.2, AVX, AVX2, or AVX512"
+    suggestion: "Use a newer x86_64 CPU with SIMD support, or switch to pgvector"
+
+  - name: "celeron-warning"
+    condition:
+      processor_patterns: ["J4105", "J3455", "J3160", "J4005", "N4100", "N5000"]
+    reason: "Celeron J/N-series CPUs may lack AVX; Milvus may have degraded performance with SSE4.2 only"
+    suggestion: "Monitor for Illegal Instruction errors; consider Weaviate or pgvector"
+    warn_only: true
 
   - name: "insufficient-memory"
     condition:
       memory_mb_less_than: 8192
-    reason: "Milvus standalone is resource-heavy; <8GB RAM is likely unstable"
-    suggestion: "Increase stone memory or choose Weaviate/PostgreSQL (pgvector) for lighter workloads"
+    reason: "Milvus standalone requires at least 8GB RAM for stable operation"
+    suggestion: "Increase stone memory or use Weaviate/pgvector for lighter workloads"
+
+  - name: "marginal-memory-warning"
+    condition:
+      memory_mb_less_than: 16384
+    reason: "Milvus performs best with 16GB+ RAM for production workloads"
+    suggestion: "Consider increasing RAM for larger vector collections"
+    warn_only: true
 
 post_install_healthcheck:
   enabled: true
   scan_log_lines: 300
-  timeout_seconds: 60
+  timeout_seconds: 120
   patterns:
-    - pattern: "Illegal instruction"
-      reason: "CPU instruction set incompatibility"
-      suggestion: "Use newer CPU hardware (SSE4.2+/AVX) or pick a different vector store"
+    - pattern: "Illegal instruction|SIGILL"
+      reason: "CPU instruction set incompatibility (missing SSE4.2/AVX)"
+      suggestion: "Use newer CPU hardware with SIMD support or switch to pgvector"
 
-    - pattern: "Cannot allocate memory|OOM"
+    - pattern: "Cannot allocate memory|OOM|out of memory"
       reason: "Insufficient memory for Milvus"
-      suggestion: "Increase stone RAM or reduce service count"
+      suggestion: "Increase stone RAM (minimum 8GB) or reduce vector collection size"
+
+    - pattern: "etcd.*failed|embed etcd.*error"
+      reason: "Embedded etcd startup failed"
+      suggestion: "Check disk space and permissions on data volume"
+
+    - pattern: "failed to connect to Minio|S3.*error"
+      reason: "Object storage connection failed"
+      suggestion: "Ensure storage configuration is correct for standalone mode"
+
+    - pattern: "Unsupported system page size"
+      reason: "ARM64 jemalloc compatibility issue"
+      suggestion: "Try a newer Milvus version with jemalloc fixes"

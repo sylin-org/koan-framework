@@ -1,8 +1,11 @@
 ﻿{
   "name": "milvus",
-  "description": "Milvus vector database (standalone)",
+  "description": "Milvus vector database (standalone mode, resource-heavy)",
   "category": "vector",
-  "tags": ["vector", "database", "embeddings", "ai"],
+  "tags": ["vector", "database", "embeddings", "ai", "similarity-search", "hnsw", "ivf"],
+  "ports": [19530, 9091],
   "port": 19530,
-  "volumes": ["milvus-data"]
+  "health_port": 9091,
+  "volumes": ["milvus-data"],
+  "minimum_memory_gb": 8
 }

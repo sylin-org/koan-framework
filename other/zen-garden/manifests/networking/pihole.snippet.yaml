@@ -1,0 +1,25 @@
+container_name: pihole
+image: pihole/pihole:2024.07.0
+ports:
+  - "53:53/tcp"
+  - "53:53/udp"
+  - "8053:80/tcp"
+environment:
+  TZ: "UTC"
+  WEBPASSWORD: "pihole"
+  DNSMASQ_LISTENING: "all"
+volumes:
+  - pihole-data:/etc/pihole
+  - pihole-dnsmasq:/etc/dnsmasq.d
+shm_size: 256m
+cap_add:
+  - NET_ADMIN
+healthcheck:
+  test: ["CMD", "dig", "+short", "+norecurse", "+retry=0", "@127.0.0.1", "pi.hole"]
+  interval: 30s
+  timeout: 10s
+  retries: 3
+  start_period: 30s
+restart: unless-stopped
+networks:
+  - zen-garden

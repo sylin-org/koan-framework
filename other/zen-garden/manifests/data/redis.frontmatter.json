@@ -1,8 +1,8 @@
 ﻿{
   "name": "redis",
-  "description": "Redis in-memory data store",
+  "description": "Redis Stack in-memory data store with search, JSON, and vector capabilities",
   "category": "cache",
-  "tags": ["database", "cache", "keyvalue", "inmemory", "search"],
+  "tags": ["database", "cache", "keyvalue", "inmemory", "search", "vector", "json"],
   "port": 6379,
   "volumes": ["redis-data"]
 }

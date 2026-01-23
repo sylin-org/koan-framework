@@ -1,0 +1,8 @@
+{
+  "name": "traefik",
+  "description": "Cloud-native reverse proxy with auto-discovery (MIT)",
+  "category": "proxy",
+  "tags": ["reverse-proxy", "load-balancer", "ssl", "letsencrypt", "ingress"],
+  "ports": [80, 443, 8080],
+  "volumes": ["traefik-certs"]
+}

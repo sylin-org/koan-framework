@@ -1,18 +1,22 @@
 container_name: milvus
-image: milvusdb/milvus:latest
+image: milvusdb/milvus:v2.5.4
 command: ["milvus", "run", "standalone"]
 ports:
   - "19530:19530"
   - "9091:9091"
 environment:
   ETCD_USE_EMBED: "true"
+  ETCD_DATA_DIR: "/var/lib/milvus/etcd"
+  ETCD_CONFIG_PATH: "/milvus/configs/embedEtcd.yaml"
+  COMMON_STORAGETYPE: "local"
 volumes:
   - milvus-data:/var/lib/milvus
 healthcheck:
   test: ["CMD", "curl", "-f", "http://localhost:9091/healthz"]
-  interval: 15s
-  timeout: 5s
+  interval: 30s
+  timeout: 10s
   retries: 5
+  start_period: 90s
 restart: unless-stopped
 networks:
   - zen-garden

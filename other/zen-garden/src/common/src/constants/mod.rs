@@ -129,6 +129,9 @@ pub const COMPAT_PASS: &str = "pass";
 /// Offering can run but will use fallback configuration
 pub const COMPAT_FALLBACK: &str = "fallback";
 
+/// Offering can run but has potential issues (proceed with caution)
+pub const COMPAT_WARNING: &str = "warning";
+
 /// Offering is incompatible and cannot run on this stone
 pub const COMPAT_FAIL: &str = "fail";
 

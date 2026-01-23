@@ -1,0 +1,47 @@
+# MinIO Compatibility Rules
+# Apache 2.0 licensed S3-compatible object storage
+# Official multi-arch support: amd64, arm64
+# ARM32 not officially supported
+# No AVX/SSE requirements (Go binary)
+version: "1"
+
+compatibility_rules:
+  - name: "arm32-not-supported"
+    condition:
+      architectures: ["armv7l", "armv6l"]
+    reason: "MinIO does not officially support ARM32 architectures"
+    suggestion: "Use ARM64 hardware (Pi 4+, Apple Silicon) or x86_64"
+
+  - name: "insufficient-memory"
+    condition:
+      memory_mb_less_than: 256
+    reason: "MinIO requires at least 256MB RAM for basic operation"
+    suggestion: "Increase stone memory allocation"
+
+  - name: "low-memory-warning"
+    condition:
+      memory_mb_less_than: 512
+    reason: "MinIO performs better with 512MB+ RAM for concurrent operations"
+    suggestion: "Consider increasing RAM for better performance with multiple clients"
+    warn_only: true
+
+post_install_healthcheck:
+  enabled: true
+  scan_log_lines: 100
+  timeout_seconds: 60
+  patterns:
+    - pattern: "Cannot allocate memory|OOM"
+      reason: "Insufficient memory for MinIO"
+      suggestion: "Increase RAM allocation"
+
+    - pattern: "Unable to initialize backend|disk.*error"
+      reason: "Storage backend initialization failed"
+      suggestion: "Check data volume permissions and disk space"
+
+    - pattern: "address already in use"
+      reason: "Port 9000 or 9001 already in use"
+      suggestion: "Stop conflicting service or change MinIO ports"
+
+    - pattern: "Access Denied|invalid credentials"
+      reason: "Authentication configuration error"
+      suggestion: "Check MINIO_ROOT_USER and MINIO_ROOT_PASSWORD environment variables"

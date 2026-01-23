@@ -53,12 +53,18 @@ post_install_healthcheck:
   timeout_seconds: 30
   
   patterns:
-    # AVX runtime detection
+    # AVX runtime detection (x86)
     - pattern: "MongoDB 5\\.0\\+ requires a CPU with AVX support"
-      reason: "CPU incompatibility detected at runtime"
+      reason: "CPU incompatibility detected at runtime (missing AVX)"
       fallback:
         image: "mongo:4.4"
-    
+
+    # ARM64 microarchitecture detection (affects Raspberry Pi 4 with ARMv8.0-A)
+    - pattern: "MongoDB 5\\.0\\+ requires ARMv8\\.2-A|does not appear to implement any of the common features"
+      reason: "ARM microarchitecture too old (requires ARMv8.2-A+, Pi 4 has ARMv8.0-A)"
+      fallback:
+        image: "mongo:4.4"
+
     # Illegal instruction (CPU instruction set mismatch)
     - pattern: "Illegal instruction"
       reason: "CPU instruction set incompatibility"

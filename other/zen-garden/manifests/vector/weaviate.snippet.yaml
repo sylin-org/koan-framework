@@ -1,14 +1,17 @@
 container_name: weaviate
-image: semitechnologies/weaviate:latest
+image: cr.weaviate.io/semitechnologies/weaviate:1.35
 ports:
   - "8080:8080"
+  - "50051:50051"
 environment:
   AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: "true"
   PERSISTENCE_DATA_PATH: "/var/lib/weaviate"
+  QUERY_DEFAULTS_LIMIT: "25"
+  CLUSTER_HOSTNAME: "weaviate"
 volumes:
   - weaviate-data:/var/lib/weaviate
 healthcheck:
-  test: ["CMD", "curl", "-f", "http://localhost:8080/v1/.well-known/ready"]
+  test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/v1/.well-known/ready"]
   interval: 15s
   timeout: 5s
   retries: 5

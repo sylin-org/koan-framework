@@ -1,8 +1,10 @@
 ﻿{
   "name": "rabbitmq",
-  "description": "RabbitMQ message broker",
+  "description": "RabbitMQ message broker with management UI",
   "category": "messaging",
-  "tags": ["messaging", "queue", "broker", "amqp"],
+  "tags": ["messaging", "queue", "broker", "amqp", "mqtt", "stomp", "streams"],
+  "ports": [5672, 15672],
   "port": 5672,
+  "management_port": 15672,
   "volumes": ["rabbitmq-data"]
 }

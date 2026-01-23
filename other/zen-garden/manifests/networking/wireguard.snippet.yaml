@@ -1,0 +1,31 @@
+container_name: wireguard
+image: lscr.io/linuxserver/wireguard:1.0.20210914
+ports:
+  - "51820:51820/udp"
+environment:
+  PUID: "1000"
+  PGID: "1000"
+  TZ: "UTC"
+  SERVERURL: "auto"
+  SERVERPORT: "51820"
+  PEERS: "3"
+  PEERDNS: "auto"
+  INTERNAL_SUBNET: "10.13.13.0"
+  ALLOWEDIPS: "0.0.0.0/0"
+cap_add:
+  - NET_ADMIN
+  - SYS_MODULE
+sysctls:
+  - net.ipv4.conf.all.src_valid_mark=1
+volumes:
+  - wireguard-config:/config
+  - /lib/modules:/lib/modules:ro
+healthcheck:
+  test: ["CMD-SHELL", "wg show | grep -q 'interface' || exit 1"]
+  interval: 30s
+  timeout: 10s
+  retries: 3
+  start_period: 15s
+restart: unless-stopped
+networks:
+  - zen-garden

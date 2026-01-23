@@ -1,0 +1,40 @@
+# Docker Registry Compatibility Rules
+# Apache 2.0 licensed OCI Distribution implementation
+# Excellent multi-arch support: amd64, arm32v6, arm32v7, arm64v8, ppc64le, riscv64, s390x
+# No AVX/SSE requirements (Go binary)
+version: "1"
+
+compatibility_rules:
+  - name: "insufficient-memory"
+    condition:
+      memory_mb_less_than: 64
+    reason: "Docker Registry requires at least 64MB RAM"
+    suggestion: "Increase stone memory allocation"
+
+  - name: "low-memory-warning"
+    condition:
+      memory_mb_less_than: 128
+    reason: "Docker Registry benefits from 128MB+ RAM for concurrent pulls"
+    suggestion: "Consider increasing RAM for multiple simultaneous image operations"
+    warn_only: true
+
+post_install_healthcheck:
+  enabled: true
+  scan_log_lines: 100
+  timeout_seconds: 30
+  patterns:
+    - pattern: "Cannot allocate memory|OOM"
+      reason: "Insufficient memory for Docker Registry"
+      suggestion: "Increase RAM allocation"
+
+    - pattern: "address already in use"
+      reason: "Port 5000 already in use"
+      suggestion: "Stop conflicting service or change registry port"
+
+    - pattern: "storage.*error|filesystem.*failed"
+      reason: "Storage backend error"
+      suggestion: "Check data volume permissions and disk space"
+
+    - pattern: "invalid configuration|config.*error"
+      reason: "Configuration error"
+      suggestion: "Check registry configuration YAML"

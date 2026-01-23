@@ -1,8 +1,9 @@
-﻿{
+{
   "name": "weaviate",
-  "description": "Weaviate vector database",
+  "description": "Weaviate open-source vector database for AI applications",
   "category": "vector",
-  "tags": ["vector", "database", "embeddings", "ai"],
+  "tags": ["vector", "database", "embeddings", "ai", "search", "semantic"],
   "port": 8080,
+  "grpc_port": 50051,
   "volumes": ["weaviate-data"]
 }

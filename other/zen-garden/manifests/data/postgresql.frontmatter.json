@@ -1,8 +1,8 @@
 ﻿{
   "name": "postgresql",
-  "description": "PostgreSQL relational database",
+  "description": "PostgreSQL relational database with pgvector extension",
   "category": "data",
-  "tags": ["database", "relational", "sql"],
+  "tags": ["database", "relational", "sql", "vector", "embeddings"],
   "port": 5432,
   "volumes": ["postgres-data"]
 }

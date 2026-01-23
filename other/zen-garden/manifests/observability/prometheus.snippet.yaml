@@ -1,0 +1,20 @@
+container_name: prometheus
+image: prom/prometheus:v2.54.0
+ports:
+  - "9090:9090"
+command:
+  - '--config.file=/etc/prometheus/prometheus.yml'
+  - '--storage.tsdb.path=/prometheus'
+  - '--web.enable-lifecycle'
+  - '--storage.tsdb.retention.time=15d'
+volumes:
+  - prometheus-data:/prometheus
+healthcheck:
+  test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
+  interval: 15s
+  timeout: 10s
+  retries: 5
+  start_period: 30s
+restart: unless-stopped
+networks:
+  - zen-garden

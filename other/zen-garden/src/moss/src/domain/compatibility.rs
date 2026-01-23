@@ -30,13 +30,14 @@ pub struct CompatCheckCapabilities {
 pub enum CompatibilityDecision {
     Pass,
     Fallback { image: String, reason: String },
+    Warning { reason: String, suggestion: Option<String> },
     Fail { reason: String, suggestion: Option<String> },
 }
 
 /// Compiled compatibility result (serializable)
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct CompiledCompatibility {
-    pub decision: String, // "pass" | "fallback" | "fail"
+    pub decision: String, // "pass" | "fallback" | "warning" | "fail"
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reason: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -118,6 +119,13 @@ pub fn compile_compatibility(
                     suggestion: None,
                 }
             }
+            CompatibilityDecision::Warning { reason, suggestion } => CompiledCompatibility {
+                decision: garden_common::COMPAT_WARNING.to_string(),
+                reason: Some(reason),
+                original_image: None,
+                fallback_image: None,
+                suggestion,
+            },
             CompatibilityDecision::Fail { reason, suggestion } => CompiledCompatibility {
                 decision: garden_common::COMPAT_FAIL.to_string(),
                 reason: Some(reason),
@@ -240,6 +248,14 @@ pub fn evaluate_compatibility(
                 return CompatibilityDecision::Fallback {
                     image: fallback.image.clone(),
                     reason: rule.reason.clone(),
+                };
+            }
+
+            // If warn_only is set, return Warning instead of Fail
+            if rule.warn_only {
+                return CompatibilityDecision::Warning {
+                    reason: rule.reason.clone(),
+                    suggestion: rule.suggestion.clone(),
                 };
             }
 
