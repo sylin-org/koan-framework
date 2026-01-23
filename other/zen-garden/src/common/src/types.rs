@@ -260,6 +260,10 @@ impl AiCapabilitiesSummary {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HardwareCapabilities {
+    /// Unique stone identifier (GUID v7, generated once on first boot)
+    /// Immutable even if hostname changes. Used for cache keying and distributed tracking.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub stone_id: Option<String>,
     pub stone_name: String,
     pub hardware: HardwareInventory,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -374,6 +378,9 @@ pub struct DiscoveryRequest {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DiscoveryResponse {
+    /// Unique stone identifier (GUID v7)
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub stone_id: Option<String>,
     pub stone_name: String,
     pub stone_endpoint: String,
     pub moss_version: String,
@@ -386,6 +393,9 @@ pub struct DiscoveryResponse {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RegisterRequest {
+    /// Unique stone identifier (GUID v7)
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub stone_id: Option<String>,
     pub stone_name: String,
     pub endpoint: String,
     pub services: Vec<RegisterServiceInfo>,
@@ -432,6 +442,9 @@ pub struct LanternTopology {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LanternStoneState {
+    /// Unique stone identifier (GUID v7)
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub stone_id: Option<String>,
     pub name: String,
     pub endpoint: String,
     pub status: String,
@@ -729,6 +742,7 @@ mod tests {
     #[test]
     fn test_discovery_response_serde() {
         let resp = DiscoveryResponse {
+            stone_id: Some("01234567-89ab-cdef-0123-456789abcdef".into()),
             stone_name: "stone-01".into(),
             stone_endpoint: "http://localhost:3001".into(),
             moss_version: "0.1.0".into(),

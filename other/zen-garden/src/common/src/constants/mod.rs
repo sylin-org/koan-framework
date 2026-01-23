@@ -54,6 +54,9 @@ pub const STONE_USER: &str = "stone";
 pub const STONE_HOME: &str = "/home/stone";
 pub const FIRST_RUN_FLAG: &str = "/etc/zen-garden/.first-run-complete";
 
+/// Default stone password (matches STONE_USER by convention)
+pub const STONE_PASSWORD: &str = "stone";
+
 // ============================================================================
 // Standard Error Codes
 // ============================================================================
