@@ -82,33 +82,7 @@ pub async fn run(config: DaemonConfig) -> anyhow::Result<()> {
         }
     };
 
-    // Phase 4.5: mDNS lurk-listener (passive topology discovery)
-    // Listens for mDNS announcements from neighbor stones to populate hot-cache
-    if let Ok(mut mdns_rx) = mdns::start_mdns_lurk_listener(stone_name.clone()) {
-        tokio::spawn(async move {
-            loop {
-                match mdns_rx.recv().await {
-                    Ok(discovered) => {
-                        // For now, just log - full cache integration comes in Phase 2
-                        tracing::debug!(
-                            stone_id = ?discovered.stone_id,
-                            stone_name = %discovered.stone_name,
-                            endpoint = %discovered.endpoint,
-                            "mDNS: Neighbor stone cached for future lookup"
-                        );
-                        // TODO: Add to TopologyCache when implemented (Phase 2)
-                    }
-                    Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
-                        tracing::warn!(missed = n, "mDNS lurk-listener: missed events");
-                    }
-                    Err(tokio::sync::broadcast::error::RecvError::Closed) => {
-                        tracing::debug!("mDNS lurk-listener channel closed");
-                        break;
-                    }
-                }
-            }
-        });
-    }
+    // Phase 4.5: Start mDNS lurk-listener (moved to Phase 11 after state creation)
 
     // Phase 5: Lantern registration
     // Console is None here since console_printer is created later
@@ -158,6 +132,7 @@ pub async fn run(config: DaemonConfig) -> anyhow::Result<()> {
         capabilities: capabilities_arc.clone(),
         network_monitor: Arc::new(network_monitor),
         api_port: port,
+        topology_cache: Arc::new(RwLock::new(std::collections::HashMap::new())),
     };
 
     // Phase 11: Start background tasks
@@ -166,6 +141,43 @@ pub async fn run(config: DaemonConfig) -> anyhow::Result<()> {
     start_registry_loader(state.clone());
     start_catalog_builder(state.clone(), console_printer.clone());
     start_manifest_loader(state.clone(), console_printer.clone());
+
+    // Phase 11.5: mDNS lurk-listener (passive topology discovery)
+    // Listens for mDNS announcements from neighbor stones to populate topology cache
+    let topology_cache_for_mdns = state.topology_cache.clone();
+    if let Ok(mut mdns_rx) = mdns::start_mdns_lurk_listener(stone_name.clone()) {
+        tokio::spawn(async move {
+            loop {
+                match mdns_rx.recv().await {
+                    Ok(discovered) => {
+                        tracing::debug!(
+                            stone_id = ?discovered.stone_id,
+                            stone_name = %discovered.stone_name,
+                            endpoint = %discovered.endpoint,
+                            "mDNS: Neighbor stone discovered and cached"
+                        );
+                        // Add to topology cache (only if stone_id is present)
+                        if let Some(sid) = discovered.stone_id {
+                            crate::domain::topology::upsert_stone(
+                                &topology_cache_for_mdns,
+                                sid,
+                                discovered.stone_name,
+                                discovered.endpoint,
+                                "unknown".to_string(), // mDNS doesn't provide version
+                            ).await;
+                        }
+                    }
+                    Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                        tracing::warn!(missed = n, "mDNS lurk-listener: missed events");
+                    }
+                    Err(tokio::sync::broadcast::error::RecvError::Closed) => {
+                        tracing::debug!("mDNS lurk-listener channel closed");
+                        break;
+                    }
+                }
+            }
+        });
+    }
 
     // Phase 12: Pre-install manifest handling
     start_preinstall_handler(&state).await;

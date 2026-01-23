@@ -16,10 +16,11 @@ static UDP_LISTENER_CELL: OnceCell<broadcast::Sender<DiscoveryEvent>> = OnceCell
 
 /// Start or get reference to singleton UDP discovery listener
 /// Returns a receiver for subscribing to discovery events
-/// 
+///
 /// IMPORTANT: This binds the UDP socket synchronously before spawning the listener task,
 /// ensuring the port is immediately available for incoming requests.
 pub async fn ensure_udp_listener(
+    stone_id: String,
     stone_name: String,
     api_endpoint: String,
 ) -> Result<broadcast::Receiver<DiscoveryEvent>> {
@@ -28,7 +29,7 @@ pub async fn ensure_udp_listener(
             // Create broadcast channel with capacity for 100 events
             let (tx, _rx) = broadcast::channel(100);
             let broadcast_tx = tx.clone();
-            
+
             // Bind socket BEFORE spawning to ensure immediate availability
             let addr = format!("0.0.0.0:{}", ports::DISCOVERY_UDP);
             let socket = match network_singletons::create_reusable_udp_socket(&addr).await {
@@ -42,23 +43,24 @@ pub async fn ensure_udp_listener(
                     return tx;
                 }
             };
-            
+
             tokio::spawn(async move {
-                if let Err(e) = udp_listener_inner(stone_name, api_endpoint, broadcast_tx, socket).await {
+                if let Err(e) = udp_listener_inner(stone_id, stone_name, api_endpoint, broadcast_tx, socket).await {
                     tracing::error!(error = ?e, "UDP discovery listener failed");
                 }
             });
-            
+
             tx
         })
         .await;
-    
+
     Ok(tx.subscribe())
 }
 
 /// Internal UDP listener implementation with async socket
 /// Runs for process lifetime, broadcasting discovery events to subscribers
 async fn udp_listener_inner(
+    stone_id: String,
     stone_name: String,
     api_endpoint: String,
     broadcast_tx: broadcast::Sender<DiscoveryEvent>,
@@ -71,7 +73,7 @@ async fn udp_listener_inner(
             Ok((len, addr)) => {
                 if let Ok(request) = serde_json::from_slice::<DiscoveryRequest>(&buf[..len]) {
                     tracing::debug!(?addr, request_id = %request.request_id, "Discovery request");
-                    
+
                     // Broadcast event to consumers (ignore if no subscribers)
                     let _ = broadcast_tx.send(DiscoveryEvent {
                         request: request.clone(),
@@ -84,8 +86,9 @@ async fn udp_listener_inner(
 
                     // Determine which local IP to advertise based on requester's network
                     let response_endpoint = get_reachable_endpoint(&addr.ip(), &api_endpoint);
-                    
+
                     let response = DiscoveryResponse {
+                        stone_id: Some(stone_id.clone()),
                         stone_name: stone_name.clone(),
                         stone_endpoint: response_endpoint.clone(),
                         moss_version: format!("{}.{}", env!("CARGO_PKG_VERSION"), env!("BUILD_NUMBER")),

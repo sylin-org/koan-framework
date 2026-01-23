@@ -68,6 +68,9 @@ pub use garden_common::manifests::OfferingManifest;
 /// All fields are wrapped in Arc for cheap cloning across tasks.
 #[derive(Clone)]
 pub struct AppState {
+    /// Unique stone identifier (GUID v7, immutable once generated)
+    pub stone_id: String,
+
     /// Stone identity (e.g., "stone-01", hostname)
     pub stone_name: String,
 
@@ -116,11 +119,27 @@ pub struct AppState {
 
     /// API port for constructing endpoint URLs
     pub api_port: u16,
+
+    /// Topology cache for discovered stones (in-memory only)
+    pub topology_cache: crate::domain::topology::TopologyCache,
 }
 
 impl AppState {
+    /// Get stone ID (GUID v7)
+    pub fn stone_id(&self) -> &str {
+        &self.stone_id
+    }
+
     /// Get stone name
     pub fn stone_name(&self) -> &str {
         &self.stone_name
+    }
+
+    /// Persist registry to disk
+    ///
+    /// Reads the current registry and saves to disk atomically.
+    pub async fn persist_registry(&self) -> anyhow::Result<()> {
+        let registry = self.registry.read().await;
+        crate::infra::save_registry_vec(&registry).await
     }
 }
