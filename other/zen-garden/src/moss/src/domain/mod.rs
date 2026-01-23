@@ -22,6 +22,9 @@ pub mod reconciliation;
 pub mod modes;
 pub mod scoring;
 pub mod metrics_collection;
+pub mod topology;
+pub mod services;
+pub mod placement;
 
 pub use service_manager::ServiceManager;
 pub use registry::Registry;
