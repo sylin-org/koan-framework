@@ -236,6 +236,9 @@ pub async fn install_service_task(state: &AppState, job_id: &str, offering: &str
     }
 
     let _ = state.persist_registry().await;
+    
+    // Sync services to self_entry and broadcast chirp so topology reflects the change immediately
+    state.sync_self_services(true).await;
 
     emit_event(state, "info", format!("✓ Service {} started successfully", offering), Some(job_id.to_string()));
 
@@ -388,6 +391,9 @@ pub async fn install_batch_task(state: &AppState, job_id: &str, offerings: Vec<S
         }
 
         let _ = state.persist_registry().await;
+        
+        // Sync services to self_entry and broadcast chirp so topology reflects the change immediately
+        state.sync_self_services(true).await;
 
         // Mark offering as completed
         {
@@ -444,4 +450,7 @@ async fn remove_installing_entry(state: &AppState, offering: &str) {
     }
     drop(registry);
     let _ = state.persist_registry().await;
+    
+    // Sync services to self_entry to reflect the removal
+    state.sync_self_services(true).await;
 }
