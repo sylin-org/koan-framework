@@ -66,6 +66,7 @@ param(
     [string]$Method = '',  # Deployment method: HTTP (API) or SSH (direct file copy) - empty prompts menu
     [ValidateSet('Package', 'MossRake', 'MossOnly', '')]
     [string]$PublishMode = '',  # What to publish: Package (full), MossRake (legacy), MossOnly - empty prompts menu
+    [switch]$ForceSSH,  # Emergency mode: Stop service, copy directly to /usr/local/bin, restart (bypasses validation)
     [string]$SSHUser = 'stone',  # SSH username
     [string]$SSHPassword = 'stone'  # SSH password
 )
@@ -661,6 +662,68 @@ function Push-BinariesViaSSH {
         Write-Status "   📁 Preparing staging directory..."
         & plink -batch -ssh "${SSHUser}@${targetHost}" -pw $SSHPassword "mkdir -p /home/stone/bin" 2>&1 | Out-Null
 
+        # FORCE MODE: Stop service, copy directly to /usr/local/bin, restart
+        if ($ForceSSH) {
+            Write-Status "   ⚠️  FORCE MODE: Bypassing validation, direct install" -Type "Warning"
+            
+            # Stop the service
+            Write-Status "   ⏹️  Stopping garden-moss service..."
+            & plink -batch -ssh "${SSHUser}@${targetHost}" -pw $SSHPassword "sudo systemctl stop garden-moss" 2>&1 | Out-Null
+            
+            # Transfer directly to /usr/local/bin via temp location
+            Write-Status "   📦 Transferring garden-moss to temp location..."
+            $pscpResult = & pscp -batch -pw $SSHPassword "$MossPath" "${SSHUser}@${targetHost}:/tmp/garden-moss.tmp" 2>&1
+            if ($LASTEXITCODE -ne 0) {
+                Write-Status "   ✗ Failed to transfer moss binary" -Type "Error"
+                Write-Status "      $pscpResult" -Type "Error"
+                return $false
+            }
+            
+            # Move to /usr/local/bin with sudo
+            Write-Status "   🔧 Installing to /usr/local/bin..."
+            & plink -batch -ssh "${SSHUser}@${targetHost}" -pw $SSHPassword "sudo mv /tmp/garden-moss.tmp /usr/local/bin/garden-moss && sudo chmod 755 /usr/local/bin/garden-moss" 2>&1 | Out-Null
+            if ($LASTEXITCODE -ne 0) {
+                Write-Status "   ✗ Failed to install binary" -Type "Error"
+                return $false
+            }
+            
+            # Handle rake if provided
+            if (-not [string]::IsNullOrEmpty($RakePath)) {
+                Write-Status "   📦 Transferring garden-rake to temp location..."
+                $pscpResult = & pscp -batch -pw $SSHPassword "$RakePath" "${SSHUser}@${targetHost}:/tmp/garden-rake.tmp" 2>&1
+                if ($LASTEXITCODE -ne 0) {
+                    Write-Status "   ✗ Failed to transfer rake binary" -Type "Error"
+                    Write-Status "      $pscpResult" -Type "Error"
+                    return $false
+                }
+                
+                Write-Status "   🔧 Installing rake to /usr/local/bin..."
+                & plink -batch -ssh "${SSHUser}@${targetHost}" -pw $SSHPassword "sudo mv /tmp/garden-rake.tmp /usr/local/bin/garden-rake && sudo chmod 755 /usr/local/bin/garden-rake" 2>&1 | Out-Null
+            }
+            
+            # Start the service
+            Write-Status "   ▶️  Starting garden-moss service..."
+            & plink -batch -ssh "${SSHUser}@${targetHost}" -pw $SSHPassword "sudo systemctl start garden-moss" 2>&1 | Out-Null
+            
+            # Wait for service
+            Write-Status "   ⏳ Waiting for service to start..."
+            Start-Sleep -Seconds 5
+            
+            # Verify version
+            $version = & plink -batch -ssh "${SSHUser}@${targetHost}" -pw $SSHPassword "/usr/local/bin/garden-moss --version 2>&1" 2>&1
+            Write-Status "   📌 Version: $version" -Type "Info"
+            
+            $serviceStatus = & plink -batch -ssh "${SSHUser}@${targetHost}" -pw $SSHPassword "systemctl is-active garden-moss 2>/dev/null" 2>&1
+            if ($serviceStatus -match "active") {
+                Write-Status "   ✅ $($Stone.Name) forcibly updated via SSH" -Type "Success"
+                return $true
+            } else {
+                Write-Status "   ⚠️  Service may not be active: $serviceStatus" -Type "Warning"
+                return $false
+            }
+        }
+
+        # NORMAL SSH MODE: Stage files for systemd scripts to handle
         # Clean up any existing staged files (may be root-owned from previous runs)
         Write-Status "   🧹 Cleaning up existing staged files..."
         & plink -batch -ssh "${SSHUser}@${targetHost}" -pw $SSHPassword "sudo rm -f /home/stone/bin/*.staged" 2>&1 | Out-Null

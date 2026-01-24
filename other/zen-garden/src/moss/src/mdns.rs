@@ -3,6 +3,7 @@ pub fn announce_moss(
     stone_id: Option<&str>,
     stone_name: &str,
     port: u16,
+    mac: Option<&str>,
 ) -> anyhow::Result<mdns_sd::ServiceDaemon> {
     use mdns_sd::{ServiceDaemon, ServiceInfo};
     use std::collections::HashMap;
@@ -19,6 +20,9 @@ pub fn announce_moss(
         properties.insert("stone_id".to_string(), id.to_string());
     }
     properties.insert("stone_name".to_string(), stone_name.to_string());
+    if let Some(mac_addr) = mac {
+        properties.insert("mac".to_string(), mac_addr.to_string());
+    }
 
     let service = ServiceInfo::new(
         service_type,
@@ -33,6 +37,7 @@ pub fn announce_moss(
     tracing::info!(
         instance = %instance_name,
         stone_id = ?stone_id,
+        mac = ?mac,
         "mDNS announcement registered with TXT records"
     );
 
@@ -44,6 +49,7 @@ pub fn announce_moss(
     _stone_id: Option<&str>,
     _stone_name: &str,
     _port: u16,
+    _mac: Option<&str>,
 ) -> anyhow::Result<()> {
     tracing::debug!("mDNS not available on Windows, skipping");
     Ok(())
@@ -55,6 +61,8 @@ pub struct MdnsDiscoveredStone {
     pub stone_id: Option<String>,
     pub stone_name: String,
     pub endpoint: String,
+    /// MAC address for Wake-on-LAN support
+    pub mac: Option<String>,
     pub discovered_at: chrono::DateTime<chrono::Utc>,
 }
 
@@ -119,6 +127,12 @@ pub fn start_mdns_lurk_listener(
                                 .to_string()
                         });
 
+                    // Extract MAC address for WoL support
+                    let mac: Option<String> = info.get_properties()
+                        .iter()
+                        .find(|p| p.key() == "mac")
+                        .map(|p| p.val_str().to_string());
+
                     // Skip self-announcements
                     if stone_name == self_stone_name {
                         continue;
@@ -131,6 +145,7 @@ pub fn start_mdns_lurk_listener(
                             stone_id: stone_id.clone(),
                             stone_name: stone_name.clone(),
                             endpoint: endpoint.clone(),
+                            mac: mac.clone(),
                             discovered_at: chrono::Utc::now(),
                         };
 
@@ -138,6 +153,7 @@ pub fn start_mdns_lurk_listener(
                             stone_id = ?stone_id,
                             stone_name = %stone_name,
                             endpoint = %endpoint,
+                            mac = ?mac,
                             "mDNS lurk-listener: Discovered neighbor stone"
                         );
 

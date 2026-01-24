@@ -952,16 +952,25 @@ function Write-StoneFiles {
     # Prepare stone-root directory structure (mirrors target filesystem)
     Write-Step "Preparing stone-root filesystem..." "..."
     $stoneRoot = Join-Path $PSScriptRoot "stone-root"
-    
+
     # Clear and recreate stone-root structure
     $stoneRootUsb = Join-Path $UsbDrive "stone-root"
     if (Test-Path $stoneRootUsb) {
-        # Forcefully remove all contents first, then the directory
-        Get-ChildItem -Path $stoneRootUsb -Recurse -Force -ErrorAction SilentlyContinue | 
-            Remove-Item -Force -Recurse -ErrorAction SilentlyContinue
-        Remove-Item $stoneRootUsb -Force -Recurse -ErrorAction Stop
+        try {
+            # Forcefully remove all contents first, then the directory
+            Get-ChildItem -Path $stoneRootUsb -Recurse -Force | Remove-Item -Force -Recurse -ErrorAction Stop
+            Remove-Item $stoneRootUsb -Force -Recurse -ErrorAction Stop
+        }
+        catch {
+            # Directory might be locked by Explorer or antivirus
+            $errorMsg = $_.Exception.Message
+            throw "Cannot remove existing stone-root directory: $errorMsg`n`nThis usually means a file is locked by Explorer or antivirus.`nTry: Close any Explorer windows showing $UsbDrive, or eject and re-insert the USB."
+        }
     }
-    Copy-Item $stoneRoot $stoneRootUsb -Recurse -Force
+    # Create destination and copy contents (not the directory itself)
+    # This avoids Copy-Item creating stone-root/stone-root when dest exists
+    New-Item -ItemType Directory -Path $stoneRootUsb -Force | Out-Null
+    Copy-Item -Path "$stoneRoot\*" -Destination $stoneRootUsb -Recurse -Force
     
     # Copy manifests to stone-root/etc/zen-garden/templates/
     $templatesDir = Join-Path $stoneRootUsb "etc\zen-garden\templates"
@@ -1654,40 +1663,7 @@ function Main {
         throw "GRUB config not found after update"
     }
     Assert-UsbFiles -UsbDrive $wizardState.UsbDrive -GrubPath $grubCfgPath
-    
-    # Final validation: verify all critical files still exist and are readable
-    Write-Step "Performing final validation..." "..."
-    $finalChecks = @(
-        @{ Path = (Join-Path $wizardState.UsbDrive "preseed.cfg"); Name = "Debian preseed file" }
-        @{ Path = (Join-Path $wizardState.UsbDrive "stone-setup.sh"); Name = "Stone setup script" }
-        @{ Path = (Join-Path $wizardState.UsbDrive "install.amd\vmlinuz"); Name = "Kernel" }
-        @{ Path = (Join-Path $wizardState.UsbDrive "install.amd\initrd.gz"); Name = "Initial ramdisk" }
-        @{ Path = $grubCfgPath; Name = "GRUB config" }
-    )
-    
-    $missingOrUnreadable = @()
-    foreach ($check in $finalChecks) {
-        if (-not (Test-Path $check.Path)) {
-            $missingOrUnreadable += "$($check.Name) (missing)"
-        }
-        else {
-            try {
-                $content = Get-Content $check.Path -Raw -ErrorAction Stop
-                if ([string]::IsNullOrWhiteSpace($content)) {
-                    $missingOrUnreadable += "$($check.Name) (empty)"
-                }
-            }
-            catch {
-                $missingOrUnreadable += "$($check.Name) (unreadable)"
-            }
-        }
-    }
-    
-    if ($missingOrUnreadable.Count -gt 0) {
-        throw "Final validation failed. Issues: $($missingOrUnreadable -join ', ')"
-    }
-    Write-Step "All files validated" "OK"
-    
+
     # Done!
     Show-Completion -Config $stoneConfig
     Write-Host "  Press Enter to exit..." -ForegroundColor Gray

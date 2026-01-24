@@ -12,7 +12,7 @@ use crate::ui::{OutputWriter, TerminalInfo};
 /// - Resolved endpoint (if applicable)
 /// - Stone name (if resolved)
 /// - Output formatting utilities
-/// - Mode flags (quiet, fresh)
+/// - Mode flags (quiet, fresh, verbose)
 pub struct CommandContext {
     /// HTTP client with connection pooling
     pub client: reqwest::Client,
@@ -24,6 +24,8 @@ pub struct CommandContext {
     pub quiet_mode: bool,
     /// Whether to bypass cache
     pub fresh_mode: bool,
+    /// Verbose level (0=off, 1=-v, 2=-vv, etc.)
+    pub verbose: u8,
     /// Terminal info for formatting
     pub term: TerminalInfo,
     /// Output writer for consistent formatting
@@ -38,6 +40,7 @@ impl CommandContext {
         stone_name: Option<String>,
         quiet_mode: bool,
         fresh_mode: bool,
+        verbose: u8,
     ) -> Self {
         let term = TerminalInfo::detect();
         let output = OutputWriter::new();
@@ -47,6 +50,7 @@ impl CommandContext {
             stone_name,
             quiet_mode,
             fresh_mode,
+            verbose,
             term,
             output,
         }
@@ -57,6 +61,7 @@ impl CommandContext {
         client: reqwest::Client,
         quiet_mode: bool,
         fresh_mode: bool,
+        verbose: u8,
     ) -> Self {
         let term = TerminalInfo::detect();
         let output = OutputWriter::new();
@@ -66,6 +71,7 @@ impl CommandContext {
             stone_name: None,
             quiet_mode,
             fresh_mode,
+            verbose,
             term,
             output,
         }
@@ -105,6 +111,7 @@ mod tests {
             Some("stone-01".to_string()),
             false,
             false,
+            0,
         );
 
         assert_eq!(
@@ -127,6 +134,7 @@ mod tests {
             reqwest::Client::new(),
             false,
             false,
+            0,
         );
 
         assert!(ctx.endpoint().is_err());

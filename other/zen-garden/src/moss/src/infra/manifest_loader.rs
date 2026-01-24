@@ -1,6 +1,6 @@
 //! Offering manifest loader
 //!
-//! Loads offering manifests from YAML files in the offerings directory.
+//! Loads offering manifests from YAML files in the manifests directory.
 //! Validates schema and populates the AppState manifest registry.
 
 use anyhow::{Context, Result};
@@ -8,9 +8,9 @@ use garden_common::manifests::OfferingManifest;
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 
-/// Default offerings directory path
-pub fn default_offerings_dir() -> PathBuf {
-    PathBuf::from("offerings")
+/// Default manifests directory path
+pub fn default_manifests_dir() -> PathBuf {
+    PathBuf::from("manifests")
 }
 
 /// Load all offering manifests from a directory
@@ -20,16 +20,16 @@ pub fn default_offerings_dir() -> PathBuf {
 ///
 /// # Example
 /// ```rust,ignore
-/// let manifests = load_offerings("offerings").await?;
+/// let manifests = load_manifests("manifests").await?;
 /// println!("Loaded {} offerings", manifests.len());
 /// ```
-pub async fn load_offerings<P: AsRef<Path>>(dir: P) -> Result<Vec<OfferingManifest>> {
+pub async fn load_manifests<P: AsRef<Path>>(dir: P) -> Result<Vec<OfferingManifest>> {
     let dir = dir.as_ref();
 
     if !dir.exists() {
         tracing::warn!(
             path = %dir.display(),
-            "Offerings directory not found, starting with empty manifest registry"
+            "Manifests directory not found, starting with empty manifest registry"
         );
         return Ok(Vec::new());
     }
@@ -177,7 +177,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_load_nonexistent_directory() {
-        let result = load_offerings("nonexistent_dir_12345").await;
+        let result = load_manifests("nonexistent_dir_12345").await;
         assert!(result.is_ok());
         assert_eq!(result.unwrap().len(), 0);
     }

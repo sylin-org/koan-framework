@@ -55,11 +55,47 @@ impl TendingState {
     }
 }
 
+/// Get the zen-garden data directory, using platform-appropriate paths.
+///
+/// Priority order:
+/// 1. Linux: XDG data directory (~/.local/share/zen-garden)
+/// 2. All platforms: Home directory (~/.zen-garden)
+/// 3. Linux fallback: /tmp/zen-garden (for containers/services)
+fn zen_garden_dir() -> Result<PathBuf> {
+    // On Linux, prefer XDG data directory
+    #[cfg(target_os = "linux")]
+    if let Some(data_dir) = dirs::data_local_dir() {
+        let zen_dir = data_dir.join("zen-garden");
+        if fs::create_dir_all(&zen_dir).is_ok() {
+            return Ok(zen_dir);
+        }
+    }
+
+    // Try home directory (works on all platforms)
+    if let Some(home) = dirs::home_dir() {
+        let zen_dir = home.join(".zen-garden");
+        if fs::create_dir_all(&zen_dir).is_ok() {
+            return Ok(zen_dir);
+        }
+    }
+
+    // Linux fallback: /tmp for containers/services without home
+    #[cfg(target_os = "linux")]
+    {
+        let tmp_dir = PathBuf::from("/tmp/zen-garden");
+        fs::create_dir_all(&tmp_dir)
+            .context("Failed to create /tmp/zen-garden directory")?;
+        tracing::warn!("Using /tmp/zen-garden for tending state (no home/XDG available)");
+        return Ok(tmp_dir);
+    }
+
+    // Non-Linux: error if no home directory
+    #[cfg(not(target_os = "linux"))]
+    anyhow::bail!("Could not determine home directory for tending state")
+}
+
 fn tending_file_path() -> Result<PathBuf> {
-    let home = dirs::home_dir().context("Could not determine home directory")?;
-    let zen_dir = home.join(".zen-garden");
-    fs::create_dir_all(&zen_dir).context("Failed to create .zen-garden directory")?;
-    Ok(zen_dir.join(".tending"))
+    Ok(zen_garden_dir()?.join(".tending"))
 }
 
 pub fn read_tending() -> Result<TendingState> {

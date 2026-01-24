@@ -84,6 +84,8 @@ pub async fn install_service_task(state: &AppState, job_id: &str, offering: &str
                 format!("Offering not found: {}", offering),
                 Some(job_id.to_string()),
             );
+            // Remove Installing entry from registry
+            remove_installing_entry(state, offering).await;
             let mut jobs = state.jobs.write().await;
             if let Some(job) = jobs.get_mut(job_id) {
                 job.status = JobStatus::Failed;
@@ -100,6 +102,8 @@ pub async fn install_service_task(state: &AppState, job_id: &str, offering: &str
                 format!("Failed to read offerings index for {}: {}", offering, e),
                 Some(job_id.to_string()),
             );
+            // Remove Installing entry from registry
+            remove_installing_entry(state, offering).await;
             let mut jobs = state.jobs.write().await;
             if let Some(job) = jobs.get_mut(job_id) {
                 job.status = JobStatus::Failed;
@@ -129,6 +133,8 @@ pub async fn install_service_task(state: &AppState, job_id: &str, offering: &str
             Some(job_id.to_string()),
         );
 
+        // Remove Installing entry from registry
+        remove_installing_entry(state, offering).await;
         let mut jobs = state.jobs.write().await;
         if let Some(job) = jobs.get_mut(job_id) {
             job.status = JobStatus::Failed;
@@ -181,6 +187,8 @@ pub async fn install_service_task(state: &AppState, job_id: &str, offering: &str
         ));
         emit_event(state, "error", format!("Installation failed for {}: {}", offering, e), Some(job_id.to_string()));
         tracing::error!(job_id, offering, error = ?e, "Docker install failed");
+        // Remove Installing entry from registry
+        remove_installing_entry(state, offering).await;
         let mut jobs = state.jobs.write().await;
         if let Some(job) = jobs.get_mut(job_id) {
             job.status = JobStatus::Failed;
@@ -195,25 +203,34 @@ pub async fn install_service_task(state: &AppState, job_id: &str, offering: &str
     // Extract port info
     let native_port = compiled.ports.first().map(|(host, _)| *host).unwrap_or(30000);
 
-    // Add to registry
-    let info = ServiceInfo {
-        name: offering.to_string(),
-        offering: offering.to_string(),
-        version: compiled.image.split(':').next_back().unwrap_or("latest").into(),
-        status: ServiceStatus::Running,
-        health: ServiceHealthStatus::Healthy,
-        ports: Ports {
-            native: native_port,
-            agnostic: None,
-        },
-        resources: None,
-    };
-
+    // Update existing registry entry (created with Installing status before job started)
+    // Change status from Installing to Running and clear job_id
     {
         let mut registry = state.registry.write().await;
         if let Some(existing) = registry.iter_mut().find(|svc| svc.name == offering) {
-            *existing = info;
+            existing.status = ServiceStatus::Running;
+            existing.health = ServiceHealthStatus::Healthy;
+            existing.job_id = None;
+            existing.version = compiled.image.split(':').next_back().unwrap_or("latest").into();
+            existing.ports = Ports {
+                native: native_port,
+                agnostic: None,
+            };
         } else {
+            // Fallback: entry was somehow removed, recreate it
+            let info = ServiceInfo {
+                name: offering.to_string(),
+                offering: offering.to_string(),
+                version: compiled.image.split(':').next_back().unwrap_or("latest").into(),
+                status: ServiceStatus::Running,
+                health: ServiceHealthStatus::Healthy,
+                ports: Ports {
+                    native: native_port,
+                    agnostic: None,
+                },
+                resources: None,
+                job_id: None,
+            };
             registry.push(info);
         }
     }
@@ -358,6 +375,7 @@ pub async fn install_batch_task(state: &AppState, job_id: &str, offerings: Vec<S
                 agnostic: None,
             },
             resources: None,
+            job_id: None,
         };
 
         {
@@ -412,4 +430,18 @@ pub async fn install_batch_task(state: &AppState, job_id: &str, offerings: Vec<S
     }
 
     tracing::info!(job_id, "Batch installation completed");
+}
+
+/// Remove an Installing entry from the registry on failure
+///
+/// Called when a service installation fails to clean up the placeholder entry
+/// that was created before the installation job started.
+async fn remove_installing_entry(state: &AppState, offering: &str) {
+    let mut registry = state.registry.write().await;
+    if let Some(pos) = registry.iter().position(|svc| svc.name == offering && svc.status == ServiceStatus::Installing) {
+        registry.remove(pos);
+        tracing::debug!(offering, "Removed Installing entry from registry after failure");
+    }
+    drop(registry);
+    let _ = state.persist_registry().await;
 }

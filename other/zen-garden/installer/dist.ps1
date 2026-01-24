@@ -222,6 +222,30 @@ if (-not $SkipPackages -and $buildErrors.Count -eq 0) {
     $windowsDir = Join-Path $DIST_DIR "windows"
 
     # Helper function to create package manifest
+    function ConvertTo-UnixLineEndings {
+        <#
+        .SYNOPSIS
+            Convert CRLF line endings to LF for Unix shell scripts
+        .DESCRIPTION
+            Ensures shell scripts work correctly on Linux by converting Windows
+            CRLF line endings to Unix LF. This prevents "required file not found"
+            errors when the shebang line has CR characters.
+        #>
+        param(
+            [Parameter(Mandatory)]
+            [string]$Path
+        )
+
+        if (Test-Path $Path) {
+            $content = Get-Content $Path -Raw
+            if ($content.Contains("`r`n")) {
+                $content = $content -replace "`r`n", "`n"
+                [System.IO.File]::WriteAllText($Path, $content, [System.Text.UTF8Encoding]::new($false))
+                Write-Host "    → Fixed line endings: $(Split-Path -Leaf $Path)" -ForegroundColor DarkGray
+            }
+        }
+    }
+
     function New-PackageManifest {
         param(
             [string]$Platform,
@@ -314,13 +338,16 @@ if (-not $SkipPackages -and $buildErrors.Count -eq 0) {
             Copy-Item $manifestsDir (Join-Path $packageDir "manifests") -Recurse
         }
 
-        # Copy deployment scripts (Linux only)
+        # Copy deployment scripts (Linux only) and ensure Unix line endings
         $scriptsPackageDir = Join-Path $packageDir "scripts"
         New-Item -ItemType Directory -Path $scriptsPackageDir -Force | Out-Null
         foreach ($scriptName in @("moss-update-helper.sh", "garden-upgrade.sh")) {
             $scriptPath = Join-Path $scriptsDir $scriptName
             if (Test-Path $scriptPath) {
-                Copy-Item $scriptPath $scriptsPackageDir
+                $destPath = Join-Path $scriptsPackageDir $scriptName
+                Copy-Item $scriptPath $destPath
+                # Ensure Unix line endings (LF only, no CRLF)
+                ConvertTo-UnixLineEndings -Path $destPath
             }
         }
 

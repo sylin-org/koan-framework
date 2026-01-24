@@ -11,6 +11,8 @@ use crate::constants::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum ServiceStatus {
+    /// Service is being installed (image pull, container creation)
+    Installing,
     Running,
     Stopped,
     Maintenance,
@@ -27,6 +29,9 @@ pub struct ServiceInfo {
     pub health: ServiceHealthStatus,
     pub ports: Ports,
     pub resources: Option<ContainerResources>,
+    /// Job ID for tracking installation progress (only set when status is Installing)
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub job_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -421,28 +426,113 @@ pub mod announcement_types {
     pub const DISCOVERY_RESPONSE: &str = "discovery_response";
     /// Periodic stone chirp with full state (services, capabilities)
     pub const STONE_CHIRP: &str = "stone_chirp";
+    /// Stone going offline announcement (graceful shutdown)
+    pub const STONE_GOODBYE: &str = "stone_goodbye";
 }
 
-/// Stone chirp payload - full state announcement including services
+/// Service information for topology entries and chirp payloads
 ///
-/// Sent every 30 seconds (or on service state change) to announce
-/// stone presence and current service inventory to the network.
+/// Lightweight representation of service state for UDP topology broadcasts.
+/// Full ServiceInfo (with health, ports, resources) is used in local registry.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct StoneChirpPayload {
-    pub stone_id: String,
-    pub stone_name: String,
-    pub endpoint: String,
-    pub moss_version: String,
-    pub services: Vec<ChirpServiceInfo>,
-}
-
-/// Service info included in chirps
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ChirpServiceInfo {
+pub struct TopologyServiceEntry {
     pub name: String,
     pub offering: String,
     pub category: String,
     pub status: String,
+}
+
+impl TopologyServiceEntry {
+    /// Convert full ServiceInfo to lightweight TopologyServiceEntry
+    /// Used when syncing registry to self_entry for chirp broadcasts
+    pub fn from_service_info(service: &ServiceInfo, category: Option<&str>) -> Self {
+        Self {
+            name: service.name.clone(),
+            offering: service.offering.clone(),
+            category: category.unwrap_or(&service.offering).to_string(),
+            status: match service.status {
+                ServiceStatus::Running => SERVICE_RUNNING,
+                ServiceStatus::Stopped => SERVICE_STOPPED,
+                ServiceStatus::Installing => SERVICE_INSTALLING,
+                ServiceStatus::Maintenance => SERVICE_MAINTENANCE,
+                ServiceStatus::Degraded => SERVICE_DEGRADED,
+                ServiceStatus::Unknown => SERVICE_UNKNOWN,
+            }.to_string(),
+        }
+    }
+    
+    /// Batch convert ServiceInfo vec to TopologyServiceEntry vec
+    pub fn from_service_infos(services: &[ServiceInfo]) -> Vec<Self> {
+        services.iter()
+            .map(|svc| Self::from_service_info(svc, None))
+            .collect()
+    }
+}
+
+/// Stone connectivity status
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum StoneStatus {
+    /// Stone is actively announcing (seen within threshold)
+    Online,
+    /// Stone has stopped announcing but is remembered for WoL
+    Offline,
+}
+
+impl std::fmt::Display for StoneStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            StoneStatus::Online => write!(f, "online"),
+            StoneStatus::Offline => write!(f, "offline"),
+        }
+    }
+}
+
+/// Topology entry representing a stone in the garden
+///
+/// Used for:
+/// - Self topology entry (this stone's current state)
+/// - Peer topology cache (discovered stones)
+/// - Chirp wire format (UDP broadcast payload)
+///
+/// Health progresses: starting → initializing → thriving/degraded
+/// 
+/// **Services**: Full ServiceInfo (richer than ChirpServiceInfo)
+/// - Enables detailed service state across all use cases
+/// - UDP chirps will be larger (~3-4x) but provide complete info
+/// - Optional fields skipped during serialization to reduce payload
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TopologyEntry {
+    pub stone_id: String,
+    pub stone_name: String,
+    pub endpoint: String,
+    pub moss_version: String,
+    /// Services running on this stone (lightweight topology representation)
+    pub services: Vec<TopologyServiceEntry>,
+    /// MAC address for Wake-on-LAN support
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub mac: Option<String>,
+    /// Health status: "starting", "initializing", "thriving", "degraded"
+    pub health: String,
+    /// Hardware capabilities (available after detection)
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub capabilities: Option<HardwareCapabilities>,
+    /// Current connectivity status
+    pub status: StoneStatus,
+    /// When this stone was first discovered
+    pub discovered_at: chrono::DateTime<chrono::Utc>,
+    /// When this stone was last seen (chirp received)
+    pub last_seen: chrono::DateTime<chrono::Utc>,
+}
+
+/// Stone goodbye payload - sent when stone is shutting down gracefully
+///
+/// Enables immediate offline marking instead of waiting for chirp timeout.
+/// Minimal payload - just identification fields needed to find the stone.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StoneGoodbyePayload {
+    pub stone_id: String,
+    pub stone_name: String,
 }
 
 // ============================================================================

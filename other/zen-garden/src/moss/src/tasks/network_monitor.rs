@@ -127,6 +127,18 @@ impl NetworkMonitor {
         self.current_ip.read().await.clone()
     }
 
+    /// Get the current IP address and MAC address
+    ///
+    /// Returns (ip, mac) tuple. MAC may be None if detection fails.
+    /// Used for announcements to include MAC for Wake-on-LAN support.
+    pub async fn get_ip_and_mac(&self) -> (String, Option<String>) {
+        let ip = self.current_ip.read().await.clone();
+        // Get MAC from network module - this re-detects the interface
+        // but MAC lookup is fast (sysfs read on Linux)
+        let (_, mac) = crate::infra::network::get_local_ip_and_mac();
+        (ip, mac)
+    }
+
     /// Check if currently disconnected (no valid LAN IP)
     pub async fn is_disconnected(&self) -> bool {
         is_disconnected(&self.current_ip.read().await)

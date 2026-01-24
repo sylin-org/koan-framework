@@ -1043,6 +1043,7 @@ async fn install_on_stone(
         None,
         quiet,
         false,
+        0, // verbose
     );
     
     let install_cmd = OfferCommand::install(
@@ -1233,11 +1234,12 @@ impl Command for OfferCommand {
                             let api_status = body.get("status").and_then(|v| v.as_str()).unwrap_or("pending");
                             let message = body.get("message").and_then(|v| v.as_str()).unwrap_or("");
 
-                            // New visual language: offering name with status
+                            // Display: lowercase name with status on same line
+                            // mongodb      [pending create]
                             println!();
-                            println!("{}{}", indent, fmt.title(&service_name.to_uppercase()));
-                            let status_indicator = ui::status_indicator(api_status, term.supports_color);
-                            println!("{}{} {}", indent, status_indicator, action);
+                            let status_text = format!("[{} {}]", api_status, action);
+                            let padding = 16usize.saturating_sub(service_name.len());
+                            println!("{}{}{}{}", indent, service_name, " ".repeat(padding), status_text);
                             println!("{}{}", indent, fmt.divider(&"─".repeat(47)));
 
                             // Extract job_id from message if present

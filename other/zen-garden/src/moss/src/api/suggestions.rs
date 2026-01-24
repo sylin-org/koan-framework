@@ -45,9 +45,9 @@ pub fn generate_suggestions(ctx: &SuggestionContext) -> Option<Vec<String>> {
 
     let suggestions = match ctx.operation.as_str() {
         "create_service" if ctx.success => vec![
-            "garden-rake observe              View service status".to_string(),
+            "garden-rake list                 View installed services".to_string(),
             "garden-rake watch <service>      Stream service logs".to_string(),
-            "garden-rake explore              Browse more offerings".to_string(),
+            "garden-rake observe              View garden status".to_string(),
         ],
         "rest_service" if ctx.success => vec![
             format!("garden-rake wake {}          Restart service", ctx.service_name.as_deref().unwrap_or("<service>")),

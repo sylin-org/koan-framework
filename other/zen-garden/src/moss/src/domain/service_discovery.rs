@@ -182,7 +182,7 @@ pub async fn find_local_services(
         }
 
         // Resolve connection
-        let protocol = connection::infer_protocol(&service.offering, &category);
+        let protocol = connection::infer_protocol(&service.offering, &category, state).await;
         let port = service.ports.native;
 
         let conn = connection::resolve_connection(
@@ -230,7 +230,7 @@ pub async fn list_all_local_services(state: &AppState) -> ServiceDiscoveryRespon
             .unwrap_or_else(|| (service.offering.clone(), vec![], None));
 
         // Resolve connection
-        let protocol = connection::infer_protocol(&service.offering, &category);
+        let protocol = connection::infer_protocol(&service.offering, &category, state).await;
         let port = service.ports.native;
 
         let conn = connection::resolve_connection(
@@ -332,7 +332,7 @@ async fn find_services_in_topology_cache(
 
         for svc in &stone.services {
             // Only include running services
-            if svc.status != "Running" {
+            if svc.status != garden_common::SERVICE_RUNNING {
                 continue;
             }
 
@@ -342,11 +342,10 @@ async fn find_services_in_topology_cache(
             }
 
             // Infer protocol and resolve connection
-            let protocol = connection::infer_protocol(&svc.offering, &svc.category);
+            let protocol = connection::infer_protocol(&svc.offering, &svc.category, state).await;
 
-            // Extract port from stone endpoint (default to 27017 for mongo, etc.)
-            // Note: Chirps don't include port info yet, so we use default ports
-            let port = infer_default_port(&svc.offering);
+            // Get port from offering manifest
+            let port = get_offering_port(&svc.offering, state).await;
 
             let conn = connection::resolve_connection(
                 &stone.stone_name,
@@ -375,29 +374,26 @@ async fn find_services_in_topology_cache(
     results
 }
 
-/// Infer default port for an offering (fallback when port not in chirp)
+/// Get default port from offering manifest
 ///
-/// NOTE: This data duplicates offering frontmatter `port` fields.
-/// Eventually, load from offering registry instead of hardcoding.
-/// Kept as fallback for topology chirps that don't include port info.
-fn infer_default_port(offering: &str) -> u16 {
-    // TODO: Load from offering frontmatter (manifests/<category>/<offering>.frontmatter.json)
-    match offering.to_lowercase().as_str() {
-        "mongodb" | "mongo" => 27017,
-        "redis" => 6379,
-        "postgres" | "postgresql" => 5432,
-        "mysql" | "mariadb" => 3306,
-        "elasticsearch" => 9200,
-        "meilisearch" => 7700,
-        "qdrant" => 6333,
-        "minio" => 9000,
-        "rabbitmq" => 5672,
-        "nats" => 4222,
-        "influxdb" => 8086,
-        "grafana" => 3000,
-        "prometheus" => 9090,
-        _ => 8080, // Generic default
+/// Looks up the offering's manifest and returns the first port mapping.
+/// Returns 8080 as fallback if manifest not found or has no ports.
+async fn get_offering_port(offering: &str, state: &AppState) -> u16 {
+    let manifests = state.manifests.read().await;
+    
+    // Find manifest by name
+    if let Some(manifest) = manifests.iter().find(|m| m.name.eq_ignore_ascii_case(offering)) {
+        // Return first port from port mappings (host_port, container_port)
+        if let Some((host_port, _)) = manifest.ports.first() {
+            return *host_port;
+        }
     }
+    
+    tracing::warn!(
+        offering = %offering,
+        "Offering manifest not found or has no port mappings, using default 8080"
+    );
+    8080 // Generic default
 }
 
 /// Find services on remote stones via HTTP requests (legacy, slower)
@@ -418,8 +414,9 @@ async fn find_remote_services(
         .into_iter()
         .map(|stone| {
             let criteria = criteria.clone();
+            let state_clone = state.clone();
             tokio::spawn(async move {
-                fetch_remote_services(&stone.endpoint, &criteria, &stone, timeout).await
+                fetch_remote_services(&stone.endpoint, &criteria, &stone, timeout, &state_clone).await
             })
         })
         .collect();
@@ -445,6 +442,7 @@ async fn fetch_remote_services(
     criteria: &ServiceSearchCriteria,
     stone: &topology::TopologyEntry,
     timeout: Duration,
+    state: &AppState,
 ) -> anyhow::Result<Vec<FoundService>> {
     let client = reqwest::Client::builder()
         .timeout(timeout)
@@ -486,7 +484,7 @@ async fn fetch_remote_services(
 
         // Infer protocol and resolve connection
         let category = service.offering.clone(); // Use offering as category fallback
-        let protocol = connection::infer_protocol(&service.offering, &category);
+        let protocol = connection::infer_protocol(&service.offering, &category, state).await;
 
         let conn = connection::resolve_connection(
             &stone.stone_name,

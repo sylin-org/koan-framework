@@ -26,6 +26,7 @@ pub async fn dispatch(
     at: Option<String>,
     quiet_mode: bool,
     fresh_mode: bool,
+    verbose: u8,
     cache: Option<&dyn CachedStoneOps>,
 ) -> anyhow::Result<()> {
     // Resolve endpoint if command requires it
@@ -51,6 +52,7 @@ pub async fn dispatch(
         stone_name,
         quiet_mode,
         fresh_mode,
+        verbose,
     );
 
     // Execute command
@@ -64,11 +66,13 @@ pub async fn dispatch_local(
     client: &reqwest::Client,
     quiet_mode: bool,
     fresh_mode: bool,
+    verbose: u8,
 ) -> anyhow::Result<()> {
     let ctx = CommandContext::without_endpoint(
         client.clone(),
         quiet_mode,
         fresh_mode,
+        verbose,
     );
 
     cmd.execute(&ctx).await

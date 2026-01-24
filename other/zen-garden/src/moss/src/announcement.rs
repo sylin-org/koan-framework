@@ -13,24 +13,14 @@
 
 use anyhow::Result;
 use garden_common::{
-    announcement_types, ports, ChirpServiceInfo, StoneChirpPayload, UdpAnnouncement,
+    announcement_types, ports, StoneGoodbyePayload,
+    UdpAnnouncement,
 };
-use serde::{Deserialize, Serialize};
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use tokio::time::Instant;
 
-/// Announcement payload - what we tell other stones about ourselves
-///
-/// This is the internal representation; converted to `StoneChirpPayload` for UDP broadcast.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AnnouncementPayload {
-    pub stone_id: String,
-    pub stone_name: String,
-    pub endpoint: String,
-    pub moss_version: String,
-    pub services: Vec<ChirpServiceInfo>,
-}
+use crate::domain::TopologyEntry;
 
 /// Announce stone presence via all available channels
 ///
@@ -41,15 +31,16 @@ pub struct AnnouncementPayload {
 ///
 /// Currently implements UDP broadcast only.
 /// mDNS TXT updates deferred (requires service re-registration).
-pub async fn announce(payload: AnnouncementPayload) -> Result<()> {
+pub async fn announce(entry: &TopologyEntry) -> Result<()> {
     tracing::debug!(
-        stone = %payload.stone_name,
-        services = payload.services.len(),
+        stone = %entry.stone_name,
+        services = entry.services.len(),
+        health = %entry.health,
         "Announcing stone presence"
     );
 
     // Send UDP broadcast announcement (all platforms)
-    send_udp_announcement(&payload).await?;
+    send_udp_announcement(entry).await?;
 
     Ok(())
 }
@@ -65,12 +56,12 @@ pub async fn announce(payload: AnnouncementPayload) -> Result<()> {
 ///
 /// Performance: JSON serialization + hash = ~6μs, negligible overhead.
 pub async fn announce_if_changed(
-    payload: AnnouncementPayload,
+    entry: &TopologyEntry,
     last_hash: &mut Option<u64>,
     last_announcement: &mut Instant,
     force: bool,
 ) -> Result<bool> {
-    let current_hash = calculate_state_hash(&payload);
+    let current_hash = calculate_state_hash(entry);
     let elapsed = last_announcement.elapsed();
     
     // Announce if: forced, changed, or >5min since last
@@ -79,7 +70,7 @@ pub async fn announce_if_changed(
         || elapsed > tokio::time::Duration::from_secs(300);
     
     if should_announce {
-        announce(payload).await?;
+        announce(entry).await?;
         *last_hash = Some(current_hash);
         *last_announcement = Instant::now();
         Ok(true) // Announced
@@ -92,18 +83,18 @@ pub async fn announce_if_changed(
 /// Calculate hash of complete announcement state
 ///
 /// Uses JSON serialization for automatic field inclusion.
-/// Any new fields added to AnnouncementPayload are automatically hashed.
+/// Any new fields added to TopologyEntry are automatically hashed.
 ///
 /// Performance: ~6μs (5μs JSON + 1μs hash), acceptable for 30s interval.
-fn calculate_state_hash(payload: &AnnouncementPayload) -> u64 {
+fn calculate_state_hash(entry: &TopologyEntry) -> u64 {
     let mut hasher = DefaultHasher::new();
     
     // Serialize to JSON for deterministic, maintainable hashing
-    if let Ok(json) = serde_json::to_string(payload) {
+    if let Ok(json) = serde_json::to_string(entry) {
         json.hash(&mut hasher);
     } else {
         // Fallback: hash stone_id as unique identifier
-        payload.stone_id.hash(&mut hasher);
+        entry.stone_id.hash(&mut hasher);
     }
     
     hasher.finish()
@@ -112,26 +103,17 @@ fn calculate_state_hash(payload: &AnnouncementPayload) -> u64 {
 /// Send UDP broadcast announcement with current state
 ///
 /// Uses the `UdpAnnouncement` envelope format with `stone_chirp` type.
-/// Includes full service inventory for topology cache updates on receivers.
-async fn send_udp_announcement(payload: &AnnouncementPayload) -> Result<()> {
+/// Broadcasts the TopologyEntry directly - chirp IS the topology entry.
+async fn send_udp_announcement(entry: &TopologyEntry) -> Result<()> {
     use tokio::net::UdpSocket;
 
     let socket = UdpSocket::bind("0.0.0.0:0").await?;
     socket.set_broadcast(true)?;
 
-    // Build the chirp payload with full service info
-    let chirp = StoneChirpPayload {
-        stone_id: payload.stone_id.clone(),
-        stone_name: payload.stone_name.clone(),
-        endpoint: payload.endpoint.clone(),
-        moss_version: payload.moss_version.clone(),
-        services: payload.services.clone(),
-    };
-
-    // Wrap in UdpAnnouncement envelope
+    // Wrap TopologyEntry in UdpAnnouncement envelope
     let announcement = UdpAnnouncement {
         announcement_type: announcement_types::STONE_CHIRP.to_string(),
-        data: serde_json::to_value(&chirp)?,
+        data: serde_json::to_value(entry)?,
     };
 
     let data = serde_json::to_vec(&announcement)?;
@@ -140,109 +122,134 @@ async fn send_udp_announcement(payload: &AnnouncementPayload) -> Result<()> {
     socket.send_to(&data, &broadcast_addr).await?;
 
     tracing::trace!(
-        endpoint = %payload.endpoint,
-        services = chirp.services.len(),
+        endpoint = %entry.endpoint,
+        services = entry.services.len(),
+        health = %entry.health,
         "UDP chirp broadcast sent"
     );
 
     Ok(())
 }
 
-/// Build announcement payload from current AppState
+/// Send a goodbye announcement before shutdown
 ///
-/// Collects all relevant stone information:
-/// - Identity (stone_id, stone_name)
-/// - Network (endpoint)
-/// - Version (moss_version)
-/// - Services (name, offering, category, status)
-pub async fn build_payload(state: &crate::AppState) -> AnnouncementPayload {
-    // Construct endpoint from network monitor IP and API port
-    let ip = state.network_monitor.get_ip().await;
-    let endpoint = format!("http://{}:{}", ip, state.api_port);
+/// Notifies other stones that this stone is going offline gracefully.
+/// This allows immediate offline marking instead of waiting for the 90s chirp timeout.
+///
+/// Called before stone shutdown/reboot operations.
+pub async fn send_goodbye(state: &crate::AppState) -> Result<()> {
+    use tokio::net::UdpSocket;
 
-    // Collect current services
-    // Note: Category uses offering name as fallback (detailed category from catalog not available here)
-    let services = state
-        .registry
-        .read()
-        .await
-        .iter()
-        .map(|svc| ChirpServiceInfo {
-            name: svc.name.clone(),
-            offering: svc.offering.clone(),
-            category: svc.offering.clone(), // Use offering as category fallback
-            status: format!("{:?}", svc.status), // Format enum as string
-        })
-        .collect();
-
-    AnnouncementPayload {
+    let goodbye = StoneGoodbyePayload {
         stone_id: state.stone_id.clone(),
         stone_name: state.stone_name.clone(),
-        endpoint,
-        moss_version: format!("{}.{}", env!("CARGO_PKG_VERSION"), env!("BUILD_NUMBER")),
-        services,
-    }
+    };
+
+    tracing::info!(
+        stone = %goodbye.stone_name,
+        "Sending goodbye announcement before shutdown"
+    );
+
+    // Wrap in UdpAnnouncement envelope
+    let announcement = UdpAnnouncement {
+        announcement_type: announcement_types::STONE_GOODBYE.to_string(),
+        data: serde_json::to_value(&goodbye)?,
+    };
+
+    let data = serde_json::to_vec(&announcement)?;
+    let broadcast_addr = format!("255.255.255.255:{}", ports::DISCOVERY_UDP);
+
+    let socket = UdpSocket::bind("0.0.0.0:0").await?;
+    socket.set_broadcast(true)?;
+    socket.send_to(&data, &broadcast_addr).await?;
+
+    tracing::info!(
+        stone = %goodbye.stone_name,
+        "Goodbye announcement sent"
+    );
+
+    Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::TopologyEntry;
+    use garden_common::TopologyServiceEntry;
 
     #[test]
     fn test_hash_stability() {
-        let payload1 = AnnouncementPayload {
+        let entry1 = TopologyEntry {
             stone_id: "test-id".to_string(),
             stone_name: "test".to_string(),
             endpoint: "http://localhost:7185".to_string(),
             moss_version: "0.1.0".to_string(),
             services: vec![],
+            mac: None,
+            health: "thriving".to_string(),
+            capabilities: None,
+            status: crate::domain::StoneStatus::Online,
+            discovered_at: chrono::Utc::now(),
+            last_seen: chrono::Utc::now(),
         };
 
-        let payload2 = payload1.clone();
+        let entry2 = entry1.clone();
 
-        let hash1 = calculate_state_hash(&payload1);
-        let hash2 = calculate_state_hash(&payload2);
+        let hash1 = calculate_state_hash(&entry1);
+        let hash2 = calculate_state_hash(&entry2);
 
-        assert_eq!(hash1, hash2, "Same payload should produce same hash");
+        assert_eq!(hash1, hash2, "Same entry should produce same hash");
     }
 
     #[test]
     fn test_hash_detects_changes() {
-        let mut payload = AnnouncementPayload {
+        let mut entry = TopologyEntry {
             stone_id: "test-id".to_string(),
             stone_name: "test".to_string(),
             endpoint: "http://localhost:7185".to_string(),
             moss_version: "0.1.0".to_string(),
             services: vec![],
+            mac: None,
+            health: "thriving".to_string(),
+            capabilities: None,
+            status: crate::domain::StoneStatus::Online,
+            discovered_at: chrono::Utc::now(),
+            last_seen: chrono::Utc::now(),
         };
 
-        let hash1 = calculate_state_hash(&payload);
-        
-        payload.stone_name = "changed".to_string();
-        let hash2 = calculate_state_hash(&payload);
+        let hash1 = calculate_state_hash(&entry);
+
+        entry.stone_name = "changed".to_string();
+        let hash2 = calculate_state_hash(&entry);
 
         assert_ne!(hash1, hash2, "Changed field should change hash");
     }
 
     #[test]
     fn test_hash_detects_service_changes() {
-        let mut payload = AnnouncementPayload {
+        let mut entry = TopologyEntry {
             stone_id: "test-id".to_string(),
             stone_name: "test".to_string(),
             endpoint: "http://localhost:7185".to_string(),
             moss_version: "0.1.0".to_string(),
             services: vec![],
+            mac: None,
+            health: "thriving".to_string(),
+            capabilities: None,
+            status: crate::domain::StoneStatus::Online,
+            discovered_at: chrono::Utc::now(),
+            last_seen: chrono::Utc::now(),
         };
 
-        let hash1 = calculate_state_hash(&payload);
-        
-        payload.services.push(ChirpServiceInfo {
+        let hash1 = calculate_state_hash(&entry);
+
+        entry.services.push(TopologyServiceEntry {
             name: "redis".to_string(),
             offering: "redis".to_string(),
             category: "data".to_string(),
             status: "Running".to_string(),
         });
-        let hash2 = calculate_state_hash(&payload);
+        let hash2 = calculate_state_hash(&entry);
 
         assert_ne!(hash1, hash2, "Added service should change hash");
     }

@@ -16,12 +16,13 @@ use crate::{api, AppState};
 /// - Root level: health, capabilities, metrics
 /// - /api/v1/offerings: Offering management (human layer)
 /// - /api/v1/services: Service management (technical layer)
-/// - /api/v1/stone: Stone operations
+/// - /api/v1/stone: Stone software operations (upgrade, deploy)
 /// - /api/v1/events, /api/v1/jobs: Events and job tracking
 /// - /api/v1/garden: Garden topology
 /// - /api/v1/pond: Security/trust management
 /// - /api/v1/console: Console control
-/// - /admin: Administrative endpoints
+/// - /api/v1/admin/moss: Moss daemon admin (shutdown, take-root)
+/// - /api/v1/admin/stone: Stone machine admin (shutdown, reboot, wake)
 pub fn configure(state: AppState) -> Router {
     Router::new()
         // Standard health/monitoring endpoints (root level)
@@ -67,9 +68,9 @@ pub fn configure(state: AppState) -> Router {
         .route("/api/v1/services/reconcile", post(api::v1::services::reconcile_inventory_v1))
         .route("/api/v1/services/refresh", post(api::v1::services::refresh_manifests_v1))
 
-        // V1 API - Stone operations
+        // V1 API - Stone operations (software)
+        .route("/api/v1/stone/info", get(api::v1::stone::get_stone_info_v1))
         .route("/api/v1/stone/upgrade", post(api::v1::stone::upgrade_stone_v1))
-        .route("/api/v1/stone/shutdown", post(api::v1::stone::shutdown_stone_v1))
         .route("/api/v1/stone/deploy", post(api::v1::stone::deploy_stone_v1))
 
         // V1 API - Events & Jobs
@@ -96,8 +97,13 @@ pub fn configure(state: AppState) -> Router {
         .route("/api/v1/console/mode", get(api::v1::console::get_console_mode_v1))
         .route("/api/v1/console/mode", post(api::v1::console::set_console_mode_v1))
 
-        // Admin endpoints
-        .route("/admin/take-root", post(api::v1::admin::admin_take_root))
+        // V1 API - Admin operations (privileged)
+        // See: docs/decisions/API-0002-admin-hierarchy.md
+        .route("/api/v1/admin/moss/shutdown", post(api::v1::admin::moss_shutdown))
+        .route("/api/v1/admin/moss/take-root", post(api::v1::admin::moss_take_root))
+        .route("/api/v1/admin/stone/shutdown", post(api::v1::admin::stone_shutdown))
+        .route("/api/v1/admin/stone/reboot", post(api::v1::admin::stone_reboot))
+        .route("/api/v1/admin/stone/:name/wake", post(api::v1::admin::stone_wake))
 
         // Apply 200 MB body limit to all routes
         .layer(axum::extract::DefaultBodyLimit::max(200 * 1024 * 1024))

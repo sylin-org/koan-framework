@@ -101,6 +101,7 @@ pub async fn adopt_offering_container(
             agnostic: None,
         },
         resources: None,
+        job_id: None,
     };
 
     Ok(Some(adopted))

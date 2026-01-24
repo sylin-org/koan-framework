@@ -3,7 +3,9 @@
 //! Handles server binding, graceful shutdown, and error handling.
 //! Extracted from main.rs for cleaner separation of concerns.
 
+use std::future::Future;
 use std::net::SocketAddr;
+use std::pin::Pin;
 use std::sync::Arc;
 use axum::Router;
 use tokio::net::TcpListener;
@@ -58,6 +60,9 @@ pub async fn bind(port: u16, console: &ConsolePrinter) -> anyhow::Result<TcpList
     }
 }
 
+/// Shutdown callback type for goodbye announcements
+pub type ShutdownCallback = Box<dyn FnOnce() -> Pin<Box<dyn Future<Output = ()> + Send>> + Send>;
+
 /// Run the HTTP server with graceful shutdown support
 ///
 /// This function handles:
@@ -65,6 +70,7 @@ pub async fn bind(port: u16, console: &ConsolePrinter) -> anyhow::Result<TcpList
 /// - Graceful shutdown on SIGTERM/SIGINT/Ctrl+C
 /// - Admin-initiated shutdown via notify channel
 /// - In-flight request draining
+/// - Goodbye announcement via shutdown_callback (if provided)
 pub async fn run(
     listener: TcpListener,
     app: Router,
@@ -72,6 +78,7 @@ pub async fn run(
     console: Arc<ConsolePrinter>,
     shutdown_notify: Arc<tokio::sync::Notify>,
     config: ServerConfig,
+    shutdown_callback: Option<ShutdownCallback>,
 ) -> anyhow::Result<()> {
     let addr = listener.local_addr()?;
 
@@ -94,6 +101,12 @@ pub async fn run(
         .with_graceful_shutdown(async move {
             shutdown_signal().await;
             tracing::info!("Shutdown signal received, initiating graceful shutdown");
+
+            // Send goodbye announcement if callback provided
+            if let Some(callback) = shutdown_callback {
+                tracing::info!("Sending goodbye announcement before shutdown");
+                callback().await;
+            }
         });
 
     // Clone console for shutdown events

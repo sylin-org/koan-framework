@@ -95,6 +95,8 @@ fn is_zen_verb(verb: &str) -> bool {
         "place" | "lift" | "invite" |
         // Admin (zen)
         "make" | "refresh" | "reconcile" | "template" | "ceremony" |
+        // Stone admin (zen) - power management
+        "rouse" | "slumber" | "stir" |
         // Installation (zen alias)
         "take-root" |
         // Discovery/aliases (zen)

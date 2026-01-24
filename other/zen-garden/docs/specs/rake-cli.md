@@ -393,13 +393,52 @@ garden-rake status --json
 }
 ```
 
-### Color Coding
+### Visual Dictionary
 
-- **Green:** Healthy, success
-- **Yellow:** Warnings, degraded
-- **Red:** Errors, critical
-- **Blue:** Informational
-- **Gray:** Disabled, inactive
+#### Status Colors
+
+| Status | Color | RGB | Meaning |
+|--------|-------|-----|---------|
+| `[thriving]` | Green | Standard | Healthy, running, success |
+| `[dormant]` | Dark Gray | 128, 128, 128 | Stopped, offline (not an error) |
+| `[needs attention]` | Red | Standard | Errors, failures, critical |
+| `[planting...]` | Cyan | Standard | Installing, setup in progress |
+
+#### Marker Colors
+
+| Marker | Color | RGB | Meaning |
+|--------|-------|-----|---------|
+| `[tended]` | Gold | 255, 215, 0 | Currently tended stone |
+
+#### General Colors
+
+| Context | Color | Usage |
+|---------|-------|-------|
+| Green | Success messages, healthy status |
+| Yellow | Warnings, degraded state |
+| Red | Errors, critical failures |
+| Cyan | Informational, in-progress |
+| Dark Gray | Inactive, disabled, offline |
+| Gold | Special markers (tended) |
+
+#### Layout Constants
+
+| Constant | Value | Usage |
+|----------|-------|-------|
+| `VALUE_COLUMN` | 36 | Column at which values align |
+| `DEFAULT_INDENT` | 4 | Standard indentation |
+| `MAX_SERVICE_NAME_LEN` | 24 | Truncation limit for names |
+
+#### Vitality Language
+
+Zen Garden uses garden vitality language instead of technical terms:
+
+| Technical | Vitality |
+|-----------|----------|
+| Running, Healthy | thriving |
+| Stopped, Offline | dormant |
+| Error, Failed | needs attention |
+| Installing | planting |
 
 ---
 

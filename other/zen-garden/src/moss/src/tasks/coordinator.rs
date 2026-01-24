@@ -17,7 +17,7 @@ use tokio::sync::RwLock;
 use garden_common::{HardwareCapabilities, ServiceHealthStatus, ServiceStatus};
 use crate::console::{ConsolePrinter, ConsoleEvent, EventCategory, EventStatus};
 use crate::discovery::UdpEvent;
-use crate::domain::topology::{TopologyCache, upsert_stone_with_services};
+use crate::domain::topology::{TopologyCache, upsert_from_chirp, mark_stone_offline};
 use crate::{
     AppState,
     adopt_existing_containers, ensure_offerings_index,
@@ -30,13 +30,14 @@ use crate::tasks::network_monitor::{NetworkMonitor, NetworkEvent};
 /// Start UDP discovery listener with topology cache integration
 ///
 /// Enables stone discovery via UDP broadcast.
-/// Handles both discovery requests (logging) and stone chirps (topology updates).
+/// Handles discovery requests (chirp response), stone chirps (topology updates), and goodbyes.
 /// Returns immediately after spawning the listener.
 pub async fn start_discovery_listener(
     stone_id: String,
     stone_name: String,
     api_endpoint: String,
     topology_cache: TopologyCache,
+    self_entry: Arc<RwLock<crate::domain::TopologyEntry>>,
     console: &ConsolePrinter,
 ) {
     match discovery::ensure_udp_listener(stone_id, stone_name, api_endpoint).await {
@@ -50,26 +51,39 @@ pub async fn start_discovery_listener(
                             tracing::debug!(
                                 request_id = %request.request_id,
                                 from = %from_addr,
-                                "Discovery request received via broadcast"
+                                "Discovery request received, responding with self entry chirp"
                             );
+                            
+                            // Respond to discovery request by chirping our current self entry
+                            let entry = self_entry.read().await.clone();
+                            if let Err(e) = crate::announcement::announce(&entry).await {
+                                tracing::warn!(
+                                    error = ?e,
+                                    request_id = %request.request_id,
+                                    "Failed to respond to discovery request"
+                                );
+                            }
                         }
                         UdpEvent::Chirp { chirp, from_addr } => {
                             tracing::debug!(
                                 stone = %chirp.stone_name,
                                 services = chirp.services.len(),
+                                mac = ?chirp.mac,
+                                health = %chirp.health,
                                 from = %from_addr,
                                 "Stone chirp received, updating topology cache"
                             );
-                            // Update topology cache with chirp data including services
-                            upsert_stone_with_services(
-                                &topology_cache,
-                                chirp.stone_id,
-                                chirp.stone_name,
-                                chirp.endpoint,
-                                chirp.moss_version,
-                                chirp.services,
-                            )
-                            .await;
+                            // Update topology cache with chirp data
+                            upsert_from_chirp(&topology_cache, chirp).await;
+                        }
+                        UdpEvent::Goodbye { goodbye, from_addr } => {
+                            tracing::info!(
+                                stone = %goodbye.stone_name,
+                                from = %from_addr,
+                                "Stone goodbye received, marking offline"
+                            );
+                            // Mark stone as offline immediately (don't wait for timeout)
+                            mark_stone_offline(&topology_cache, &goodbye.stone_id).await;
                         }
                     }
                 }
@@ -199,7 +213,7 @@ pub fn start_manifest_loader(state: AppState, console: Arc<ConsolePrinter>) {
             "Offering manifests",
         ));
 
-        match infra::load_offerings(infra::default_offerings_dir()).await {
+        match infra::load_manifests(infra::default_manifests_dir()).await {
             Ok(manifests) => {
                 let count = manifests.len();
                 *state.manifests.write().await = manifests;
@@ -417,6 +431,7 @@ pub async fn start_all_background_tasks(
         stone_name.to_string(),
         api_endpoint.to_string(),
         state.topology_cache.clone(),
+        state.self_entry.clone(),
         &console,
     )
     .await;

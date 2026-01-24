@@ -9,47 +9,21 @@ use crate::command_manifest::cmd;
 use crate::commands::{Command, CommandResult};
 use crate::context::CommandContext;
 use crate::discovery;
-use crate::stone_cache::{CachedStone, GLOBAL_CACHE};
+use crate::layout::{IndentLevel, Layout};
 use crate::suggestions;
 use crate::tending;
 use crate::ui;
 use async_trait::async_trait;
-use garden_common::{ChirpServiceInfo, CliFormatter, DiscoveryResponse, GardenApiResponse, HardwareCapabilities, ServiceInfo};
-use serde::Deserialize;
+use garden_common::{CliFormatter, GardenApiResponse, TopologyEntry};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
 /// Global counter for stones displayed (for footer)
 static STONE_COUNT: AtomicUsize = AtomicUsize::new(0);
 
-// === Topology API response types ===
-
-/// Stone entry from topology API
-#[derive(Debug, Clone, Deserialize)]
-#[allow(dead_code)] // Fields used for JSON deserialization schema completeness
-struct TopologyStone {
-    pub stone_id: String,
-    pub stone_name: String,
-    pub endpoint: String,
-    pub moss_version: String,
-    pub services: Vec<ChirpServiceInfo>,
-    pub last_seen: String,
-}
-
-/// Topology response from Moss API
-#[derive(Debug, Deserialize)]
-#[allow(dead_code)] // Fields used for JSON deserialization schema completeness
-struct TopologyResponse {
-    pub stones: Vec<TopologyStone>,
-    pub local_stone_id: String,
-    pub local_stone_name: String,
-}
-
-/// Internal struct for stone data during observation
-struct StoneData {
-    capabilities: HardwareCapabilities,
-    services: Vec<ServiceInfo>,
-    endpoint: String,
+/// Stone data from topology cache (lightweight, no HTTP calls)
+struct TopologyStoneData<'a> {
+    entry: &'a TopologyEntry,
 }
 
 /// Observe command for garden overview
@@ -106,53 +80,153 @@ async fn observe_garden(
     });
 
     // Get currently tended stone name for marking (compare by name, not endpoint)
-    let tended_stone_name = tending::read_tending()
-        .ok()
+    let tended_state = tending::read_tending().ok();
+    let tended_stone_name = tended_state
+        .as_ref()
         .filter(|s| s.is_valid())
         .map(|s| s.stone_name.clone());
 
     // Display header immediately (no waiting for discovery)
-    let fmt = CliFormatter::new();
-    let indent = " ".repeat(ui::constants::DEFAULT_INDENT);
+    let layout = Layout::new();
 
-    println!();
-    println!("{}{}", indent, fmt.title("GARDEN OBSERVE"));
-    println!("{}{}", indent, fmt.divider(&"─".repeat(47)));
-
-    // Fresh mode: Do UDP discovery for real-time network scan
-    // Default: Query tended Moss's topology cache (populated by chirps)
-    if ctx.fresh_mode {
-        if let Some(ref filter) = offerings_filter {
-            println!("{}discovering stones (filtered: {})...", indent, filter.join(", "));
+    // Verbose mode diagnostics
+    if ctx.verbose > 0 {
+        layout.blank();
+        layout.line(&format!("Verbose mode enabled (level {})", ctx.verbose))
+            .level(IndentLevel::Card)
+            .tag("verbose")
+            .print();
+        if let Some(ref tended) = tended_state {
+            layout.field("Tending")
+                .value(format!("{} at {}", tended.stone_name, tended.endpoint))
+                .level(IndentLevel::Card)
+                .tag("verbose")
+                .print();
         } else {
-            println!("{}scanning network (fresh mode)...", indent);
+            layout.field("Tending")
+                .value("none")
+                .level(IndentLevel::Card)
+                .tag("verbose")
+                .print();
         }
-        println!();
-        return observe_via_udp_discovery(ctx, stone_filter, offerings_filter, tended_stone_name).await;
+        layout.field("Fresh mode")
+            .value(if ctx.fresh_mode { "enabled" } else { "disabled" })
+            .level(IndentLevel::Card)
+            .tag("verbose")
+            .print();
+    }
+
+    // Main header
+    layout.blank();
+    layout.header("GARDEN OBSERVE")
+        .level(IndentLevel::Card)
+        .underline()
+        .underline_len(47)
+        .print();
+
+    // Track if we need to update tending (when falling back from unreachable stone)
+    let mut should_update_tending = false;
+
+    // Fresh mode: For detailed stone info with resource metrics
+    // Note: Fresh mode requires UDP discovery + HTTP fetches (not yet refactored)
+    if ctx.fresh_mode {
+        // TODO: Implement fresh mode with detailed ServiceInfo fetches
+        // For now, just note that fresh mode is ignored and continue to topology view
+        if ctx.verbose > 0 {
+            layout.line("Note: Fresh mode ignored, using topology cache")
+                .level(IndentLevel::Card)
+                .print();
+        }
     }
 
     // Default path: Query topology from tended Moss
     if let Some(ref tended) = tending::read_tending().ok() {
-        println!("{}querying topology from {}...", indent, tended.stone_name);
-        println!();
+        layout.line(&format!("querying topology from {}...", tended.stone_name))
+            .level(IndentLevel::Card)
+            .print();
+        layout.blank();
 
         // Try to get topology from tended Moss
-        let topology_url = format!("{}/api/v1/garden/topology?include_local=true", tended.endpoint.trim_end_matches('/'));
+        let topology_url = format!("{}/api/v1/garden/topology", tended.endpoint.trim_end_matches('/'));
+
+        if ctx.verbose > 0 {
+            layout.field("GET")
+                .value(&topology_url)
+                .level(IndentLevel::Card)
+                .tag("verbose")
+                .print();
+        }
+
         match ctx.client.get(&topology_url).timeout(Duration::from_secs(5)).send().await {
             Ok(resp) if resp.status().is_success() => {
-                if let Ok(api_response) = resp.json::<GardenApiResponse<TopologyResponse>>().await {
-                    // Display topology from cache
-                    let topology = api_response.data;
-                    display_topology_response(&topology, &offerings_filter, tended_stone_name.as_deref(), &ctx.client).await;
-                    display_footer();
-                    return Ok(());
+                match resp.json::<GardenApiResponse<Vec<TopologyEntry>>>().await {
+                    Ok(api_response) => {
+                        // Display topology from cache
+                        let stones = api_response.data;
+
+                        if ctx.verbose > 0 {
+                            layout.field("Response")
+                                .value(format!("{} stones in topology", stones.len()))
+                                .level(IndentLevel::Card)
+                                .tag("verbose")
+                                .print();
+                            for stone in &stones {
+                                layout.line(&format!("- {} (id: {}, endpoint: {}, health: {})",
+                                    stone.stone_name, stone.stone_id, stone.endpoint, stone.health))
+                                    .level(IndentLevel::Section)
+                                    .tag("verbose")
+                                    .print();
+                            }
+                            layout.blank();
+                        }
+
+                        display_topology_entries(&stones, &stone_filter, &offerings_filter, tended_stone_name.as_deref(), ctx.verbose);
+                        display_footer();
+                        return Ok(());
+                    }
+                    Err(e) => {
+                        tracing::warn!(error = ?e, "Failed to parse topology JSON");
+                        if ctx.verbose > 0 {
+                            layout.field("JSON parse error")
+                                .value(e.to_string())
+                                .level(IndentLevel::Card)
+                                .tag("verbose")
+                                .print();
+                        }
+                        // Fall through to Lantern/fallback
+                    }
                 }
             }
             Ok(resp) => {
-                tracing::warn!(status = ?resp.status(), "Tended stone returned error, falling back to discovery");
+                let status = resp.status();
+                tracing::warn!(status = ?status, "Tended stone returned error, falling back to discovery");
+                if ctx.verbose > 0 {
+                    layout.field("Response status")
+                        .value(status.to_string())
+                        .level(IndentLevel::Card)
+                        .tag("verbose")
+                        .print();
+                }
+                layout.status(&format!("Stone \"{}\" is sleeping (offline). Picking a new stone...", tended.stone_name))
+                    .level(IndentLevel::Card)
+                    .warn()
+                    .print();
+                should_update_tending = true;
             }
             Err(e) => {
                 tracing::warn!(error = ?e, "Failed to reach tended stone, falling back to discovery");
+                if ctx.verbose > 0 {
+                    layout.field("Connection error")
+                        .value(e.to_string())
+                        .level(IndentLevel::Card)
+                        .tag("verbose")
+                        .print();
+                }
+                layout.status(&format!("Stone \"{}\" is sleeping (offline). Picking a new stone...", tended.stone_name))
+                    .level(IndentLevel::Card)
+                    .warn()
+                    .print();
+                should_update_tending = true;
             }
         }
     }
@@ -186,330 +260,92 @@ async fn observe_garden(
         }
     }
 
-    println!("{}discovering stones...", indent);
-    println!();
-
-    // Final fallback: UDP discovery
-    observe_via_udp_discovery(ctx, stone_filter, offerings_filter, tended_stone_name).await
-}
-
-/// UDP discovery flow for fresh mode or when no topology is available
-async fn observe_via_udp_discovery(
-    ctx: &CommandContext,
-    stone_filter: Option<String>,
-    offerings_filter: Option<Vec<String>>,
-    tended_stone_name: Option<String>,
-) -> anyhow::Result<()> {
-    // Hot cache architecture - Check cache FIRST (zero discovery for common case)
-    let cached_stones = GLOBAL_CACHE.get_all();
-
-    let mut found_any_stone = false;
-
-    if !cached_stones.is_empty() {
-        tracing::info!(count = cached_stones.len(), "Using cached stone discovery (cache hit)");
-
-        // Stream cached results progressively - spawn concurrent fetch tasks
-        let mut fetch_handles = vec![];
-
-        for cached in cached_stones {
-            // Filter by name if specified
-            if let Some(ref filter_name) = stone_filter {
-                if cached.capabilities.stone_name.to_lowercase() != filter_name.to_lowercase() {
-                    continue;
-                }
-            }
-
-            // Spawn concurrent fetch task - display as data arrives
-            let client_clone = ctx.client.clone();
-            let offerings_filter_clone = offerings_filter.clone();
-            let tended_clone = tended_stone_name.clone();
-            let handle = tokio::spawn(async move {
-                fetch_and_display_stone(&client_clone, &cached, &offerings_filter_clone, tended_clone.as_deref()).await
-            });
-            fetch_handles.push(handle);
-        }
-
-        // Wait for all concurrent fetches to complete
-        for handle in fetch_handles {
-            if let Ok(success) = handle.await {
-                if success {
-                    found_any_stone = true;
-                }
-            }
-        }
-
-        if stone_filter.is_some() && !found_any_stone {
-            println!("{}x Stone '{}' not found in cache", " ".repeat(ui::constants::DEFAULT_INDENT), stone_filter.as_ref().unwrap());
-            display_footer();
-            return Ok(());
-        }
-    } else {
-        tracing::info!("Cache miss - performing stone discovery");
-
-        // Create channel for streaming discovered stones
-        let (stone_tx, mut stone_rx) = tokio::sync::mpsc::unbounded_channel();
-
-        // Spawn discovery in blocking task (UDP operations are sync)
-        let stone_filter_clone = stone_filter.clone();
-        let mut discovery_handle = tokio::task::spawn_blocking(move || {
-            discovery::discover_all_moss_stream(
-                Duration::from_secs(5),
-                move |response, _discovery_instant| {
-                    // Filter by name if specified
-                    if let Some(ref filter_name) = stone_filter_clone {
-                        if response.stone_name.to_lowercase() != filter_name.to_lowercase() {
-                            return;
-                        }
-                    }
-
-                    // Send to async channel for immediate processing
-                    let _ = stone_tx.send(response);
-                }
-            )
-        });
-
-        println!();
-
-        // Process stones as they arrive - spawn concurrent fetch tasks immediately
-        let mut fetch_handles = vec![];
-        let client = ctx.client.clone();
-
-        loop {
-            tokio::select! {
-                Some(response) = stone_rx.recv() => {
-                    // Spawn fetch task immediately when stone discovered
-                    let client_clone = client.clone();
-                    let offerings_filter_clone = offerings_filter.clone();
-                    let tended_clone = tended_stone_name.clone();
-
-                    let handle = tokio::spawn(async move {
-                        fetch_and_display_discovered_stone(&client_clone, &response, &offerings_filter_clone, tended_clone.as_deref()).await
-                    });
-                    fetch_handles.push(handle);
-                }
-                _ = &mut discovery_handle => {
-                    // Discovery finished
-                    break;
-                }
-            }
-        }
-
-        // Wait for all concurrent fetches to complete
-        for handle in fetch_handles {
-            if let Ok(success) = handle.await {
-                if success {
-                    found_any_stone = true;
-                }
-            }
-        }
-
-        // Fallback to localhost if no stones discovered
-        if !found_any_stone {
-            found_any_stone = try_localhost_fallback(&ctx.client, &offerings_filter, tended_stone_name.as_deref()).await;
-        }
-    }
-
-    if !found_any_stone {
-        println!("{}No reachable stones found", " ".repeat(ui::constants::DEFAULT_INDENT));
-    }
+    layout.line("discovering stones...")
+        .level(IndentLevel::Card)
+        .print();
+    layout.blank();
+    layout.line("No Lantern registry found")
+        .level(IndentLevel::Card)
+        .print();
+    layout.blank();
+    layout.line("Try: garden-rake observe --tend <stone>  (to specify a tended stone)")
+        .level(IndentLevel::Card)
+        .tag("hint")
+        .print();
 
     display_footer();
     Ok(())
 }
 
+
+
 /// Display stones from topology API response (from tended Moss's cache)
-async fn display_topology_response(
-    topology: &TopologyResponse,
+/// 
+/// This function uses data already in the topology cache - NO HTTP calls per stone.
+/// The TopologyEntry already contains services and capabilities from the chirp broadcasts.
+fn display_topology_entries(
+    stones: &[TopologyEntry],
+    stone_filter: &Option<String>,
     offerings_filter: &Option<Vec<String>>,
     tended_stone_name: Option<&str>,
-    client: &reqwest::Client,
+    verbose: u8,
 ) {
-    let fmt = CliFormatter::new();
-    let indent = " ".repeat(ui::constants::DEFAULT_INDENT);
-    let term = ui::TerminalInfo::detect();
+    let layout = Layout::new();
 
-    if topology.stones.is_empty() {
-        println!("{}No stones in topology cache", indent);
-        println!();
-        println!("{}{}", indent, fmt.hint("Try: garden-rake observe --fresh  (to scan network)"));
+    if stones.is_empty() {
+        layout.line("No stones in topology cache")
+            .level(IndentLevel::Card)
+            .print();
+        layout.blank();
+        layout.line("Try: garden-rake observe --fresh  (to scan network)")
+            .level(IndentLevel::Card)
+            .tag("hint")
+            .print();
         return;
     }
 
-    for stone in &topology.stones {
-        STONE_COUNT.fetch_add(1, Ordering::SeqCst);
+    // Filter stones if name specified
+    let filtered_stones: Vec<&TopologyEntry> = if let Some(ref filter_name) = stone_filter {
+        stones.iter()
+            .filter(|s| s.stone_name.eq_ignore_ascii_case(filter_name))
+            .collect()
+    } else {
+        stones.iter().collect()
+    };
 
-        // Compare stone names case-insensitively
+    if filtered_stones.is_empty() && stone_filter.is_some() {
+        layout.status(&format!("Stone '{}' not found in topology", stone_filter.as_ref().unwrap()))
+            .level(IndentLevel::Card)
+            .error()
+            .print();
+        return;
+    }
+
+    // Display each stone using TopologyEntry data directly (no HTTP calls, no conversion)
+    for stone in filtered_stones {
+        // Skip stones without capabilities
+        if stone.capabilities.is_none() {
+            if verbose > 0 {
+                layout.status(&format!("Stone {} has no capabilities data (may be offline)", stone.stone_name))
+                    .level(IndentLevel::Card)
+                    .tag("verbose")
+                    .print();
+            }
+            continue;
+        }
+
+        // Compare stone names case-insensitively for tended marker
         let is_tended = tended_stone_name
             .map(|t| t.eq_ignore_ascii_case(&stone.stone_name))
             .unwrap_or(false);
-        let tended_marker = if is_tended { " [tended]" } else { "" };
 
-        // Stone name with status and tended marker on same line
-        let stone_name_upper = stone.stone_name.to_uppercase();
-
-        // Check if stone is reachable for status
-        let health_url = format!("{}/health", stone.endpoint.trim_end_matches('/'));
-        let status_text = match client.get(&health_url).timeout(Duration::from_millis(500)).send().await {
-            Ok(resp) if resp.status().is_success() => "thriving",
-            _ => "dormant",
-        };
-        let status_indicator = ui::status_indicator(status_text, term.supports_color);
-
-        // Calculate padding to align status at column 26
-        let name_width = 28;
-        let name_display = fmt.title(&stone_name_upper);
-        let padding = if stone_name_upper.len() < name_width {
-            " ".repeat(name_width - stone_name_upper.len())
-        } else {
-            " ".to_string()
-        };
-
-        println!("{}{}{}{}{}", indent, name_display, padding, status_indicator, tended_marker);
-
-        // Stone ID
-        println!("{}{}", indent, fmt.hint(&format!("id: {}", stone.stone_id)));
-        println!("{}{}", indent, fmt.divider(&"─".repeat(47)));
-
-        // ACCESS section
-        println!();
-        println!("{}{}", indent, fmt.group("ACCESS"));
-        let endpoint_display = stone.endpoint.trim_start_matches("http://").trim_end_matches('/');
-        println!("{}    {:<16} {}", indent, "ENDPOINT", endpoint_display);
-        println!();
-
-        // Filter services if needed
-        let filtered_services: Vec<_> = if let Some(ref filters) = offerings_filter {
-            stone.services.iter()
-                .filter(|s| filters.iter().any(|f|
-                    s.name.to_lowercase().contains(f) ||
-                    s.offering.to_lowercase().contains(f)))
-                .collect()
-        } else {
-            stone.services.iter().collect()
-        };
-
-        // OFFERINGS section
-        println!("{}{}", indent, fmt.group("OFFERINGS"));
-        if filtered_services.is_empty() && offerings_filter.is_some() {
-            println!("{}    No matching offerings", indent);
-        } else if filtered_services.is_empty() {
-            println!("{}    No offerings installed", indent);
-        } else {
-            for svc in filtered_services.iter() {
-                let status = ui::status_indicator(&svc.status.to_lowercase(), term.supports_color);
-                println!("{}    {:<20} {}", indent, svc.name, status);
-            }
-        }
-
-        println!(); // Blank line between stones
+        // Display directly from TopologyEntry - no conversion needed
+        let topology_data = TopologyStoneData { entry: stone };
+        let _ = display_topology_stone(&topology_data, offerings_filter, is_tended);
     }
 }
 
-/// Fetch and display a cached stone
-async fn fetch_and_display_stone(
-    client: &reqwest::Client,
-    cached: &CachedStone,
-    offerings_filter: &Option<Vec<String>>,
-    tended_stone_name: Option<&str>,
-) -> bool {
-    let services_url = format!("{}/api/v1/services", cached.endpoint.trim_end_matches('/'));
-    if let Ok(resp) = client.get(&services_url).timeout(Duration::from_secs(5)).send().await {
-        if let Ok(services_json) = resp.json::<serde_json::Value>().await {
-            let services: Vec<ServiceInfo> = serde_json::from_value(
-                services_json.get("data").cloned().unwrap_or(services_json)
-            ).unwrap_or_default();
 
-            let stone_data = StoneData {
-                capabilities: cached.capabilities.clone(),
-                services,
-                endpoint: cached.endpoint.clone(),
-            };
-
-            // Display as soon as data arrives
-            // Compare stone names case-insensitively
-            let is_tended = tended_stone_name
-                .map(|t| t.eq_ignore_ascii_case(&cached.capabilities.stone_name))
-                .unwrap_or(false);
-            let _ = display_stone(&stone_data, offerings_filter, is_tended);
-            return true;
-        }
-    }
-    false
-}
-
-/// Fetch and display a newly discovered stone
-async fn fetch_and_display_discovered_stone(
-    client: &reqwest::Client,
-    response: &DiscoveryResponse,
-    offerings_filter: &Option<Vec<String>>,
-    tended_stone_name: Option<&str>,
-) -> bool {
-    let caps_url = format!("{}/capabilities", response.stone_endpoint.trim_end_matches('/'));
-    if let Ok(resp) = client.get(&caps_url).timeout(Duration::from_secs(5)).send().await {
-        if let Ok(caps_response) = resp.json::<GardenApiResponse<HardwareCapabilities>>().await {
-            let services_url = format!("{}/api/v1/services", response.stone_endpoint.trim_end_matches('/'));
-            if let Ok(svc_resp) = client.get(&services_url).timeout(Duration::from_secs(5)).send().await {
-                if let Ok(services_json) = svc_resp.json::<serde_json::Value>().await {
-                    let services: Vec<ServiceInfo> = serde_json::from_value(
-                        services_json.get("data").cloned().unwrap_or(services_json)
-                    ).unwrap_or_default();
-
-                    let stone_data = StoneData {
-                        capabilities: caps_response.data,
-                        services,
-                        endpoint: response.stone_endpoint.clone(),
-                    };
-
-                    // Display as soon as data arrives
-                    // Compare stone names case-insensitively
-                    let is_tended = tended_stone_name
-                        .map(|t| t.eq_ignore_ascii_case(&stone_data.capabilities.stone_name))
-                        .unwrap_or(false);
-                    let _ = display_stone(&stone_data, offerings_filter, is_tended);
-                    return true;
-                }
-            }
-        }
-    }
-    false
-}
-
-/// Try localhost as fallback when no stones discovered
-async fn try_localhost_fallback(
-    client: &reqwest::Client,
-    offerings_filter: &Option<Vec<String>>,
-    tended_stone_name: Option<&str>,
-) -> bool {
-    let localhost = format!("http://127.0.0.1:{}", garden_common::ports::MOSS_HTTP);
-
-    let caps_url = format!("{}/capabilities", localhost);
-    if let Ok(resp) = client.get(&caps_url).timeout(Duration::from_secs(5)).send().await {
-        if let Ok(caps_response) = resp.json::<GardenApiResponse<HardwareCapabilities>>().await {
-            let services_url = format!("{}/api/v1/services", localhost);
-            if let Ok(svc_resp) = client.get(&services_url).timeout(Duration::from_secs(5)).send().await {
-                if let Ok(services_json) = svc_resp.json::<serde_json::Value>().await {
-                    let services: Vec<ServiceInfo> = serde_json::from_value(
-                        services_json.get("data").cloned().unwrap_or(services_json)
-                    ).unwrap_or_default();
-
-                    let stone_data = StoneData {
-                        capabilities: caps_response.data,
-                        services,
-                        endpoint: localhost.clone(),
-                    };
-
-                    // Compare stone names case-insensitively
-                    let is_tended = tended_stone_name
-                        .map(|t| t.eq_ignore_ascii_case(&stone_data.capabilities.stone_name))
-                        .unwrap_or(false);
-                    let _ = display_stone(&stone_data, offerings_filter, is_tended);
-                    return true;
-                }
-            }
-        }
-    }
-    false
-}
 
 /// Display topology from Lantern registry
 fn display_lantern_topology(topology: &garden_common::LanternTopology, offering_filter: Option<&str>, tended_stone_name: Option<&str>) {
@@ -529,22 +365,13 @@ fn display_lantern_topology(topology: &garden_common::LanternTopology, offering_
         let is_tended = tended_stone_name
             .map(|t| t.eq_ignore_ascii_case(&stone.name))
             .unwrap_or(false);
-        let tended_marker = if is_tended { " [tended]" } else { "" };
+        let tended_marker = if is_tended { ui::tended_marker(term.supports_color) } else { String::new() };
 
-        // Stone name with status and tended marker on same line
-        let stone_name_upper = stone.name.to_uppercase();
+        // Stone name with status and tended marker on same line - preserve original case
         let status_indicator = ui::status_indicator(&stone.status, term.supports_color);
-
-        // Calculate padding to align status at column 26
-        let name_width = 28;
-        let name_display = fmt.title(&stone_name_upper);
-        let padding = if stone_name_upper.len() < name_width {
-            " ".repeat(name_width - stone_name_upper.len())
-        } else {
-            " ".to_string()
-        };
-
-        println!("{}{}{}{}{}", indent, name_display, padding, status_indicator, tended_marker);
+        let status_with_tended = format!("{}{}", status_indicator, tended_marker);
+        let name_display = fmt.title(&stone.name);
+        println!("{}{}", indent, ui::place_value(&name_display, &status_with_tended));
 
         // Stone ID if available
         if let Some(ref stone_id) = stone.stone_id {
@@ -555,9 +382,9 @@ fn display_lantern_topology(topology: &garden_common::LanternTopology, offering_
 
         // ACCESS section
         println!();
-        println!("{}{}", indent, fmt.group("ACCESS"));
+        println!("{}    {}", indent, fmt.group("ACCESS"));
         let endpoint_display = stone.endpoint.trim_start_matches("http://").trim_end_matches('/');
-        println!("{}    {:<16} {}", indent, "ENDPOINT", endpoint_display);
+        println!("{}        {}", indent, ui::place_value("ENDPOINT", endpoint_display));
         println!();
 
         // Filter services if needed
@@ -571,15 +398,15 @@ fn display_lantern_topology(topology: &garden_common::LanternTopology, offering_
         };
 
         // OFFERINGS section
-        println!("{}{}", indent, fmt.group("OFFERINGS"));
+        println!("{}    {}", indent, fmt.group("OFFERINGS"));
         if filtered_services.is_empty() && offering_filter.is_some() {
-            println!("{}    No matching offerings", indent);
+            println!("{}        {}", indent, ui::place_value("", "No matching offerings"));
         } else if filtered_services.is_empty() {
-            println!("{}    No offerings installed", indent);
+            println!("{}        {}", indent, ui::place_value("", "No offerings installed"));
         } else {
             for svc in filtered_services.iter() {
                 let status = ui::status_indicator(&svc.status, term.supports_color);
-                println!("{}    {:<20} {}", indent, svc.name, status);
+                println!("{}        {}", indent, ui::place_value(&svc.name, &status));
             }
         }
 
@@ -587,9 +414,10 @@ fn display_lantern_topology(topology: &garden_common::LanternTopology, offering_
     }
 }
 
-/// Display a single stone with its offerings
-fn display_stone(stone: &StoneData, offering_filter: &Option<Vec<String>>, is_tended: bool) -> anyhow::Result<()> {
-    let caps = &stone.capabilities;
+/// Display stone from topology cache (lightweight view, no HTTP calls)
+fn display_topology_stone(stone: &TopologyStoneData, offering_filter: &Option<Vec<String>>, is_tended: bool) -> anyhow::Result<()> {
+    let entry = stone.entry;
+    let caps = entry.capabilities.as_ref().unwrap(); // Already filtered out None in caller
     let term = ui::TerminalInfo::detect();
     let fmt = CliFormatter::new();
     let indent = " ".repeat(ui::constants::DEFAULT_INDENT);
@@ -597,64 +425,42 @@ fn display_stone(stone: &StoneData, offering_filter: &Option<Vec<String>>, is_te
     // Increment stone counter
     STONE_COUNT.fetch_add(1, Ordering::SeqCst);
 
-    // Determine stone status from detection_status
-    let status_text = match caps.detection_status {
-        garden_common::DetectionStatus::Scanning => "waking up",
-        garden_common::DetectionStatus::Partial => "initializing",
-        garden_common::DetectionStatus::Complete => "thriving",
-    };
+    // Stone health from topology
+    let status_text = entry.health.as_str();
 
-    // Stone name with status and tended marker on same line
-    // Align status at column 26 (matching offerings table)
-    let stone_name_upper = caps.stone_name.to_uppercase();
+    // Stone name with status and tended marker
     let status_indicator = ui::status_indicator(status_text, term.supports_color);
-    let tended_marker = if is_tended { " [tended]" } else { "" };
+    let tended_marker = if is_tended { ui::tended_marker(term.supports_color) } else { String::new() };
+    let status_with_tended = format!("{}{}", status_indicator, tended_marker);
+    let name_display = fmt.title(&entry.stone_name);
+    println!("{}{}", indent, ui::place_value(&name_display, &status_with_tended));
 
-    // Calculate padding to align status
-    let name_width = 28;
-    let name_display = fmt.title(&stone_name_upper);
-    let padding = if stone_name_upper.len() < name_width {
-        " ".repeat(name_width - stone_name_upper.len())
-    } else {
-        " ".to_string()
-    };
-
-    println!("{}{}{}{}{}", indent, name_display, padding, status_indicator, tended_marker);
-
-    // Stone ID (if available)
-    if let Some(ref stone_id) = caps.stone_id {
-        println!("{}{}", indent, fmt.hint(&format!("id: {}", stone_id)));
-    }
-
+    // Stone ID
+    println!("{}{}", indent, fmt.hint(&format!("id: {}", entry.stone_id)));
     println!("{}{}", indent, fmt.divider(&"─".repeat(47)));
 
     // === ACCESS SECTION ===
     println!();
-    println!("{}{}", indent, fmt.group("ACCESS"));
-
-    // Parse endpoint to extract IP and port
-    let endpoint_clean = stone.endpoint.trim_start_matches("http://").trim_end_matches('/');
+    println!("{}    {}", indent, fmt.group("ACCESS"));
+    let endpoint_clean = entry.endpoint.trim_start_matches("http://").trim_end_matches('/');
     let (ip_addr, port) = if let Some(colon_pos) = endpoint_clean.rfind(':') {
         (&endpoint_clean[..colon_pos], &endpoint_clean[colon_pos + 1..])
     } else {
         (endpoint_clean, "7185")
     };
-
-    // mDNS name is stone_name.local
-    let mdns_name = format!("{}.local", caps.stone_name.to_lowercase());
-
-    println!("{}    {:<16} http://{}:{}", indent, "HTTP", ip_addr, port);
-    println!("{}    {:<16} {}", indent, "MDNS", mdns_name);
-    println!("{}    {:<16} {}", indent, "IP", ip_addr);
+    let mdns_name = format!("{}.local", entry.stone_name.to_lowercase());
+    println!("{}        {}", indent, ui::place_value("HTTP", &format!("http://{}:{}", ip_addr, port)));
+    println!("{}        {}", indent, ui::place_value("MDNS", &mdns_name));
+    println!("{}        {}", indent, ui::place_value("IP", ip_addr));
 
     // === HARDWARE SECTION ===
     println!();
-    println!("{}{}", indent, fmt.group("HARDWARE"));
-    println!("{}    {:<16} {}", indent, "ARCH", caps.hardware.cpu.architecture);
-    println!("{}    {:<16} {} cores", indent, "CPU", caps.hardware.cpu.cores);
-    println!("{}    {:<16} {} GB", indent, "MEMORY", caps.hardware.memory.total_mb / 1024);
+    println!("{}    {}", indent, fmt.group("HARDWARE"));
+    println!("{}        {}", indent, ui::place_value("ARCH", &caps.hardware.cpu.architecture));
+    println!("{}        {}", indent, ui::place_value("CPU", &format!("{} cores", caps.hardware.cpu.cores)));
+    println!("{}        {}", indent, ui::place_value("MEMORY", &format!("{} GB", caps.hardware.memory.total_mb / 1024)));
 
-    // Show primary storage if available
+    // Storage
     if !caps.hardware.storage.is_empty() {
         if let Some(largest) = caps.hardware.storage.iter().max_by_key(|d| d.size_gb) {
             let disk_type_str = match largest.disk_type {
@@ -668,19 +474,14 @@ fn display_stone(stone: &StoneData, offering_filter: &Option<Vec<String>>, is_te
             } else {
                 format!("{} GB {} ({:.0}% used)", largest.size_gb, disk_type_str, largest.used_percent)
             };
-            println!("{}    {:<16} {}", indent, "STORAGE", storage_value);
+            println!("{}        {}", indent, ui::place_value("STORAGE", &storage_value));
         }
     }
 
-    // Show AI capabilities if available
+    // AI capabilities
     if let Some(ref ai_caps) = caps.hardware.ai_capabilities {
         if ai_caps.gpu_count > 0 {
-            let gpu_text = if ai_caps.gpu_count == 1 {
-                "1 GPU".to_string()
-            } else {
-                format!("{} GPUs", ai_caps.gpu_count)
-            };
-
+            let gpu_text = if ai_caps.gpu_count == 1 { "1 GPU".to_string() } else { format!("{} GPUs", ai_caps.gpu_count) };
             let vram_text = if ai_caps.total_vram_mb >= 1024 {
                 format!(" ({} GB)", ai_caps.total_vram_mb / 1024)
             } else if ai_caps.total_vram_mb > 0 {
@@ -688,7 +489,6 @@ fn display_stone(stone: &StoneData, offering_filter: &Option<Vec<String>>, is_te
             } else {
                 String::new()
             };
-
             let runtime_text = if !ai_caps.runtimes.is_empty() {
                 let base_runtimes: Vec<String> = ai_caps.runtimes.iter()
                     .filter(|r| !r.contains(':'))
@@ -700,96 +500,40 @@ fn display_stone(stone: &StoneData, offering_filter: &Option<Vec<String>>, is_te
                         _ => r.to_uppercase(),
                     })
                     .collect();
-
-                if !base_runtimes.is_empty() {
-                    format!(" - {}", base_runtimes.join(", "))
-                } else {
-                    String::new()
-                }
+                if !base_runtimes.is_empty() { format!(" - {}", base_runtimes.join(", ")) } else { String::new() }
             } else {
                 String::new()
             };
-
-            println!("{}    {:<16} {}{}{}", indent, "AI", gpu_text, vram_text, runtime_text);
-        }
-    } else {
-        // Fallback to old GPU detection
-        let ai_devices: Vec<&garden_common::GpuInfo> = caps.hardware.gpus.iter()
-            .filter(|gpu| {
-                !gpu.ai_runtimes.is_empty() ||
-                gpu.capabilities.iter().any(|c| c == "cuda" || c == "rocm" || c == "vulkan" || c == "directml")
-            })
-            .collect();
-
-        if !ai_devices.is_empty() {
-            println!("{}    {:<16} {} device(s)", indent, "AI", ai_devices.len());
+            println!("{}        {}", indent, ui::place_value("AI", &format!("{}{}{}", gpu_text, vram_text, runtime_text)));
         }
     }
 
-    // Filter services if needed
-    let filtered_services: Vec<&ServiceInfo> = if let Some(ref filters) = offering_filter {
-        stone.services.iter()
-            .filter(|s| filters.contains(&s.name.to_lowercase()))
+    // === OFFERINGS SECTION (lightweight from topology) ===
+    println!();
+    println!("{}    {}", indent, fmt.group("OFFERINGS"));
+
+    // Filter services from topology
+    let filtered_services: Vec<_> = if let Some(ref filters) = offering_filter {
+        entry.services.iter()
+            .filter(|s| filters.contains(&s.offering.to_lowercase()))
             .collect()
     } else {
-        stone.services.iter().collect()
+        entry.services.iter().collect()
     };
 
-    // === OFFERINGS SECTION ===
-    println!();
-    println!("{}{}", indent, fmt.group("OFFERINGS"));
-
     if filtered_services.is_empty() && offering_filter.is_some() {
-        println!("{}    No matching offerings", indent);
-        let hidden = stone.services.len();
+        println!("{}        {}", indent, ui::place_value("", "No matching offerings"));
+        let hidden = entry.services.len();
         if hidden > 0 {
-            println!("{}    ({} other service{})", indent, hidden, if hidden == 1 { "" } else { "s" });
+            println!("{}        ({} other service{})", indent, hidden, if hidden == 1 { "" } else { "s" });
         }
     } else if filtered_services.is_empty() {
-        println!("{}    No offerings installed", indent);
+        println!("{}        {}", indent, ui::place_value("", "No offerings installed"));
     } else {
-        // Build offerings table
-        let mut table = ui::TableBuilder::new()
-            .with_indent(ui::constants::DEFAULT_INDENT * 2)
-            .add_column(24, ui::Align::Left)
-            .add_column(14, ui::Align::Left)
-            .add_column(10, ui::Align::Right)
-            .add_column(10, ui::Align::Right)
-            .add_column(10, ui::Align::Right)
-            .add_column(10, ui::Align::Right);
-
-        for svc in filtered_services.iter() {
-            let status_indicator = ui::status_indicator(&format!("{:?}", svc.status).to_lowercase(), term.supports_color);
-
-            if let Some(ref res) = svc.resources {
-                table.add_row(vec![
-                    ui::truncate_name(&svc.name, ui::constants::MAX_SERVICE_NAME_LEN),
-                    status_indicator,
-                    res.cpu_friendly.clone(),
-                    res.memory_friendly.clone(),
-                    res.network_rx_friendly.clone(),
-                    res.uptime_friendly.clone(),
-                ]);
-            } else {
-                table.add_row(vec![
-                    ui::truncate_name(&svc.name, ui::constants::MAX_SERVICE_NAME_LEN),
-                    status_indicator,
-                    "-".to_string(),
-                    "-".to_string(),
-                    "-".to_string(),
-                    "-".to_string(),
-                ]);
-            }
-        }
-
-        println!("{}", table.render());
-
-        // Show hidden count if filtered
-        if offering_filter.is_some() {
-            let hidden = stone.services.len() - filtered_services.len();
-            if hidden > 0 {
-                println!("{}    + {} other service{}", indent, hidden, if hidden == 1 { "" } else { "s" });
-            }
+        // Simple list (no resource metrics in topology cache)
+        for svc in filtered_services {
+            let status_indicator = ui::status_indicator(&svc.status, term.supports_color);
+            println!("{}        {}", indent, ui::place_value(&format!("{} ({})", svc.name, svc.offering), &status_indicator));
         }
     }
 
@@ -797,16 +541,19 @@ fn display_stone(stone: &StoneData, offering_filter: &Option<Vec<String>>, is_te
     Ok(())
 }
 
-/// Display footer with stone count and related commands
+/// Display footer with stone count and hints
 fn display_footer() {
+    let layout = Layout::new();
     let fmt = CliFormatter::new();
-    let indent = " ".repeat(ui::constants::DEFAULT_INDENT);
     let count = STONE_COUNT.load(Ordering::SeqCst);
 
-    println!("{}{}", indent, fmt.divider(&"─".repeat(47)));
-    println!("{}{} stone{} discovered", indent, count, if count == 1 { "" } else { "s" });
-    println!();
-    println!("{}{}", indent, fmt.hint("For stone details:      garden-rake <stone>?"));
-    println!("{}{}", indent, fmt.hint("To tend a stone:        garden-rake tend <stone>"));
-    println!();
+    // Footer at Card level (matching stone header level)
+    let indent_card = IndentLevel::Card.indent();
+
+    println!("{}{}", indent_card, fmt.divider(&"─".repeat(47)));
+    println!("{}{} stone{} discovered", indent_card, count, if count == 1 { "" } else { "s" });
+    layout.blank();
+    println!("{}{}", indent_card, fmt.hint("For stone details:      garden-rake <stone>?"));
+    println!("{}{}", indent_card, fmt.hint("To tend a stone:        garden-rake tend <stone>"));
+    // Related commands are printed by suggestions::print_suggestions() after execute()
 }

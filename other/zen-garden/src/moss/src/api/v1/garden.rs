@@ -1,5 +1,5 @@
 ﻿use axum::{
-    extract::{Path, Query, State},
+    extract::{Path, State},
     http::{HeaderMap, StatusCode},
     Json,
 };
@@ -7,8 +7,7 @@ use crate::api::responses::{GardenOverview, StoneInfo, ApiResponse};
 use crate::api::suggestions::{generate_suggestions, SuggestionContext};
 use crate::{error_response, AppState, metrics};
 use crate::domain::{placement::{PlacementRequest, PlacementResponse}, topology};
-use garden_common::{api_utils::ApiErrorResponse, ChirpServiceInfo, CpuCapabilities, DetectionStatus, DiskCapabilities, HardwareCapabilities, HardwareInventory, MemoryCapabilities};
-use serde::{Deserialize, Serialize};
+use garden_common::{api_utils::ApiErrorResponse, CpuCapabilities, DetectionStatus, DiskCapabilities, HardwareCapabilities, HardwareInventory, MemoryCapabilities};
 
 /// GET /api/v1/garden - Get garden overview (all stones)
 pub async fn get_garden_v1(
@@ -183,93 +182,53 @@ async fn get_local_stone_info(state: &AppState) -> Result<StoneInfo, (StatusCode
 
 // === TOPOLOGY API ===
 
-/// Query parameters for topology endpoint
-#[derive(Debug, Deserialize, Default)]
-pub struct TopologyQueryParams {
-    /// If true, include the local stone in the response
-    #[serde(default)]
-    pub include_local: bool,
-}
-
-/// Stone entry in topology response
-#[derive(Debug, Clone, Serialize)]
-pub struct TopologyStone {
-    pub stone_id: String,
-    pub stone_name: String,
-    pub endpoint: String,
-    pub moss_version: String,
-    pub services: Vec<ChirpServiceInfo>,
-    pub last_seen: String,
-}
-
-/// Topology response containing all known stones
-#[derive(Debug, Serialize)]
-pub struct TopologyResponse {
-    pub stones: Vec<TopologyStone>,
-    pub local_stone_id: String,
-    pub local_stone_name: String,
-}
-
-/// GET /api/v1/garden/topology - Get topology cache (all known stones from chirps)
+/// GET /api/v1/garden/topology - Get all known stones in the garden
 ///
-/// Returns the list of stones discovered via UDP chirps.
-/// Use ?include_local=true to also include the local stone in the response.
+/// Returns all stones as TopologyEntry objects: self entry first, then peers from cache.
+/// No conversion needed - TopologyEntry is the universal model.
 pub async fn get_topology_v1(
     State(state): State<AppState>,
-    Query(params): Query<TopologyQueryParams>,
     headers: HeaderMap,
-) -> Result<Json<ApiResponse<TopologyResponse>>, (StatusCode, Json<ApiErrorResponse>)> {
-    let mut stones: Vec<TopologyStone> = topology::get_all_stones(&state.topology_cache)
-        .await
-        .into_iter()
-        .map(|entry| TopologyStone {
-            stone_id: entry.stone_id,
-            stone_name: entry.stone_name,
-            endpoint: entry.endpoint,
-            moss_version: entry.moss_version,
-            services: entry.services,
-            last_seen: entry.last_seen.to_rfc3339(),
-        })
-        .collect();
+) -> Result<Json<ApiResponse<Vec<topology::TopologyEntry>>>, (StatusCode, Json<ApiErrorResponse>)> {
+    // Step 1: Read self entry (single source of truth for local stone)
+    let self_entry = state.self_entry.read().await.clone();
+    
+    tracing::debug!(
+        stone_id = %self_entry.stone_id,
+        stone_name = %self_entry.stone_name,
+        services = self_entry.services.len(),
+        health = %self_entry.health,
+        "Topology: self entry prepared"
+    );
 
-    // Optionally include local stone
-    if params.include_local {
-        // Get local stone's services from registry
-        let local_services: Vec<ChirpServiceInfo> = {
-            let registry = state.registry.read().await;
-            registry.iter().map(|svc| ChirpServiceInfo {
-                name: svc.name.clone(),
-                offering: svc.offering.clone(),
-                category: svc.offering.clone(), // Use offering as category fallback
-                status: format!("{:?}", svc.status),
-            }).collect()
-        };
+    // Step 2: Start response with self entry first
+    let mut stones = vec![self_entry.clone()];
 
-        // Get local endpoint
-        let current_ip = state.network_monitor.get_ip().await;
-        let local_endpoint = format!("http://{}:{}", current_ip, state.api_port);
+    // Step 3: Add all cached peer stones (skipping self if present)
+    let cache_entries = topology::get_all_stones(&state.topology_cache).await;
 
-        stones.push(TopologyStone {
-            stone_id: state.stone_id.clone(),
-            stone_name: state.stone_name.clone(),
-            endpoint: local_endpoint,
-            moss_version: format!("{}.{}", env!("CARGO_PKG_VERSION"), env!("BUILD_NUMBER")),
-            services: local_services,
-            last_seen: chrono::Utc::now().to_rfc3339(),
-        });
+    for entry in cache_entries {
+        if entry.stone_id == state.stone_id {
+            tracing::debug!(
+                cached_stone_id = %entry.stone_id,
+                "Topology: skipping self from cache"
+            );
+            continue;
+        }
+
+        stones.push(entry);
     }
 
-    let response = TopologyResponse {
-        stones,
-        local_stone_id: state.stone_id.clone(),
-        local_stone_name: state.stone_name.clone(),
-    };
+    tracing::debug!(
+        total_stones = stones.len(),
+        "Topology: response built"
+    );
 
     let ctx = SuggestionContext::from_headers(&headers, "topology_query");
     let suggestions = generate_suggestions(&ctx);
 
     Ok(Json(ApiResponse {
-        data: response,
+        data: stones,
         suggestions,
     }))
 }

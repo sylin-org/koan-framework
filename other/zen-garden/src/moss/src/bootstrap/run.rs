@@ -47,7 +47,47 @@ pub async fn run(config: DaemonConfig) -> anyhow::Result<()> {
     let stone_id = infra::load_or_generate_stone_id().await;
     tracing::info!(stone_id = %stone_id, stone_name = %stone_name, "Stone identity loaded");
 
-    // Phase 1: First-boot initialization (Linux only)
+    // Phase 0.5: Initialize self topology entry
+    // Create with minimal identity, will be progressively enriched during boot
+    let self_entry = Arc::new(RwLock::new(crate::domain::TopologyEntry {
+        stone_id: stone_id.clone(),
+        stone_name: stone_name.clone(),
+        endpoint: String::new(), // Will be set in Phase 3
+        moss_version: version_string(),
+        services: Vec::new(),
+        mac: None, // Will be set in Phase 2
+        health: garden_common::constants::STONE_STARTING.to_string(),
+        capabilities: None, // Will be set in Phase 9
+        status: garden_common::StoneStatus::Online,
+        discovered_at: chrono::Utc::now(),
+        last_seen: chrono::Utc::now(),
+    }));
+    tracing::debug!("Self topology entry initialized (health=starting)");
+
+    // Phase 1: Start UDP listener EARLY (can now respond to discovery requests)
+    // Listener needs minimal dependencies: stone_id, stone_name, topology_cache
+    // Self-entry will be progressively updated as boot continues
+    let topology_cache = Arc::new(RwLock::new(std::collections::HashMap::new()));
+    
+    // Console is needed for UDP listener, create it early
+    let console_printer = Arc::new(console::ConsolePrinter::with_dedup_ttl(
+        config.console_mode,
+        config.event_dedup_ttl_secs,
+    ));
+    
+    // Start UDP listener - can now respond to announcement requests with current self_entry state
+    start_discovery_listener(
+        stone_id.clone(),
+        stone_name.clone(),
+        String::new(), // Endpoint not yet known, will be set in Phase 3.5
+        topology_cache.clone(),
+        self_entry.clone(),
+        &console_printer,
+    )
+    .await;
+    tracing::info!("UDP listener started at Phase 1 (can respond to discovery requests)");
+
+    // Phase 1.5: First-boot initialization (Linux only)
     // Windows/dev environments don't need hostname/hosts/avahi setup
     if cfg!(target_os = "linux") && console::is_first_run() {
         start_first_boot_task(&stone_name, port, config.docker_retry_delay_secs());
@@ -61,6 +101,9 @@ pub async fn run(config: DaemonConfig) -> anyhow::Result<()> {
             .with_connected_poll(30)
     ).await;
 
+    // Phase 2.5: Get MAC address for self entry
+    let (_, mac_address) = crate::infra::network::get_local_ip_and_mac();
+
     // Phase 3: Resolve API endpoint
     // Prefer explicit STONE_HOST, otherwise use monitored network IP
     let use_static_host = std::env::var(garden_common::ENV_STONE_HOST)
@@ -73,8 +116,29 @@ pub async fn run(config: DaemonConfig) -> anyhow::Result<()> {
         format!("http://{}:{}", network_monitor.get_ip().await, port)
     };
 
-    // Phase 4: mDNS announcement (Linux only) - includes stone_id in TXT records
-    let _mdns = match mdns::announce_moss(Some(stone_id.as_str()), &stone_name, port) {
+    // Phase 3.5: Update self entry with network configuration
+    {
+        let mut entry = self_entry.write().await;
+        entry.endpoint = api_endpoint.clone();
+        entry.mac = mac_address.clone();
+        entry.health = garden_common::constants::STONE_INITIALIZING.to_string();
+        entry.last_seen = chrono::Utc::now();
+    }
+    tracing::debug!(endpoint = %api_endpoint, mac = ?mac_address, "Self entry updated (health=initializing)");
+    
+    // Auto-chirp: Network configuration complete
+    {
+        let entry = self_entry.read().await.clone();
+        if let Err(e) = crate::announcement::announce(&entry).await {
+            tracing::warn!(error = ?e, "Failed to auto-chirp after network config");
+        } else {
+            tracing::debug!("Auto-chirp sent after network configuration");
+        }
+    }
+
+    // Phase 4: mDNS announcement (Linux only) - includes stone_id and MAC in TXT records
+    let (_, mac_for_mdns) = crate::infra::network::get_local_ip_and_mac();
+    let _mdns = match mdns::announce_moss(Some(stone_id.as_str()), &stone_name, port, mac_for_mdns.as_deref()) {
         Ok(daemon) => Some(daemon),
         Err(e) => {
             tracing::warn!(error = ?e, "mDNS announcement failed");
@@ -84,8 +148,7 @@ pub async fn run(config: DaemonConfig) -> anyhow::Result<()> {
 
     // Phase 4.5: Start mDNS lurk-listener (moved to Phase 11 after state creation)
 
-    // Phase 5: Lantern registration
-    // Console is None here since console_printer is created later
+    // Phase 6: Lantern registration (console already created in Phase 1)
     start_lantern_registration(
         &stone_id,
         &stone_name,
@@ -93,14 +156,9 @@ pub async fn run(config: DaemonConfig) -> anyhow::Result<()> {
         port,
         use_static_host.is_some(),
         &network_monitor,
-        None,
+        Some(&console_printer),
     ).await;
 
-    // Phase 6: Console printer
-    let console_printer = Arc::new(console::ConsolePrinter::with_dedup_ttl(
-        config.console_mode,
-        config.event_dedup_ttl_secs,
-    ));
     emit_startup_events(&console_printer, &config);
 
     // Phase 7: Docker connection
@@ -112,6 +170,25 @@ pub async fn run(config: DaemonConfig) -> anyhow::Result<()> {
 
     // Phase 9: Capabilities loading
     let capabilities_arc = init_capabilities(&stone_id, &stone_name, &console_printer).await;
+
+    // Phase 9.5: Update self entry with capabilities and set health to thriving
+    {
+        let mut entry = self_entry.write().await;
+        entry.capabilities = capabilities_arc.read().await.clone();
+        entry.health = garden_common::constants::STONE_THRIVING.to_string();
+        entry.last_seen = chrono::Utc::now();
+    }
+    tracing::debug!("Self entry updated with capabilities (health=thriving)");
+    
+    // Auto-chirp: Capabilities complete
+    {
+        let entry = self_entry.read().await.clone();
+        if let Err(e) = crate::announcement::announce(&entry).await {
+            tracing::warn!(error = ?e, "Failed to auto-chirp after capabilities update");
+        } else {
+            tracing::debug!("Auto-chirp sent after capabilities detection");
+        }
+    }
 
     // Phase 10: Build AppState
     let state = AppState {
@@ -132,22 +209,27 @@ pub async fn run(config: DaemonConfig) -> anyhow::Result<()> {
         capabilities: capabilities_arc.clone(),
         network_monitor: Arc::new(network_monitor),
         api_port: port,
-        topology_cache: Arc::new(RwLock::new(std::collections::HashMap::new())),
+        topology_cache: topology_cache.clone(),
+        self_entry: self_entry.clone(),
     };
 
-    // Phase 11: Start background tasks (including UDP chirp listener for topology updates)
-    start_discovery_listener(
-        stone_id.clone(),
-        stone_name.clone(),
-        api_endpoint.clone(),
-        state.topology_cache.clone(),
-        &console_printer,
-    )
-    .await;
+    // Phase 11: Start background tasks
+    // UDP listener already started in Phase 1
     start_hardware_detection(stone_name.clone(), capabilities_arc.clone(), console_printer.clone(), state.clone());
     start_registry_loader(state.clone());
     start_catalog_builder(state.clone(), console_printer.clone());
     start_manifest_loader(state.clone(), console_printer.clone());
+    
+    // Phase 11.3: Sync self_entry services after registry loads
+    let state_for_sync = state.clone();
+    tokio::spawn(async move {
+        // Wait for registry to load
+        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+        
+        // Use helper method to sync and chirp
+        state_for_sync.sync_self_services(true).await;
+        tracing::debug!("Initial service sync complete");
+    });
 
     // Phase 11.5: mDNS lurk-listener (passive topology discovery)
     // Listens for mDNS announcements from neighbor stones to populate topology cache
@@ -161,16 +243,27 @@ pub async fn run(config: DaemonConfig) -> anyhow::Result<()> {
                             stone_id = ?discovered.stone_id,
                             stone_name = %discovered.stone_name,
                             endpoint = %discovered.endpoint,
+                            mac = ?discovered.mac,
                             "mDNS: Neighbor stone discovered and cached"
                         );
                         // Add to topology cache (only if stone_id is present)
                         if let Some(sid) = discovered.stone_id {
-                            crate::domain::topology::upsert_stone(
+                            let entry = crate::domain::TopologyEntry {
+                                stone_id: sid,
+                                stone_name: discovered.stone_name,
+                                endpoint: discovered.endpoint,
+                                moss_version: "unknown".to_string(), // mDNS doesn't provide version
+                                services: vec![], // mDNS doesn't provide services
+                                mac: discovered.mac,
+                                health: garden_common::constants::STONE_INITIALIZING.to_string(), // mDNS = early discovery
+                                capabilities: None, // mDNS doesn't provide capabilities
+                                status: garden_common::StoneStatus::Online,
+                                discovered_at: chrono::Utc::now(),
+                                last_seen: chrono::Utc::now(),
+                            };
+                            crate::domain::topology::upsert_from_chirp(
                                 &topology_cache_for_mdns,
-                                sid,
-                                discovered.stone_name,
-                                discovered.endpoint,
-                                "unknown".to_string(), // mDNS doesn't provide version
+                                entry,
                             ).await;
                         }
                     }
@@ -191,20 +284,30 @@ pub async fn run(config: DaemonConfig) -> anyhow::Result<()> {
     let discovered_peers = crate::discovery::discover_peers(&stone_id, 3).await;
     for peer in discovered_peers {
         if let Some(peer_id) = peer.stone_id {
-            crate::domain::topology::upsert_stone(
+            let entry = crate::domain::TopologyEntry {
+                stone_id: peer_id,
+                stone_name: peer.stone_name,
+                endpoint: peer.stone_endpoint,
+                moss_version: peer.moss_version,
+                services: vec![], // Discovery response doesn't include services yet
+                mac: None, // Will be populated by later chirps
+                health: garden_common::constants::STONE_INITIALIZING.to_string(),
+                capabilities: None,
+                status: garden_common::StoneStatus::Online,
+                discovered_at: chrono::Utc::now(),
+                last_seen: chrono::Utc::now(),
+            };
+            crate::domain::topology::upsert_from_chirp(
                 &state.topology_cache,
-                peer_id,
-                peer.stone_name,
-                peer.stone_endpoint,
-                peer.moss_version,
+                entry,
             ).await;
         }
     }
 
     // Phase 13: Initial announcement (announce ourselves)
     tracing::info!("Sending initial announcement...");
-    let payload = crate::announcement::build_payload(&state).await;
-    if let Err(e) = crate::announcement::announce(payload).await {
+    let entry = state.self_entry.read().await.clone();
+    if let Err(e) = crate::announcement::announce(&entry).await {
         tracing::warn!(error = ?e, "Initial announcement failed");
     }
 
@@ -219,10 +322,9 @@ pub async fn run(config: DaemonConfig) -> anyhow::Result<()> {
             match event_rx.recv().await {
                 Ok(event) if event.message.contains("service") || event.message.contains("offering") => {
                     tracing::debug!(message = %event.message, "Service-related event detected, announcing");
-                    let payload = crate::announcement::build_payload(&state_for_events).await;
-                    if let Err(e) = crate::announcement::announce(payload).await {
-                        tracing::warn!(error = ?e, "Event-driven announcement failed");
-                    }
+                    
+                    // Sync services and chirp
+                    state_for_events.sync_self_services(true).await;
                 }
                 Ok(_) => {},
                 Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
@@ -247,6 +349,16 @@ pub async fn run(config: DaemonConfig) -> anyhow::Result<()> {
     let app = router::configure(state.clone());
     let listener = bind_server(port, &console_printer).await?;
 
+    // Create shutdown callback to send goodbye announcement
+    let goodbye_state = state.clone();
+    let shutdown_callback: crate::bootstrap::server::ShutdownCallback = Box::new(move || {
+        Box::pin(async move {
+            if let Err(e) = crate::announcement::send_goodbye(&goodbye_state).await {
+                tracing::warn!(error = ?e, "Failed to send goodbye announcement");
+            }
+        })
+    });
+
     run_server(
         listener,
         app,
@@ -254,6 +366,7 @@ pub async fn run(config: DaemonConfig) -> anyhow::Result<()> {
         console_printer,
         shutdown_tx,
         ServerConfig::default(),
+        Some(shutdown_callback),
     ).await
 }
 

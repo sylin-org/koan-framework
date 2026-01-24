@@ -1,63 +1,28 @@
 #!/bin/bash
-# Moss Update Helper - Processes staged upgrades before moss starts
-# This script runs as root via systemd ExecStartPre
+# moss-update-helper.sh - Check for staged binaries before Moss starts
 #
-# Handles two upgrade methods:
-# 1. Package-based: pending-upgrade.tar.gz (new unified method)
-# 2. Binary-based: *.staged files (legacy method for backwards compatibility)
-#
-# Staging locations:
-# - /var/lib/zen-garden/staging/ : HTTP API deployments (root writes here)
-# - /home/stone/bin/             : SSH deployments (stone user writes here)
+# This script runs as ExecStartPre in the systemd unit (before garden-upgrade.sh).
+# It checks if there are staged binaries from a previous upgrade attempt.
+# The actual installation is handled by garden-upgrade.sh.
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-STAGING_DIR="/var/lib/zen-garden/staging"
-PACKAGE_FILE="$STAGING_DIR/pending-upgrade.tar.gz"
-
-# Legacy staging locations for individual binaries
-STAGING_DIRS=(
-    "/var/lib/zen-garden/staging"  # HTTP API (root-owned)
-    "/home/stone/bin"               # SSH (stone-owned)
-)
-TARGET_DIR="/usr/local/bin"
+STAGING_DIR="/var/lib/zen-garden/staging/validated"
 
 log() {
     echo "[moss-update-helper] $1"
 }
 
-# Process a staged binary from any staging location
-# Args: $1 = component name (garden-moss or garden-rake)
-process_staged_binary() {
-    local component="$1"
-    local staged_file="${component}.staged"
-    local target_path="${TARGET_DIR}/${component}"
+log "Starting update check..."
 
-    for staging_dir in "${STAGING_DIRS[@]}"; do
-        local staged_path="${staging_dir}/${staged_file}"
+# Check if we have staged binaries
+if [[ -d "$STAGING_DIR/bin" ]]; then
+    log "Found staged binaries - will be installed by garden-upgrade.sh"
+else
+    log "No staged binaries found"
+fi
 
-        if [ -f "$staged_path" ]; then
-            log "Found staged ${component} in ${staging_dir}"
-
-            # Validate it's actually an executable
-            if ! file "$staged_path" | grep -qE '(ELF|executable)'; then
-                log "WARNING: ${staged_path} doesn't appear to be a valid executable, skipping"
-                rm -f "$staged_path"
-                continue
-            fi
-
-            # Backup current binary
-            if [ -f "$target_path" ]; then
-                cp "$target_path" "${target_path}.backup" 2>/dev/null || true
-                log "Backed up current ${component}"
-            fi
-
-            # Copy staged binary to target
-            if cp "$staged_path" "$target_path"; then
-                chmod +x "$target_path"
-                rm -f "$staged_path"
-                log "${component} updated successfully from ${staging_dir}"
+exit 0
                 return 0
             else
                 log "ERROR: Failed to copy ${staged_path} to ${target_path}"

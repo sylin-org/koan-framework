@@ -8,7 +8,7 @@ use crate::api::suggestions::{generate_suggestions, SuggestionContext};
 use crate::{error_response, AppState};
 use garden_common::{
     api_utils::{ApiErrorResponse, sanitize_query, sanitize_name, sanitize_tag, is_suspicious},
-    ServiceInfo, ServiceStatus,
+    Ports, ServiceHealthStatus, ServiceInfo, ServiceStatus,
 };
 
 /// Query parameters for GET /api/v1/services
@@ -268,6 +268,34 @@ pub async fn create_service_v1(
     };
 
     state.jobs.write().await.insert(job_id.clone(), job);
+
+    // Add service to registry immediately with Installing status
+    // This ensures `rake list` shows the service as planting
+    {
+        let native_port = compiled.ports.first().map(|(host, _)| *host).unwrap_or(30000);
+        let installing_info = ServiceInfo {
+            name: offering.clone(),
+            offering: offering.clone(),
+            version: compiled.image.split(':').next_back().unwrap_or("latest").into(),
+            status: ServiceStatus::Installing,
+            health: ServiceHealthStatus::Offline,
+            ports: Ports {
+                native: native_port,
+                agnostic: None,
+            },
+            resources: None,
+            job_id: Some(job_id.clone()),
+        };
+
+        let mut registry = state.registry.write().await;
+        // Replace if exists (shouldn't happen, but be safe)
+        if let Some(existing) = registry.iter_mut().find(|svc| svc.name == offering) {
+            *existing = installing_info;
+        } else {
+            registry.push(installing_info);
+        }
+    }
+    let _ = state.persist_registry().await;
 
     // Spawn async installation task
     let state_clone = state.clone();

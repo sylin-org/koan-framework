@@ -318,11 +318,12 @@ pub async fn refresh_catalog_v1(
 // Helper functions
 
 fn simplify_health(status: &garden_common::ServiceStatus) -> String {
-    use garden_common::ServiceStatus;
+    use garden_common::{ServiceStatus, constants};
     match status {
-        ServiceStatus::Running => "healthy".to_string(),
-        ServiceStatus::Stopped | ServiceStatus::Unknown => "unhealthy".to_string(),
-        ServiceStatus::Maintenance | ServiceStatus::Degraded => "degraded".to_string(),
+        ServiceStatus::Running => constants::HEALTH_HEALTHY.to_string(),
+        ServiceStatus::Stopped | ServiceStatus::Unknown => constants::HEALTH_UNHEALTHY.to_string(),
+        ServiceStatus::Maintenance | ServiceStatus::Degraded => constants::HEALTH_DEGRADED.to_string(),
+        ServiceStatus::Installing => constants::HEALTH_INSTALLING.to_string(),
     }
 }
 

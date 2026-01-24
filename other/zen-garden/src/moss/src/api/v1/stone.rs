@@ -1,7 +1,10 @@
-// Stone Operations API
+// Stone Software Operations API
 //
-// Purpose: System-level operations on the stone itself
-// Custom actions using single-colon format: :upgrade, :shutdown, :deploy
+// Purpose: Software-level operations on the stone (upgrade, deploy, info)
+// Custom actions using single-colon format: :upgrade, :deploy
+//
+// Note: Machine power operations (shutdown, reboot) moved to /api/v1/admin/stone/
+// See: docs/decisions/API-0002-admin-hierarchy.md
 
 use axum::{
     body::Bytes,
@@ -9,13 +12,77 @@ use axum::{
     http::{HeaderMap, StatusCode},
 };
 use base64::Engine;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use sha2::{Sha256, Digest};
 
 use crate::AppState;
+use crate::api::responses::ApiResponse;
+use garden_common::api_utils::ApiErrorResponse;
 use crate::domain::validate_binary_architecture;
-use garden_common::names::{MOSS_BINARY, RAKE_BINARY};
+use garden_common::{names::{MOSS_BINARY, RAKE_BINARY}, HardwareCapabilities, ServiceInfo};
+
+// ============================================================================
+// Stone Info Endpoint (for observe command)
+// ============================================================================
+
+/// Combined stone information response
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StoneInfoResponse {
+    /// Hardware capabilities (CPU, memory, GPU, storage)
+    pub capabilities: HardwareCapabilities,
+    /// Active services on this stone
+    pub services: Vec<ServiceInfo>,
+    /// Stone endpoint (for reference)
+    pub endpoint: String,
+}
+
+/// GET /api/v1/stone/info - Get complete stone information
+///
+/// Returns everything needed for `observe` command in one response.
+/// Optimized for garden-wide discovery and status displays.
+/// Eliminates multiple round-trips (capabilities + services).
+///
+/// # Response
+/// - 200: StoneInfoResponse with capabilities + services + endpoint
+/// - 500: Internal error
+pub async fn get_stone_info_v1(
+    State(state): State<AppState>,
+    _headers: HeaderMap,
+) -> Result<Json<ApiResponse<StoneInfoResponse>>, (StatusCode, Json<ApiErrorResponse>)> {
+    // Get capabilities from cached state
+    let capabilities = {
+        let caps_guard = state.capabilities.read().await;
+        caps_guard.as_ref().cloned().unwrap_or_else(|| {
+            crate::infra::hardware::create_skeleton(state.stone_name.clone())
+        })
+    };
+
+    // Get services (reuse existing registry logic)
+    let services: Vec<ServiceInfo> = {
+        let registry = state.registry.read().await;
+        registry.clone()
+    };
+
+    // Build endpoint
+    let current_ip = state.network_monitor.get_ip().await;
+    let endpoint = format!("http://{}:{}", current_ip, state.api_port);
+
+    let response = StoneInfoResponse {
+        capabilities,
+        services,
+        endpoint,
+    };
+
+    Ok(Json(ApiResponse {
+        data: response,
+        suggestions: None,
+    }))
+}
+
+// ============================================================================
+// Stone Upgrade Endpoint
+// ============================================================================
 
 /// POST /api/v1/stone:upgrade
 /// Upgrade stone software (moss/rake binaries)
@@ -213,23 +280,6 @@ pub async fn upgrade_stone_v1(
     }
 }
 
-/// POST /api/v1/stone:shutdown
-/// Gracefully shutdown the Moss daemon
-pub async fn shutdown_stone_v1(
-    State(state): State<AppState>,
-) -> (StatusCode, Json<serde_json::Value>) {
-    tracing::info!("Stone shutdown endpoint called");
-    state.shutdown_tx.notify_one();
-
-    (
-        StatusCode::OK,
-        Json(serde_json::json!({
-            "success": true,
-            "message": "Shutdown initiated"
-        })),
-    )
-}
-
 /// POST /api/v1/stone:deploy
 /// Deploy a complete upgrade package (.tar.gz for Linux, .zip for Windows)
 ///
@@ -296,74 +346,236 @@ pub async fn deploy_stone_v1(
 
     tracing::info!(hash = %actual_hash, size = body.len(), "Package checksum verified");
 
-    // Determine staging path based on platform
-    let (staging_dir, package_name) = if cfg!(windows) {
-        (
-            std::env::var("GARDEN_STAGING_DIR")
-                .unwrap_or_else(|_| "C:\\ProgramData\\ZenGarden\\staging".to_string()),
-            "pending-upgrade.zip",
-        )
+    // Extract and validate package
+    let staging_base = if cfg!(windows) {
+        std::env::var("GARDEN_STAGING_DIR")
+            .unwrap_or_else(|_| "C:\\ProgramData\\ZenGarden\\staging".to_string())
     } else {
-        (
-            std::env::var("GARDEN_STAGING_DIR")
-                .unwrap_or_else(|_| "/var/lib/zen-garden/staging".to_string()),
-            "pending-upgrade.tar.gz",
-        )
+        std::env::var("GARDEN_STAGING_DIR")
+            .unwrap_or_else(|_| "/var/lib/zen-garden/staging".to_string())
     };
 
-    // Ensure staging directory exists
-    if let Err(e) = std::fs::create_dir_all(&staging_dir) {
-        tracing::error!(error = ?e, dir = %staging_dir, "Failed to create staging directory");
+    // Create temporary extraction directory
+    let temp_dir = format!("{}/extract-{}", staging_base, actual_hash[..8].to_string());
+    if let Err(e) = std::fs::create_dir_all(&temp_dir) {
+        tracing::error!(error = ?e, dir = %temp_dir, "Failed to create extraction directory");
         return (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(json!({
                 "status": "error",
-                "message": "Failed to create staging directory",
+                "message": "Failed to create extraction directory",
                 "error": format!("{}", e),
             })),
         );
     }
 
-    let target_path = if cfg!(windows) {
-        format!("{}\\{}", staging_dir, package_name)
+    // Write package to temp file for extraction
+    let temp_package = format!("{}/package.tar.gz", temp_dir);
+    if let Err(e) = std::fs::write(&temp_package, &body) {
+        tracing::error!(error = ?e, "Failed to write temporary package");
+        let _ = std::fs::remove_dir_all(&temp_dir);
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({
+                "status": "error",
+                "message": "Failed to write temporary package",
+            })),
+        );
+    }
+
+    // Extract package (tar.gz on Linux/Windows for now)
+    tracing::info!(path = %temp_package, "Extracting package...");
+    let extract_result = if cfg!(windows) {
+        std::process::Command::new("tar")
+            .args(&["-xzf", &temp_package, "-C", &temp_dir])
+            .output()
     } else {
-        format!("{}/{}", staging_dir, package_name)
+        std::process::Command::new("tar")
+            .args(&["-xzf", &temp_package, "-C", &temp_dir])
+            .output()
     };
 
-    // Write to temporary location first
-    let temp_path = format!("{}.tmp", target_path);
-    if let Err(e) = std::fs::write(&temp_path, &body) {
-        tracing::error!(error = ?e, path = %temp_path, "Failed to write package");
+    if let Err(e) = extract_result {
+        tracing::error!(error = ?e, "Failed to extract package");
+        let _ = std::fs::remove_dir_all(&temp_dir);
         return (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(json!({
                 "status": "error",
-                "message": "Failed to write package file",
-                "error": format!("{}", e),
+                "message": "Failed to extract package",
             })),
         );
     }
 
-    // Atomic rename to final location
-    if let Err(e) = std::fs::rename(&temp_path, &target_path) {
-        tracing::error!(error = ?e, path = %target_path, "Failed to stage package");
-        let _ = std::fs::remove_file(&temp_path);
+    // Find extracted directory (zen-garden-*)
+    let package_dir = match std::fs::read_dir(&temp_dir) {
+        Ok(entries) => {
+            entries
+                .filter_map(|e| e.ok())
+                .find(|e| {
+                    e.file_name()
+                        .to_str()
+                        .map(|n| n.starts_with("zen-garden-"))
+                        .unwrap_or(false)
+                })
+                .map(|e| e.path())
+        }
+        Err(e) => {
+            tracing::error!(error = ?e, "Failed to read extraction directory");
+            let _ = std::fs::remove_dir_all(&temp_dir);
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({
+                    "status": "error",
+                    "message": "Failed to locate extracted package",
+                })),
+            );
+        }
+    };
+
+    let package_dir = match package_dir {
+        Some(dir) => dir,
+        None => {
+            tracing::error!("No zen-garden-* directory found in package");
+            let _ = std::fs::remove_dir_all(&temp_dir);
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({
+                    "status": "error",
+                    "message": "Invalid package structure - no zen-garden-* directory",
+                })),
+            );
+        }
+    };
+
+    // Read and parse package.json
+    let manifest_path = package_dir.join("package.json");
+    let manifest: serde_json::Value = match std::fs::read_to_string(&manifest_path) {
+        Ok(content) => match serde_json::from_str(&content) {
+            Ok(json) => json,
+            Err(e) => {
+                tracing::error!(error = ?e, "Failed to parse package.json");
+                let _ = std::fs::remove_dir_all(&temp_dir);
+                return (
+                    StatusCode::BAD_REQUEST,
+                    Json(json!({
+                        "status": "error",
+                        "message": "Invalid package.json format",
+                    })),
+                );
+            }
+        },
+        Err(e) => {
+            tracing::error!(error = ?e, "Failed to read package.json");
+            let _ = std::fs::remove_dir_all(&temp_dir);
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({
+                    "status": "error",
+                    "message": "Missing package.json",
+                })),
+            );
+        }
+    };
+
+    // Validate platform
+    let platform = manifest.get("platform").and_then(|v| v.as_str()).unwrap_or("unknown");
+    let expected_platform = if cfg!(windows) { "windows" } else { "linux" };
+    if platform != expected_platform {
+        tracing::error!(expected = expected_platform, actual = platform, "Platform mismatch");
+        let _ = std::fs::remove_dir_all(&temp_dir);
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({
+                "status": "error",
+                "message": format!("Platform mismatch - expected {}, got {}", expected_platform, platform),
+            })),
+        );
+    }
+
+    // Create validated staging directory
+    let validated_dir = format!("{}/validated", staging_base);
+    let _ = std::fs::remove_dir_all(&validated_dir); // Clear old staging
+    if let Err(e) = std::fs::create_dir_all(&format!("{}/bin", validated_dir)) {
+        tracing::error!(error = ?e, "Failed to create validated staging");
+        let _ = std::fs::remove_dir_all(&temp_dir);
         return (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(json!({
                 "status": "error",
-                "message": "Failed to stage package",
-                "error": format!("{}", e),
+                "message": "Failed to create validated staging directory",
             })),
         );
     }
 
-    tracing::info!(path = %target_path, "Package staged successfully");
+    // Copy validated binaries to staging
+    let bin_dir = package_dir.join("bin");
+    if !bin_dir.exists() {
+        tracing::error!("Package missing bin/ directory");
+        let _ = std::fs::remove_dir_all(&temp_dir);
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({
+                "status": "error",
+                "message": "Invalid package - missing bin/ directory",
+            })),
+        );
+    }
 
-    // Check if package contains moss by peeking at package.json
-    // For simplicity, we always trigger a restart since the upgrade script
-    // will determine what to do based on package contents
-    let contains_moss = peek_package_for_moss(&target_path);
+    let mut contains_moss = false;
+    match std::fs::read_dir(&bin_dir) {
+        Ok(entries) => {
+            for entry in entries.filter_map(|e| e.ok()) {
+                let file_name = entry.file_name();
+                let name = file_name.to_string_lossy();
+                if name.starts_with("garden-moss") {
+                    contains_moss = true;
+                }
+                let dest = format!("{}/bin/{}", validated_dir, name);
+                if let Err(e) = std::fs::copy(entry.path(), &dest) {
+                    tracing::error!(error = ?e, file = %name, "Failed to copy binary");
+                } else {
+                    tracing::info!(file = %name, "Staged validated binary");
+                }
+            }
+        }
+        Err(e) => {
+            tracing::error!(error = ?e, "Failed to read bin directory");
+            let _ = std::fs::remove_dir_all(&temp_dir);
+            let _ = std::fs::remove_dir_all(&validated_dir);
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({
+                    "status": "error",
+                    "message": "Failed to read binaries",
+                })),
+            );
+        }
+    }
+
+    // Copy scripts if present
+    let scripts_dir = package_dir.join("scripts");
+    if scripts_dir.exists() {
+        if let Err(e) = std::fs::create_dir_all(&format!("{}/scripts", validated_dir)) {
+            tracing::warn!(error = ?e, "Failed to create scripts staging");
+        } else if let Ok(entries) = std::fs::read_dir(&scripts_dir) {
+            for entry in entries.filter_map(|e| e.ok()) {
+                let file_name = entry.file_name();
+                let name = file_name.to_string_lossy();
+                let dest = format!("{}/scripts/{}", validated_dir, name);
+                if let Err(e) = std::fs::copy(entry.path(), &dest) {
+                    tracing::warn!(error = ?e, file = %name, "Failed to copy script");
+                } else {
+                    tracing::info!(file = %name, "Staged validated script");
+                }
+            }
+        }
+    }
+
+    // Cleanup extraction directory
+    let _ = std::fs::remove_dir_all(&temp_dir);
+
+    tracing::info!(path = %validated_dir, "Package validated and staged");
 
     if contains_moss {
         tracing::info!("Package contains garden-moss, initiating graceful shutdown for upgrade");
@@ -373,8 +585,8 @@ pub async fn deploy_stone_v1(
             StatusCode::ACCEPTED,
             Json(json!({
                 "status": "accepted",
-                "message": "Package staged successfully. Service restart initiated.",
-                "staged_path": target_path,
+                "message": "Package validated and staged. Service restart initiated.",
+                "staged_path": validated_dir,
                 "sha256": actual_hash,
                 "size": body.len(),
             })),
@@ -384,27 +596,11 @@ pub async fn deploy_stone_v1(
             StatusCode::OK,
             Json(json!({
                 "status": "success",
-                "message": "Package staged successfully. Restart required to apply.",
-                "staged_path": target_path,
+                "message": "Package validated and staged. Restart required to apply.",
+                "staged_path": validated_dir,
                 "sha256": actual_hash,
                 "size": body.len(),
             })),
         )
     }
-}
-
-/// Peek into a package to check if it contains garden-moss
-fn peek_package_for_moss(package_path: &str) -> bool {
-    // For .tar.gz, we could parse the archive, but for simplicity
-    // we'll just assume packages with moss should trigger restart.
-    // The upgrade script will handle the actual extraction and validation.
-    //
-    // A more robust implementation would:
-    // 1. Extract package.json from the archive
-    // 2. Parse it and check if components.garden-moss exists
-    //
-    // For now, we always return true to trigger restart,
-    // letting the upgrade script decide what to do.
-    let _ = package_path;
-    true
 }

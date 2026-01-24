@@ -106,6 +106,9 @@ pub const HEALTH_DEGRADED: &str = "degraded";
 /// Overall daemon health status - unhealthy (critical failure)
 pub const HEALTH_UNHEALTHY: &str = "unhealthy";
 
+/// Service health status - installing (setup in progress)
+pub const HEALTH_INSTALLING: &str = "installing";
+
 // ============================================================================
 // Health Check Status Constants (HealthCheck struct)
 // ============================================================================
@@ -152,6 +155,22 @@ pub const VITALITY_WITHERING: &str = "withering";
 pub const VITALITY_DORMANT: &str = "dormant";
 
 // ============================================================================
+// Stone Boot Health Progression
+// ============================================================================
+
+/// Stone is starting up (Phase 0: basic identity loaded)
+pub const STONE_STARTING: &str = "starting";
+
+/// Stone is initializing (Phase 2-3: network + basic hardware detected)
+pub const STONE_INITIALIZING: &str = "initializing";
+
+/// Stone is thriving (all services healthy, complete inventory)
+pub const STONE_THRIVING: &str = "thriving";
+
+/// Stone is degraded (some service errors detected)
+pub const STONE_DEGRADED: &str = "degraded";
+
+// ============================================================================
 // Service Status Constants
 // ============================================================================
 
@@ -160,6 +179,9 @@ pub const SERVICE_RUNNING: &str = "running";
 
 /// Service is stopped
 pub const SERVICE_STOPPED: &str = "stopped";
+
+/// Service is being installed
+pub const SERVICE_INSTALLING: &str = "installing";
 
 /// Service is in maintenance mode
 pub const SERVICE_MAINTENANCE: &str = "maintenance";

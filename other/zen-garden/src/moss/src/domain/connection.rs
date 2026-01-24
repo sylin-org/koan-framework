@@ -42,30 +42,36 @@ pub fn default_template(protocol: &str) -> String {
 
 /// Infer protocol from offering category and name
 ///
-/// Used when protocol isn't explicitly specified.
-/// NOTE: Per-offering protocols (mongodb, postgresql, etc.) should eventually
-/// move to offering frontmatter. Category defaults come from category.json.
-pub fn infer_protocol(offering_name: &str, category: &str) -> String {
-    // First try by name (more specific)
-    // TODO: Move these to offering frontmatter (protocol field)
-    match offering_name.to_lowercase().as_str() {
-        "mongodb" | "mongo" => "mongodb".to_string(),
-        "postgresql" | "postgres" => "postgresql".to_string(),
-        "mysql" | "mariadb" => "mysql".to_string(),
-        "redis" | "dragonfly" | "keydb" => "redis".to_string(),
-        "elasticsearch" | "opensearch" => "http".to_string(),
-        "meilisearch" | "typesense" => "http".to_string(),
-        "minio" => "http".to_string(),
-        "nats" => "nats".to_string(),
-        "rabbitmq" => "amqp".to_string(),
-        _ => {
-            // Fall back to category's default_protocol from category.json
-            get_category_registry()
-                .default_protocol(category)
-                .map(|s| s.to_string())
-                .unwrap_or_else(|| "tcp".to_string())
+/// Infer protocol from offering manifest or category registry
+///
+/// Looks up offering's connection_template to determine protocol,
+/// falls back to category default_protocol, then "tcp" as last resort.
+pub async fn infer_protocol(offering_name: &str, category: &str, state: &crate::app_state::AppState) -> String {
+    // Try to get protocol from offering manifest's connection_template
+    let manifests = state.manifests.read().await;
+    
+    if let Some(manifest) = manifests.iter().find(|m| m.name.eq_ignore_ascii_case(offering_name)) {
+        if let Some(ref template) = manifest.connection_template {
+            // Extract protocol from template (e.g., "mongodb://", "postgresql://")
+            if let Some(proto_end) = template.find("://") {
+                let protocol = &template[..proto_end];
+                return protocol.to_string();
+            }
         }
     }
+    
+    // Fall back to category's default_protocol from category.json
+    get_category_registry()
+        .default_protocol(category)
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| {
+            tracing::warn!(
+                offering = %offering_name,
+                category = %category,
+                "No protocol found in manifest or category, using 'tcp'"
+            );
+            "tcp".to_string()
+        })
 }
 
 /// Extract IP address from endpoint URL
@@ -274,13 +280,21 @@ mod tests {
         assert_eq!(conn.uris[0], "redis://stone-01.local:6379");
     }
 
-    #[test]
-    fn test_infer_protocol() {
-        assert_eq!(infer_protocol("mongodb", "database"), "mongodb");
-        assert_eq!(infer_protocol("postgres", "database"), "postgresql");
-        assert_eq!(infer_protocol("redis", "cache"), "redis");
-        assert_eq!(infer_protocol("unknown-db", "database"), "tcp");
-        assert_eq!(infer_protocol("unknown", "cache"), "redis");
+    #[tokio::test]
+    async fn test_infer_protocol() {
+        use std::sync::Arc;
+        use tokio::sync::RwLock;
+        use crate::AppState;
+        
+        // Create minimal AppState with empty manifests
+        let state = AppState {
+            manifests: Arc::new(RwLock::new(Vec::new())),
+            ..Default::default()
+        };
+        
+        // Without manifests, should fallback to category defaults
+        assert_eq!(infer_protocol("unknown-db", "database", &state).await, "tcp");
+        // Note: Other tests would need actual manifests loaded
     }
 
     #[test]

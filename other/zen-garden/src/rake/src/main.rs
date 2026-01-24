@@ -593,6 +593,64 @@ enum Commands {
         at: Option<String>,
     },
 
+    /// Wake a stone via Wake-on-LAN
+    #[command(
+        long_about = "Send a Wake-on-LAN magic packet to wake a sleeping stone.\n\n\
+        Examples:\n  \
+        garden-rake rouse oak                     # Wake stone named 'oak'\n  \
+        garden-rake rouse oak at cedar            # Send WoL from 'cedar' to wake 'oak'\n\n\
+        The stone must have been previously discovered (MAC address cached).\n\
+        Wake-on-LAN requires BIOS/UEFI and NIC support on the target machine."
+    )]
+    Rouse {
+        /// Stone name to wake
+        stone: String,
+
+        /// Moss endpoint to send WoL from (omit to use tended stone)
+        #[arg(long)]
+        at: Option<String>,
+    },
+
+    /// Shut down a stone (power off)
+    #[command(
+        long_about = "Power off the target stone machine.\n\n\
+        Examples:\n  \
+        garden-rake slumber                       # Shut down tended stone\n  \
+        garden-rake slumber oak                   # Shut down stone 'oak' (by name)\n  \
+        garden-rake slumber --at oak              # Same as above\n  \
+        garden-rake slumber --at http://10.0.0.5:7185  # By URL\n\n\
+        Accepts: stone name, stone ID, or full URL.\n\
+        The stone's MAC address is preserved in topology cache for Wake-on-LAN.\n\
+        Use 'garden-rake rouse <stone>' to wake it later."
+    )]
+    Slumber {
+        /// Stone name, stone ID, or endpoint URL (omit to use tended stone)
+        stone: Option<String>,
+
+        /// Stone name, stone ID, or endpoint URL (alternative to positional)
+        #[arg(long)]
+        at: Option<String>,
+    },
+
+    /// Reboot a stone
+    #[command(
+        long_about = "Restart the target stone machine.\n\n\
+        Examples:\n  \
+        garden-rake stir                          # Reboot tended stone\n  \
+        garden-rake stir oak                      # Reboot stone 'oak' (by name)\n  \
+        garden-rake stir --at oak                 # Same as above\n  \
+        garden-rake stir --at http://10.0.0.5:7185  # By URL\n\n\
+        Accepts: stone name, stone ID, or full URL."
+    )]
+    Stir {
+        /// Stone name, stone ID, or endpoint URL (omit to use tended stone)
+        stone: Option<String>,
+
+        /// Stone name, stone ID, or endpoint URL (alternative to positional)
+        #[arg(long)]
+        at: Option<String>,
+    },
+
     /// Browse command directory (interactive command reference)
     #[command(
         long_about = "Browse the command directory with descriptions and examples.\n\n\
@@ -902,6 +960,20 @@ fn normalize_zen_to_clap(parsed: &parser::ParsedCommand) -> anyhow::Result<Vec<S
             args.extend(parsed.args.clone());
         }
 
+        // === STONE ADMIN (power management) ===
+        "rouse" => {
+            args.push("rouse".to_string());
+            args.extend(parsed.args.clone());
+        }
+        "slumber" => {
+            args.push("slumber".to_string());
+            args.extend(parsed.args.clone());
+        }
+        "stir" => {
+            args.push("stir".to_string());
+            args.extend(parsed.args.clone());
+        }
+
         // === ADMIN ===
         "template" => {
             args.push("template".to_string());
@@ -1102,7 +1174,7 @@ async fn async_main() -> anyhow::Result<()> {
         Some(command) => match command {
         Commands::Status { at } => {
             let cmd = commands::discovery::StatusCommand::new(quiet_mode);
-            dispatch::dispatch(&cmd, &client, at, quiet_mode, fresh_mode, Some(&*GLOBAL_CACHE)).await?;
+            dispatch::dispatch(&cmd, &client, at, quiet_mode, fresh_mode, cli.verbose, Some(&*GLOBAL_CACHE)).await?;
         }
 
         Commands::Offer { offering, action, at, prefer, anywhere_on_fail, placement_mode } => {
@@ -1111,7 +1183,7 @@ async fn async_main() -> anyhow::Result<()> {
                 if let Some(name) = offering {
                     let is_quiet = matches!(mode, PlacementMode::Auto) || quiet_mode;
                     let cmd = commands::offering::OfferCommand::placement_recommend(name.to_string(), is_quiet);
-                    dispatch::dispatch_local(&cmd, &client, quiet_mode, fresh_mode).await?;
+                    dispatch::dispatch_local(&cmd, &client, quiet_mode, fresh_mode, cli.verbose).await?;
                 } else {
                     anyhow::bail!("Usage: garden-rake offer <offering> --placement-mode <interactive|auto>");
                 }
@@ -1126,7 +1198,7 @@ async fn async_main() -> anyhow::Result<()> {
                     }
                     (Some(q), None) => {
                         let cmd = commands::offering::OfferCommand::query_anywhere(q.to_string(), prefer, quiet_mode);
-                        dispatch::dispatch_local(&cmd, &client, quiet_mode, fresh_mode).await?;
+                        dispatch::dispatch_local(&cmd, &client, quiet_mode, fresh_mode, cli.verbose).await?;
                     }
                     _ => {
                         anyhow::bail!("Usage with --at anywhere: garden-rake offer <query> --at anywhere [--prefer <token>]");
@@ -1163,7 +1235,8 @@ async fn async_main() -> anyhow::Result<()> {
                             endpoint.clone(),
                             None,
                             quiet_mode,
-                            false
+                            false,
+                            cli.verbose,
                         );
                         cmd.execute(&ctx).await?;
                         return Ok(());
@@ -1177,39 +1250,39 @@ async fn async_main() -> anyhow::Result<()> {
                 }
             };
 
-            dispatch::dispatch(&cmd, &client, at, quiet_mode, fresh_mode, Some(&*GLOBAL_CACHE)).await?;
+            dispatch::dispatch(&cmd, &client, at, quiet_mode, fresh_mode, cli.verbose, Some(&*GLOBAL_CACHE)).await?;
         }
 
         Commands::List { at } => {
             let cmd = commands::discovery::ListCommand::new(quiet_mode);
-            dispatch::dispatch(&cmd, &client, at, quiet_mode, fresh_mode, Some(&*GLOBAL_CACHE)).await?;
+            dispatch::dispatch(&cmd, &client, at, quiet_mode, fresh_mode, cli.verbose, Some(&*GLOBAL_CACHE)).await?;
         }
 
         Commands::Remove { service, at, force } => {
             let cmd = commands::lifecycle::RemoveCommand::new(service, force, quiet_mode);
-            dispatch::dispatch(&cmd, &client, at, quiet_mode, fresh_mode, Some(&*GLOBAL_CACHE)).await?;
+            dispatch::dispatch(&cmd, &client, at, quiet_mode, fresh_mode, cli.verbose, Some(&*GLOBAL_CACHE)).await?;
         }
 
         Commands::Uproot { service, at, force } => {
             let cmd = commands::lifecycle::UprootCommand::new(service, force, quiet_mode);
-            dispatch::dispatch(&cmd, &client, at, quiet_mode, fresh_mode, Some(&*GLOBAL_CACHE)).await?;
+            dispatch::dispatch(&cmd, &client, at, quiet_mode, fresh_mode, cli.verbose, Some(&*GLOBAL_CACHE)).await?;
         }
 
         Commands::Adopt { container, at } => {
             let cmd = commands::adoption::AdoptCommand::new(container, quiet_mode);
-            dispatch::dispatch(&cmd, &client, at, quiet_mode, fresh_mode, Some(&*GLOBAL_CACHE)).await?;
+            dispatch::dispatch(&cmd, &client, at, quiet_mode, fresh_mode, cli.verbose, Some(&*GLOBAL_CACHE)).await?;
         }
 
         Commands::Release { service, at } => {
             let cmd = commands::adoption::ReleaseCommand::new(service, quiet_mode);
-            dispatch::dispatch(&cmd, &client, at, quiet_mode, fresh_mode, Some(&*GLOBAL_CACHE)).await?;
+            dispatch::dispatch(&cmd, &client, at, quiet_mode, fresh_mode, cli.verbose, Some(&*GLOBAL_CACHE)).await?;
         }
 
         Commands::Locate { target, at } => {
             match target {
                 LocateTarget::Strays => {
                     let cmd = commands::adoption::LocateStraysCommand::new(quiet_mode);
-                    dispatch::dispatch(&cmd, &client, at, quiet_mode, fresh_mode, Some(&*GLOBAL_CACHE)).await?;
+                    dispatch::dispatch(&cmd, &client, at, quiet_mode, fresh_mode, cli.verbose, Some(&*GLOBAL_CACHE)).await?;
                 }
             }
         }
@@ -1224,17 +1297,17 @@ async fn async_main() -> anyhow::Result<()> {
                 fresh_mode,
                 wishfully,
             );
-            dispatch::dispatch(&cmd, &client, at, quiet_mode, fresh_mode, Some(&*GLOBAL_CACHE)).await?;
+            dispatch::dispatch(&cmd, &client, at, quiet_mode, fresh_mode, cli.verbose, Some(&*GLOBAL_CACHE)).await?;
         }
 
         Commands::Adopted { at } => {
             let cmd = commands::discovery::AdoptedCommand::new(quiet_mode);
-            dispatch::dispatch(&cmd, &client, at, quiet_mode, fresh_mode, Some(&*GLOBAL_CACHE)).await?;
+            dispatch::dispatch(&cmd, &client, at, quiet_mode, fresh_mode, cli.verbose, Some(&*GLOBAL_CACHE)).await?;
         }
 
         Commands::Borrowed { at } => {
             let cmd = commands::discovery::BorrowedCommand::new(quiet_mode);
-            dispatch::dispatch(&cmd, &client, at, quiet_mode, fresh_mode, Some(&*GLOBAL_CACHE)).await?;
+            dispatch::dispatch(&cmd, &client, at, quiet_mode, fresh_mode, cli.verbose, Some(&*GLOBAL_CACHE)).await?;
         }
 
         Commands::Borrow { name, from, at } => {
@@ -1242,27 +1315,27 @@ async fn async_main() -> anyhow::Result<()> {
                 "Missing URL. Use: garden-rake borrow {} from <url>", name
             ))?;
             let cmd = commands::adoption::BorrowCommand::new(name, url_str, quiet_mode);
-            dispatch::dispatch(&cmd, &client, at, quiet_mode, fresh_mode, Some(&*GLOBAL_CACHE)).await?;
+            dispatch::dispatch(&cmd, &client, at, quiet_mode, fresh_mode, cli.verbose, Some(&*GLOBAL_CACHE)).await?;
         }
 
         Commands::Return { name, at } => {
             let cmd = commands::adoption::ReturnCommand::new(name, quiet_mode);
-            dispatch::dispatch(&cmd, &client, at, quiet_mode, fresh_mode, Some(&*GLOBAL_CACHE)).await?;
+            dispatch::dispatch(&cmd, &client, at, quiet_mode, fresh_mode, cli.verbose, Some(&*GLOBAL_CACHE)).await?;
         }
 
         Commands::Upgrade { service, all, at } => {
             let cmd = commands::lifecycle::UpgradeCommand::new(service, all, quiet_mode);
-            dispatch::dispatch(&cmd, &client, at, quiet_mode, fresh_mode, Some(&*GLOBAL_CACHE)).await?;
+            dispatch::dispatch(&cmd, &client, at, quiet_mode, fresh_mode, cli.verbose, Some(&*GLOBAL_CACHE)).await?;
         }
 
         Commands::Rest { service, at } => {
             let cmd = commands::lifecycle::RestCommand::new(service, quiet_mode);
-            dispatch::dispatch(&cmd, &client, at, quiet_mode, fresh_mode, Some(&*GLOBAL_CACHE)).await?;
+            dispatch::dispatch(&cmd, &client, at, quiet_mode, fresh_mode, cli.verbose, Some(&*GLOBAL_CACHE)).await?;
         }
 
         Commands::Wake { service, at } => {
             let cmd = commands::lifecycle::WakeCommand::new(service, quiet_mode);
-            dispatch::dispatch(&cmd, &client, at, quiet_mode, fresh_mode, Some(&*GLOBAL_CACHE)).await?;
+            dispatch::dispatch(&cmd, &client, at, quiet_mode, fresh_mode, cli.verbose, Some(&*GLOBAL_CACHE)).await?;
         }
 
         Commands::Place {
@@ -1273,7 +1346,7 @@ async fn async_main() -> anyhow::Result<()> {
         } => {
             match commands::management::PlaceCommand::from_args(target, code, passphrase, quiet_mode) {
                 Ok(cmd) => {
-                    dispatch::dispatch(&cmd, &client, at, quiet_mode, fresh_mode, Some(&*GLOBAL_CACHE)).await?;
+                    dispatch::dispatch(&cmd, &client, at, quiet_mode, fresh_mode, cli.verbose, Some(&*GLOBAL_CACHE)).await?;
                 }
                 Err(e) => {
                     eprintln!("{}{} {}", " ".repeat(ui::constants::DEFAULT_INDENT), ui::status_indicator("error", term.supports_color), e);
@@ -1283,12 +1356,12 @@ async fn async_main() -> anyhow::Result<()> {
 
         Commands::Invite { at } => {
             let cmd = commands::management::InviteCommand::new(quiet_mode);
-            dispatch::dispatch(&cmd, &client, at, quiet_mode, fresh_mode, Some(&*GLOBAL_CACHE)).await?;
+            dispatch::dispatch(&cmd, &client, at, quiet_mode, fresh_mode, cli.verbose, Some(&*GLOBAL_CACHE)).await?;
         }
 
         Commands::Observe { stone, offering } => {
             let cmd = commands::discovery::ObserveCommand::new(stone, offering, quiet_mode);
-            dispatch::dispatch_local(&cmd, &client, quiet_mode, fresh_mode).await?;
+            dispatch::dispatch_local(&cmd, &client, quiet_mode, fresh_mode, cli.verbose).await?;
         }
 
         Commands::Watch { target, until, at } => {
@@ -1305,7 +1378,7 @@ async fn async_main() -> anyhow::Result<()> {
                     commands::discovery::WatchCommand::events(until, quiet_mode)
                 }
             };
-            dispatch::dispatch(&cmd, &client, at, quiet_mode, fresh_mode, Some(&*GLOBAL_CACHE)).await?;
+            dispatch::dispatch(&cmd, &client, at, quiet_mode, fresh_mode, cli.verbose, Some(&*GLOBAL_CACHE)).await?;
         }
 
         Commands::Template { command } => {
@@ -1315,18 +1388,18 @@ async fn async_main() -> anyhow::Result<()> {
                 TemplateCommands::Show { name, at } => (TemplateAction::Show { name }, at),
             };
             let cmd = commands::local::TemplateCommand::new(action, quiet_mode);
-            dispatch::dispatch(&cmd, &client, at, quiet_mode, fresh_mode, Some(&*GLOBAL_CACHE)).await?;
+            dispatch::dispatch(&cmd, &client, at, quiet_mode, fresh_mode, cli.verbose, Some(&*GLOBAL_CACHE)).await?;
         }
 
         Commands::Ceremony { name } => {
             let cmd = commands::local::CeremonyCommand::new(name, quiet_mode);
-            dispatch::dispatch_local(&cmd, &client, quiet_mode, fresh_mode).await?;
+            dispatch::dispatch_local(&cmd, &client, quiet_mode, fresh_mode, cli.verbose).await?;
         }
 
         Commands::Tend { target, clear } => {
             let verbose = cli.verbose > 0;
             let cmd = commands::management::TendCommand::new(target, clear, verbose);
-            dispatch::dispatch_local(&cmd, &client, quiet_mode, fresh_mode).await?;
+            dispatch::dispatch_local(&cmd, &client, quiet_mode, fresh_mode, cli.verbose).await?;
         }
 
         Commands::Pond { action, at } => {
@@ -1340,7 +1413,7 @@ async fn async_main() -> anyhow::Result<()> {
                 PondAction::Untrust { stone_name } => PondActionType::Untrust { stone_name },
             };
             let cmd = commands::management::PondCommand::new(action_type, quiet_mode);
-            dispatch::dispatch(&cmd, &client, at, quiet_mode, fresh_mode, Some(&*GLOBAL_CACHE)).await?;
+            dispatch::dispatch(&cmd, &client, at, quiet_mode, fresh_mode, cli.verbose, Some(&*GLOBAL_CACHE)).await?;
         }
 
         Commands::Lift { target_type, stone_name, at } => {
@@ -1361,7 +1434,7 @@ async fn async_main() -> anyhow::Result<()> {
                 }
             };
             let cmd = commands::management::LiftCommand::new(target, quiet_mode);
-            dispatch::dispatch(&cmd, &client, at, quiet_mode, fresh_mode, Some(&*GLOBAL_CACHE)).await?;
+            dispatch::dispatch(&cmd, &client, at, quiet_mode, fresh_mode, cli.verbose, Some(&*GLOBAL_CACHE)).await?;
         }
 
         Commands::Make { target, action, at } => {
@@ -1378,7 +1451,7 @@ async fn async_main() -> anyhow::Result<()> {
                 MakeAction::Minimal => MakeActionType::Minimal,
             };
             let cmd = commands::management::MakeCommand::new(action_type, quiet_mode);
-            dispatch::dispatch(&cmd, &client, at, quiet_mode, fresh_mode, Some(&*GLOBAL_CACHE)).await?;
+            dispatch::dispatch(&cmd, &client, at, quiet_mode, fresh_mode, cli.verbose, Some(&*GLOBAL_CACHE)).await?;
         }
 
         Commands::TakeRoot { at: at_keyword, stone } => {
@@ -1391,17 +1464,36 @@ async fn async_main() -> anyhow::Result<()> {
                 at_keyword.clone()
             };
             let cmd = commands::admin::InstallServiceCommand::take_root(quiet_mode);
-            dispatch::dispatch(&cmd, &client, target, quiet_mode, fresh_mode, Some(&*GLOBAL_CACHE)).await?;
+            dispatch::dispatch(&cmd, &client, target, quiet_mode, fresh_mode, cli.verbose, Some(&*GLOBAL_CACHE)).await?;
         }
 
         Commands::InstallService { at } => {
             let cmd = commands::admin::InstallServiceCommand::install_service(quiet_mode);
-            dispatch::dispatch(&cmd, &client, at, quiet_mode, fresh_mode, Some(&*GLOBAL_CACHE)).await?;
+            dispatch::dispatch(&cmd, &client, at, quiet_mode, fresh_mode, cli.verbose, Some(&*GLOBAL_CACHE)).await?;
+        }
+
+        Commands::Rouse { stone, at } => {
+            let cmd = commands::admin::RouseCommand::new(stone, quiet_mode);
+            dispatch::dispatch(&cmd, &client, at, quiet_mode, fresh_mode, cli.verbose, Some(&*GLOBAL_CACHE)).await?;
+        }
+
+        Commands::Slumber { stone, at } => {
+            // Merge: positional stone takes precedence, then --at
+            let target = stone.or(at);
+            let cmd = commands::admin::SlumberCommand::new(quiet_mode);
+            dispatch::dispatch(&cmd, &client, target, quiet_mode, fresh_mode, cli.verbose, Some(&*GLOBAL_CACHE)).await?;
+        }
+
+        Commands::Stir { stone, at } => {
+            // Merge: positional stone takes precedence, then --at
+            let target = stone.or(at);
+            let cmd = commands::admin::StirCommand::new(quiet_mode);
+            dispatch::dispatch(&cmd, &client, target, quiet_mode, fresh_mode, cli.verbose, Some(&*GLOBAL_CACHE)).await?;
         }
 
         Commands::BrowseCommands { name, category, zen, normative } => {
             let cmd = commands::local::BrowseCommand::new(name, category, zen, normative);
-            dispatch::dispatch_local(&cmd, &client, quiet_mode, fresh_mode).await?;
+            dispatch::dispatch_local(&cmd, &client, quiet_mode, fresh_mode, cli.verbose).await?;
         }
 
         Commands::Refresh { component, from, at } => {
@@ -1412,7 +1504,7 @@ async fn async_main() -> anyhow::Result<()> {
 
         Commands::Reconcile { drop_invalid, at } => {
             let cmd = commands::management::ReconcileCommand::new(drop_invalid, quiet_mode);
-            dispatch::dispatch(&cmd, &client, at, quiet_mode, fresh_mode, Some(&*GLOBAL_CACHE)).await?;
+            dispatch::dispatch(&cmd, &client, at, quiet_mode, fresh_mode, cli.verbose, Some(&*GLOBAL_CACHE)).await?;
         }
         }
     }

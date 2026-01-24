@@ -58,6 +58,11 @@ pub mod cmd {
     // Scaffolded
     pub const CEREMONY: &str = "ceremony";
     pub const TEMPLATE: &str = "template";
+
+    // Stone admin (power management)
+    pub const ROUSE: &str = "rouse";
+    pub const SLUMBER: &str = "slumber";
+    pub const STIR: &str = "stir";
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1492,6 +1497,134 @@ pub static MANIFEST: Lazy<CommandManifest> = Lazy::new(|| {
         see_also: vec!["offer"],
     });
 
+    // === STONE ADMIN COMMANDS ===
+    // Power management for physical stones
+
+    manifest.add(CommandDef {
+        name: cmd::ROUSE,
+        zen_name: "rouse",
+        normative_name: Some("admin stone wake"),
+        category: CommandCategory::System,
+        description: "Wake a stone via Wake-on-LAN",
+        long_description: "Send a Wake-on-LAN magic packet to wake a sleeping stone.\n\n\
+            Requires the stone's MAC address to be cached from previous discovery.\n\
+            The stone must have WoL enabled in BIOS/UEFI and NIC configuration.\n\
+            MAC addresses are preserved even when stones go offline (up to 64 offline stones, 24h retention).",
+        remote_capable: true,
+        params: vec![
+            CommandParam {
+                name: "stone",
+                zen_syntax: "<stone>",
+                normative_syntax: None,
+                description: "Stone name to wake",
+                required: true,
+            },
+            CommandParam {
+                name: "at",
+                zen_syntax: "at <stone>",
+                normative_syntax: Some("--at <stone>"),
+                description: "Stone to send WoL from (omit to use tended stone)",
+                required: false,
+            },
+        ],
+        examples: vec![
+            CommandExample {
+                description: "Wake a stone by name",
+                zen_syntax: Some("garden-rake rouse oak"),
+                normative_syntax: Some("garden-rake admin stone wake oak"),
+            },
+            CommandExample {
+                description: "Wake stone from specific moss instance",
+                zen_syntax: Some("garden-rake rouse oak at cedar"),
+                normative_syntax: Some("garden-rake admin stone wake oak --at cedar"),
+            },
+        ],
+        see_also: vec!["slumber", "stir", "observe"],
+    });
+
+    manifest.add(CommandDef {
+        name: cmd::SLUMBER,
+        zen_name: "slumber",
+        normative_name: Some("admin stone shutdown"),
+        category: CommandCategory::System,
+        description: "Shut down a stone (power off)",
+        long_description: "Power off the target stone machine.\n\n\
+            Uses systemctl poweroff on Linux and shutdown /s /t 0 on Windows.\n\
+            The stone's MAC address is preserved in topology cache for future Wake-on-LAN.\n\
+            If no stone is specified, operates on the tended stone.",
+        remote_capable: true,
+        params: vec![
+            CommandParam {
+                name: "stone",
+                zen_syntax: "[stone]",
+                normative_syntax: Some("--target <stone>"),
+                description: "Stone name to shut down (omit for tended stone)",
+                required: false,
+            },
+            CommandParam {
+                name: "at",
+                zen_syntax: "at <stone>",
+                normative_syntax: Some("--at <stone>"),
+                description: "Stone to send command from (if target is remote)",
+                required: false,
+            },
+        ],
+        examples: vec![
+            CommandExample {
+                description: "Shut down tended stone",
+                zen_syntax: Some("garden-rake slumber"),
+                normative_syntax: Some("garden-rake admin stone shutdown"),
+            },
+            CommandExample {
+                description: "Shut down specific stone",
+                zen_syntax: Some("garden-rake slumber oak"),
+                normative_syntax: Some("garden-rake admin stone shutdown --target oak"),
+            },
+        ],
+        see_also: vec!["rouse", "stir"],
+    });
+
+    manifest.add(CommandDef {
+        name: cmd::STIR,
+        zen_name: "stir",
+        normative_name: Some("admin stone reboot"),
+        category: CommandCategory::System,
+        description: "Reboot a stone",
+        long_description: "Restart the target stone machine.\n\n\
+            Uses systemctl reboot on Linux and shutdown /r /t 0 on Windows.\n\
+            If no stone is specified, operates on the tended stone.",
+        remote_capable: true,
+        params: vec![
+            CommandParam {
+                name: "stone",
+                zen_syntax: "[stone]",
+                normative_syntax: Some("--target <stone>"),
+                description: "Stone name to reboot (omit for tended stone)",
+                required: false,
+            },
+            CommandParam {
+                name: "at",
+                zen_syntax: "at <stone>",
+                normative_syntax: Some("--at <stone>"),
+                description: "Stone to send command from (if target is remote)",
+                required: false,
+            },
+        ],
+        examples: vec![
+            CommandExample {
+                description: "Reboot tended stone",
+                zen_syntax: Some("garden-rake stir"),
+                normative_syntax: Some("garden-rake admin stone reboot"),
+            },
+            CommandExample {
+                description: "Reboot specific stone",
+                zen_syntax: Some("garden-rake stir oak"),
+                normative_syntax: Some("garden-rake admin stone reboot --target oak"),
+            },
+        ],
+        see_also: vec!["slumber", "rouse"],
+    });
+
     manifest
 });
 
@@ -1510,6 +1643,8 @@ pub fn validate_manifest() {
         "tend", "reconcile", "refresh", "ceremony", "template",
         // System
         "take-root", "make",
+        // Stone admin (power management)
+        "rouse", "slumber", "stir",
         // Pond
         "place", "invite", "lift",
     ];

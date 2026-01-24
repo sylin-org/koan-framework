@@ -11,12 +11,14 @@
 - ✅ Positional "at" syntax working
 - ✅ Auto-discovery working
 - ✅ Tending state (context management) implemented
+- ✅ Admin API hierarchy: /api/v1/admin/moss/, /api/v1/admin/stone/
 - ❌ Dual syntax NOT implemented (no normative "services create" style)
 - ❌ explore verb missing (using "list" instead)
 - ❌ nourish verb missing (using "upgrade" instead)
 - ❌ release verb missing (using "remove" instead)
 - ❌ touch verb missing (no deep diagnostics command)
 - ❌ garden verb missing (topology view not implemented)
+- ❌ slumber/stir verbs not in rake CLI yet (API ready)
 - 🔶 API versioning exists (/api/v1/) but versionless redirect unclear  
 
 ---
@@ -67,6 +69,8 @@ This proposal defines a **dual-syntax CLI** that serves both zen purists and nor
 | **touch**      | inspect          | Feel the stone's warmth and texture           | Deep diagnostics          |
 | **tend**       | (zen-only)       | Care for, direct attention                    | Set context               |
 | **garden**     | topology         | The whole ecosystem                           | Multi-stone view          |
+| **slumber**    | admin stone shutdown | Deep winter sleep                         | Power off stone           |
+| **stir**       | admin stone reboot   | Gentle awakening from slumber             | Reboot stone              |
 
 ---
 

@@ -1,13 +1,21 @@
 //! Administrative API endpoints
 //!
 //! Provides privileged operations for system administration:
-//! - Graceful daemon shutdown
-//! - Windows service installation
+//!
+//! ## Moss Operations (/api/v1/admin/moss/)
+//! - `POST /shutdown` - Graceful daemon exit
+//! - `POST /take-root` - Install as Windows service
+//!
+//! ## Stone Operations (/api/v1/admin/stone/)
+//! - `POST /shutdown` - Power off the machine
+//! - `POST /reboot` - Restart the machine
+//! - `POST /:name/wake` - Wake stone via Wake-on-LAN (rouse)
 //!
 //! These endpoints should be protected by authentication in production.
+//! See: docs/decisions/API-0002-admin-hierarchy.md
 
 use axum::{
-    extract::State,
+    extract::{Path, State},
     http::StatusCode,
     Json,
 };
@@ -15,7 +23,11 @@ use serde_json::json;
 
 use crate::AppState;
 
-/// POST /admin/shutdown - Initiate graceful daemon shutdown
+// ============================================================================
+// Moss Operations - Daemon lifecycle
+// ============================================================================
+
+/// POST /api/v1/admin/moss/shutdown - Graceful daemon exit
 ///
 /// Triggers graceful shutdown sequence:
 /// 1. Stops accepting new requests
@@ -24,34 +36,22 @@ use crate::AppState;
 ///
 /// # Returns
 /// - 200 OK: Shutdown initiated successfully
-///
-/// # Example Response
-/// ```json
-/// {
-///   "success": true,
-///   "message": "Shutdown initiated"
-/// }
-/// ```
-///
-/// # Note
-/// This endpoint returns immediately. The actual shutdown happens asynchronously.
-/// Connected clients may see connection closed errors as the server stops.
-pub async fn admin_shutdown(
+pub async fn moss_shutdown(
     State(state): State<AppState>,
 ) -> (StatusCode, Json<serde_json::Value>) {
-    tracing::info!("Admin shutdown endpoint called");
+    tracing::info!("Admin moss shutdown requested");
     state.shutdown_tx.notify_one();
 
     (
         StatusCode::OK,
         Json(json!({
             "success": true,
-            "message": "Shutdown initiated"
+            "message": "Moss daemon shutdown initiated"
         })),
     )
 }
 
-/// POST /admin/take-root - Install moss as Windows system service
+/// POST /api/v1/admin/moss/take-root - Install as Windows service
 ///
 /// **Windows only** - Installs moss as a Windows service using sc.exe.
 ///
@@ -64,28 +64,18 @@ pub async fn admin_shutdown(
 ///
 /// # Returns
 /// - 200 OK: Service installed and started
+/// - 400 BAD_REQUEST: Not supported on this platform
 /// - 409 CONFLICT: Service already exists
 /// - 500 INTERNAL_SERVER_ERROR: Installation failed
-///
-/// # Windows Example Response
-/// ```json
-/// {
-///   "success": true,
-///   "message": "🌿 Moss has taken root as a Windows service\n✓ Service is now awake and thriving"
-/// }
-/// ```
-///
-/// # Linux/Mac Response
-/// Returns 400 BAD_REQUEST with message to use systemd instead.
 #[cfg(target_os = "windows")]
-pub async fn admin_take_root() -> Result<
+pub async fn moss_take_root() -> Result<
     (StatusCode, Json<serde_json::Value>),
     (StatusCode, Json<serde_json::Value>),
 > {
     use std::path::PathBuf;
     use std::process::Command;
 
-    tracing::info!("Admin take-root endpoint called - installing as Windows service");
+    tracing::info!("Admin moss take-root requested - installing as Windows service");
 
     let current_exe = match std::env::current_exe() {
         Ok(path) => path,
@@ -197,11 +187,11 @@ pub async fn admin_take_root() -> Result<
 
             let install_message = if is_removable {
                 format!(
-                    "🌿 Moss has taken root from removable media\nInstalled to: {}",
+                    "Moss has taken root from removable media\nInstalled to: {}",
                     exe_path_str
                 )
             } else {
-                "🌿 Moss has taken root as a Windows service".to_string()
+                "Moss has taken root as a Windows service".to_string()
             };
 
             match start_output {
@@ -211,7 +201,7 @@ pub async fn admin_take_root() -> Result<
                         StatusCode::OK,
                         Json(json!({
                             "success": true,
-                            "message": format!("{}\n✓ Service is now awake and thriving", install_message)
+                            "message": format!("{}\nService is now running", install_message)
                         })),
                     ))
                 }
@@ -221,7 +211,7 @@ pub async fn admin_take_root() -> Result<
                         StatusCode::OK,
                         Json(json!({
                             "success": true,
-                            "message": format!("{}\n⚠️  Service installed but not started. Start manually with: sc start ZenGardenMoss", install_message)
+                            "message": format!("{}\nService installed but not started. Start manually with: sc start ZenGardenMoss", install_message)
                         })),
                     ))
                 }
@@ -252,11 +242,9 @@ pub async fn admin_take_root() -> Result<
     }
 }
 
-/// POST /admin/take-root - Not supported on Linux/Mac
-///
-/// Returns 400 BAD_REQUEST with guidance to use systemd on Linux.
+/// POST /api/v1/admin/moss/take-root - Not supported on Linux/Mac
 #[cfg(not(target_os = "windows"))]
-pub async fn admin_take_root() -> Result<
+pub async fn moss_take_root() -> Result<
     (StatusCode, Json<serde_json::Value>),
     (StatusCode, Json<serde_json::Value>),
 > {
@@ -267,4 +255,216 @@ pub async fn admin_take_root() -> Result<
             "error": "take-root is only supported on Windows. Use systemd on Linux."
         })),
     ))
+}
+
+// ============================================================================
+// Stone Operations - Machine power management
+// ============================================================================
+
+/// POST /api/v1/admin/stone/shutdown - Power off the machine
+///
+/// Initiates system shutdown. The response is returned before shutdown begins.
+/// A goodbye announcement is sent automatically via SIGTERM handler when moss
+/// receives the termination signal from the OS shutdown sequence.
+///
+/// # Platform Behavior
+/// - Linux: `systemctl poweroff`
+/// - Windows: `shutdown /s /t 0`
+///
+/// # Returns
+/// - 200 OK: Shutdown command issued
+/// - 500 INTERNAL_SERVER_ERROR: Failed to issue shutdown command
+pub async fn stone_shutdown(
+    State(_state): State<AppState>,
+) -> (StatusCode, Json<serde_json::Value>) {
+    tracing::warn!("Stone shutdown requested - initiating system poweroff");
+
+    // Spawn shutdown command after brief delay to allow response
+    tokio::spawn(async {
+        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+
+        #[cfg(unix)]
+        {
+            tracing::info!("Executing: systemctl poweroff");
+            let result = std::process::Command::new("systemctl")
+                .args(["poweroff"])
+                .spawn();
+
+            if let Err(e) = result {
+                // Fallback to shutdown command
+                tracing::warn!(error = ?e, "systemctl failed, trying shutdown -h now");
+                let _ = std::process::Command::new("shutdown")
+                    .args(["-h", "now"])
+                    .spawn();
+            }
+        }
+
+        #[cfg(windows)]
+        {
+            tracing::info!("Executing: shutdown /s /t 0");
+            let _ = std::process::Command::new("shutdown")
+                .args(["/s", "/t", "0"])
+                .spawn();
+        }
+    });
+
+    (
+        StatusCode::OK,
+        Json(json!({
+            "success": true,
+            "message": "Stone entering slumber..."
+        })),
+    )
+}
+
+/// POST /api/v1/admin/stone/reboot - Restart the machine
+///
+/// Initiates system reboot. The response is returned before reboot begins.
+/// A goodbye announcement is sent automatically via SIGTERM handler when moss
+/// receives the termination signal from the OS reboot sequence.
+///
+/// # Platform Behavior
+/// - Linux: `systemctl reboot`
+/// - Windows: `shutdown /r /t 0`
+///
+/// # Returns
+/// - 200 OK: Reboot command issued
+/// - 500 INTERNAL_SERVER_ERROR: Failed to issue reboot command
+pub async fn stone_reboot(
+    State(_state): State<AppState>,
+) -> (StatusCode, Json<serde_json::Value>) {
+    tracing::warn!("Stone reboot requested - initiating system restart");
+
+    // Spawn reboot command after brief delay to allow response
+    tokio::spawn(async {
+        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+
+        #[cfg(unix)]
+        {
+            tracing::info!("Executing: systemctl reboot");
+            let result = std::process::Command::new("systemctl")
+                .args(["reboot"])
+                .spawn();
+
+            if let Err(e) = result {
+                // Fallback to reboot command
+                tracing::warn!(error = ?e, "systemctl failed, trying reboot");
+                let _ = std::process::Command::new("reboot").spawn();
+            }
+        }
+
+        #[cfg(windows)]
+        {
+            tracing::info!("Executing: shutdown /r /t 0");
+            let _ = std::process::Command::new("shutdown")
+                .args(["/r", "/t", "0"])
+                .spawn();
+        }
+    });
+
+    (
+        StatusCode::OK,
+        Json(json!({
+            "success": true,
+            "message": "Stone stirring..."
+        })),
+    )
+}
+
+/// POST /api/v1/admin/stone/:name/wake - Wake a stone via Wake-on-LAN
+///
+/// Sends a Wake-on-LAN magic packet to the specified stone using its
+/// cached MAC address from the topology cache.
+///
+/// The stone must have been discovered previously (either online or offline)
+/// with a valid MAC address.
+///
+/// # Path Parameters
+/// - `name`: Stone name to wake
+///
+/// # Returns
+/// - 200 OK: WoL packet sent successfully
+/// - 404 NOT_FOUND: Stone not found in topology cache
+/// - 400 BAD_REQUEST: Stone has no MAC address (discovery didn't capture it)
+/// - 500 INTERNAL_SERVER_ERROR: Failed to send WoL packet
+pub async fn stone_wake(
+    State(state): State<AppState>,
+    Path(stone_name): Path<String>,
+) -> (StatusCode, Json<serde_json::Value>) {
+    tracing::info!(stone = %stone_name, "Wake-on-LAN requested");
+
+    // Look up stone in topology cache (includes offline stones)
+    let stone = crate::domain::topology::get_stone_by_name(&state.topology_cache, &stone_name).await;
+
+    match stone {
+        None => {
+            tracing::warn!(stone = %stone_name, "Stone not found in topology cache");
+            (
+                StatusCode::NOT_FOUND,
+                Json(json!({
+                    "success": false,
+                    "error": format!("Stone '{}' not found in topology cache", stone_name),
+                    "hint": "The stone may not have been discovered yet. Try 'garden-rake observe' first."
+                })),
+            )
+        }
+        Some(entry) => {
+            match entry.mac {
+                None => {
+                    tracing::warn!(
+                        stone = %stone_name,
+                        status = %entry.status,
+                        "Stone has no MAC address cached"
+                    );
+                    (
+                        StatusCode::BAD_REQUEST,
+                        Json(json!({
+                            "success": false,
+                            "error": format!("Stone '{}' has no MAC address", stone_name),
+                            "hint": "MAC address was not captured during discovery. The stone may be on a platform that doesn't report MAC."
+                        })),
+                    )
+                }
+                Some(ref mac) => {
+                    tracing::info!(
+                        stone = %stone_name,
+                        mac = %mac,
+                        status = %entry.status,
+                        "Sending Wake-on-LAN magic packet"
+                    );
+
+                    match crate::infra::network::send_wol_packet(mac).await {
+                        Ok(()) => {
+                            (
+                                StatusCode::OK,
+                                Json(json!({
+                                    "success": true,
+                                    "message": format!("Rousing {}...", stone_name),
+                                    "stone": stone_name,
+                                    "mac": mac,
+                                    "status": entry.status.to_string(),
+                                    "last_seen": entry.last_seen.to_rfc3339()
+                                })),
+                            )
+                        }
+                        Err(e) => {
+                            tracing::error!(
+                                stone = %stone_name,
+                                mac = %mac,
+                                error = ?e,
+                                "Failed to send WoL packet"
+                            );
+                            (
+                                StatusCode::INTERNAL_SERVER_ERROR,
+                                Json(json!({
+                                    "success": false,
+                                    "error": format!("Failed to send WoL packet: {}", e)
+                                })),
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
 }

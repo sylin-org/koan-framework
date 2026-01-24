@@ -436,10 +436,26 @@ impl CategoryGrid {
 
 /// Render status indicator with optional color
 /// Uses garden vitality language where appropriate
+///
+/// Color scheme:
+/// - [thriving] = green (healthy, running)
+/// - [dormant] = dark gray (stopped, offline)
+/// - [needs attention] = red (errors, failures)
+/// - [planting...] = cyan (installing)
 pub fn status_indicator(status: &str, color: bool) -> String {
     let status_lower = status.to_lowercase();
     let status_str = status_lower.as_str();
-    
+
+    // Installing/planting status - service being set up
+    if status_str == "installing" || status_str == "planting" {
+        let bracketed = "[planting...]".to_string();
+        return if color {
+            bracketed.cyan().to_string()
+        } else {
+            bracketed
+        };
+    }
+
     let indicator = if status_str == garden_common::SERVICE_RUNNING || status_str == garden_common::VITALITY_THRIVING {
         garden_common::VITALITY_THRIVING
     } else if status_str == garden_common::SERVICE_STOPPED || status_str == garden_common::VITALITY_DORMANT {
@@ -455,27 +471,32 @@ pub fn status_indicator(status: &str, color: bool) -> String {
     } else {
         return status.to_string();  // Unknown status, pass through without brackets
     };
-    
+
     // Always bracket known statuses
     let bracketed = format!("[{}]", indicator);
-    
+
     if color {
-        let is_healthy = status_str == garden_common::SERVICE_RUNNING 
-            || status_str == "ok" 
-            || status_str == garden_common::HEALTH_HEALTHY 
+        let is_healthy = status_str == garden_common::SERVICE_RUNNING
+            || status_str == "ok"
+            || status_str == garden_common::HEALTH_HEALTHY
             || status_str == garden_common::VITALITY_THRIVING;
-            
-        let is_degraded = status_str == garden_common::SERVICE_STOPPED 
-            || status_str == "warn" || status_str == "warning"
-            || status_str == garden_common::HEALTH_DEGRADED 
+
+        let is_dormant = status_str == garden_common::SERVICE_STOPPED
             || status_str == garden_common::VITALITY_DORMANT;
-            
+
+        let is_degraded = status_str == "warn" || status_str == "warning"
+            || status_str == garden_common::HEALTH_DEGRADED;
+
         let is_unhealthy = status_str == "error" || status_str == "failed"
-            || status_str == garden_common::HEALTH_UNHEALTHY 
-            || status_str == garden_common::VITALITY_WITHERING;
-            
+            || status_str == garden_common::HEALTH_UNHEALTHY
+            || status_str == garden_common::VITALITY_WITHERING
+            || status_str == garden_common::VITALITY_NEEDS_ATTENTION;
+
         if is_healthy {
             bracketed.green().to_string()
+        } else if is_dormant {
+            // Dark gray for dormant/stopped (not an error, just offline)
+            bracketed.truecolor(128, 128, 128).to_string()
         } else if is_degraded {
             bracketed.yellow().to_string()
         } else if is_unhealthy {
@@ -485,6 +506,18 @@ pub fn status_indicator(status: &str, color: bool) -> String {
         }
     } else {
         bracketed
+    }
+}
+
+/// Render tended marker with gold color
+/// Returns " [tended]" in gold when color is enabled, plain otherwise
+pub fn tended_marker(color: bool) -> String {
+    let marker = " [tended]";
+    if color {
+        // Gold color (RGB: 255, 215, 0)
+        marker.truecolor(255, 215, 0).to_string()
+    } else {
+        marker.to_string()
     }
 }
 
@@ -547,6 +580,29 @@ pub fn format_wall_clock() -> String {
     Local::now().format("%H:%M:%S").to_string()
 }
 
+/// Place a value at the standard column (VALUE_COLUMN)
+///
+/// Pads or truncates the label to fit exactly before VALUE_COLUMN,
+/// then appends the value. If label is too long, truncates with ellipsis.
+///
+/// Example output (VALUE_COLUMN = 36):
+/// ```text
+/// stone-coral-prairie                 [thriving]
+/// some-very-long-stone-name-that-i... [thriving]
+/// ```
+pub fn place_value(label: &str, value: &str) -> String {
+    let max_label_width = constants::VALUE_COLUMN - 1; // 35 chars for label
+
+    if label.len() > max_label_width {
+        // Truncate with ellipsis
+        let truncated = format!("{}...", &label[..max_label_width - 3]);
+        format!("{} {}", truncated, value)
+    } else {
+        // Pad to align value
+        format!("{:<width$} {}", label, value, width = max_label_width)
+    }
+}
+
 /// Constants for UI rendering
 pub mod constants {
     pub const DEFAULT_INDENT: usize = 4;
@@ -555,6 +611,8 @@ pub mod constants {
     pub const NUMERIC_PRECISION: usize = 2;
     pub const MAX_SERVICE_NAME_LEN: usize = 24;
     pub const LEGEND_SYMBOL: char = '*';
+    /// Column at which values should be placed (after label)
+    pub const VALUE_COLUMN: usize = 36;
 }
 
 #[cfg(test)]

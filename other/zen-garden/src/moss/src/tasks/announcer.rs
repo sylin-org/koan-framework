@@ -32,10 +32,11 @@ pub fn start_periodic_announcer(state: AppState) {
         loop {
             ticker.tick().await;
 
-            let payload = crate::announcement::build_payload(&state).await;
+            // Read current self topology entry
+            let entry = state.self_entry.read().await.clone();
             
             match crate::announcement::announce_if_changed(
-                payload, 
+                &entry, 
                 &mut last_hash, 
                 &mut last_announcement,
                 false, // Not forced

@@ -122,6 +122,9 @@ pub struct AppState {
 
     /// Topology cache for discovered stones (in-memory only)
     pub topology_cache: crate::domain::topology::TopologyCache,
+
+    /// Self topology entry (this stone's current state)
+    pub self_entry: Arc<RwLock<crate::domain::TopologyEntry>>,
 }
 
 impl AppState {
@@ -141,5 +144,88 @@ impl AppState {
     pub async fn persist_registry(&self) -> anyhow::Result<()> {
         let registry = self.registry.read().await;
         crate::infra::save_registry_vec(&registry).await
+    }
+    
+    /// Sync self_entry services from registry
+    /// 
+    /// Converts ServiceInfo → TopologyServiceEntry and updates self_entry.
+    /// Optionally triggers immediate chirp announcement.
+    /// Called after any registry modification.
+    pub async fn sync_self_services(&self, auto_chirp: bool) {
+        let registry = self.registry.read().await;
+        let topology_services = garden_common::TopologyServiceEntry::from_service_infos(&registry);
+        
+        {
+            let mut entry = self.self_entry.write().await;
+            entry.services = topology_services;
+            entry.last_seen = chrono::Utc::now();
+        }
+        
+        tracing::debug!(count = registry.len(), "Synced self_entry services from registry");
+        
+        if auto_chirp {
+            let entry = self.self_entry.read().await.clone();
+            if let Err(e) = crate::announcement::announce(&entry).await {
+                tracing::warn!(error = ?e, "Failed to auto-chirp after service sync");
+            }
+        }
+    }
+    
+    /// Add or update a single service in registry and self_entry
+    /// 
+    /// Immediately syncs to self_entry and triggers chirp.
+    /// This is the primary method for service state changes.
+    pub async fn upsert_service(&self, service: ServiceInfo, auto_chirp: bool) {
+        {
+            let mut registry = self.registry.write().await;
+            if let Some(pos) = registry.iter().position(|s| s.name == service.name) {
+                registry[pos] = service;
+            } else {
+                registry.push(service);
+            }
+        }
+        
+        self.sync_self_services(auto_chirp).await;
+        
+        if let Err(e) = self.persist_registry().await {
+            tracing::error!(error = ?e, "Failed to persist registry after upsert");
+        }
+    }
+    
+    /// Remove a service from registry and self_entry
+    /// 
+    /// Immediately syncs to self_entry and triggers chirp.
+    pub async fn remove_service(&self, service_name: &str, auto_chirp: bool) {
+        {
+            let mut registry = self.registry.write().await;
+            registry.retain(|s| s.name != service_name);
+        }
+        
+        self.sync_self_services(auto_chirp).await;
+        
+        if let Err(e) = self.persist_registry().await {
+            tracing::error!(error = ?e, "Failed to persist registry after removal");
+        }
+    }
+    
+    /// Batch update services (for reconciliation/adoption)
+    /// 
+    /// Replaces entire registry and triggers chirp.
+    pub async fn replace_services(&self, services: Vec<ServiceInfo>, auto_chirp: bool) {
+        {
+            let mut registry = self.registry.write().await;
+            *registry = services;
+        }
+        
+        self.sync_self_services(auto_chirp).await;
+        
+        if let Err(e) = self.persist_registry().await {
+            tracing::error!(error = ?e, "Failed to persist registry after batch update");
+        }
+    }
+    
+    /// Get snapshot of services (read-only)
+    pub async fn get_services(&self) -> Vec<ServiceInfo> {
+        self.registry.read().await.clone()
     }
 }

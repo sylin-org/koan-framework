@@ -1,11 +1,12 @@
 use anyhow::Result;
 use garden_common::{
-    announcement_types, ports, DiscoveryRequest, DiscoveryResponse, StoneChirpPayload,
-    UdpAnnouncement,
+    announcement_types, ports, DiscoveryRequest, DiscoveryResponse,
+    StoneGoodbyePayload, UdpAnnouncement,
 };
 use std::net::SocketAddr;
 use tokio::sync::{broadcast, OnceCell};
 
+use crate::domain::TopologyEntry;
 use crate::network_singletons;
 
 /// UDP event propagated to consumers
@@ -13,6 +14,7 @@ use crate::network_singletons;
 /// Consumers subscribe to these events and filter by variant.
 /// - `Request`: Another stone is looking for peers (respond with our info)
 /// - `Chirp`: Another stone is announcing its presence (update topology cache)
+/// - `Goodbye`: Another stone is shutting down (mark as offline immediately)
 #[derive(Debug, Clone)]
 pub enum UdpEvent {
     /// Discovery request from a stone looking for peers
@@ -20,9 +22,14 @@ pub enum UdpEvent {
         request: DiscoveryRequest,
         from_addr: SocketAddr,
     },
-    /// Stone chirp with full state (services, etc.)
+    /// Stone chirp - a TopologyEntry being broadcast
     Chirp {
-        chirp: StoneChirpPayload,
+        chirp: TopologyEntry,
+        from_addr: SocketAddr,
+    },
+    /// Stone goodbye - graceful shutdown notification
+    Goodbye {
+        goodbye: StoneGoodbyePayload,
         from_addr: SocketAddr,
     },
 }
@@ -164,8 +171,8 @@ async fn handle_announcement(
             }
         }
         announcement_types::STONE_CHIRP => {
-            // Parse the data as StoneChirpPayload
-            if let Ok(chirp) = serde_json::from_value::<StoneChirpPayload>(announcement.data.clone())
+            // Parse the data as TopologyEntry
+            if let Ok(chirp) = serde_json::from_value::<TopologyEntry>(announcement.data.clone())
             {
                 // Ignore our own chirps
                 if chirp.stone_id == stone_id {
@@ -176,6 +183,7 @@ async fn handle_announcement(
                 tracing::debug!(
                     stone = %chirp.stone_name,
                     services = chirp.services.len(),
+                    health = %chirp.health,
                     from = ?addr,
                     "Received stone chirp"
                 );
@@ -183,6 +191,29 @@ async fn handle_announcement(
                 // Broadcast chirp event to consumers (for topology cache update)
                 let _ = broadcast_tx.send(UdpEvent::Chirp {
                     chirp,
+                    from_addr: addr,
+                });
+            }
+        }
+        announcement_types::STONE_GOODBYE => {
+            // Parse the data as StoneGoodbyePayload
+            if let Ok(goodbye) = serde_json::from_value::<StoneGoodbyePayload>(announcement.data.clone())
+            {
+                // Ignore our own goodbye (shouldn't happen, but be safe)
+                if goodbye.stone_id == stone_id {
+                    tracing::trace!("Ignoring own goodbye");
+                    return;
+                }
+
+                tracing::info!(
+                    stone = %goodbye.stone_name,
+                    from = ?addr,
+                    "Received stone goodbye - marking offline"
+                );
+
+                // Broadcast goodbye event to consumers (for immediate offline marking)
+                let _ = broadcast_tx.send(UdpEvent::Goodbye {
+                    goodbye,
                     from_addr: addr,
                 });
             }
