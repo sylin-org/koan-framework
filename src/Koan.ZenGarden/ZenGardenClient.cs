@@ -205,7 +205,7 @@ public sealed class ZenGardenClient : IZenGardenClient
             return cached;
         }
         
-        // Level 2: Ensure we have discovered stones
+        // Level 2: Ensure we have at least one Stone discovered
         if (_topologyCache.IsEmpty)
         {
             await DiscoverStonesAsync(cancellationToken: cancellationToken);
@@ -217,34 +217,90 @@ public sealed class ZenGardenClient : IZenGardenClient
             return null;
         }
         
-        // Level 3: Search across all known Stones for the offering
-        foreach (var stone in _topologyCache.Values)
+        // Level 3: Query ANY Stone for the service - all Stones share the Garden topology cache
+        // Use ?q= to search Garden-wide, not just local services
+        var anyStone = _topologyCache.Values.First();
+        
+        var result = await SearchServicesAsync(anyStone, offering, cancellationToken);
+        
+        if (result is { Count: > 0 })
         {
-            if (!await IsStoneHealthyAsync(stone, TimeSpan.FromSeconds(2), cancellationToken))
-            {
-                _logger.LogDebug("Stone {Stone} is unhealthy, skipping", stone.StoneName);
-                continue;
-            }
+            var service = result[0];
             
-            var service = await GetServiceAsync(stone, offering, cancellationToken);
-            
-            // Service must be running and have either Connection or Ports info
-            if (service is { IsRunning: true } && (service.Connection != null || service.Ports?.Native != null))
-            {
-                _logger.LogDebug("Found {Offering} on {Stone}", offering, stone.StoneName);
-                
-                // Bind to this stone for future requests
-                lock (_bindLock)
-                {
-                    _boundStone = stone;
+            // The response includes which Stone has the service - extract it
+            var serviceStone = service.Stone != null 
+                ? new Stone 
+                { 
+                    StoneId = service.Stone.Id,
+                    StoneName = service.Stone.Name ?? anyStone.StoneName,
+                    StoneEndpoint = FixLoopbackEndpoint(service.Stone.Endpoint, service.Connection?.Ip) ?? anyStone.StoneEndpoint
                 }
-                
-                return CacheOffering(service, stone);
+                : anyStone;
+            
+            _logger.LogDebug("Found {Offering} on {Stone} via Garden cache", offering, serviceStone.StoneName);
+            
+            // Bind to the Stone that has the service
+            lock (_bindLock)
+            {
+                _boundStone = serviceStone;
             }
+            
+            // Cache to topology for future lookups
+            _topologyCache[serviceStone.CacheKey] = serviceStone;
+            
+            return CacheOffering(service, serviceStone);
         }
         
-        _logger.LogWarning("Service {Offering} not found on any Stone", offering);
+        _logger.LogWarning("Service {Offering} not found in Garden", offering);
         return null;
+    }
+    
+    /// <summary>
+    /// Search for a service across the entire Garden using the cached topology.
+    /// Uses GET /api/v1/services?q={offering} which queries all Stones.
+    /// </summary>
+    private async Task<IReadOnlyList<ServiceInfo>?> SearchServicesAsync(
+        Stone stone,
+        string query,
+        CancellationToken cancellationToken = default)
+    {
+        var url = $"{stone.StoneEndpoint}{Constants.Moss.ServicesEndpoint}?q={Uri.EscapeDataString(query)}";
+        _logger.LogDebug("Searching Garden for service: {Url}", url);
+        
+        try
+        {
+            var response = await _httpClient.GetAsync(url, cancellationToken);
+            
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogDebug("Search failed with status: {Status}", response.StatusCode);
+                return null;
+            }
+            
+            var json = await response.Content.ReadAsStringAsync(cancellationToken);
+            _logger.LogDebug("Search response: {Json}", json);
+            
+            var wrapper = JsonSerializer.Deserialize<ServicesListResponse>(json, _jsonOptions);
+            
+            return wrapper?.Data?.Services;
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogDebug("Failed to search services on {Stone}: {Error}", stone.StoneName, ex.Message);
+            return null;
+        }
+    }
+    
+    /// <summary>
+    /// Fix loopback addresses (127.0.0.1) in Stone endpoints using the service IP.
+    /// </summary>
+    private static string? FixLoopbackEndpoint(string? endpoint, string? serviceIp)
+    {
+        if (string.IsNullOrEmpty(endpoint)) return null;
+        if (!endpoint.Contains("127.0.0.1")) return endpoint;
+        if (string.IsNullOrEmpty(serviceIp) || serviceIp == "127.0.0.1") return null;
+        
+        return endpoint.Replace("127.0.0.1", serviceIp);
     }
 
     /// <inheritdoc />

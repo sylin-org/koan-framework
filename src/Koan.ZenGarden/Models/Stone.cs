@@ -70,6 +70,10 @@ public sealed record ServiceInfo
     [JsonPropertyName("ports")]
     public ServicePorts? Ports { get; init; }
     
+    /// <summary>Stone that hosts this service (from Garden-wide search).</summary>
+    [JsonPropertyName("stone")]
+    public ServiceStoneRef? Stone { get; init; }
+    
     /// <summary>Check if service is running.</summary>
     [JsonIgnore]
     public bool IsRunning => Status.Equals("Running", StringComparison.OrdinalIgnoreCase);
@@ -77,6 +81,21 @@ public sealed record ServiceInfo
     /// <summary>Check if service is healthy.</summary>
     [JsonIgnore]
     public bool IsHealthy => Health?.Equals("Healthy", StringComparison.OrdinalIgnoreCase) ?? false;
+}
+
+/// <summary>
+/// Reference to a Stone in service search results.
+/// </summary>
+public sealed record ServiceStoneRef
+{
+    [JsonPropertyName("id")]
+    public string? Id { get; init; }
+    
+    [JsonPropertyName("name")]
+    public string? Name { get; init; }
+    
+    [JsonPropertyName("endpoint")]
+    public string? Endpoint { get; init; }
 }
 
 /// <summary>
