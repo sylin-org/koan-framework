@@ -1,8 +1,0 @@
-{
-  "name": "pihole",
-  "description": "Network-wide ad blocking DNS sinkhole (EUPL v1.2)",
-  "category": "networking",
-  "tags": ["dns", "ad-blocking", "privacy", "network", "dhcp"],
-  "ports": [53, 8053],
-  "volumes": ["pihole-data", "pihole-dnsmasq"]
-}

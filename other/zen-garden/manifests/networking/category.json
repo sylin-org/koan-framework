@@ -1,8 +1,0 @@
-{
-  "$schema": "../category.schema.json",
-  "name": "networking",
-  "description": "Network services including DNS, VPN, and network management",
-  "aliases": ["network", "dns", "vpn", "tunnel"],
-  "default_protocol": "http",
-  "tags": ["networking", "infrastructure"]
-}

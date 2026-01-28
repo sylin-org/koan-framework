@@ -1,8 +1,0 @@
-{
-  "name": "nextcloud",
-  "description": "Self-hosted cloud platform for files, calendar, contacts (AGPL v3)",
-  "category": "storage",
-  "tags": ["cloud", "files", "sync", "calendar", "contacts", "collaboration"],
-  "ports": [8080],
-  "volumes": ["nextcloud-data", "nextcloud-apps", "nextcloud-config"]
-}

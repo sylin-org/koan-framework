@@ -1,2 +1,0 @@
-stone ALL=(root) NOPASSWD: /bin/systemctl restart garden-moss.service
-stone ALL=(root) NOPASSWD: /usr/bin/systemctl restart garden-moss.service

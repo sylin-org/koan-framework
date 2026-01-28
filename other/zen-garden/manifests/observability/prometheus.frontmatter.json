@@ -1,8 +1,0 @@
-{
-  "name": "prometheus",
-  "description": "Prometheus metrics collection and alerting (Apache 2.0, CNCF)",
-  "category": "observability",
-  "tags": ["monitoring", "metrics", "alerting", "tsdb", "observability"],
-  "port": 9090,
-  "volumes": ["prometheus-data"]
-}

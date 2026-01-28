@@ -1,9 +1,0 @@
-{
-  "$schema": "../category.schema.json",
-  "name": "data",
-  "description": "Databases and data stores (relational, document, key-value)",
-  "aliases": ["database", "db", "databases", "datastore", "data-store", "rdbms"],
-  "parent_of": ["cache", "search", "vector"],
-  "default_protocol": "tcp",
-  "tags": ["data", "persistence"]
-}

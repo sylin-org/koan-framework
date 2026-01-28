@@ -1,8 +1,0 @@
-{
-  "name": "grafana",
-  "description": "Grafana visualization and dashboards (AGPL v3)",
-  "category": "observability",
-  "tags": ["monitoring", "visualization", "dashboards", "metrics", "logs", "observability"],
-  "port": 3000,
-  "volumes": ["grafana-data"]
-}

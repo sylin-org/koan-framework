@@ -1,9 +1,0 @@
-{
-  "$schema": "../category.schema.json",
-  "name": "ai",
-  "description": "AI/ML inference servers and model hosting",
-  "aliases": ["llm", "ml", "models", "inference", "machine-learning"],
-  "default_protocol": "http",
-  "connection_template": "http://{host}:{port}",
-  "tags": ["ai", "ml", "inference"]
-}

@@ -1,8 +1,0 @@
-﻿{
-  "name": "mongodb",
-  "description": "MongoDB NoSQL database",
-  "category": "data",
-  "tags": ["database", "document", "nosql"],
-  "port": 27017,
-  "volumes": ["mongo-data"]
-}

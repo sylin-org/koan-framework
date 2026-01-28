@@ -1,9 +1,0 @@
-{
-  "$schema": "../category.schema.json",
-  "name": "storage",
-  "description": "Object storage, file storage, and cloud storage solutions",
-  "aliases": ["s3", "object-storage", "files", "blob"],
-  "default_protocol": "http",
-  "connection_template": "http://{host}:{port}",
-  "tags": ["storage", "files", "objects"]
-}

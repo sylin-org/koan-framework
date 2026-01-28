@@ -1,8 +1,0 @@
-﻿# garden-moss configuration
-# Generated: {{TIMESTAMP}}
-#
-# Note: stone_name is intentionally omitted.
-# Moss uses the system hostname as the stone identity (mDNS: <hostname>.local).
-
-port = 7185
-log_level = "info"
