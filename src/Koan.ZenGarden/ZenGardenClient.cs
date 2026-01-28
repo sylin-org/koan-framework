@@ -49,6 +49,22 @@ public sealed class ZenGardenClient : IZenGardenClient
         TimeSpan? timeout = null,
         CancellationToken cancellationToken = default)
     {
+        // Fast path: all Stones share the same topology, so one response is enough
+        // for service discovery. We return immediately on first valid response.
+        return await DiscoverStonesAsync(timeout, waitForAll: false, cancellationToken);
+    }
+    
+    /// <summary>
+    /// Discover Stones with option to wait for all responses.
+    /// </summary>
+    /// <param name="timeout">Discovery timeout.</param>
+    /// <param name="waitForAll">If true, waits for timeout to collect all Stones. If false (default), returns on first valid response.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    public async Task<IReadOnlyList<Stone>> DiscoverStonesAsync(
+        TimeSpan? timeout,
+        bool waitForAll,
+        CancellationToken cancellationToken = default)
+    {
         timeout ??= TimeSpan.FromSeconds(_options.DiscoveryTimeoutSeconds);
         
         var request = new DiscoveryRequest
@@ -146,6 +162,14 @@ public sealed class ZenGardenClient : IZenGardenClient
                         _topologyCache[stone.CacheKey] = stone;
                         _logger.LogDebug("Discovered Stone: {Name} at {Endpoint}", 
                             stone.StoneName, stone.StoneEndpoint);
+                        
+                        // Fast path: all Stones share the same topology map,
+                        // so one response is sufficient for service discovery
+                        if (!waitForAll)
+                        {
+                            _logger.LogDebug("Returning early with first Stone (all share topology)");
+                            return stones.Values.ToList();
+                        }
                     }
                 }
             }

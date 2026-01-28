@@ -43,10 +43,11 @@ Stones respond with their identity:
 
 ### Implementation Notes
 
-1. **Binding** - On multi-homed Windows (WSL, Hyper-V), bind to a LAN interface explicitly (192.168.x.x, 10.x.x.x, 172.16-31.x.x)
-2. **Port Binding** - Bind to port 7184 to receive multicast responses
-3. **Timeout** - Use per-receive timeout (500ms) rather than global timeout
-4. **Echo Filtering** - Your own request may echo back; filter by checking for `endpoint` field
+1. **Early Return** - All Stones share the same topology map, so one response is sufficient. Return immediately on first valid response rather than waiting for timeout.
+2. **Binding** - On multi-homed Windows (WSL, Hyper-V), bind to a LAN interface explicitly (192.168.x.x, 10.x.x.x, 172.16-31.x.x)
+3. **Port Binding** - Bind to port 7184 to receive multicast responses
+4. **Timeout** - Use per-receive timeout (500ms) rather than global timeout
+5. **Echo Filtering** - Your own request may echo back; filter by checking for `endpoint` field
 
 ---
 
