@@ -165,6 +165,8 @@ For discovery to work, allow:
 
 ## Service Resolution Flow
 
+All Stones in a Garden share a topology cache. Query ANY Stone to find services across the entire Garden.
+
 ```
 ┌──────────────────────────────────────────────────────────────────┐
 │ FindServiceAsync("mongodb")                                       │
@@ -182,22 +184,57 @@ For discovery to work, allow:
               │                               │
               ▼                               ▼
 ┌─────────────────────────┐   ┌────────────────────────────────────┐
-│ Return cached result    │   │ 2. Get topology (discover if empty) │
-└─────────────────────────┘   └────────────────────────────────────┘
+│ Return cached result    │   │ 2. Discover any Stone (early return)│
+└─────────────────────────┘   │    UDP multicast → first responder │
+                              └────────────────────────────────────┘
                                               │
                                               ▼
                               ┌────────────────────────────────────┐
-                              │ 3. For each Stone in topology:     │
-                              │    GET /api/v1/services/{offering} │
-                              │    If found & healthy → cache it   │
+                              │ 3. Query Garden cache:             │
+                              │    GET /api/v1/services?q=mongodb  │
+                              │    Returns: stone + connection info│
                               └────────────────────────────────────┘
                                               │
                                               ▼
                               ┌────────────────────────────────────┐
                               │ 4. Build connection string:        │
-                              │    • From connection.uris[0] OR    │
-                              │    • From scheme://host:ports.native│
+                              │    mongodb://192.168.1.135:27017   │
+                              │    Cache result for future calls   │
                               └────────────────────────────────────┘
+```
+
+### Key Insight: Garden Topology Cache
+
+Each Stone maintains a cache of all services running across the entire Garden.
+This means:
+- You only need to discover ONE Stone
+- Query that Stone with `?q=` to find ANY service in the Garden
+- Response includes which Stone hosts the service + connection info
+
+```http
+GET /api/v1/services?q=mongodb HTTP/1.1
+Host: stone-bronze-canyon:7185
+
+Response:
+{
+  "data": {
+    "found": true,
+    "services": [{
+      "name": "mongodb",
+      "status": "running",
+      "stone": {
+        "name": "stone-coral-prairie",
+        "endpoint": "http://192.168.1.135:7185"
+      },
+      "connection": {
+        "ip": "192.168.1.135",
+        "port": 27017,
+        "uris": ["tcp://192.168.1.135:27017"]
+      }
+    }],
+    "source": "cache"  // ← From Garden topology cache
+  }
+}
 ```
 
 ---
