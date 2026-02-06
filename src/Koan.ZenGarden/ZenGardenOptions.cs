@@ -1,34 +1,65 @@
-﻿namespace Koan.ZenGarden;
+namespace Koan.ZenGarden;
 
 /// <summary>
-/// Configuration options for Zen Garden client.
+/// Configuration options for Zen Garden tools-domain integration.
 /// </summary>
 public sealed class ZenGardenOptions
 {
-    /// <summary>Configuration section name.</summary>
-    public const string SectionName = "ZenGarden";
-    
-    /// <summary>Enable or disable Zen Garden discovery.</summary>
-    public bool Enabled { get; set; } = true;
-    
-    /// <summary>UDP discovery timeout in seconds.</summary>
-    public int DiscoveryTimeoutSeconds { get; set; } = Constants.Discovery.DefaultTimeoutSeconds;
-    
-    /// <summary>HTTP request timeout in seconds.</summary>
-    public int HttpTimeoutSeconds { get; set; } = 10;
-    
-    /// <summary>Enable Chirp listener for hot-cache topology.</summary>
-    public bool EnableChirpListener { get; set; } = false;
-    
-    /// <summary>Multicast group override (defaults to 239.255.42.99).</summary>
-    public string? MulticastGroup { get; set; }
-    
-    /// <summary>Discovery port override (defaults to 7184).</summary>
-    public int? DiscoveryPort { get; set; }
-    
+    public const string SectionName = "Koan:ZenGarden";
+
     /// <summary>
-    /// Custom scheme mappings (offering → scheme).
-    /// Merged with built-in mappings.
+    /// Optional explicit Moss endpoint (for example "http://stone-01:7185").
+    /// When not set, endpoint is resolved via discovery.
     /// </summary>
-    public Dictionary<string, string>? SchemeMappings { get; set; }
+    public string? Endpoint { get; set; }
+
+    /// <summary>
+    /// Enable Moss discovery and automatic rebind when connection fails.
+    /// </summary>
+    public bool EnableDiscovery { get; set; } = true;
+
+    /// <summary>
+    /// Discovery request timeout in seconds.
+    /// </summary>
+    public int DiscoveryTimeoutSeconds { get; set; } = Constants.Discovery.DefaultTimeoutSeconds;
+
+    /// <summary>
+    /// Discovery UDP port (default 7184).
+    /// </summary>
+    public int DiscoveryPort { get; set; } = Constants.Discovery.DefaultPort;
+
+    /// <summary>
+    /// Discovery multicast group (default 239.255.42.99).
+    /// </summary>
+    public string DiscoveryMulticastGroup { get; set; } = Constants.Discovery.DefaultMulticastGroup;
+
+    /// <summary>
+    /// Cache TTL for discovered stones.
+    /// </summary>
+    public int DiscoveryCacheTtlSeconds { get; set; } = Constants.Discovery.DefaultCacheTtlSeconds;
+
+    /// <summary>
+    /// Enable directed broadcast fallback discovery.
+    /// </summary>
+    public bool DiscoveryEnableBroadcastFallback { get; set; } = true;
+
+    /// <summary>
+    /// Enable limited broadcast fallback (255.255.255.255).
+    /// </summary>
+    public bool DiscoveryEnableLimitedBroadcast { get; set; } = false;
+
+    /// <summary>
+    /// HTTP timeout used for snapshot and stream requests.
+    /// </summary>
+    public int HttpTimeoutSeconds { get; set; } = 30;
+
+    /// <summary>
+    /// Delay between stream reconnect attempts after failures.
+    /// </summary>
+    public int StreamReconnectDelaySeconds { get; set; } = 3;
+
+    /// <summary>
+    /// Max number of event ids kept for dedupe.
+    /// </summary>
+    public int DedupeWindowSize { get; set; } = 4096;
 }
