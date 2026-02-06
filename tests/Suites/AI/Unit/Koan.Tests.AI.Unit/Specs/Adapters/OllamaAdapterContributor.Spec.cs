@@ -126,6 +126,37 @@ public sealed class OllamaAdapterContributorSpec
     }
 
     [Fact]
+    public async Task ContributeAsync_with_missing_required_capabilities_schedules_wish_and_continues()
+    {
+        var configuration = BuildConfiguration(new Dictionary<string, string?>
+        {
+            ["Koan:Ai:Ollama:ConnectionString"] = "zen-garden://ollama?cap=llama3.2,nomic-embed-text"
+        });
+
+        var sourceRegistry = new RecordingSourceRegistry();
+        var adapterRegistry = new InMemoryAdapterRegistry();
+        var zenGardenProvider = new StubZenGardenProvider(_ => new ZenGardenOfferingResolution
+        {
+            ToolFqid = "offering:ollama",
+            Offering = "ollama",
+            Uris = new[] { "http://zen-ollama:11434" },
+            Capabilities = new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["model"] = new[] { "llama3.2" }
+            }
+        });
+
+        using var provider = BuildServiceProvider(configuration, sourceRegistry, adapterRegistry, zenGardenProvider);
+
+        var contributor = new OllamaAdapterContributor();
+        await contributor.ContributeAsync(provider, CancellationToken.None);
+
+        sourceRegistry.RegisteredSources.Should().ContainSingle();
+        zenGardenProvider.WishRequests.Should().ContainSingle();
+        zenGardenProvider.WishRequests[0].Capabilities.Should().Contain(["llama3.2", "nomic-embed-text"]);
+    }
+
+    [Fact]
     public async Task ContributeAsync_bails_when_source_already_registered()
     {
         var configuration = BuildConfiguration(new Dictionary<string, string?>
@@ -229,6 +260,7 @@ public sealed class OllamaAdapterContributorSpec
     private sealed class StubZenGardenProvider : IZenGardenInitializationProvider
     {
         private readonly Func<ZenGardenConnectionIntent, ZenGardenOfferingResolution?> _resolver;
+        public List<ZenGardenConnectionIntent> WishRequests { get; } = new();
 
         public StubZenGardenProvider(Func<ZenGardenConnectionIntent, ZenGardenOfferingResolution?> resolver)
         {
@@ -246,6 +278,24 @@ public sealed class OllamaAdapterContributorSpec
             CancellationToken cancellationToken = default)
         {
             return ValueTask.FromResult(_resolver(intent));
+        }
+
+        public ValueTask<ZenGardenCapabilityWishReceipt?> WishCapabilitiesAsync(
+            ZenGardenConnectionIntent intent,
+            CancellationToken cancellationToken = default)
+        {
+            WishRequests.Add(intent);
+            return ValueTask.FromResult<ZenGardenCapabilityWishReceipt?>(new ZenGardenCapabilityWishReceipt
+            {
+                RequestId = Guid.NewGuid().ToString("N"),
+                ToolFqid = "offering:ollama",
+                OfferingSelector = intent.ToOfferingSelector(),
+                Requested = intent.Capabilities,
+                Missing = intent.Capabilities,
+                IsFulfilled = false,
+                Status = "requested",
+                CreatedAt = DateTimeOffset.UtcNow
+            });
         }
     }
 

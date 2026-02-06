@@ -241,12 +241,13 @@ internal sealed class OllamaAdapterContributor : IAiAdapterContributor
 
         var offering = ResolveZenGardenOffering(ollamaConfig, zenGardenProvider);
         var instance = ResolveZenGardenInstance(ollamaConfig);
-        var intent = ZenGardenConnectionIntent.ForOffering(offering, instance, requiredCapabilities);
+        var resolveIntent = ZenGardenConnectionIntent.ForOffering(offering, instance);
+        var capabilityIntent = ZenGardenConnectionIntent.ForOffering(offering, instance, requiredCapabilities);
 
         ZenGardenOfferingResolution? resolved;
         try
         {
-            resolved = await zenGardenProvider.ResolveAsync(intent, ct).ConfigureAwait(false);
+            resolved = await zenGardenProvider.ResolveAsync(resolveIntent, ct).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -256,8 +257,20 @@ internal sealed class OllamaAdapterContributor : IAiAdapterContributor
 
         if (resolved is null)
         {
-            KoanLog.BootDebug(logger, LogActions.ZenGarden, "auto-not-ready", ("offering", intent.ToOfferingSelector()));
+            KoanLog.BootDebug(logger, LogActions.ZenGarden, "auto-not-ready", ("offering", resolveIntent.ToOfferingSelector()));
             return null;
+        }
+
+        var missing = ResolveMissingCapabilities(requiredCapabilities, resolved);
+        if (missing.Count > 0)
+        {
+            await TriggerWishfulCapabilityEnsureAsync(
+                zenGardenProvider,
+                capabilityIntent,
+                missing,
+                "auto",
+                logger,
+                ct).ConfigureAwait(false);
         }
 
         var endpoint = resolved.GetUri("http", "https");
@@ -320,10 +333,12 @@ internal sealed class OllamaAdapterContributor : IAiAdapterContributor
                 ResolveZenGardenInstance(ollamaConfig),
                 fallbackCapabilities);
 
+            var resolveIntent = intent with { Capabilities = Array.Empty<string>() };
+
             ZenGardenOfferingResolution? resolved;
             try
             {
-                resolved = await zenGardenProvider.ResolveAsync(intent, ct).ConfigureAwait(false);
+                resolved = await zenGardenProvider.ResolveAsync(resolveIntent, ct).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
@@ -337,6 +352,18 @@ internal sealed class OllamaAdapterContributor : IAiAdapterContributor
                 return null;
             }
 
+            var missing = ResolveMissingCapabilities(intent.Capabilities, resolved);
+            if (missing.Count > 0)
+            {
+                await TriggerWishfulCapabilityEnsureAsync(
+                    zenGardenProvider,
+                    intent,
+                    missing,
+                    "intent",
+                    logger,
+                    ct).ConfigureAwait(false);
+            }
+
             endpoint = resolved.GetUri("http", "https") ?? string.Empty;
             if (string.IsNullOrWhiteSpace(endpoint))
             {
@@ -344,7 +371,7 @@ internal sealed class OllamaAdapterContributor : IAiAdapterContributor
                 return null;
             }
 
-            modelHint = ResolveModelHint(defaultModel, fallbackCapabilities, resolved);
+            modelHint = ResolveModelHint(defaultModel, intent.Capabilities, resolved);
         }
 
         var caps = await GetCapabilitiesAsync(endpoint, modelHint, ct).ConfigureAwait(false);
@@ -498,16 +525,143 @@ internal sealed class OllamaAdapterContributor : IAiAdapterContributor
         {
             foreach (var required in requiredCapabilities)
             {
-                if (models.Any(model => string.Equals(model, required, StringComparison.OrdinalIgnoreCase)))
+                var requiredToken = required.Trim().ToLowerInvariant();
+                var separator = requiredToken.IndexOf(':');
+                var requiredType = separator > 0 && separator < requiredToken.Length - 1
+                    ? requiredToken[..separator]
+                    : null;
+                var requiredName = separator > 0 && separator < requiredToken.Length - 1
+                    ? requiredToken[(separator + 1)..]
+                    : requiredToken;
+
+                if (requiredType is not null &&
+                    !string.Equals(requiredType, "model", StringComparison.OrdinalIgnoreCase))
                 {
-                    return required;
+                    continue;
+                }
+
+                if (models.Any(model => string.Equals(model, requiredName, StringComparison.OrdinalIgnoreCase)))
+                {
+                    return requiredName;
                 }
             }
 
             return models[0];
         }
 
-        return requiredCapabilities.FirstOrDefault();
+        var fallback = requiredCapabilities.FirstOrDefault();
+        if (string.IsNullOrWhiteSpace(fallback))
+        {
+            return fallback;
+        }
+
+        var token = fallback.Trim().ToLowerInvariant();
+        var fallbackSeparator = token.IndexOf(':');
+        if (fallbackSeparator > 0 && fallbackSeparator < token.Length - 1)
+        {
+            var type = token[..fallbackSeparator];
+            if (string.Equals(type, "model", StringComparison.OrdinalIgnoreCase))
+            {
+                return token[(fallbackSeparator + 1)..];
+            }
+        }
+
+        return token;
+    }
+
+    private static IReadOnlyList<string> ResolveMissingCapabilities(
+        IReadOnlyList<string> requiredCapabilities,
+        ZenGardenOfferingResolution resolved)
+    {
+        if (requiredCapabilities.Count == 0)
+        {
+            return Array.Empty<string>();
+        }
+
+        var missing = new List<string>();
+        foreach (var required in requiredCapabilities)
+        {
+            if (!CapabilityPresent(required, resolved.Capabilities))
+            {
+                missing.Add(required);
+            }
+        }
+
+        return missing;
+    }
+
+    private static bool CapabilityPresent(
+        string raw,
+        IReadOnlyDictionary<string, IReadOnlyList<string>> capabilities)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return false;
+        }
+
+        var token = raw.Trim().ToLowerInvariant();
+        var separator = token.IndexOf(':');
+        if (separator > 0 && separator < token.Length - 1)
+        {
+            var type = token[..separator];
+            var name = token[(separator + 1)..];
+            return capabilities.TryGetValue(type, out var typed) &&
+                typed.Any(value => string.Equals(value, name, StringComparison.OrdinalIgnoreCase));
+        }
+
+        foreach (var entry in capabilities.Values)
+        {
+            if (entry.Any(value => string.Equals(value, token, StringComparison.OrdinalIgnoreCase)))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static async Task TriggerWishfulCapabilityEnsureAsync(
+        IZenGardenInitializationProvider provider,
+        ZenGardenConnectionIntent intent,
+        IReadOnlyList<string> missing,
+        string source,
+        ILogger logger,
+        CancellationToken ct)
+    {
+        try
+        {
+            var receipt = await provider.WishCapabilitiesAsync(intent, ct).ConfigureAwait(false);
+            if (receipt is null)
+            {
+                KoanLog.BootWarning(
+                    logger,
+                    LogActions.ZenGarden,
+                    "wish-not-scheduled",
+                    ("source", source),
+                    ("offering", intent.ToOfferingSelector()),
+                    ("missing", string.Join(",", missing)));
+                return;
+            }
+
+            KoanLog.BootInfo(
+                logger,
+                LogActions.ZenGarden,
+                "wish-scheduled",
+                ("source", source),
+                ("requestId", receipt.RequestId),
+                ("offering", receipt.OfferingSelector),
+                ("missing", string.Join(",", receipt.Missing)));
+        }
+        catch (Exception ex)
+        {
+            KoanLog.BootWarning(
+                logger,
+                LogActions.ZenGarden,
+                "wish-schedule-failed",
+                ("source", source),
+                ("offering", intent.ToOfferingSelector()),
+                ("reason", ex.Message));
+        }
     }
 
     /// <summary>
