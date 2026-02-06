@@ -1,144 +1,182 @@
-﻿# Koan.ZenGarden
+# Koan.ZenGarden
 
-Zero-config infrastructure discovery for Koan Framework via [Zen Garden](https://github.com/your-org/zen-garden).
+Greenfield Zen Garden tools-domain runtime for Koan applications.
 
-## Overview
-
-`Koan.ZenGarden` enables Koan applications to automatically discover infrastructure services (MongoDB, Redis, RabbitMQ, etc.) running on Zen Garden Stones without any configuration. Just add the package and your app finds its dependencies.
+`Koan.ZenGarden` subscribes to Zen Garden's normative tools APIs and emits app-friendly events when offerings and seed banks become ready, unavailable, or change capabilities.
 
 ## Quick Start
 
 ```csharp
-// Create the client
-using var httpClient = new HttpClient();
-using var zenClient = new ZenGardenClient(httpClient, logger);
+using Koan.ZenGarden;
+using Koan.ZenGarden.Extensions;
 
-// Discover all Stones on the network
-var stones = await zenClient.DiscoverStonesAsync();
-
-// Find a specific service (searches all Stones)
-var mongodb = await zenClient.FindServiceAsync("mongodb");
-if (mongodb != null)
+var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddKoan();
+builder.Services.AddKoanZenGarden(configure: options =>
 {
-    var client = new MongoClient(mongodb.ConnectionString);
-    // Use MongoDB...
+    options.EnableDiscovery = true;
+});
+
+using var mongodbSub = ZenGarden.Offering.On(
+    "mongodb",
+    async (evt, ct) =>
+    {
+        // Reconfigure routes/clients when Mongo comes online/offline.
+    });
+
+using var ollamaSub = ZenGarden.Offering.On(
+    "ollama",
+    ["modelv1", "modelv2"],
+    async (evt, ct) =>
+    {
+        // React when required capabilities are satisfied/unsatisfied.
+    });
+
+using var storageSub = ZenGarden.Storage.On(
+    "default",
+    async (evt, ct) =>
+    {
+        // React to seed-bank readiness changes.
+    });
+```
+
+## API Surface
+
+### Offering events
+
+```csharp
+IDisposable On(
+    string offering,
+    Func<ZenGardenAvailabilityEvent, CancellationToken, ValueTask> handler,
+    ZenGardenWatchOptions? options = null);
+
+IDisposable On(
+    string offering,
+    IReadOnlyList<string> requires,
+    Func<ZenGardenAvailabilityEvent, CancellationToken, ValueTask> handler,
+    ZenGardenWatchOptions? options = null);
+```
+
+### Storage events
+
+```csharp
+IDisposable On(
+    string seedBank,
+    Func<ZenGardenAvailabilityEvent, CancellationToken, ValueTask> handler,
+    ZenGardenWatchOptions? options = null);
+
+IDisposable OnAny(
+    Func<ZenGardenAvailabilityEvent, CancellationToken, ValueTask> handler,
+    ZenGardenWatchOptions? options = null);
+```
+
+### Catalog
+
+```csharp
+Task<IReadOnlyList<ZenGardenToolSnapshot>> ZenGarden.Offering.Catalog(...)
+Task<ZenGardenToolSnapshot?> ZenGarden.Offering.Catalog("ollama", ...)
+Task<IReadOnlyList<ZenGardenToolSnapshot>> ZenGarden.Storage.Catalog(...)
+Task<ZenGardenToolSnapshot?> ZenGarden.Storage.Catalog("default", ...)
+```
+
+## Event Kinds
+
+- `Online`
+- `Offline`
+- `Changed`
+- `CapabilitiesSatisfied`
+- `CapabilitiesUnsatisfied`
+
+## Selector Ergonomics
+
+The offering selector can include bracketed requirements:
+
+```csharp
+var subscription = ZenGardenSubscription.Parse("ollama[modelv1,modelv2]");
+```
+
+You can also build explicitly:
+
+```csharp
+var subscription = ZenGardenSubscription.ForOffering("ollama")
+    .Require("modelv1", "modelv2");
+```
+
+## Runtime Notes
+
+- Source APIs:
+  - `GET /api/v1/garden/tools`
+  - `GET /api/v1/garden/tools/stream`
+- Endpoint resolution:
+  - explicit `ZenGardenOptions.Endpoint`
+  - `GARDEN_STONE` environment selector
+  - cached Moss binding (TTL-backed)
+  - UDP discovery (`GARDEN_DISCOVERY_TIMEOUT_SECS`, `DISCOVERY_PORT`, `DISCOVERY_MCAST_GROUP` + broadcast fallbacks)
+  - automatic re-discovery when bound endpoint stops responding
+- Stream semantics:
+  - snapshot-first
+  - replay-friendly with cursor / event-id
+  - at-least-once delivery; dedupe by event id in client runtime
+- Tool coverage:
+  - offerings (`tool_type=offering`)
+  - seed banks (`tool_type=seed-bank`)
+
+## Configuration
+
+```csharp
+builder.Services.AddKoanZenGarden(configure: options =>
+{
+    options.Endpoint = "http://stone-01:7185"; // optional explicit override
+    options.EnableDiscovery = true;
+    options.DiscoveryTimeoutSeconds = 3;
+    options.DiscoveryPort = 7184;
+    options.DiscoveryMulticastGroup = "239.255.42.99";
+    options.DiscoveryCacheTtlSeconds = 90;
+    options.DiscoveryEnableBroadcastFallback = true;
+    options.DiscoveryEnableLimitedBroadcast = false;
+    options.HttpTimeoutSeconds = 30;
+    options.StreamReconnectDelaySeconds = 3;
+    options.DedupeWindowSize = 4096;
+});
+```
+
+Configuration section:
+
+```json
+{
+  "Koan": {
+    "ZenGarden": {
+      "Endpoint": "http://stone-01:7185",
+      "EnableDiscovery": true,
+      "DiscoveryTimeoutSeconds": 3,
+      "DiscoveryPort": 7184,
+      "DiscoveryMulticastGroup": "239.255.42.99",
+      "DiscoveryCacheTtlSeconds": 90,
+      "DiscoveryEnableBroadcastFallback": true,
+      "DiscoveryEnableLimitedBroadcast": false,
+      "HttpTimeoutSeconds": 30,
+      "StreamReconnectDelaySeconds": 3,
+      "DedupeWindowSize": 4096
+    }
+  }
 }
 ```
 
-## Features
-
-- **UDP Multicast Discovery** - Finds Stones via 239.255.42.99:7184 (returns on first response)
-- **Garden-wide Search** - Query any Stone to find services across the entire Garden
-- **Connection String Building** - Constructs proper connection strings (mongodb://, redis://, etc.)
-- **Caching** - Caches discovered services for app lifetime
-- **Multi-homed Support** - Works correctly on Windows with WSL/Hyper-V
-
-## Architecture
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│  Koan Application                                           │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │  ZenGardenClient                                     │   │
-│  │  1. DiscoverStonesAsync() → Find any Stone           │   │
-│  │  2. FindServiceAsync("mongodb") → Query Garden cache │   │
-│  │  3. Get connection string for the hosting Stone      │   │
-│  └─────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────┘
-                          │
-                          │ UDP 7184 / HTTP 7185
-                          ▼
-┌─────────────────────────────────────────────────────────────┐
-│  Zen Garden (All Stones share topology cache)               │
-│                                                             │
-│  ┌─────────────────┐  ┌─────────────────┐                  │
-│  │ stone-alpha     │  │ stone-beta      │                  │
-│  │ (MongoDB,Redis) │  │ (RabbitMQ)      │                  │
-│  │ Moss :7185      │  │ Moss :7185      │                  │
-│  └─────────────────┘  └─────────────────┘                  │
-│           ↑                   ↑                             │
-│           └───── Shared Topology Cache ─────┘               │
-│                                                             │
-│  Query ANY Stone with ?q=mongodb → returns Stone + conn    │
-└─────────────────────────────────────────────────────────────┘
-```
-
-## API Reference
-
-### ZenGardenClient
-
-| Method | Description |
-|--------|-------------|
-| `DiscoverStonesAsync()` | Discover all Stones via UDP multicast |
-| `FindServiceAsync(offering)` | Find a service across all Stones, returns connection string |
-| `GetServiceAsync(stone, name)` | Get specific service from a Stone |
-| `GetServicesAsync(stone)` | List all services on a Stone |
-| `IsStoneHealthyAsync(stone)` | Check if a Stone is reachable |
-| `InvalidateOffering(name)` | Clear cached offering (triggers re-search) |
-| `InvalidateStone()` | Clear Stone binding (triggers re-discovery) |
-
-### Configuration
+Direct options shape:
 
 ```csharp
-var options = new ZenGardenOptions
+new ZenGardenOptions
 {
-    DiscoveryTimeoutSeconds = 5,    // UDP discovery timeout
-    HttpTimeoutSeconds = 10,         // HTTP request timeout
-    MulticastGroup = "239.255.42.99", // Multicast address
-    DiscoveryPort = 7184,            // UDP port
-    SchemeMappings = new Dictionary<string, string>
-    {
-        ["custom-service"] = "custom" // Custom scheme mapping
-    }
+    Endpoint = "http://stone-01:7185", // optional
+    EnableDiscovery = true,
+    DiscoveryTimeoutSeconds = 3,
+    DiscoveryPort = 7184,
+    DiscoveryMulticastGroup = "239.255.42.99",
+    DiscoveryCacheTtlSeconds = 90,
+    DiscoveryEnableBroadcastFallback = true,
+    DiscoveryEnableLimitedBroadcast = false,
+    HttpTimeoutSeconds = 30,
+    StreamReconnectDelaySeconds = 3,
+    DedupeWindowSize = 4096
 };
 ```
-
-## Caching Strategy
-
-The client uses **two-level caching**:
-
-1. **Topology Cache** - Discovered Stones (in-memory, app lifetime)
-2. **Offering Cache** - Resolved service URLs (in-memory, app lifetime)
-
-```
-Request: FindServiceAsync("mongodb")
-    │
-    ├─► Check offering cache → HIT → Return cached connection
-    │
-    └─► MISS → Search all Stones
-              │
-              ├─► Found → Cache & return
-              │
-              └─► Not found → Return null
-```
-
-### Invalidation
-
-- `InvalidateOffering("mongodb")` - Re-search on next request
-- `InvalidateStone()` - Re-discover all Stones, clear all caches
-
-## Error Handling
-
-```csharp
-try
-{
-    await mongoClient.PingAsync();
-}
-catch (MongoConnectionException)
-{
-    // Service may have moved - invalidate and re-discover
-    zenClient.InvalidateOffering("mongodb");
-    var newService = await zenClient.FindServiceAsync("mongodb");
-    // Reconnect...
-}
-```
-
-## Requirements
-
-- .NET 10.0+
-- Network access to Zen Garden Stones (UDP 7184, HTTP 7185)
-- At least one Stone running on the network
-
-## License
-
-Apache 2.0 - See [LICENSE](../../LICENSE)

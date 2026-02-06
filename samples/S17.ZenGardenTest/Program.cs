@@ -1,160 +1,231 @@
-﻿using Koan.ZenGarden;
+using Koan.ZenGarden;
 using Koan.ZenGarden.Models;
 using Microsoft.Extensions.Logging;
-using MongoDB.Bson;
-using MongoDB.Driver;
 
-Console.WriteLine("╔════════════════════════════════════════════════════════════╗");
-Console.WriteLine("║       Zen Garden + Koan Framework Integration Test         ║");
-Console.WriteLine("╚════════════════════════════════════════════════════════════╝");
+Console.WriteLine("==============================================================");
+Console.WriteLine("Koan.ZenGarden Tools-Domain Smoke Test");
+Console.WriteLine("==============================================================");
 Console.WriteLine();
 
-// Setup logging
+var endpointOverride = Environment.GetEnvironmentVariable("KOAN_ZENGARDEN_ENDPOINT")
+    ?? Environment.GetEnvironmentVariable("KOAN_TESTS_ZENGARDEN_ENDPOINT");
+var gardenStoneSelector = Environment.GetEnvironmentVariable(Constants.EnvironmentVariables.GardenStone);
+var endpointDisplay = !string.IsNullOrWhiteSpace(endpointOverride)
+    ? endpointOverride
+    : !string.IsNullOrWhiteSpace(gardenStoneSelector)
+        ? $"{Constants.EnvironmentVariables.GardenStone}={gardenStoneSelector}"
+        : "(auto-discovery)";
+var preferredOffering = Environment.GetEnvironmentVariable("KOAN_ZENGARDEN_OFFERING") ?? "mongodb";
+var preferredSeedBank = Environment.GetEnvironmentVariable("KOAN_ZENGARDEN_STORAGE") ?? "default";
+var capabilityList = ParseCsv(Environment.GetEnvironmentVariable("KOAN_ZENGARDEN_CAPABILITIES"));
+var watchSeconds = ParseInt(Environment.GetEnvironmentVariable("KOAN_ZENGARDEN_WATCH_SECONDS"), 10);
+
 using var loggerFactory = LoggerFactory.Create(builder =>
 {
-    builder.AddConsole();
-    builder.SetMinimumLevel(LogLevel.Debug);
+    builder.AddSimpleConsole(options =>
+    {
+        options.TimestampFormat = "HH:mm:ss ";
+        options.SingleLine = true;
+    });
+    builder.SetMinimumLevel(LogLevel.Information);
 });
 
 var logger = loggerFactory.CreateLogger<ZenGardenClient>();
-
-// Create the client
-using var httpClient = new HttpClient();
-using var zenClient = new ZenGardenClient(httpClient, logger, new ZenGardenOptions
+using var client = new ZenGardenClient(logger, new ZenGardenOptions
 {
-    DiscoveryTimeoutSeconds = 5,
-    HttpTimeoutSeconds = 10
+    Endpoint = endpointOverride,
+    EnableDiscovery = true,
+    HttpTimeoutSeconds = 10,
+    StreamReconnectDelaySeconds = 2,
+    DedupeWindowSize = 2048
 });
 
-Console.WriteLine("🔍 Step 1: Discovering Stones on the network...");
+ZenGarden.Configure(client);
+
+Console.WriteLine($"Endpoint selector: {endpointDisplay}");
 Console.WriteLine();
 
-var stones = await zenClient.DiscoverStonesAsync();
-
-if (stones.Count == 0)
-{
-    Console.WriteLine("❌ No Stones found on the network!");
-    Console.WriteLine("   Make sure you have a Zen Garden Stone running.");
-    return 1;
-}
-
-Console.WriteLine($"✅ Found {stones.Count} Stone(s):");
-foreach (var stone in stones)
-{
-    Console.WriteLine($"   📦 {stone.StoneName}");
-    Console.WriteLine($"      Endpoint: {stone.StoneEndpoint}");
-    Console.WriteLine($"      Version:  {stone.MossVersion ?? "unknown"}");
-}
-Console.WriteLine();
-
-Console.WriteLine("🔍 Step 2: Finding MongoDB service...");
-Console.WriteLine();
-
-var mongoService = await zenClient.FindServiceAsync("mongodb");
-
-if (mongoService == null)
-{
-    Console.WriteLine("❌ MongoDB not found in the Garden!");
-    Console.WriteLine("   Make sure MongoDB is installed on one of your Stones.");
-    
-    // List available services
-    Console.WriteLine();
-    Console.WriteLine("Available services:");
-    foreach (var stone in stones)
-    {
-        var services = await zenClient.GetServicesAsync(stone);
-        foreach (var svc in services)
-        {
-            Console.WriteLine($"   • {svc.Offering} ({svc.Status}) on {stone.StoneName}");
-        }
-    }
-    return 1;
-}
-
-Console.WriteLine($"✅ Found MongoDB!");
-Console.WriteLine($"   Stone:            {mongoService.Stone.StoneName}");
-Console.WriteLine($"   Status:           {mongoService.Service.Status}");
-Console.WriteLine($"   Health:           {mongoService.Service.Health}");
-Console.WriteLine($"   Connection String: {mongoService.ConnectionString}");
-Console.WriteLine();
-
-Console.WriteLine("🔌 Step 3: Connecting to MongoDB...");
-Console.WriteLine();
-
+IReadOnlyList<ZenGardenToolSnapshot> offerings;
+IReadOnlyList<ZenGardenToolSnapshot> storage;
 try
 {
-    var mongoClient = new MongoClient(mongoService.ConnectionString);
-    
-    // Test the connection
-    var databases = await mongoClient.ListDatabaseNamesAsync();
-    var dbList = await databases.ToListAsync();
-    
-    Console.WriteLine($"✅ Connected! Found {dbList.Count} database(s):");
-    foreach (var db in dbList)
-    {
-        Console.WriteLine($"   📁 {db}");
-    }
-    Console.WriteLine();
-    
-    Console.WriteLine("📝 Step 4: Writing a test record...");
-    Console.WriteLine();
-    
-    var database = mongoClient.GetDatabase("koan_test");
-    var collection = database.GetCollection<BsonDocument>("zen_garden_discovery_test");
-    
-    var document = new BsonDocument
-    {
-        { "test", "Zen Garden Discovery" },
-        { "framework", "Koan" },
-        { "stone", mongoService.Stone.StoneName },
-        { "timestamp", DateTime.UtcNow },
-        { "message", "Hello from Koan.ZenGarden! 🌱" }
-    };
-    
-    await collection.InsertOneAsync(document);
-    Console.WriteLine($"✅ Inserted document with _id: {document["_id"]}");
-    Console.WriteLine();
-    
-    // Read it back
-    var filter = Builders<BsonDocument>.Filter.Eq("_id", document["_id"]);
-    var found = await collection.Find(filter).FirstOrDefaultAsync();
-    
-    if (found != null)
-    {
-        Console.WriteLine("📖 Read back the document:");
-        Console.WriteLine($"   {found.ToJson()}");
-    }
-    Console.WriteLine();
-    
-    // Clean up
-    await collection.DeleteOneAsync(filter);
-    Console.WriteLine("🗑️  Cleaned up test document.");
-    Console.WriteLine();
-    
-    Console.WriteLine("═══════════════════════════════════════════════════════════════");
-    Console.WriteLine("✅ SUCCESS! Zen Garden integration is working!");
-    Console.WriteLine("═══════════════════════════════════════════════════════════════");
-    Console.WriteLine();
-    Console.WriteLine("Summary:");
-    Console.WriteLine($"  • Discovered {stones.Count} Stone(s) via UDP multicast");
-    Console.WriteLine($"  • Found MongoDB on {mongoService.Stone.StoneName}");
-    Console.WriteLine($"  • Connected using: {mongoService.ConnectionString}");
-    Console.WriteLine($"  • Successfully wrote and read a test record");
-    Console.WriteLine();
-    
-    return 0;
+    offerings = await ZenGarden.Offering.Catalog();
+    storage = await ZenGarden.Storage.Catalog();
 }
 catch (Exception ex)
 {
-    Console.WriteLine($"❌ MongoDB connection failed: {ex.Message}");
-    Console.WriteLine();
-    Console.WriteLine("Debug info:");
-    Console.WriteLine($"  Connection string: {mongoService.ConnectionString}");
-    Console.WriteLine($"  Stone endpoint: {mongoService.Stone.StoneEndpoint}");
-    Console.WriteLine();
-    Console.WriteLine("Possible fixes:");
-    Console.WriteLine("  1. Check if MongoDB container is running on the Stone");
-    Console.WriteLine("  2. Verify the connection string scheme (should be mongodb://)");
-    Console.WriteLine("  3. Check firewall/network connectivity to the Stone");
+    Console.WriteLine($"Failed to resolve/reach Zen Garden endpoint '{endpointDisplay}': {ex.Message}");
+    Console.WriteLine("Set KOAN_ZENGARDEN_ENDPOINT or GARDEN_STONE, or make sure UDP discovery (port 7184) can reach a Moss node.");
     return 1;
+}
+
+Console.WriteLine($"Offerings: {offerings.Count}");
+foreach (var tool in offerings.Take(10))
+{
+    Console.WriteLine($"  - {tool.ToolFqid} ready={tool.Ready} state={tool.State} rev={tool.Revision}");
+}
+
+Console.WriteLine($"Seed banks: {storage.Count}");
+foreach (var tool in storage.Take(10))
+{
+    Console.WriteLine($"  - {tool.ToolFqid} ready={tool.Ready} state={tool.State} rev={tool.Revision}");
+}
+
+if (offerings.Count == 0)
+{
+    Console.WriteLine();
+    Console.WriteLine("No offerings found. Verify the test garden has active tools.");
+    return 1;
+}
+
+var selectedOffering = SelectTool(offerings, "offering:", preferredOffering);
+var selectedSeedBank = SelectTool(storage, "seed-bank:", preferredSeedBank);
+
+if (selectedOffering is null)
+{
+    Console.WriteLine("Could not select an offering to watch.");
+    return 1;
+}
+
+if (selectedSeedBank is null && storage.Count > 0)
+{
+    selectedSeedBank = storage[0];
+}
+
+capabilityList = capabilityList.Count > 0
+    ? capabilityList
+    : DeriveRequirements(selectedOffering);
+
+Console.WriteLine();
+Console.WriteLine("Watch configuration:");
+Console.WriteLine($"  offering: {selectedOffering.ToolFqid}");
+Console.WriteLine($"  storage:  {(selectedSeedBank is null ? "(none)" : selectedSeedBank.ToolFqid)}");
+Console.WriteLine($"  requires: {(capabilityList.Count == 0 ? "(none)" : string.Join(",", capabilityList))}");
+Console.WriteLine($"  duration: {watchSeconds}s");
+Console.WriteLine();
+
+var offeringInitial = new TaskCompletionSource<ZenGardenAvailabilityEvent>(TaskCreationOptions.RunContinuationsAsynchronously);
+var storageInitial = new TaskCompletionSource<ZenGardenAvailabilityEvent>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+using var offeringSub = capabilityList.Count == 0
+    ? ZenGarden.Offering.On(
+        StripPrefix(selectedOffering.ToolFqid, "offering:"),
+        (evt, ct) => OnEvent("offering", evt, offeringInitial))
+    : ZenGarden.Offering.On(
+        StripPrefix(selectedOffering.ToolFqid, "offering:"),
+        capabilityList,
+        (evt, ct) => OnEvent("offering", evt, offeringInitial));
+
+using var storageSub = selectedSeedBank is null
+    ? null
+    : ZenGarden.Storage.On(
+        StripPrefix(selectedSeedBank.ToolFqid, "seed-bank:"),
+        (evt, ct) => OnEvent("storage", evt, storageInitial));
+
+using var warmupCts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+await WaitForInitialEventAsync(offeringInitial.Task, "offering", warmupCts.Token);
+if (selectedSeedBank is not null)
+{
+    await WaitForInitialEventAsync(storageInitial.Task, "storage", warmupCts.Token);
+}
+
+Console.WriteLine();
+Console.WriteLine("Streaming live events...");
+Console.WriteLine();
+
+if (watchSeconds > 0)
+{
+    await Task.Delay(TimeSpan.FromSeconds(watchSeconds));
+}
+
+Console.WriteLine();
+Console.WriteLine("Done.");
+return 0;
+
+static ValueTask OnEvent(
+    string channel,
+    ZenGardenAvailabilityEvent evt,
+    TaskCompletionSource<ZenGardenAvailabilityEvent> initial)
+{
+    Console.WriteLine($"{DateTimeOffset.UtcNow:HH:mm:ss} [{channel}] kind={evt.Kind} fqid={evt.Current.ToolFqid} ready={evt.Current.Ready} rev={evt.Current.Revision}");
+    initial.TrySetResult(evt);
+    return ValueTask.CompletedTask;
+}
+
+static async Task WaitForInitialEventAsync(
+    Task<ZenGardenAvailabilityEvent> eventTask,
+    string channel,
+    CancellationToken cancellationToken)
+{
+    try
+    {
+        await eventTask.WaitAsync(cancellationToken);
+    }
+    catch (OperationCanceledException)
+    {
+        Console.WriteLine($"Timed out waiting for initial {channel} event.");
+    }
+}
+
+static ZenGardenToolSnapshot? SelectTool(
+    IReadOnlyList<ZenGardenToolSnapshot> tools,
+    string prefix,
+    string preferredName)
+{
+    if (tools.Count == 0)
+    {
+        return null;
+    }
+
+    var preferredFqid = $"{prefix}{preferredName}".ToLowerInvariant();
+    var preferred = tools.FirstOrDefault(t =>
+        string.Equals(t.ToolFqid, preferredFqid, StringComparison.OrdinalIgnoreCase));
+    return preferred ?? tools[0];
+}
+
+static IReadOnlyList<string> DeriveRequirements(ZenGardenToolSnapshot tool)
+{
+    var derived = new List<string>();
+    foreach (var cap in tool.Capabilities)
+    {
+        if (cap.Value.Count == 0)
+        {
+            continue;
+        }
+
+        derived.Add($"{cap.Key}:{cap.Value[0]}");
+        if (derived.Count >= 2)
+        {
+            break;
+        }
+    }
+
+    return derived;
+}
+
+static IReadOnlyList<string> ParseCsv(string? value)
+{
+    if (string.IsNullOrWhiteSpace(value))
+    {
+        return Array.Empty<string>();
+    }
+
+    return value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+        .Where(v => !string.IsNullOrWhiteSpace(v))
+        .ToArray();
+}
+
+static int ParseInt(string? raw, int fallback)
+{
+    return int.TryParse(raw, out var parsed) ? parsed : fallback;
+}
+
+static string StripPrefix(string fqid, string prefix)
+{
+    if (fqid.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+    {
+        return fqid[prefix.Length..];
+    }
+
+    return fqid;
 }

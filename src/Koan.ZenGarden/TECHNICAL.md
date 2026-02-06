@@ -1,346 +1,144 @@
-﻿# Koan.ZenGarden Technical Reference
+# Koan.ZenGarden Technical Reference
 
-## Protocol Specification
+## Scope
 
-This document captures the discovered Zen Garden protocols based on live testing (January 2026).
+This project is a greenfield tools-domain runtime client for Zen Garden.
 
----
+It uses discovery-first Moss endpoint binding:
 
-## Stone Discovery Protocol
+- explicit endpoint/selector overrides when provided
+- `GARDEN_STONE` selector support
+- UDP discovery with cache
+- automatic re-discovery and rebind on connection failure
 
-### UDP Multicast
+It does not use `/api/v1/services` as a primary catalog source.
 
-Zen Garden Stones announce themselves via UDP multicast.
+## Module Boot
 
-| Parameter | Value |
-|-----------|-------|
-| **Multicast Group** | `239.255.42.99` |
-| **Port** | `7184` |
-| **Protocol** | UDP |
-| **Payload Format** | JSON |
+- Auto-registration: `Initialization/KoanAutoRegistrar.cs` implements `IKoanAutoRegistrar`.
+- DI entrypoint: `AddKoanZenGarden(...)` in `Extensions/ServiceCollectionExtensions.cs`.
+- Runtime resolution: static `ZenGarden` facade resolves `IZenGardenClient` from `AppHost.Current`.
 
-### Discovery Request
+## Protocols
 
-Send JSON payload to multicast group:
+### Discovery
 
-```json
-{
-  "action": "discover"
-}
-```
+- UDP announcement envelope:
+  - `type: discovery_request` + `data`
+  - `type: discovery_response` + `data`
+- default UDP:
+  - multicast `239.255.42.99:7184`
+  - optional broadcast fallbacks
+- env overrides:
+  - `GARDEN_DISCOVERY_TIMEOUT_SECS`
+  - `DISCOVERY_PORT`
+  - `DISCOVERY_MCAST_GROUP`
+  - `DISCOVERY_ENABLE_BCAST_FALLBACK`
+  - `DISCOVERY_ENABLE_LIMITED_BCAST`
 
-### Discovery Response
+### Snapshot API
 
-Stones respond with their identity:
+- `GET /api/v1/garden/tools`
+- Optional filters:
+  - `tool_type`
+  - `tool_fqid`
+  - `capability`
+  - `since`
 
-```json
-{
-  "name": "stone-coral-prairie",
-  "version": "1.0.0",
-  "endpoint": "http://192.168.1.135:7185"
-}
-```
+### Stream API (SSE)
 
-### Implementation Notes
+- `GET /api/v1/garden/tools/stream`
+- Event types consumed:
+  - `tools.snapshot`
+  - `tool.upsert`
+  - `tool.remove`
+  - `tools.heartbeat`
 
-1. **Early Return** - All Stones share the same topology map, so one response is sufficient. Return immediately on first valid response rather than waiting for timeout.
-2. **Binding** - On multi-homed Windows (WSL, Hyper-V), bind to a LAN interface explicitly (192.168.x.x, 10.x.x.x, 172.16-31.x.x)
-3. **Port Binding** - Bind to port 7184 to receive multicast responses
-4. **Timeout** - Use per-receive timeout (500ms) rather than global timeout
-5. **Echo Filtering** - Your own request may echo back; filter by checking for `endpoint` field
+## Runtime Architecture
 
----
+`ZenGardenClient` performs:
 
-## Moss HTTP API
+1. Moss endpoint resolution:
+   - explicit option endpoint
+   - `GARDEN_STONE` selector
+   - hot cache
+   - UDP discovery
+2. Endpoint health checks and automatic rebind on failure.
+3. Snapshot reads for catalog queries.
+4. Long-lived SSE stream consumption.
+5. Local projection cache keyed by `tool_fqid`.
+6. Event-id dedupe window.
+7. Derived availability event emission to subscribers.
 
-Each Stone runs a Moss daemon on port 7185 providing service information.
+### Local Projection
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/health` | GET | Health check |
-| `/api/v1/services` | GET | List all services |
-| `/api/v1/services/{name}` | GET | Get specific service |
+Each tool is represented as `ZenGardenToolSnapshot`:
 
-### Health Check
+- `tool_fqid`, `tool_uid`, `tool_type`
+- `state`, `ready`, `revision`
+- `connection`
+- `capabilities`, `capability_revision`
+- `stone_id`, `stone_name`
 
-```http
-GET /health HTTP/1.1
-Host: 192.168.1.135:7185
-```
+### Subscription Matching
 
-**Response:**
+`ZenGardenSubscription` contains:
 
-```json
-{
-  "status": "healthy",
-  "timestamp": "2026-01-28T10:00:00Z"
-}
-```
+- `ToolType` filter (offering / seed-bank)
+- optional `ToolFqid`
+- optional capability requirements (`AND` semantics)
 
-### List Services
+Capability tokens support:
 
-```http
-GET /api/v1/services HTTP/1.1
-Host: 192.168.1.135:7185
-```
+- untyped: `modelv1`
+- typed: `extension:pgvector`
+- separators: `,` or `|`
 
-**Response:**
+## Derived Event Semantics
 
-```json
-{
-  "services": [
-    {
-      "name": "mongodb",
-      "status": "running",
-      "healthy": true,
-      "connection": {
-        "uris": [
-          "mongodb://192.168.1.135:27017"
-        ]
-      }
-    },
-    {
-      "name": "redis",
-      "status": "running",
-      "healthy": true,
-      "connection": {
-        "uris": [
-          "redis://192.168.1.135:6379"
-        ]
-      }
-    }
-  ]
-}
-```
+`ZenGardenAvailabilityEventKind`:
 
-### Get Specific Service
+- `Online`: tool transitions to ready.
+- `Offline`: tool transitions away from ready or is removed.
+- `Changed`: revision change without online/offline transition.
+- `CapabilitiesSatisfied`: requirement set becomes satisfied.
+- `CapabilitiesUnsatisfied`: requirement set becomes unsatisfied.
 
-```http
-GET /api/v1/services/mongodb HTTP/1.1
-Host: 192.168.1.135:7185
-```
+## Public Ergonomics
 
-**Response (Ports format):**
-
-```json
-{
-  "offering": "mongodb",
-  "status": "running",
-  "healthy": true,
-  "ports": {
-    "native": 27017,
-    "agnostic": null
-  }
-}
-```
-
-> ⚠️ **Note:** The single-service endpoint returns `ports` object, while the list endpoint returns `connection.uris[]`. The client handles both formats.
-
----
-
-## Network Configuration
-
-### Ports
-
-| Service | Port | Protocol | Purpose |
-|---------|------|----------|---------|
-| Discovery | 7184 | UDP | Stone multicast discovery |
-| Moss API | 7185 | HTTP | Service management API |
-| MongoDB | 27017 | TCP | Database (when running) |
-| Redis | 6379 | TCP | Cache (when running) |
-| RabbitMQ | 5672 | TCP | Messaging (when running) |
-| NATS | 4222 | TCP | Messaging (when running) |
-| PostgreSQL | 5432 | TCP | Database (when running) |
-| Elasticsearch | 9200 | TCP | Search (when running) |
-| Meilisearch | 7700 | TCP | Search (when running) |
-
-### Firewall Rules (Windows)
-
-For discovery to work, allow:
-- UDP 7184 inbound (multicast responses)
-- TCP 7185 outbound (Moss API)
-- TCP to service ports as needed
-
----
-
-## Service Resolution Flow
-
-All Stones in a Garden share a topology cache. Query ANY Stone to find services across the entire Garden.
-
-```
-┌──────────────────────────────────────────────────────────────────┐
-│ FindServiceAsync("mongodb")                                       │
-└──────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌──────────────────────────────────────────────────────────────────┐
-│ 1. Check offering cache                                           │
-│    Key: "mongodb" → Value: ResolvedService { Stone, ConnString }  │
-└──────────────────────────────────────────────────────────────────┘
-                              │
-              ┌───────────────┴───────────────┐
-              │                               │
-           HIT ✓                           MISS
-              │                               │
-              ▼                               ▼
-┌─────────────────────────┐   ┌────────────────────────────────────┐
-│ Return cached result    │   │ 2. Discover any Stone (early return)│
-└─────────────────────────┘   │    UDP multicast → first responder │
-                              └────────────────────────────────────┘
-                                              │
-                                              ▼
-                              ┌────────────────────────────────────┐
-                              │ 3. Query Garden cache:             │
-                              │    GET /api/v1/services?q=mongodb  │
-                              │    Returns: stone + connection info│
-                              └────────────────────────────────────┘
-                                              │
-                                              ▼
-                              ┌────────────────────────────────────┐
-                              │ 4. Build connection string:        │
-                              │    mongodb://192.168.1.135:27017   │
-                              │    Cache result for future calls   │
-                              └────────────────────────────────────┘
-```
-
-### Key Insight: Garden Topology Cache
-
-Each Stone maintains a cache of all services running across the entire Garden.
-This means:
-- You only need to discover ONE Stone
-- Query that Stone with `?q=` to find ANY service in the Garden
-- Response includes which Stone hosts the service + connection info
-
-```http
-GET /api/v1/services?q=mongodb HTTP/1.1
-Host: stone-bronze-canyon:7185
-
-Response:
-{
-  "data": {
-    "found": true,
-    "services": [{
-      "name": "mongodb",
-      "status": "running",
-      "stone": {
-        "name": "stone-coral-prairie",
-        "endpoint": "http://192.168.1.135:7185"
-      },
-      "connection": {
-        "ip": "192.168.1.135",
-        "port": 27017,
-        "uris": ["tcp://192.168.1.135:27017"]
-      }
-    }],
-    "source": "cache"  // ← From Garden topology cache
-  }
-}
-```
-
----
-
-## Scheme Mappings
-
-The client maps offering names to connection string schemes:
-
-| Offering | Scheme |
-|----------|--------|
-| mongodb | mongodb |
-| redis | redis |
-| rabbitmq | amqp |
-| nats | nats |
-| postgres, postgresql | postgres |
-| elasticsearch | http |
-| meilisearch | http |
-| mysql, mariadb | mysql |
-| kafka | kafka |
-| mssql | mssql |
-| *other* | tcp |
-
----
-
-## Discovered Stones (Test Environment)
-
-From live testing on 2026-01-28:
-
-| Stone Name | IP | Moss Endpoint | Services |
-|------------|-----|--------------|----------|
-| stone-coral-prairie | 192.168.1.135 | http://192.168.1.135:7185 | mongodb |
-| stone-crystal-forest | 192.168.1.197 | http://192.168.1.197:7185 | (none active) |
-| stone-bronze-canyon | 192.168.1.107 | http://192.168.1.107:7185 | (none active) |
-
----
-
-## Implementation Gotchas
-
-### 1. UDP Binding on Multi-homed Windows
-
-Windows with WSL2 or Hyper-V has multiple network interfaces. Binding to `IPAddress.Any` may bind to wrong interface.
-
-**Solution:** Enumerate interfaces and bind to one with a LAN prefix:
+Preferred app-facing API:
 
 ```csharp
-private IPAddress GetLanBindAddress()
-{
-    foreach (var nic in NetworkInterface.GetAllNetworkInterfaces())
-    {
-        if (nic.OperationalStatus != OperationalStatus.Up) continue;
-        foreach (var addr in nic.GetIPProperties().UnicastAddresses)
-        {
-            if (addr.Address.AddressFamily != AddressFamily.InterNetwork) continue;
-            var bytes = addr.Address.GetAddressBytes();
-            // 192.168.x.x, 10.x.x.x, 172.16-31.x.x
-            if (bytes[0] == 192 && bytes[1] == 168) return addr.Address;
-            if (bytes[0] == 10) return addr.Address;
-            if (bytes[0] == 172 && bytes[1] >= 16 && bytes[1] <= 31) return addr.Address;
-        }
-    }
-    return IPAddress.Any; // Fallback
-}
+using var sub = ZenGarden.Offering.On("mongodb", async (evt, ct) => { });
+using var capSub = ZenGarden.Offering.On("ollama", ["modelv1", "modelv2"], async (evt, ct) => { });
+using var storageSub = ZenGarden.Storage.On("default", async (evt, ct) => { });
 ```
 
-### 2. UDP Receive Timeout
-
-`ReceiveFromAsync` with a long `CancellationToken` blocks forever if no response.
-
-**Solution:** Create per-receive timeout:
+Catalog access:
 
 ```csharp
-using var receiveCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-receiveCts.CancelAfter(TimeSpan.FromMilliseconds(500));
-await socket.ReceiveFromAsync(buffer, endPoint, receiveCts.Token);
+var offerings = await ZenGarden.Offering.Catalog();
+var storage = await ZenGarden.Storage.Catalog();
 ```
 
-### 3. API Response Format Variance
+## Configuration
 
-`/api/v1/services` returns `connection.uris[]`, but `/api/v1/services/{name}` returns `ports.native`.
+`ZenGardenOptions`:
 
-**Solution:** Handle both:
+- section: `Koan:ZenGarden`
+- `Endpoint` (optional explicit selector/endpoint)
+- `EnableDiscovery`
+- `DiscoveryTimeoutSeconds`
+- `DiscoveryPort`
+- `DiscoveryMulticastGroup`
+- `DiscoveryCacheTtlSeconds`
+- `DiscoveryEnableBroadcastFallback`
+- `DiscoveryEnableLimitedBroadcast`
+- `HttpTimeoutSeconds`
+- `StreamReconnectDelaySeconds`
+- `DedupeWindowSize`
 
-```csharp
-if (service.Connection != null)
-    return service.Connection.GetUri(scheme);
-else if (service.Ports?.Native != null)
-    return $"{scheme}://{stone.Host}:{service.Ports.Native}";
-```
+## Non-Goals
 
----
-
-## Test Results
-
-Successfully validated on 2026-01-28:
-
-```
-✅ Found 3 Stone(s):
-   📦 stone-coral-prairie at http://192.168.1.135:7185
-   📦 stone-crystal-forest at http://192.168.1.197:7185
-   📦 stone-bronze-canyon at http://192.168.1.107:7185
-
-✅ Found MongoDB!
-   Connection String: mongodb://192.168.1.135:27017
-
-✅ Connected! Found 3 database(s): admin, config, local
-✅ Inserted document with _id: 6979bd5484292f1d99ecc8b1
-📖 Read back: "Hello from Koan.ZenGarden! 🌱"
-🗑️ Cleaned up test document.
-```
+- No backward compatibility wrappers for legacy discovery API.
+- No dual-read/dual-write behavior across old and new surfaces.
