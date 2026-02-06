@@ -74,6 +74,31 @@ public sealed class ZenGardenInitializationProviderTests
     }
 
     [Fact]
+    public async Task ResolveAsync_without_instance_selector_can_bind_ready_alias_candidate()
+    {
+        var snapshots = new[]
+        {
+            CreateSnapshot(
+                "offering:ollama@adopted",
+                ready: true,
+                "http://ollama-adopted:11434",
+                "offering:ollama")
+        };
+
+        await using var provider = BuildScope(
+            new StubZenGardenClient(snapshots),
+            new StubBinding("ollama", "ollama"));
+
+        var initializationProvider = provider.GetRequiredService<IZenGardenInitializationProvider>();
+        var resolved = await initializationProvider.ResolveAsync(ZenGardenConnectionIntent.ForOffering("ollama"));
+
+        resolved.Should().NotBeNull();
+        resolved!.ToolFqid.Should().Be("offering:ollama@adopted");
+        resolved.Offering.Should().Be("ollama@adopted");
+        resolved.GetUri("http").Should().Be("http://ollama-adopted:11434");
+    }
+
+    [Fact]
     public void TryGetDefaultOffering_uses_registered_bindings()
     {
         using var provider = BuildScope(
@@ -84,6 +109,23 @@ public sealed class ZenGardenInitializationProviderTests
 
         initializationProvider.TryGetDefaultOffering("mongo", out var offering).Should().BeTrue();
         offering.Should().Be("mongodb");
+    }
+
+    [Fact]
+    public async Task WishCapabilitiesAsync_returns_receipt()
+    {
+        await using var provider = BuildScope(
+            new StubZenGardenClient(Array.Empty<ZenGardenToolSnapshot>()),
+            new StubBinding("ollama", "ollama"));
+
+        var initializationProvider = provider.GetRequiredService<IZenGardenInitializationProvider>();
+        var receipt = await initializationProvider.WishCapabilitiesAsync(
+            ZenGardenConnectionIntent.ForOffering("ollama", capabilities: ["llama3.2", "nomic-embed-text"]));
+
+        receipt.Should().NotBeNull();
+        receipt!.OfferingSelector.Should().Be("ollama");
+        receipt.ToolFqid.Should().Be("offering:ollama");
+        receipt.Requested.Should().Contain(["llama3.2", "nomic-embed-text"]);
     }
 
     private static ServiceProvider BuildScope(
@@ -102,7 +144,7 @@ public sealed class ZenGardenInitializationProviderTests
         return services.BuildServiceProvider();
     }
 
-    private static ZenGardenToolSnapshot CreateSnapshot(string toolFqid, bool ready, string uri)
+    private static ZenGardenToolSnapshot CreateSnapshot(string toolFqid, bool ready, string uri, params string[] aliases)
     {
         return new ZenGardenToolSnapshot
         {
@@ -111,6 +153,7 @@ public sealed class ZenGardenInitializationProviderTests
             Ready = ready,
             State = ready ? ZenGardenToolState.Ready : ZenGardenToolState.Unavailable,
             Revision = ready ? 2 : 1,
+            Aliases = aliases,
             Connection = new ZenGardenConnection
             {
                 Uris = new[] { uri }
@@ -150,6 +193,56 @@ public sealed class ZenGardenInitializationProviderTests
                 .Where(subscription.RequirementsSatisfiedBy)
                 .ToArray();
             return Task.FromResult<IReadOnlyList<ZenGardenToolSnapshot>>(results);
+        }
+
+        public ValueTask<ZenGardenCapabilityWish> WishAsync(
+            string offering,
+            IReadOnlyList<string> capabilities,
+            ZenGardenCapabilityWishOptions? options = null,
+            CancellationToken cancellationToken = default)
+        {
+            var normalizedSelector = offering.Trim().ToLowerInvariant();
+            var toolFqid = normalizedSelector.StartsWith("offering:", StringComparison.OrdinalIgnoreCase)
+                ? normalizedSelector
+                : $"offering:{normalizedSelector}";
+
+            var wish = new ZenGardenCapabilityWish
+            {
+                RequestId = Guid.NewGuid().ToString("N"),
+                ToolFqid = toolFqid,
+                OfferingSelector = normalizedSelector.StartsWith("offering:", StringComparison.OrdinalIgnoreCase)
+                    ? normalizedSelector["offering:".Length..]
+                    : normalizedSelector,
+                Requested = capabilities,
+                Missing = capabilities,
+                Status = "requested",
+                IsFulfilled = false,
+                CreatedAt = DateTimeOffset.UtcNow,
+                UpdatedAt = DateTimeOffset.UtcNow
+            };
+
+            return ValueTask.FromResult(wish);
+        }
+
+        public IDisposable SubscribeCapability(
+            string requestId,
+            Func<ZenGardenCapabilityProgressEvent, CancellationToken, ValueTask> handler,
+            ZenGardenCapabilityWatchOptions? options = null)
+        {
+            throw new NotSupportedException();
+        }
+
+        public IDisposable SubscribeCapability(
+            Func<ZenGardenCapabilityProgressEvent, CancellationToken, ValueTask> handler,
+            ZenGardenCapabilityWatchOptions? options = null)
+        {
+            throw new NotSupportedException();
+        }
+
+        public bool TryGetCapabilityWish(string requestId, out ZenGardenCapabilityWish wish)
+        {
+            wish = default!;
+            return false;
         }
 
         public bool TryGetCurrent(string toolFqid, out ZenGardenToolSnapshot snapshot)

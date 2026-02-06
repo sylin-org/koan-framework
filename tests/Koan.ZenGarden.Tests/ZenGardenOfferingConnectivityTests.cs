@@ -110,13 +110,17 @@ public sealed class ZenGardenOfferingConnectivityTests : IClassFixture<ZenGarden
         });
 
         var exactFqid = $"offering:{offering}";
-        var prefix = $"{exactFqid}:";
+        var colonPrefix = $"{exactFqid}:";
+        var atPrefix = $"{exactFqid}@";
 
         return all
             .Where(tool =>
                 string.Equals(tool.ToolFqid, exactFqid, StringComparison.OrdinalIgnoreCase) ||
-                tool.ToolFqid.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                tool.ToolFqid.StartsWith(colonPrefix, StringComparison.OrdinalIgnoreCase) ||
+                tool.ToolFqid.StartsWith(atPrefix, StringComparison.OrdinalIgnoreCase) ||
+                tool.Aliases.Any(alias => string.Equals(alias, exactFqid, StringComparison.OrdinalIgnoreCase)))
             .OrderBy(tool => string.Equals(tool.ToolFqid, exactFqid, StringComparison.OrdinalIgnoreCase) ? 0 : 1)
+            .ThenBy(tool => tool.Aliases.Any(alias => string.Equals(alias, exactFqid, StringComparison.OrdinalIgnoreCase)) ? 0 : 1)
             .ThenBy(tool => tool.ToolFqid, StringComparer.OrdinalIgnoreCase)
             .ToArray();
     }

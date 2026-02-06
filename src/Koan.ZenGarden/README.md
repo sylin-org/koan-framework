@@ -42,6 +42,14 @@ using var storageSub = ZenGarden.Storage.On(
 
 ## API Surface
 
+### Typed core subscription (`ZenGarden.On<TEvent>`)
+
+```csharp
+using var availability = ZenGarden.On<ZenGardenAvailabilityEvent>(
+    ZenGardenSubscription.ForOffering("mongodb"),
+    async (evt, ct) => { /* online/offline/changed */ });
+```
+
 ### Offering events
 
 ```csharp
@@ -77,6 +85,22 @@ Task<IReadOnlyList<ZenGardenToolSnapshot>> ZenGarden.Offering.Catalog(...)
 Task<ZenGardenToolSnapshot?> ZenGarden.Offering.Catalog("ollama", ...)
 Task<IReadOnlyList<ZenGardenToolSnapshot>> ZenGarden.Storage.Catalog(...)
 Task<ZenGardenToolSnapshot?> ZenGarden.Storage.Catalog("default", ...)
+```
+
+### Capability wishes and progress
+
+```csharp
+var wish = await ZenGarden.Capability.Wish(
+    "ollama",
+    ["llama3.2", "nomic-embed-text"]);
+
+using var progress = ZenGarden.On<ZenGardenCapabilityProgressEvent>(
+    wish,
+    async (evt, ct) =>
+    {
+        // Requested -> InProgress -> PartiallyFulfilled -> Fulfilled
+        Console.WriteLine($"{evt.Kind} missing={string.Join(",", evt.Wish.Missing)}");
+    });
 ```
 
 ## Wishful Offering Requests
@@ -151,6 +175,14 @@ Capability notes:
 - `Changed`
 - `CapabilitiesSatisfied`
 - `CapabilitiesUnsatisfied`
+
+Capability progress kinds (`ZenGardenCapabilityProgressEventKind`):
+
+- `Requested`
+- `InProgress`
+- `PartiallyFulfilled`
+- `Fulfilled`
+- `Failed`
 
 ## Listening And Adapting To Announcements
 
@@ -284,6 +316,7 @@ Optional Mongo Zen Garden overrides:
   - `Koan:Ai:Ollama:Urls:0 = "zen-garden://ollama"`
 - Auto path (no explicit members, or unresolved explicit intent):
   - resolves `ollama` through Zen Garden first
+  - if required capabilities are missing, triggers wishful capability ensure and continues startup
   - falls back to existing host/container/local Ollama discovery
   - `AdditionalUrls` are then merged as fallback members
 
@@ -292,6 +325,12 @@ Ollama capability requirements passed to Zen Garden are sourced from:
 - `Koan:Ai:Ollama:RequiredCapabilities`
 - `Koan:Ai:Ollama:RequiredModels`
 - `Koan:Ai:Ollama:ZenGarden:Capabilities`
+
+Non-blocking behavior:
+
+- Startup does not wait for capability fulfillment.
+- Capability progress is observable through `ZenGarden.Capability.On(...)` / `ZenGarden.On<ZenGardenCapabilityProgressEvent>(...)`.
+- Applications should gate feature activation on progress or on offering capability availability events.
 
 ## Configuration
 

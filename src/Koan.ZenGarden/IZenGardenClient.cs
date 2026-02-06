@@ -12,9 +12,26 @@ public interface IZenGardenClient : IDisposable
         Func<ZenGardenAvailabilityEvent, CancellationToken, ValueTask> handler,
         ZenGardenWatchOptions? options = null);
 
+    IDisposable SubscribeCapability(
+        string requestId,
+        Func<ZenGardenCapabilityProgressEvent, CancellationToken, ValueTask> handler,
+        ZenGardenCapabilityWatchOptions? options = null);
+
+    IDisposable SubscribeCapability(
+        Func<ZenGardenCapabilityProgressEvent, CancellationToken, ValueTask> handler,
+        ZenGardenCapabilityWatchOptions? options = null);
+
     Task<IReadOnlyList<ZenGardenToolSnapshot>> CatalogAsync(
         ZenGardenSubscription subscription,
         CancellationToken cancellationToken = default);
+
+    ValueTask<ZenGardenCapabilityWish> WishAsync(
+        string offering,
+        IReadOnlyList<string> capabilities,
+        ZenGardenCapabilityWishOptions? options = null,
+        CancellationToken cancellationToken = default);
+
+    bool TryGetCapabilityWish(string requestId, out ZenGardenCapabilityWish wish);
 
     bool TryGetCurrent(string toolFqid, out ZenGardenToolSnapshot snapshot);
 }

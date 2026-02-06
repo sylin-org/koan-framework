@@ -17,4 +17,12 @@ public interface IZenGardenInitializationProvider
     ValueTask<ZenGardenOfferingResolution?> ResolveAsync(
         ZenGardenConnectionIntent intent,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Fires a non-blocking wishful capability ensure request and returns a request receipt.
+    /// Returns null when capability wish cannot be scheduled.
+    /// </summary>
+    ValueTask<ZenGardenCapabilityWishReceipt?> WishCapabilitiesAsync(
+        ZenGardenConnectionIntent intent,
+        CancellationToken cancellationToken = default);
 }

@@ -11,6 +11,7 @@ public static class ZenGarden
 
     public static ZenGardenOfferingSurface Offering { get; } = new();
     public static ZenGardenStorageSurface Storage { get; } = new();
+    public static ZenGardenCapabilitySurface Capability { get; } = new();
 
     public static void Configure(IZenGardenClient client)
     {
@@ -40,6 +41,48 @@ public static class ZenGarden
             ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<ZenGardenClient>.Instance;
 
         Configure(new ZenGardenClient(httpClient, logger, options));
+    }
+
+    public static IDisposable On<TEvent>(
+        ZenGardenSubscription subscription,
+        Func<TEvent, CancellationToken, ValueTask> handler,
+        ZenGardenWatchOptions? options = null)
+    {
+        ArgumentNullException.ThrowIfNull(subscription);
+        ArgumentNullException.ThrowIfNull(handler);
+
+        if (typeof(TEvent) != typeof(ZenGardenAvailabilityEvent))
+        {
+            throw new NotSupportedException(
+                $"Unsupported Zen Garden event type '{typeof(TEvent).Name}'. " +
+                $"Use '{nameof(ZenGardenAvailabilityEvent)}' for tool availability subscriptions.");
+        }
+
+        return Client.Subscribe(
+            subscription,
+            (evt, ct) => handler((TEvent)(object)evt, ct),
+            options);
+    }
+
+    public static IDisposable On<TEvent>(
+        ZenGardenCapabilityWish wish,
+        Func<TEvent, CancellationToken, ValueTask> handler,
+        ZenGardenCapabilityWatchOptions? options = null)
+    {
+        ArgumentNullException.ThrowIfNull(wish);
+        ArgumentNullException.ThrowIfNull(handler);
+
+        if (typeof(TEvent) != typeof(ZenGardenCapabilityProgressEvent))
+        {
+            throw new NotSupportedException(
+                $"Unsupported Zen Garden event type '{typeof(TEvent).Name}'. " +
+                $"Use '{nameof(ZenGardenCapabilityProgressEvent)}' for capability progress subscriptions.");
+        }
+
+        return Client.SubscribeCapability(
+            wish.RequestId,
+            (evt, ct) => handler((TEvent)(object)evt, ct),
+            options);
     }
 
     internal static IZenGardenClient Client =>

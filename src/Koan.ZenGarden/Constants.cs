@@ -32,5 +32,6 @@ public static class Constants
         public const string HealthEndpoint = "/health";
         public const string ToolsEndpoint = "/api/v1/garden/tools";
         public const string ToolsStreamEndpoint = "/api/v1/garden/tools/stream";
+        public const string CapabilityEnsureEndpointFormat = "/api/v1/stone/offerings/{0}/capabilities";
     }
 }

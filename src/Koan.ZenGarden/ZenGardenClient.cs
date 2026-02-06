@@ -17,6 +17,9 @@ public sealed class ZenGardenClient : IZenGardenClient
     private readonly ConcurrentDictionary<string, ZenGardenToolSnapshot> _tools =
         new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<Guid, SubscriptionRegistration> _subscriptions = new();
+    private readonly ConcurrentDictionary<Guid, CapabilitySubscriptionRegistration> _capabilitySubscriptions = new();
+    private readonly ConcurrentDictionary<string, CapabilityWishRegistration> _capabilityWishes =
+        new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, CachedMossStone> _stoneCache =
         new(StringComparer.OrdinalIgnoreCase);
 
@@ -102,6 +105,68 @@ public sealed class ZenGardenClient : IZenGardenClient
         return new SubscriptionHandle(this, registration.Id);
     }
 
+    public IDisposable SubscribeCapability(
+        string requestId,
+        Func<ZenGardenCapabilityProgressEvent, CancellationToken, ValueTask> handler,
+        ZenGardenCapabilityWatchOptions? options = null)
+    {
+        ThrowIfDisposed();
+
+        if (string.IsNullOrWhiteSpace(requestId))
+        {
+            throw new ArgumentException("Request id is required.", nameof(requestId));
+        }
+
+        if (handler is null)
+        {
+            throw new ArgumentNullException(nameof(handler));
+        }
+
+        var registration = new CapabilitySubscriptionRegistration(
+            Guid.NewGuid(),
+            requestId.Trim(),
+            options ?? new ZenGardenCapabilityWatchOptions(),
+            handler);
+
+        _capabilitySubscriptions[registration.Id] = registration;
+        EnsureStreamLoopStarted();
+
+        if (registration.Options.EmitInitialState)
+        {
+            _ = EmitCapabilityInitialStateAsync(registration, _lifetimeCts.Token);
+        }
+
+        return new CapabilitySubscriptionHandle(this, registration.Id);
+    }
+
+    public IDisposable SubscribeCapability(
+        Func<ZenGardenCapabilityProgressEvent, CancellationToken, ValueTask> handler,
+        ZenGardenCapabilityWatchOptions? options = null)
+    {
+        ThrowIfDisposed();
+
+        if (handler is null)
+        {
+            throw new ArgumentNullException(nameof(handler));
+        }
+
+        var registration = new CapabilitySubscriptionRegistration(
+            Guid.NewGuid(),
+            null,
+            options ?? new ZenGardenCapabilityWatchOptions(),
+            handler);
+
+        _capabilitySubscriptions[registration.Id] = registration;
+        EnsureStreamLoopStarted();
+
+        if (registration.Options.EmitInitialState)
+        {
+            _ = EmitCapabilityInitialStateAsync(registration, _lifetimeCts.Token);
+        }
+
+        return new CapabilitySubscriptionHandle(this, registration.Id);
+    }
+
     public async Task<IReadOnlyList<ZenGardenToolSnapshot>> CatalogAsync(
         ZenGardenSubscription subscription,
         CancellationToken cancellationToken = default)
@@ -138,6 +203,165 @@ public sealed class ZenGardenClient : IZenGardenClient
             .ToArray();
 
         return filtered;
+    }
+
+    public async ValueTask<ZenGardenCapabilityWish> WishAsync(
+        string offering,
+        IReadOnlyList<string> capabilities,
+        ZenGardenCapabilityWishOptions? options = null,
+        CancellationToken cancellationToken = default)
+    {
+        ThrowIfDisposed();
+
+        if (string.IsNullOrWhiteSpace(offering))
+        {
+            throw new ArgumentException("Offering is required.", nameof(offering));
+        }
+
+        var requestedRequirements = CollectRequestedRequirements(offering, capabilities, options);
+        if (requestedRequirements.Count == 0)
+        {
+            throw new ArgumentException("At least one capability is required.", nameof(capabilities));
+        }
+
+        var offeringSubscription = ZenGardenSubscription.ForOffering(offering);
+        var toolFqid = offeringSubscription.ToolFqid
+            ?? throw new InvalidOperationException("Failed to normalize offering selector.");
+        var offeringSelector = toolFqid.StartsWith("offering:", StringComparison.OrdinalIgnoreCase)
+            ? toolFqid["offering:".Length..]
+            : toolFqid;
+
+        var snapshot = await ResolveCurrentToolSnapshotAsync(toolFqid, cancellationToken).ConfigureAwait(false);
+        var requested = requestedRequirements.Select(static x => x.Canonical).ToArray();
+        var satisfied = EvaluateSatisfiedCapabilities(requestedRequirements, snapshot).ToArray();
+        var missing = requested
+            .Except(satisfied, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        var now = DateTimeOffset.UtcNow;
+        var wish = new ZenGardenCapabilityWish
+        {
+            RequestId = Guid.NewGuid().ToString("N"),
+            ToolFqid = toolFqid,
+            OfferingSelector = offeringSelector,
+            Requested = requested,
+            Satisfied = satisfied,
+            Missing = missing,
+            IsFulfilled = missing.Length == 0,
+            Status = missing.Length == 0 ? "fulfilled" : satisfied.Length > 0 ? "partial" : "requested",
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+
+        var registration = new CapabilityWishRegistration
+        {
+            RequestId = wish.RequestId,
+            ToolFqid = wish.ToolFqid,
+            OfferingSelector = wish.OfferingSelector,
+            Requirements = requestedRequirements,
+            Current = wish
+        };
+
+        _capabilityWishes[wish.RequestId] = registration;
+
+        await PublishCapabilityProgressAsync(
+            kind: wish.IsFulfilled
+                ? ZenGardenCapabilityProgressEventKind.Fulfilled
+                : wish.Satisfied.Count > 0
+                    ? ZenGardenCapabilityProgressEventKind.PartiallyFulfilled
+                    : ZenGardenCapabilityProgressEventKind.Requested,
+            registration: registration,
+            previous: null,
+            currentTool: snapshot,
+            eventId: null,
+            cursor: _cursor,
+            ct: cancellationToken).ConfigureAwait(false);
+
+        if (missing.Length == 0)
+        {
+            return wish;
+        }
+
+        var wishOptions = options ?? new ZenGardenCapabilityWishOptions();
+        var failures = new List<string>();
+
+        foreach (var requirement in requestedRequirements.Where(r => missing.Contains(r.Canonical, StringComparer.OrdinalIgnoreCase)))
+        {
+            var ensureResponse = await EnsureCapabilityWishfullyAsync(
+                offeringSelector,
+                requirement,
+                wishOptions,
+                cancellationToken).ConfigureAwait(false);
+
+            if (!ensureResponse.Success)
+            {
+                failures.Add($"{requirement.Canonical}: {ensureResponse.Message}");
+            }
+        }
+
+        if (failures.Count > 0)
+        {
+            var previous = UpdateCapabilityWish(registration, current =>
+            {
+                return current with
+                {
+                    Status = "failed",
+                    Message = string.Join("; ", failures),
+                    UpdatedAt = DateTimeOffset.UtcNow
+                };
+            });
+
+            await PublishCapabilityProgressAsync(
+                ZenGardenCapabilityProgressEventKind.Failed,
+                registration,
+                previous,
+                currentTool: snapshot,
+                eventId: null,
+                cursor: _cursor,
+                ct: cancellationToken).ConfigureAwait(false);
+        }
+        else
+        {
+            var previous = UpdateCapabilityWish(registration, current =>
+            {
+                return current with
+                {
+                    Status = "in_progress",
+                    Message = "Capability ensure requests accepted.",
+                    UpdatedAt = DateTimeOffset.UtcNow
+                };
+            });
+
+            await PublishCapabilityProgressAsync(
+                ZenGardenCapabilityProgressEventKind.InProgress,
+                registration,
+                previous,
+                currentTool: snapshot,
+                eventId: null,
+                cursor: _cursor,
+                ct: cancellationToken).ConfigureAwait(false);
+        }
+
+        return SnapshotCapabilityWish(registration);
+    }
+
+    public bool TryGetCapabilityWish(string requestId, out ZenGardenCapabilityWish wish)
+    {
+        ThrowIfDisposed();
+        if (string.IsNullOrWhiteSpace(requestId))
+        {
+            wish = default!;
+            return false;
+        }
+
+        if (_capabilityWishes.TryGetValue(requestId.Trim(), out var registration))
+        {
+            wish = SnapshotCapabilityWish(registration);
+            return true;
+        }
+
+        wish = default!;
+        return false;
     }
 
     public bool TryGetCurrent(string toolFqid, out ZenGardenToolSnapshot snapshot)
@@ -223,6 +447,44 @@ public sealed class ZenGardenClient : IZenGardenClient
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogDebug(ex, "Failed to emit initial state for subscription {SubscriptionId}", registration.Id);
+        }
+    }
+
+    private async Task EmitCapabilityInitialStateAsync(CapabilitySubscriptionRegistration registration, CancellationToken ct)
+    {
+        try
+        {
+            var wishes = _capabilityWishes.Values.ToArray();
+            foreach (var wishRegistration in wishes)
+            {
+                if (ct.IsCancellationRequested)
+                {
+                    break;
+                }
+
+                if (!registration.Matches(wishRegistration.RequestId))
+                {
+                    continue;
+                }
+
+                var wish = SnapshotCapabilityWish(wishRegistration);
+                await registration.Handler(
+                    new ZenGardenCapabilityProgressEvent
+                    {
+                        Kind = MapStatusToProgressKind(wish),
+                        Wish = wish,
+                        Previous = null,
+                        CurrentTool = null,
+                        EventId = wish.EventId,
+                        Cursor = wish.Cursor,
+                        Timestamp = wish.UpdatedAt
+                    },
+                    ct).ConfigureAwait(false);
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogDebug(ex, "Failed to emit initial capability state for subscription {SubscriptionId}", registration.Id);
         }
     }
 
@@ -421,6 +683,7 @@ public sealed class ZenGardenClient : IZenGardenClient
 
         _tools[current.ToolFqid] = current;
         await PublishDerivedEventsAsync(current, previous, eventId, cursor, ct);
+        await PublishCapabilityUpdatesAsync(current, eventId, cursor, ct);
     }
 
     private async Task ApplyRemoveAsync(JsonElement payload, string? eventId, long? cursor, CancellationToken ct)
@@ -448,13 +711,13 @@ public sealed class ZenGardenClient : IZenGardenClient
             StoneId = previous?.StoneId,
             StoneName = previous?.StoneName,
             Connection = previous?.Connection,
-            Capabilities = previous?.Capabilities
-                ?? new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase),
+            Capabilities = new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase),
             CapabilityRevision = previous?.CapabilityRevision,
             UpdatedAt = DateTimeOffset.UtcNow
         };
 
         await PublishDerivedEventsAsync(current, previous, eventId, cursor, ct);
+        await PublishCapabilityUpdatesAsync(current, eventId, cursor, ct);
     }
 
     private async Task PublishDerivedEventsAsync(
@@ -576,6 +839,119 @@ public sealed class ZenGardenClient : IZenGardenClient
         }
     }
 
+    private async Task PublishCapabilityUpdatesAsync(
+        ZenGardenToolSnapshot current,
+        string? eventId,
+        long? cursor,
+        CancellationToken ct)
+    {
+        var registrations = _capabilityWishes.Values.ToArray();
+        foreach (var registration in registrations)
+        {
+            if (!IsToolMatch(registration.ToolFqid, current))
+            {
+                continue;
+            }
+
+            var satisfied = EvaluateSatisfiedCapabilities(registration.Requirements, current).ToArray();
+            var requested = registration.Requirements.Select(static x => x.Canonical).ToArray();
+            var missing = requested
+                .Except(satisfied, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+
+            ZenGardenCapabilityWish? previousWish = null;
+            ZenGardenCapabilityProgressEventKind? kind = null;
+
+            lock (registration.Gate)
+            {
+                var currentWish = registration.Current;
+                var currentSatisfied = currentWish.Satisfied.ToArray();
+                var currentMissing = currentWish.Missing.ToArray();
+
+                var satisfiedChanged = !currentSatisfied.SequenceEqual(satisfied, StringComparer.OrdinalIgnoreCase);
+                var missingChanged = !currentMissing.SequenceEqual(missing, StringComparer.OrdinalIgnoreCase);
+                if (!satisfiedChanged && !missingChanged)
+                {
+                    continue;
+                }
+
+                previousWish = currentWish;
+                var nextStatus = missing.Length == 0 ? "fulfilled" : satisfied.Length > 0 ? "partial" : "in_progress";
+                registration.Current = currentWish with
+                {
+                    Satisfied = satisfied,
+                    Missing = missing,
+                    IsFulfilled = missing.Length == 0,
+                    Status = nextStatus,
+                    Message = missing.Length == 0
+                        ? "Capability wish fulfilled."
+                        : $"Capabilities still pending: {string.Join(", ", missing)}",
+                    UpdatedAt = DateTimeOffset.UtcNow,
+                    EventId = eventId,
+                    Cursor = cursor
+                };
+
+                kind = missing.Length == 0
+                    ? ZenGardenCapabilityProgressEventKind.Fulfilled
+                    : satisfied.Length > 0
+                        ? ZenGardenCapabilityProgressEventKind.PartiallyFulfilled
+                        : ZenGardenCapabilityProgressEventKind.InProgress;
+            }
+
+            if (kind is not null && previousWish is not null)
+            {
+                await PublishCapabilityProgressAsync(
+                    kind.Value,
+                    registration,
+                    previousWish,
+                    current,
+                    eventId,
+                    cursor,
+                    ct).ConfigureAwait(false);
+            }
+        }
+    }
+
+    private async Task PublishCapabilityProgressAsync(
+        ZenGardenCapabilityProgressEventKind kind,
+        CapabilityWishRegistration registration,
+        ZenGardenCapabilityWish? previous,
+        ZenGardenToolSnapshot? currentTool,
+        string? eventId,
+        long? cursor,
+        CancellationToken ct)
+    {
+        var current = SnapshotCapabilityWish(registration);
+        var progressEvent = new ZenGardenCapabilityProgressEvent
+        {
+            Kind = kind,
+            Wish = current,
+            Previous = previous,
+            CurrentTool = currentTool,
+            EventId = eventId ?? current.EventId,
+            Cursor = cursor ?? current.Cursor,
+            Timestamp = DateTimeOffset.UtcNow
+        };
+
+        var subscriptions = _capabilitySubscriptions.Values.ToArray();
+        foreach (var subscription in subscriptions)
+        {
+            if (!subscription.Matches(current.RequestId))
+            {
+                continue;
+            }
+
+            try
+            {
+                await subscription.Handler(progressEvent, ct).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogWarning(ex, "ZenGarden capability subscription handler failed for {SubscriptionId}", subscription.Id);
+            }
+        }
+    }
+
     private bool RememberEventId(string eventId)
     {
         lock (_seenEventLock)
@@ -596,6 +972,160 @@ public sealed class ZenGardenClient : IZenGardenClient
 
             return true;
         }
+    }
+
+    private async Task<ZenGardenToolSnapshot?> ResolveCurrentToolSnapshotAsync(string toolFqid, CancellationToken ct)
+    {
+        if (_tools.TryGetValue(toolFqid, out var current))
+        {
+            return current;
+        }
+
+        var scoped = await CatalogAsync(new ZenGardenSubscription
+        {
+            ToolType = Models.ZenGardenToolType.Offering,
+            ToolFqid = toolFqid
+        }, ct).ConfigureAwait(false);
+
+        if (scoped.Count > 0)
+        {
+            return scoped[0];
+        }
+
+        var broad = await CatalogAsync(new ZenGardenSubscription
+        {
+            ToolType = Models.ZenGardenToolType.Offering
+        }, ct).ConfigureAwait(false);
+
+        var colonPrefix = toolFqid + ":";
+        var atPrefix = toolFqid + "@";
+
+        return broad.FirstOrDefault(tool =>
+            string.Equals(tool.ToolFqid, toolFqid, StringComparison.OrdinalIgnoreCase) ||
+            tool.ToolFqid.StartsWith(colonPrefix, StringComparison.OrdinalIgnoreCase) ||
+            tool.ToolFqid.StartsWith(atPrefix, StringComparison.OrdinalIgnoreCase) ||
+            tool.Aliases.Any(alias => string.Equals(alias, toolFqid, StringComparison.OrdinalIgnoreCase)));
+    }
+
+    private static IReadOnlyList<ZenGardenCapabilityRequirement> CollectRequestedRequirements(
+        string offering,
+        IReadOnlyList<string> capabilities,
+        ZenGardenCapabilityWishOptions? options)
+    {
+        var parsed = ZenGardenCapabilityRequirement.ParseMany(capabilities ?? Array.Empty<string>());
+        var selector = ZenGardenSubscription.ForOffering(offering);
+        if (selector.Requires.Count > 0)
+        {
+            parsed = parsed.Concat(selector.Requires).Distinct().ToArray();
+        }
+
+        if (!string.IsNullOrWhiteSpace(options?.TypeHint))
+        {
+            var type = options.TypeHint.Trim().ToLowerInvariant();
+            parsed = parsed
+                .Select(r =>
+                {
+                    if (string.IsNullOrWhiteSpace(r.Type))
+                    {
+                        return r with { Type = type };
+                    }
+
+                    return r;
+                })
+                .ToArray();
+        }
+
+        return parsed;
+    }
+
+    private static IReadOnlyCollection<string> EvaluateSatisfiedCapabilities(
+        IReadOnlyList<ZenGardenCapabilityRequirement> requirements,
+        ZenGardenToolSnapshot? tool)
+    {
+        if (requirements.Count == 0 || tool is null)
+        {
+            return Array.Empty<string>();
+        }
+
+        var satisfied = new List<string>();
+        foreach (var requirement in requirements)
+        {
+            if (requirement.Matches(tool.Capabilities))
+            {
+                satisfied.Add(requirement.Canonical);
+            }
+        }
+
+        return satisfied
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
+    private static bool IsToolMatch(string requestedToolFqid, ZenGardenToolSnapshot current)
+    {
+        if (string.Equals(current.ToolFqid, requestedToolFqid, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        var colonPrefix = requestedToolFqid + ":";
+        if (current.ToolFqid.StartsWith(colonPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        var atPrefix = requestedToolFqid + "@";
+        if (current.ToolFqid.StartsWith(atPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return current.Aliases.Any(alias => string.Equals(alias, requestedToolFqid, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private ZenGardenCapabilityWish SnapshotCapabilityWish(CapabilityWishRegistration registration)
+    {
+        lock (registration.Gate)
+        {
+            return registration.Current;
+        }
+    }
+
+    private ZenGardenCapabilityWish UpdateCapabilityWish(
+        CapabilityWishRegistration registration,
+        Func<ZenGardenCapabilityWish, ZenGardenCapabilityWish> mutator)
+    {
+        lock (registration.Gate)
+        {
+            var previous = registration.Current;
+            registration.Current = mutator(previous);
+            return previous;
+        }
+    }
+
+    private static ZenGardenCapabilityProgressEventKind MapStatusToProgressKind(ZenGardenCapabilityWish wish)
+    {
+        if (string.Equals(wish.Status, "failed", StringComparison.OrdinalIgnoreCase))
+        {
+            return ZenGardenCapabilityProgressEventKind.Failed;
+        }
+
+        if (wish.IsFulfilled)
+        {
+            return ZenGardenCapabilityProgressEventKind.Fulfilled;
+        }
+
+        if (wish.Satisfied.Count > 0)
+        {
+            return ZenGardenCapabilityProgressEventKind.PartiallyFulfilled;
+        }
+
+        if (string.Equals(wish.Status, "in_progress", StringComparison.OrdinalIgnoreCase))
+        {
+            return ZenGardenCapabilityProgressEventKind.InProgress;
+        }
+
+        return ZenGardenCapabilityProgressEventKind.Requested;
     }
 
     private async Task<HttpResponseMessage> GetSnapshotWithRecoveryAsync(
@@ -669,6 +1199,103 @@ public sealed class ZenGardenClient : IZenGardenClient
         }
 
         return await _httpClient.SendAsync(finalRequest, HttpCompletionOption.ResponseHeadersRead, ct);
+    }
+
+    private async Task<CapabilityEnsureResult> EnsureCapabilityWishfullyAsync(
+        string offeringSelector,
+        ZenGardenCapabilityRequirement requirement,
+        ZenGardenCapabilityWishOptions options,
+        CancellationToken ct)
+    {
+        var request = new CapabilityEnsureRequest
+        {
+            Name = requirement.Name,
+            Type = requirement.Type,
+            DryRun = options.DryRun
+        };
+
+        for (var attempt = 0; attempt < 2; attempt++)
+        {
+            var endpoint = await EnsureBoundEndpointAsync(ct, forceRediscovery: attempt > 0).ConfigureAwait(false);
+            var uri = BuildCapabilityEnsureUri(endpoint, offeringSelector);
+
+            try
+            {
+                var payload = JsonSerializer.Serialize(request, _jsonOptions);
+                using var response = await _httpClient.PostAsync(
+                    uri,
+                    new StringContent(payload, Encoding.UTF8, "application/json"),
+                    ct).ConfigureAwait(false);
+
+                if (attempt == 0 && ShouldRetryWithRediscovery(response.StatusCode))
+                {
+                    InvalidateBoundStone($"Capability ensure failed with {(int)response.StatusCode}.");
+                    continue;
+                }
+
+                var body = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+                if (response.IsSuccessStatusCode)
+                {
+                    var message = ParseCapabilityEnsureStatus(body) ?? "accepted";
+                    return new CapabilityEnsureResult(true, message);
+                }
+
+                return new CapabilityEnsureResult(false, ParseCapabilityEnsureStatus(body) ?? response.ReasonPhrase ?? "request failed");
+            }
+            catch (Exception ex) when (attempt == 0 && ShouldRetryWithRediscovery(ex))
+            {
+                InvalidateBoundStone("Capability ensure failed with connection exception.", ex);
+            }
+            catch (Exception ex)
+            {
+                return new CapabilityEnsureResult(false, ex.Message);
+            }
+        }
+
+        return new CapabilityEnsureResult(false, "unable to reach moss endpoint");
+    }
+
+    private static string? ParseCapabilityEnsureStatus(string? body)
+    {
+        if (string.IsNullOrWhiteSpace(body))
+        {
+            return null;
+        }
+
+        try
+        {
+            using var doc = JsonDocument.Parse(body);
+            var payload = ExtractDataOrSelf(doc.RootElement);
+            var status = ReadString(payload, "status");
+            var message = ReadString(payload, "message");
+
+            if (!string.IsNullOrWhiteSpace(status) && !string.IsNullOrWhiteSpace(message))
+            {
+                return $"{status}: {message}";
+            }
+
+            if (!string.IsNullOrWhiteSpace(status))
+            {
+                return status;
+            }
+
+            if (!string.IsNullOrWhiteSpace(message))
+            {
+                return message;
+            }
+
+            var success = ReadBoolean(payload, "success");
+            if (success is not null)
+            {
+                return success.Value ? "success" : "failed";
+            }
+        }
+        catch (JsonException)
+        {
+            return body.Trim();
+        }
+
+        return null;
     }
 
     private async Task<string> EnsureBoundEndpointAsync(CancellationToken ct, bool forceRediscovery = false)
@@ -1480,6 +2107,16 @@ public sealed class ZenGardenClient : IZenGardenClient
         return builder.Uri;
     }
 
+    private Uri BuildCapabilityEnsureUri(string endpoint, string offeringSelector)
+    {
+        var encodedOffering = Uri.EscapeDataString(offeringSelector.Trim().ToLowerInvariant());
+        var path = string.Format(
+            CultureInfo.InvariantCulture,
+            Constants.Moss.CapabilityEnsureEndpointFormat,
+            encodedOffering);
+        return CreateBaseUriBuilder(endpoint, path).Uri;
+    }
+
     private Uri BuildStreamUri(string endpoint, long? since)
     {
         var builder = CreateBaseUriBuilder(endpoint, Constants.Moss.ToolsStreamEndpoint);
@@ -1571,6 +2208,7 @@ public sealed class ZenGardenClient : IZenGardenClient
             Revision = ReadLong(payload, "revision") ?? 0,
             StoneId = ReadString(payload, "stone_id"),
             StoneName = ReadString(payload, "stone_name"),
+            Aliases = ParseAliases(payload),
             Connection = ParseConnection(payload),
             Capabilities = capabilities,
             CapabilityRevision = ReadLong(payload, "capability_revision"),
@@ -1607,6 +2245,23 @@ public sealed class ZenGardenClient : IZenGardenClient
             Port = ReadInt(connectionElement, "port"),
             Uris = uris
         };
+    }
+
+    private static IReadOnlyList<string> ParseAliases(JsonElement payload)
+    {
+        if (!TryGetProperty(payload, "aliases", out var aliasesElement) ||
+            aliasesElement.ValueKind != JsonValueKind.Array)
+        {
+            return Array.Empty<string>();
+        }
+
+        return aliasesElement.EnumerateArray()
+            .Where(x => x.ValueKind == JsonValueKind.String)
+            .Select(x => x.GetString())
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Select(x => x!.Trim().ToLowerInvariant())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
     }
 
     private static IReadOnlyDictionary<string, IReadOnlyList<string>> ParseCapabilities(JsonElement payload)
@@ -1856,6 +2511,44 @@ public sealed class ZenGardenClient : IZenGardenClient
         ZenGardenWatchOptions Options,
         Func<ZenGardenAvailabilityEvent, CancellationToken, ValueTask> Handler);
 
+    private sealed record CapabilitySubscriptionRegistration(
+        Guid Id,
+        string? RequestId,
+        ZenGardenCapabilityWatchOptions Options,
+        Func<ZenGardenCapabilityProgressEvent, CancellationToken, ValueTask> Handler)
+    {
+        public bool Matches(string requestId)
+        {
+            return string.IsNullOrWhiteSpace(RequestId)
+                || string.Equals(RequestId, requestId, StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    private sealed class CapabilityWishRegistration
+    {
+        public required string RequestId { get; init; }
+        public required string ToolFqid { get; init; }
+        public required string OfferingSelector { get; init; }
+        public required IReadOnlyList<ZenGardenCapabilityRequirement> Requirements { get; init; }
+        public required ZenGardenCapabilityWish Current { get; set; }
+        public object Gate { get; } = new();
+    }
+
+    private sealed record CapabilityEnsureRequest
+    {
+        [JsonPropertyName("name")]
+        public required string Name { get; init; }
+
+        [JsonPropertyName("type")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? Type { get; init; }
+
+        [JsonPropertyName("dry_run")]
+        public bool DryRun { get; init; }
+    }
+
+    private readonly record struct CapabilityEnsureResult(bool Success, string Message);
+
     private sealed class SubscriptionHandle : IDisposable
     {
         private readonly ZenGardenClient _owner;
@@ -1876,6 +2569,29 @@ public sealed class ZenGardenClient : IZenGardenClient
             }
 
             _owner._subscriptions.TryRemove(_id, out _);
+        }
+    }
+
+    private sealed class CapabilitySubscriptionHandle : IDisposable
+    {
+        private readonly ZenGardenClient _owner;
+        private readonly Guid _id;
+        private int _disposed;
+
+        public CapabilitySubscriptionHandle(ZenGardenClient owner, Guid id)
+        {
+            _owner = owner;
+            _id = id;
+        }
+
+        public void Dispose()
+        {
+            if (Interlocked.Exchange(ref _disposed, 1) != 0)
+            {
+                return;
+            }
+
+            _owner._capabilitySubscriptions.TryRemove(_id, out _);
         }
     }
 }

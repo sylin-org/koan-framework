@@ -4,6 +4,15 @@
 
 This project is a greenfield tools-domain runtime client for Zen Garden.
 
+## Decision
+
+`Koan.ZenGarden` adopts a typed event model with a non-blocking wishful capability workflow:
+
+- canonical primitive: `ZenGarden.On<TEvent>(...)`
+- ergonomic wrappers remain: `ZenGarden.Offering.On(...)`, `ZenGarden.Storage.On(...)`, `ZenGarden.Capability.On(...)`
+- capability requests are scheduled wishfully and never block startup
+- capability fulfillment is reported incrementally (`PartiallyFulfilled`) and finally (`Fulfilled`) from tools SSE updates
+
 It uses discovery-first Moss endpoint binding:
 
 - explicit endpoint/selector overrides when provided
@@ -69,6 +78,7 @@ It does not use `/api/v1/services` as a primary catalog source.
 5. Local projection cache keyed by `tool_fqid`.
 6. Event-id dedupe window.
 7. Derived availability event emission to subscribers.
+8. Non-blocking capability wish state tracking and progress emission.
 
 ### Local Projection
 
@@ -104,6 +114,14 @@ Capability tokens support:
 - `CapabilitiesSatisfied`: requirement set becomes satisfied.
 - `CapabilitiesUnsatisfied`: requirement set becomes unsatisfied.
 
+`ZenGardenCapabilityProgressEventKind`:
+
+- `Requested`: wish accepted and tracked.
+- `InProgress`: capability ensure requests submitted.
+- `PartiallyFulfilled`: some requested capabilities are now present.
+- `Fulfilled`: all requested capabilities are present.
+- `Failed`: wish scheduling/ensure request failed.
+
 ## Wishful Dependency Contract
 
 Wishful dependency means applications declare desired tools before those tools are
@@ -115,12 +133,15 @@ Application surfaces:
 - `ZenGarden.Offering.On("ollama", ["llama3.2"], handler)`
 - `ZenGarden.Offering.Catalog("mongodb")`
 - `ZenGarden.Offering.Catalog("ollama", ["llama3.2"])`
+- `ZenGarden.Capability.Wish("ollama", ["llama3.2", "nomic-embed-text"])`
+- `ZenGarden.Capability.On(wish, handler)`
 
 Behavior:
 
 - Missing tools do not fail registration of the subscription.
 - `EmitInitialState=true` (default) emits current state immediately after subscribe.
 - Capability-bound subscriptions receive capability transition events in addition to online/offline.
+- Capability wish requests are non-blocking: startup continues while fulfillment progresses via SSE-driven updates.
 
 Capability requirement matching:
 
@@ -166,6 +187,7 @@ Provider responsibilities:
 - map adapter default offering bindings
 - resolve ready offering projections through tools snapshot API
 - return connection metadata (`uris`, `protocol`, `host`, `port`, capabilities)
+- schedule capability ensures wishfully without blocking startup
 
 Implemented adapter bindings:
 
@@ -193,6 +215,7 @@ Ollama (`OllamaAdapterContributor`):
   - `Koan:Ai:Ollama:RequiredCapabilities`
   - `Koan:Ai:Ollama:RequiredModels`
   - `Koan:Ai:Ollama:ZenGarden:Capabilities`
+- when required capabilities are missing, contributor schedules wishful ensure and continues registration
 
 ## Announcement Adaptation Flow
 
@@ -225,6 +248,13 @@ Preferred app-facing API:
 using var sub = ZenGarden.Offering.On("mongodb", async (evt, ct) => { });
 using var capSub = ZenGarden.Offering.On("ollama", ["modelv1", "modelv2"], async (evt, ct) => { });
 using var storageSub = ZenGarden.Storage.On("default", async (evt, ct) => { });
+
+var wish = await ZenGarden.Capability.Wish("ollama", ["modelv1", "modelv2"]);
+using var wishSub = ZenGarden.Capability.On(wish, async (evt, ct) => { });
+
+using var typed = ZenGarden.On<ZenGardenAvailabilityEvent>(
+    ZenGardenSubscription.ForOffering("mongodb"),
+    async (evt, ct) => { });
 ```
 
 Catalog access:

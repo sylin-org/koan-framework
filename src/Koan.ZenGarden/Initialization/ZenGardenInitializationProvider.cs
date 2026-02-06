@@ -43,6 +43,47 @@ internal sealed class ZenGardenInitializationProvider : IZenGardenInitialization
         return _offeringByAdapter.TryGetValue(adapterId.Trim().ToLowerInvariant(), out offering!);
     }
 
+    public async ValueTask<ZenGardenCapabilityWishReceipt?> WishCapabilitiesAsync(
+        ZenGardenConnectionIntent intent,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(intent);
+        if (intent.Capabilities.Count == 0)
+        {
+            return null;
+        }
+
+        ZenGardenCapabilityWish wish;
+        try
+        {
+            wish = await _client.WishAsync(
+                intent.ToOfferingSelector(),
+                intent.Capabilities,
+                options: null,
+                cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex,
+                "Zen Garden capability wish failed for {Selector} (caps={Capabilities})",
+                intent.ToOfferingSelector(),
+                string.Join(",", intent.Capabilities));
+            return null;
+        }
+
+        return new ZenGardenCapabilityWishReceipt
+        {
+            RequestId = wish.RequestId,
+            ToolFqid = wish.ToolFqid,
+            OfferingSelector = wish.OfferingSelector,
+            Requested = wish.Requested,
+            Missing = wish.Missing,
+            IsFulfilled = wish.IsFulfilled,
+            Status = wish.Status,
+            CreatedAt = wish.CreatedAt
+        };
+    }
+
     public async ValueTask<ZenGardenOfferingResolution?> ResolveAsync(
         ZenGardenConnectionIntent intent,
         CancellationToken cancellationToken = default)
@@ -100,15 +141,19 @@ internal sealed class ZenGardenInitializationProvider : IZenGardenInitialization
         }
 
         var exactFqid = $"offering:{intent.Offering}";
-        var prefix = $"{exactFqid}:";
+        var colonPrefix = $"{exactFqid}:";
+        var atPrefix = $"{exactFqid}@";
 
         var matched = tools
             .Where(tool => tool.Ready)
             .Where(tool =>
                 string.Equals(tool.ToolFqid, exactFqid, StringComparison.OrdinalIgnoreCase) ||
-                tool.ToolFqid.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                tool.ToolFqid.StartsWith(colonPrefix, StringComparison.OrdinalIgnoreCase) ||
+                tool.ToolFqid.StartsWith(atPrefix, StringComparison.OrdinalIgnoreCase) ||
+                tool.Aliases.Any(alias => string.Equals(alias, exactFqid, StringComparison.OrdinalIgnoreCase)))
             .Where(scopedSubscription.RequirementsSatisfiedBy)
             .OrderBy(tool => string.Equals(tool.ToolFqid, exactFqid, StringComparison.OrdinalIgnoreCase) ? 0 : 1)
+            .ThenBy(tool => tool.Aliases.Any(alias => string.Equals(alias, exactFqid, StringComparison.OrdinalIgnoreCase)) ? 0 : 1)
             .ThenBy(tool => tool.ToolFqid, StringComparer.OrdinalIgnoreCase)
             .FirstOrDefault();
 

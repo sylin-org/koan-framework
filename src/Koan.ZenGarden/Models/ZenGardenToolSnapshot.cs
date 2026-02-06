@@ -34,6 +34,7 @@ public sealed record ZenGardenToolSnapshot
     public long Revision { get; init; }
     public string? StoneId { get; init; }
     public string? StoneName { get; init; }
+    public IReadOnlyList<string> Aliases { get; init; } = Array.Empty<string>();
     public ZenGardenConnection? Connection { get; init; }
     public IReadOnlyDictionary<string, IReadOnlyList<string>> Capabilities { get; init; }
         = new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase);

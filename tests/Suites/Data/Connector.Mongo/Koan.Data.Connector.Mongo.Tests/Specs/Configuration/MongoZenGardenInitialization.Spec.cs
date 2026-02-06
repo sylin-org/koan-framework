@@ -113,5 +113,12 @@ public sealed class MongoZenGardenInitializationSpec
         {
             return ValueTask.FromResult(_resolver(intent));
         }
+
+        public ValueTask<ZenGardenCapabilityWishReceipt?> WishCapabilitiesAsync(
+            ZenGardenConnectionIntent intent,
+            CancellationToken cancellationToken = default)
+        {
+            return ValueTask.FromResult<ZenGardenCapabilityWishReceipt?>(null);
+        }
     }
 }
