@@ -23,7 +23,8 @@ Manual smoke harness for the greenfield `Koan.ZenGarden` tools-domain adapter.
   - Preferred seed-bank to watch.
   - Default: `default`
 - `KOAN_ZENGARDEN_CAPABILITIES`
-  - Optional CSV requirements, e.g. `modelv1,modelv2` or `extension:pgvector`.
+  - Optional CSV requirements, e.g. `llama3.2,nomic-embed-text`.
+  - Type prefixes are optional and mainly useful for disambiguation.
   - If omitted, requirements are derived from the selected offering capabilities.
 - `KOAN_ZENGARDEN_WATCH_SECONDS`
   - How long to keep streaming live events after initial events.

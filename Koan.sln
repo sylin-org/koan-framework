@@ -345,6 +345,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.ZenGarden.Tests", "tes
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.ZenGarden", "src\Koan.ZenGarden\Koan.ZenGarden.csproj", "{1A637298-756A-4866-AE33-1CE159760D70}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.ZenGarden.Core", "src\Koan.ZenGarden.Core\Koan.ZenGarden.Core.csproj", "{75789E12-7ECD-4D44-B229-C30C7CE7081B}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -1649,6 +1651,18 @@ Global
 		{1A637298-756A-4866-AE33-1CE159760D70}.Release|x64.Build.0 = Release|Any CPU
 		{1A637298-756A-4866-AE33-1CE159760D70}.Release|x86.ActiveCfg = Release|Any CPU
 		{1A637298-756A-4866-AE33-1CE159760D70}.Release|x86.Build.0 = Release|Any CPU
+		{75789E12-7ECD-4D44-B229-C30C7CE7081B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{75789E12-7ECD-4D44-B229-C30C7CE7081B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{75789E12-7ECD-4D44-B229-C30C7CE7081B}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{75789E12-7ECD-4D44-B229-C30C7CE7081B}.Debug|x64.Build.0 = Debug|Any CPU
+		{75789E12-7ECD-4D44-B229-C30C7CE7081B}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{75789E12-7ECD-4D44-B229-C30C7CE7081B}.Debug|x86.Build.0 = Debug|Any CPU
+		{75789E12-7ECD-4D44-B229-C30C7CE7081B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{75789E12-7ECD-4D44-B229-C30C7CE7081B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{75789E12-7ECD-4D44-B229-C30C7CE7081B}.Release|x64.ActiveCfg = Release|Any CPU
+		{75789E12-7ECD-4D44-B229-C30C7CE7081B}.Release|x64.Build.0 = Release|Any CPU
+		{75789E12-7ECD-4D44-B229-C30C7CE7081B}.Release|x86.ActiveCfg = Release|Any CPU
+		{75789E12-7ECD-4D44-B229-C30C7CE7081B}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -1821,6 +1835,7 @@ Global
 		{E611D525-1F5B-40F2-9361-AB88CB20504F} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{133A2DE4-0EC1-4064-8BE0-7994CB80FB70} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{1A637298-756A-4866-AE33-1CE159760D70} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
+		{75789E12-7ECD-4D44-B229-C30C7CE7081B} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {669C5778-BFAE-4972-B427-0AFF99562045}

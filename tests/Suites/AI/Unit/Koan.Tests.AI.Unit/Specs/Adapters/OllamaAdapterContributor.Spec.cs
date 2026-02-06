@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -11,6 +11,7 @@ using Koan.AI.Contracts.Sources;
 using Koan.AI.Connector.Ollama.Initialization;
 using Koan.AI.Connector.Ollama.Options;
 using Koan.Core.Adapters;
+using Koan.ZenGarden.Core;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -23,17 +24,13 @@ namespace Koan.Tests.AI.Unit.Specs.Adapters;
 public sealed class OllamaAdapterContributorSpec
 {
     [Fact]
-    public async Task ContributeAsync_with_explicit_and_services_registers_expected_source()
+    public async Task ContributeAsync_with_explicit_url_registers_expected_source()
     {
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
             ["Koan:Ai:Ollama:Urls:0"] = "http://localhost:6001",
             ["Koan:Ai:Ollama:DefaultModel"] = "phi3",
-            ["Koan:Ai:Ollama:Policy"] = "RoundRobin",
-            ["Koan:Ai:Services:Ollama:0:Id"] = "EdgeHost",
-            ["Koan:Ai:Services:Ollama:0:BaseUrl"] = "http://localhost:6002",
-            ["Koan:Ai:Services:Ollama:0:DefaultModel"] = "llama3",
-            ["Koan:Ai:Services:Ollama:0:Weight"] = "3"
+            ["Koan:Ai:Ollama:Policy"] = "RoundRobin"
         });
 
         var sourceRegistry = new RecordingSourceRegistry();
@@ -50,60 +47,81 @@ public sealed class OllamaAdapterContributorSpec
         source.Policy.Should().Be("RoundRobin");
         source.Origin.Should().Be("explicit-config");
         source.IsAutoDiscovered.Should().BeFalse();
-        source.Members.Should().HaveCount(2);
+        source.Members.Should().ContainSingle();
 
-        var explicitMember = source.Members[0];
-        explicitMember.Name.Should().Be("ollama::explicit-1");
-        explicitMember.Order.Should().Be(0);
-        explicitMember.Origin.Should().Be("config-urls");
-        explicitMember.IsAutoDiscovered.Should().BeFalse();
-        explicitMember.Capabilities.Should().NotBeNull();
-        explicitMember.Capabilities!.Should().ContainKey("Chat").WhoseValue.Model.Should().Be("phi3");
-
-        var serviceMember = source.Members[1];
-        serviceMember.Name.Should().Be("ollama::edgehost");
-        serviceMember.Order.Should().Be(1);
-        serviceMember.Origin.Should().Be("config-services");
-        serviceMember.Weight.Should().Be(3);
-        serviceMember.Capabilities.Should().NotBeNull();
-        serviceMember.Capabilities!.Should().ContainKey("Chat").WhoseValue.Model.Should().Be("llama3");
+        var member = source.Members[0];
+        member.Name.Should().Be("ollama::explicit-1");
+        member.ConnectionString.Should().Be("http://localhost:6001");
+        member.Order.Should().Be(0);
+        member.Origin.Should().Be("config-urls");
+        member.IsAutoDiscovered.Should().BeFalse();
+        member.Capabilities.Should().ContainKey("Chat").WhoseValue.Model.Should().Be("phi3");
 
         adapterRegistry.All.Should().ContainSingle(adapter => adapter.Id == "ollama");
     }
 
     [Fact]
-    public async Task ContributeAsync_without_explicit_combines_services_and_additional_urls()
+    public async Task ContributeAsync_with_zen_garden_connection_string_resolves_member()
     {
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
-            ["Koan:Ai:Ollama:DefaultModel"] = "phi3",
-            ["Koan:Ai:Ollama:AdditionalUrls:0"] = "http://localhost:6003",
-            ["Koan:Ai:Services:Ollama:0:BaseUrl"] = "http://localhost:6004"
+            ["Koan:Ai:Ollama:ConnectionString"] = "zen-garden://ollama?cap=llama3.2,nomic-embed-text",
+            ["Koan:Ai:Ollama:DefaultModel"] = "llama3.2"
         });
 
         var sourceRegistry = new RecordingSourceRegistry();
         var adapterRegistry = new InMemoryAdapterRegistry();
-        using var provider = BuildServiceProvider(configuration, sourceRegistry, adapterRegistry);
+        var zenGardenProvider = new StubZenGardenProvider(_ => new ZenGardenOfferingResolution
+        {
+            ToolFqid = "offering:ollama",
+            Offering = "ollama",
+            Uris = new[] { "http://zen-ollama:11434" },
+            Capabilities = new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["model"] = new[] { "llama3.2", "nomic-embed-text" }
+            }
+        });
+
+        using var provider = BuildServiceProvider(configuration, sourceRegistry, adapterRegistry, zenGardenProvider);
 
         var contributor = new OllamaAdapterContributor();
         await contributor.ContributeAsync(provider, CancellationToken.None);
 
         var source = sourceRegistry.RegisteredSources.Single();
-        source.Origin.Should().Be("config-services");
+        source.Origin.Should().Be("explicit-config");
         source.IsAutoDiscovered.Should().BeFalse();
+        source.Members.Should().ContainSingle();
 
-        source.Members.Should().ContainSingle(member => member.ConnectionString == "http://localhost:6004" && member.Origin == "config-services");
-        var serviceMember = source.Members.Single(member => member.ConnectionString == "http://localhost:6004");
-        serviceMember.IsAutoDiscovered.Should().BeFalse();
-        serviceMember.Capabilities.Should().NotBeNull();
-        serviceMember.Capabilities!.Should().ContainKey("Chat");
+        var member = source.Members.Single();
+        member.Name.Should().Be("ollama::connection");
+        member.ConnectionString.Should().Be("http://zen-ollama:11434");
+        member.Origin.Should().Be("config-connection-string");
+        member.Capabilities.Should().ContainKey("Chat").WhoseValue.Model.Should().Be("llama3.2");
+    }
 
-        source.Members.Should().Contain(member => member.ConnectionString == "http://localhost:6003" && member.Origin == "config-additional-urls");
-        var additionalMember = source.Members.Single(member => member.ConnectionString == "http://localhost:6003");
-        additionalMember.IsAutoDiscovered.Should().BeFalse();
-        additionalMember.Capabilities.Should().NotBeNull();
-        additionalMember.Capabilities!.Should().ContainKey("Chat");
+    [Fact]
+    public async Task ContributeAsync_with_unresolved_zen_garden_connection_uses_additional_url_fallback()
+    {
+        var configuration = BuildConfiguration(new Dictionary<string, string?>
+        {
+            ["Koan:Ai:Ollama:ConnectionString"] = "zen-garden://ollama",
+            ["Koan:Ai:Ollama:AdditionalUrls:0"] = "http://localhost:6003",
+            ["Koan:Ai:Ollama:DefaultModel"] = "phi3"
+        });
 
+        var sourceRegistry = new RecordingSourceRegistry();
+        var adapterRegistry = new InMemoryAdapterRegistry();
+        var zenGardenProvider = new StubZenGardenProvider(_ => null);
+        using var provider = BuildServiceProvider(configuration, sourceRegistry, adapterRegistry, zenGardenProvider);
+
+        var contributor = new OllamaAdapterContributor();
+        await contributor.ContributeAsync(provider, CancellationToken.None);
+
+        var source = sourceRegistry.RegisteredSources.Single();
+        source.Origin.Should().Be("auto-discovery");
+        source.Members.Should().Contain(member =>
+            member.ConnectionString == "http://localhost:6003" &&
+            member.Origin == "config-additional-urls");
         adapterRegistry.All.Should().ContainSingle(adapter => adapter.Id == "ollama");
     }
 
@@ -134,6 +152,7 @@ public sealed class OllamaAdapterContributorSpec
         IConfiguration configuration,
         RecordingSourceRegistry sourceRegistry,
         IAiAdapterRegistry adapterRegistry,
+        IZenGardenInitializationProvider? zenGardenProvider = null,
         AiOptions? aiOptions = null,
         OllamaOptions? ollamaOptions = null,
         AdaptersReadinessOptions? readiness = null)
@@ -150,6 +169,12 @@ public sealed class OllamaAdapterContributorSpec
         services.AddSingleton<IOptionsMonitor<OllamaOptions>>(new TestOptionsMonitor<OllamaOptions>(ollamaOptions ?? new OllamaOptions()));
         services.AddSingleton<IOptions<AdaptersReadinessOptions>>(Options.Create(readiness ?? new AdaptersReadinessOptions()));
         services.AddSingleton<ILogger<OllamaAdapterContributor>>(NullLogger<OllamaAdapterContributor>.Instance);
+
+        if (zenGardenProvider is not null)
+        {
+            services.AddSingleton(zenGardenProvider);
+        }
+
         return services.BuildServiceProvider();
     }
 
@@ -198,6 +223,29 @@ public sealed class OllamaAdapterContributorSpec
                 Members = new List<AiMemberDefinition>(),
                 Capabilities = new Dictionary<string, AiCapabilityConfig>()
             };
+        }
+    }
+
+    private sealed class StubZenGardenProvider : IZenGardenInitializationProvider
+    {
+        private readonly Func<ZenGardenConnectionIntent, ZenGardenOfferingResolution?> _resolver;
+
+        public StubZenGardenProvider(Func<ZenGardenConnectionIntent, ZenGardenOfferingResolution?> resolver)
+        {
+            _resolver = resolver;
+        }
+
+        public bool TryGetDefaultOffering(string adapterId, out string offering)
+        {
+            offering = "ollama";
+            return string.Equals(adapterId, "ollama", StringComparison.OrdinalIgnoreCase);
+        }
+
+        public ValueTask<ZenGardenOfferingResolution?> ResolveAsync(
+            ZenGardenConnectionIntent intent,
+            CancellationToken cancellationToken = default)
+        {
+            return ValueTask.FromResult(_resolver(intent));
         }
     }
 

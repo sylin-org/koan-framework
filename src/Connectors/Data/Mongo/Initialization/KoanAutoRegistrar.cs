@@ -20,6 +20,7 @@ using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Naming;
 using Koan.Data.Connector.Mongo.Discovery;
 using Koan.Data.Connector.Mongo.Orchestration;
+using Koan.ZenGarden.Core;
 using MongoItems = Koan.Data.Connector.Mongo.Infrastructure.MongoProvenanceItems;
 using ProvenanceModes = Koan.Core.Hosting.Bootstrap.ProvenancePublicationModeExtensions;
 
@@ -63,6 +64,10 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         // NEW: Register MongoDB discovery adapter (maintains "Reference = Intent")
         // Adding Koan.Data.Connector.Mongo automatically enables MongoDB discovery capabilities
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IServiceDiscoveryAdapter, MongoDiscoveryAdapter>());
+
+        // Optional Zen Garden binding metadata (used only when Koan.ZenGarden is referenced).
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IZenGardenOfferingBinding, MongoZenGardenOfferingBinding>());
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IZenGardenOfferingBinding, MongoDbZenGardenOfferingBinding>());
     }
 
     private static void ConfigureMongoStaticState()

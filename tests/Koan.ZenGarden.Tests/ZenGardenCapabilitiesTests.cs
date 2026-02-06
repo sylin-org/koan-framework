@@ -102,7 +102,7 @@ public sealed class ZenGardenCapabilitiesTests : IClassFixture<ZenGardenFixture>
 
         var capability = selected.Capabilities
             .First(entry => entry.Value.Count > 0);
-        var token = $"{capability.Key}:{capability.Value[0]}";
+        var token = capability.Value[0];
         var offeringName = StripPrefix(selected.ToolFqid, "offering:");
 
         var firstEvent = await CaptureInitialEventAsync(

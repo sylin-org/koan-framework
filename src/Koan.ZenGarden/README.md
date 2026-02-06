@@ -79,6 +79,71 @@ Task<IReadOnlyList<ZenGardenToolSnapshot>> ZenGarden.Storage.Catalog(...)
 Task<ZenGardenToolSnapshot?> ZenGarden.Storage.Catalog("default", ...)
 ```
 
+## Wishful Offering Requests
+
+Applications can declare a desired dependency even when it is not ready yet.
+This is the recommended startup model for dynamic infrastructure.
+
+### Ask for an offering (no capability constraint)
+
+```csharp
+using var sub = ZenGarden.Offering.On(
+    "mongodb",
+    async (evt, ct) =>
+    {
+        if (evt.Kind == ZenGardenAvailabilityEventKind.Online)
+        {
+            await appFeatures.EnableMongoAsync(evt.Current, ct);
+        }
+
+        if (evt.Kind == ZenGardenAvailabilityEventKind.Offline)
+        {
+            await appFeatures.DisableMongoAsync(ct);
+        }
+    });
+```
+
+### Ask for an offering with required capabilities
+
+```csharp
+using var sub = ZenGarden.Offering.On(
+    "ollama",
+    ["llama3.2", "nomic-embed-text"],
+    async (evt, ct) =>
+    {
+        if (evt.Kind == ZenGardenAvailabilityEventKind.CapabilitiesSatisfied)
+        {
+            await appFeatures.EnableAiRouteAsync(evt.Current, ct);
+        }
+
+        if (evt.Kind == ZenGardenAvailabilityEventKind.CapabilitiesUnsatisfied ||
+            evt.Kind == ZenGardenAvailabilityEventKind.Offline)
+        {
+            await appFeatures.DisableAiRouteAsync(ct);
+        }
+    });
+```
+
+### Wishful query at startup (point-in-time)
+
+```csharp
+var mongo = await ZenGarden.Offering.Catalog("mongodb", ct);
+if (mongo?.Ready == true)
+{
+    await appFeatures.EnableMongoAsync(mongo, ct);
+}
+
+var ollamaWithModels = await ZenGarden.Offering.Catalog(
+    "ollama",
+    ["llama3.2", "nomic-embed-text"],
+    ct);
+```
+
+Capability notes:
+
+- Use bare capability names by default (`llama3.2`, `nomic-embed-text`).
+- Prefixes like `model:` are optional and only needed for disambiguation.
+
 ## Event Kinds
 
 - `Online`
@@ -86,6 +151,43 @@ Task<ZenGardenToolSnapshot?> ZenGarden.Storage.Catalog("default", ...)
 - `Changed`
 - `CapabilitiesSatisfied`
 - `CapabilitiesUnsatisfied`
+
+## Listening And Adapting To Announcements
+
+`Koan.ZenGarden` consumes Zen Garden tool announcements from the stream and emits
+derived app events. The handler is the application adaptation point.
+
+```csharp
+using var sub = ZenGarden.Offering.On(
+    "redis",
+    async (evt, ct) =>
+    {
+        switch (evt.Kind)
+        {
+            case ZenGardenAvailabilityEventKind.Online:
+                await runtime.BindRedisAsync(evt.Current, ct);
+                break;
+            case ZenGardenAvailabilityEventKind.Changed:
+                await runtime.RefreshRedisBindingAsync(evt.Current, ct);
+                break;
+            case ZenGardenAvailabilityEventKind.Offline:
+                await runtime.UnbindRedisAsync(ct);
+                break;
+        }
+    },
+    new ZenGardenWatchOptions
+    {
+        // true by default: emit current state immediately after subscribe.
+        EmitInitialState = true
+    });
+```
+
+Operational guidance:
+
+- Keep handlers idempotent. Duplicate or replayed stream events can happen.
+- Use `evt.Current` as the source of truth for connection/capability state.
+- Treat `Changed` as a rebind signal when online/offline did not change.
+- Prefer enabling/disabling features instead of throwing during startup.
 
 ## Selector Ergonomics
 
@@ -120,6 +222,76 @@ var subscription = ZenGardenSubscription.ForOffering("ollama")
 - Tool coverage:
   - offerings (`tool_type=offering`)
   - seed banks (`tool_type=seed-bank`)
+
+## Connection Intent URIs
+
+`Koan.ZenGarden` is an initialization provider for adapter connection intent resolution.
+
+Minimum valid URI:
+
+```text
+zen-garden://<offering>
+```
+
+Example:
+
+```text
+zen-garden://mongodb
+```
+
+Optional extended forms:
+
+- `zen-garden://<offering>:<instance>`
+- `zen-garden://<offering>?cap=<item>[,<item>...]`
+
+Capability notes:
+
+- Bare capability items are preferred (`llama3.2`, `nomic-embed-text`).
+- Typed selectors remain optional for disambiguation only.
+
+Resolution order:
+
+1. Explicit native connection string -> pass-through.
+2. `zen-garden://...` -> resolve via Zen Garden first, then connector autonomous discovery fallback.
+3. `auto` or empty with `Koan.ZenGarden` referenced -> Zen Garden first, then connector autonomous discovery fallback.
+
+Selector note:
+
+- `zen-garden://<offering>` resolves the base offering first (`offering:<offering>`).
+- If only instance variants exist, resolution falls back to the first ready `offering:<offering>:<instance>`.
+
+### MongoDB adapter behavior
+
+- Default auto path (`ConnectionString` empty or `auto`):
+  - resolves `mongodb` through Zen Garden first
+  - falls back to existing Mongo autonomous discovery if unresolved
+- Explicit Zen Garden URI path:
+  - `Koan:Data:Mongo:ConnectionString = "zen-garden://mongodb"`
+  - `Koan:Data:Mongo:ConnectionString = "zen-garden://mongodb:dev"`
+  - unresolved intent falls back to Mongo autonomous discovery
+
+Optional Mongo Zen Garden overrides:
+
+- `Koan:Data:Mongo:ZenGarden:Offering`
+- `Koan:Data:Mongo:ZenGarden:Instance`
+- `Koan:Data:Mongo:ZenGarden:Capabilities` (array or csv)
+
+### Ollama adapter behavior
+
+- Explicit single connection intent:
+  - `Koan:Ai:Ollama:ConnectionString = "zen-garden://ollama?cap=llama3.2,nomic-embed-text"`
+- Explicit URL list still works, and each URL can also be a Zen Garden URI:
+  - `Koan:Ai:Ollama:Urls:0 = "zen-garden://ollama"`
+- Auto path (no explicit members, or unresolved explicit intent):
+  - resolves `ollama` through Zen Garden first
+  - falls back to existing host/container/local Ollama discovery
+  - `AdditionalUrls` are then merged as fallback members
+
+Ollama capability requirements passed to Zen Garden are sourced from:
+
+- `Koan:Ai:Ollama:RequiredCapabilities`
+- `Koan:Ai:Ollama:RequiredModels`
+- `Koan:Ai:Ollama:ZenGarden:Capabilities`
 
 ## Configuration
 

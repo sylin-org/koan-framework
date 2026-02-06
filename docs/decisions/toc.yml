@@ -234,6 +234,8 @@
       href: DATA-0087-koan-context-chunk-relative-path-alignment.md
     - name: DATA-0088 Adapter auto-configuration resolver pipeline
       href: DATA-0088-adapter-auto-configuration-resolver-pipeline.md
+    - name: DATA-0089 Zen Garden connection intent minimum URI shape
+      href: DATA-0089-zengarden-connection-intent-minimum-uri-shape.md
 - name: Web (WEB)
   items:
     - name: WEB-0010 Separate AI web surface

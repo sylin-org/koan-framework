@@ -10,6 +10,15 @@ Integration tests for the greenfield `Koan.ZenGarden` tools-domain adapter.
   - offering availability
   - offering capability requirement satisfaction
   - storage (seed-bank) availability
+- End-to-end offering resolution through `IZenGardenInitializationProvider` for:
+  - `zen-garden://mongodb`
+  - `zen-garden://ollama`
+- Active connectivity probes when offerings exist:
+  - MongoDB `ping` command via resolved URI
+  - Ollama `GET /api/tags` via resolved endpoint
+- Endpoint-contract handler:
+  - validates offering connection metadata shape before probing
+  - fails with a spec-level diagnostic when metadata is protocol-inconsistent
 
 ## Environment
 

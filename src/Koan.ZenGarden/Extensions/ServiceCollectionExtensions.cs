@@ -1,4 +1,6 @@
 using Koan.Core.Modules;
+using Koan.ZenGarden.Core;
+using Koan.ZenGarden.Initialization;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -36,6 +38,8 @@ public static class ServiceCollectionExtensions
             var options = sp.GetService<IOptions<ZenGardenOptions>>()?.Value ?? new ZenGardenOptions();
             return new ZenGardenClient(logger, options);
         });
+
+        services.TryAddSingleton<IZenGardenInitializationProvider, ZenGardenInitializationProvider>();
 
         return services;
     }

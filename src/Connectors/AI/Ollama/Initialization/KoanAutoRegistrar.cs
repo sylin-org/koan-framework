@@ -6,6 +6,7 @@ using Koan.AI.Connector.Ollama.Options;
 using Koan.AI.Contracts.Adapters;
 using Koan.Core;
 using Koan.Core.Modules;
+using Koan.ZenGarden.Core;
 
 namespace Koan.AI.Connector.Ollama.Initialization;
 
@@ -21,6 +22,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 
         // Register the adapter contributor for zero-config initialization
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IAiAdapterContributor, OllamaAdapterContributor>());
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IZenGardenOfferingBinding, OllamaZenGardenOfferingBinding>());
     }
 
     public void Describe(Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, Microsoft.Extensions.Hosting.IHostEnvironment env)

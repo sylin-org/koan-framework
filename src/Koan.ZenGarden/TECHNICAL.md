@@ -90,8 +90,8 @@ Each tool is represented as `ZenGardenToolSnapshot`:
 
 Capability tokens support:
 
-- untyped: `modelv1`
-- typed: `extension:pgvector`
+- untyped (recommended): `modelv1`
+- typed (optional disambiguation): `extension:pgvector`
 - separators: `,` or `|`
 
 ## Derived Event Semantics
@@ -103,6 +103,119 @@ Capability tokens support:
 - `Changed`: revision change without online/offline transition.
 - `CapabilitiesSatisfied`: requirement set becomes satisfied.
 - `CapabilitiesUnsatisfied`: requirement set becomes unsatisfied.
+
+## Wishful Dependency Contract
+
+Wishful dependency means applications declare desired tools before those tools are
+available, then adapt when announcements indicate readiness changes.
+
+Application surfaces:
+
+- `ZenGarden.Offering.On("mongodb", handler)`
+- `ZenGarden.Offering.On("ollama", ["llama3.2"], handler)`
+- `ZenGarden.Offering.Catalog("mongodb")`
+- `ZenGarden.Offering.Catalog("ollama", ["llama3.2"])`
+
+Behavior:
+
+- Missing tools do not fail registration of the subscription.
+- `EmitInitialState=true` (default) emits current state immediately after subscribe.
+- Capability-bound subscriptions receive capability transition events in addition to online/offline.
+
+Capability requirement matching:
+
+- `modelv1`: untyped requirement, matches any capability type containing `modelv1`.
+- `type:modelv1`: typed requirement, matches only `capabilities["type"]`.
+- Multiple requirements are `AND`-ed.
+- For model queries, type prefixes are generally unnecessary and treated as optional hints.
+
+## Connection Intent URI Contract
+
+For initialization-driven connection resolution, the minimum Zen Garden URI is:
+
+```text
+zen-garden://<offering>
+```
+
+Canonical minimum example:
+
+```text
+zen-garden://mongodb
+```
+
+Extended forms remain optional:
+
+- `zen-garden://<offering>:<instance>`
+- `zen-garden://<offering>?cap=<item>[,<item>...]`
+
+Rules:
+
+- Minimum form must always be accepted.
+- Capability items are untyped by default; typed selectors are optional.
+- Zen Garden resolution is first attempt for `zen-garden://...`, then connector autonomous discovery fallback.
+- Offering-only intents (`zen-garden://mongodb`) resolve `offering:mongodb` first and fall back to ready instance candidates (`offering:mongodb:<instance>`) when needed.
+
+## Initialization Provider
+
+`Koan.ZenGarden` registers `IZenGardenInitializationProvider` and consumes connector-provided
+`IZenGardenOfferingBinding` metadata from `Koan.ZenGarden.Core`.
+
+Provider responsibilities:
+
+- parse and normalize Zen Garden intent URIs (`zen-garden://...`)
+- map adapter default offering bindings
+- resolve ready offering projections through tools snapshot API
+- return connection metadata (`uris`, `protocol`, `host`, `port`, capabilities)
+
+Implemented adapter bindings:
+
+- Mongo connector: `mongo` / `mongodb` -> offering `mongodb`
+- Ollama connector: `ollama` -> offering `ollama`
+
+## Adapter Integration
+
+Mongo (`MongoOptionsConfigurator`):
+
+- explicit native connection strings remain pass-through
+- explicit `zen-garden://...` is resolved first, then autonomous Mongo discovery fallback
+- `auto` / empty uses Zen Garden first (`mongodb` binding), then autonomous Mongo discovery fallback
+- optional overrides:
+  - `Koan:Data:Mongo:ZenGarden:Offering`
+  - `Koan:Data:Mongo:ZenGarden:Instance`
+  - `Koan:Data:Mongo:ZenGarden:Capabilities`
+
+Ollama (`OllamaAdapterContributor`):
+
+- `Koan:Ai:Ollama:ConnectionString` supports `zen-garden://...` or direct URL
+- `Koan:Ai:Ollama:Urls[*]` also accepts Zen Garden intents per entry
+- auto path (or unresolved explicit intent) runs Zen Garden first, then legacy host/container/local probes
+- required capability hints forwarded to Zen Garden:
+  - `Koan:Ai:Ollama:RequiredCapabilities`
+  - `Koan:Ai:Ollama:RequiredModels`
+  - `Koan:Ai:Ollama:ZenGarden:Capabilities`
+
+## Announcement Adaptation Flow
+
+Runtime flow:
+
+1. Moss stream event arrives (`tools.snapshot`, `tool.upsert`, `tool.remove`).
+2. Local projection cache is updated (`tool_fqid` keyed).
+3. Subscription predicates are evaluated.
+4. Derived availability events are emitted to application handlers.
+5. Application rebinds/disables features.
+
+Recommended handler pattern:
+
+- Handle `Online` by binding client/routes/features.
+- Handle `Offline` by unbinding and degrading gracefully.
+- Handle `CapabilitiesSatisfied` and `CapabilitiesUnsatisfied` for conditional features.
+- Handle `Changed` as a refresh/reconfigure signal.
+
+Reliability notes:
+
+- Event stream is at-least-once; client keeps event-id dedupe window.
+- Reconnect uses cursor / last-event-id where available.
+- Adaptation handlers should be idempotent and safe to replay.
 
 ## Public Ergonomics
 
