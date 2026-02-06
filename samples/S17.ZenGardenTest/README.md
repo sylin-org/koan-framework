@@ -1,37 +1,46 @@
 # S17.ZenGardenTest
 
-Manual smoke harness for the greenfield `Koan.ZenGarden` tools-domain adapter.
+Console harness that proves `reference = intent` with Zen Garden auto-resolution.
 
-## What it exercises
+By only referencing these adapters in the project file:
 
-- Catalog listing for offerings and seed banks.
-- Offering subscription (with optional capability requirements).
-- Storage subscription for seed-bank availability.
-- Live stream consumption over `tools/stream`.
+- `Koan.Data.Connector.Mongo`
+- `Koan.AI.Connector.Ollama`
+- `Koan.ZenGarden`
 
-## Environment variables
+this sample boots with `services.AddKoan()` and resolves MongoDB + Ollama through Zen Garden automatically.
+
+## What it shows
+
+- live offering/storage catalog snapshot
+- resolved intent diagnostics for `zen-garden://mongodb` and `zen-garden://ollama`
+- Mongo write/read probe through `Entity<T>`
+- Ollama chat probe through `Engine.Chat(...)`
+- subscription events for offering/storage changes
+- non-blocking capability wish request for Ollama models
+- incremental capability progress events (`Requested`, `PartiallyFulfilled`, `Fulfilled`)
+
+## Environment
 
 - `KOAN_ZENGARDEN_ENDPOINT`
   - Optional explicit Moss endpoint override.
-  - If omitted, the sample uses `GARDEN_STONE` (if set) or UDP discovery.
+- `KOAN_TESTS_ZENGARDEN_ENDPOINT`
+  - Alternate endpoint override.
 - `GARDEN_STONE`
-  - Optional endpoint/selector used by Zen Garden clients (for example `stone-01` or `http://stone-01:7185`).
-- `KOAN_ZENGARDEN_OFFERING`
-  - Preferred offering to watch.
-  - Default: `mongodb`
-- `KOAN_ZENGARDEN_STORAGE`
-  - Preferred seed-bank to watch.
-  - Default: `default`
-- `KOAN_ZENGARDEN_CAPABILITIES`
-  - Optional CSV requirements, e.g. `llama3.2,nomic-embed-text`.
-  - Type prefixes are optional and mainly useful for disambiguation.
-  - If omitted, requirements are derived from the selected offering capabilities.
+  - Optional selector used by Zen Garden discovery.
 - `KOAN_ZENGARDEN_WATCH_SECONDS`
-  - How long to keep streaming live events after initial events.
-  - Default: `10`
+  - Event watch duration in seconds (default `5`).
+- `KOAN_OLLAMA_WISH_CAPS`
+  - Capability wish list for Ollama (csv or `|`, default `llama3.2,nomic-embed-text`).
 
 ## Run
 
 ```powershell
 dotnet run --project samples\S17.ZenGardenTest\S17.ZenGardenTest.csproj
+```
+
+or run launcher:
+
+```powershell
+samples\S17.ZenGardenTest\start.bat
 ```
