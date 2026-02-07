@@ -310,7 +310,17 @@ public abstract class KoanPokablePeriodicServiceBase : KoanFluentServiceBase, IK
     private async Task ExecuteWork(CancellationToken cancellationToken)
     {
         // Prevent concurrent execution
-        if (!await _executionSemaphore.WaitAsync(100, cancellationToken))
+        bool lockAcquired;
+        try
+        {
+            lockAcquired = await _executionSemaphore.WaitAsync(100, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            return;
+        }
+
+        if (!lockAcquired)
         {
             Logger.LogDebug("{ServiceName} skipping execution - already running", Name);
             return;
@@ -319,6 +329,10 @@ public abstract class KoanPokablePeriodicServiceBase : KoanFluentServiceBase, IK
         try
         {
             await ExecutePeriodicAsync(cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            Logger.LogDebug("{ServiceName} periodic execution canceled during shutdown", Name);
         }
         catch (Exception ex)
         {

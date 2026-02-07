@@ -111,6 +111,10 @@ public class KoanBackgroundServiceOrchestrator : BackgroundService, IHealthContr
             // Wait for cancellation
             await Task.Delay(Timeout.Infinite, stoppingToken);
         }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        {
+            _logger.LogKoanServices("stopped");
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Background service orchestrator failed");
@@ -139,14 +143,6 @@ public class KoanBackgroundServiceOrchestrator : BackgroundService, IHealthContr
                 cts.CancelAfter(TimeSpan.FromSeconds(_options.StartupTimeoutSeconds));
 
                 var task = service.ExecuteAsync(cts.Token);
-
-                _runningServices.Add(new ServiceExecutionContext
-                {
-                    Service = service,
-                    Task = task,
-                    CancellationTokenSource = cts,
-                    StartedAt = DateTimeOffset.UtcNow
-                });
 
                 // For startup services, wait for completion or timeout
                 try
@@ -282,8 +278,20 @@ public class KoanBackgroundServiceOrchestrator : BackgroundService, IHealthContr
         {
             try
             {
-                context.CancellationTokenSource?.Cancel();
-                context.CancellationTokenSource?.Dispose();
+                if (!context.CancellationTokenSource.IsCancellationRequested)
+                {
+                    context.CancellationTokenSource.Cancel();
+                }
+            }
+            catch (ObjectDisposedException)
+            {
+            }
+            try
+            {
+                context.CancellationTokenSource.Dispose();
+            }
+            catch (ObjectDisposedException)
+            {
             }
             catch (Exception ex)
             {
