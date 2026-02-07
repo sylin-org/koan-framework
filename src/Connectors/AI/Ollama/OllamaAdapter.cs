@@ -224,28 +224,13 @@ internal sealed class OllamaAdapter : IAiAdapter
 
     public Task<AiCapabilities> GetCapabilitiesAsync(CancellationToken ct = default)
     {
-        var modelMetadata = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-        {
-            ["default_model"] = _defaultModel,
-            ["supports_pull"] = "true"
-        };
-
         return Task.FromResult(new AiCapabilities
         {
             AdapterId = Id,
             AdapterType = Type,
             SupportsChat = true,
             SupportsStreaming = true,
-            SupportsEmbeddings = true,
-            ModelManagement = new AiModelManagementCapabilities
-            {
-                SupportsInstall = true,
-                SupportsRemove = true,
-                SupportsRefresh = true,
-                SupportsProvenance = true,
-                ProvisioningModes = new[] { "pull" },
-                ProviderMetadata = modelMetadata
-            }
+            SupportsEmbeddings = true
         });
     }
 

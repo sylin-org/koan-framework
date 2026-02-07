@@ -126,7 +126,7 @@ public sealed class OllamaAdapterContributorSpec
     }
 
     [Fact]
-    public async Task ContributeAsync_with_missing_required_capabilities_schedules_wish_and_continues()
+    public async Task ContributeAsync_with_missing_required_capabilities_passes_capability_intent_to_provider_and_continues()
     {
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
@@ -152,8 +152,8 @@ public sealed class OllamaAdapterContributorSpec
         await contributor.ContributeAsync(provider, CancellationToken.None);
 
         sourceRegistry.RegisteredSources.Should().ContainSingle();
-        zenGardenProvider.WishRequests.Should().ContainSingle();
-        zenGardenProvider.WishRequests[0].Capabilities.Should().Contain(["llama3.2", "nomic-embed-text"]);
+        zenGardenProvider.ResolveRequests.Should().ContainSingle();
+        zenGardenProvider.ResolveRequests[0].Capabilities.Should().Contain(["llama3.2", "nomic-embed-text"]);
     }
 
     [Fact]
@@ -260,6 +260,7 @@ public sealed class OllamaAdapterContributorSpec
     private sealed class StubZenGardenProvider : IZenGardenInitializationProvider
     {
         private readonly Func<ZenGardenConnectionIntent, ZenGardenOfferingResolution?> _resolver;
+        public List<ZenGardenConnectionIntent> ResolveRequests { get; } = new();
         public List<ZenGardenConnectionIntent> WishRequests { get; } = new();
 
         public StubZenGardenProvider(Func<ZenGardenConnectionIntent, ZenGardenOfferingResolution?> resolver)
@@ -277,6 +278,7 @@ public sealed class OllamaAdapterContributorSpec
             ZenGardenConnectionIntent intent,
             CancellationToken cancellationToken = default)
         {
+            ResolveRequests.Add(intent);
             return ValueTask.FromResult(_resolver(intent));
         }
 

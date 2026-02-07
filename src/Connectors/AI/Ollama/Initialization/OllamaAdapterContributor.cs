@@ -241,8 +241,7 @@ internal sealed class OllamaAdapterContributor : IAiAdapterContributor
 
         var offering = ResolveZenGardenOffering(ollamaConfig, zenGardenProvider);
         var instance = ResolveZenGardenInstance(ollamaConfig);
-        var resolveIntent = ZenGardenConnectionIntent.ForOffering(offering, instance);
-        var capabilityIntent = ZenGardenConnectionIntent.ForOffering(offering, instance, requiredCapabilities);
+        var resolveIntent = ZenGardenConnectionIntent.ForOffering(offering, instance, requiredCapabilities);
 
         ZenGardenOfferingResolution? resolved;
         try
@@ -259,18 +258,6 @@ internal sealed class OllamaAdapterContributor : IAiAdapterContributor
         {
             KoanLog.BootDebug(logger, LogActions.ZenGarden, "auto-not-ready", ("offering", resolveIntent.ToOfferingSelector()));
             return null;
-        }
-
-        var missing = ResolveMissingCapabilities(requiredCapabilities, resolved);
-        if (missing.Count > 0)
-        {
-            await TriggerWishfulCapabilityEnsureAsync(
-                zenGardenProvider,
-                capabilityIntent,
-                missing,
-                "auto",
-                logger,
-                ct).ConfigureAwait(false);
         }
 
         var endpoint = resolved.GetUri("http", "https");
@@ -333,12 +320,10 @@ internal sealed class OllamaAdapterContributor : IAiAdapterContributor
                 ResolveZenGardenInstance(ollamaConfig),
                 fallbackCapabilities);
 
-            var resolveIntent = intent with { Capabilities = Array.Empty<string>() };
-
             ZenGardenOfferingResolution? resolved;
             try
             {
-                resolved = await zenGardenProvider.ResolveAsync(resolveIntent, ct).ConfigureAwait(false);
+                resolved = await zenGardenProvider.ResolveAsync(intent, ct).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
@@ -350,18 +335,6 @@ internal sealed class OllamaAdapterContributor : IAiAdapterContributor
             {
                 KoanLog.BootWarning(logger, LogActions.ZenGarden, "intent-not-ready", ("intent", rawConnection));
                 return null;
-            }
-
-            var missing = ResolveMissingCapabilities(intent.Capabilities, resolved);
-            if (missing.Count > 0)
-            {
-                await TriggerWishfulCapabilityEnsureAsync(
-                    zenGardenProvider,
-                    intent,
-                    missing,
-                    "intent",
-                    logger,
-                    ct).ConfigureAwait(false);
             }
 
             endpoint = resolved.GetUri("http", "https") ?? string.Empty;
@@ -418,7 +391,13 @@ internal sealed class OllamaAdapterContributor : IAiAdapterContributor
         }
 
         var required = section.GetSection("RequiredModels").Get<string[]>();
-        return required?.FirstOrDefault();
+        var requiredModel = required?.FirstOrDefault();
+        if (!string.IsNullOrWhiteSpace(requiredModel))
+        {
+            return requiredModel;
+        }
+
+        return "llama3.2";
     }
 
     private static void ValidateConfiguration(string? configuredConnectionString, string[]? explicitUrls, string[]? additionalUrls, ILogger logger)
@@ -516,11 +495,6 @@ internal sealed class OllamaAdapterContributor : IAiAdapterContributor
         IReadOnlyList<string> requiredCapabilities,
         ZenGardenOfferingResolution resolved)
     {
-        if (!string.IsNullOrWhiteSpace(defaultModel))
-        {
-            return defaultModel;
-        }
-
         if (resolved.Capabilities.TryGetValue("model", out var models) && models.Count > 0)
         {
             foreach (var required in requiredCapabilities)
@@ -549,10 +523,15 @@ internal sealed class OllamaAdapterContributor : IAiAdapterContributor
             return models[0];
         }
 
+        if (!string.IsNullOrWhiteSpace(defaultModel))
+        {
+            return defaultModel;
+        }
+
         var fallback = requiredCapabilities.FirstOrDefault();
         if (string.IsNullOrWhiteSpace(fallback))
         {
-            return fallback;
+            return defaultModel ?? "llama3.2";
         }
 
         var token = fallback.Trim().ToLowerInvariant();
@@ -567,101 +546,6 @@ internal sealed class OllamaAdapterContributor : IAiAdapterContributor
         }
 
         return token;
-    }
-
-    private static IReadOnlyList<string> ResolveMissingCapabilities(
-        IReadOnlyList<string> requiredCapabilities,
-        ZenGardenOfferingResolution resolved)
-    {
-        if (requiredCapabilities.Count == 0)
-        {
-            return Array.Empty<string>();
-        }
-
-        var missing = new List<string>();
-        foreach (var required in requiredCapabilities)
-        {
-            if (!CapabilityPresent(required, resolved.Capabilities))
-            {
-                missing.Add(required);
-            }
-        }
-
-        return missing;
-    }
-
-    private static bool CapabilityPresent(
-        string raw,
-        IReadOnlyDictionary<string, IReadOnlyList<string>> capabilities)
-    {
-        if (string.IsNullOrWhiteSpace(raw))
-        {
-            return false;
-        }
-
-        var token = raw.Trim().ToLowerInvariant();
-        var separator = token.IndexOf(':');
-        if (separator > 0 && separator < token.Length - 1)
-        {
-            var type = token[..separator];
-            var name = token[(separator + 1)..];
-            return capabilities.TryGetValue(type, out var typed) &&
-                typed.Any(value => string.Equals(value, name, StringComparison.OrdinalIgnoreCase));
-        }
-
-        foreach (var entry in capabilities.Values)
-        {
-            if (entry.Any(value => string.Equals(value, token, StringComparison.OrdinalIgnoreCase)))
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private static async Task TriggerWishfulCapabilityEnsureAsync(
-        IZenGardenInitializationProvider provider,
-        ZenGardenConnectionIntent intent,
-        IReadOnlyList<string> missing,
-        string source,
-        ILogger logger,
-        CancellationToken ct)
-    {
-        try
-        {
-            var receipt = await provider.WishCapabilitiesAsync(intent, ct).ConfigureAwait(false);
-            if (receipt is null)
-            {
-                KoanLog.BootWarning(
-                    logger,
-                    LogActions.ZenGarden,
-                    "wish-not-scheduled",
-                    ("source", source),
-                    ("offering", intent.ToOfferingSelector()),
-                    ("missing", string.Join(",", missing)));
-                return;
-            }
-
-            KoanLog.BootInfo(
-                logger,
-                LogActions.ZenGarden,
-                "wish-scheduled",
-                ("source", source),
-                ("requestId", receipt.RequestId),
-                ("offering", receipt.OfferingSelector),
-                ("missing", string.Join(",", receipt.Missing)));
-        }
-        catch (Exception ex)
-        {
-            KoanLog.BootWarning(
-                logger,
-                LogActions.ZenGarden,
-                "wish-schedule-failed",
-                ("source", source),
-                ("offering", intent.ToOfferingSelector()),
-                ("reason", ex.Message));
-        }
     }
 
     /// <summary>
@@ -811,6 +695,13 @@ internal sealed class OllamaAdapterContributor : IAiAdapterContributor
                 Timeout = TimeSpan.FromSeconds(timeoutSeconds)
             };
 
+            var baseAddress = ResolveAdapterBaseAddress(services, configuration);
+            if (baseAddress is not null)
+            {
+                http.BaseAddress = baseAddress;
+                KoanLog.BootDebug(logger, LogActions.Discovery, "adapter-base-address", ("url", baseAddress.ToString()));
+            }
+
             var adapterLogger = services.GetService<ILogger<OllamaAdapter>>() ?? NullLogger<OllamaAdapter>.Instance;
 
             var adapter = new OllamaAdapter(http, adapterLogger, configuration, readinessOptions?.Value, resolvedOptions);
@@ -824,6 +715,50 @@ internal sealed class OllamaAdapterContributor : IAiAdapterContributor
         {
             KoanLog.BootWarning(logger, LogActions.Discovery, "adapter-registration-failed", ("reason", ex.Message));
         }
+    }
+
+    private static Uri? ResolveAdapterBaseAddress(IServiceProvider services, IConfiguration configuration)
+    {
+        var sourceRegistry = services.GetService<IAiSourceRegistry>();
+        if (sourceRegistry?.TryGetSource(Constants.Discovery.WellKnownServiceName, out var source) == true)
+        {
+            var candidate = source?.Members
+                .OrderBy(member => member.Order)
+                .Select(member => member.ConnectionString)
+                .FirstOrDefault(connection => !string.IsNullOrWhiteSpace(connection));
+            if (!string.IsNullOrWhiteSpace(candidate) &&
+                Uri.TryCreate(candidate, UriKind.Absolute, out var resolvedFromSource))
+            {
+                return resolvedFromSource;
+            }
+        }
+
+        var fallbackCandidates = new[]
+        {
+            configuration["Koan:Ai:Ollama:BaseUrl"],
+            configuration["Koan:Ai:Ollama:Urls:0"],
+            configuration["Koan:Ai:Ollama:ConnectionString"]
+        };
+
+        foreach (var raw in fallbackCandidates)
+        {
+            if (string.IsNullOrWhiteSpace(raw))
+            {
+                continue;
+            }
+
+            if (ZenGardenConnectionIntent.TryParse(raw, out _))
+            {
+                continue;
+            }
+
+            if (Uri.TryCreate(raw, UriKind.Absolute, out var parsed))
+            {
+                return parsed;
+            }
+        }
+
+        return null;
     }
 
     private static string ResolvePolicy(IConfigurationSection ollamaConfig, IConfiguration configuration)
