@@ -1,7 +1,9 @@
 using Koan.Core;
 using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Provenance;
+using static Koan.Core.Hosting.Bootstrap.BootSettingSource;
 using Koan.ZenGarden.Extensions;
+using Koan.ZenGarden.Persistence;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -37,6 +39,10 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         var requireHostMoss = Configuration.ReadWithSource(cfg, $"{ZenGardenOptions.SectionName}:RequireHostMossWhenContainerized", defaults.RequireHostMossWhenContainerized);
         var containerHost = Configuration.ReadWithSource(cfg, $"{ZenGardenOptions.SectionName}:ContainerHost", defaults.ContainerHost);
         var containerHostPort = Configuration.ReadWithSource(cfg, $"{ZenGardenOptions.SectionName}:ContainerHostPort", defaults.ContainerHostPort);
+        var persistDiscoveryCache = Configuration.ReadWithSource(cfg, $"{ZenGardenOptions.SectionName}:PersistDiscoveryCache", defaults.PersistDiscoveryCache);
+        var discoveryCachePath = Configuration.ReadWithSource(cfg, $"{ZenGardenOptions.SectionName}:DiscoveryCachePath", defaults.DiscoveryCachePath);
+        var persistedCacheTtlHours = Configuration.ReadWithSource(cfg, $"{ZenGardenOptions.SectionName}:PersistedCacheTtlHours", defaults.PersistedCacheTtlHours);
+        var preferredStoneName = Configuration.ReadWithSource(cfg, $"{ZenGardenOptions.SectionName}:PreferredStoneName", defaults.PreferredStoneName);
 
         module.AddSetting("Endpoint", endpoint.Value, source: endpoint.Source, sourceKey: endpoint.ResolvedKey);
         module.AddSetting("EnableDiscovery", enableDiscovery.Value.ToString(), source: enableDiscovery.Source, sourceKey: enableDiscovery.ResolvedKey);
@@ -52,6 +58,23 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         module.AddSetting("RequireHostMossWhenContainerized", requireHostMoss.Value.ToString(), source: requireHostMoss.Source, sourceKey: requireHostMoss.ResolvedKey);
         module.AddSetting("ContainerHost", containerHost.Value, source: containerHost.Source, sourceKey: containerHost.ResolvedKey);
         module.AddSetting("ContainerHostPort", containerHostPort.Value.ToString(), source: containerHostPort.Source, sourceKey: containerHostPort.ResolvedKey);
+        module.AddSetting("PersistDiscoveryCache", persistDiscoveryCache.Value.ToString(), source: persistDiscoveryCache.Source, sourceKey: persistDiscoveryCache.ResolvedKey);
+        module.AddSetting("DiscoveryCachePath", discoveryCachePath.Value ?? "(auto-resolved)", source: discoveryCachePath.Source, sourceKey: discoveryCachePath.ResolvedKey);
+        module.AddSetting("PersistedCacheTtlHours", persistedCacheTtlHours.Value.ToString(), source: persistedCacheTtlHours.Source, sourceKey: persistedCacheTtlHours.ResolvedKey);
+        module.AddSetting("PreferredStoneName", preferredStoneName.Value ?? "(none)", source: preferredStoneName.Source, sourceKey: preferredStoneName.ResolvedKey);
+
+        if (persistDiscoveryCache.Value)
+        {
+            var resolvedPath = StoneRosterPathResolver.Resolve(
+                new ZenGardenOptions { DiscoveryCachePath = discoveryCachePath.Value });
+            module.AddSetting("DiscoveryCachePath (resolved)", resolvedPath, source: Custom);
+        }
+
+        module.AddTool(
+            "Zen Garden Topology",
+            Constants.Moss.TopologyEndpoint,
+            "Remote garden topology endpoint for active Stone roster hydration.",
+            capability: "zen-garden.topology");
 
         module.AddTool(
             "Zen Garden Tools Snapshot",

@@ -79,4 +79,30 @@ public sealed class ZenGardenOptions
     /// Moss port used when ContainerHost is a hostname without explicit port.
     /// </summary>
     public int ContainerHostPort { get; set; } = Constants.Moss.DefaultPort;
+
+    /// <summary>
+    /// When true, discovered Stone topology is persisted to disk for failover recovery.
+    /// </summary>
+    public bool PersistDiscoveryCache { get; set; } = true;
+
+    /// <summary>
+    /// Explicit path to the Stone roster cache directory.
+    /// When null, auto-resolved from environment or convention (.Koan/zen-garden/).
+    /// </summary>
+    public string? DiscoveryCachePath { get; set; }
+
+    /// <summary>
+    /// TTL in hours for persisted Stone entries (default 168 = 7 days).
+    /// Persisted entries use a longer TTL than in-memory entries to support
+    /// failover scenarios where the primary Moss may be down for extended periods.
+    /// </summary>
+    public int PersistedCacheTtlHours { get; set; } = Constants.Persistence.DefaultPersistedCacheTtlHours;
+
+    /// <summary>
+    /// Preferred Moss Stone name for soft-affinity binding.
+    /// When set, the adapter tries to connect to the named Stone before falling
+    /// back to the container host or general discovery. Supports stone names,
+    /// stone IDs, host:port, and .local suffixes.
+    /// </summary>
+    public string? PreferredStoneName { get; set; }
 }

@@ -47,6 +47,12 @@ It does not use `/api/v1/services` as a primary catalog source.
   - `DISCOVERY_ENABLE_BCAST_FALLBACK`
   - `DISCOVERY_ENABLE_LIMITED_BCAST`
 
+### Topology API
+
+- `GET /api/v1/garden/topology`
+- Returns array of `TopologyEntry`: `stone_id`, `stone_name`, `endpoint`, `moss_version`, `health`, `last_seen`
+- Consumed for active topology hydration (failover roster)
+
 ### Snapshot API
 
 - `GET /api/v1/garden/tools`
@@ -69,11 +75,15 @@ It does not use `/api/v1/services` as a primary catalog source.
 
 `ZenGardenClient` performs:
 
-1. Moss endpoint resolution:
-   - explicit option endpoint
-   - `GARDEN_STONE` selector
-   - hot cache
-   - UDP discovery
+1. Moss endpoint resolution (ordered by priority):
+   1. Seed persisted Stone roster into in-memory cache (once on first resolution)
+   2. Currently bound Stone (skipped on forced rediscovery after failure)
+   3. Explicit endpoint / `GARDEN_STONE` selector
+   4. Preferred Stone name (soft affinity via `PreferredStoneName` option)
+   5. In-memory cache (includes seeded persisted entries with refreshed timestamps)
+   6. Container host binding (`host.docker.internal`)
+   7. Persisted roster re-read (catches sibling container writes since seeding)
+   8. UDP multicast/broadcast discovery
 2. Endpoint health checks and automatic rebind on failure.
 3. Snapshot reads for catalog queries.
 4. Long-lived SSE stream consumption.
@@ -81,6 +91,8 @@ It does not use `/api/v1/services` as a primary catalog source.
 6. Event-id dedupe window.
 7. Derived availability event emission to subscribers.
 8. Non-blocking capability wish state tracking and progress emission.
+9. Passive topology enrichment from tool snapshot events.
+10. Persistent Stone roster with merge-on-write.
 
 ### Local Projection
 
@@ -306,13 +318,121 @@ var storage = await ZenGarden.Storage.Catalog();
 - `RequireHostMossWhenContainerized` (default `true`)
 - `ContainerHost` (default `host.docker.internal`)
 - `ContainerHostPort` (default `7185`)
+- `PersistDiscoveryCache` (default `true`)
+- `DiscoveryCachePath` (optional explicit path; auto-resolved when null)
+- `PersistedCacheTtlHours` (default `168` = 7 days)
+- `PreferredStoneName` (optional soft-affinity Stone name)
 
 Containerized resolution policy:
 
 - If `DOTNET_RUNNING_IN_CONTAINER=true` and `RequireHostMossWhenContainerized=true`:
   - `Koan.ZenGarden` requires host Moss reachability through `ContainerHost`/`ContainerHostPort`
-  - if unreachable, resolution fails fast with explicit configuration guidance
+  - if unreachable on first startup, resolution fails fast with explicit configuration guidance
   - UDP discovery is not used as the primary path in this mode
+
+Containerized reconnection failover:
+
+- On reconnection (`forceRediscovery`) in a container where all health-checked paths fail:
+  - UDP discovery cannot cross container network boundaries
+  - The adapter relies on cached Stone topology for failover
+  - Best alternative Stone (most recently seen, excluding the known-down container host) is
+    returned optimistically without health check
+  - If no alternative stones exist in cache, falls back to the container host optimistically
+  - The caller's HTTP request fails naturally and the reconnect loop retries
+  - The `RequireHostMossWhenContainerized` configuration error is only thrown on first-time
+    resolution, not during reconnection
+
+## Persistent Stone Roster
+
+The client persists discovered Moss Stone metadata to disk for failover recovery.
+
+### File Format
+
+`stones.json` — a JSON array of `CachedMossStone` records:
+
+```json
+[
+  {
+    "Endpoint": "http://192.168.1.50:7185",
+    "StoneId": "abc123",
+    "StoneName": "moss-primary",
+    "MossVersion": "0.9.1",
+    "LanternEndpoint": "http://192.168.1.50:3000",
+    "LastSeenUtc": "2026-02-07T12:00:00+00:00"
+  }
+]
+```
+
+### Location Resolution
+
+1. `Koan:ZenGarden:DiscoveryCachePath` (explicit config)
+2. `KOAN_ZENGARDEN_CACHE_PATH` environment variable
+3. `/app/cache/zen-garden/` when containerized (`DOTNET_RUNNING_IN_CONTAINER=true`) and
+   the standard `/app/cache` volume mount exists
+4. `.Koan/zen-garden/` relative to working directory (host convention)
+
+### Write Behavior
+
+- Write-through on `BindStone()` only (not every cache update)
+- Fire-and-forget from the bind path (no I/O blocking)
+- Merge-on-write: reads existing file, merges by CacheKey (newer wins), atomically replaces
+- Atomic rename: writes to `stones.json.tmp` then `File.Move(overwrite: true)`
+- `SemaphoreSlim` serializes writes within a single process
+
+### TTL
+
+- In-memory cache TTL: `DiscoveryCacheTtlSeconds` (default 90s) — hot path
+- Persisted roster TTL: `PersistedCacheTtlHours` (default 168h / 7 days) — cold failover path
+- Expired entries are filtered on load and pruned on write
+
+### Cross-Container Safety
+
+Multiple containers sharing a bind-mounted `.Koan/zen-garden/` volume:
+- Each container reads before writing, merges its knowledge, then atomically replaces
+- `File.Move(overwrite: true)` ensures the last writer wins with a valid file
+- Readers always get a complete, consistent file
+
+## Active Topology Hydration
+
+While connected to a Moss, the client periodically fetches the full Stone topology
+via `GET /api/v1/garden/topology`. This returns all Stones known to the Moss mesh,
+including peers that may not host any tools visible in the SSE stream.
+
+- Triggered on `BindStone()` (fire-and-forget, immediate on connection)
+- Refreshed on `tools.heartbeat` events (throttled to every 5 minutes)
+- Response contains `stone_id`, `stone_name`, `endpoint`, `moss_version`, `last_seen`
+- All learned Stones are cached and persisted to the roster
+- The roster is written immediately after a hydration that learns new Stones
+
+This is the primary mechanism for building failover capacity: when the host Moss goes
+down in a container, the roster contains peer Stone endpoints learned while connected.
+
+## Passive Topology Enrichment
+
+The SSE tools stream carries `stone_id` and `stone_name` on each tool snapshot. As the
+client processes `tool.upsert` events, it passively learns about Stones it has never
+directly discovered.
+
+- Derives Moss endpoint from tool connection `hostname` or `ip`: `http://{host}:7185`
+- Only enriches when the Stone is not already cached with a fresh timestamp (< 5 min)
+- Enriched entries are persisted on the next `BindStone()` call
+
+This supplements active hydration by learning Stone details from tool connection
+metadata, useful when the topology endpoint is unavailable.
+
+## Preferred Stone Affinity
+
+Operators can specify a preferred Moss Stone name via configuration:
+
+- `Koan:ZenGarden:PreferredStoneName` in appsettings.json
+- `KOAN_ZENGARDEN_PREFERRED_STONE` environment variable
+
+This is a soft affinity — the adapter tries the named Stone before falling back to
+the container host or general discovery. If the preferred Stone is unreachable,
+resolution continues through the normal chain.
+
+Matching uses the same `MatchesSelector` logic as `GARDEN_STONE`: supports stone
+names, stone IDs, `host:port`, and `.local` suffixes.
 
 ## Non-Goals
 

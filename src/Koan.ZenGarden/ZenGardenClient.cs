@@ -1,4 +1,5 @@
 using Koan.ZenGarden.Models;
+using Koan.ZenGarden.Persistence;
 
 namespace Koan.ZenGarden;
 
@@ -22,6 +23,7 @@ public sealed class ZenGardenClient : IZenGardenClient
         new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, CachedMossStone> _stoneCache =
         new(StringComparer.OrdinalIgnoreCase);
+    private readonly IStoneRosterStore? _rosterStore;
 
     private readonly HashSet<string> _seenEventIds = new(StringComparer.OrdinalIgnoreCase);
     private readonly Queue<string> _seenEventOrder = new();
@@ -32,6 +34,8 @@ public sealed class ZenGardenClient : IZenGardenClient
     private CancellationTokenSource _lifetimeCts = new();
     private Task? _streamLoopTask;
     private int _streamStarted;
+    private int _persistedRosterSeeded;
+    private DateTimeOffset _lastTopologyHydration;
     private bool _disposed;
 
     private long? _cursor;
@@ -42,14 +46,22 @@ public sealed class ZenGardenClient : IZenGardenClient
         HttpClient httpClient,
         ILogger<ZenGardenClient> logger,
         ZenGardenOptions? options = null)
-        : this(httpClient, logger, options, ownsHttpClient: false)
+        : this(httpClient, logger, options, ownsHttpClient: false, rosterStore: null)
     {
     }
 
     public ZenGardenClient(
         ILogger<ZenGardenClient> logger,
         ZenGardenOptions? options = null)
-        : this(new HttpClient(), logger, options, ownsHttpClient: true)
+        : this(new HttpClient(), logger, options, ownsHttpClient: true, rosterStore: null)
+    {
+    }
+
+    internal ZenGardenClient(
+        ILogger<ZenGardenClient> logger,
+        ZenGardenOptions? options,
+        IStoneRosterStore? rosterStore)
+        : this(new HttpClient(), logger, options, ownsHttpClient: true, rosterStore)
     {
     }
 
@@ -57,12 +69,14 @@ public sealed class ZenGardenClient : IZenGardenClient
         HttpClient httpClient,
         ILogger<ZenGardenClient> logger,
         ZenGardenOptions? options,
-        bool ownsHttpClient)
+        bool ownsHttpClient,
+        IStoneRosterStore? rosterStore)
     {
         _httpClient = httpClient;
         _logger = logger;
         _options = options ?? new ZenGardenOptions();
         _ownsHttpClient = ownsHttpClient;
+        _rosterStore = rosterStore;
         _jsonOptions = new JsonSerializerOptions
         {
             PropertyNameCaseInsensitive = true
@@ -625,6 +639,7 @@ public sealed class ZenGardenClient : IZenGardenClient
                 await ApplyRemoveAsync(eventPayload, eventId, cursor, ct);
                 break;
             case "tools.heartbeat":
+                await TryHydrateTopologyThrottledAsync(ct);
                 break;
             default:
                 await TryProcessGenericEventAsync(eventPayload, eventId, cursor, ct);
@@ -682,6 +697,7 @@ public sealed class ZenGardenClient : IZenGardenClient
         }
 
         _tools[current.ToolFqid] = current;
+        TryEnrichTopologyFromSnapshot(current);
         await PublishDerivedEventsAsync(current, previous, eventId, cursor, ct);
         await PublishCapabilityUpdatesAsync(current, eventId, cursor, ct);
     }
@@ -1301,8 +1317,10 @@ public sealed class ZenGardenClient : IZenGardenClient
     private async Task<string> EnsureBoundEndpointAsync(CancellationToken ct, bool forceRediscovery = false)
     {
         ThrowIfDisposed();
+        await SeedFromPersistedRosterAsync(ct).ConfigureAwait(false);
         var containerized = IsContainerizedRuntime();
 
+        // 1. Currently bound Stone (skip when force-rediscovering after a failure)
         if (!forceRediscovery)
         {
             var bound = _boundStone;
@@ -1312,25 +1330,32 @@ public sealed class ZenGardenClient : IZenGardenClient
             }
         }
 
-        if (!forceRediscovery)
+        // 2. Explicit endpoint / GARDEN_STONE selector
+        var selector = ResolvePreferredSelector();
+        if (!string.IsNullOrWhiteSpace(selector))
         {
-            var selector = ResolvePreferredSelector();
-            if (!string.IsNullOrWhiteSpace(selector))
+            var selected = await ResolveStoneFromSelectorAsync(selector, ct);
+            if (selected is not null)
             {
-                var selected = await ResolveStoneFromSelectorAsync(selector, ct);
-                if (selected is not null)
-                {
-                    return BindStone(selected).Endpoint;
-                }
-            }
-
-            var cached = await ResolveFromCacheAsync(ct);
-            if (cached is not null)
-            {
-                return BindStone(cached).Endpoint;
+                return BindStone(selected).Endpoint;
             }
         }
 
+        // 3. Preferred Stone name (soft affinity)
+        var preferred = await ResolvePreferredStoneNameAsync(ct);
+        if (preferred is not null)
+        {
+            return BindStone(preferred).Endpoint;
+        }
+
+        // 4. In-memory cache (includes seeded persisted entries)
+        var cached = await ResolveFromCacheAsync(ct);
+        if (cached is not null)
+        {
+            return BindStone(cached).Endpoint;
+        }
+
+        // 5. Container host binding
         if (containerized)
         {
             TryResolveContainerHostEndpoint(out var configuredContainerEndpoint);
@@ -1338,6 +1363,50 @@ public sealed class ZenGardenClient : IZenGardenClient
             if (hostStone is not null)
             {
                 return BindStone(hostStone).Endpoint;
+            }
+
+            // 6. Persisted roster re-read (catches sibling container writes since seeding)
+            var fallbackPersisted = await ResolveFromPersistedRosterAsync(ct);
+            if (fallbackPersisted is not null)
+            {
+                return BindStone(fallbackPersisted).Endpoint;
+            }
+
+            // If we have prior topology knowledge (persisted roster was loaded or
+            // stones were learned via SSE enrichment), return optimistically without
+            // health check. The caller's HTTP request will fail naturally and the
+            // reconnect loop retries until a Moss comes back. UDP discovery can't
+            // cross container network boundaries, so cached topology is the only
+            // viable failover path.
+            //
+            // Only throw the configuration error on a true cold start with an empty
+            // cache (no prior successful connection), where misconfiguration is likely.
+            if (!_stoneCache.IsEmpty)
+            {
+                var failoverStone = ResolveBestCachedStoneForFailover(configuredContainerEndpoint);
+                if (failoverStone is not null)
+                {
+                    _logger.LogDebug(
+                        "Container failover: binding to cached Stone {StoneName} at {Endpoint} (not health-checked).",
+                        failoverStone.StoneName, failoverStone.Endpoint);
+                    return BindStone(failoverStone).Endpoint;
+                }
+
+                // All cached stones were filtered (shouldn't happen, but fall back to
+                // container host optimistically rather than throw).
+                if (!string.IsNullOrWhiteSpace(configuredContainerEndpoint))
+                {
+                    _logger.LogDebug(
+                        "Container failover: no cached alternatives, returning host endpoint {Endpoint} optimistically.",
+                        configuredContainerEndpoint);
+                    var hostFallback = new CachedMossStone
+                    {
+                        Endpoint = configuredContainerEndpoint,
+                        StoneName = new Uri(configuredContainerEndpoint).Host,
+                        LastSeenUtc = DateTimeOffset.UtcNow
+                    };
+                    return BindStone(hostFallback).Endpoint;
+                }
             }
 
             if (RequireHostMossWhenContainerized())
@@ -1490,6 +1559,375 @@ public sealed class ZenGardenClient : IZenGardenClient
         return null;
     }
 
+    private async Task SeedFromPersistedRosterAsync(CancellationToken ct)
+    {
+        if (_rosterStore is null)
+        {
+            return;
+        }
+
+        if (Interlocked.CompareExchange(ref _persistedRosterSeeded, 1, 0) != 0)
+        {
+            return;
+        }
+
+        try
+        {
+            var persisted = await _rosterStore.LoadAsync(ct).ConfigureAwait(false);
+            var now = DateTimeOffset.UtcNow;
+            foreach (var stone in persisted)
+            {
+                // Refresh LastSeenUtc so seeded entries survive the in-memory TTL purge
+                // (persisted roster already filtered by its own 7-day TTL)
+                var refreshed = stone with { LastSeenUtc = now };
+                _stoneCache.TryAdd(refreshed.CacheKey, refreshed);
+                if (!string.Equals(refreshed.CacheKey, refreshed.StoneName, StringComparison.OrdinalIgnoreCase))
+                {
+                    _stoneCache.TryAdd(refreshed.StoneName, refreshed);
+                }
+            }
+
+            if (persisted.Count > 0)
+            {
+                _logger.LogInformation(
+                    "Seeded {Count} stones from persisted roster into in-memory cache.",
+                    persisted.Count);
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogDebug(ex, "Failed to seed stone cache from persisted roster.");
+        }
+    }
+
+    private async Task<CachedMossStone?> ResolvePreferredStoneNameAsync(CancellationToken ct)
+    {
+        var preferred = ResolvePreferredStoneNameValue();
+        if (string.IsNullOrWhiteSpace(preferred))
+        {
+            return null;
+        }
+
+        foreach (var stone in _stoneCache.Values.DistinctBy(x => x.Endpoint))
+        {
+            if (!MatchesSelector(stone, preferred))
+            {
+                continue;
+            }
+
+            if (await IsMossReachableAsync(stone, ct))
+            {
+                return CacheStone(stone with { LastSeenUtc = DateTimeOffset.UtcNow });
+            }
+        }
+
+        if (!_options.EnableDiscovery)
+        {
+            return null;
+        }
+
+        var discovered = await DiscoverStonesAsync(
+            ResolveDiscoveryTimeout(),
+            waitForAll: true,
+            ct);
+
+        foreach (var stone in discovered)
+        {
+            if (!MatchesSelector(stone, preferred))
+            {
+                continue;
+            }
+
+            if (await IsMossReachableAsync(stone, ct))
+            {
+                return CacheStone(stone);
+            }
+        }
+
+        return null;
+    }
+
+    private string? ResolvePreferredStoneNameValue()
+    {
+        var envValue = System.Environment.GetEnvironmentVariable(
+            Constants.EnvironmentVariables.PreferredStoneName);
+        if (!string.IsNullOrWhiteSpace(envValue))
+        {
+            return envValue.Trim();
+        }
+
+        if (!string.IsNullOrWhiteSpace(_options.PreferredStoneName))
+        {
+            return _options.PreferredStoneName.Trim();
+        }
+
+        return null;
+    }
+
+    private async Task<CachedMossStone?> ResolveFromPersistedRosterAsync(CancellationToken ct)
+    {
+        if (_rosterStore is null)
+        {
+            return null;
+        }
+
+        IReadOnlyList<CachedMossStone> persisted;
+        try
+        {
+            persisted = await _rosterStore.LoadAsync(ct).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogDebug(ex, "Failed to load persisted stone roster for failover.");
+            return null;
+        }
+
+        if (persisted.Count == 0)
+        {
+            return null;
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        foreach (var stone in persisted)
+        {
+            var refreshed = stone with { LastSeenUtc = now };
+            _stoneCache.TryAdd(refreshed.CacheKey, refreshed);
+            if (!string.Equals(refreshed.CacheKey, refreshed.StoneName, StringComparison.OrdinalIgnoreCase))
+            {
+                _stoneCache.TryAdd(refreshed.StoneName, refreshed);
+            }
+        }
+
+        var candidates = persisted
+            .DistinctBy(s => s.Endpoint)
+            .OrderByDescending(s => s.LastSeenUtc)
+            .ToArray();
+
+        foreach (var stone in candidates)
+        {
+            if (await IsMossReachableAsync(stone, ct).ConfigureAwait(false))
+            {
+                return CacheStone(stone with { LastSeenUtc = now });
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Picks the best cached Stone for optimistic failover in a container.
+    /// Prefers alternative stones over the (known-down) container host, ordered
+    /// by most recently seen. Returns null only when the cache is empty.
+    /// </summary>
+    private CachedMossStone? ResolveBestCachedStoneForFailover(string? containerHostEndpoint)
+    {
+        if (_stoneCache.IsEmpty)
+        {
+            return null;
+        }
+
+        var candidates = _stoneCache.Values
+            .DistinctBy(s => s.Endpoint, StringComparer.OrdinalIgnoreCase)
+            .OrderByDescending(s => s.LastSeenUtc)
+            .ToArray();
+
+        if (candidates.Length == 0)
+        {
+            return null;
+        }
+
+        // Prefer alternatives over the container host (which we already know is unreachable)
+        if (!string.IsNullOrWhiteSpace(containerHostEndpoint))
+        {
+            var alternative = candidates.FirstOrDefault(
+                s => !string.Equals(s.Endpoint, containerHostEndpoint, StringComparison.OrdinalIgnoreCase));
+            if (alternative is not null)
+            {
+                return alternative;
+            }
+        }
+
+        // All cached stones are the container host — return it as last resort
+        return candidates[0];
+    }
+
+    private void PersistRosterFireAndForget()
+    {
+        if (_rosterStore is null)
+        {
+            return;
+        }
+
+        var snapshot = _stoneCache.Values
+            .DistinctBy(s => s.CacheKey, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await _rosterStore.PersistAsync(snapshot).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "Background stone roster persist failed.");
+            }
+        });
+    }
+
+    private void TryEnrichTopologyFromSnapshot(ZenGardenToolSnapshot snapshot)
+    {
+        if (string.IsNullOrWhiteSpace(snapshot.StoneName))
+        {
+            return;
+        }
+
+        var cacheKey = string.IsNullOrWhiteSpace(snapshot.StoneId)
+            ? snapshot.StoneName
+            : snapshot.StoneId!;
+
+        if (_stoneCache.TryGetValue(cacheKey, out var existing) &&
+            DateTimeOffset.UtcNow - existing.LastSeenUtc < TimeSpan.FromMinutes(5))
+        {
+            return;
+        }
+
+        var host = !string.IsNullOrWhiteSpace(snapshot.Connection?.Hostname)
+            ? snapshot.Connection.Hostname
+            : !string.IsNullOrWhiteSpace(snapshot.Connection?.Ip)
+                ? snapshot.Connection.Ip
+                : null;
+
+        if (string.IsNullOrWhiteSpace(host))
+        {
+            return;
+        }
+
+        var mossEndpoint = $"http://{host}:{Constants.Moss.DefaultPort}";
+
+        var learned = new CachedMossStone
+        {
+            Endpoint = mossEndpoint,
+            StoneId = snapshot.StoneId,
+            StoneName = snapshot.StoneName,
+            LastSeenUtc = DateTimeOffset.UtcNow
+        };
+
+        CacheStone(learned);
+        _logger.LogDebug(
+            "Topology enrichment: learned stone {StoneName} at {Endpoint} from tool {ToolFqid}",
+            learned.StoneName, learned.Endpoint, snapshot.ToolFqid);
+    }
+
+    /// <summary>
+    /// Fetches the full topology from the bound Moss and caches all known stones.
+    /// Called after bind and periodically on heartbeat to keep the roster warm.
+    /// </summary>
+    private async Task HydrateTopologyFromMossAsync(CancellationToken ct)
+    {
+        var bound = _boundStone;
+        if (bound is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var uri = $"{bound.Endpoint.TrimEnd('/')}{Constants.Moss.TopologyEndpoint}";
+
+            using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            linked.CancelAfter(TimeSpan.FromSeconds(5));
+
+            using var response = await _httpClient.GetAsync(uri, linked.Token).ConfigureAwait(false);
+            if (!response.IsSuccessStatusCode)
+            {
+                return;
+            }
+
+            var json = await response.Content.ReadAsStringAsync(linked.Token).ConfigureAwait(false);
+            var envelope = JsonSerializer.Deserialize<TopologyApiResponse>(json, _jsonOptions);
+            var entries = envelope?.Data;
+            if (entries is null || entries.Count == 0)
+            {
+                return;
+            }
+
+            var now = DateTimeOffset.UtcNow;
+            var learned = 0;
+            foreach (var entry in entries)
+            {
+                if (string.IsNullOrWhiteSpace(entry.Endpoint) || string.IsNullOrWhiteSpace(entry.StoneName))
+                {
+                    continue;
+                }
+
+                var lastSeen = entry.LastSeen ?? now;
+
+                // Primary: cache with the endpoint from the topology API (typically IP-based).
+                var stone = new CachedMossStone
+                {
+                    Endpoint = entry.Endpoint,
+                    StoneId = entry.StoneId,
+                    StoneName = entry.StoneName,
+                    MossVersion = entry.MossVersion,
+                    LastSeenUtc = lastSeen
+                };
+
+                CacheStone(stone);
+                learned++;
+
+                // Secondary: also cache a .local variant for mDNS resolution on the host network.
+                // This gives the resolution chain two reachable paths per stone.
+                var localEndpoint = $"http://{entry.StoneName}.local:{Constants.Moss.DefaultPort}";
+                if (!string.Equals(entry.Endpoint, localEndpoint, StringComparison.OrdinalIgnoreCase))
+                {
+                    var localStone = stone with { Endpoint = localEndpoint };
+                    _stoneCache.TryAdd($"{entry.StoneName}.local", localStone);
+                }
+            }
+
+            _lastTopologyHydration = now;
+
+            if (learned > 0)
+            {
+                _logger.LogDebug(
+                    "Topology hydration: cached {Count} stones from bound Moss {StoneName}.",
+                    learned, bound.StoneName);
+                PersistRosterFireAndForget();
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogDebug(ex, "Topology hydration from bound Moss failed.");
+        }
+    }
+
+    private void HydrateTopologyFireAndForget(CancellationToken ct)
+    {
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await HydrateTopologyFromMossAsync(ct).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogDebug(ex, "Background topology hydration failed.");
+            }
+        }, CancellationToken.None);
+    }
+
+    private async Task TryHydrateTopologyThrottledAsync(CancellationToken ct)
+    {
+        var elapsed = DateTimeOffset.UtcNow - _lastTopologyHydration;
+        if (elapsed < TimeSpan.FromMinutes(Constants.Moss.TopologyHydrationIntervalMinutes))
+        {
+            return;
+        }
+
+        await HydrateTopologyFromMossAsync(ct).ConfigureAwait(false);
+    }
+
     private async Task<CachedMossStone?> FindFirstReachableAsync(
         IReadOnlyList<CachedMossStone> stones,
         CancellationToken ct)
@@ -1539,6 +1977,8 @@ public sealed class ZenGardenClient : IZenGardenClient
         }
 
         _logger.LogDebug("Bound to Moss endpoint {Endpoint} ({Stone})", cached.Endpoint, cached.StoneName);
+        PersistRosterFireAndForget();
+        HydrateTopologyFireAndForget(_lifetimeCts.Token);
         return cached;
     }
 
@@ -2532,16 +2972,6 @@ public sealed class ZenGardenClient : IZenGardenClient
         }
     }
 
-    private sealed record CachedMossStone
-    {
-        public required string Endpoint { get; init; }
-        public string? StoneId { get; init; }
-        public required string StoneName { get; init; }
-        public string? MossVersion { get; init; }
-        public string? LanternEndpoint { get; init; }
-        public DateTimeOffset LastSeenUtc { get; init; }
-        public string CacheKey => string.IsNullOrWhiteSpace(StoneId) ? StoneName : StoneId!;
-    }
 
     private sealed record DiscoveryRequestEnvelope
     {
@@ -2640,6 +3070,33 @@ public sealed class ZenGardenClient : IZenGardenClient
     }
 
     private readonly record struct CapabilityEnsureResult(bool Success, string Message);
+
+    private sealed record TopologyApiResponse
+    {
+        [JsonPropertyName("data")]
+        public List<TopologyEntryResponse>? Data { get; init; }
+    }
+
+    private sealed record TopologyEntryResponse
+    {
+        [JsonPropertyName("stone_id")]
+        public string? StoneId { get; init; }
+
+        [JsonPropertyName("stone_name")]
+        public string? StoneName { get; init; }
+
+        [JsonPropertyName("endpoint")]
+        public string? Endpoint { get; init; }
+
+        [JsonPropertyName("moss_version")]
+        public string? MossVersion { get; init; }
+
+        [JsonPropertyName("last_seen")]
+        public DateTimeOffset? LastSeen { get; init; }
+
+        [JsonPropertyName("health")]
+        public string? Health { get; init; }
+    }
 
     private sealed class SubscriptionHandle : IDisposable
     {

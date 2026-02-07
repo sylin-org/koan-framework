@@ -1,6 +1,7 @@
 using Koan.Core.Modules;
 using Koan.ZenGarden.Core;
 using Koan.ZenGarden.Initialization;
+using Koan.ZenGarden.Persistence;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -36,7 +37,18 @@ public static class ServiceCollectionExtensions
         {
             var logger = sp.GetService<ILogger<ZenGardenClient>>() ?? NullLogger<ZenGardenClient>.Instance;
             var options = sp.GetService<IOptions<ZenGardenOptions>>()?.Value ?? new ZenGardenOptions();
-            return new ZenGardenClient(logger, options);
+
+            IStoneRosterStore? rosterStore = null;
+            if (options.PersistDiscoveryCache)
+            {
+                var path = StoneRosterPathResolver.Resolve(options);
+                var ttl = TimeSpan.FromHours(Math.Max(1, options.PersistedCacheTtlHours));
+                var storeLogger = sp.GetService<ILogger<StoneRosterStore>>()
+                    ?? NullLogger<StoneRosterStore>.Instance;
+                rosterStore = new StoneRosterStore(path, ttl, storeLogger);
+            }
+
+            return new ZenGardenClient(logger, options, rosterStore);
         });
 
         services.TryAddSingleton<IZenGardenInitializationProvider, ZenGardenInitializationProvider>();

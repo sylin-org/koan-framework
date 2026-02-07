@@ -28,14 +28,25 @@ public static class Constants
         public const string ContainerHost = "KOAN_ZENGARDEN_CONTAINER_HOST";
         public const string ContainerHostPort = "KOAN_ZENGARDEN_CONTAINER_HOST_PORT";
         public const string RequireHostMossWhenContainerized = "KOAN_ZENGARDEN_REQUIRE_HOST_MOSS";
+        public const string CachePath = "KOAN_ZENGARDEN_CACHE_PATH";
+        public const string PreferredStoneName = "KOAN_ZENGARDEN_PREFERRED_STONE";
+    }
+
+    public static class Persistence
+    {
+        public const int DefaultPersistedCacheTtlHours = 168; // 7 days
+        public const string DefaultCacheSubdirectory = ".Koan/zen-garden";
+        public const string RosterFileName = "stones.json";
     }
 
     public static class Moss
     {
         public const int DefaultPort = 7185;
         public const string HealthEndpoint = "/health";
+        public const string TopologyEndpoint = "/api/v1/garden/topology";
         public const string ToolsEndpoint = "/api/v1/garden/tools";
         public const string ToolsStreamEndpoint = "/api/v1/garden/tools/stream";
         public const string CapabilityEnsureEndpointFormat = "/api/v1/stone/offerings/{0}/capabilities";
+        public const int TopologyHydrationIntervalMinutes = 5;
     }
 }
