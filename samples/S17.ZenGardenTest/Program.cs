@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
 using Koan.AI;
+using Koan.AI.Contracts.Adapters;
 using Koan.AI.Contracts.Sources;
 using Koan.Core;
 using Koan.Core.Hosting.App;
@@ -15,7 +16,18 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 
 var json = new JsonSerializerOptions { WriteIndented = true };
+var step = 1;
+void StepLog(string title)
+{
+    Console.WriteLine($"[Step {step:00}] {title}");
+    step++;
+}
+void DetailLog(string message)
+{
+    Console.WriteLine($"         {message}");
+}
 
+StepLog("Building host and loading configuration.");
 var builder = Host.CreateApplicationBuilder(args);
 
 var endpointOverride = Environment.GetEnvironmentVariable("KOAN_ZENGARDEN_ENDPOINT")
@@ -23,19 +35,25 @@ var endpointOverride = Environment.GetEnvironmentVariable("KOAN_ZENGARDEN_ENDPOI
 if (!string.IsNullOrWhiteSpace(endpointOverride))
 {
     builder.Configuration["Koan:ZenGarden:Endpoint"] = endpointOverride;
+    DetailLog($"Using explicit endpoint override: {endpointOverride}");
 }
 if (string.IsNullOrWhiteSpace(builder.Configuration["Koan:Ai:AllowDiscoveryInNonDev"]))
 {
     builder.Configuration["Koan:Ai:AllowDiscoveryInNonDev"] = "true";
+    DetailLog("Enabled AI discovery for non-development environment.");
 }
 
 // Reference-driven bootstrap: adapters self-register when their packages are referenced.
 builder.Services.AddKoan();
+DetailLog("Registered Koan services via AddKoan().");
 
+StepLog("Starting host and activating auto-registrars.");
 using var host = builder.Build();
 await host.StartAsync();
+DetailLog("Host started.");
 
 AppHost.Current ??= host.Services;
+DetailLog("AppHost.Current assigned.");
 
 var endpointDisplay = !string.IsNullOrWhiteSpace(endpointOverride)
     ? endpointOverride
@@ -50,6 +68,7 @@ Console.WriteLine("=============================================================
 Console.WriteLine($"Endpoint selector: {endpointDisplay}");
 Console.WriteLine();
 
+StepLog("Subscribing to offering/storage availability streams.");
 var events = new ConcurrentQueue<ZenGardenEventEntry>();
 var capabilityEvents = new ConcurrentQueue<ZenGardenCapabilityEventEntry>();
 using var mongoSubscription = ZenGarden.On<ZenGardenAvailabilityEvent>(
@@ -63,11 +82,16 @@ using var ollamaSubscription = ZenGarden.On<ZenGardenAvailabilityEvent>(
 using var storageSubscription = ZenGarden.Storage.On(
     "default",
     (evt, ct) => RecordEvent(events, "seed-bank:default", evt));
+DetailLog("Subscribed: offering:mongodb, offering:ollama, seed-bank:default.");
 
 var wishedCapabilities = ParseCapabilities(
     Environment.GetEnvironmentVariable("KOAN_OLLAMA_WISH_CAPS"),
     "llama3.2,nomic-embed-text");
+var ollamaWaitSeconds = ParseInt(Environment.GetEnvironmentVariable("KOAN_OLLAMA_WAIT_SECONDS"), 90);
+var ollamaRefreshSeconds = ParseInt(Environment.GetEnvironmentVariable("KOAN_OLLAMA_REFRESH_SECONDS"), 2);
 
+StepLog("Submitting a wishful capability request for Ollama.");
+DetailLog($"Requested capabilities: {string.Join(", ", wishedCapabilities)}");
 ZenGardenCapabilityWish? capabilityWish = null;
 IDisposable? capabilityWishSubscription = null;
 try
@@ -78,6 +102,7 @@ try
         (evt, ct) => RecordCapabilityEvent(capabilityEvents, evt));
 
     Console.WriteLine($"[Wish] request={capabilityWish.RequestId} status={capabilityWish.Status} missing={string.Join(",", capabilityWish.Missing)}");
+    DetailLog("Capability progress subscription attached.");
     Console.WriteLine();
 }
 catch (Exception ex)
@@ -88,6 +113,7 @@ catch (Exception ex)
 
 try
 {
+    StepLog("Reading live Zen Garden catalogs.");
     Console.WriteLine("[Catalog] Loading offerings + seed-banks...");
     var offerings = await ZenGarden.Offering.Catalog();
     var storage = await ZenGarden.Storage.Catalog();
@@ -111,6 +137,7 @@ catch (Exception ex)
     Console.WriteLine($"[Catalog] Failed to load catalog: {ex.Message}");
 }
 
+StepLog("Resolving auto-initialization intents for MongoDB and Ollama.");
 using (var scope = host.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
@@ -147,6 +174,7 @@ using (var scope = host.Services.CreateScope())
     Console.WriteLine();
 }
 
+StepLog("Running MongoDB probe (write + read).");
 try
 {
     Console.WriteLine("[Mongo] Running write/read probe...");
@@ -165,6 +193,21 @@ catch (Exception ex)
 }
 
 Console.WriteLine();
+StepLog("Waiting for Ollama source readiness (post-initialization loop).");
+var ollamaReady = await WaitForOllamaChatReadinessAsync(
+    host.Services,
+    capabilityEvents,
+    wishedCapabilities,
+    ollamaWaitSeconds,
+    ollamaRefreshSeconds,
+    CancellationToken.None);
+if (!ollamaReady)
+{
+    Console.WriteLine("[Ollama] Chat source is still not ready; running probe anyway.");
+    Console.WriteLine();
+}
+
+StepLog("Running Ollama probe (Engine.Chat).");
 try
 {
     Console.WriteLine("[Ollama] Running chat probe...");
@@ -179,11 +222,13 @@ catch (Exception ex)
 var watchSeconds = ParseInt(Environment.GetEnvironmentVariable("KOAN_ZENGARDEN_WATCH_SECONDS"), 5);
 if (watchSeconds > 0)
 {
+    StepLog("Watching live stream updates.");
     Console.WriteLine();
     Console.WriteLine($"[Events] Watching subscriptions for {watchSeconds}s...");
     await Task.Delay(TimeSpan.FromSeconds(watchSeconds));
 }
 
+StepLog("Printing captured event summaries.");
 Console.WriteLine();
 Console.WriteLine("[Events] Recent entries:");
 foreach (var evt in events.Take(20))
@@ -201,6 +246,7 @@ foreach (var evt in capabilityEvents.Take(20))
 Console.WriteLine();
 Console.WriteLine("Done.");
 
+StepLog("Stopping host and exiting sample.");
 capabilityWishSubscription?.Dispose();
 await host.StopAsync();
 return;
@@ -210,13 +256,16 @@ static ValueTask RecordEvent(
     string channel,
     ZenGardenAvailabilityEvent evt)
 {
-    target.Enqueue(new ZenGardenEventEntry(
+    var entry = new ZenGardenEventEntry(
         DateTimeOffset.UtcNow,
         channel,
         evt.Kind.ToString(),
         evt.Current.ToolFqid,
         evt.Current.Ready,
-        evt.Current.Revision));
+        evt.Current.Revision);
+    target.Enqueue(entry);
+
+    Console.WriteLine($"[Event][{entry.TimestampUtc:HH:mm:ss}] {entry.Channel} kind={entry.Kind} tool={entry.ToolFqid} ready={entry.Ready} rev={entry.Revision}");
 
     while (target.Count > 200 && target.TryDequeue(out _))
     {
@@ -229,17 +278,119 @@ static ValueTask RecordCapabilityEvent(
     ConcurrentQueue<ZenGardenCapabilityEventEntry> target,
     ZenGardenCapabilityProgressEvent evt)
 {
-    target.Enqueue(new ZenGardenCapabilityEventEntry(
+    var entry = new ZenGardenCapabilityEventEntry(
         DateTimeOffset.UtcNow,
         evt.Kind.ToString(),
         evt.Wish.RequestId,
-        evt.Wish.Missing.ToArray()));
+        evt.Wish.Missing.ToArray());
+    target.Enqueue(entry);
+
+    Console.WriteLine($"[Capability][{entry.TimestampUtc:HH:mm:ss}] kind={entry.Kind} request={entry.RequestId} missing={string.Join(",", entry.Missing)}");
 
     while (target.Count > 200 && target.TryDequeue(out _))
     {
     }
 
     return ValueTask.CompletedTask;
+}
+
+static async Task<bool> WaitForOllamaChatReadinessAsync(
+    IServiceProvider rootServices,
+    ConcurrentQueue<ZenGardenCapabilityEventEntry> capabilityEvents,
+    IReadOnlyList<string> wishedCapabilities,
+    int timeoutSeconds,
+    int refreshSeconds,
+    CancellationToken cancellationToken)
+{
+    if (timeoutSeconds <= 0)
+    {
+        Console.WriteLine("[Ollama][Wait] skipped (timeout <= 0).");
+        return false;
+    }
+
+    if (refreshSeconds <= 0)
+    {
+        refreshSeconds = 1;
+    }
+
+    Console.WriteLine($"[Ollama][Wait] timeout={timeoutSeconds}s refresh={refreshSeconds}s wished={string.Join(",", wishedCapabilities)}");
+    using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(timeoutSeconds));
+    using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
+    var token = linked.Token;
+
+    var attempt = 0;
+    while (!token.IsCancellationRequested)
+    {
+        attempt++;
+
+        if (TryGetOllamaChatStatus(rootServices, out var sourceCount, out var memberCount))
+        {
+            Console.WriteLine($"[Ollama][Wait] ready after attempt={attempt} sources={sourceCount} members={memberCount}");
+            return true;
+        }
+
+        var lastProgress = capabilityEvents.LastOrDefault();
+        var progress = lastProgress is null
+            ? "none"
+            : $"{lastProgress.Kind} missing={string.Join(",", lastProgress.Missing)}";
+        Console.WriteLine($"[Ollama][Wait] attempt={attempt} source-not-ready progress={progress}");
+
+        var refreshed = await RefreshOllamaContributorAsync(rootServices, token).ConfigureAwait(false);
+        if (!refreshed)
+        {
+            Console.WriteLine("[Ollama][Wait] no Ollama contributor found to refresh.");
+        }
+
+        try
+        {
+            await Task.Delay(TimeSpan.FromSeconds(refreshSeconds), token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
+        {
+            break;
+        }
+    }
+
+    var finalReady = TryGetOllamaChatStatus(rootServices, out var finalSources, out var finalMembers);
+    Console.WriteLine($"[Ollama][Wait] timed out. ready={finalReady} sources={finalSources} members={finalMembers}");
+    return finalReady;
+}
+
+static bool TryGetOllamaChatStatus(
+    IServiceProvider rootServices,
+    out int sourceCount,
+    out int memberCount)
+{
+    var sourceRegistry = rootServices.GetRequiredService<IAiSourceRegistry>();
+    var sources = sourceRegistry
+        .GetSourcesWithCapability("Chat")
+        .Where(source => string.Equals(source.Provider, "ollama", StringComparison.OrdinalIgnoreCase))
+        .ToArray();
+
+    sourceCount = sources.Length;
+    memberCount = sources.Sum(source => source.Members.Count);
+    return memberCount > 0;
+}
+
+static async Task<bool> RefreshOllamaContributorAsync(
+    IServiceProvider rootServices,
+    CancellationToken cancellationToken)
+{
+    using var scope = rootServices.CreateScope();
+    var contributors = scope.ServiceProvider.GetServices<IAiAdapterContributor>();
+    foreach (var contributor in contributors)
+    {
+        var contributorName = contributor.GetType().FullName ?? contributor.GetType().Name;
+        if (!contributorName.Contains("OllamaAdapterContributor", StringComparison.OrdinalIgnoreCase))
+        {
+            continue;
+        }
+
+        await contributor.ContributeAsync(scope.ServiceProvider, cancellationToken).ConfigureAwait(false);
+        return true;
+    }
+
+    return false;
 }
 
 static string RedactConnectionString(string? value)
