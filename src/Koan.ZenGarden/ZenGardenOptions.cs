@@ -62,4 +62,21 @@ public sealed class ZenGardenOptions
     /// Max number of event ids kept for dedupe.
     /// </summary>
     public int DedupeWindowSize { get; set; } = 4096;
+
+    /// <summary>
+    /// When true and runtime is containerized, require Moss to be reachable on the container host
+    /// instead of relying on UDP discovery.
+    /// </summary>
+    public bool RequireHostMossWhenContainerized { get; set; } = true;
+
+    /// <summary>
+    /// Host alias or explicit endpoint used when containerized.
+    /// Examples: "host.docker.internal", "moss-host", "http://moss-host:7185".
+    /// </summary>
+    public string ContainerHost { get; set; } = "host.docker.internal";
+
+    /// <summary>
+    /// Moss port used when ContainerHost is a hostname without explicit port.
+    /// </summary>
+    public int ContainerHostPort { get; set; } = Constants.Moss.DefaultPort;
 }

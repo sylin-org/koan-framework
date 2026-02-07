@@ -184,6 +184,30 @@ Capability progress kinds (`ZenGardenCapabilityProgressEventKind`):
 - `Fulfilled`
 - `Failed`
 
+## Centralized Non-Blocking Capability Orchestration
+
+`Koan.ZenGarden` is the orchestration owner for offering capability fulfillment.
+Adapters pass intent; they do not schedule ensures directly.
+
+Flow:
+
+1. Application declares intent:
+   - subscription (`ZenGarden.Offering.On(...)`)
+   - explicit wish (`ZenGarden.Capability.Wish(...)`)
+   - initialization URI (`zen-garden://<offering>?cap=...`)
+2. `IZenGardenInitializationProvider.ResolveAsync(intent)` resolves the best ready offering candidate.
+3. If requested capabilities are missing, the provider schedules wishful ensures internally (throttled/deduped) and returns immediately.
+4. Startup continues without waiting for fulfillment.
+5. SSE stream updates drive:
+   - capability progress events (`Requested`, `InProgress`, `PartiallyFulfilled`, `Fulfilled`, `Failed`)
+   - availability capability transitions (`CapabilitiesSatisfied`, `CapabilitiesUnsatisfied`)
+
+Contract:
+
+- Non-blocking by default.
+- App adaptation happens in event handlers.
+- Adapter modules consume resolved state/endpoints only.
+
 ## Listening And Adapting To Announcements
 
 `Koan.ZenGarden` consumes Zen Garden tool announcements from the stream and emits
@@ -244,6 +268,7 @@ var subscription = ZenGardenSubscription.ForOffering("ollama")
 - Endpoint resolution:
   - explicit `ZenGardenOptions.Endpoint`
   - `GARDEN_STONE` environment selector
+  - container host endpoint (when containerized)
   - cached Moss binding (TTL-backed)
   - UDP discovery (`GARDEN_DISCOVERY_TIMEOUT_SECS`, `DISCOVERY_PORT`, `DISCOVERY_MCAST_GROUP` + broadcast fallbacks)
   - automatic re-discovery when bound endpoint stops responding
@@ -254,6 +279,37 @@ var subscription = ZenGardenSubscription.ForOffering("ollama")
 - Tool coverage:
   - offerings (`tool_type=offering`)
   - seed banks (`tool_type=seed-bank`)
+
+### Containerized Apps
+
+When running in containers (`DOTNET_RUNNING_IN_CONTAINER=true`), `Koan.ZenGarden` can require Moss on the host side.
+
+Defaults:
+
+- `RequireHostMossWhenContainerized = true`
+- `ContainerHost = "host.docker.internal"`
+- `ContainerHostPort = 7185`
+
+If host Moss is unreachable in container mode, startup resolution fails fast with a clear error.
+
+Override host alias/name:
+
+```json
+{
+  "Koan": {
+    "ZenGarden": {
+      "ContainerHost": "moss-host",
+      "ContainerHostPort": 7185
+    }
+  }
+}
+```
+
+Environment-variable overrides:
+
+- `KOAN_ZENGARDEN_CONTAINER_HOST`
+- `KOAN_ZENGARDEN_CONTAINER_HOST_PORT`
+- `KOAN_ZENGARDEN_REQUIRE_HOST_MOSS`
 
 ## Connection Intent URIs
 
@@ -316,7 +372,8 @@ Optional Mongo Zen Garden overrides:
   - `Koan:Ai:Ollama:Urls:0 = "zen-garden://ollama"`
 - Auto path (no explicit members, or unresolved explicit intent):
   - resolves `ollama` through Zen Garden first
-  - if required capabilities are missing, triggers wishful capability ensure and continues startup
+  - forwards requested capability intent to Zen Garden initialization provider
+  - provider handles wishful ensure scheduling centrally and continues startup non-blocking
   - falls back to existing host/container/local Ollama discovery
   - `AdditionalUrls` are then merged as fallback members
 
@@ -348,6 +405,9 @@ builder.Services.AddKoanZenGarden(configure: options =>
     options.HttpTimeoutSeconds = 30;
     options.StreamReconnectDelaySeconds = 3;
     options.DedupeWindowSize = 4096;
+    options.RequireHostMossWhenContainerized = true;
+    options.ContainerHost = "host.docker.internal";
+    options.ContainerHostPort = 7185;
 });
 ```
 
@@ -367,7 +427,10 @@ Configuration section:
       "DiscoveryEnableLimitedBroadcast": false,
       "HttpTimeoutSeconds": 30,
       "StreamReconnectDelaySeconds": 3,
-      "DedupeWindowSize": 4096
+      "DedupeWindowSize": 4096,
+      "RequireHostMossWhenContainerized": true,
+      "ContainerHost": "host.docker.internal",
+      "ContainerHostPort": 7185
     }
   }
 }
@@ -388,6 +451,9 @@ new ZenGardenOptions
     DiscoveryEnableLimitedBroadcast = false,
     HttpTimeoutSeconds = 30,
     StreamReconnectDelaySeconds = 3,
-    DedupeWindowSize = 4096
+    DedupeWindowSize = 4096,
+    RequireHostMossWhenContainerized = true,
+    ContainerHost = "host.docker.internal",
+    ContainerHostPort = 7185
 };
 ```

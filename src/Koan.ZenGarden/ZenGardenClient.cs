@@ -1301,6 +1301,7 @@ public sealed class ZenGardenClient : IZenGardenClient
     private async Task<string> EnsureBoundEndpointAsync(CancellationToken ct, bool forceRediscovery = false)
     {
         ThrowIfDisposed();
+        var containerized = IsContainerizedRuntime();
 
         if (!forceRediscovery)
         {
@@ -1330,6 +1331,24 @@ public sealed class ZenGardenClient : IZenGardenClient
             }
         }
 
+        if (containerized)
+        {
+            TryResolveContainerHostEndpoint(out var configuredContainerEndpoint);
+            var hostStone = await ResolveContainerHostStoneAsync(ct).ConfigureAwait(false);
+            if (hostStone is not null)
+            {
+                return BindStone(hostStone).Endpoint;
+            }
+
+            if (RequireHostMossWhenContainerized())
+            {
+                throw new InvalidOperationException(
+                    "Containerized runtime requires host Moss endpoint but none was reachable. " +
+                    $"Configured host endpoint candidate: {(string.IsNullOrWhiteSpace(configuredContainerEndpoint) ? "(none)" : configuredContainerEndpoint)}. " +
+                    "Configure Koan:ZenGarden:ContainerHost (or KOAN_ZENGARDEN_CONTAINER_HOST) and optional ContainerHostPort.");
+            }
+        }
+
         if (_options.EnableDiscovery)
         {
             var discovered = await DiscoverStonesAsync(
@@ -1351,6 +1370,28 @@ public sealed class ZenGardenClient : IZenGardenClient
 
         throw new InvalidOperationException(
             "Unable to resolve a Moss endpoint. Configure Koan:ZenGarden:Endpoint or GARDEN_STONE, or ensure UDP discovery on port 7184 is available.");
+    }
+
+    private async Task<CachedMossStone?> ResolveContainerHostStoneAsync(CancellationToken ct)
+    {
+        if (!TryResolveContainerHostEndpoint(out var endpoint))
+        {
+            return null;
+        }
+
+        var candidate = new CachedMossStone
+        {
+            Endpoint = endpoint,
+            StoneName = new Uri(endpoint).Host,
+            LastSeenUtc = DateTimeOffset.UtcNow
+        };
+
+        if (!await IsMossReachableAsync(candidate, ct).ConfigureAwait(false))
+        {
+            return null;
+        }
+
+        return CacheStone(candidate);
     }
 
     private string? ResolvePreferredSelector()
@@ -2040,6 +2081,57 @@ public sealed class ZenGardenClient : IZenGardenClient
         }
 
         return false;
+    }
+
+    private bool IsContainerizedRuntime()
+    {
+        if (TryReadBooleanEnvironment(Constants.EnvironmentVariables.DotnetRunningInContainer, out var explicitContainer))
+        {
+            return explicitContainer;
+        }
+
+        return false;
+    }
+
+    private bool RequireHostMossWhenContainerized()
+    {
+        if (TryReadBooleanEnvironment(Constants.EnvironmentVariables.RequireHostMossWhenContainerized, out var envOverride))
+        {
+            return envOverride;
+        }
+
+        return _options.RequireHostMossWhenContainerized;
+    }
+
+    private bool TryResolveContainerHostEndpoint(out string endpoint)
+    {
+        endpoint = string.Empty;
+
+        var hostSelector = NormalizeEndpointOrSelector(
+            System.Environment.GetEnvironmentVariable(Constants.EnvironmentVariables.ContainerHost));
+        if (string.IsNullOrWhiteSpace(hostSelector))
+        {
+            hostSelector = NormalizeEndpointOrSelector(_options.ContainerHost);
+        }
+
+        if (string.IsNullOrWhiteSpace(hostSelector))
+        {
+            return false;
+        }
+
+        if (TryNormalizeAbsoluteEndpoint(hostSelector, out endpoint))
+        {
+            return true;
+        }
+
+        var port = _options.ContainerHostPort;
+        if (TryReadIntEnvironment(Constants.EnvironmentVariables.ContainerHostPort, 1, 65535, out var envPort))
+        {
+            port = envPort;
+        }
+
+        var hostOnly = $"http://{hostSelector.Trim()}:{port}";
+        return TryNormalizeAbsoluteEndpoint(hostOnly, out endpoint);
     }
 
     private static bool IsValidDiscoveryMulticastGroup(string? value, out string normalized)

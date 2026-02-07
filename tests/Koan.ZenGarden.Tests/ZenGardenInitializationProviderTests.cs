@@ -114,8 +114,9 @@ public sealed class ZenGardenInitializationProviderTests
     [Fact]
     public async Task WishCapabilitiesAsync_returns_receipt()
     {
+        var client = new StubZenGardenClient(Array.Empty<ZenGardenToolSnapshot>());
         await using var provider = BuildScope(
-            new StubZenGardenClient(Array.Empty<ZenGardenToolSnapshot>()),
+            client,
             new StubBinding("ollama", "ollama"));
 
         var initializationProvider = provider.GetRequiredService<IZenGardenInitializationProvider>();
@@ -126,6 +127,82 @@ public sealed class ZenGardenInitializationProviderTests
         receipt!.OfferingSelector.Should().Be("ollama");
         receipt.ToolFqid.Should().Be("offering:ollama");
         receipt.Requested.Should().Contain(["llama3.2", "nomic-embed-text"]);
+        client.WishCalls.Should().ContainSingle();
+    }
+
+    [Fact]
+    public async Task ResolveAsync_with_missing_capabilities_schedules_non_blocking_wish_and_returns_resolution()
+    {
+        var snapshots = new[]
+        {
+            new ZenGardenToolSnapshot
+            {
+                ToolFqid = "offering:ollama",
+                ToolType = ZenGardenToolType.Offering,
+                Ready = true,
+                State = ZenGardenToolState.Ready,
+                Revision = 2,
+                Connection = new ZenGardenConnection
+                {
+                    Uris = ["http://zen-ollama:11434"]
+                },
+                Capabilities = new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["model"] = ["llama3.2"]
+                }
+            }
+        };
+
+        var client = new StubZenGardenClient(snapshots);
+        await using var provider = BuildScope(
+            client,
+            new StubBinding("ollama", "ollama"));
+
+        var initializationProvider = provider.GetRequiredService<IZenGardenInitializationProvider>();
+        var resolved = await initializationProvider.ResolveAsync(
+            ZenGardenConnectionIntent.ForOffering("ollama", capabilities: ["llama3.2", "nomic-embed-text"]));
+
+        resolved.Should().NotBeNull();
+        resolved!.ToolFqid.Should().Be("offering:ollama");
+        client.WishCalls.Should().ContainSingle();
+        client.WishCalls[0].Offering.Should().Be("ollama");
+        client.WishCalls[0].Capabilities.Should().Contain(["llama3.2", "nomic-embed-text"]);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_with_satisfied_capabilities_does_not_schedule_wish()
+    {
+        var snapshots = new[]
+        {
+            new ZenGardenToolSnapshot
+            {
+                ToolFqid = "offering:ollama",
+                ToolType = ZenGardenToolType.Offering,
+                Ready = true,
+                State = ZenGardenToolState.Ready,
+                Revision = 2,
+                Connection = new ZenGardenConnection
+                {
+                    Uris = ["http://zen-ollama:11434"]
+                },
+                Capabilities = new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["model"] = ["llama3.2", "nomic-embed-text"]
+                }
+            }
+        };
+
+        var client = new StubZenGardenClient(snapshots);
+        await using var provider = BuildScope(
+            client,
+            new StubBinding("ollama", "ollama"));
+
+        var initializationProvider = provider.GetRequiredService<IZenGardenInitializationProvider>();
+        var resolved = await initializationProvider.ResolveAsync(
+            ZenGardenConnectionIntent.ForOffering("ollama", capabilities: ["llama3.2", "nomic-embed-text"]));
+
+        resolved.Should().NotBeNull();
+        client.WishCalls.Should().BeEmpty();
     }
 
     private static ServiceProvider BuildScope(
@@ -170,6 +247,7 @@ public sealed class ZenGardenInitializationProviderTests
     private sealed class StubZenGardenClient : IZenGardenClient
     {
         private readonly IReadOnlyList<ZenGardenToolSnapshot> _snapshots;
+        public List<WishCall> WishCalls { get; } = new();
 
         public StubZenGardenClient(IReadOnlyList<ZenGardenToolSnapshot> snapshots)
         {
@@ -201,6 +279,8 @@ public sealed class ZenGardenInitializationProviderTests
             ZenGardenCapabilityWishOptions? options = null,
             CancellationToken cancellationToken = default)
         {
+            WishCalls.Add(new WishCall(offering, capabilities.ToArray()));
+
             var normalizedSelector = offering.Trim().ToLowerInvariant();
             var toolFqid = normalizedSelector.StartsWith("offering:", StringComparison.OrdinalIgnoreCase)
                 ? normalizedSelector
@@ -254,5 +334,7 @@ public sealed class ZenGardenInitializationProviderTests
         public void Dispose()
         {
         }
+
+        public sealed record WishCall(string Offering, IReadOnlyList<string> Capabilities);
     }
 }

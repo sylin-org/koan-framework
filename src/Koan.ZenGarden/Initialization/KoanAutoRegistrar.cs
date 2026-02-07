@@ -34,6 +34,9 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         var timeoutSeconds = Configuration.ReadWithSource(cfg, $"{ZenGardenOptions.SectionName}:HttpTimeoutSeconds", defaults.HttpTimeoutSeconds);
         var reconnectSeconds = Configuration.ReadWithSource(cfg, $"{ZenGardenOptions.SectionName}:StreamReconnectDelaySeconds", defaults.StreamReconnectDelaySeconds);
         var dedupeWindow = Configuration.ReadWithSource(cfg, $"{ZenGardenOptions.SectionName}:DedupeWindowSize", defaults.DedupeWindowSize);
+        var requireHostMoss = Configuration.ReadWithSource(cfg, $"{ZenGardenOptions.SectionName}:RequireHostMossWhenContainerized", defaults.RequireHostMossWhenContainerized);
+        var containerHost = Configuration.ReadWithSource(cfg, $"{ZenGardenOptions.SectionName}:ContainerHost", defaults.ContainerHost);
+        var containerHostPort = Configuration.ReadWithSource(cfg, $"{ZenGardenOptions.SectionName}:ContainerHostPort", defaults.ContainerHostPort);
 
         module.AddSetting("Endpoint", endpoint.Value, source: endpoint.Source, sourceKey: endpoint.ResolvedKey);
         module.AddSetting("EnableDiscovery", enableDiscovery.Value.ToString(), source: enableDiscovery.Source, sourceKey: enableDiscovery.ResolvedKey);
@@ -46,6 +49,9 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         module.AddSetting("HttpTimeoutSeconds", timeoutSeconds.Value.ToString(), source: timeoutSeconds.Source, sourceKey: timeoutSeconds.ResolvedKey);
         module.AddSetting("StreamReconnectDelaySeconds", reconnectSeconds.Value.ToString(), source: reconnectSeconds.Source, sourceKey: reconnectSeconds.ResolvedKey);
         module.AddSetting("DedupeWindowSize", dedupeWindow.Value.ToString(), source: dedupeWindow.Source, sourceKey: dedupeWindow.ResolvedKey);
+        module.AddSetting("RequireHostMossWhenContainerized", requireHostMoss.Value.ToString(), source: requireHostMoss.Source, sourceKey: requireHostMoss.ResolvedKey);
+        module.AddSetting("ContainerHost", containerHost.Value, source: containerHost.Source, sourceKey: containerHost.ResolvedKey);
+        module.AddSetting("ContainerHostPort", containerHostPort.Value.ToString(), source: containerHostPort.Source, sourceKey: containerHostPort.ResolvedKey);
 
         module.AddTool(
             "Zen Garden Tools Snapshot",

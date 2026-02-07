@@ -19,11 +19,15 @@ public static class Constants
     public static class EnvironmentVariables
     {
         public const string GardenStone = "GARDEN_STONE";
+        public const string DotnetRunningInContainer = "DOTNET_RUNNING_IN_CONTAINER";
         public const string GardenDiscoveryTimeoutSeconds = "GARDEN_DISCOVERY_TIMEOUT_SECS";
         public const string DiscoveryPort = "DISCOVERY_PORT";
         public const string DiscoveryMulticastGroup = "DISCOVERY_MCAST_GROUP";
         public const string DiscoveryEnableBroadcastFallback = "DISCOVERY_ENABLE_BCAST_FALLBACK";
         public const string DiscoveryEnableLimitedBroadcast = "DISCOVERY_ENABLE_LIMITED_BCAST";
+        public const string ContainerHost = "KOAN_ZENGARDEN_CONTAINER_HOST";
+        public const string ContainerHostPort = "KOAN_ZENGARDEN_CONTAINER_HOST_PORT";
+        public const string RequireHostMossWhenContainerized = "KOAN_ZENGARDEN_REQUIRE_HOST_MOSS";
     }
 
     public static class Moss

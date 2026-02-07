@@ -11,12 +11,14 @@ This project is a greenfield tools-domain runtime client for Zen Garden.
 - canonical primitive: `ZenGarden.On<TEvent>(...)`
 - ergonomic wrappers remain: `ZenGarden.Offering.On(...)`, `ZenGarden.Storage.On(...)`, `ZenGarden.Capability.On(...)`
 - capability requests are scheduled wishfully and never block startup
+- capability orchestration is centralized in `IZenGardenInitializationProvider.ResolveAsync(intent)`
 - capability fulfillment is reported incrementally (`PartiallyFulfilled`) and finally (`Fulfilled`) from tools SSE updates
 
 It uses discovery-first Moss endpoint binding:
 
 - explicit endpoint/selector overrides when provided
 - `GARDEN_STONE` selector support
+- container host binding in containerized runtime (`DOTNET_RUNNING_IN_CONTAINER=true`)
 - UDP discovery with cache
 - automatic re-discovery and rebind on connection failure
 
@@ -187,7 +189,15 @@ Provider responsibilities:
 - map adapter default offering bindings
 - resolve ready offering projections through tools snapshot API
 - return connection metadata (`uris`, `protocol`, `host`, `port`, capabilities)
-- schedule capability ensures wishfully without blocking startup
+- when `ResolveAsync(intent)` includes capability requirements:
+  - evaluate missing capabilities against current snapshot
+  - schedule wishful ensures non-blocking (with scheduling throttle)
+  - return resolved endpoint immediately so startup can proceed
+
+Boundary:
+
+- `Koan.ZenGarden` owns capability orchestration and fulfillment tracking.
+- Adapter modules provide intent and consume resolved state; they do not invoke capability ensure directly.
 
 Implemented adapter bindings:
 
@@ -215,7 +225,20 @@ Ollama (`OllamaAdapterContributor`):
   - `Koan:Ai:Ollama:RequiredCapabilities`
   - `Koan:Ai:Ollama:RequiredModels`
   - `Koan:Ai:Ollama:ZenGarden:Capabilities`
-- when required capabilities are missing, contributor schedules wishful ensure and continues registration
+- contributor passes capability-bearing intent to initialization provider
+- provider performs centralized wish scheduling when capabilities are missing and contributor continues registration
+
+## Centralized Orchestration Flow
+
+`ResolveAsync(intent-with-capabilities)` runtime sequence:
+
+1. Resolve offering candidate (`ready=true`) by selector/instance/alias.
+2. Compare requested capabilities with current projection.
+3. If missing:
+   - enqueue wishful ensure through tools-domain capability endpoint (non-blocking)
+   - emit progress through capability stream updates
+4. Return offering resolution immediately.
+5. App adapts later on `ZenGardenCapabilityProgressEvent` and `ZenGardenAvailabilityEvent` capability transitions.
 
 ## Announcement Adaptation Flow
 
@@ -280,6 +303,16 @@ var storage = await ZenGarden.Storage.Catalog();
 - `HttpTimeoutSeconds`
 - `StreamReconnectDelaySeconds`
 - `DedupeWindowSize`
+- `RequireHostMossWhenContainerized` (default `true`)
+- `ContainerHost` (default `host.docker.internal`)
+- `ContainerHostPort` (default `7185`)
+
+Containerized resolution policy:
+
+- If `DOTNET_RUNNING_IN_CONTAINER=true` and `RequireHostMossWhenContainerized=true`:
+  - `Koan.ZenGarden` requires host Moss reachability through `ContainerHost`/`ContainerHostPort`
+  - if unreachable, resolution fails fast with explicit configuration guidance
+  - UDP discovery is not used as the primary path in this mode
 
 ## Non-Goals
 

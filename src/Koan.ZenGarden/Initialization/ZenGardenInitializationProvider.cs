@@ -1,6 +1,7 @@
 using Koan.ZenGarden.Core;
 using Koan.ZenGarden.Models;
 using Microsoft.Extensions.Logging;
+using System.Collections.Concurrent;
 
 namespace Koan.ZenGarden.Initialization;
 
@@ -9,6 +10,7 @@ internal sealed class ZenGardenInitializationProvider : IZenGardenInitialization
     private readonly IZenGardenClient _client;
     private readonly ILogger<ZenGardenInitializationProvider> _logger;
     private readonly IReadOnlyDictionary<string, string> _offeringByAdapter;
+    private readonly ConcurrentDictionary<string, DateTimeOffset> _wishScheduleCache = new(StringComparer.OrdinalIgnoreCase);
 
     public ZenGardenInitializationProvider(
         IZenGardenClient client,
@@ -92,15 +94,11 @@ internal sealed class ZenGardenInitializationProvider : IZenGardenInitialization
 
         var selector = intent.ToOfferingSelector();
         var subscription = ZenGardenSubscription.ForOffering(selector);
-        if (intent.Capabilities.Count > 0)
-        {
-            subscription = subscription.Require(intent.Capabilities.ToArray());
-        }
 
         var snapshot = await ResolveReadySnapshotAsync(subscription, cancellationToken).ConfigureAwait(false);
         if (snapshot is null && string.IsNullOrWhiteSpace(intent.Instance))
         {
-            snapshot = await ResolveReadyInstanceSnapshotAsync(intent, subscription, cancellationToken).ConfigureAwait(false);
+            snapshot = await ResolveReadyInstanceSnapshotAsync(intent, cancellationToken).ConfigureAwait(false);
         }
 
         if (snapshot is null)
@@ -110,6 +108,11 @@ internal sealed class ZenGardenInitializationProvider : IZenGardenInitialization
                 selector,
                 intent.Capabilities.Count == 0 ? "(none)" : string.Join(",", intent.Capabilities));
             return null;
+        }
+
+        if (intent.Capabilities.Count > 0)
+        {
+            await EnsureCapabilitiesWishfullyAsync(intent, snapshot, cancellationToken).ConfigureAwait(false);
         }
 
         return MapResolution(snapshot);
@@ -125,13 +128,15 @@ internal sealed class ZenGardenInitializationProvider : IZenGardenInitialization
 
     private async Task<ZenGardenToolSnapshot?> ResolveReadyInstanceSnapshotAsync(
         ZenGardenConnectionIntent intent,
-        ZenGardenSubscription scopedSubscription,
         CancellationToken cancellationToken)
     {
+        var requirements = intent.Capabilities.Count == 0
+            ? Array.Empty<ZenGardenCapabilityRequirement>()
+            : ZenGardenCapabilityRequirement.ParseMany(intent.Capabilities).ToArray();
+
         var broadSubscription = new ZenGardenSubscription
         {
-            ToolType = ZenGardenToolType.Offering,
-            Requires = scopedSubscription.Requires
+            ToolType = ZenGardenToolType.Offering
         };
 
         var tools = await CatalogAsync(broadSubscription, cancellationToken).ConfigureAwait(false);
@@ -151,9 +156,9 @@ internal sealed class ZenGardenInitializationProvider : IZenGardenInitialization
                 tool.ToolFqid.StartsWith(colonPrefix, StringComparison.OrdinalIgnoreCase) ||
                 tool.ToolFqid.StartsWith(atPrefix, StringComparison.OrdinalIgnoreCase) ||
                 tool.Aliases.Any(alias => string.Equals(alias, exactFqid, StringComparison.OrdinalIgnoreCase)))
-            .Where(scopedSubscription.RequirementsSatisfiedBy)
             .OrderBy(tool => string.Equals(tool.ToolFqid, exactFqid, StringComparison.OrdinalIgnoreCase) ? 0 : 1)
             .ThenBy(tool => tool.Aliases.Any(alias => string.Equals(alias, exactFqid, StringComparison.OrdinalIgnoreCase)) ? 0 : 1)
+            .ThenBy(tool => requirements.Length > 0 && requirements.All(req => req.Matches(tool.Capabilities)) ? 0 : 1)
             .ThenBy(tool => tool.ToolFqid, StringComparer.OrdinalIgnoreCase)
             .FirstOrDefault();
 
@@ -184,6 +189,57 @@ internal sealed class ZenGardenInitializationProvider : IZenGardenInitialization
         }
 
         return tools;
+    }
+
+    private async Task EnsureCapabilitiesWishfullyAsync(
+        ZenGardenConnectionIntent intent,
+        ZenGardenToolSnapshot snapshot,
+        CancellationToken cancellationToken)
+    {
+        var requirements = ZenGardenCapabilityRequirement.ParseMany(intent.Capabilities).ToArray();
+        if (requirements.Length == 0)
+        {
+            return;
+        }
+
+        var missing = requirements
+            .Where(req => !req.Matches(snapshot.Capabilities))
+            .Select(req => req.Canonical)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        if (missing.Length == 0)
+        {
+            return;
+        }
+
+        var cacheKey = $"{intent.ToOfferingSelector()}|{string.Join(",", missing.OrderBy(static x => x, StringComparer.OrdinalIgnoreCase))}";
+        var now = DateTimeOffset.UtcNow;
+        if (_wishScheduleCache.TryGetValue(cacheKey, out var lastScheduled) &&
+            now - lastScheduled < TimeSpan.FromSeconds(15))
+        {
+            _logger.LogDebug(
+                "Zen Garden wish scheduling throttled for {Selector} (missing={Capabilities})",
+                intent.ToOfferingSelector(),
+                string.Join(",", missing));
+            return;
+        }
+
+        _wishScheduleCache[cacheKey] = now;
+        var receipt = await WishCapabilitiesAsync(intent, cancellationToken).ConfigureAwait(false);
+        if (receipt is null)
+        {
+            _logger.LogDebug(
+                "Zen Garden wish scheduling skipped/failed for {Selector} (missing={Capabilities})",
+                intent.ToOfferingSelector(),
+                string.Join(",", missing));
+            return;
+        }
+
+        _logger.LogInformation(
+            "Zen Garden wish scheduled for {Selector} request={RequestId} missing={Capabilities}",
+            intent.ToOfferingSelector(),
+            receipt.RequestId,
+            string.Join(",", receipt.Missing));
     }
 
     private static ZenGardenOfferingResolution MapResolution(ZenGardenToolSnapshot snapshot)
