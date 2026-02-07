@@ -17,6 +17,7 @@ using Koan.Data.Abstractions.Naming;
 using Koan.Data.Vector.Abstractions;
 using Koan.Data.Vector.Connector.Weaviate.Discovery;
 using Koan.Data.Vector.Connector.Weaviate.Orchestration;
+using Koan.ZenGarden.Core;
 using WeaviateItems = Koan.Data.Vector.Connector.Weaviate.Infrastructure.WeaviateProvenanceItems;
 using ProvenanceModes = Koan.Core.Hosting.Bootstrap.ProvenancePublicationModeExtensions;
 
@@ -41,6 +42,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         // Register Weaviate discovery adapter (maintains "Reference = Intent")
         // Adding Koan.Data.Vector.Connector.Weaviate automatically enables Weaviate discovery capabilities
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IServiceDiscoveryAdapter, WeaviateDiscoveryAdapter>());
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IZenGardenOfferingBinding, WeaviateZenGardenOfferingBinding>());
 
         services.AddSingleton<IVectorAdapterFactory, WeaviateVectorAdapterFactory>();
         services.AddHttpClient("weaviate");
@@ -181,5 +183,4 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         return endpoint;
     }
 }
-
 

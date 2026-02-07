@@ -785,10 +785,15 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
         // Generate event name in format: "October 1, 2025"
         var eventName = normalizedDate.ToString("MMMM d, yyyy");
 
-        // Check if event already exists for this date
+        // Check if event already exists for this date.
+        // Note: use an inclusive/exclusive UTC day range instead of `e.EventDate.Date == normalizedDate`
+        // to avoid Mongo translator emitting `$dateTrunc` (unsupported on older Mongo servers).
+        var dayStart = normalizedDate;
+        var dayEndExclusive = dayStart.AddDays(1);
         var existingEvents = await Event.Query(e =>
             e.Type == EventType.DailyAuto &&
-            e.EventDate.Date == normalizedDate,
+            e.EventDate >= dayStart &&
+            e.EventDate < dayEndExclusive,
             ct);
 
         if (existingEvents.Any())

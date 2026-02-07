@@ -29,6 +29,7 @@
     <ProjectReference Include="..\..\src\Koan.AI\Koan.AI.csproj" />
     <ProjectReference Include="..\..\src\Koan.Data.AI\Koan.Data.AI.csproj" />
     <ProjectReference Include="..\..\src\Connectors\AI\Ollama\Koan.AI.Connector.Ollama.csproj" />
+    <ProjectReference Include="..\..\src\Koan.ZenGarden\Koan.ZenGarden.csproj" />
 
     <!-- Vector Search -->
     <ProjectReference Include="..\..\src\Koan.Data.Vector\Koan.Data.Vector.csproj" />

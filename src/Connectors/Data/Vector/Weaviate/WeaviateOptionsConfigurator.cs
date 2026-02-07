@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Linq;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -11,6 +13,7 @@ using Koan.Core.Infrastructure;
 using Koan.Core.Logging;
 using Koan.Core.Orchestration;
 using Koan.Core.Orchestration.Abstractions;
+using Koan.ZenGarden.Core;
 using WeaviateItems = Koan.Data.Vector.Connector.Weaviate.Infrastructure.WeaviateProvenanceItems;
 
 namespace Koan.Data.Vector.Connector.Weaviate;
@@ -22,6 +25,7 @@ namespace Koan.Data.Vector.Connector.Weaviate;
 internal sealed class WeaviateOptionsConfigurator : AdapterOptionsConfigurator<WeaviateOptions>
 {
     private readonly IServiceDiscoveryCoordinator? _discoveryCoordinator;
+    private readonly IZenGardenInitializationProvider? _zenGardenInitializationProvider;
 
     protected override string ProviderName => "Weaviate";
 
@@ -29,10 +33,12 @@ internal sealed class WeaviateOptionsConfigurator : AdapterOptionsConfigurator<W
         IConfiguration config,
         ILogger<WeaviateOptionsConfigurator>? logger,
         IOptions<AdaptersReadinessOptions> readinessOptions,
-        IServiceDiscoveryCoordinator? discoveryCoordinator = null)
+        IServiceDiscoveryCoordinator? discoveryCoordinator = null,
+        IZenGardenInitializationProvider? zenGardenInitializationProvider = null)
         : base(config, logger, readinessOptions)
     {
         _discoveryCoordinator = discoveryCoordinator;
+        _zenGardenInitializationProvider = zenGardenInitializationProvider;
     }
 
     // Simplified constructor for orchestration scenarios without DI
@@ -41,6 +47,7 @@ internal sealed class WeaviateOptionsConfigurator : AdapterOptionsConfigurator<W
                Microsoft.Extensions.Options.Options.Create(new AdaptersReadinessOptions()))
     {
         _discoveryCoordinator = null;
+        _zenGardenInitializationProvider = null;
     }
 
     protected override void ConfigureProviderSpecific(WeaviateOptions options)
@@ -60,22 +67,51 @@ internal sealed class WeaviateOptionsConfigurator : AdapterOptionsConfigurator<W
 
         var explicitConnectionString = ReadProviderConfiguration(string.Empty, WeaviateItems.ConnectionStringKeys);
 
-        if (!string.IsNullOrWhiteSpace(explicitConnectionString))
+        var requestedConnection = !string.IsNullOrWhiteSpace(explicitConnectionString)
+            ? explicitConnectionString
+            : options.ConnectionString;
+
+        if (ZenGardenConnectionIntent.TryParse(requestedConnection, out var zenGardenIntent))
+        {
+            if (TryResolveZenGardenConnection(zenGardenIntent!, out var resolved))
+            {
+                options.ConnectionString = resolved;
+                options.Endpoint = resolved;
+                KoanLog.ConfigInfo(Logger, LogActions.ZenGarden, "intent-resolved", ("intent", requestedConnection));
+            }
+            else
+            {
+                options.ConnectionString = ResolveAutonomousConnection();
+                options.Endpoint = options.ConnectionString;
+                KoanLog.ConfigWarning(Logger, LogActions.ZenGarden, "intent-fallback-autonomous", ("intent", requestedConnection));
+            }
+        }
+        else if (!string.IsNullOrWhiteSpace(explicitConnectionString))
         {
             KoanLog.ConfigInfo(Logger, LogActions.Config, "connection-explicit", ("source", "configuration"));
             options.ConnectionString = explicitConnectionString;
             options.Endpoint = explicitConnectionString; // For backward compatibility
         }
-        else if (string.Equals(options.ConnectionString?.Trim(), "auto", StringComparison.OrdinalIgnoreCase) ||
-                 string.IsNullOrWhiteSpace(options.ConnectionString))
+        else if (IsAutoConnection(requestedConnection))
         {
-            KoanLog.ConfigInfo(Logger, LogActions.Discovery, "auto-mode");
-            options.ConnectionString = ResolveAutonomousConnection();
-            options.Endpoint = options.ConnectionString; // For backward compatibility
+            var defaultIntent = BuildDefaultZenGardenIntent();
+            if (TryResolveZenGardenConnection(defaultIntent, out var resolved))
+            {
+                options.ConnectionString = resolved;
+                options.Endpoint = resolved;
+                KoanLog.ConfigInfo(Logger, LogActions.ZenGarden, "auto-resolved", ("offering", defaultIntent.ToOfferingSelector()));
+            }
+            else
+            {
+                KoanLog.ConfigInfo(Logger, LogActions.Discovery, "auto-mode");
+                options.ConnectionString = ResolveAutonomousConnection();
+                options.Endpoint = options.ConnectionString; // For backward compatibility
+            }
         }
         else
         {
             KoanLog.ConfigInfo(Logger, LogActions.Config, "connection-preconfigured");
+            options.ConnectionString = requestedConnection ?? string.Empty;
             options.Endpoint = options.ConnectionString; // For backward compatibility
         }
 
@@ -162,11 +198,154 @@ internal sealed class WeaviateOptionsConfigurator : AdapterOptionsConfigurator<W
         return Koan.Core.Configuration.Read(Configuration, Infrastructure.Constants.Configuration.Flags.DisableAutoDetection, false);
     }
 
+    private ZenGardenConnectionIntent BuildDefaultZenGardenIntent()
+    {
+        var configuredOffering = ReadProviderConfiguration(
+            string.Empty,
+            "Koan:Data:Weaviate:ZenGarden:Offering");
+
+        if (string.IsNullOrWhiteSpace(configuredOffering) &&
+            _zenGardenInitializationProvider?.TryGetDefaultOffering("weaviate", out var mappedOffering) == true)
+        {
+            configuredOffering = mappedOffering;
+        }
+
+        if (string.IsNullOrWhiteSpace(configuredOffering))
+        {
+            configuredOffering = "weaviate";
+        }
+
+        var configuredInstance = ReadProviderConfiguration(
+            string.Empty,
+            "Koan:Data:Weaviate:ZenGarden:Instance");
+
+        return ZenGardenConnectionIntent.ForOffering(
+            configuredOffering,
+            configuredInstance,
+            ReadZenGardenCapabilities());
+    }
+
+    private IReadOnlyList<string> ReadZenGardenCapabilities()
+    {
+        var sectionValues = Configuration
+            .GetSection("Koan:Data:Weaviate:ZenGarden:Capabilities")
+            .Get<string[]>() ?? Array.Empty<string>();
+
+        var singleValue = ReadProviderConfiguration(
+            string.Empty,
+            "Koan:Data:Weaviate:ZenGarden:Capability");
+
+        var parsed = new List<string>();
+        foreach (var raw in sectionValues)
+        {
+            AppendCapabilities(raw, parsed);
+        }
+
+        AppendCapabilities(singleValue, parsed);
+
+        return new ReadOnlyCollection<string>(parsed
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Select(x => x.ToLowerInvariant())
+            .ToArray());
+    }
+
+    private static void AppendCapabilities(string? raw, ICollection<string> output)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return;
+        }
+
+        foreach (var token in raw.Split([',', '|'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            if (!string.IsNullOrWhiteSpace(token))
+            {
+                output.Add(token.Trim());
+            }
+        }
+    }
+
+    private bool TryResolveZenGardenConnection(
+        ZenGardenConnectionIntent intent,
+        out string connectionString)
+    {
+        connectionString = string.Empty;
+        if (_zenGardenInitializationProvider is null)
+        {
+            KoanLog.ConfigDebug(Logger, LogActions.ZenGarden, "provider-missing");
+            return false;
+        }
+
+        try
+        {
+            var resolved = _zenGardenInitializationProvider
+                .ResolveAsync(intent)
+                .GetAwaiter()
+                .GetResult();
+
+            if (resolved is null)
+            {
+                KoanLog.ConfigDebug(Logger, LogActions.ZenGarden, "offering-not-ready",
+                    ("offering", intent.ToOfferingSelector()));
+                return false;
+            }
+
+            var directUri = resolved.GetUri("http", "https");
+            if (!string.IsNullOrWhiteSpace(directUri) &&
+                Uri.TryCreate(directUri, UriKind.Absolute, out var parsedUri))
+            {
+                connectionString = NormalizeEndpoint(parsedUri);
+                KoanLog.ConfigInfo(Logger, LogActions.ZenGarden, "resolved",
+                    ("offering", resolved.ToolFqid),
+                    ("connection", connectionString));
+                return true;
+            }
+
+            var host = !string.IsNullOrWhiteSpace(resolved.Hostname)
+                ? resolved.Hostname
+                : resolved.Ip;
+            if (string.IsNullOrWhiteSpace(host))
+            {
+                KoanLog.ConfigWarning(Logger, LogActions.ZenGarden, "missing-endpoint",
+                    ("offering", resolved.ToolFqid));
+                return false;
+            }
+
+            var port = resolved.Port ?? 8080;
+            connectionString = $"http://{host}:{port}";
+            KoanLog.ConfigInfo(Logger, LogActions.ZenGarden, "resolved",
+                ("offering", resolved.ToolFqid),
+                ("connection", connectionString));
+            return true;
+        }
+        catch (Exception ex)
+        {
+            KoanLog.ConfigWarning(Logger, LogActions.ZenGarden, "exception",
+                ("offering", intent.ToOfferingSelector()),
+                ("reason", ex.Message));
+            KoanLog.ConfigDebug(Logger, LogActions.ZenGarden, "exception-detail", ("exception", ex.ToString()));
+            return false;
+        }
+    }
+
+    private static bool IsAutoConnection(string? connectionString)
+    {
+        return string.IsNullOrWhiteSpace(connectionString)
+            || string.Equals(connectionString.Trim(), "auto", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string NormalizeEndpoint(Uri uri)
+    {
+        var port = uri.IsDefaultPort ? string.Empty : $":{uri.Port}";
+        return $"{uri.Scheme}://{uri.Host}{port}";
+    }
+
     private static class LogActions
     {
         public const string Config = "weaviate.config";
         public const string Discovery = "weaviate.discovery";
         public const string DiscoveryRequest = "weaviate.discovery.request";
+        public const string ZenGarden = "weaviate.zengarden";
     }
 
     private static class LogOutcomeValues
