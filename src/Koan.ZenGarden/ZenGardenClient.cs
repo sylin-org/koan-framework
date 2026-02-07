@@ -15,6 +15,11 @@ public sealed class ZenGardenClient : IZenGardenClient
     private readonly JsonSerializerOptions _jsonOptions;
     private readonly bool _ownsHttpClient;
 
+    private static readonly JsonSerializerOptions TopologySerializerOptions = new()
+    {
+        PropertyNameCaseInsensitive = true
+    };
+
     private readonly ConcurrentDictionary<string, ZenGardenToolSnapshot> _tools =
         new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<Guid, SubscriptionRegistration> _subscriptions = new();
@@ -24,6 +29,7 @@ public sealed class ZenGardenClient : IZenGardenClient
     private readonly ConcurrentDictionary<string, CachedMossStone> _stoneCache =
         new(StringComparer.OrdinalIgnoreCase);
     private readonly IStoneRosterStore? _rosterStore;
+    private readonly string? _mossTopologyPath;
 
     private readonly HashSet<string> _seenEventIds = new(StringComparer.OrdinalIgnoreCase);
     private readonly Queue<string> _seenEventOrder = new();
@@ -77,6 +83,7 @@ public sealed class ZenGardenClient : IZenGardenClient
         _options = options ?? new ZenGardenOptions();
         _ownsHttpClient = ownsHttpClient;
         _rosterStore = rosterStore;
+        _mossTopologyPath = StoneRosterPathResolver.ResolveMossTopologyPath(_options);
         _jsonOptions = new JsonSerializerOptions
         {
             PropertyNameCaseInsensitive = true
@@ -1561,42 +1568,129 @@ public sealed class ZenGardenClient : IZenGardenClient
 
     private async Task SeedFromPersistedRosterAsync(CancellationToken ct)
     {
-        if (_rosterStore is null)
-        {
-            return;
-        }
-
         if (Interlocked.CompareExchange(ref _persistedRosterSeeded, 1, 0) != 0)
         {
             return;
         }
 
+        // 1. Own roster (garden-stones.json) — client's operational knowledge
+        if (_rosterStore is not null)
+        {
+            try
+            {
+                var persisted = await _rosterStore.LoadAsync(ct).ConfigureAwait(false);
+                var now = DateTimeOffset.UtcNow;
+                foreach (var stone in persisted)
+                {
+                    // Refresh LastSeenUtc so seeded entries survive the in-memory TTL purge
+                    // (persisted roster already filtered by its own 7-day TTL)
+                    var refreshed = stone with { LastSeenUtc = now };
+                    _stoneCache.TryAdd(refreshed.CacheKey, refreshed);
+                    if (!string.Equals(refreshed.CacheKey, refreshed.StoneName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        _stoneCache.TryAdd(refreshed.StoneName, refreshed);
+                    }
+                }
+
+                if (persisted.Count > 0)
+                {
+                    _logger.LogInformation(
+                        "Seeded {Count} stones from persisted roster into in-memory cache.",
+                        persisted.Count);
+                }
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogDebug(ex, "Failed to seed stone cache from persisted roster.");
+            }
+        }
+
+        // 2. Moss topology (garden-topology.json) — fills gaps from Moss's mesh view
+        await SeedFromMossTopologyAsync(ct).ConfigureAwait(false);
+    }
+
+    private async Task SeedFromMossTopologyAsync(CancellationToken ct)
+    {
         try
         {
-            var persisted = await _rosterStore.LoadAsync(ct).ConfigureAwait(false);
+            if (_mossTopologyPath is null || !File.Exists(_mossTopologyPath))
+                return;
+
+            var json = await File.ReadAllTextAsync(_mossTopologyPath, ct).ConfigureAwait(false);
+            if (string.IsNullOrWhiteSpace(json))
+                return;
+
+            // File is a bare JSON array — NOT the HTTP API envelope.
+            // The HTTP path unwraps {"data": [...]}, but the file is just [...].
+            var entries = JsonSerializer.Deserialize<List<MossTopologyEntry>>(json, TopologySerializerOptions);
+            if (entries is null || entries.Count == 0)
+                return;
+
+            var seeded = 0;
             var now = DateTimeOffset.UtcNow;
-            foreach (var stone in persisted)
+
+            foreach (var entry in entries)
             {
-                // Refresh LastSeenUtc so seeded entries survive the in-memory TTL purge
-                // (persisted roster already filtered by its own 7-day TTL)
-                var refreshed = stone with { LastSeenUtc = now };
-                _stoneCache.TryAdd(refreshed.CacheKey, refreshed);
-                if (!string.Equals(refreshed.CacheKey, refreshed.StoneName, StringComparison.OrdinalIgnoreCase))
+                if (string.IsNullOrWhiteSpace(entry.Endpoint))
+                    continue;
+
+                var cacheKey = !string.IsNullOrWhiteSpace(entry.StoneId)
+                    ? entry.StoneId
+                    : entry.StoneName;
+
+                if (string.IsNullOrWhiteSpace(cacheKey))
+                    continue;
+
+                // Only add if not already present from own roster (own roster wins)
+                if (_stoneCache.ContainsKey(cacheKey))
+                    continue;
+
+                // Refresh LastSeenUtc to now — same policy as own-roster seeding.
+                // The file may be hours old if Moss is down, but the data is the best
+                // available truth. Let active hydration update to real timestamps later.
+                var stone = new CachedMossStone
                 {
-                    _stoneCache.TryAdd(refreshed.StoneName, refreshed);
+                    Endpoint = entry.Endpoint,
+                    StoneId = entry.StoneId,
+                    StoneName = entry.StoneName ?? cacheKey,
+                    MossVersion = entry.MossVersion,
+                    LastSeenUtc = now
+                };
+
+                if (_stoneCache.TryAdd(cacheKey, stone))
+                {
+                    seeded++;
+
+                    // Index by name if StoneId was the primary key
+                    if (!string.IsNullOrWhiteSpace(entry.StoneId)
+                        && !string.IsNullOrWhiteSpace(entry.StoneName))
+                    {
+                        _stoneCache.TryAdd(entry.StoneName, stone);
+                    }
+
+                    // Also cache .local variant for mDNS resolution parity.
+                    // Active hydration already does this — file-based seed should too,
+                    // so host-network lookups find file-seeded stones by .local name.
+                    if (!string.IsNullOrWhiteSpace(entry.StoneName))
+                    {
+                        var localKey = $"{entry.StoneName}.local";
+                        var localEndpoint = $"http://{entry.StoneName}.local:{Constants.Moss.DefaultPort}";
+                        var localStone = stone with { Endpoint = localEndpoint };
+                        _stoneCache.TryAdd(localKey, localStone);
+                    }
                 }
             }
 
-            if (persisted.Count > 0)
+            if (seeded > 0)
             {
-                _logger.LogInformation(
-                    "Seeded {Count} stones from persisted roster into in-memory cache.",
-                    persisted.Count);
+                _logger.LogDebug(
+                    "Seeded {Count} stones from Moss topology file into in-memory cache.",
+                    seeded);
             }
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            _logger.LogDebug(ex, "Failed to seed stone cache from persisted roster.");
+            _logger.LogDebug(ex, "Could not seed from Moss topology file (non-fatal).");
         }
     }
 
@@ -3074,28 +3168,7 @@ public sealed class ZenGardenClient : IZenGardenClient
     private sealed record TopologyApiResponse
     {
         [JsonPropertyName("data")]
-        public List<TopologyEntryResponse>? Data { get; init; }
-    }
-
-    private sealed record TopologyEntryResponse
-    {
-        [JsonPropertyName("stone_id")]
-        public string? StoneId { get; init; }
-
-        [JsonPropertyName("stone_name")]
-        public string? StoneName { get; init; }
-
-        [JsonPropertyName("endpoint")]
-        public string? Endpoint { get; init; }
-
-        [JsonPropertyName("moss_version")]
-        public string? MossVersion { get; init; }
-
-        [JsonPropertyName("last_seen")]
-        public DateTimeOffset? LastSeen { get; init; }
-
-        [JsonPropertyName("health")]
-        public string? Health { get; init; }
+        public List<MossTopologyEntry>? Data { get; init; }
     }
 
     private sealed class SubscriptionHandle : IDisposable

@@ -36,7 +36,9 @@ public static class Constants
     {
         public const int DefaultPersistedCacheTtlHours = 168; // 7 days
         public const string DefaultCacheSubdirectory = ".Koan/zen-garden";
-        public const string RosterFileName = "stones.json";
+        public const string RosterFileName = "garden-stones.json";
+        public const string LegacyRosterFileName = "stones.json";
+        public const string MossTopologyFileName = "garden-topology.json";
     }
 
     public static class Moss

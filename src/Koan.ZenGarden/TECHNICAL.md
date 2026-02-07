@@ -50,8 +50,9 @@ It does not use `/api/v1/services` as a primary catalog source.
 ### Topology API
 
 - `GET /api/v1/garden/topology`
-- Returns array of `TopologyEntry`: `stone_id`, `stone_name`, `endpoint`, `moss_version`, `health`, `last_seen`
+- Returns `{"data": [...]}` envelope containing `TopologyEntry` objects: `stone_id`, `stone_name`, `endpoint`, `moss_version`, `health`, `last_seen`
 - Consumed for active topology hydration (failover roster)
+- Note: the HTTP response uses an envelope; the file (`garden-topology.json`) is a bare array
 
 ### Snapshot API
 
@@ -76,7 +77,7 @@ It does not use `/api/v1/services` as a primary catalog source.
 `ZenGardenClient` performs:
 
 1. Moss endpoint resolution (ordered by priority):
-   1. Seed persisted Stone roster into in-memory cache (once on first resolution)
+   1. Seed from own roster (`garden-stones.json`) and Moss topology (`garden-topology.json`) into in-memory cache (once on first resolution)
    2. Currently bound Stone (skipped on forced rediscovery after failure)
    3. Explicit endpoint / `GARDEN_STONE` selector
    4. Preferred Stone name (soft affinity via `PreferredStoneName` option)
@@ -346,9 +347,26 @@ Containerized reconnection failover:
 
 The client persists discovered Moss Stone metadata to disk for failover recovery.
 
+### Shared Topology Directory
+
+Moss and clients coexist in a shared directory:
+
+```
+/app/cache/zen-garden/                  (container mount point)
+  garden-topology.json                  ← Moss writes (authoritative mesh snapshot)
+  garden-stones.json                    ← Clients write (operational roster)
+```
+
+On the host, Moss writes to the system-wide data directory:
+- Linux/macOS: `/var/lib/zen-garden/topology/garden-topology.json`
+- Windows: `C:\ProgramData\zen-garden\topology\garden-topology.json`
+- Override: `GARDEN_DATA_DIR` env var → `{GARDEN_DATA_DIR}/topology/garden-topology.json`
+
+See `DATA-0090-shared-topology-directory.md` for the architectural decision.
+
 ### File Format
 
-`stones.json` — a JSON array of `CachedMossStone` records:
+`garden-stones.json` — a JSON array of `CachedMossStone` records (client-owned):
 
 ```json
 [
@@ -363,6 +381,36 @@ The client persists discovered Moss Stone metadata to disk for failover recovery
 ]
 ```
 
+`garden-topology.json` — a bare JSON array of Moss `TopologyEntry` records (Moss-owned, read-only):
+
+```json
+[
+  {
+    "stone_id": "019abc12-...",
+    "stone_name": "stone-coral-prairie",
+    "endpoint": "http://192.168.1.50:7185",
+    "moss_version": "0.9.1",
+    "last_seen": "2026-02-07T12:00:30Z",
+    "health": "thriving",
+    "status": "online"
+  }
+]
+```
+
+**Note**: The file is a bare JSON array — NOT the HTTP API envelope (`{"data": [...]}`).
+The client only extracts: `stone_id`, `stone_name`, `endpoint`, `moss_version`, `last_seen`.
+
+### Cold-Start Seeding Priority
+
+```
+1. Own roster (garden-stones.json)     ← Client's operational knowledge, wins on key conflict
+2. Moss topology (garden-topology.json) ← Fills gaps from Moss's mesh view
+3. Active hydration (HTTP)              ← Live fetch on bind, refreshes everything
+4. SSE stream (real-time)               ← Continuous updates after connection
+```
+
+The first two are file reads (< 1ms). Steps 3-4 require Moss to be reachable.
+
 ### Location Resolution
 
 1. `Koan:ZenGarden:DiscoveryCachePath` (explicit config)
@@ -376,7 +424,7 @@ The client persists discovered Moss Stone metadata to disk for failover recovery
 - Write-through on `BindStone()` only (not every cache update)
 - Fire-and-forget from the bind path (no I/O blocking)
 - Merge-on-write: reads existing file, merges by CacheKey (newer wins), atomically replaces
-- Atomic rename: writes to `stones.json.tmp` then `File.Move(overwrite: true)`
+- Atomic rename: writes to `garden-stones.json.tmp` then `File.Move(overwrite: true)`
 - `SemaphoreSlim` serializes writes within a single process
 
 ### TTL
@@ -385,12 +433,20 @@ The client persists discovered Moss Stone metadata to disk for failover recovery
 - Persisted roster TTL: `PersistedCacheTtlHours` (default 168h / 7 days) — cold failover path
 - Expired entries are filtered on load and pruned on write
 
+### Migration
+
+On first `LoadAsync()`, if `garden-stones.json` does not exist but `stones.json` does at the
+same resolved path, it is renamed automatically. This one-time migration preserves existing
+cached topology from before the rename. On shared volumes with concurrent container starts,
+the rename is race-safe (first writer wins, others continue gracefully).
+
 ### Cross-Container Safety
 
-Multiple containers sharing a bind-mounted `.Koan/zen-garden/` volume:
+Multiple containers sharing a bind-mounted directory:
 - Each container reads before writing, merges its knowledge, then atomically replaces
 - `File.Move(overwrite: true)` ensures the last writer wins with a valid file
 - Readers always get a complete, consistent file
+- Moss writes `garden-topology.json`; clients write `garden-stones.json` — no writer conflicts
 
 ## Active Topology Hydration
 

@@ -31,6 +31,8 @@ internal sealed class StoneRosterStore : IStoneRosterStore
     {
         try
         {
+            MigrateLegacyFilename();
+
             if (!File.Exists(_filePath))
             {
                 return Array.Empty<CachedMossStone>();
@@ -108,6 +110,36 @@ internal sealed class StoneRosterStore : IStoneRosterStore
         finally
         {
             _writeLock.Release();
+        }
+    }
+
+    private void MigrateLegacyFilename()
+    {
+        if (File.Exists(_filePath))
+            return;
+
+        var dir = Path.GetDirectoryName(_filePath);
+        if (string.IsNullOrEmpty(dir))
+            return;
+
+        var legacyPath = Path.Combine(dir, Constants.Persistence.LegacyRosterFileName);
+        if (!File.Exists(legacyPath))
+            return;
+
+        try
+        {
+            File.Move(legacyPath, _filePath);
+            _logger.LogInformation(
+                "Migrated legacy roster file: {Legacy} → {Current}",
+                legacyPath, _filePath);
+        }
+        catch (Exception ex)
+        {
+            // Race-safe: on shared volumes, multiple containers may attempt the rename
+            // simultaneously. The first succeeds; others get FileNotFoundException.
+            // This is expected and non-fatal — the winning container's rename stands.
+            _logger.LogDebug(ex,
+                "Could not migrate legacy roster file {Legacy}", legacyPath);
         }
     }
 

@@ -44,6 +44,75 @@ internal static class StoneRosterPathResolver
         return Path.Combine(conventionDir, Constants.Persistence.RosterFileName);
     }
 
+    /// <summary>
+    /// Resolves the path for the Moss-authored topology file.
+    /// Resolution chain:
+    /// 1. Same directory as roster (container mount or explicit config — co-located files)
+    /// 2. <c>GARDEN_DATA_DIR</c> env var + <c>/topology/garden-topology.json</c>
+    /// 3. System-wide Zen Garden data directory:
+    ///    - Linux: <c>/var/lib/zen-garden/topology/</c>
+    ///    - Windows: <c>%ProgramData%\zen-garden\topology\</c>
+    /// Returns the first path where the file actually exists, or the roster-adjacent
+    /// path as a default (so the file can appear there later).
+    /// </summary>
+    public static string? ResolveMossTopologyPath(ZenGardenOptions options)
+    {
+        var rosterPath = Resolve(options);
+        var rosterDir = Path.GetDirectoryName(rosterPath);
+
+        // 1. Co-located with roster (container mount or explicit config)
+        if (!string.IsNullOrEmpty(rosterDir))
+        {
+            var colocated = Path.Combine(rosterDir, Constants.Persistence.MossTopologyFileName);
+            if (File.Exists(colocated))
+                return colocated;
+        }
+
+        // 2. GARDEN_DATA_DIR env var (Moss convention, overridable)
+        var gardenDataDir = Environment.GetEnvironmentVariable("GARDEN_DATA_DIR");
+        if (!string.IsNullOrWhiteSpace(gardenDataDir))
+        {
+            var envPath = Path.Combine(gardenDataDir.Trim(), "topology", Constants.Persistence.MossTopologyFileName);
+            if (File.Exists(envPath))
+                return envPath;
+        }
+
+        // 3. System-wide Zen Garden data directory (platform-specific)
+        var systemPath = ResolveSystemTopologyPath();
+        if (systemPath is not null && File.Exists(systemPath))
+            return systemPath;
+
+        // Default: roster-adjacent path (file may appear later via mount injection)
+        return string.IsNullOrEmpty(rosterDir)
+            ? null
+            : Path.Combine(rosterDir, Constants.Persistence.MossTopologyFileName);
+    }
+
+    private static string? ResolveSystemTopologyPath()
+    {
+        // System-wide stable paths that survive user changes and are accessible by services.
+        // These match Moss's data_dir conventions from paths.rs / filesystem.rs.
+        if (OperatingSystem.IsLinux())
+        {
+            return Path.Combine("/var/lib/zen-garden", "topology", Constants.Persistence.MossTopologyFileName);
+        }
+
+        if (OperatingSystem.IsWindows())
+        {
+            // C:\ProgramData\zen-garden — same as Moss's Windows service installation path
+            var programData = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
+            if (!string.IsNullOrEmpty(programData))
+                return Path.Combine(programData, "zen-garden", "topology", Constants.Persistence.MossTopologyFileName);
+        }
+
+        if (OperatingSystem.IsMacOS())
+        {
+            return Path.Combine("/var/lib/zen-garden", "topology", Constants.Persistence.MossTopologyFileName);
+        }
+
+        return null;
+    }
+
     private static bool IsContainerized()
     {
         return string.Equals(
