@@ -4,8 +4,8 @@ setlocal enableextensions enabledelayedexpansion
 set "ROOT=%~dp0"
 pushd "%ROOT%" >nul
 
-set "PROJECT_NAME=koan-s6-snapvault"
-set "COMPOSE_FILE=docker\compose.yml"
+set "CONTAINER_NAME=koan-s6-snapvault"
+set "IMAGE_NAME=koan-s6-snapvault:dev"
 set "OPEN_URL=http://localhost:5086"
 
 where docker >nul 2>nul
@@ -48,38 +48,36 @@ echo Docker Desktop is ready!
 :docker_ready
 echo Docker Desktop is running.
 
-docker compose version >nul 2>nul
-if errorlevel 1 goto use_docker_compose
+REM Stop any existing container
+docker stop %CONTAINER_NAME% >nul 2>nul
+docker rm %CONTAINER_NAME% >nul 2>nul
 
-:use_compose
-echo Building images...
-docker compose -p %PROJECT_NAME% -f "%COMPOSE_FILE%" build
+echo Building image...
+docker build -t %IMAGE_NAME% -f Dockerfile ..\..\..
 if errorlevel 1 (popd & exit /b 1)
 
-echo Starting services...
-docker compose -p %PROJECT_NAME% -f "%COMPOSE_FILE%" up -d
-if errorlevel 1 (popd & exit /b 1)
-goto done
+REM Ensure volume directories exist
+if not exist "%ROOT%.Koan\Data" mkdir "%ROOT%.Koan\Data"
+if not exist "%ROOT%.Koan\cache" mkdir "%ROOT%.Koan\cache"
+if not exist "%ROOT%.Koan\storage" mkdir "%ROOT%.Koan\storage"
 
-:use_docker_compose
-where docker-compose >nul 2>nul
-if errorlevel 1 (
-  echo docker-compose is not available. Please update Docker Desktop.
-  popd & exit /b 1
-)
-
-echo Building images...
-docker-compose -p %PROJECT_NAME% -f "%COMPOSE_FILE%" build
-if errorlevel 1 (popd & exit /b 1)
-
-echo Starting services...
-docker-compose -p %PROJECT_NAME% -f "%COMPOSE_FILE%" up -d
+echo Starting SnapVault container...
+docker run -d --name %CONTAINER_NAME% ^
+  --env-file docker-run.env ^
+  -p 5086:5086 ^
+  -v "%ROOT%.Koan\Data:/app/data" ^
+  -v "%ROOT%.Koan\cache:/app/cache" ^
+  -v "%ROOT%.Koan\storage:/app/storage" ^
+  %IMAGE_NAME%
 if errorlevel 1 (popd & exit /b 1)
 
-:done
 echo.
 echo SnapVault is starting up!
 echo Opening browser to %OPEN_URL%
+echo.
+echo   Logs:    docker logs -f %CONTAINER_NAME%
+echo   Stop:    docker stop %CONTAINER_NAME%
+echo   Restart: docker restart %CONTAINER_NAME%
 echo.
 start "" "%OPEN_URL%" >nul 2>&1
 popd
