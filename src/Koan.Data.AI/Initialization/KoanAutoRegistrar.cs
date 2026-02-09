@@ -25,10 +25,14 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         // Use source-generated registry populated at module initialization
         var embeddingTypes = EmbeddingRegistry.GetRegisteredTypes();
 
-        // Register event hooks for each entity type
+        // Register event hooks only for entity types with lifecycle enabled (attribute present)
         foreach (var entityType in embeddingTypes)
         {
-            RegisterEmbeddingHooks(entityType);
+            var metadata = EmbeddingMetadata.Resolve(entityType);
+            if (metadata.LifecycleEnabled)
+            {
+                RegisterEmbeddingHooks(entityType);
+            }
         }
 
         // Register EmbeddingWorker as a hosted service (background worker)
@@ -54,14 +58,14 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         module.Describe(ModuleVersion);
 
         var registeredTypes = EmbeddingRegistry.GetRegisteredTypes();
-        var syncCount = registeredTypes.Count(t => !EmbeddingMetadata.Get(t).Async);
-        var asyncCount = registeredTypes.Count(t => EmbeddingMetadata.Get(t).Async);
+        var syncCount = registeredTypes.Count(t => !EmbeddingMetadata.Resolve(t).Async);
+        var asyncCount = registeredTypes.Count(t => EmbeddingMetadata.Resolve(t).Async);
 
         module.AddNote($"Registered {registeredTypes.Count} auto-embedding entities ({syncCount} sync, {asyncCount} async)");
 
         foreach (var type in registeredTypes.OrderBy(t => t.Name))
         {
-            var metadata = EmbeddingMetadata.Get(type);
+            var metadata = EmbeddingMetadata.Resolve(type);
             var mode = metadata.Template != null ? "Template" :
                        metadata.Properties.Length > 0 && metadata.Policy == EmbeddingPolicy.Explicit ? "Properties" :
                        metadata.Policy.ToString();
@@ -151,7 +155,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         where TEntity : class, Koan.Data.Abstractions.IEntity<string>
     {
         var entity = ctx.Current;
-        var metadata = EmbeddingMetadata.Get<TEntity>();
+        var metadata = EmbeddingMetadata.Resolve<TEntity>();
 
         // Compute current content signature
         var currentSignature = metadata.ComputeSignature(entity);
@@ -274,7 +278,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         // Generate embedding with source routing
         float[] embedding;
         using (metadata.Source != null || metadata.Model != null
-            ? Koan.AI.Client.Context(source: metadata.Source, model: metadata.Model)
+            ? Koan.AI.Client.Scope(all: metadata.Source)
             : null)
         {
             embedding = await Koan.AI.Client.Embed(text, ct);

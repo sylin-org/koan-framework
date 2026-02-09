@@ -54,7 +54,7 @@ public class EmbeddingAttribute : Attribute
 
     /// <summary>
     /// AI source or group name for routing embeddings to specific providers.
-    /// Flows through Client.Context(source: ...) to route to appropriate AI service.
+    /// Flows through Client.Scope(all: ...) to route to appropriate AI service.
     /// Examples: "ollama-primary", "openai-prod", "azure-embeddings"
     /// If null, uses default routing.
     /// </summary>

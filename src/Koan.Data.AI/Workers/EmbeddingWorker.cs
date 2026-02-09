@@ -230,7 +230,7 @@ public class EmbeddingWorker : BackgroundService
             }
 
             // Verify content signature hasn't changed
-            var metadata = EmbeddingMetadata.Get<TEntity>();
+            var metadata = EmbeddingMetadata.Resolve<TEntity>();
             var currentSignature = metadata.ComputeSignature(entity);
 
             if (currentSignature != job.ContentSignature)
@@ -253,7 +253,7 @@ public class EmbeddingWorker : BackgroundService
             // Generate embedding with source routing
             float[] embedding;
             using (metadata.Source != null || metadata.Model != null
-                ? Client.Context(source: metadata.Source, model: metadata.Model)
+                ? Client.Scope(all: metadata.Source)
                 : null)
             {
                 embedding = await Client.Embed(job.EmbeddingText, ct);
@@ -310,7 +310,7 @@ public class EmbeddingWorker : BackgroundService
             stopwatch.Stop();
 
             // Record failure telemetry
-            var metadata = EmbeddingMetadata.Get<TEntity>();
+            var metadata = EmbeddingMetadata.Resolve<TEntity>();
             var estimatedTokens = EmbeddingMetadata.EstimateTokens(job.EmbeddingText);
 
             _telemetry?.RecordEmbeddingGeneration(

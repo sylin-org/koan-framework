@@ -11,8 +11,9 @@ using Microsoft.Extensions.Logging;
 namespace Koan.Data.AI;
 
 /// <summary>
-/// Runtime metadata cache for [Embedding] attributes.
-/// Provides efficient access to embedding configuration and text generation logic.
+/// Runtime metadata cache for embedding configuration.
+/// Convention-first: Resolve() never returns null — decorated entities get attribute config,
+/// undecorated entities get convention-inferred config (AllStrings policy, lifecycle disabled).
 /// </summary>
 public class EmbeddingMetadata
 {
@@ -20,8 +21,11 @@ public class EmbeddingMetadata
     private static readonly ILogger? _logger = (Koan.Core.Hosting.App.AppHost.Current?.GetService(typeof(ILoggerFactory)) as ILoggerFactory)?.CreateLogger("Koan.Data.AI.EmbeddingMetadata");
 
     // Approximate tokens per character for English text (tiktoken-style estimation)
-    // Real tokenizers vary, but ~4 chars/token is a reasonable heuristic
     private const double CHARS_PER_TOKEN = 4.0;
+
+    // Entity infrastructure properties excluded from convention/AllStrings scanning.
+    // These are identity/framework fields, not semantic content.
+    private static readonly HashSet<string> InfrastructureProperties = new(StringComparer.OrdinalIgnoreCase) { "Id" };
 
     public EmbeddingPolicy Policy { get; init; }
     public string? Template { get; init; }
@@ -38,32 +42,47 @@ public class EmbeddingMetadata
     public int Version { get; init; }
 
     /// <summary>
-    /// Gets cached metadata for the specified entity type.
-    /// Thread-safe, cached after first access.
+    /// True when [Embedding] attribute is present — gates auto-embed-on-save lifecycle hooks.
+    /// Convention-inferred metadata has this set to false.
     /// </summary>
-    public static EmbeddingMetadata Get(Type entityType)
+    public bool LifecycleEnabled { get; init; }
+
+    /// <summary>
+    /// True when the entity type has [Embedding] attribute.
+    /// </summary>
+    public bool HasAttribute { get; init; }
+
+    /// <summary>
+    /// Resolves metadata for the specified entity type. Never returns null.
+    /// Decorated entities get attribute-configured metadata; undecorated entities
+    /// get convention-inferred metadata (AllStrings policy, no lifecycle).
+    /// </summary>
+    public static EmbeddingMetadata Resolve(Type entityType)
     {
         return _cache.GetOrAdd(entityType, BuildMetadata);
     }
 
     /// <summary>
-    /// Gets cached metadata for the specified entity type (generic).
+    /// Resolves metadata for the specified entity type (generic). Never returns null.
     /// </summary>
-    public static EmbeddingMetadata Get<TEntity>() where TEntity : class
+    public static EmbeddingMetadata Resolve<TEntity>() where TEntity : class
     {
-        return Get(typeof(TEntity));
+        return Resolve(typeof(TEntity));
     }
 
     private static EmbeddingMetadata BuildMetadata(Type entityType)
     {
         var attr = entityType.GetCustomAttribute<EmbeddingAttribute>();
-        if (attr == null)
+        if (attr is not null)
         {
-            throw new InvalidOperationException(
-                $"Type {entityType.Name} has no [Embedding] attribute. " +
-                $"Add [Embedding] to enable automatic embedding generation.");
+            return BuildFromAttribute(entityType, attr);
         }
 
+        return InferConvention(entityType);
+    }
+
+    private static EmbeddingMetadata BuildFromAttribute(Type entityType, EmbeddingAttribute attr)
+    {
         string[] properties;
 
         // Precedence: Template > Properties > Policy
@@ -94,7 +113,32 @@ public class EmbeddingMetadata
             MaxDepth = attr.MaxDepth,
             Exclude = attr.Exclude ?? Array.Empty<string>(),
             WarnOnTruncation = attr.WarnOnTruncation,
-            Version = attr.Version
+            Version = attr.Version,
+            LifecycleEnabled = true,
+            HasAttribute = true
+        };
+    }
+
+    /// <summary>
+    /// Infers convention metadata for entities without [Embedding] attribute.
+    /// Scans public string properties (excluding [EmbeddingIgnore]).
+    /// Lifecycle disabled — on-demand only.
+    /// </summary>
+    private static EmbeddingMetadata InferConvention(Type entityType)
+    {
+        var properties = entityType.GetProperties()
+            .Where(p => p.CanRead && p.GetCustomAttribute<EmbeddingIgnoreAttribute>() == null)
+            .Where(p => !InfrastructureProperties.Contains(p.Name))
+            .Where(p => p.PropertyType == typeof(string) || p.PropertyType == typeof(string[]))
+            .Select(p => p.Name)
+            .ToArray();
+
+        return new EmbeddingMetadata
+        {
+            Policy = EmbeddingPolicy.AllStrings,
+            Properties = properties,
+            LifecycleEnabled = false,
+            HasAttribute = false
         };
     }
 
@@ -128,9 +172,6 @@ public class EmbeddingMetadata
         return text;
     }
 
-    /// <summary>
-    /// Builds embedding text from properties (legacy behavior).
-    /// </summary>
     private string BuildFromProperties(object entity)
     {
         var parts = new List<string>();
@@ -138,7 +179,6 @@ public class EmbeddingMetadata
 
         foreach (var propName in Properties)
         {
-            // Skip excluded properties
             if (Exclude.Contains(propName))
                 continue;
 
@@ -165,37 +205,75 @@ public class EmbeddingMetadata
         return string.Join("\n\n", parts);
     }
 
-    /// <summary>
-    /// Serializes entity to JSON for FullJson policy.
-    /// Respects MaxDepth, Exclude, and [EmbeddingIgnore] attributes.
-    /// </summary>
     private string SerializeToJson(object entity)
     {
-        // MaxDepth in [Embedding] means "nested object depth", but JsonSerializer counts from root
-        // Add 2 to account for root object + properties (MaxDepth=2 means allow 2 levels of nested objects)
-        var jsonMaxDepth = MaxDepth > 0 ? MaxDepth + 2 : 64;
-
         var options = new JsonSerializerOptions
         {
             WriteIndented = false,
             DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-            MaxDepth = jsonMaxDepth,
+            MaxDepth = 64,
             ReferenceHandler = ReferenceHandler.IgnoreCycles
         };
 
-        // Apply property exclusions if specified
         if (Exclude != null && Exclude.Length > 0)
         {
             options.TypeInfoResolver = new ExclusionTypeInfoResolver(Exclude);
         }
 
         var json = JsonSerializer.Serialize(entity, entity.GetType(), options);
+
+        if (MaxDepth > 0)
+        {
+            json = TruncateJsonDepth(json);
+        }
+
         return json;
     }
 
-    /// <summary>
-    /// Custom TypeInfoResolver that excludes specified properties from serialization.
-    /// </summary>
+    private string TruncateJsonDepth(string json)
+    {
+        using var doc = JsonDocument.Parse(json);
+        using var stream = new System.IO.MemoryStream();
+        using var writer = new Utf8JsonWriter(stream, new JsonWriterOptions { Indented = false });
+        WriteWithDepthLimit(writer, doc.RootElement, 0);
+        writer.Flush();
+        return Encoding.UTF8.GetString(stream.ToArray());
+    }
+
+    private void WriteWithDepthLimit(Utf8JsonWriter writer, JsonElement element, int objectDepth)
+    {
+        switch (element.ValueKind)
+        {
+            case JsonValueKind.Object:
+                if (objectDepth > MaxDepth)
+                {
+                    writer.WriteNullValue();
+                    return;
+                }
+                writer.WriteStartObject();
+                foreach (var property in element.EnumerateObject())
+                {
+                    writer.WritePropertyName(property.Name);
+                    WriteWithDepthLimit(writer, property.Value, objectDepth + 1);
+                }
+                writer.WriteEndObject();
+                break;
+
+            case JsonValueKind.Array:
+                writer.WriteStartArray();
+                foreach (var item in element.EnumerateArray())
+                {
+                    WriteWithDepthLimit(writer, item, objectDepth);
+                }
+                writer.WriteEndArray();
+                break;
+
+            default:
+                element.WriteTo(writer);
+                break;
+        }
+    }
+
     private class ExclusionTypeInfoResolver : System.Text.Json.Serialization.Metadata.DefaultJsonTypeInfoResolver
     {
         private readonly HashSet<string> _excludedProperties;
@@ -211,7 +289,6 @@ public class EmbeddingMetadata
 
             if (typeInfo.Kind == System.Text.Json.Serialization.Metadata.JsonTypeInfoKind.Object)
             {
-                // Remove excluded properties
                 var propsToRemove = typeInfo.Properties
                     .Where(p => _excludedProperties.Contains(p.Name))
                     .ToList();
@@ -226,27 +303,20 @@ public class EmbeddingMetadata
         }
     }
 
-    /// <summary>
-    /// Truncates text to fit within token limit.
-    /// Uses approximate token estimation (chars / 4).
-    /// Preserves word boundaries and adds ellipsis.
-    /// </summary>
     private string TruncateToTokenLimit(string text, Type entityType)
     {
         var estimatedTokens = EstimateTokens(text);
 
         if (estimatedTokens <= MaxTokens)
-            return text; // No truncation needed
+            return text;
 
-        // Truncate to approximate character limit (reserve 3 chars for "...")
         var maxChars = (int)(MaxTokens * CHARS_PER_TOKEN) - 3;
-        if (maxChars <= 0)
+        if (maxChars < 4)
             return "...";
 
         if (text.Length <= maxChars)
             return text;
 
-        // Find last word boundary (space) before maxChars
         var truncated = text.Substring(0, maxChars);
         var lastSpace = truncated.LastIndexOf(' ');
 
@@ -255,10 +325,8 @@ public class EmbeddingMetadata
             truncated = truncated.Substring(0, lastSpace);
         }
 
-        // Add ellipsis (without space before it)
         truncated = truncated.TrimEnd() + "...";
 
-        // Emit warning if configured
         if (WarnOnTruncation && _logger != null)
         {
             _logger.LogWarning(
@@ -270,30 +338,18 @@ public class EmbeddingMetadata
         return truncated;
     }
 
-    /// <summary>
-    /// Estimates token count from text length.
-    /// Uses approximate heuristic: tokens ≈ chars / 4
-    /// </summary>
     public static int EstimateTokens(string text)
     {
         return (int)Math.Ceiling(text.Length / CHARS_PER_TOKEN);
     }
 
-    /// <summary>
-    /// Renders template string with property values substituted.
-    /// Template format: "{PropertyName}" gets replaced with property value.
-    /// String arrays are automatically joined with ", ".
-    /// Respects Exclude list.
-    /// </summary>
     private string RenderTemplate(object entity)
     {
         var result = Template!;
         var entityType = entity.GetType();
 
-        // Replace {PropertyName} with property values
         foreach (var propName in Properties)
         {
-            // Skip excluded properties
             if (Exclude.Contains(propName))
             {
                 result = result.Replace($"{{{propName}}}", "");
@@ -326,22 +382,13 @@ public class EmbeddingMetadata
         return result;
     }
 
-    /// <summary>
-    /// Computes SHA256 content signature from entity's embedding text.
-    /// Includes version number to force re-embedding when schema changes.
-    /// Same content + same version = same signature = no need to regenerate embedding.
-    /// </summary>
     public string ComputeSignature(object entity)
     {
         var text = BuildEmbeddingText(entity);
-        // Include version in signature to invalidate cache when schema changes
         var versionedContent = $"v{Version}:{text}";
         return ComputeSignature(versionedContent);
     }
 
-    /// <summary>
-    /// Computes SHA256 hash of text content.
-    /// </summary>
     public static string ComputeSignature(string text)
     {
         using var sha256 = SHA256.Create();
@@ -349,10 +396,6 @@ public class EmbeddingMetadata
         return Convert.ToHexString(hash).ToLowerInvariant();
     }
 
-    /// <summary>
-    /// Extracts property names from template string.
-    /// Example: "{Title}\n\n{Content}" returns ["Title", "Content"]
-    /// </summary>
     private static string[] ExtractTemplateProperties(string template)
     {
         var regex = new Regex(@"\{(\w+)\}", RegexOptions.Compiled);
@@ -360,25 +403,24 @@ public class EmbeddingMetadata
         return matches.Select(m => m.Groups[1].Value).Distinct().ToArray();
     }
 
-    /// <summary>
-    /// Infers properties from entity type based on policy.
-    /// </summary>
     private static string[] InferPropertiesFromPolicy(Type entityType, EmbeddingPolicy policy)
     {
         return policy switch
         {
             EmbeddingPolicy.AllStrings => entityType.GetProperties()
                 .Where(p => p.CanRead && p.GetCustomAttribute<EmbeddingIgnoreAttribute>() == null)
+                .Where(p => !InfrastructureProperties.Contains(p.Name))
                 .Where(p => p.PropertyType == typeof(string) || p.PropertyType == typeof(string[]))
                 .Select(p => p.Name)
                 .ToArray(),
 
             EmbeddingPolicy.AllPublic => entityType.GetProperties()
                 .Where(p => p.CanRead && p.GetCustomAttribute<EmbeddingIgnoreAttribute>() == null)
+                .Where(p => !InfrastructureProperties.Contains(p.Name))
                 .Select(p => p.Name)
                 .ToArray(),
 
-            EmbeddingPolicy.FullJson => Array.Empty<string>(), // Properties not used in FullJson mode
+            EmbeddingPolicy.FullJson => Array.Empty<string>(),
 
             EmbeddingPolicy.Explicit => throw new InvalidOperationException(
                 $"Type {entityType.Name} uses EmbeddingPolicy.Explicit but does not specify Properties or Template. " +

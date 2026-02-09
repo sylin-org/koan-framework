@@ -53,7 +53,7 @@ public static partial class EmbeddingRegistry
 
             var snapshot = _registeredTypes.Keys.ToArray();
             return snapshot
-                .Where(t => EmbeddingMetadata.Get(t).Async)
+                .Where(t => EmbeddingMetadata.Resolve(t).Async)
                 .ToArray();
         }
     }

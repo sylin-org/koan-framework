@@ -58,7 +58,7 @@ public static class EmbeddingMigrator
         CancellationToken ct = default)
         where TEntity : class, IEntity<string>
     {
-        var metadata = EmbeddingMetadata.Get<TEntity>();
+        var metadata = EmbeddingMetadata.Resolve<TEntity>();
         logger?.LogInformation(
             "Starting re-embedding migration for {EntityType}: model={Model}, source={Source}, provider={Provider}",
             typeof(TEntity).Name, targetModel ?? "default", targetSource ?? "default", targetProvider ?? "default");
@@ -240,7 +240,7 @@ public static class EmbeddingMigrator
                 // Generate embedding with target model/source
                 float[] embedding;
                 using (targetSource != null || targetProvider != null || targetModel != null
-                    ? Client.Context(source: targetSource, provider: targetProvider, model: targetModel)
+                    ? Client.Scope(all: targetSource)
                     : null)
                 {
                     embedding = await Client.Embed(text, ct);
