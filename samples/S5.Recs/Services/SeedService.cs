@@ -699,7 +699,7 @@ internal sealed class SeedService : ISeedService
         _logger?.LogDebug("Vector pipeline starting: {Count} items, model={Model}", itemsList.Count, modelId);
 
         // Build lookup: contentHash -> Media
-        var metadata = EmbeddingMetadata.Get<Media>();
+        var metadata = EmbeddingMetadata.Resolve<Media>();
         var mediaByHash = new Dictionary<string, Media>();
         foreach (var media in itemsList)
         {

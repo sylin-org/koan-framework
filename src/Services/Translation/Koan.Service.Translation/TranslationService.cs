@@ -104,9 +104,8 @@ public class TranslationService
 
         _logger.LogDebug("Translating single chunk ({Length} chars) from {SourceLanguage} to {TargetLanguage}", text.Length, sourceLanguage, targetLanguage);
 
-        var chatOptions = new AiChatOptions
+        var chatOptions = new ChatOptions
         {
-            Message = prompt,
             SystemPrompt = $@"You are a professional literary translator tasked with translating from {GetLanguageName(sourceLanguage)} to {GetLanguageName(targetLanguage)}.
 
 YOUR TASK:
@@ -131,7 +130,7 @@ BEGIN:",
             Model = model
         };
 
-        var rawTranslation = await Client.Chat(chatOptions, ct);
+        var rawTranslation = await Client.Chat(prompt, chatOptions, ct);
 
         // Post-process to remove common AI artifacts
         return CleanTranslationOutput(rawTranslation, targetLanguage);
@@ -398,13 +397,12 @@ BEGIN:",
             // Use a sample if text is very long
             var sampleText = text.Length > 500 ? text.Substring(0, 500) : text;
 
-            var chatOptions = new AiChatOptions
+            var chatOptions = new ChatOptions
             {
-                Message = sampleText,
                 SystemPrompt = "You are a language detection system. Identify the language and output ONLY the two-letter ISO 639-1 code in lowercase (examples: en, es, fr, de, ja, zh). Output nothing else - no explanations, no punctuation, just the code."
             };
 
-            var languageCode = await Client.Chat(chatOptions, ct);
+            var languageCode = await Client.Chat(sampleText, chatOptions, ct);
 
             // Extract just the code if AI added extra text
             var cleanCode = ExtractLanguageCode(languageCode);

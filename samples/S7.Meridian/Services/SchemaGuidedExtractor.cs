@@ -162,9 +162,8 @@ public sealed class SchemaGuidedExtractor : ISchemaGuidedExtractor
         FieldSource source,
         CancellationToken ct)
     {
-        var chatOptions = new AiChatOptions
+        var chatOptions = new ChatOptions
         {
-            Message = prompt,
             Model = _options.Facts.ExtractionModel,
             Temperature = _options.Facts.ExtractionTemperature,
             MaxTokens = 0,
@@ -177,7 +176,7 @@ public sealed class SchemaGuidedExtractor : ISchemaGuidedExtractor
             _logger.LogDebug("Extracting batch '{Batch}' ({FieldCount} fields) using {Model}",
                 batch.CategoryName, batch.FieldPaths.Count, _options.Facts.ExtractionModel);
 
-            raw = await Client.Chat(chatOptions, ct);
+            raw = await Client.Chat(prompt, chatOptions, ct);
 
             if (_logger.IsEnabled(LogLevel.Trace))
             {

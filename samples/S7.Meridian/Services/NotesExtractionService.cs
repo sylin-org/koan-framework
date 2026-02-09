@@ -87,15 +87,14 @@ public sealed class NotesExtractionService : INotesExtractionService
 
         try
         {
-            var chatOptions = new AiChatOptions
+            var chatOptions = new ChatOptions
             {
-                Message = prompt,
                 Model = _options.Extraction.Model ?? "granite3.3:8b",
                 Temperature = 0.1, // Low temperature for deterministic extraction
                 MaxTokens = 2000
             };
 
-            var response = await Client.Chat(chatOptions, ct);
+            var response = await Client.Chat(prompt, chatOptions, ct);
 
             if (string.IsNullOrWhiteSpace(response))
             {

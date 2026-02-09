@@ -51,9 +51,8 @@ public sealed class SourceTypeAuthoringService : ISourceTypeAuthoringService
 
         var prompt = BuildPrompt(request);
         var model = request.Model ?? _options.Extraction.Model ?? "granite3.3:8b";
-        var chatOptions = new AiChatOptions
+        var chatOptions = new ChatOptions
         {
-            Message = prompt,
             Model = model,
             Temperature = 0.15,
             MaxTokens = 900
@@ -62,7 +61,7 @@ public sealed class SourceTypeAuthoringService : ISourceTypeAuthoringService
         string rawResponse;
         try
         {
-            rawResponse = await Client.Chat(chatOptions, ct);
+            rawResponse = await Client.Chat(prompt, chatOptions, ct);
         }
         catch (Exception ex)
         {

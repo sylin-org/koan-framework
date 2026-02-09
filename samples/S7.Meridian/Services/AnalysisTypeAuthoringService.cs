@@ -65,9 +65,8 @@ public sealed class AnalysisTypeAuthoringService : IAnalysisTypeAuthoringService
         var prompt = BuildPrompt(request);
         // Model selection removed from request; use options default or fallback
         var model = _options.Extraction.Model ?? "granite3.3:8b";
-        var chatOptions = new AiChatOptions
+        var chatOptions = new ChatOptions
         {
-            Message = prompt,
             Model = model,
             Temperature = 0.1,
             MaxTokens = 4000
@@ -76,7 +75,7 @@ public sealed class AnalysisTypeAuthoringService : IAnalysisTypeAuthoringService
         string rawResponse;
         try
         {
-            rawResponse = await Client.Chat(chatOptions, ct).ConfigureAwait(false);
+            rawResponse = await Client.Chat(prompt, chatOptions, ct).ConfigureAwait(false);
         }
         catch (Exception ex)
         {

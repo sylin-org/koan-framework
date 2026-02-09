@@ -49,15 +49,36 @@ public sealed class AiController : ControllerBase
     }
 
     [HttpGet(Constants.Routes.Capabilities)]
-    public async Task<IActionResult> Capabilities(CancellationToken ct)
+    public IActionResult Capabilities()
     {
-        var caps = new List<AiCapabilities>();
-        foreach (var a in _registry.All)
+        var caps = _registry.All.Select(a => new
         {
-            try { caps.Add(await a.GetCapabilitiesAsync(ct)); }
-            catch { /* ignore unavailable adapter */ }
-        }
+            a.Id,
+            a.Type,
+            Chat = a is IChatAdapter,
+            Embed = a is IEmbedAdapter,
+            Ocr = a is IOcrAdapter,
+            ModelManagement = a.ModelManager is not null
+        });
         return Ok(caps);
+    }
+
+    [HttpPost(Constants.Routes.Ocr)]
+    public async Task<IActionResult> Ocr(IFormFile file, CancellationToken ct)
+    {
+        if (file is null || file.Length == 0)
+            return BadRequest(new { message = "Image file is required." });
+
+        using var ms = new System.IO.MemoryStream();
+        await file.CopyToAsync(ms, ct);
+        var imageBytes = ms.ToArray();
+
+        var text = await Client.Ocr(imageBytes, new Contracts.Options.OcrOptions
+        {
+            MimeType = file.ContentType
+        }, ct);
+
+        return Ok(new { text });
     }
 
     [HttpPost(Constants.Routes.AdapterModelInstall)]

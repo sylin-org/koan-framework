@@ -63,9 +63,8 @@ public sealed class FactCategorizer : IFactCategorizer
         var prompt = BuildCategorizationPrompt(catalog, analysisType);
 
         // Call LLM
-        var chatOptions = new AiChatOptions
+        var chatOptions = new ChatOptions
         {
-            Message = prompt,
             Model = _options.Facts.ExtractionModel,
             Temperature = 0.3, // Lower temperature for consistent categorization
             MaxTokens = 0,
@@ -75,7 +74,7 @@ public sealed class FactCategorizer : IFactCategorizer
         string raw;
         try
         {
-            raw = await Client.Chat(chatOptions, ct);
+            raw = await Client.Chat(prompt, chatOptions, ct);
             _logger.LogDebug("LLM categorization response length: {Length} characters", raw.Length);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)

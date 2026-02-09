@@ -268,9 +268,9 @@ public sealed class DocumentClassifier : IDocumentClassifier
         promptBuilder.AppendLine().AppendLine("Document preview:").AppendLine(preview);
         promptBuilder.AppendLine().AppendLine("Respond ONLY in JSON with fields typeId, confidence (0.0-1.0), and reasoning.");
 
-        var chatOptions = new AiChatOptions
+        var message = promptBuilder.ToString();
+        var chatOptions = new ChatOptions
         {
-            Message = promptBuilder.ToString(),
             Temperature = 0.1,
             MaxTokens = 400,
             Model = _options.Classification.LlmModel ?? _options.Extraction.Model ?? "granite3.3:8b"
@@ -278,7 +278,7 @@ public sealed class DocumentClassifier : IDocumentClassifier
 
         try
         {
-            var response = await Client.Chat(chatOptions, ct);
+            var response = await Client.Chat(message, chatOptions, ct);
 
             // Check for empty response
             if (string.IsNullOrWhiteSpace(response))
