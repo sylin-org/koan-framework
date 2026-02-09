@@ -15,7 +15,10 @@ public sealed class ZenGardenContainerResolutionTests
         using var env = EnvironmentScope.Override(new Dictionary<string, string?>
         {
             [Constants.EnvironmentVariables.DotnetRunningInContainer] = "true",
-            [Constants.EnvironmentVariables.ContainerHost] = "moss-container"
+            [Constants.EnvironmentVariables.ContainerHost] = "moss-container",
+            [Constants.EnvironmentVariables.GardenStone] = null,
+            [Constants.EnvironmentVariables.PreferredStoneName] = null,
+            [Constants.EnvironmentVariables.CachePath] = null
         });
 
         var handler = new ContainerHostMossHandler("moss-container", healthy: true);
@@ -26,7 +29,9 @@ public sealed class ZenGardenContainerResolutionTests
             new ZenGardenOptions
             {
                 EnableDiscovery = false,
-                RequireHostMossWhenContainerized = true
+                RequireHostMossWhenContainerized = true,
+                PersistDiscoveryCache = false,
+                KoiDiscoveryEnabled = false
             });
 
         var tools = await client.CatalogAsync(ZenGardenSubscription.ForOffering("ollama"));
@@ -41,7 +46,10 @@ public sealed class ZenGardenContainerResolutionTests
         using var env = EnvironmentScope.Override(new Dictionary<string, string?>
         {
             [Constants.EnvironmentVariables.DotnetRunningInContainer] = "true",
-            [Constants.EnvironmentVariables.ContainerHost] = "moss-container"
+            [Constants.EnvironmentVariables.ContainerHost] = "moss-container",
+            [Constants.EnvironmentVariables.GardenStone] = null,
+            [Constants.EnvironmentVariables.PreferredStoneName] = null,
+            [Constants.EnvironmentVariables.CachePath] = null
         });
 
         var handler = new ContainerHostMossHandler("moss-container", healthy: false);
@@ -52,7 +60,9 @@ public sealed class ZenGardenContainerResolutionTests
             new ZenGardenOptions
             {
                 EnableDiscovery = false,
-                RequireHostMossWhenContainerized = true
+                RequireHostMossWhenContainerized = true,
+                PersistDiscoveryCache = false,
+                KoiDiscoveryEnabled = false
             });
 
         var act = async () => await client.CatalogAsync(ZenGardenSubscription.ForOffering("ollama"));
