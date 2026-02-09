@@ -31,7 +31,7 @@ public sealed class EmbeddingMetadataSpec
             NumericValue = 42 // Should be ignored
         };
 
-        var metadata = EmbeddingMetadata.Get<AllStringsTestEntity>();
+        var metadata = EmbeddingMetadata.Resolve<AllStringsTestEntity>();
 
         // Act
         var embeddingText = metadata.BuildEmbeddingText(entity);
@@ -57,7 +57,7 @@ public sealed class EmbeddingMetadataSpec
             InternalNotes = "Should be excluded"
         };
 
-        var metadata = EmbeddingMetadata.Get<ExplicitPropertiesEntity>();
+        var metadata = EmbeddingMetadata.Resolve<ExplicitPropertiesEntity>();
 
         // Act
         var embeddingText = metadata.BuildEmbeddingText(entity);
@@ -82,7 +82,7 @@ public sealed class EmbeddingMetadataSpec
             Year = 2024
         };
 
-        var metadata = EmbeddingMetadata.Get<TemplateEntity>();
+        var metadata = EmbeddingMetadata.Resolve<TemplateEntity>();
 
         // Act
         var embeddingText = metadata.BuildEmbeddingText(entity);
@@ -112,7 +112,7 @@ public sealed class EmbeddingMetadataSpec
             }
         };
 
-        var metadata = EmbeddingMetadata.Get<FullJsonEntity>();
+        var metadata = EmbeddingMetadata.Resolve<FullJsonEntity>();
 
         // Act
         var embeddingText = metadata.BuildEmbeddingText(entity);
@@ -142,7 +142,7 @@ public sealed class EmbeddingMetadataSpec
             PasswordHash = "hashed_password"
         };
 
-        var metadata = EmbeddingMetadata.Get<FullJsonWithExclusionsEntity>();
+        var metadata = EmbeddingMetadata.Resolve<FullJsonWithExclusionsEntity>();
 
         // Act
         var embeddingText = metadata.BuildEmbeddingText(entity);
@@ -183,7 +183,7 @@ public sealed class EmbeddingMetadataSpec
                       "This sentence should be truncated at a word boundary."
         };
 
-        var metadata = EmbeddingMetadata.Get<TruncationTestEntity>();
+        var metadata = EmbeddingMetadata.Resolve<TruncationTestEntity>();
 
         // Act
         var embeddingText = metadata.BuildEmbeddingText(entity);
@@ -209,8 +209,8 @@ public sealed class EmbeddingMetadataSpec
             Content = "Same content"
         };
 
-        var metadataV1 = EmbeddingMetadata.Get<VersionedEntityV1>();
-        var metadataV2 = EmbeddingMetadata.Get<VersionedEntityV2>();
+        var metadataV1 = EmbeddingMetadata.Resolve<VersionedEntityV1>();
+        var metadataV2 = EmbeddingMetadata.Resolve<VersionedEntityV2>();
 
         // Act
         var signatureV1 = metadataV1.ComputeSignature(entity);
@@ -232,7 +232,7 @@ public sealed class EmbeddingMetadataSpec
             Content = "Stable content"
         };
 
-        var metadata = EmbeddingMetadata.Get<VersionedEntityV1>();
+        var metadata = EmbeddingMetadata.Resolve<VersionedEntityV1>();
 
         // Act
         var signature1 = metadata.ComputeSignature(entity);

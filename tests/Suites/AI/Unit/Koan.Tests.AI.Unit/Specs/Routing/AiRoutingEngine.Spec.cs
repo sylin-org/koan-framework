@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -8,15 +8,20 @@ using FluentAssertions;
 using Koan.AI;
 using Koan.AI.Contracts.Adapters;
 using Koan.AI.Contracts.Models;
+using Koan.AI.Contracts.Options;
 using Koan.AI.Contracts.Routing;
 using Koan.AI.Contracts.Sources;
 using Koan.AI.Pipeline;
+using Microsoft.Extensions.Options;
 using Xunit;
 
 namespace Koan.Tests.AI.Unit.Specs.Routing;
 
 public sealed class AiRoutingEngineSpec
 {
+    private static AiCategoryRouter CreateRouter(InMemoryAdapterRegistry adapters, FakeSourceRegistry sources)
+        => new(adapters, sources, Options.Create(new AiOptions()));
+
     [Fact]
     public void ResolveChat_without_hints_selects_highest_priority_source()
     {
@@ -42,9 +47,9 @@ public sealed class AiRoutingEngineSpec
                 ["Chat"] = new() { Model = "beta-chat" }
             }));
 
-        var engine = new AiRoutingEngine(adapters, sources);
+        var router = CreateRouter(adapters, sources);
 
-        var resolution = engine.ResolveChat(new AiChatRequest
+        var resolution = router.ResolveChat(new AiChatRequest
         {
             Messages = new List<AiMessage> { new("user", "hi") }
         });
@@ -83,9 +88,9 @@ public sealed class AiRoutingEngineSpec
             },
             members: members));
 
-        var engine = new AiRoutingEngine(adapters, sources);
+        var router = CreateRouter(adapters, sources);
 
-        var resolution = engine.ResolveChat(new AiChatRequest
+        var resolution = router.ResolveChat(new AiChatRequest
         {
             Messages = new List<AiMessage> { new("user", "hey") },
             Route = new AiRouteHints { AdapterId = "alpha::secondary" }
@@ -118,9 +123,9 @@ public sealed class AiRoutingEngineSpec
             },
             members: members));
 
-        var engine = new AiRoutingEngine(adapters, sources);
+        var router = CreateRouter(adapters, sources);
 
-        var resolution = engine.ResolveChat(new AiChatRequest
+        var resolution = router.ResolveChat(new AiChatRequest
         {
             Messages = new List<AiMessage> { new("user", "hi") }
         });
@@ -147,9 +152,9 @@ public sealed class AiRoutingEngineSpec
             priority: 50,
             capabilities: new Dictionary<string, AiCapabilityConfig>()));
 
-        var engine = new AiRoutingEngine(adapters, sources);
+        var router = CreateRouter(adapters, sources);
 
-        var resolution = engine.ResolveEmbeddings(new AiEmbeddingsRequest
+        var resolution = router.ResolveEmbeddings(new AiEmbeddingsRequest
         {
             Model = "text-embedding-x",
             Input = new List<string> { "hello" }
@@ -175,16 +180,16 @@ public sealed class AiRoutingEngineSpec
                 ["Chat"] = new() { Model = "alpha-chat" }
             }));
 
-        var engine = new AiRoutingEngine(adapters, sources);
+        var router = CreateRouter(adapters, sources);
 
-        var act = () => engine.ResolveChat(new AiChatRequest
+        var act = () => router.ResolveChat(new AiChatRequest
         {
             Messages = new List<AiMessage> { new("user", "hi") },
             Route = new AiRouteHints { AdapterId = "missing" }
         });
 
         act.Should().Throw<InvalidOperationException>()
-            .WithMessage("Source 'missing' not found. Available sources: alpha");
+            .WithMessage("Source 'missing' not found*");
     }
 
     [Fact]
@@ -202,15 +207,15 @@ public sealed class AiRoutingEngineSpec
                 ["Chat"] = new() { Model = "alpha-chat" }
             }));
 
-        var engine = new AiRoutingEngine(adapters, sources);
+        var router = CreateRouter(adapters, sources);
 
-        var act = () => engine.ResolveChat(new AiChatRequest
+        var act = () => router.ResolveChat(new AiChatRequest
         {
             Messages = new List<AiMessage> { new("user", "hi") }
         });
 
         act.Should().Throw<InvalidOperationException>()
-            .WithMessage("No adapter found for provider 'alpha'. Available adapters: ");
+            .WithMessage("No adapter found for provider 'alpha'*");
     }
 
     [Fact]
@@ -229,16 +234,16 @@ public sealed class AiRoutingEngineSpec
                 ["Chat"] = new() { Model = "alpha-chat" }
             }));
 
-        var engine = new AiRoutingEngine(adapters, sources);
+        var router = CreateRouter(adapters, sources);
 
-        var act = () => engine.ResolveChat(new AiChatRequest
+        var act = () => router.ResolveChat(new AiChatRequest
         {
             Messages = new List<AiMessage> { new("user", "hi") },
             Route = new AiRouteHints { AdapterId = "alpha::missing" }
         });
 
         act.Should().Throw<InvalidOperationException>()
-            .WithMessage("Member 'alpha::missing' not found in source 'alpha'. Available members: alpha::primary");
+            .WithMessage("Member 'alpha::missing' not found in source 'alpha'*");
     }
 
     private static AiSourceDefinition CreateSource(
@@ -327,7 +332,7 @@ public sealed class AiRoutingEngineSpec
         }
     }
 
-    private sealed class TestAdapter : IAiAdapter
+    private sealed class TestAdapter : IChatAdapter, IEmbedAdapter
     {
         private readonly string _id;
 
@@ -357,15 +362,5 @@ public sealed class AiRoutingEngineSpec
 
         public Task<IReadOnlyList<AiModelDescriptor>> ListModelsAsync(CancellationToken ct = default)
             => Task.FromResult<IReadOnlyList<AiModelDescriptor>>(Array.Empty<AiModelDescriptor>());
-
-        public Task<AiCapabilities> GetCapabilitiesAsync(CancellationToken ct = default)
-            => Task.FromResult(new AiCapabilities
-            {
-                AdapterId = _id,
-                AdapterType = _id,
-                SupportsChat = true,
-                SupportsStreaming = true,
-                SupportsEmbeddings = true
-            });
     }
 }

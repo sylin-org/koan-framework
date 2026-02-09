@@ -103,7 +103,7 @@ public class Phase3_AsyncQueueTests
     public void TestAsyncDocument_HasAsyncConfiguration()
     {
         // Arrange & Act
-        var metadata = EmbeddingMetadata.Get<TestAsyncDocument>();
+        var metadata = EmbeddingMetadata.Resolve<TestAsyncDocument>();
 
         // Assert
         metadata.Async.Should().BeTrue();

@@ -48,7 +48,7 @@ public sealed class PipelineE2ETests
             KoanEnv.TryInitialize(scopedProvider);
 
             using var partition = EntityContext.Partition($"meridian-e2e-{Guid.NewGuid():N}");
-            using var aiScope = Ai.With(new FakeAi());
+            using var aiScope = Client.With(new FakeAi());
             var ct = CancellationToken.None;
 
             var analysisType = new AnalysisType

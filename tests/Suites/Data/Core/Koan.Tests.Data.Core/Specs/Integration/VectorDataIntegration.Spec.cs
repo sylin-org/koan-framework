@@ -267,7 +267,7 @@ public sealed class VectorDataIntegrationSpec
             Content = "Vector databases enable semantic search capabilities."
         };
 
-        var metadata = EmbeddingMetadata.Get<ArticleEntity>();
+        var metadata = EmbeddingMetadata.Resolve<ArticleEntity>();
         var embeddingText = metadata.BuildEmbeddingText(article);
 
         embeddingText.Should().Contain("AI-Powered Search");

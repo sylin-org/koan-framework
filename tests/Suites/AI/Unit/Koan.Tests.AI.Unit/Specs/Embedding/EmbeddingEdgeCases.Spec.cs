@@ -23,7 +23,7 @@ public sealed class EmbeddingEdgeCasesSpec
     [Fact]
     public void BuildEmbeddingText_null_properties_are_skipped()
     {
-        var metadata = EmbeddingMetadata.Get<AllStringsTestEntity>();
+        var metadata = EmbeddingMetadata.Resolve<AllStringsTestEntity>();
 
         var entity = new AllStringsTestEntity
         {
@@ -43,7 +43,7 @@ public sealed class EmbeddingEdgeCasesSpec
     [Fact]
     public void BuildEmbeddingText_all_null_properties_returns_empty_string()
     {
-        var metadata = EmbeddingMetadata.Get<AllStringsTestEntity>();
+        var metadata = EmbeddingMetadata.Resolve<AllStringsTestEntity>();
 
         var entity = new AllStringsTestEntity
         {
@@ -62,7 +62,7 @@ public sealed class EmbeddingEdgeCasesSpec
     [Fact]
     public void RenderTemplate_missing_property_replaces_with_empty()
     {
-        var metadata = EmbeddingMetadata.Get<TemplateEntity>();
+        var metadata = EmbeddingMetadata.Resolve<TemplateEntity>();
 
         var entity = new TemplateEntity
         {
@@ -83,7 +83,7 @@ public sealed class EmbeddingEdgeCasesSpec
     [Fact]
     public void Truncation_very_long_word_truncates_mid_word()
     {
-        var metadata = EmbeddingMetadata.Get<TruncationTestEntity>();
+        var metadata = EmbeddingMetadata.Resolve<TruncationTestEntity>();
 
         // Create a 10,000-character word (no spaces)
         var veryLongWord = new string('a', 10000);
@@ -111,7 +111,7 @@ public sealed class EmbeddingEdgeCasesSpec
             Content = "This is a very long text that should be truncated to almost nothing"
         };
 
-        var metadata = EmbeddingMetadata.Get<MaxTokensOneEntity>();
+        var metadata = EmbeddingMetadata.Resolve<MaxTokensOneEntity>();
         var embeddingText = metadata.BuildEmbeddingText(entity);
 
         embeddingText.Should().Be("...", "MaxTokens=1 with long text should produce just ellipsis");
@@ -128,7 +128,7 @@ public sealed class EmbeddingEdgeCasesSpec
             Content = new string('x', 10000)
         };
 
-        var metadata = EmbeddingMetadata.Get<MaxTokensZeroEntity>();
+        var metadata = EmbeddingMetadata.Resolve<MaxTokensZeroEntity>();
         var embeddingText = metadata.BuildEmbeddingText(entity);
 
         embeddingText.Length.Should().Be(10000, "MaxTokens=0 should not truncate");
@@ -140,7 +140,7 @@ public sealed class EmbeddingEdgeCasesSpec
     [Fact]
     public void BuildEmbeddingText_string_array_all_empty_produces_empty()
     {
-        var metadata = EmbeddingMetadata.Get<StringArrayEntity>();
+        var metadata = EmbeddingMetadata.Resolve<StringArrayEntity>();
 
         var entity = new StringArrayEntity
         {
@@ -158,7 +158,7 @@ public sealed class EmbeddingEdgeCasesSpec
     [Fact]
     public void FullJson_max_depth_one_limits_nesting()
     {
-        var metadata = EmbeddingMetadata.Get<MaxDepthOneEntity>();
+        var metadata = EmbeddingMetadata.Resolve<MaxDepthOneEntity>();
 
         var entity = new MaxDepthOneEntity
         {
@@ -190,7 +190,7 @@ public sealed class EmbeddingEdgeCasesSpec
     [Fact]
     public void FullJson_circular_reference_handled_gracefully()
     {
-        var metadata = EmbeddingMetadata.Get<CircularReferenceEntity>();
+        var metadata = EmbeddingMetadata.Resolve<CircularReferenceEntity>();
 
         var parent = new CircularReferenceEntity
         {
@@ -220,7 +220,7 @@ public sealed class EmbeddingEdgeCasesSpec
     [Fact]
     public void Exclude_removes_properties_from_all_policies()
     {
-        var metadata = EmbeddingMetadata.Get<ExclusionEntity>();
+        var metadata = EmbeddingMetadata.Resolve<ExclusionEntity>();
 
         var entity = new ExclusionEntity
         {
@@ -241,7 +241,7 @@ public sealed class EmbeddingEdgeCasesSpec
     [Fact]
     public void RenderTemplate_empty_template_produces_empty_string()
     {
-        var metadata = EmbeddingMetadata.Get<EmptyTemplateEntity>();
+        var metadata = EmbeddingMetadata.Resolve<EmptyTemplateEntity>();
 
         var entity = new EmptyTemplateEntity
         {
@@ -259,7 +259,7 @@ public sealed class EmbeddingEdgeCasesSpec
     [Fact]
     public void ComputeSignature_changes_when_content_changes()
     {
-        var metadata = EmbeddingMetadata.Get<AllStringsTestEntity>();
+        var metadata = EmbeddingMetadata.Resolve<AllStringsTestEntity>();
 
         var entity1 = new AllStringsTestEntity { Title = "Version 1", Description = "Content A" };
         var entity2 = new AllStringsTestEntity { Title = "Version 1", Description = "Content B" };
@@ -276,8 +276,8 @@ public sealed class EmbeddingEdgeCasesSpec
     [Fact]
     public void ComputeSignature_includes_version_number()
     {
-        var metadata1 = EmbeddingMetadata.Get<VersionedEntity>();
-        var metadata2 = EmbeddingMetadata.Get<VersionedEntityV2>();
+        var metadata1 = EmbeddingMetadata.Resolve<VersionedEntity>();
+        var metadata2 = EmbeddingMetadata.Resolve<VersionedEntityV2>();
 
         var entity1 = new VersionedEntity { Content = "Same content" };
         var entity2 = new VersionedEntityV2 { Content = "Same content" };
@@ -294,7 +294,7 @@ public sealed class EmbeddingEdgeCasesSpec
     [Fact]
     public void ComputeSignature_is_deterministic()
     {
-        var metadata = EmbeddingMetadata.Get<AllStringsTestEntity>();
+        var metadata = EmbeddingMetadata.Resolve<AllStringsTestEntity>();
 
         var entity = new AllStringsTestEntity { Title = "Test", Description = "Deterministic" };
 

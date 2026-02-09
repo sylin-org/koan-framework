@@ -17,7 +17,7 @@ public class Phase1_CoreInfrastructureTests
     public void EmbeddingMetadata_AllStringsPolicy_IncludesStringPropertiesOnly()
     {
         // Arrange & Act
-        var metadata = EmbeddingMetadata.Get<TestDocument>();
+        var metadata = EmbeddingMetadata.Resolve<TestDocument>();
 
         // Assert
         metadata.Policy.Should().Be(EmbeddingPolicy.AllStrings);
@@ -32,7 +32,7 @@ public class Phase1_CoreInfrastructureTests
     public void EmbeddingMetadata_ExplicitProperties_IncludesOnlySpecified()
     {
         // Arrange & Act
-        var metadata = EmbeddingMetadata.Get<TestArticle>();
+        var metadata = EmbeddingMetadata.Resolve<TestArticle>();
 
         // Assert
         metadata.Properties.Should().HaveCount(2);
@@ -45,7 +45,7 @@ public class Phase1_CoreInfrastructureTests
     public void EmbeddingMetadata_TemplateMode_ParsesTemplate()
     {
         // Arrange & Act
-        var metadata = EmbeddingMetadata.Get<TestPost>();
+        var metadata = EmbeddingMetadata.Resolve<TestPost>();
 
         // Assert
         metadata.Template.Should().Be("Title: {Title}\nAuthor: {Author}\nContent: {Content}");
@@ -58,7 +58,7 @@ public class Phase1_CoreInfrastructureTests
     public void EmbeddingMetadata_AsyncConfiguration_IsPreserved()
     {
         // Arrange & Act
-        var metadata = EmbeddingMetadata.Get<TestAsyncDocument>();
+        var metadata = EmbeddingMetadata.Resolve<TestAsyncDocument>();
 
         // Assert
         metadata.Async.Should().BeTrue();
@@ -78,7 +78,7 @@ public class Phase1_CoreInfrastructureTests
             InternalId = "should-not-appear",
             ViewCount = 42
         };
-        var metadata = EmbeddingMetadata.Get<TestDocument>();
+        var metadata = EmbeddingMetadata.Resolve<TestDocument>();
 
         // Act
         var text = metadata.BuildEmbeddingText(doc);
@@ -103,7 +103,7 @@ public class Phase1_CoreInfrastructureTests
             Author = "John Doe",
             Content = "Post content"
         };
-        var metadata = EmbeddingMetadata.Get<TestPost>();
+        var metadata = EmbeddingMetadata.Resolve<TestPost>();
 
         // Act
         var text = metadata.BuildEmbeddingText(post);
@@ -128,7 +128,7 @@ public class Phase1_CoreInfrastructureTests
             Title = "Same",
             Content = "Content"
         };
-        var metadata = EmbeddingMetadata.Get<TestDocument>();
+        var metadata = EmbeddingMetadata.Resolve<TestDocument>();
 
         // Act
         var sig1 = metadata.ComputeSignature(doc1);
@@ -155,7 +155,7 @@ public class Phase1_CoreInfrastructureTests
             Title = "Second",
             Content = "Content"
         };
-        var metadata = EmbeddingMetadata.Get<TestDocument>();
+        var metadata = EmbeddingMetadata.Resolve<TestDocument>();
 
         // Act
         var sig1 = metadata.ComputeSignature(doc1);
@@ -169,8 +169,8 @@ public class Phase1_CoreInfrastructureTests
     public void EmbeddingMetadata_CachesResults()
     {
         // Arrange & Act
-        var metadata1 = EmbeddingMetadata.Get<TestDocument>();
-        var metadata2 = EmbeddingMetadata.Get<TestDocument>();
+        var metadata1 = EmbeddingMetadata.Resolve<TestDocument>();
+        var metadata2 = EmbeddingMetadata.Resolve<TestDocument>();
 
         // Assert
         metadata1.Should().BeSameAs(metadata2); // Same instance from cache
@@ -180,7 +180,7 @@ public class Phase1_CoreInfrastructureTests
     public void EmbeddingMetadata_ExplicitPolicy_IncludesOnlySpecifiedProperties()
     {
         // Arrange & Act
-        var metadata = EmbeddingMetadata.Get<TestExplicitEntity>();
+        var metadata = EmbeddingMetadata.Resolve<TestExplicitEntity>();
 
         // Assert
         metadata.Policy.Should().Be(EmbeddingPolicy.Explicit);
@@ -199,7 +199,7 @@ public class Phase1_CoreInfrastructureTests
             Content = null!, // Null string
             Tags = null! // Null array
         };
-        var metadata = EmbeddingMetadata.Get<TestDocument>();
+        var metadata = EmbeddingMetadata.Resolve<TestDocument>();
 
         // Act
         var text = metadata.BuildEmbeddingText(doc);
@@ -220,7 +220,7 @@ public class Phase1_CoreInfrastructureTests
             Content = "Content",
             Tags = Array.Empty<string>()
         };
-        var metadata = EmbeddingMetadata.Get<TestDocument>();
+        var metadata = EmbeddingMetadata.Resolve<TestDocument>();
 
         // Act
         var text = metadata.BuildEmbeddingText(doc);
@@ -246,7 +246,7 @@ public class Phase1_CoreInfrastructureTests
             Content = "Unicode: ñ, 中文, 🎨, café",
             Tags = new[] { "日本語", "español" }
         };
-        var metadata = EmbeddingMetadata.Get<TestDocument>();
+        var metadata = EmbeddingMetadata.Resolve<TestDocument>();
 
         // Act
         var text = metadata.BuildEmbeddingText(doc);
@@ -272,7 +272,7 @@ public class Phase1_CoreInfrastructureTests
             Content = largeContent,
             Tags = new[] { "large", "test" }
         };
-        var metadata = EmbeddingMetadata.Get<TestDocument>();
+        var metadata = EmbeddingMetadata.Resolve<TestDocument>();
 
         // Act
         var text = metadata.BuildEmbeddingText(doc);
@@ -292,7 +292,7 @@ public class Phase1_CoreInfrastructureTests
             Content = "Content",
             Tags = new[] { "valid", null!, "also-valid" }
         };
-        var metadata = EmbeddingMetadata.Get<TestDocument>();
+        var metadata = EmbeddingMetadata.Resolve<TestDocument>();
 
         // Act
         var text = metadata.BuildEmbeddingText(doc);
@@ -314,7 +314,7 @@ public class Phase1_CoreInfrastructureTests
             Content = null!,
             Tags = null!
         };
-        var metadata = EmbeddingMetadata.Get<TestDocument>();
+        var metadata = EmbeddingMetadata.Resolve<TestDocument>();
 
         // Act
         var text = metadata.BuildEmbeddingText(doc);
@@ -334,7 +334,7 @@ public class Phase1_CoreInfrastructureTests
             Content = "\t\n",
             Tags = new[] { "  ", "\t" }
         };
-        var metadata = EmbeddingMetadata.Get<TestDocument>();
+        var metadata = EmbeddingMetadata.Resolve<TestDocument>();
 
         // Act
         var text = metadata.BuildEmbeddingText(doc);
@@ -347,7 +347,7 @@ public class Phase1_CoreInfrastructureTests
     public void EmbeddingMetadata_ExplicitPolicy_WithoutPropertiesOrTemplate_ThrowsInvalidOperationException()
     {
         // Arrange & Act
-        Action act = () => EmbeddingMetadata.Get<TestExplicitEntityWithoutProperties>();
+        Action act = () => EmbeddingMetadata.Resolve<TestExplicitEntityWithoutProperties>();
 
         // Assert
         act.Should().Throw<InvalidOperationException>()
@@ -366,7 +366,7 @@ public class Phase1_CoreInfrastructureTests
             Content = null!,
             Tags = null!
         };
-        var metadata = EmbeddingMetadata.Get<TestDocument>();
+        var metadata = EmbeddingMetadata.Resolve<TestDocument>();
 
         // Act
         var signature = metadata.ComputeSignature(doc);
@@ -392,7 +392,7 @@ public class Phase1_CoreInfrastructureTests
             Title = "Special: <>&\"'",
             Content = "Symbols: !@#$%^&*()"
         };
-        var metadata = EmbeddingMetadata.Get<TestDocument>();
+        var metadata = EmbeddingMetadata.Resolve<TestDocument>();
 
         // Act
         var sig1 = metadata.ComputeSignature(doc1);
@@ -407,7 +407,7 @@ public class Phase1_CoreInfrastructureTests
     {
         // Arrange & Act
         var tasks = Enumerable.Range(0, 100)
-            .Select(_ => Task.Run(() => EmbeddingMetadata.Get<TestDocument>()))
+            .Select(_ => Task.Run(() => EmbeddingMetadata.Resolve<TestDocument>()))
             .ToArray();
 
         await Task.WhenAll(tasks);
@@ -431,7 +431,7 @@ public class Phase1_CoreInfrastructureTests
             Title = "Test Title",
             Content = "Test Content"
         };
-        var metadata = EmbeddingMetadata.Get<TestTemplateWithBadProperty>();
+        var metadata = EmbeddingMetadata.Resolve<TestTemplateWithBadProperty>();
 
         // Act
         var text = metadata.BuildEmbeddingText(entity);
@@ -451,7 +451,7 @@ public class Phase1_CoreInfrastructureTests
             ValidProp = "Valid Value",
             AnotherValid = "Another Value"
         };
-        var metadata = EmbeddingMetadata.Get<TestTemplateMixedProperties>();
+        var metadata = EmbeddingMetadata.Resolve<TestTemplateMixedProperties>();
 
         // Act
         var text = metadata.BuildEmbeddingText(entity);
@@ -473,7 +473,7 @@ public class Phase1_CoreInfrastructureTests
             RequiredField = "Present",
             OptionalField = null
         };
-        var metadata = EmbeddingMetadata.Get<TestTemplateWithNullable>();
+        var metadata = EmbeddingMetadata.Resolve<TestTemplateWithNullable>();
 
         // Act
         var text = metadata.BuildEmbeddingText(entity);
@@ -487,7 +487,7 @@ public class Phase1_CoreInfrastructureTests
     public void EmbeddingMetadata_AllPublicPolicy_IncludesAllPublicProperties()
     {
         // Arrange & Act
-        var metadata = EmbeddingMetadata.Get<TestAllPublicEntity>();
+        var metadata = EmbeddingMetadata.Resolve<TestAllPublicEntity>();
 
         // Assert
         metadata.Policy.Should().Be(EmbeddingPolicy.AllPublic);
@@ -508,7 +508,7 @@ public class Phase1_CoreInfrastructureTests
             IntProp = 42,
             BoolProp = true
         };
-        var metadata = EmbeddingMetadata.Get<TestAllPublicEntity>();
+        var metadata = EmbeddingMetadata.Resolve<TestAllPublicEntity>();
 
         // Act
         var text = metadata.BuildEmbeddingText(entity);
@@ -524,7 +524,7 @@ public class Phase1_CoreInfrastructureTests
     public void BuildEmbeddingText_EmptyPropertiesArray_FallsBackToPolicy()
     {
         // Arrange - Entity with Properties = new string[0]
-        var metadata = EmbeddingMetadata.Get<TestEmptyPropertiesArray>();
+        var metadata = EmbeddingMetadata.Resolve<TestEmptyPropertiesArray>();
 
         var entity = new TestEmptyPropertiesArray
         {
