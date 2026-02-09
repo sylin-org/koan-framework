@@ -4,6 +4,9 @@ setlocal enableextensions enabledelayedexpansion
 set "ROOT=%~dp0"
 pushd "%ROOT%" >nul
 
+REM Resolve repo root as absolute path (avoids .dockerignore lookup bug with relative ..\..\.. paths)
+for %%I in ("%ROOT%..\..") do set "REPO_ROOT=%%~fI"
+
 set "CONTAINER_NAME=koan-s6-snapvault"
 set "IMAGE_NAME=koan-s6-snapvault:dev"
 set "OPEN_URL=http://localhost:5086"
@@ -53,7 +56,7 @@ docker stop %CONTAINER_NAME% >nul 2>nul
 docker rm %CONTAINER_NAME% >nul 2>nul
 
 echo Building image...
-docker build -t %IMAGE_NAME% -f Dockerfile ..\..\..
+docker build -t %IMAGE_NAME% -f "%ROOT%Dockerfile" "%REPO_ROOT%"
 if errorlevel 1 (popd & exit /b 1)
 
 REM Ensure volume directories exist

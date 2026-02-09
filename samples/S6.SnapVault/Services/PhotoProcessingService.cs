@@ -7,6 +7,7 @@ using S6.SnapVault.Hubs;
 using S6.SnapVault.Services.AI;
 using Koan.Media.Core.Extensions;
 using Koan.AI;
+using Koan.AI.Contracts.Options;
 using Koan.Data.Core;
 using Koan.Data.Vector;
 using System.Text.RegularExpressions;
@@ -638,9 +639,13 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
             // Apply variable substitution
             prompt = _promptFactory.SubstituteVariables(prompt, context);
 
-            // Use vision pipeline API (AI-0020 pattern)
-            var response = await Koan.AI.Ai.FromImage(imageBytes, "image/jpeg")
-                .ToText(prompt, model: "qwen2.5vl", ct);
+            // Use vision pipeline API (AI-0021 category pattern)
+            var response = await Client.Chat(prompt, new ChatOptions
+            {
+                Image = imageBytes,
+                ImageMimeType = "image/jpeg",
+                Model = "qwen2.5vl"
+            }, ct);
 
             // Parse JSON with robust error handling
             var analysis = ParseAiResponse(response);
@@ -740,9 +745,13 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
         _logger.LogDebug("Classifying image style for photo {PhotoId}...", photo.Id);
         var classificationStart = Stopwatch.StartNew();
 
-        // Use vision pipeline API for classification (AI-0020 pattern)
-        var classificationResponse = await Koan.AI.Ai.FromImage(imageBytes, "image/jpeg")
-            .ToText(classificationPrompt, model: "qwen2.5vl", ct);
+        // Use vision pipeline API for classification (AI-0021 category pattern)
+        var classificationResponse = await Client.Chat(classificationPrompt, new ChatOptions
+        {
+            Image = imageBytes,
+            ImageMimeType = "image/jpeg",
+            Model = "qwen2.5vl"
+        }, ct);
         classificationStart.Stop();
 
         // Parse classification result (should be style name like "portrait" or "landscape")

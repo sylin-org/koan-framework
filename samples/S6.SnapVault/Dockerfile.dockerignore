@@ -5,6 +5,7 @@
 **/.nuget/
 **/TestResults/
 **/BenchmarkDotNet.Artifacts/
+**/artifacts/
 
 # Git
 .git/
@@ -20,8 +21,7 @@
 **/*.sln.docstates
 
 # Documentation (not needed for runtime)
-*.md
-!samples/**/README.md
+**/*.md
 !**/AnalyzerReleases.Shipped.md
 !**/AnalyzerReleases.Unshipped.md
 
@@ -39,7 +39,7 @@
 **/.dockerignore
 **/docker-compose*.yml
 
-# All .Koan directories (volume data, cache, etc.)
+# All .Koan directories (volume data, cache, storage)
 **/.Koan/
 
 # Logs
@@ -59,7 +59,33 @@
 **/tmp/
 **/temp/
 
+# Samples not needed for this build (context is repo root)
+samples/S0.*/
+samples/S1.*/
+samples/S2.*/
+samples/S3.*/
+samples/S4.*/
+samples/S5.*/
+samples/S7.*/
+samples/S8.*/
+samples/S9.*/
+samples/S10.*/
+samples/S12.*/
+samples/S13.*/
+samples/S14.*/
+samples/S16.*/
+samples/S17.*/
+samples/archive/
+samples/guides/
+samples/KoanAspire*/
 
-# Temporary files
-**/tmp/
-**/temp/
+# Claude / tools
+.claude/
+tools/
+scripts/
+packaging/
+other/
+data/
+resources/
+docs/
+.github/
