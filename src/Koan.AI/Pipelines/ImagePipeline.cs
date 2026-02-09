@@ -5,6 +5,7 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Koan.AI.Contracts.Options;
+using Koan.AI.Context;
 using Koan.Data.Core;
 using Koan.Storage.Abstractions;
 using Koan.Media.Abstractions.Model;
@@ -48,12 +49,11 @@ public sealed class ImagePipeline : IAiPipelineStage<byte[]>
         // Lazy generation - cached for multiple terminal operations
         _lazyGeneration = new Lazy<Task<byte[]>>(async () =>
         {
-            using (_context.Model != null || _context.Source != null || _context.Provider != null
-                ? Client.Context(source: _context.Source, provider: _context.Provider, model: _context.Model)
+            using (_context.Model != null || _context.Source != null
+                ? Client.Scope(all: _context.Source)
                 : null)
             {
                 // TODO: Implement text-to-image generation when API is available
-                // For now, throw NotImplementedException
                 throw new NotImplementedException(
                     "Text-to-image generation not yet implemented. " +
                     "Requires integration with image generation models (DALL-E, Stable Diffusion, etc.)");
@@ -207,11 +207,15 @@ public sealed class ImagePipeline : IAiPipelineStage<byte[]>
 
         var bytes = _imageBytes ?? await _lazyGeneration!.Value;
 
-        using (_context.Model != null || model != null || _context.Source != null || _context.Provider != null
-            ? Client.Context(source: _context.Source, provider: _context.Provider, model: model ?? _context.Model)
+        using (_context.Model != null || model != null || _context.Source != null
+            ? Client.Scope(all: _context.Source)
             : null)
         {
-            return await Client.Understand(bytes, prompt, ct);
+            return await Client.Chat(prompt, new ChatOptions
+            {
+                Image = bytes,
+                Model = model ?? _context.Model
+            }, ct);
         }
     }
 

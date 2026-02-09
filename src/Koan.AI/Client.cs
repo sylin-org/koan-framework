@@ -1,24 +1,30 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Koan.AI.Contracts;
 using Koan.AI.Contracts.Models;
 using Koan.AI.Contracts.Options;
 using Koan.AI.Context;
 using Koan.Core;
-using System.Runtime.CompilerServices;
 
 namespace Koan.AI;
 
 /// <summary>
 /// Static client for Koan AI operations.
-/// Provides capability-based routing for chat, embeddings, vision, and streaming.
+/// Single facade for Chat, Embed, OCR, and Streaming with category-aware routing.
 /// </summary>
 public static class Client
 {
     private static readonly AsyncLocal<IAiPipeline?> _override = new();
     private static Func<IServiceProvider, IAiPipeline>? _resolver;
 
+    /// <summary>
+    /// Override the AI pipeline for the current async context (useful for testing).
+    /// </summary>
     public static IDisposable With(IAiPipeline @override)
     {
         var prev = _override.Value;
@@ -26,65 +32,62 @@ public static class Client
         return new Reset(() => _override.Value = prev);
     }
 
-    // ============================================================================
-    // Capability-First API (NEW - ADR-0014)
-    // ============================================================================
+    // ========================================================================
+    // Chat
+    // ========================================================================
 
     /// <summary>
-    /// Chat with AI using a simple message. Uses capability-based routing.
+    /// Chat with AI using a simple message.
     /// </summary>
-    /// <param name="message">User message</param>
-    /// <param name="ct">Cancellation token</param>
-    /// <returns>AI response text</returns>
     public static async Task<string> Chat(string message, CancellationToken ct = default)
     {
-        // Merge context overrides (model, source, provider)
-        var (source, provider, model) = AiContextScope.ResolveMerged(null, null, null);
-
-        var response = await Resolve().PromptAsync(new AiChatRequest
-        {
-            Messages = new() { new AiMessage("user", message) },
-            Model = model,
-            Route = source != null || provider != null
-                ? new AiRouteHints { AdapterId = source ?? provider }
-                : null
-        }, ct);
+        var response = await Resolve().PromptAsync(BuildChatRequest(message, null), ct);
         return response.Text;
     }
 
     /// <summary>
-    /// Chat with AI using detailed options. Uses capability-based routing.
+    /// Chat with AI using detailed options.
     /// </summary>
-    /// <param name="options">Chat options including message, model overrides, temperature, etc.</param>
-    /// <param name="ct">Cancellation token</param>
-    /// <returns>AI response text</returns>
-    public static async Task<string> Chat(AiChatOptions options, CancellationToken ct = default)
+    public static async Task<string> Chat(string message, ChatOptions options, CancellationToken ct = default)
     {
-        var response = await Resolve().PromptAsync(BuildChatRequest(options), ct);
+        var response = await Resolve().PromptAsync(BuildChatRequest(message, options), ct);
         return response.Text;
     }
 
     /// <summary>
-    /// Stream chat responses from AI. Uses capability-based routing.
+    /// Chat with AI and return a rich result with metadata.
     /// </summary>
-    /// <param name="message">User message</param>
-    /// <param name="ct">Cancellation token</param>
-    /// <returns>Async stream of text chunks</returns>
+    public static async Task<ChatResult> ChatResult(string message, CancellationToken ct = default)
+    {
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        var response = await Resolve().PromptAsync(BuildChatRequest(message, null), ct);
+        sw.Stop();
+
+        return new ChatResult
+        {
+            Text = response.Text,
+            Model = response.Model,
+            TokensIn = response.TokensIn,
+            TokensOut = response.TokensOut,
+            TokensUsed = (response.TokensIn ?? 0) + (response.TokensOut ?? 0),
+            Latency = sw.Elapsed,
+            AdapterId = response.AdapterId,
+            FinishReason = response.FinishReason
+        };
+    }
+
+    // ========================================================================
+    // Stream
+    // ========================================================================
+
+    /// <summary>
+    /// Stream chat responses from AI token-by-token.
+    /// </summary>
     public static async IAsyncEnumerable<string> Stream(
         string message,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
-        // Merge context overrides (model, source, provider)
-        var (source, provider, model) = AiContextScope.ResolveMerged(null, null, null);
-
-        await foreach (var chunk in Resolve().StreamAsync(new AiChatRequest
-        {
-            Messages = new() { new AiMessage("user", message) },
-            Model = model,
-            Route = source != null || provider != null
-                ? new AiRouteHints { AdapterId = source ?? provider }
-                : null
-        }, ct))
+        await foreach (var chunk in Resolve().StreamAsync(BuildChatRequest(message, null), ct))
         {
             if (!string.IsNullOrEmpty(chunk.DeltaText))
                 yield return chunk.DeltaText;
@@ -92,187 +95,177 @@ public static class Client
     }
 
     /// <summary>
-    /// Stream chat responses from AI with detailed options. Uses capability-based routing.
+    /// Stream chat responses from AI with detailed options.
     /// </summary>
-    /// <param name="options">Chat options including message, model overrides, temperature, etc.</param>
-    /// <param name="ct">Cancellation token</param>
-    /// <returns>Async stream of text chunks</returns>
     public static async IAsyncEnumerable<string> Stream(
-        AiChatOptions options,
+        string message,
+        ChatOptions options,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
-        await foreach (var chunk in Resolve().StreamAsync(BuildChatRequest(options), ct))
+        await foreach (var chunk in Resolve().StreamAsync(BuildChatRequest(message, options), ct))
         {
             if (!string.IsNullOrEmpty(chunk.DeltaText))
                 yield return chunk.DeltaText;
         }
     }
 
+    // ========================================================================
+    // Embed
+    // ========================================================================
+
     /// <summary>
-    /// Generate embeddings for text. Uses capability-based routing.
+    /// Generate an embedding vector for text.
     /// </summary>
-    /// <param name="text">Text to embed</param>
-    /// <param name="ct">Cancellation token</param>
-    /// <returns>Embedding vector</returns>
     public static async Task<float[]> Embed(string text, CancellationToken ct = default)
     {
-        // Merge context overrides (model, source, provider)
-        var (source, provider, model) = AiContextScope.ResolveMerged(null, null, null);
-
         var response = await Resolve().EmbedAsync(new AiEmbeddingsRequest
         {
-            Input = new() { text },
-            Model = model
+            Input = new() { text }
         }, ct);
         return response.Vectors.FirstOrDefault() ?? Array.Empty<float>();
     }
 
     /// <summary>
-    /// Generate embeddings with detailed options. Uses capability-based routing.
+    /// Generate an embedding vector for text with options.
     /// </summary>
-    /// <param name="options">Embed options including text(s), model overrides, etc.</param>
-    /// <param name="ct">Cancellation token</param>
-    /// <returns>Embedding vectors</returns>
-    public static async Task<float[][]> Embed(AiEmbedOptions options, CancellationToken ct = default)
+    public static async Task<float[]> Embed(string text, EmbedOptions options, CancellationToken ct = default)
     {
-        var texts = options.Texts ?? (options.Text != null ? new[] { options.Text } : Array.Empty<string>());
-        if (texts.Length == 0)
-            throw new ArgumentException("Either Text or Texts must be provided", nameof(options));
+        var response = await Resolve().EmbedAsync(new AiEmbeddingsRequest
+        {
+            Input = new() { text },
+            Model = options.Model
+        }, ct);
+        return response.Vectors.FirstOrDefault() ?? Array.Empty<float>();
+    }
 
-        // Merge context overrides (model, source, provider)
-        var (source, provider, model) = AiContextScope.ResolveMerged(
-            options.Source,
-            options.Provider,
-            options.Model);
+    /// <summary>
+    /// Generate embeddings for multiple texts in a single batch.
+    /// </summary>
+    public static async Task<float[][]> EmbedBatch(string[] texts, CancellationToken ct = default)
+    {
+        if (texts is null || texts.Length == 0)
+            throw new ArgumentException("At least one text must be provided", nameof(texts));
 
         var response = await Resolve().EmbedAsync(new AiEmbeddingsRequest
         {
-            Input = texts.ToList(),
-            Model = model
+            Input = texts.ToList()
         }, ct);
 
         return response.Vectors.ToArray();
     }
 
     /// <summary>
-    /// Understand/analyze an image with AI vision. Uses capability-based routing.
+    /// Generate an embedding and return a rich result with metadata.
     /// </summary>
-    /// <param name="imageBytes">Image data</param>
-    /// <param name="prompt">Question or instruction about the image</param>
-    /// <param name="ct">Cancellation token</param>
-    /// <returns>AI response text</returns>
-    public static async Task<string> Understand(byte[] imageBytes, string prompt, CancellationToken ct = default)
+    public static async Task<EmbedResult> EmbedResult(string text, CancellationToken ct = default)
     {
-        // For now, route through chat with a vision-capable model
-        // TODO: Add dedicated vision adapter methods with proper multimodal support
-        var parts = new List<AiMessagePart>
+        var response = await Resolve().EmbedAsync(new AiEmbeddingsRequest
         {
-            new AiMessagePart { Type = "text", Text = prompt },
-            new AiMessagePart { Type = "image", Data = imageBytes, MimeType = "image/jpeg" }
-        };
-
-        // Merge context overrides (model, source, provider)
-        var (source, provider, model) = AiContextScope.ResolveMerged(null, null, null);
-
-        var response = await Resolve().PromptAsync(new AiChatRequest
-        {
-            Messages = new()
-            {
-                new AiMessage("user", prompt)
-                {
-                    Parts = parts
-                }
-            },
-            Model = model,  // Apply context model
-            Route = source != null || provider != null
-                ? new AiRouteHints { AdapterId = source ?? provider }
-                : null
+            Input = new() { text }
         }, ct);
-        return response.Text;
+
+        var vector = response.Vectors.FirstOrDefault() ?? Array.Empty<float>();
+        return new EmbedResult
+        {
+            Vector = vector,
+            Model = response.Model,
+            Dimension = vector.Length
+        };
     }
 
     /// <summary>
-    /// Understand/analyze an image with detailed options. Uses capability-based routing.
+    /// Low-level embed access for pipeline/internal use.
     /// </summary>
-    /// <param name="options">Vision options including image, prompt, model overrides, etc.</param>
-    /// <param name="ct">Cancellation token</param>
-    /// <returns>AI response text</returns>
-    public static async Task<string> Understand(AiVisionOptions options, CancellationToken ct = default)
-    {
-        var parts = new List<AiMessagePart>
-        {
-            new AiMessagePart { Type = "text", Text = options.Prompt },
-            new AiMessagePart { Type = "image", Data = options.ImageBytes, MimeType = options.ImageFormat ?? "image/jpeg" }
-        };
-
-        var messages = new List<AiMessage>
-        {
-            new AiMessage("user", options.Prompt)
-            {
-                Parts = parts
-            }
-        };
-
-        // Add system prompt if provided
-        if (!string.IsNullOrWhiteSpace(options.SystemPrompt))
-        {
-            messages.Insert(0, new AiMessage("system", options.SystemPrompt));
-        }
-
-        var promptOpts = new AiPromptOptions
-        {
-            Temperature = options.Temperature,
-            MaxOutputTokens = options.MaxTokens
-        };
-
-        // Merge context overrides
-        var (source, provider, model) = AiContextScope.ResolveMerged(
-            options.Source,
-            options.Provider,
-            options.Model);
-
-        var response = await Resolve().PromptAsync(new AiChatRequest
-        {
-            Messages = messages,
-            Model = model,
-            Options = promptOpts,
-            Route = source != null || provider != null
-                ? new AiRouteHints { AdapterId = source ?? provider }
-                : null
-        }, ct);
-
-        return response.Text;
-    }
-
-    /// <summary>
-    /// Create a scoped context for AI operations with source/provider/model overrides.
-    /// Context flows across async boundaries and can be nested (inner overrides outer).
-    /// </summary>
-    /// <param name="source">Source or group name to use. Examples: "ollama-primary", "production-ollama"</param>
-    /// <param name="provider">Provider type to use. Examples: "ollama", "openai"</param>
-    /// <param name="model">Model name to use. Examples: "llama3.2:70b", "gpt-4o"</param>
-    /// <returns>Disposable scope that restores previous context when disposed</returns>
-    public static AiContextScope Context(
-        string? source = null,
-        string? provider = null,
-        string? model = null)
-    {
-        return new AiContextScope(source, provider, model);
-    }
-
     public static Task<AiEmbeddingsResponse> Embed(AiEmbeddingsRequest req, CancellationToken ct = default)
         => Resolve().EmbedAsync(req, ct);
+
+    // ========================================================================
+    // OCR
+    // ========================================================================
+
+    /// <summary>
+    /// Extract text from an image using OCR (delegates through Chat with vision model).
+    /// </summary>
+    public static async Task<string> Ocr(byte[] image, CancellationToken ct = default)
+    {
+        return await Ocr(image, new OcrOptions(), ct);
+    }
+
+    /// <summary>
+    /// Extract text from an image using OCR with options.
+    /// </summary>
+    public static async Task<string> Ocr(byte[] image, OcrOptions options, CancellationToken ct = default)
+    {
+        if (image is null || image.Length == 0)
+            throw new ArgumentException("Image data is required", nameof(image));
+
+        var prompt = GetOcrPrompt(options.Format);
+        var chatOptions = new ChatOptions
+        {
+            Image = image,
+            ImageMimeType = options.MimeType,
+            Model = options.Model,
+            Source = options.Source
+        };
+
+        return await Chat(prompt, chatOptions, ct);
+    }
+
+    /// <summary>
+    /// Extract text from an image and return a rich result.
+    /// </summary>
+    public static async Task<OcrResult> OcrResult(byte[] image, CancellationToken ct = default)
+    {
+        var text = await Ocr(image, ct);
+        return new OcrResult { Text = text };
+    }
+
+    /// <summary>
+    /// Extract text from an image with options and return a rich result.
+    /// </summary>
+    public static async Task<OcrResult> OcrResult(byte[] image, OcrOptions options, CancellationToken ct = default)
+    {
+        var text = await Ocr(image, options, ct);
+        return new OcrResult
+        {
+            Text = text,
+            Format = options.Format,
+            Model = options.Model
+        };
+    }
+
+    // ========================================================================
+    // Scope (replaces Context — per-category routing)
+    // ========================================================================
+
+    /// <summary>
+    /// Create a scoped routing context with per-category overrides.
+    /// Categories: "all" applies to all categories; "chat"/"embed"/"ocr" target specific categories.
+    /// </summary>
+    public static AiCategoryScope Scope(
+        string? all = null,
+        string? chat = null,
+        string? embed = null,
+        string? ocr = null)
+    {
+        return new AiCategoryScope(
+            all: all,
+            chatSource: chat,
+            embedSource: embed,
+            ocrSource: ocr);
+    }
+
+    // ========================================================================
+    // Conversation Builder
+    // ========================================================================
 
     public static AiConversationBuilder Conversation()
         => new(Resolve());
 
-    public static AiConversationBuilder Conversation(this IAiPipeline ai)
-    {
-        if (ai is null) throw new ArgumentNullException(nameof(ai));
-        return new AiConversationBuilder(ai);
-    }
+    // ========================================================================
+    // Discovery
+    // ========================================================================
 
-    // Discovery helpers for optional usage
     public static bool IsAvailable
     {
         get
@@ -302,70 +295,103 @@ public static class Client
         return scope.ServiceProvider.GetService<IAiPipeline>();
     }
 
+    // ========================================================================
+    // Internal
+    // ========================================================================
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static IAiPipeline Resolve()
     {
         if (_override.Value is IAiPipeline o) return o;
-        var sp = Koan.Core.Hosting.App.AppHost.Current ?? throw new InvalidOperationException("AI not configured; call services.AddKoan() or AddAi() and ensure AppHost.Current is set during startup.");
+        var sp = Koan.Core.Hosting.App.AppHost.Current
+            ?? throw new InvalidOperationException(
+                "AI not configured; call services.AddKoan() or AddAi() and ensure AppHost.Current is set during startup.");
         _resolver ??= CreateResolver(sp);
         return _resolver(sp);
     }
 
-    private static AiChatRequest BuildChatRequest(AiChatOptions options)
+    private static AiChatRequest BuildChatRequest(string message, ChatOptions? options)
     {
-        // Build messages list
-        var messages = options.Messages?.ToList() ?? new List<AiMessage>();
+        var messages = new List<AiMessage>();
 
-        // If no messages but Message is provided, add user message
-        if (messages.Count == 0 && !string.IsNullOrWhiteSpace(options.Message))
+        if (options?.Messages is { Count: > 0 })
         {
-            messages.Add(new AiMessage("user", options.Message));
+            messages.AddRange(options.Messages);
+        }
+        else
+        {
+            messages.Add(new AiMessage("user", message));
         }
 
-        // If SystemPrompt is provided, prepend system message
-        if (!string.IsNullOrWhiteSpace(options.SystemPrompt))
+        if (!string.IsNullOrWhiteSpace(options?.SystemPrompt))
         {
             messages.Insert(0, new AiMessage("system", options.SystemPrompt));
         }
 
-        // Build prompt options
-        var promptOpts = new AiPromptOptions
+        // Handle multimodal (image)
+        if (options?.Image is { Length: > 0 })
         {
-            Temperature = options.Temperature,
-            MaxOutputTokens = options.MaxTokens,
-            TopP = options.TopP,
-            Stop = options.Stop,
-            Seed = options.Seed,
-            Think = options.Think,
-            ResponseFormat = options.ResponseFormat
-        };
+            var idx = messages.FindLastIndex(m => m.Role == "user");
+            if (idx >= 0)
+            {
+                var userMsg = messages[idx];
+                messages[idx] = userMsg with
+                {
+                    Parts = new List<AiMessagePart>
+                    {
+                        new() { Type = "text", Text = userMsg.Content },
+                        new() { Type = "image", Data = options.Image, MimeType = options.ImageMimeType ?? "image/jpeg" }
+                    }
+                };
+            }
+        }
 
-        // Merge context overrides
-        var (source, provider, model) = AiContextScope.ResolveMerged(
-            options.Source,
-            options.Provider,
-            options.Model);
+        AiPromptOptions? promptOpts = null;
+        if (options is not null)
+        {
+            promptOpts = new AiPromptOptions
+            {
+                Temperature = options.Temperature,
+                MaxOutputTokens = options.MaxTokens,
+                TopP = options.TopP,
+                Stop = options.Stop,
+                Seed = options.Seed,
+                Think = options.Think,
+                ResponseFormat = options.ResponseFormat
+            };
+        }
+
+        var (scopeSource, _) = AiCategoryScope.ResolveMerged("Chat", options?.Source);
+        var model = options?.Model;
 
         return new AiChatRequest
         {
             Messages = messages,
             Model = model,
             Options = promptOpts,
-            Route = source != null || provider != null
-                ? new AiRouteHints { AdapterId = source ?? provider }
+            Route = scopeSource is not null
+                ? new AiRouteHints { AdapterId = scopeSource }
                 : null
         };
     }
 
+    private static string GetOcrPrompt(OcrFormat format) => format switch
+    {
+        OcrFormat.Markdown =>
+            "Extract all text from this image. Format the output as Markdown, preserving headings, lists, and structure.",
+        OcrFormat.Structured =>
+            "Extract all text from this image. Return a JSON object with regions, each containing: text, confidence (0-1), and bounding_box (x, y, width, height).",
+        _ =>
+            "Extract all text from this image. Return only the extracted text, preserving the original formatting."
+    };
+
     private static Func<IServiceProvider, IAiPipeline> CreateResolver(IServiceProvider sp)
     {
-        // Cache the delegate per ServiceProvider instance
         return (svc) =>
         {
             var scopeFactory = svc.GetService<IServiceScopeFactory>();
             if (scopeFactory is null)
                 throw new InvalidOperationException("ServiceScopeFactory missing; invalid DI container state.");
-            // Prefer ambient scope if present (ASP.NET); else create a scope
             var ia = svc.GetService<IAiPipeline>();
             if (ia is not null) return ia;
             using var scope = scopeFactory.CreateScope();

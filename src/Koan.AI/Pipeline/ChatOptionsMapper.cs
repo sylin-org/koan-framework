@@ -1,6 +1,5 @@
 ﻿using System.Collections.Generic;
 using Koan.AI.Contracts.Models;
-using Koan.AI.Contracts.Options;
 using Microsoft.Extensions.AI;
 
 namespace Koan.AI.Pipeline;

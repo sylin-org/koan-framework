@@ -4,6 +4,7 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Koan.AI.Contracts.Options;
+using Koan.AI.Context;
 
 namespace Koan.AI.Pipelines;
 
@@ -47,7 +48,7 @@ public sealed class TextPipeline : IAiPipelineStage<string>
     public async Task<float[]> ToEmbedding(string? model = null, CancellationToken ct = default)
     {
         using (_context.Model != null || model != null
-            ? Client.Context(model: model ?? _context.Model)
+            ? Client.Scope(all: _context.Source)
             : null)
         {
             return await Client.Embed(_input, ct);
@@ -64,13 +65,12 @@ public sealed class TextPipeline : IAiPipelineStage<string>
     /// <returns>AI response text</returns>
     public async Task<string> ToResponse(string? model = null, string? systemPrompt = null, CancellationToken ct = default)
     {
-        using (_context.Model != null || model != null || _context.Source != null || _context.Provider != null
-            ? Client.Context(source: _context.Source, provider: _context.Provider, model: model ?? _context.Model)
+        using (_context.Model != null || model != null || _context.Source != null
+            ? Client.Scope(all: _context.Source)
             : null)
         {
-            return await Client.Chat(new AiChatOptions
+            return await Client.Chat(_input, new ChatOptions
             {
-                Message = _input,
                 SystemPrompt = systemPrompt ?? _context.SystemPrompt,
                 Model = model ?? _context.Model
             }, ct);
@@ -90,13 +90,12 @@ public sealed class TextPipeline : IAiPipelineStage<string>
         string? systemPrompt = null,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
-        using (_context.Model != null || model != null || _context.Source != null || _context.Provider != null
-            ? Client.Context(source: _context.Source, provider: _context.Provider, model: model ?? _context.Model)
+        using (_context.Model != null || model != null || _context.Source != null
+            ? Client.Scope(all: _context.Source)
             : null)
         {
-            await foreach (var chunk in Client.Stream(new AiChatOptions
+            await foreach (var chunk in Client.Stream(_input, new ChatOptions
             {
-                Message = _input,
                 SystemPrompt = systemPrompt ?? _context.SystemPrompt,
                 Model = model ?? _context.Model
             }, ct))

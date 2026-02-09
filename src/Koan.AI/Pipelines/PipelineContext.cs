@@ -9,7 +9,6 @@ internal sealed record PipelineContext
 
     public string? Model { get; init; }
     public string? Source { get; init; }
-    public string? Provider { get; init; }
     public string? SystemPrompt { get; init; }
     public object? Options { get; init; }
 
@@ -18,9 +17,6 @@ internal sealed record PipelineContext
 
     public PipelineContext WithSource(string? source)
         => this with { Source = source ?? Source };
-
-    public PipelineContext WithProvider(string? provider)
-        => this with { Provider = provider ?? Provider };
 
     public PipelineContext WithSystemPrompt(string? systemPrompt)
         => this with { SystemPrompt = systemPrompt ?? SystemPrompt };

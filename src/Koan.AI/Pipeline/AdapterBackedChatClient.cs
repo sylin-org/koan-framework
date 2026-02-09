@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
+using Koan.AI.Contracts.Adapters;
 using Koan.AI.Contracts.Models;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
@@ -11,10 +12,10 @@ namespace Koan.AI.Pipeline;
 
 internal sealed class AdapterBackedChatClient : IChatClient
 {
-    private readonly AiRoutingEngine _routing;
+    private readonly AiCategoryRouter _routing;
     private readonly ILogger<AdapterBackedChatClient> _logger;
 
-    public AdapterBackedChatClient(AiRoutingEngine routing, ILogger<AdapterBackedChatClient> logger)
+    public AdapterBackedChatClient(AiCategoryRouter routing, ILogger<AdapterBackedChatClient> logger)
     {
         _routing = routing ?? throw new ArgumentNullException(nameof(routing));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -27,18 +28,22 @@ internal sealed class AdapterBackedChatClient : IChatClient
         var request = ChatOptionsMapper.CreateChatRequest(messages, options);
         var resolution = _routing.ResolveChat(request);
 
+        var chatAdapter = resolution.Adapter as IChatAdapter
+            ?? throw new InvalidOperationException(
+                $"Adapter '{resolution.Adapter.Id}' does not implement IChatAdapter");
+
         request.InternalConnectionString = resolution.Member.ConnectionString;
         if (!string.IsNullOrWhiteSpace(resolution.EffectiveModel))
         {
             request = request with { Model = resolution.EffectiveModel };
         }
 
-        var response = await resolution.Adapter.ChatAsync(request, cancellationToken).ConfigureAwait(false);
+        var response = await chatAdapter.ChatAsync(request, cancellationToken).ConfigureAwait(false);
 
         _logger.LogInformation(
-            "AI prompt served by adapter {Adapter} ({Capability}) via {Source}/{Member}",
+            "AI prompt served by adapter {Adapter} ({Category}) via {Source}/{Member}",
             resolution.Adapter.Id,
-            resolution.Capability,
+            resolution.Category,
             resolution.Source.Name,
             resolution.Member.Name);
 
@@ -55,6 +60,10 @@ internal sealed class AdapterBackedChatClient : IChatClient
         var request = ChatOptionsMapper.CreateChatRequest(messages, options);
         var resolution = _routing.ResolveChat(request);
 
+        var chatAdapter = resolution.Adapter as IChatAdapter
+            ?? throw new InvalidOperationException(
+                $"Adapter '{resolution.Adapter.Id}' does not implement IChatAdapter");
+
         request.InternalConnectionString = resolution.Member.ConnectionString;
         if (!string.IsNullOrWhiteSpace(resolution.EffectiveModel))
         {
@@ -62,7 +71,7 @@ internal sealed class AdapterBackedChatClient : IChatClient
         }
 
         var index = 0;
-        await foreach (var chunk in resolution.Adapter.StreamAsync(request, cancellationToken).ConfigureAwait(false))
+        await foreach (var chunk in chatAdapter.StreamAsync(request, cancellationToken).ConfigureAwait(false))
         {
             _logger.LogDebug(
                 "Streaming chunk {ChunkIndex} from adapter {Adapter}",

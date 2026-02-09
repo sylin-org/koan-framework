@@ -43,9 +43,9 @@ public static class ServiceCollectionExtensions
         // - Source health aggregation
         // - Background health monitor service
 
-        // Register existing infrastructure
+        // Register infrastructure
         services.TryAddSingleton<IAiAdapterRegistry, InMemoryAdapterRegistry>();
-        services.TryAddSingleton<AiRoutingEngine>();
+        services.TryAddSingleton<AiCategoryRouter>();
 
         services.TryAddSingleton<IChatClient, AdapterBackedChatClient>();
         services.TryAddSingleton<IEmbeddingGenerator<string, Embedding<float>>, AdapterBackedEmbeddingGenerator>();

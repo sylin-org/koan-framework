@@ -59,41 +59,27 @@ internal sealed class AiProvenancePublisher : BackgroundService
         PublishSourceHealth(module);
     }
 
-    private async Task PublishAdapterRosterAsync(ProvenanceModuleWriter module, CancellationToken ct)
+    private Task PublishAdapterRosterAsync(ProvenanceModuleWriter module, CancellationToken ct)
     {
         var summaries = new List<string>();
 
         foreach (var adapter in _adapters.All)
         {
-            try
+            var summary = new StringBuilder();
+            summary.Append(adapter.Id);
+            summary.Append(" (type=").Append(adapter.Type).Append(')');
+
+            // Structural capability detection via ISP interfaces
+            summary.Append(" chat=").Append(adapter is Contracts.Adapters.IChatAdapter ? "yes" : "no");
+            summary.Append(" embed=").Append(adapter is Contracts.Adapters.IEmbedAdapter ? "yes" : "no");
+            summary.Append(" ocr=").Append(adapter is Contracts.Adapters.IOcrAdapter ? "yes" : "no");
+
+            if (adapter.ModelManager is not null)
             {
-                var capabilities = await adapter.GetCapabilitiesAsync(ct).ConfigureAwait(false);
-                var summary = new StringBuilder();
-                summary.Append(adapter.Id);
-                if (!string.IsNullOrWhiteSpace(capabilities.AdapterType))
-                {
-                    summary.Append(" (type=").Append(capabilities.AdapterType).Append(')');
-                }
-
-                summary.Append(" chat=").Append(capabilities.SupportsChat ? "yes" : "no");
-                summary.Append(" stream=").Append(capabilities.SupportsStreaming ? "yes" : "no");
-                summary.Append(" embed=").Append(capabilities.SupportsEmbeddings ? "yes" : "no");
-
-                if (capabilities.ModelManagement is { } management)
-                {
-                    var modes = management.ProvisioningModes is { Count: > 0 }
-                        ? string.Join(',', management.ProvisioningModes)
-                        : "none";
-                    summary.Append(" provision=").Append(modes);
-                }
-
-                summaries.Add(summary.ToString());
+                summary.Append(" provision=yes");
             }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Unable to retrieve capabilities for adapter {AdapterId}", adapter.Id);
-                summaries.Add($"{adapter.Id} (error reading capabilities)");
-            }
+
+            summaries.Add(summary.ToString());
         }
 
         module.SetSetting(KoanAiProvenanceItems.AdapterRoster.Key, setting => setting
@@ -103,6 +89,8 @@ internal sealed class AiProvenancePublisher : BackgroundService
             .Source(ProvenanceSettingSource.Custom)
             .Consumers(KoanAiProvenanceItems.AdapterRoster.DefaultConsumers?.ToArray() ?? Array.Empty<string>())
             .State(ProvenanceSettingState.Configured));
+
+        return Task.CompletedTask;
     }
 
     private void PublishSourceHealth(ProvenanceModuleWriter module)
