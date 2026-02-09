@@ -1,6 +1,7 @@
 using Koan.Core.Modules;
 using Koan.ZenGarden.Core;
 using Koan.ZenGarden.Initialization;
+using Koan.ZenGarden.Koi;
 using Koan.ZenGarden.Persistence;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -33,6 +34,13 @@ public static class ServiceCollectionExtensions
             }
         }
 
+        services.TryAddSingleton<IKoiHandler>(sp =>
+        {
+            var options = sp.GetService<IOptions<ZenGardenOptions>>()?.Value ?? new ZenGardenOptions();
+            var logger = sp.GetService<ILogger<KoiHandler>>() ?? NullLogger<KoiHandler>.Instance;
+            return new KoiHandler(options, logger);
+        });
+
         services.TryAddSingleton<IZenGardenClient>(sp =>
         {
             var logger = sp.GetService<ILogger<ZenGardenClient>>() ?? NullLogger<ZenGardenClient>.Instance;
@@ -48,7 +56,11 @@ public static class ServiceCollectionExtensions
                 rosterStore = new StoneRosterStore(path, ttl, storeLogger);
             }
 
-            return new ZenGardenClient(logger, options, rosterStore);
+            var koiHandler = options.KoiDiscoveryEnabled
+                ? sp.GetService<IKoiHandler>()
+                : null;
+
+            return new ZenGardenClient(logger, options, rosterStore, koiHandler);
         });
 
         services.TryAddSingleton<IZenGardenInitializationProvider, ZenGardenInitializationProvider>();

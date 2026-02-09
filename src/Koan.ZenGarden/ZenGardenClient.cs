@@ -1,3 +1,4 @@
+using Koan.ZenGarden.Koi;
 using Koan.ZenGarden.Models;
 using Koan.ZenGarden.Persistence;
 
@@ -29,6 +30,8 @@ public sealed class ZenGardenClient : IZenGardenClient
     private readonly ConcurrentDictionary<string, CachedMossStone> _stoneCache =
         new(StringComparer.OrdinalIgnoreCase);
     private readonly IStoneRosterStore? _rosterStore;
+    private readonly IKoiHandler? _koiHandler;
+    private readonly IDisposable? _koiSubscription;
     private readonly string? _mossTopologyPath;
 
     private readonly HashSet<string> _seenEventIds = new(StringComparer.OrdinalIgnoreCase);
@@ -52,22 +55,23 @@ public sealed class ZenGardenClient : IZenGardenClient
         HttpClient httpClient,
         ILogger<ZenGardenClient> logger,
         ZenGardenOptions? options = null)
-        : this(httpClient, logger, options, ownsHttpClient: false, rosterStore: null)
+        : this(httpClient, logger, options, ownsHttpClient: false, rosterStore: null, koiHandler: null)
     {
     }
 
     public ZenGardenClient(
         ILogger<ZenGardenClient> logger,
         ZenGardenOptions? options = null)
-        : this(new HttpClient(), logger, options, ownsHttpClient: true, rosterStore: null)
+        : this(new HttpClient(), logger, options, ownsHttpClient: true, rosterStore: null, koiHandler: null)
     {
     }
 
     internal ZenGardenClient(
         ILogger<ZenGardenClient> logger,
         ZenGardenOptions? options,
-        IStoneRosterStore? rosterStore)
-        : this(new HttpClient(), logger, options, ownsHttpClient: true, rosterStore)
+        IStoneRosterStore? rosterStore,
+        IKoiHandler? koiHandler = null)
+        : this(new HttpClient(), logger, options, ownsHttpClient: true, rosterStore, koiHandler)
     {
     }
 
@@ -76,20 +80,30 @@ public sealed class ZenGardenClient : IZenGardenClient
         ILogger<ZenGardenClient> logger,
         ZenGardenOptions? options,
         bool ownsHttpClient,
-        IStoneRosterStore? rosterStore)
+        IStoneRosterStore? rosterStore,
+        IKoiHandler? koiHandler)
     {
         _httpClient = httpClient;
         _logger = logger;
         _options = options ?? new ZenGardenOptions();
         _ownsHttpClient = ownsHttpClient;
         _rosterStore = rosterStore;
-        _mossTopologyPath = StoneRosterPathResolver.ResolveMossTopologyPath(_options);
+        _koiHandler = koiHandler;
+        _mossTopologyPath = _options.PersistDiscoveryCache
+            ? StoneRosterPathResolver.ResolveMossTopologyPath(_options)
+            : null;
         _jsonOptions = new JsonSerializerOptions
         {
             PropertyNameCaseInsensitive = true
         };
 
         _httpClient.Timeout = TimeSpan.FromSeconds(_options.HttpTimeoutSeconds);
+
+        if (_koiHandler is not null)
+        {
+            _koiSubscription = _koiHandler.OnTopologyEvent(OnKoiTopologyEventAsync);
+            _koiHandler.Start();
+        }
     }
 
     public IDisposable Subscribe(
@@ -410,6 +424,8 @@ public sealed class ZenGardenClient : IZenGardenClient
             _lifetimeCts.Cancel();
         }
 
+        _koiSubscription?.Dispose();
+
         try
         {
             _streamLoopTask?.Wait(TimeSpan.FromSeconds(2));
@@ -430,7 +446,15 @@ public sealed class ZenGardenClient : IZenGardenClient
     {
         try
         {
-            var tools = await CatalogAsync(registration.Subscription, ct);
+            // When the subscription has capability requirements, CatalogAsync filters
+            // out tools that don't satisfy them — leaving nothing to emit when
+            // capabilities are unsatisfied. Strip requirements so we get the full
+            // tool list, then classify each tool locally below.
+            var catalogSubscription = registration.Subscription.Requires.Count > 0
+                ? registration.Subscription with { Requires = Array.Empty<ZenGardenCapabilityRequirement>() }
+                : registration.Subscription;
+
+            var tools = await CatalogAsync(catalogSubscription, ct);
             foreach (var snapshot in tools)
             {
                 if (ct.IsCancellationRequested)
@@ -1348,21 +1372,28 @@ public sealed class ZenGardenClient : IZenGardenClient
             }
         }
 
-        // 3. Preferred Stone name (soft affinity)
+        // 3. Koi topology snapshot (authoritative when connected)
+        var koiStone = ResolveFromKoiSnapshot();
+        if (koiStone is not null)
+        {
+            return BindStone(koiStone).Endpoint;
+        }
+
+        // 4. Preferred Stone name (soft affinity)
         var preferred = await ResolvePreferredStoneNameAsync(ct);
         if (preferred is not null)
         {
             return BindStone(preferred).Endpoint;
         }
 
-        // 4. In-memory cache (includes seeded persisted entries)
+        // 5. In-memory cache (includes seeded persisted entries)
         var cached = await ResolveFromCacheAsync(ct);
         if (cached is not null)
         {
             return BindStone(cached).Endpoint;
         }
 
-        // 5. Container host binding
+        // 6. Container host binding
         if (containerized)
         {
             TryResolveContainerHostEndpoint(out var configuredContainerEndpoint);
@@ -1372,7 +1403,7 @@ public sealed class ZenGardenClient : IZenGardenClient
                 return BindStone(hostStone).Endpoint;
             }
 
-            // 6. Persisted roster re-read (catches sibling container writes since seeding)
+            // 7. Persisted roster re-read (catches sibling container writes since seeding)
             var fallbackPersisted = await ResolveFromPersistedRosterAsync(ct);
             if (fallbackPersisted is not null)
             {
@@ -1867,6 +1898,144 @@ public sealed class ZenGardenClient : IZenGardenClient
                 _logger.LogDebug(ex, "Background stone roster persist failed.");
             }
         });
+    }
+
+    // ── Koi topology event interception ────────────────────────────────
+
+    private ValueTask OnKoiTopologyEventAsync(KoiTopologyEvent evt, CancellationToken ct)
+    {
+        switch (evt.Kind)
+        {
+            case KoiTopologyEventKind.StoneOnline:
+                if (evt.Stone is not null)
+                {
+                    var cached = CacheStone(evt.Stone.ToCachedMossStone());
+                    if (!string.IsNullOrWhiteSpace(evt.Stone.LocalEndpoint))
+                        CacheStone(cached with { Endpoint = evt.Stone.LocalEndpoint });
+
+                    PersistRosterFireAndForget();
+                    _logger.LogInformation(
+                        "Koi: stone {StoneName} online at {Endpoint}.",
+                        evt.Stone.StoneName, evt.Stone.Endpoint);
+                }
+                break;
+
+            case KoiTopologyEventKind.StoneChanged:
+                if (evt.Stone is not null)
+                {
+                    var updated = CacheStone(evt.Stone.ToCachedMossStone());
+                    if (!string.IsNullOrWhiteSpace(evt.Stone.LocalEndpoint))
+                        CacheStone(updated with { Endpoint = evt.Stone.LocalEndpoint });
+
+                    PersistRosterFireAndForget();
+                    _logger.LogDebug(
+                        "Koi: stone {StoneName} metadata changed at {Endpoint}.",
+                        evt.Stone.StoneName, evt.Stone.Endpoint);
+                }
+                break;
+
+            case KoiTopologyEventKind.StoneOffline:
+                if (evt.Stone is not null)
+                {
+                    EvictStone(evt.Stone);
+                    PersistRosterFireAndForget();
+                    _logger.LogInformation(
+                        "Koi: stone {StoneName} went offline — evicted from cache.",
+                        evt.Stone.StoneName);
+                }
+                break;
+
+            case KoiTopologyEventKind.TopologyReset:
+                ReconcileCacheWithKoiSnapshot(evt.Snapshot);
+                PersistRosterFireAndForget();
+                _logger.LogInformation(
+                    "Koi: topology reconciled — {StoneCount} stone(s) in view.",
+                    evt.Snapshot.Stones.Count);
+                break;
+        }
+
+        return ValueTask.CompletedTask;
+    }
+
+    private void EvictStone(DiscoveredStone stone)
+    {
+        var key = stone.CacheKey;
+        _stoneCache.TryRemove(key, out _);
+        _stoneCache.TryRemove(stone.StoneName, out _);
+
+        // If the evicted stone is the currently bound endpoint, invalidate it
+        var bound = _boundStone;
+        if (bound is not null &&
+            (string.Equals(bound.CacheKey, key, StringComparison.OrdinalIgnoreCase) ||
+             string.Equals(bound.Endpoint, stone.Endpoint, StringComparison.OrdinalIgnoreCase)))
+        {
+            InvalidateBoundStone("Koi reported stone offline");
+        }
+    }
+
+    private void ReconcileCacheWithKoiSnapshot(KoiTopologySnapshot snapshot)
+    {
+        if (snapshot.State != KoiHandlerState.Connected)
+            return;
+
+        // Build set of stone keys from Koi's current view
+        var koiKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var stone in snapshot.Stones)
+        {
+            var cached = CacheStone(stone.ToCachedMossStone());
+            koiKeys.Add(cached.CacheKey);
+            koiKeys.Add(cached.StoneName);
+
+            if (!string.IsNullOrWhiteSpace(stone.LocalEndpoint))
+            {
+                var local = CacheStone(cached with { Endpoint = stone.LocalEndpoint });
+                koiKeys.Add(local.StoneName);
+            }
+        }
+
+        // Evict stones no longer visible to Koi (authoritative)
+        foreach (var key in _stoneCache.Keys)
+        {
+            if (!koiKeys.Contains(key))
+            {
+                if (_stoneCache.TryRemove(key, out var removed))
+                {
+                    _logger.LogDebug(
+                        "Koi reconciliation: evicted stale stone {StoneName} at {Endpoint}",
+                        removed.StoneName, removed.Endpoint);
+                }
+            }
+        }
+
+        _logger.LogInformation(
+            "Koi topology reset: reconciled cache to {Count} stones.",
+            snapshot.Stones.Count);
+    }
+
+    private CachedMossStone? ResolveFromKoiSnapshot()
+    {
+        var snapshot = _koiHandler?.CurrentSnapshot;
+        if (snapshot is null || snapshot.State != KoiHandlerState.Connected || snapshot.Stones.Count == 0)
+            return null;
+
+        // Prefer the PreferredStoneName if configured
+        var preferred = _options.PreferredStoneName;
+        if (!string.IsNullOrWhiteSpace(preferred))
+        {
+            var match = snapshot.Stones.FirstOrDefault(s =>
+                string.Equals(s.StoneName, preferred, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(s.StoneId, preferred, StringComparison.OrdinalIgnoreCase));
+
+            if (match is not null)
+                return match.ToCachedMossStone();
+        }
+
+        // Return the most recently seen stone
+        var best = snapshot.Stones
+            .OrderByDescending(s => s.DiscoveredAt)
+            .First();
+
+        return best.ToCachedMossStone();
     }
 
     private void TryEnrichTopologyFromSnapshot(ZenGardenToolSnapshot snapshot)

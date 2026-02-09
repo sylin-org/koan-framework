@@ -63,11 +63,35 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
         module.AddSetting("PersistedCacheTtlHours", persistedCacheTtlHours.Value.ToString(), source: persistedCacheTtlHours.Source, sourceKey: persistedCacheTtlHours.ResolvedKey);
         module.AddSetting("PreferredStoneName", preferredStoneName.Value ?? "(none)", source: preferredStoneName.Source, sourceKey: preferredStoneName.ResolvedKey);
 
+        // Koi topology handler
+        var koiEnabled = Configuration.ReadWithSource(cfg, $"{ZenGardenOptions.SectionName}:KoiDiscoveryEnabled", defaults.KoiDiscoveryEnabled);
+        var koiEndpoint = Configuration.ReadWithSource(cfg, $"{ZenGardenOptions.SectionName}:KoiEndpoint", defaults.KoiEndpoint);
+        var koiHealthTimeout = Configuration.ReadWithSource(cfg, $"{ZenGardenOptions.SectionName}:KoiHealthTimeout", defaults.KoiHealthTimeout);
+        var koiContinuous = Configuration.ReadWithSource(cfg, $"{ZenGardenOptions.SectionName}:KoiContinuousDiscovery", defaults.KoiContinuousDiscovery);
+        var koiLantern = Configuration.ReadWithSource(cfg, $"{ZenGardenOptions.SectionName}:KoiLanternDiscovery", defaults.KoiLanternDiscovery);
+        var koiRetryInterval = Configuration.ReadWithSource(cfg, $"{ZenGardenOptions.SectionName}:KoiRetryInterval", defaults.KoiRetryInterval);
+
+        module.AddSetting("KoiDiscoveryEnabled", koiEnabled.Value.ToString(), source: koiEnabled.Source, sourceKey: koiEnabled.ResolvedKey);
+        module.AddSetting("KoiEndpoint", koiEndpoint.Value ?? "(auto-detected)", source: koiEndpoint.Source, sourceKey: koiEndpoint.ResolvedKey);
+        module.AddSetting("KoiHealthTimeout", koiHealthTimeout.Value.ToString(), source: koiHealthTimeout.Source, sourceKey: koiHealthTimeout.ResolvedKey);
+        module.AddSetting("KoiContinuousDiscovery", koiContinuous.Value.ToString(), source: koiContinuous.Source, sourceKey: koiContinuous.ResolvedKey);
+        module.AddSetting("KoiLanternDiscovery", koiLantern.Value.ToString(), source: koiLantern.Source, sourceKey: koiLantern.ResolvedKey);
+        module.AddSetting("KoiRetryInterval", koiRetryInterval.Value.ToString(), source: koiRetryInterval.Source, sourceKey: koiRetryInterval.ResolvedKey);
+
         if (persistDiscoveryCache.Value)
         {
             var resolvedPath = StoneRosterPathResolver.Resolve(
                 new ZenGardenOptions { DiscoveryCachePath = discoveryCachePath.Value });
             module.AddSetting("DiscoveryCachePath (resolved)", resolvedPath, source: Custom);
+        }
+
+        if (koiEnabled.Value)
+        {
+            module.AddTool(
+                "Koi Topology Handler",
+                koiEndpoint.Value ?? $"http://localhost:{Constants.Koi.DefaultPort}",
+                "Background mDNS-to-HTTP topology handler via Koi daemon.",
+                capability: "zen-garden.koi");
         }
 
         module.AddTool(
