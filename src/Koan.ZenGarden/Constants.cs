@@ -30,6 +30,8 @@ public static class Constants
         public const string RequireHostMossWhenContainerized = "KOAN_ZENGARDEN_REQUIRE_HOST_MOSS";
         public const string CachePath = "KOAN_ZENGARDEN_CACHE_PATH";
         public const string PreferredStoneName = "KOAN_ZENGARDEN_PREFERRED_STONE";
+        public const string KoiEndpoint = "KOAN_ZENGARDEN_KOI_ENDPOINT";
+        public const string KoiEnabled = "KOAN_ZENGARDEN_KOI_ENABLED";
     }
 
     public static class Persistence
@@ -39,6 +41,17 @@ public static class Constants
         public const string RosterFileName = "garden-stones.json";
         public const string LegacyRosterFileName = "stones.json";
         public const string MossTopologyFileName = "garden-topology.json";
+    }
+
+    public static class Koi
+    {
+        public const int DefaultPort = 5641;
+        public const string HealthEndpoint = "/healthz";
+        public const string AdminStatusEndpoint = "/v1/admin/status";
+        public const string BrowseEndpoint = "/v1/browse";
+        public const string EventsEndpoint = "/v1/events";
+        public const string MossServiceType = "_moss._tcp";
+        public const string LanternServiceType = "_lantern._tcp";
     }
 
     public static class Moss

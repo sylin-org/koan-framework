@@ -105,4 +105,46 @@ public sealed class ZenGardenOptions
     /// stone IDs, host:port, and .local suffixes.
     /// </summary>
     public string? PreferredStoneName { get; set; }
+
+    // ── Koi topology handler ─────────────────────────────────────────
+
+    /// <summary>
+    /// Explicit Koi daemon endpoint (e.g. "http://localhost:5641").
+    /// When null, auto-detected from container state or defaults to localhost.
+    /// </summary>
+    public string? KoiEndpoint { get; set; }
+
+    /// <summary>
+    /// Enable the background Koi topology handler.
+    /// When true, the handler probes for Koi at startup and maintains a live topology projection.
+    /// </summary>
+    public bool KoiDiscoveryEnabled { get; set; } = true;
+
+    /// <summary>
+    /// Timeout for the Koi health probe. Keep short — this gates the fast-fail path.
+    /// </summary>
+    public TimeSpan KoiHealthTimeout { get; set; } = TimeSpan.FromMilliseconds(500);
+
+    /// <summary>
+    /// Idle timeout for Koi browse requests. The SSE stream closes after this duration
+    /// of silence, signaling that all currently known services have been reported.
+    /// </summary>
+    public TimeSpan KoiBrowseIdleTimeout { get; set; } = TimeSpan.FromSeconds(3);
+
+    /// <summary>
+    /// Enable continuous SSE event streaming from Koi for real-time topology updates.
+    /// When false, the handler performs a single browse and does not maintain a stream.
+    /// </summary>
+    public bool KoiContinuousDiscovery { get; set; } = true;
+
+    /// <summary>
+    /// Also browse for <c>_lantern._tcp</c> services via Koi for cross-subnet topology.
+    /// </summary>
+    public bool KoiLanternDiscovery { get; set; } = true;
+
+    /// <summary>
+    /// Interval between Koi re-probe attempts when in <c>NotDetected</c> state,
+    /// and the maximum backoff cap when in <c>Reconnecting</c> state.
+    /// </summary>
+    public TimeSpan KoiRetryInterval { get; set; } = TimeSpan.FromSeconds(30);
 }
