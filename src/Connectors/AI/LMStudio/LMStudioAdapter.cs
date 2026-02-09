@@ -23,7 +23,8 @@ namespace Koan.AI.Connector.LMStudio;
 
 [AiAdapterDescriptor(priority: 12, Weight = 2)]
 internal sealed class LMStudioAdapter : BaseKoanAdapter,
-    IAiAdapter,
+    IChatAdapter,
+    IEmbedAdapter,
     IAdapterReadiness,
     IAdapterReadinessConfiguration,
     IAsyncAdapterInitializer
@@ -228,18 +229,6 @@ internal sealed class LMStudioAdapter : BaseKoanAdapter,
             AdapterId = AdapterId,
             AdapterType = Type
         }).ToList();
-    }
-
-    public Task<AiCapabilities> GetCapabilitiesAsync(CancellationToken ct = default)
-    {
-        return Task.FromResult(new AiCapabilities
-        {
-            AdapterId = AdapterId,
-            AdapterType = Type,
-            SupportsChat = true,
-            SupportsStreaming = true,
-            SupportsEmbeddings = true
-        });
     }
 
     public AdapterReadinessState ReadinessState => _stateManager.State;

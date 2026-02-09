@@ -16,7 +16,7 @@ using Koan.AI.Connector.Ollama.Options;
 
 namespace Koan.AI.Connector.Ollama;
 
-internal sealed class OllamaAdapter : IAiAdapter
+internal sealed class OllamaAdapter : IChatAdapter, IEmbedAdapter
 {
     private readonly HttpClient _http;
     private readonly ILogger<OllamaAdapter> _logger;
@@ -220,18 +220,6 @@ internal sealed class OllamaAdapter : IAiAdapter
         }
 
         return models;
-    }
-
-    public Task<AiCapabilities> GetCapabilitiesAsync(CancellationToken ct = default)
-    {
-        return Task.FromResult(new AiCapabilities
-        {
-            AdapterId = Id,
-            AdapterType = Type,
-            SupportsChat = true,
-            SupportsStreaming = true,
-            SupportsEmbeddings = true
-        });
     }
 
     private async Task<OllamaTagsResponse?> FetchTagsAsync(CancellationToken ct)
