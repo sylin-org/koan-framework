@@ -53,6 +53,8 @@ public sealed record ZenGardenOfferingResolution
 
     /// <summary>
     /// Selects the best URI candidate by preferred scheme order, then falls back to host/port synthesis.
+    /// Requires candidates to be valid RFC 3986 URIs (use <see cref="GetConnectionString"/> for
+    /// connection strings that may not parse as URIs, such as MongoDB replica set strings).
     /// </summary>
     public string? GetUri(params string[] preferredSchemes)
     {
@@ -91,6 +93,53 @@ public sealed record ZenGardenOfferingResolution
             }
         }
 
+        return SynthesizeFromMetadata(preferredSchemes);
+    }
+
+    /// <summary>
+    /// Selects the best connection string candidate by scheme prefix matching.
+    /// Unlike <see cref="GetUri"/>, this does not require candidates to be valid RFC 3986 URIs —
+    /// it matches by raw string prefix (e.g. <c>mongodb://</c>), so connection strings like
+    /// MongoDB replica set URLs with comma-separated hosts pass through untouched.
+    /// </summary>
+    public string? GetConnectionString(params string[] preferredSchemes)
+    {
+        if (Uris.Count > 0)
+        {
+            if (preferredSchemes.Length > 0)
+            {
+                var preferred = preferredSchemes
+                    .Where(x => !string.IsNullOrWhiteSpace(x))
+                    .Select(x => x.Trim().ToLowerInvariant() + "://")
+                    .ToArray();
+
+                foreach (var prefix in preferred)
+                {
+                    foreach (var uri in Uris)
+                    {
+                        if (!string.IsNullOrWhiteSpace(uri) &&
+                            uri.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                        {
+                            return uri;
+                        }
+                    }
+                }
+            }
+
+            foreach (var uri in Uris)
+            {
+                if (!string.IsNullOrWhiteSpace(uri))
+                {
+                    return uri;
+                }
+            }
+        }
+
+        return SynthesizeFromMetadata(preferredSchemes);
+    }
+
+    private string? SynthesizeFromMetadata(string[] preferredSchemes)
+    {
         var host = !string.IsNullOrWhiteSpace(Hostname)
             ? Hostname
             : !string.IsNullOrWhiteSpace(Ip)

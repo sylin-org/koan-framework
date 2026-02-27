@@ -99,6 +99,61 @@ public sealed class ZenGardenInitializationProviderTests
     }
 
     [Fact]
+    public async Task ResolveAsync_GetConnectionString_returns_replica_set_url()
+    {
+        var replicaSetUrl =
+            "mongodb://stone-shadowed-swamp.local:27017,stone-golden-summit.local:27017,stone-topaz-butte.local:27017,stone-limpid-dune.local:27017/?replicaSet=zen-garden";
+
+        var snapshots = new[]
+        {
+            new ZenGardenToolSnapshot
+            {
+                ToolFqid = "offering:mongodb",
+                ToolType = ZenGardenToolType.Offering,
+                Ready = true,
+                State = ZenGardenToolState.Ready,
+                Revision = 2,
+                Connection = new ZenGardenConnection
+                {
+                    Uris = [replicaSetUrl]
+                }
+            }
+        };
+
+        await using var provider = BuildScope(
+            new StubZenGardenClient(snapshots),
+            new StubBinding("mongo", "mongodb"));
+
+        var initializationProvider = provider.GetRequiredService<IZenGardenInitializationProvider>();
+        var resolved = await initializationProvider.ResolveAsync(ZenGardenConnectionIntent.ForOffering("mongodb"));
+
+        resolved.Should().NotBeNull();
+        // GetConnectionString uses prefix matching — passes replica set URLs through untouched
+        resolved!.GetConnectionString("mongodb").Should().Be(replicaSetUrl);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_GetConnectionString_returns_single_host_url()
+    {
+        var snapshots = new[]
+        {
+            CreateSnapshot("offering:mongodb", ready: true, "mongodb://primary:27018")
+        };
+
+        await using var provider = BuildScope(
+            new StubZenGardenClient(snapshots),
+            new StubBinding("mongo", "mongodb"));
+
+        var initializationProvider = provider.GetRequiredService<IZenGardenInitializationProvider>();
+        var resolved = await initializationProvider.ResolveAsync(ZenGardenConnectionIntent.ForOffering("mongodb"));
+
+        resolved.Should().NotBeNull();
+        // Both methods work for single-host URLs
+        resolved!.GetConnectionString("mongodb").Should().Be("mongodb://primary:27018");
+        resolved.GetUri("mongodb").Should().Be("mongodb://primary:27018");
+    }
+
+    [Fact]
     public void TryGetDefaultOffering_uses_registered_bindings()
     {
         using var provider = BuildScope(

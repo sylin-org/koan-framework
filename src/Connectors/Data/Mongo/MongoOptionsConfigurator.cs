@@ -322,10 +322,14 @@ internal sealed class MongoOptionsConfigurator : AdapterOptionsConfigurator<Mong
     {
         connectionString = string.Empty;
 
-        var directMongoUri = resolved.GetUri("mongodb", "mongodb+srv");
-        if (TryGetMongoUri(directMongoUri, out var parsedMongo))
+        // Primary path: native MongoDB connection string (supports replica sets with comma-separated hosts).
+        // Uses GetConnectionString (prefix match) instead of GetUri (Uri.TryCreate) because
+        // System.Uri rejects multi-host MongoDB connection strings as invalid RFC 3986 URIs.
+        var mongoConnectionString = resolved.GetConnectionString("mongodb", "mongodb+srv");
+        if (!string.IsNullOrWhiteSpace(mongoConnectionString) &&
+            mongoConnectionString.StartsWith("mongodb", StringComparison.OrdinalIgnoreCase))
         {
-            connectionString = MergeMongoOverrides(parsedMongo!, databaseName, username, password);
+            connectionString = MergeMongoOverrides(mongoConnectionString, databaseName, username, password);
             return true;
         }
 
@@ -353,42 +357,88 @@ internal sealed class MongoOptionsConfigurator : AdapterOptionsConfigurator<Mong
         return true;
     }
 
-    private static bool TryGetMongoUri(string? candidate, out Uri? uri)
-    {
-        uri = null;
-        if (string.IsNullOrWhiteSpace(candidate))
-        {
-            return false;
-        }
-
-        if (!Uri.TryCreate(candidate, UriKind.Absolute, out uri))
-        {
-            return false;
-        }
-
-        return uri.Scheme.StartsWith("mongodb", StringComparison.OrdinalIgnoreCase);
-    }
-
+    /// <summary>
+    /// Applies database, username, and password overrides to a MongoDB connection string
+    /// using string manipulation. Handles both single-host and replica-set (multi-host)
+    /// connection strings without routing through System.Uri or UriBuilder.
+    /// </summary>
     private static string MergeMongoOverrides(
-        Uri mongoUri,
+        string connectionString,
         string? databaseName,
         string? username,
         string? password)
     {
-        var builder = new UriBuilder(mongoUri);
-        if (!string.IsNullOrWhiteSpace(username) && string.IsNullOrWhiteSpace(builder.UserName))
+        // Format: mongodb[+srv]://[user:pass@]hosts[/database][?options]
+        var schemeEnd = connectionString.IndexOf("://", StringComparison.Ordinal);
+        if (schemeEnd < 0) return connectionString;
+
+        var scheme = connectionString[..(schemeEnd + 3)]; // e.g. "mongodb://"
+        var rest = connectionString[(schemeEnd + 3)..];    // everything after "://"
+
+        // Split existing auth from host portion
+        string existingAuth = string.Empty;
+        var atIndex = rest.IndexOf('@');
+        var slashIndex = rest.IndexOf('/');
+        var questionIndex = rest.IndexOf('?');
+
+        // '@' must appear before any '/' or '?' to be auth (not part of query params)
+        if (atIndex >= 0 && (slashIndex < 0 || atIndex < slashIndex) && (questionIndex < 0 || atIndex < questionIndex))
         {
-            builder.UserName = username;
-            builder.Password = password ?? string.Empty;
+            existingAuth = rest[..atIndex];
+            rest = rest[(atIndex + 1)..];
         }
 
-        if (!string.IsNullOrWhiteSpace(databaseName) &&
-            string.IsNullOrWhiteSpace(builder.Path?.Trim('/')))
+        // Split hosts from path+query
+        string hosts;
+        string pathAndQuery;
+        var pathStart = rest.IndexOf('/');
+        if (pathStart >= 0)
         {
-            builder.Path = "/" + databaseName.Trim();
+            hosts = rest[..pathStart];
+            pathAndQuery = rest[pathStart..]; // includes leading '/'
+        }
+        else
+        {
+            var queryStart = rest.IndexOf('?');
+            if (queryStart >= 0)
+            {
+                hosts = rest[..queryStart];
+                pathAndQuery = rest[queryStart..];
+            }
+            else
+            {
+                hosts = rest;
+                pathAndQuery = string.Empty;
+            }
         }
 
-        return builder.Uri.OriginalString.TrimEnd('/');
+        // Apply auth override (only if not already present)
+        var auth = !string.IsNullOrWhiteSpace(existingAuth)
+            ? existingAuth + "@"
+            : !string.IsNullOrWhiteSpace(username)
+                ? $"{username}:{password ?? string.Empty}@"
+                : string.Empty;
+
+        // Apply database override (only if not already present in path)
+        if (!string.IsNullOrWhiteSpace(databaseName))
+        {
+            // Extract existing path portion (before any '?')
+            var existingPath = pathAndQuery;
+            var existingQuery = string.Empty;
+            var qIdx = pathAndQuery.IndexOf('?');
+            if (qIdx >= 0)
+            {
+                existingPath = pathAndQuery[..qIdx];
+                existingQuery = pathAndQuery[qIdx..];
+            }
+
+            if (string.IsNullOrWhiteSpace(existingPath.Trim('/')))
+            {
+                pathAndQuery = "/" + databaseName.Trim() + existingQuery;
+            }
+        }
+
+        return (scheme + auth + hosts + pathAndQuery).TrimEnd('/');
     }
 
     private static bool IsAutoConnection(string? connectionString)

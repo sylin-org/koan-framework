@@ -222,42 +222,97 @@ public static class ConnectionStringParser
 
     private static ConnectionStringComponents ParseMongo(string connectionString)
     {
-        // MongoDB format: mongodb://[username:password@]host[:port][/database][?options]
-        if (!connectionString.StartsWith("mongodb://", StringComparison.OrdinalIgnoreCase))
+        // MongoDB format: mongodb[+srv]://[username:password@]host1[:port1][,host2[:port2],...][/database][?options]
+        if (!connectionString.StartsWith("mongodb", StringComparison.OrdinalIgnoreCase))
         {
-            // Fallback to generic parsing
             return ParseGeneric(connectionString);
         }
 
-        var uri = new Uri(connectionString);
-        string host = uri.Host;
-        int port = uri.Port > 0 ? uri.Port : 27017;
-        string? database = string.IsNullOrWhiteSpace(uri.AbsolutePath) || uri.AbsolutePath == "/"
-            ? null
-            : uri.AbsolutePath.TrimStart('/');
+        var schemeEnd = connectionString.IndexOf("://", StringComparison.Ordinal);
+        if (schemeEnd < 0) return ParseGeneric(connectionString);
 
+        var rest = connectionString[(schemeEnd + 3)..];
+
+        // Extract auth
         string? username = null;
         string? password = null;
-        if (!string.IsNullOrEmpty(uri.UserInfo))
+        var atIndex = rest.IndexOf('@');
+        var slashIndex = rest.IndexOf('/');
+        var questionIndex = rest.IndexOf('?');
+        if (atIndex >= 0 && (slashIndex < 0 || atIndex < slashIndex) && (questionIndex < 0 || atIndex < questionIndex))
         {
-            var userParts = uri.UserInfo.Split(':', 2);
+            var authPart = rest[..atIndex];
+            rest = rest[(atIndex + 1)..];
+            var userParts = authPart.Split(':', 2);
             username = userParts[0];
             if (userParts.Length > 1)
                 password = userParts[1];
         }
 
+        // Split hosts from path+query
+        string hostsPart;
+        string? database = null;
         var parameters = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        if (!string.IsNullOrWhiteSpace(uri.Query))
+
+        var pathIdx = rest.IndexOf('/');
+        var qIdx = rest.IndexOf('?');
+        if (pathIdx >= 0)
         {
-            foreach (var param in uri.Query.TrimStart('?').Split('&'))
+            hostsPart = rest[..pathIdx];
+            var afterHosts = rest[(pathIdx + 1)..];
+            var dbQIdx = afterHosts.IndexOf('?');
+            if (dbQIdx >= 0)
             {
-                var kv = param.Split('=', 2);
-                if (kv.Length == 2)
-                    parameters[kv[0]] = kv[1];
+                var dbCandidate = afterHosts[..dbQIdx];
+                if (!string.IsNullOrWhiteSpace(dbCandidate))
+                    database = dbCandidate;
+                ParseQueryParams(afterHosts[(dbQIdx + 1)..], parameters);
             }
+            else
+            {
+                if (!string.IsNullOrWhiteSpace(afterHosts))
+                    database = afterHosts;
+            }
+        }
+        else if (qIdx >= 0)
+        {
+            hostsPart = rest[..qIdx];
+            ParseQueryParams(rest[(qIdx + 1)..], parameters);
+        }
+        else
+        {
+            hostsPart = rest;
+        }
+
+        // For multi-host (replica set), store the full hosts string in Host and use port 0
+        // to signal that port is embedded in the host string.
+        // For single-host, parse host:port normally.
+        var isMultiHost = hostsPart.Contains(',');
+        string host;
+        int port;
+        if (isMultiHost)
+        {
+            host = hostsPart;
+            port = 0;
+        }
+        else
+        {
+            var hostPortParts = hostsPart.Split(':', 2);
+            host = hostPortParts[0];
+            port = hostPortParts.Length > 1 && int.TryParse(hostPortParts[1], out var p) ? p : 27017;
         }
 
         return new ConnectionStringComponents(host, port, database, username, password, parameters);
+    }
+
+    private static void ParseQueryParams(string query, Dictionary<string, string> parameters)
+    {
+        foreach (var param in query.Split('&', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var kv = param.Split('=', 2);
+            if (kv.Length == 2)
+                parameters[kv[0]] = kv[1];
+        }
     }
 
     private static string BuildMongo(ConnectionStringComponents components)
@@ -276,7 +331,13 @@ public static class ConnectionStringParser
             ? string.Empty
             : "?" + string.Join("&", components.Parameters.Select(p => $"{p.Key}={p.Value}"));
 
-        return $"mongodb://{auth}{components.Host}:{components.Port}{database}{query}";
+        // Multi-host: port is embedded in Host (e.g. "host1:27017,host2:27017"), don't append :port
+        var isMultiHost = components.Host.Contains(',');
+        var hostPort = isMultiHost
+            ? components.Host
+            : $"{components.Host}:{components.Port}";
+
+        return $"mongodb://{auth}{hostPort}{database}{query}";
     }
 
     #endregion
