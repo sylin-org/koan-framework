@@ -265,7 +265,7 @@ Environment overrides: `KOAN_ZENGARDEN_KOI_ENDPOINT`, `KOAN_ZENGARDEN_KOI_ENABLE
 
 ### 12. Koi SSE-to-event mapping
 
-The handler consumes `GET /v1/events?type=_moss._tcp&idle_for=0` and maps Koi events:
+The handler consumes `GET /v1/mdns/events?type=_moss._tcp&idle_for=0` and maps Koi events:
 
 | Koi SSE event | Handler action | Emitted event |
 |---|---|---|

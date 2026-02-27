@@ -407,7 +407,7 @@ public sealed class KoiHandlerTests : IDisposable
             if (path.Equals(Constants.Koi.HealthEndpoint, StringComparison.OrdinalIgnoreCase))
                 return Task.FromResult(CloneResponse(HealthResponse));
 
-            if (path.Equals(Constants.Koi.AdminStatusEndpoint, StringComparison.OrdinalIgnoreCase))
+            if (path.Equals(Constants.Koi.StatusEndpoint, StringComparison.OrdinalIgnoreCase))
                 return Task.FromResult(CloneResponse(AdminStatusResponse));
 
             if (path.Equals(Constants.Koi.BrowseEndpoint, StringComparison.OrdinalIgnoreCase))

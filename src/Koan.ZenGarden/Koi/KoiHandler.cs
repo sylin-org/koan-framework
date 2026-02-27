@@ -155,7 +155,7 @@ internal sealed class KoiHandler : IKoiHandler
             if (!response.IsSuccessStatusCode)
                 return false;
 
-            // Health returns {"ok":true}; version is on /v1/admin/status
+            // Health returns {"ok":true}; version is on /v1/status
             await TryFetchVersionAsync(linked.Token).ConfigureAwait(false);
 
             return true;
@@ -172,7 +172,7 @@ internal sealed class KoiHandler : IKoiHandler
         try
         {
             using var response = await _httpClient
-                .GetAsync($"{_koiEndpoint}{Constants.Koi.AdminStatusEndpoint}", ct)
+                .GetAsync($"{_koiEndpoint}{Constants.Koi.StatusEndpoint}", ct)
                 .ConfigureAwait(false);
 
             if (!response.IsSuccessStatusCode) return;

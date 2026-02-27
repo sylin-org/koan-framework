@@ -47,9 +47,9 @@ public static class Constants
     {
         public const int DefaultPort = 5641;
         public const string HealthEndpoint = "/healthz";
-        public const string AdminStatusEndpoint = "/v1/admin/status";
-        public const string BrowseEndpoint = "/v1/browse";
-        public const string EventsEndpoint = "/v1/events";
+        public const string StatusEndpoint = "/v1/status";
+        public const string BrowseEndpoint = "/v1/mdns/discover";
+        public const string EventsEndpoint = "/v1/mdns/subscribe";
         public const string MossServiceType = "_moss._tcp";
         public const string LanternServiceType = "_lantern._tcp";
     }

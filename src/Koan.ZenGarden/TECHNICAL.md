@@ -47,6 +47,26 @@ It does not use `/api/v1/services` as a primary catalog source.
   - `DISCOVERY_ENABLE_BCAST_FALLBACK`
   - `DISCOVERY_ENABLE_LIMITED_BCAST`
 
+### Koi (mDNS-to-HTTP bridge)
+
+`Koan.ZenGarden` can use Koi as an authoritative, continuous topology source.
+Koi runs as a host daemon and exposes mDNS over HTTP so containers can see LAN
+services without multicast.
+
+Endpoints used by the Koi handler:
+
+- `GET /healthz` (liveness probe)
+- `GET /v1/status` (version + capability status)
+- `GET /v1/mdns/browse?type=_moss._tcp&idle_for=3` (initial snapshot)
+- `GET /v1/mdns/events?type=_moss._tcp&idle_for=0` (continuous stream)
+
+Optional lantern discovery uses the same endpoints with `type=_lantern._tcp`.
+The SSE streams follow Koi's event format: `data: {"found": {...}}`,
+`data: {"resolved": {...}}`, `data: {"removed": {...}}`.
+
+Koi also exposes DNS, certmesh, health, and proxy capabilities, but the ZenGarden
+handler only consumes the mDNS stream plus health/status endpoints.
+
 ### Topology API
 
 - `GET /api/v1/garden/topology`
@@ -78,13 +98,15 @@ It does not use `/api/v1/services` as a primary catalog source.
 
 1. Moss endpoint resolution (ordered by priority):
    1. Seed from own roster (`garden-stones.json`) and Moss topology (`garden-topology.json`) into in-memory cache (once on first resolution)
-   2. Currently bound Stone (skipped on forced rediscovery after failure)
-   3. Explicit endpoint / `GARDEN_STONE` selector
-   4. Preferred Stone name (soft affinity via `PreferredStoneName` option)
-   5. In-memory cache (includes seeded persisted entries with refreshed timestamps)
-   6. Container host binding (`host.docker.internal`)
-   7. Persisted roster re-read (catches sibling container writes since seeding)
-   8. UDP multicast/broadcast discovery
+  2. Currently bound Stone (skipped on forced rediscovery after failure)
+  3. Koi snapshot: Stones (authoritative when connected)
+  4. Koi snapshot: Lanterns (cross-subnet topology when present)
+  5. Explicit endpoint / `GARDEN_STONE` selector
+  6. Preferred Stone name (soft affinity via `PreferredStoneName` option)
+  7. In-memory cache (includes seeded persisted entries with refreshed timestamps)
+  8. Container host binding (`host.docker.internal`)
+  9. Persisted roster re-read (catches sibling container writes since seeding)
+  10. UDP multicast/broadcast discovery
 2. Endpoint health checks and automatic rebind on failure.
 3. Snapshot reads for catalog queries.
 4. Long-lived SSE stream consumption.
@@ -323,6 +345,17 @@ var storage = await ZenGarden.Storage.Catalog();
 - `DiscoveryCachePath` (optional explicit path; auto-resolved when null)
 - `PersistedCacheTtlHours` (default `168` = 7 days)
 - `PreferredStoneName` (optional soft-affinity Stone name)
+- `KoiEndpoint` (optional explicit Koi endpoint, default `http://localhost:5641`)
+- `KoiDiscoveryEnabled` (default `true`)
+- `KoiHealthTimeout` (default 500ms)
+- `KoiBrowseIdleTimeout` (default 3s)
+- `KoiContinuousDiscovery` (default `true`)
+- `KoiLanternDiscovery` (default `true`)
+- `KoiRetryInterval` (default 30s)
+
+Koi env overrides:
+- `KOAN_ZENGARDEN_KOI_ENDPOINT`
+- `KOAN_ZENGARDEN_KOI_ENABLED`
 
 Containerized resolution policy:
 
