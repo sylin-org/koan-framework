@@ -1,3 +1,4 @@
+using Koan.ZenGarden.Core;
 using Koan.ZenGarden.Models;
 
 namespace Koan.ZenGarden;
@@ -24,11 +25,10 @@ public sealed record ZenGardenSubscription
 
     public static ZenGardenSubscription ForStorage(string seedBank)
     {
-        var fqid = NormalizeSeedBank(seedBank);
         return new ZenGardenSubscription
         {
             ToolType = ZenGardenToolType.SeedBank,
-            ToolFqid = fqid
+            ToolFqid = Core.ToolFqid.Parse(seedBank).ToString()
         };
     }
 
@@ -49,10 +49,13 @@ public sealed record ZenGardenSubscription
             return false;
         }
 
-        if (!string.IsNullOrWhiteSpace(ToolFqid) &&
-            !string.Equals(snapshot.ToolFqid, ToolFqid, StringComparison.OrdinalIgnoreCase))
+        if (!string.IsNullOrWhiteSpace(ToolFqid))
         {
-            return false;
+            var query = Core.ToolFqid.Parse(ToolFqid);
+            if (!query.MatchesSnapshot(snapshot.ToolFqid, snapshot.OfferingType, null))
+            {
+                return false;
+            }
         }
 
         return true;
@@ -105,29 +108,7 @@ public sealed record ZenGardenSubscription
             trimmed = trimmed[..bracketStart].Trim();
         }
 
-        var fqid = NormalizeOffering(trimmed);
+        var fqid = Core.ToolFqid.Parse(trimmed).ToString();
         return (fqid, requires);
-    }
-
-    private static string NormalizeOffering(string offering)
-    {
-        var normalized = offering.Trim().ToLowerInvariant();
-        if (normalized.StartsWith("offering:", StringComparison.Ordinal))
-        {
-            return normalized;
-        }
-
-        return $"offering:{normalized}";
-    }
-
-    private static string NormalizeSeedBank(string seedBank)
-    {
-        var normalized = seedBank.Trim().ToLowerInvariant();
-        if (normalized.StartsWith("seed-bank:", StringComparison.Ordinal))
-        {
-            return normalized;
-        }
-
-        return $"seed-bank:{normalized}";
     }
 }

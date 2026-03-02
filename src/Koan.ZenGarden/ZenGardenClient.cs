@@ -262,9 +262,7 @@ public sealed class ZenGardenClient : IZenGardenClient
         var offeringSubscription = ZenGardenSubscription.ForOffering(offering);
         var toolFqid = offeringSubscription.ToolFqid
             ?? throw new InvalidOperationException("Failed to normalize offering selector.");
-        var offeringSelector = toolFqid.StartsWith("offering:", StringComparison.OrdinalIgnoreCase)
-            ? toolFqid["offering:".Length..]
-            : toolFqid;
+        var offeringSelector = Core.ToolFqid.Parse(toolFqid).ToString();
 
         var snapshot = await ResolveCurrentToolSnapshotAsync(toolFqid, cancellationToken).ConfigureAwait(false);
         var requested = requestedRequirements.Select(static x => x.Canonical).ToArray();
@@ -735,7 +733,7 @@ public sealed class ZenGardenClient : IZenGardenClient
 
     private async Task ApplyRemoveAsync(JsonElement payload, string? eventId, long? cursor, CancellationToken ct)
     {
-        var toolFqid = ReadString(payload, "tool_fqid");
+        var toolFqid = ReadString(payload, "fqid") ?? ReadString(payload, "tool_fqid");
         if (string.IsNullOrWhiteSpace(toolFqid))
         {
             return;
@@ -750,13 +748,16 @@ public sealed class ZenGardenClient : IZenGardenClient
         var current = new ZenGardenToolSnapshot
         {
             ToolFqid = toolFqid,
-            ToolUid = ReadString(payload, "tool_uid") ?? previous?.ToolUid,
-            ToolType = ParseToolType(ReadString(payload, "tool_type")) ?? previous?.ToolType ?? ZenGardenToolType.Unknown,
+            ToolUid = previous?.ToolUid,
+            OfferingType = previous?.OfferingType,
+            Category = previous?.Category,
+            ToolType = previous?.ToolType ?? ZenGardenToolType.Unknown,
             State = ZenGardenToolState.Unavailable,
             Ready = false,
             Revision = revision,
             StoneId = previous?.StoneId,
             StoneName = previous?.StoneName,
+            StoneEndpoint = previous?.StoneEndpoint,
             Connection = previous?.Connection,
             Capabilities = new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase),
             CapabilityRevision = previous?.CapabilityRevision,
@@ -1044,14 +1045,9 @@ public sealed class ZenGardenClient : IZenGardenClient
             ToolType = Models.ZenGardenToolType.Offering
         }, ct).ConfigureAwait(false);
 
-        var colonPrefix = toolFqid + ":";
-        var atPrefix = toolFqid + "@";
-
+        var query = Core.ToolFqid.Parse(toolFqid);
         return broad.FirstOrDefault(tool =>
-            string.Equals(tool.ToolFqid, toolFqid, StringComparison.OrdinalIgnoreCase) ||
-            tool.ToolFqid.StartsWith(colonPrefix, StringComparison.OrdinalIgnoreCase) ||
-            tool.ToolFqid.StartsWith(atPrefix, StringComparison.OrdinalIgnoreCase) ||
-            tool.Aliases.Any(alias => string.Equals(alias, toolFqid, StringComparison.OrdinalIgnoreCase)));
+            query.MatchesSnapshot(tool.ToolFqid, tool.OfferingType, tool.Aliases));
     }
 
     private static IReadOnlyList<ZenGardenCapabilityRequirement> CollectRequestedRequirements(
@@ -1110,24 +1106,8 @@ public sealed class ZenGardenClient : IZenGardenClient
 
     private static bool IsToolMatch(string requestedToolFqid, ZenGardenToolSnapshot current)
     {
-        if (string.Equals(current.ToolFqid, requestedToolFqid, StringComparison.OrdinalIgnoreCase))
-        {
-            return true;
-        }
-
-        var colonPrefix = requestedToolFqid + ":";
-        if (current.ToolFqid.StartsWith(colonPrefix, StringComparison.OrdinalIgnoreCase))
-        {
-            return true;
-        }
-
-        var atPrefix = requestedToolFqid + "@";
-        if (current.ToolFqid.StartsWith(atPrefix, StringComparison.OrdinalIgnoreCase))
-        {
-            return true;
-        }
-
-        return current.Aliases.Any(alias => string.Equals(alias, requestedToolFqid, StringComparison.OrdinalIgnoreCase));
+        return Core.ToolFqid.Parse(requestedToolFqid)
+            .MatchesSnapshot(current.ToolFqid, current.OfferingType, current.Aliases);
     }
 
     private ZenGardenCapabilityWish SnapshotCapabilityWish(CapabilityWishRegistration registration)
@@ -2055,18 +2035,30 @@ public sealed class ZenGardenClient : IZenGardenClient
             return;
         }
 
-        var host = !string.IsNullOrWhiteSpace(snapshot.Connection?.Hostname)
-            ? snapshot.Connection.Hostname
-            : !string.IsNullOrWhiteSpace(snapshot.Connection?.Ip)
-                ? snapshot.Connection.Ip
-                : null;
+        // Prefer stone.endpoint (the Moss base URL) directly
+        string? mossEndpoint = null;
+        if (!string.IsNullOrWhiteSpace(snapshot.StoneEndpoint))
+        {
+            mossEndpoint = snapshot.StoneEndpoint.TrimEnd('/');
+        }
+        else
+        {
+            var host = !string.IsNullOrWhiteSpace(snapshot.Connection?.Hostname)
+                ? snapshot.Connection.Hostname
+                : !string.IsNullOrWhiteSpace(snapshot.Connection?.Ip)
+                    ? snapshot.Connection.Ip
+                    : null;
 
-        if (string.IsNullOrWhiteSpace(host))
+            if (!string.IsNullOrWhiteSpace(host))
+            {
+                mossEndpoint = $"http://{host}:{Constants.Moss.DefaultPort}";
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(mossEndpoint))
         {
             return;
         }
-
-        var mossEndpoint = $"http://{host}:{Constants.Moss.DefaultPort}";
 
         var learned = new CachedMossStone
         {
@@ -2877,14 +2869,14 @@ public sealed class ZenGardenClient : IZenGardenClient
         var builder = CreateBaseUriBuilder(endpoint, Constants.Moss.ToolsEndpoint);
         var query = new List<string>();
 
-        if (subscription.ToolType is not null)
+        if (subscription.ToolType == ZenGardenToolType.SeedBank)
         {
-            query.Add($"tool_type={Uri.EscapeDataString(ToWireToolType(subscription.ToolType.Value))}");
+            query.Add($"category={Uri.EscapeDataString(ToWireCategory(subscription.ToolType.Value))}");
         }
 
         if (!string.IsNullOrWhiteSpace(subscription.ToolFqid))
         {
-            query.Add($"tool_fqid={Uri.EscapeDataString(subscription.ToolFqid)}");
+            query.Add($"fqid={Uri.EscapeDataString(subscription.ToolFqid)}");
         }
 
         if (subscription.Requires.Count > 0)
@@ -2934,12 +2926,12 @@ public sealed class ZenGardenClient : IZenGardenClient
         return new UriBuilder($"{endpoint.TrimEnd('/')}{path}");
     }
 
-    private static string ToWireToolType(ZenGardenToolType toolType)
+    private static string ToWireCategory(ZenGardenToolType toolType)
     {
         return toolType switch
         {
             ZenGardenToolType.Offering => "offering",
-            ZenGardenToolType.SeedBank => "seed-bank",
+            ZenGardenToolType.SeedBank => "storage",
             _ => "unknown"
         };
     }
@@ -2978,33 +2970,54 @@ public sealed class ZenGardenClient : IZenGardenClient
         snapshot = default!;
         var payload = ExtractDataOrSelf(element);
 
-        var toolFqid = ReadString(payload, "tool_fqid");
+        // New GardenTool shape: { fqid, tool: {}, stone: {}, service: {}, capabilities: [] }
+        var toolFqid = ReadString(payload, "fqid") ?? ReadString(payload, "tool_fqid");
         if (string.IsNullOrWhiteSpace(toolFqid))
         {
             return false;
         }
 
-        var capabilities = ParseCapabilities(payload);
-        var ready = ReadBoolean(payload, "ready") ?? false;
-        var state = ParseToolState(ReadString(payload, "state"));
+        // Nested objects
+        TryGetProperty(payload, "tool", out var toolElement);
+        TryGetProperty(payload, "stone", out var stoneElement);
+        TryGetProperty(payload, "service", out var serviceElement);
 
+        var offeringType = ReadString(toolElement, "type");
+        var category = ReadString(toolElement, "category");
+        var toolUid = ReadString(toolElement, "id") ?? ReadString(payload, "tool_uid");
+
+        var stoneId = ReadString(stoneElement, "id") ?? ReadString(payload, "stone_id");
+        var stoneName = ReadString(stoneElement, "name") ?? ReadString(payload, "stone_name");
+        var stoneEndpoint = ReadString(stoneElement, "endpoint");
+
+        // Service status/ready — fall back to old flat fields
+        var statusString = ReadString(serviceElement, "status") ?? ReadString(payload, "state");
+        var state = ParseToolState(statusString);
+        var ready = ReadBoolean(serviceElement, "ready") ?? ReadBoolean(payload, "ready") ?? false;
         if (state == ZenGardenToolState.Ready)
         {
             ready = true;
         }
 
+        var capabilities = ParseCapabilities(payload);
+
         snapshot = new ZenGardenToolSnapshot
         {
             ToolFqid = toolFqid.ToLowerInvariant(),
-            ToolUid = ReadString(payload, "tool_uid"),
-            ToolType = ParseToolType(ReadString(payload, "tool_type")) ?? ZenGardenToolType.Unknown,
+            ToolUid = toolUid,
+            OfferingType = offeringType,
+            Category = category,
+            ToolType = ParseToolTypeFromCategory(category)
+                ?? ParseToolType(ReadString(payload, "tool_type"))
+                ?? ZenGardenToolType.Unknown,
             State = state,
             Ready = ready,
             Revision = ReadLong(payload, "revision") ?? 0,
-            StoneId = ReadString(payload, "stone_id"),
-            StoneName = ReadString(payload, "stone_name"),
+            StoneId = stoneId,
+            StoneName = stoneName,
+            StoneEndpoint = stoneEndpoint,
             Aliases = ParseAliases(payload),
-            Connection = ParseConnection(payload),
+            Connection = ParseServiceConnection(serviceElement, stoneElement),
             Capabilities = capabilities,
             CapabilityRevision = ReadLong(payload, "capability_revision"),
             UpdatedAt = ParseDateTimeOffset(ReadString(payload, "updated_at"))
@@ -3013,16 +3026,15 @@ public sealed class ZenGardenClient : IZenGardenClient
         return true;
     }
 
-    private static ZenGardenConnection? ParseConnection(JsonElement payload)
+    private static ZenGardenConnection? ParseServiceConnection(JsonElement serviceElement, JsonElement stoneElement)
     {
-        if (!TryGetProperty(payload, "connection", out var connectionElement) ||
-            connectionElement.ValueKind != JsonValueKind.Object)
+        if (serviceElement.ValueKind != JsonValueKind.Object)
         {
             return null;
         }
 
         var uris = Array.Empty<string>();
-        if (TryGetProperty(connectionElement, "uris", out var urisElement) &&
+        if (TryGetProperty(serviceElement, "uris", out var urisElement) &&
             urisElement.ValueKind == JsonValueKind.Array)
         {
             uris = urisElement.EnumerateArray()
@@ -3032,14 +3044,49 @@ public sealed class ZenGardenClient : IZenGardenClient
                 .ToArray();
         }
 
+        var protocol = ReadString(serviceElement, "protocol");
+
+        // Derive hostname / IP from stone metadata
+        string? hostname = null;
+        string? ip = null;
+        int? port = null;
+
+        var stoneName = ReadString(stoneElement, "name");
+        if (!string.IsNullOrWhiteSpace(stoneName))
+        {
+            hostname = stoneName.Contains('.') ? stoneName : $"{stoneName}.local";
+        }
+
+        var stoneEndpoint = ReadString(stoneElement, "endpoint");
+        if (!string.IsNullOrWhiteSpace(stoneEndpoint))
+        {
+            ip = ExtractHost(stoneEndpoint);
+        }
+
+        // Extract port from first URI
+        if (uris.Length > 0 && Uri.TryCreate(uris[0], UriKind.Absolute, out var parsed) && parsed.Port > 0)
+        {
+            port = parsed.Port;
+        }
+
         return new ZenGardenConnection
         {
-            Protocol = ReadString(connectionElement, "protocol"),
-            Hostname = ReadString(connectionElement, "hostname"),
-            Ip = ReadString(connectionElement, "ip"),
-            Port = ReadInt(connectionElement, "port"),
+            Protocol = protocol,
+            Hostname = hostname,
+            Ip = ip,
+            Port = port,
             Uris = uris
         };
+    }
+
+    private static string? ExtractHost(string endpoint)
+    {
+        var without = endpoint
+            .Replace("http://", "", StringComparison.OrdinalIgnoreCase)
+            .Replace("https://", "", StringComparison.OrdinalIgnoreCase);
+        var hostPort = without.Split('/')[0];
+        var colonIdx = hostPort.LastIndexOf(':');
+        return colonIdx > 0 ? hostPort[..colonIdx] : hostPort;
     }
 
     private static IReadOnlyList<string> ParseAliases(JsonElement payload)
@@ -3062,30 +3109,87 @@ public sealed class ZenGardenClient : IZenGardenClient
     private static IReadOnlyDictionary<string, IReadOnlyList<string>> ParseCapabilities(JsonElement payload)
     {
         var result = new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase);
-        if (!TryGetProperty(payload, "capabilities", out var caps) || caps.ValueKind != JsonValueKind.Object)
+        if (!TryGetProperty(payload, "capabilities", out var caps))
         {
             return result;
         }
 
-        foreach (var property in caps.EnumerateObject())
+        // New format: array of { type, items }
+        if (caps.ValueKind == JsonValueKind.Array)
         {
-            if (property.Value.ValueKind != JsonValueKind.Array)
+            foreach (var entry in caps.EnumerateArray())
             {
-                continue;
+                if (entry.ValueKind != JsonValueKind.Object)
+                {
+                    continue;
+                }
+
+                var capType = ReadString(entry, "type") ?? ReadString(entry, "cap_type");
+                if (string.IsNullOrWhiteSpace(capType))
+                {
+                    continue;
+                }
+
+                if (!TryGetProperty(entry, "items", out var itemsElement) ||
+                    itemsElement.ValueKind != JsonValueKind.Array)
+                {
+                    continue;
+                }
+
+                var items = itemsElement.EnumerateArray()
+                    .Where(x => x.ValueKind == JsonValueKind.String)
+                    .Select(x => x.GetString()!)
+                    .Where(x => !string.IsNullOrWhiteSpace(x))
+                    .Select(x => x.Trim().ToLowerInvariant())
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToArray();
+
+                if (items.Length > 0)
+                {
+                    result[capType.Trim().ToLowerInvariant()] = items;
+                }
             }
 
-            var items = property.Value.EnumerateArray()
-                .Where(x => x.ValueKind == JsonValueKind.String)
-                .Select(x => x.GetString()!)
-                .Where(x => !string.IsNullOrWhiteSpace(x))
-                .Select(x => x.Trim().ToLowerInvariant())
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToArray();
+            return result;
+        }
 
-            result[property.Name.ToLowerInvariant()] = items;
+        // Legacy format: object map { "model": ["llama3"] }
+        if (caps.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var property in caps.EnumerateObject())
+            {
+                if (property.Value.ValueKind != JsonValueKind.Array)
+                {
+                    continue;
+                }
+
+                var items = property.Value.EnumerateArray()
+                    .Where(x => x.ValueKind == JsonValueKind.String)
+                    .Select(x => x.GetString()!)
+                    .Where(x => !string.IsNullOrWhiteSpace(x))
+                    .Select(x => x.Trim().ToLowerInvariant())
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToArray();
+
+                result[property.Name.ToLowerInvariant()] = items;
+            }
         }
 
         return result;
+    }
+
+    private static ZenGardenToolType? ParseToolTypeFromCategory(string? category)
+    {
+        if (string.IsNullOrWhiteSpace(category))
+        {
+            return null;
+        }
+
+        return category.Trim().ToLowerInvariant() switch
+        {
+            "storage" => ZenGardenToolType.SeedBank,
+            _ => ZenGardenToolType.Offering
+        };
     }
 
     private static ZenGardenToolType? ParseToolType(string? value)
@@ -3112,9 +3216,9 @@ public sealed class ZenGardenClient : IZenGardenClient
 
         return value.Trim().ToLowerInvariant() switch
         {
-            "ready" => ZenGardenToolState.Ready,
+            "running" or "ready" => ZenGardenToolState.Ready,
             "degraded" => ZenGardenToolState.Degraded,
-            "unavailable" => ZenGardenToolState.Unavailable,
+            "stopped" or "unavailable" => ZenGardenToolState.Unavailable,
             _ => ZenGardenToolState.Unknown
         };
     }

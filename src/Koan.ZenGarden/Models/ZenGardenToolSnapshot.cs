@@ -26,14 +26,34 @@ public sealed record ZenGardenConnection
 
 public sealed record ZenGardenToolSnapshot
 {
+    /// <summary>
+    /// Bare fqid: "mongodb", "mongodb:prod", "ollama:adopted".
+    /// </summary>
     public required string ToolFqid { get; init; }
+
+    /// <summary>
+    /// Unique identifier (GUIDv7) from tool.id.
+    /// </summary>
     public string? ToolUid { get; init; }
+
+    /// <summary>
+    /// Offering type from tool.type: "mongodb", "ollama", "seed-bank".
+    /// </summary>
+    public string? OfferingType { get; init; }
+
+    /// <summary>
+    /// Tool category: "orchestrator", "offering", "storage".
+    /// Maps to <see cref="ZenGardenToolType"/> for backward-compat.
+    /// </summary>
+    public string? Category { get; init; }
+
     public ZenGardenToolType ToolType { get; init; }
     public ZenGardenToolState State { get; init; }
     public bool Ready { get; init; }
     public long Revision { get; init; }
     public string? StoneId { get; init; }
     public string? StoneName { get; init; }
+    public string? StoneEndpoint { get; init; }
     public IReadOnlyList<string> Aliases { get; init; } = Array.Empty<string>();
     public ZenGardenConnection? Connection { get; init; }
     public IReadOnlyDictionary<string, IReadOnlyList<string>> Capabilities { get; init; }

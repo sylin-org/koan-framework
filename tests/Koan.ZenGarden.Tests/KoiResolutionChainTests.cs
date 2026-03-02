@@ -272,12 +272,12 @@ public sealed class KoiResolutionChainTests : IDisposable
                         "cursor": 1,
                         "tools": [
                           {
-                            "tool_fqid": "offering:test",
-                            "tool_type": "offering",
-                            "state": "ready",
-                            "ready": true,
+                            "fqid": "test",
+                            "tool": { "name": "", "type": "test", "category": "offering", "id": "", "tags": [] },
+                            "stone": { "id": "", "name": "", "endpoint": "" },
+                            "service": { "status": "running", "ready": true, "protocol": "http", "uris": [] },
                             "revision": 1,
-                            "capabilities": {}
+                            "capabilities": []
                           }
                         ]
                       }

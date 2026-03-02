@@ -108,12 +108,12 @@ public sealed class ZenGardenContainerResolutionTests
                     "cursor": 1,
                     "tools": [
                       {
-                        "tool_fqid": "offering:ollama",
-                        "tool_type": "offering",
-                        "state": "ready",
-                        "ready": true,
+                        "fqid": "ollama",
+                        "tool": { "name": "", "type": "ollama", "category": "offering", "id": "", "tags": [] },
+                        "stone": { "id": "", "name": "", "endpoint": "" },
+                        "service": { "status": "running", "ready": true, "protocol": "http", "uris": [] },
                         "revision": 1,
-                        "capabilities": {}
+                        "capabilities": []
                       }
                     ]
                   }

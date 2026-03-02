@@ -22,7 +22,7 @@ public sealed class MongoZenGardenInitializationSpec
                 intent.Offering.Should().Be("mongodb");
                 return new ZenGardenOfferingResolution
                 {
-                    ToolFqid = "offering:mongodb",
+                    ToolFqid = "mongodb",
                     Offering = "mongodb",
                     Hostname = "mongo-zen",
                     Port = 27019
@@ -45,7 +45,7 @@ public sealed class MongoZenGardenInitializationSpec
             },
             new StubZenGardenProvider(_ => new ZenGardenOfferingResolution
             {
-                ToolFqid = "offering:mongodb:dev",
+                ToolFqid = "mongodb:dev",
                 Offering = "mongodb",
                 Instance = "dev",
                 Uris = new[] { "mongodb://mongo-dev:27021" }

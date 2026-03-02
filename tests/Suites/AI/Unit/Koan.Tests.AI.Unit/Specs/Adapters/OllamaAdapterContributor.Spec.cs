@@ -73,7 +73,7 @@ public sealed class OllamaAdapterContributorSpec
         var adapterRegistry = new InMemoryAdapterRegistry();
         var zenGardenProvider = new StubZenGardenProvider(_ => new ZenGardenOfferingResolution
         {
-            ToolFqid = "offering:ollama",
+            ToolFqid = "ollama",
             Offering = "ollama",
             Uris = new[] { "http://zen-ollama:11434" },
             Capabilities = new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase)
@@ -137,7 +137,7 @@ public sealed class OllamaAdapterContributorSpec
         var adapterRegistry = new InMemoryAdapterRegistry();
         var zenGardenProvider = new StubZenGardenProvider(_ => new ZenGardenOfferingResolution
         {
-            ToolFqid = "offering:ollama",
+            ToolFqid = "ollama",
             Offering = "ollama",
             Uris = new[] { "http://zen-ollama:11434" },
             Capabilities = new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase)
@@ -290,7 +290,7 @@ public sealed class OllamaAdapterContributorSpec
             return ValueTask.FromResult<ZenGardenCapabilityWishReceipt?>(new ZenGardenCapabilityWishReceipt
             {
                 RequestId = Guid.NewGuid().ToString("N"),
-                ToolFqid = "offering:ollama",
+                ToolFqid = "ollama",
                 OfferingSelector = intent.ToOfferingSelector(),
                 Requested = intent.Capabilities,
                 Missing = intent.Capabilities,

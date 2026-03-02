@@ -109,18 +109,12 @@ public sealed class ZenGardenOfferingConnectivityTests : IClassFixture<ZenGarden
             ToolType = ZenGardenToolType.Offering
         });
 
-        var exactFqid = $"offering:{offering}";
-        var colonPrefix = $"{exactFqid}:";
-        var atPrefix = $"{exactFqid}@";
+        var query = Core.ToolFqid.Parse(offering);
 
         return all
-            .Where(tool =>
-                string.Equals(tool.ToolFqid, exactFqid, StringComparison.OrdinalIgnoreCase) ||
-                tool.ToolFqid.StartsWith(colonPrefix, StringComparison.OrdinalIgnoreCase) ||
-                tool.ToolFqid.StartsWith(atPrefix, StringComparison.OrdinalIgnoreCase) ||
-                tool.Aliases.Any(alias => string.Equals(alias, exactFqid, StringComparison.OrdinalIgnoreCase)))
-            .OrderBy(tool => string.Equals(tool.ToolFqid, exactFqid, StringComparison.OrdinalIgnoreCase) ? 0 : 1)
-            .ThenBy(tool => tool.Aliases.Any(alias => string.Equals(alias, exactFqid, StringComparison.OrdinalIgnoreCase)) ? 0 : 1)
+            .Where(tool => query.MatchesSnapshot(tool.ToolFqid, tool.OfferingType, tool.Aliases))
+            .OrderBy(tool => string.Equals(tool.ToolFqid, offering, StringComparison.OrdinalIgnoreCase) ? 0 : 1)
+            .ThenBy(tool => tool.Aliases.Any(alias => string.Equals(alias, offering, StringComparison.OrdinalIgnoreCase)) ? 0 : 1)
             .ThenBy(tool => tool.ToolFqid, StringComparer.OrdinalIgnoreCase)
             .ToArray();
     }

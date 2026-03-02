@@ -6,7 +6,7 @@ namespace Koan.ZenGarden.Core;
 public sealed record ZenGardenOfferingResolution
 {
     /// <summary>
-    /// Resolved tool fqid (for example: offering:mongodb or offering:ollama:dev).
+    /// Resolved tool fqid (for example: mongodb or ollama:dev).
     /// </summary>
     public required string ToolFqid { get; init; }
 

@@ -145,19 +145,13 @@ internal sealed class ZenGardenInitializationProvider : IZenGardenInitialization
             return null;
         }
 
-        var exactFqid = $"offering:{intent.Offering}";
-        var colonPrefix = $"{exactFqid}:";
-        var atPrefix = $"{exactFqid}@";
+        var query = Core.ToolFqid.Parse(intent.Offering);
 
         var matched = tools
             .Where(tool => tool.Ready)
-            .Where(tool =>
-                string.Equals(tool.ToolFqid, exactFqid, StringComparison.OrdinalIgnoreCase) ||
-                tool.ToolFqid.StartsWith(colonPrefix, StringComparison.OrdinalIgnoreCase) ||
-                tool.ToolFqid.StartsWith(atPrefix, StringComparison.OrdinalIgnoreCase) ||
-                tool.Aliases.Any(alias => string.Equals(alias, exactFqid, StringComparison.OrdinalIgnoreCase)))
-            .OrderBy(tool => string.Equals(tool.ToolFqid, exactFqid, StringComparison.OrdinalIgnoreCase) ? 0 : 1)
-            .ThenBy(tool => tool.Aliases.Any(alias => string.Equals(alias, exactFqid, StringComparison.OrdinalIgnoreCase)) ? 0 : 1)
+            .Where(tool => query.MatchesSnapshot(tool.ToolFqid, tool.OfferingType, tool.Aliases))
+            .OrderBy(tool => string.Equals(tool.ToolFqid, intent.Offering, StringComparison.OrdinalIgnoreCase) ? 0 : 1)
+            .ThenBy(tool => tool.Aliases.Any(alias => string.Equals(alias, intent.Offering, StringComparison.OrdinalIgnoreCase)) ? 0 : 1)
             .ThenBy(tool => requirements.Length > 0 && requirements.All(req => req.Matches(tool.Capabilities)) ? 0 : 1)
             .ThenBy(tool => tool.ToolFqid, StringComparer.OrdinalIgnoreCase)
             .FirstOrDefault();
@@ -244,19 +238,13 @@ internal sealed class ZenGardenInitializationProvider : IZenGardenInitialization
 
     private static ZenGardenOfferingResolution MapResolution(ZenGardenToolSnapshot snapshot)
     {
-        var selector = snapshot.ToolFqid.StartsWith("offering:", StringComparison.OrdinalIgnoreCase)
-            ? snapshot.ToolFqid["offering:".Length..]
-            : snapshot.ToolFqid;
-
-        var instanceSeparator = selector.IndexOf(':', StringComparison.Ordinal);
-        var offering = instanceSeparator >= 0 ? selector[..instanceSeparator] : selector;
-        var instance = instanceSeparator >= 0 ? selector[(instanceSeparator + 1)..] : null;
+        var parsed = Core.ToolFqid.Parse(snapshot.ToolFqid);
 
         return new ZenGardenOfferingResolution
         {
             ToolFqid = snapshot.ToolFqid,
-            Offering = offering,
-            Instance = string.IsNullOrWhiteSpace(instance) ? null : instance,
+            Offering = parsed.OfferingType,
+            Instance = parsed.Instance,
             Protocol = snapshot.Connection?.Protocol,
             Hostname = snapshot.Connection?.Hostname,
             Ip = snapshot.Connection?.Ip,

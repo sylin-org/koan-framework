@@ -14,8 +14,8 @@ public sealed class ZenGardenInitializationProviderTests
     {
         var snapshots = new[]
         {
-            CreateSnapshot("offering:mongodb", ready: false, "mongodb://standby:27017"),
-            CreateSnapshot("offering:mongodb", ready: true, "mongodb://primary:27018")
+            CreateSnapshot("mongodb", ready: false, "mongodb://standby:27017"),
+            CreateSnapshot("mongodb", ready: true, "mongodb://primary:27018")
         };
 
         await using var provider = BuildScope(
@@ -28,7 +28,7 @@ public sealed class ZenGardenInitializationProviderTests
         var resolved = await initializationProvider.ResolveAsync(intent);
 
         resolved.Should().NotBeNull();
-        resolved!.ToolFqid.Should().Be("offering:mongodb");
+        resolved!.ToolFqid.Should().Be("mongodb");
         resolved.Offering.Should().Be("mongodb");
         resolved.GetUri("mongodb").Should().Be("mongodb://primary:27018");
     }
@@ -38,7 +38,7 @@ public sealed class ZenGardenInitializationProviderTests
     {
         var snapshots = new[]
         {
-            CreateSnapshot("offering:mongodb", ready: false, "mongodb://standby:27017")
+            CreateSnapshot("mongodb", ready: false, "mongodb://standby:27017")
         };
 
         await using var provider = BuildScope(
@@ -56,7 +56,7 @@ public sealed class ZenGardenInitializationProviderTests
     {
         var snapshots = new[]
         {
-            CreateSnapshot("offering:mongodb:dev", ready: true, "mongodb://dev-primary:27019")
+            CreateSnapshot("mongodb:dev", ready: true, "mongodb://dev-primary:27019")
         };
 
         await using var provider = BuildScope(
@@ -67,7 +67,7 @@ public sealed class ZenGardenInitializationProviderTests
         var resolved = await initializationProvider.ResolveAsync(ZenGardenConnectionIntent.ForOffering("mongodb"));
 
         resolved.Should().NotBeNull();
-        resolved!.ToolFqid.Should().Be("offering:mongodb:dev");
+        resolved!.ToolFqid.Should().Be("mongodb:dev");
         resolved.Offering.Should().Be("mongodb");
         resolved.Instance.Should().Be("dev");
         resolved.GetUri("mongodb").Should().Be("mongodb://dev-primary:27019");
@@ -79,10 +79,10 @@ public sealed class ZenGardenInitializationProviderTests
         var snapshots = new[]
         {
             CreateSnapshot(
-                "offering:ollama@adopted",
+                "ollama@adopted",
                 ready: true,
                 "http://ollama-adopted:11434",
-                "offering:ollama")
+                "ollama")
         };
 
         await using var provider = BuildScope(
@@ -93,8 +93,9 @@ public sealed class ZenGardenInitializationProviderTests
         var resolved = await initializationProvider.ResolveAsync(ZenGardenConnectionIntent.ForOffering("ollama"));
 
         resolved.Should().NotBeNull();
-        resolved!.ToolFqid.Should().Be("offering:ollama@adopted");
-        resolved.Offering.Should().Be("ollama@adopted");
+        resolved!.ToolFqid.Should().Be("ollama@adopted");
+        resolved.Offering.Should().Be("ollama");
+        resolved.Instance.Should().Be("adopted");
         resolved.GetUri("http").Should().Be("http://ollama-adopted:11434");
     }
 
@@ -108,7 +109,7 @@ public sealed class ZenGardenInitializationProviderTests
         {
             new ZenGardenToolSnapshot
             {
-                ToolFqid = "offering:mongodb",
+                ToolFqid = "mongodb",
                 ToolType = ZenGardenToolType.Offering,
                 Ready = true,
                 State = ZenGardenToolState.Ready,
@@ -137,7 +138,7 @@ public sealed class ZenGardenInitializationProviderTests
     {
         var snapshots = new[]
         {
-            CreateSnapshot("offering:mongodb", ready: true, "mongodb://primary:27018")
+            CreateSnapshot("mongodb", ready: true, "mongodb://primary:27018")
         };
 
         await using var provider = BuildScope(
@@ -180,7 +181,7 @@ public sealed class ZenGardenInitializationProviderTests
 
         receipt.Should().NotBeNull();
         receipt!.OfferingSelector.Should().Be("ollama");
-        receipt.ToolFqid.Should().Be("offering:ollama");
+        receipt.ToolFqid.Should().Be("ollama");
         receipt.Requested.Should().Contain(["llama3.2", "nomic-embed-text"]);
         client.WishCalls.Should().ContainSingle();
     }
@@ -192,7 +193,7 @@ public sealed class ZenGardenInitializationProviderTests
         {
             new ZenGardenToolSnapshot
             {
-                ToolFqid = "offering:ollama",
+                ToolFqid = "ollama",
                 ToolType = ZenGardenToolType.Offering,
                 Ready = true,
                 State = ZenGardenToolState.Ready,
@@ -218,7 +219,7 @@ public sealed class ZenGardenInitializationProviderTests
             ZenGardenConnectionIntent.ForOffering("ollama", capabilities: ["llama3.2", "nomic-embed-text"]));
 
         resolved.Should().NotBeNull();
-        resolved!.ToolFqid.Should().Be("offering:ollama");
+        resolved!.ToolFqid.Should().Be("ollama");
         client.WishCalls.Should().ContainSingle();
         client.WishCalls[0].Offering.Should().Be("ollama");
         client.WishCalls[0].Capabilities.Should().Contain(["llama3.2", "nomic-embed-text"]);
@@ -231,7 +232,7 @@ public sealed class ZenGardenInitializationProviderTests
         {
             new ZenGardenToolSnapshot
             {
-                ToolFqid = "offering:ollama",
+                ToolFqid = "ollama",
                 ToolType = ZenGardenToolType.Offering,
                 Ready = true,
                 State = ZenGardenToolState.Ready,
@@ -337,17 +338,12 @@ public sealed class ZenGardenInitializationProviderTests
             WishCalls.Add(new WishCall(offering, capabilities.ToArray()));
 
             var normalizedSelector = offering.Trim().ToLowerInvariant();
-            var toolFqid = normalizedSelector.StartsWith("offering:", StringComparison.OrdinalIgnoreCase)
-                ? normalizedSelector
-                : $"offering:{normalizedSelector}";
 
             var wish = new ZenGardenCapabilityWish
             {
                 RequestId = Guid.NewGuid().ToString("N"),
-                ToolFqid = toolFqid,
-                OfferingSelector = normalizedSelector.StartsWith("offering:", StringComparison.OrdinalIgnoreCase)
-                    ? normalizedSelector["offering:".Length..]
-                    : normalizedSelector,
+                ToolFqid = normalizedSelector,
+                OfferingSelector = normalizedSelector,
                 Requested = capabilities,
                 Missing = capabilities,
                 Status = "requested",

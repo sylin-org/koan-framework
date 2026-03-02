@@ -31,7 +31,7 @@ public sealed class ZenGardenCapabilitiesTests : IClassFixture<ZenGardenFixture>
 
         tools.Should().NotBeNull();
         tools.Should().OnlyContain(x => x.ToolType == ZenGardenToolType.Offering);
-        tools.Should().OnlyContain(x => x.ToolFqid.StartsWith("offering:", StringComparison.OrdinalIgnoreCase));
+        tools.Should().OnlyContain(x => !string.IsNullOrEmpty(x.ToolFqid));
     }
 
     [Fact]
@@ -49,7 +49,7 @@ public sealed class ZenGardenCapabilitiesTests : IClassFixture<ZenGardenFixture>
 
         tools.Should().NotBeNull();
         tools.Should().OnlyContain(x => x.ToolType == ZenGardenToolType.SeedBank);
-        tools.Should().OnlyContain(x => x.ToolFqid.StartsWith("seed-bank:", StringComparison.OrdinalIgnoreCase));
+        tools.Should().OnlyContain(x => !string.IsNullOrEmpty(x.ToolFqid));
     }
 
     [Fact]
@@ -67,7 +67,7 @@ public sealed class ZenGardenCapabilitiesTests : IClassFixture<ZenGardenFixture>
             return;
         }
 
-        var offeringName = StripPrefix(selected.ToolFqid, "offering:");
+        var offeringName = selected.ToolFqid;
         var firstEvent = await CaptureInitialEventAsync(
             ZenGardenSubscription.ForOffering(offeringName),
             TimeSpan.FromSeconds(15));
@@ -103,7 +103,7 @@ public sealed class ZenGardenCapabilitiesTests : IClassFixture<ZenGardenFixture>
         var capability = selected.Capabilities
             .First(entry => entry.Value.Count > 0);
         var token = capability.Value[0];
-        var offeringName = StripPrefix(selected.ToolFqid, "offering:");
+        var offeringName = selected.ToolFqid;
 
         var firstEvent = await CaptureInitialEventAsync(
             ZenGardenSubscription.ForOffering(offeringName).Require(token),
@@ -135,7 +135,7 @@ public sealed class ZenGardenCapabilitiesTests : IClassFixture<ZenGardenFixture>
             return;
         }
 
-        var seedBankName = StripPrefix(selected.ToolFqid, "seed-bank:");
+        var seedBankName = Core.ToolFqid.Parse(selected.ToolFqid).ToString();
         var firstEvent = await CaptureInitialEventAsync(
             ZenGardenSubscription.ForStorage(seedBankName),
             TimeSpan.FromSeconds(15));
@@ -204,13 +204,4 @@ public sealed class ZenGardenCapabilitiesTests : IClassFixture<ZenGardenFixture>
         return false;
     }
 
-    private static string StripPrefix(string value, string prefix)
-    {
-        if (value.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
-        {
-            return value[prefix.Length..];
-        }
-
-        return value;
-    }
 }
