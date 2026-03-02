@@ -137,6 +137,158 @@ catch (Exception ex)
     Console.WriteLine($"[Catalog] Failed to load catalog: {ex.Message}");
 }
 
+string? orchestratorUri = null;
+string? chatModel = null;
+string? embedModel = null;
+
+try
+{
+    StepLog("Checking for Ollama orchestrator in catalog.");
+    var allOfferings = await ZenGarden.Offering.Catalog();
+    var orchestrator = allOfferings.FirstOrDefault(t =>
+        string.Equals(t.ToolFqid, "ollama:orchestrator", StringComparison.OrdinalIgnoreCase) && t.Ready);
+
+    if (orchestrator?.Connection?.Uris.Count > 0)
+    {
+        orchestratorUri = orchestrator.Connection.Uris[0].TrimEnd('/');
+        Console.WriteLine($"[Orchestrator] Detected at {orchestratorUri} (stone={orchestrator.StoneName})");
+    }
+    else
+    {
+        Console.WriteLine("[Orchestrator] No ready ollama:orchestrator in catalog; skipping orchestrator steps.");
+    }
+
+    Console.WriteLine();
+}
+catch (Exception ex)
+{
+    Console.WriteLine($"[Orchestrator] Detection failed: {ex.Message}");
+    Console.WriteLine();
+}
+
+if (orchestratorUri is not null)
+{
+    using var orchestratorHttp = new HttpClient
+    {
+        BaseAddress = new Uri(orchestratorUri),
+        Timeout = TimeSpan.FromSeconds(60)
+    };
+    var snakeJson = new JsonSerializerOptions
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
+        PropertyNameCaseInsensitive = true
+    };
+
+    try
+    {
+        StepLog("Fetching model recommendations from orchestrator.");
+        var capabilities = new[] { "completion", "embedding" };
+
+        foreach (var capability in capabilities)
+        {
+            var body = await orchestratorHttp.GetStringAsync($"/v1/recommendations?capability={capability}");
+            var recs = JsonSerializer.Deserialize<OrchestratorRecommendations>(body, snakeJson);
+
+            if (recs?.Recommendations is { Count: > 0 })
+            {
+                Console.WriteLine($"[Recommendations] {capability} ({recs.Recommendations.Count} models):");
+                foreach (var rec in recs.Recommendations.Take(3))
+                {
+                    Console.WriteLine($"  #{rec.Rank} {rec.Model}  score={rec.Score} verdict={rec.Verdict} params={rec.ParameterSize} ctx={rec.ContextLength}");
+                    if (rec.Reasoning is { Count: > 0 })
+                    {
+                        Console.WriteLine($"       {string.Join("; ", rec.Reasoning)}");
+                    }
+                }
+
+                var topModel = recs.Recommendations[0].Model;
+                if (capability == "completion") chatModel = topModel;
+                else if (capability == "embedding") embedModel = topModel;
+            }
+            else
+            {
+                Console.WriteLine($"[Recommendations] {capability}: no models recommended.");
+            }
+        }
+
+        Console.WriteLine();
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[Recommendations] Failed: {ex.Message}");
+        Console.WriteLine();
+    }
+
+    try
+    {
+        StepLog("Exercising recommended models via orchestrator proxy.");
+
+        if (chatModel is not null)
+        {
+            Console.WriteLine($"[Orchestrator] Chat probe: model={chatModel}");
+            var chatPayload = JsonSerializer.Serialize(new
+            {
+                model = chatModel,
+                messages = new[] { new { role = "user", content = "Respond with one word: koan" } },
+                stream = false
+            });
+
+            var chatResponse = await orchestratorHttp.PostAsync("/api/chat",
+                new StringContent(chatPayload, System.Text.Encoding.UTF8, "application/json"));
+            var chatBody = await chatResponse.Content.ReadAsStringAsync();
+
+            if (chatResponse.IsSuccessStatusCode)
+            {
+                using var chatDoc = JsonDocument.Parse(chatBody);
+                var content = chatDoc.RootElement.GetProperty("message").GetProperty("content").GetString();
+                Console.WriteLine($"[Orchestrator] Chat response: {content}");
+            }
+            else
+            {
+                Console.WriteLine($"[Orchestrator] Chat failed ({(int)chatResponse.StatusCode}): {chatBody}");
+            }
+        }
+
+        if (embedModel is not null)
+        {
+            Console.WriteLine($"[Orchestrator] Embed probe: model={embedModel}");
+            var embedPayload = JsonSerializer.Serialize(new
+            {
+                model = embedModel,
+                input = "The zen garden is quiet"
+            });
+
+            var embedResponse = await orchestratorHttp.PostAsync("/api/embed",
+                new StringContent(embedPayload, System.Text.Encoding.UTF8, "application/json"));
+            var embedBody = await embedResponse.Content.ReadAsStringAsync();
+
+            if (embedResponse.IsSuccessStatusCode)
+            {
+                using var embedDoc = JsonDocument.Parse(embedBody);
+                var embeddings = embedDoc.RootElement.GetProperty("embeddings");
+                if (embeddings.GetArrayLength() > 0)
+                {
+                    var first = embeddings[0];
+                    var dims = first.GetArrayLength();
+                    var preview = string.Join(", ", first.EnumerateArray().Take(5).Select(v => v.GetDouble().ToString("F4")));
+                    Console.WriteLine($"[Orchestrator] Embedding: {dims} dimensions [{preview}, ...]");
+                }
+            }
+            else
+            {
+                Console.WriteLine($"[Orchestrator] Embed failed ({(int)embedResponse.StatusCode}): {embedBody}");
+            }
+        }
+
+        Console.WriteLine();
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[Orchestrator] Exercise failed: {ex.Message}");
+        Console.WriteLine();
+    }
+}
+
 StepLog("Resolving auto-initialization intents for MongoDB and Ollama.");
 using (var scope = host.Services.CreateScope())
 {
@@ -167,7 +319,7 @@ using (var scope = host.Services.CreateScope())
             sourceRegistered = ollamaSource is not null,
             sourceMembers = ollamaSource?.Members.Count ?? 0
         },
-        engineAvailable = Engine.IsAvailable
+        engineAvailable = Client.IsAvailable
     };
 
     Console.WriteLine(JsonSerializer.Serialize(diagnostic, json));
@@ -207,11 +359,11 @@ if (!ollamaReady)
     Console.WriteLine();
 }
 
-StepLog("Running Ollama probe (Engine.Chat).");
+StepLog("Running Ollama probe (Client.Chat).");
 try
 {
     Console.WriteLine("[Ollama] Running chat probe...");
-    var response = await Engine.Chat("Respond with one word: koan");
+    var response = await Client.Chat("Respond with one word: koan");
     Console.WriteLine($"[Ollama] response: {response}");
 }
 catch (Exception ex)
@@ -454,3 +606,17 @@ sealed class MongoNote : Entity<MongoNote>
     public string Text { get; set; } = string.Empty;
     public DateTimeOffset CreatedAtUtc { get; set; }
 }
+
+sealed record OrchestratorRecommendations(
+    string Capability,
+    List<ModelRecommendation> Recommendations);
+
+sealed record ModelRecommendation(
+    string Model,
+    int Rank,
+    int Score,
+    string Verdict,
+    string? ParameterSize,
+    string? QuantizationLevel,
+    int? ContextLength,
+    List<string>? Reasoning);
