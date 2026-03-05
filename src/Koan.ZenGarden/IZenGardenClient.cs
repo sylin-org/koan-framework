@@ -7,6 +7,11 @@ namespace Koan.ZenGarden;
 /// </summary>
 public interface IZenGardenClient : IDisposable
 {
+    /// <summary>
+    /// The endpoint of the currently bound Moss stone, or null if not yet discovered/bound.
+    /// </summary>
+    string? BoundEndpoint { get; }
+
     IDisposable Subscribe(
         ZenGardenSubscription subscription,
         Func<ZenGardenAvailabilityEvent, CancellationToken, ValueTask> handler,

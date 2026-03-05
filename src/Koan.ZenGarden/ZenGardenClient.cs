@@ -106,6 +106,9 @@ public sealed class ZenGardenClient : IZenGardenClient
         }
     }
 
+    /// <inheritdoc />
+    public string? BoundEndpoint => _boundStone?.Endpoint;
+
     public IDisposable Subscribe(
         ZenGardenSubscription subscription,
         Func<ZenGardenAvailabilityEvent, CancellationToken, ValueTask> handler,
@@ -231,10 +234,10 @@ public sealed class ZenGardenClient : IZenGardenClient
             _tools[snapshot.ToolFqid] = snapshot;
         }
 
+        // Server returns results pre-sorted (exact fqid → category → alphabetical).
         var filtered = snapshots
             .Where(subscription.Matches)
             .Where(subscription.RequirementsSatisfiedBy)
-            .OrderBy(x => x.ToolFqid, StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
         return filtered;
@@ -1080,6 +1083,7 @@ public sealed class ZenGardenClient : IZenGardenClient
 
         return parsed;
     }
+
 
     private static IReadOnlyCollection<string> EvaluateSatisfiedCapabilities(
         IReadOnlyList<ZenGardenCapabilityRequirement> requirements,

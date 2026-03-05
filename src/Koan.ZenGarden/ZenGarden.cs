@@ -13,6 +13,18 @@ public static class ZenGarden
     public static ZenGardenStorageSurface Storage { get; } = new();
     public static ZenGardenCapabilitySurface Capability { get; } = new();
 
+    /// <summary>
+    /// Returns the recommended model for an AI capability using orchestrator recommendations.
+    /// Pass <see cref="Koan.Core.AI.AiCapability"/> constants: Chat, Embed, Vision, Ocr, Quick, Synthesis, Thinking, Tools.
+    /// Returns null if the orchestrator is unreachable or no recommendations are available.
+    /// </summary>
+    public static string? RecommendedModel(string capability)
+    {
+        var advisor = Koan.Core.Hosting.App.AppHost.Current?.GetService(typeof(Koan.Core.AI.IAiModelAdvisor))
+            as Koan.Core.AI.IAiModelAdvisor;
+        return advisor?.GetRecommendedModel(capability);
+    }
+
     public static void Configure(IZenGardenClient client)
     {
         if (client is null)
