@@ -8,6 +8,7 @@ using Koan.AI.Contracts.Options;
 using Koan.AI.Contracts.Routing;
 using Koan.AI.Contracts.Sources;
 using Koan.AI.Context;
+using Koan.Core.AI;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -23,26 +24,27 @@ internal sealed class AiCategoryRouter
     private readonly IAiAdapterRegistry _adapterRegistry;
     private readonly IAiSourceRegistry _sourceRegistry;
     private readonly AiOptions _options;
+    private readonly IAiModelAdvisor? _advisor;
     private readonly ILogger<AiCategoryRouter>? _logger;
 
     private static readonly IReadOnlyDictionary<string, AiCategoryDefinition> Categories =
         new Dictionary<string, AiCategoryDefinition>(StringComparer.OrdinalIgnoreCase)
         {
-            ["Chat"] = new()
+            [AiCapability.Chat] = new()
             {
-                Name = "Chat",
+                Name = AiCapability.Chat,
                 AdapterInterface = typeof(IChatAdapter),
             },
-            ["Embed"] = new()
+            [AiCapability.Embed] = new()
             {
-                Name = "Embed",
+                Name = AiCapability.Embed,
                 AdapterInterface = typeof(IEmbedAdapter),
             },
-            ["Ocr"] = new()
+            [AiCapability.Ocr] = new()
             {
-                Name = "Ocr",
+                Name = AiCapability.Ocr,
                 AdapterInterface = typeof(IOcrAdapter),
-                Via = "Chat",
+                Via = AiCapability.Chat,
                 DefaultModel = "glm-ocr",
             },
         };
@@ -51,11 +53,13 @@ internal sealed class AiCategoryRouter
         IAiAdapterRegistry adapterRegistry,
         IAiSourceRegistry sourceRegistry,
         IOptions<AiOptions> options,
+        IAiModelAdvisor? advisor = null,
         ILogger<AiCategoryRouter>? logger = null)
     {
         _adapterRegistry = adapterRegistry;
         _sourceRegistry = sourceRegistry;
         _options = options.Value;
+        _advisor = advisor;
         _logger = logger;
     }
 
@@ -73,7 +77,11 @@ internal sealed class AiCategoryRouter
         // Category config defaults
         var categoryOptions = GetCategoryOptions(category);
         var effectiveSource = scopeSource ?? categoryOptions?.Source;
-        var effectiveModel = scopeModel ?? categoryOptions?.Model ?? definition.DefaultModel;
+        var advisorModel = scopeModel is null ? _advisor?.GetRecommendedModel(category) : null;
+        var effectiveModel = scopeModel ?? advisorModel ?? categoryOptions?.Model ?? definition.DefaultModel;
+
+        if (advisorModel is not null)
+            _logger?.LogDebug("Category {Category} using advisor-recommended model: {Model}", category, advisorModel);
 
         // Via delegation: if task category and no dedicated adapter, delegate to protocol category
         var via = categoryOptions?.Via ?? definition.Via;
@@ -99,7 +107,28 @@ internal sealed class AiCategoryRouter
     public AiRouteResolution ResolveChat(AiChatRequest request)
     {
         if (request is null) throw new ArgumentNullException(nameof(request));
-        return Resolve("Chat", request.Route?.AdapterId, request.Model);
+
+        var modelHint = request.Model;
+
+        // Vision-aware routing: when request contains image content and no explicit model,
+        // ask the advisor for a vision-capable model instead of a text-only chat model.
+        if (string.IsNullOrEmpty(modelHint) && _advisor is not null)
+        {
+            var hasImage = request.Messages?.Any(m =>
+                m.Parts?.Any(p => string.Equals(p.Type, "image", StringComparison.OrdinalIgnoreCase)) == true) == true;
+
+            if (hasImage)
+            {
+                var visionModel = _advisor.GetRecommendedModel(AiCapability.Vision);
+                if (visionModel is not null)
+                {
+                    _logger?.LogDebug("Vision content detected — using advisor-recommended vision model: {Model}", visionModel);
+                    modelHint = visionModel;
+                }
+            }
+        }
+
+        return Resolve(AiCapability.Chat, request.Route?.AdapterId, modelHint);
     }
 
     /// <summary>
@@ -108,7 +137,7 @@ internal sealed class AiCategoryRouter
     public AiRouteResolution ResolveEmbeddings(AiEmbeddingsRequest request)
     {
         if (request is null) throw new ArgumentNullException(nameof(request));
-        return Resolve("Embed", null, request.Model);
+        return Resolve(AiCapability.Embed, null, request.Model);
     }
 
     private bool HasDedicatedAdapter(Type adapterInterface)
@@ -118,17 +147,17 @@ internal sealed class AiCategoryRouter
 
     private AiCategoryOptions? GetCategoryOptions(string category) => category switch
     {
-        "Chat" => _options.Chat,
-        "Embed" => _options.Embed,
-        "Ocr" => _options.Ocr,
+        AiCapability.Chat => _options.Chat,
+        AiCapability.Embed => _options.Embed,
+        AiCapability.Ocr => _options.Ocr,
         _ => null
     };
 
     private static string MapCategoryToCapability(string category) => category switch
     {
-        "Chat" => "Chat",
-        "Embed" => "Embedding",
-        "Ocr" => "Ocr",
+        AiCapability.Chat => "Chat",
+        AiCapability.Embed => "Embedding",
+        AiCapability.Ocr => "Ocr",
         _ => category
     };
 

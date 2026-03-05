@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Immutable;
 using System.Threading;
+using Koan.Core.AI;
 
 namespace Koan.AI.Context;
 
@@ -107,9 +108,9 @@ public sealed class AiCategoryScope : IDisposable
 
     private CategoryOverride? GetCategoryOverride(string category) => category switch
     {
-        "Chat" => _chat,
-        "Embed" => _embed,
-        "Ocr" => _ocr,
+        AiCapability.Chat => _chat,
+        AiCapability.Embed => _embed,
+        AiCapability.Ocr => _ocr,
         _ => null
     };
 
