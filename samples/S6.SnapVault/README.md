@@ -99,9 +99,12 @@ public class PhotoAsset : MediaEntity<PhotoAsset>
     }
 }
 
-// 2. Vision analysis with fluent pipeline API
-var analysisJson = await Ai.FromImage(imageBytes, "image/jpeg")
-    .ToText(structuredJsonPrompt, model: "qwen2.5vl");
+// 2. Vision analysis — model auto-selected by ZenGarden advisor
+var analysisJson = await Client.Chat(structuredJsonPrompt, new ChatOptions
+{
+    Image = imageBytes,
+    ImageMimeType = "image/jpeg"
+}, ct);
 
 // 3. Save entity - framework handles embedding automatically!
 photo.ProcessingStatus = ProcessingStatus.Completed;
@@ -459,7 +462,7 @@ Potential additions to demonstrate more framework capabilities:
 
 **"AI analysis returns null"**
 - Verify Ollama is running: `curl http://localhost:11434`
-- Check models are pulled: `ollama list` (should show `all-minilm`, `qwen2.5vl`)
+- Check orchestrator recommendations: `curl http://localhost:21434/v1/recommendations` (should list vision and embedding models)
 
 **"Vector search not working"**
 - Verify Weaviate is running: `curl http://localhost:8080/v1/.well-known/ready`
@@ -500,8 +503,7 @@ For detailed debugging, see [DEVELOPER_GUIDE.md](./DEVELOPER_GUIDE.md#troublesho
 ## Credits and Acknowledgments
 
 **Framework**: Koan Framework - Entity-first, multi-provider architecture
-**Vision Model**: Qwen2.5-VL (Alibaba Cloud) via Ollama
-**Embedding Model**: all-minilm (sentence-transformers) via Ollama
+**AI Models**: Auto-selected by ZenGarden orchestrator advisor (vision, embedding, chat)
 **Vector Database**: Weaviate
 **Image Processing**: ImageSharp 3.x
 **Design Inspiration**: Google Photos, Lightroom, Figma

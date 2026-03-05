@@ -643,8 +643,7 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
             var response = await Client.Chat(prompt, new ChatOptions
             {
                 Image = imageBytes,
-                ImageMimeType = "image/jpeg",
-                Model = "qwen2.5vl"
+                ImageMimeType = "image/jpeg"
             }, ct);
 
             // Parse JSON with robust error handling
@@ -749,8 +748,7 @@ internal sealed class PhotoProcessingService : IPhotoProcessingService
         var classificationResponse = await Client.Chat(classificationPrompt, new ChatOptions
         {
             Image = imageBytes,
-            ImageMimeType = "image/jpeg",
-            Model = "qwen2.5vl"
+            ImageMimeType = "image/jpeg"
         }, ct);
         classificationStart.Stop();
 

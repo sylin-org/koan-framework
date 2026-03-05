@@ -1,3 +1,4 @@
+using Koan.Core.AI;
 using Koan.Core;
 using Koan.Web;
 using Koan.Web.Extensions;
@@ -59,40 +60,13 @@ Koan.Core.Hosting.App.AppHost.Current ??= app.Services;
 // Seed default analysis styles (S5.Recs pattern)
 var logger = app.Services.GetRequiredService<ILogger<Program>>();
 
-// Optional startup observability for wishful Ollama model fulfillment.
-var requiredModels = app.Configuration
-    .GetSection("Koan:Ai:Ollama:RequiredModels")
-    .Get<string[]>()?
-    .Where(model => !string.IsNullOrWhiteSpace(model))
-    .Select(model => model.Trim())
-    .Distinct(StringComparer.OrdinalIgnoreCase)
-    .ToArray()
-    ?? Array.Empty<string>();
-
-IDisposable? ollamaCapabilitySubscription = null;
-if (requiredModels.Length > 0)
-{
-    ollamaCapabilitySubscription = ZenGarden.Offering.On(
-        "ollama",
-        requiredModels,
-        (evt, ct) =>
-        {
-            logger.LogInformation(
-                "ZenGarden Ollama availability event kind={Kind} tool={Tool} ready={Ready} required={RequiredModels}",
-                evt.Kind,
-                evt.Current.ToolFqid,
-                evt.Current.Ready,
-                string.Join(",", requiredModels));
-
-            return ValueTask.CompletedTask;
-        });
-
-    logger.LogInformation(
-        "ZenGarden capability subscription attached for Ollama required models: {Models}",
-        string.Join(", ", requiredModels));
-}
-
-app.Lifetime.ApplicationStopping.Register(() => ollamaCapabilitySubscription?.Dispose());
+// Log recommended models from orchestrator advisor (zero-config model selection)
+var vision = ZenGarden.RecommendedModel(AiCapability.Vision);
+var embedding = ZenGarden.RecommendedModel(AiCapability.Embed);
+var chat = ZenGarden.RecommendedModel(AiCapability.Chat);
+logger.LogInformation(
+    "ZenGarden model advisor: vision={Vision}, embedding={Embedding}, chat={Chat}",
+    vision ?? "(pending)", embedding ?? "(pending)", chat ?? "(pending)");
 
 await AnalysisStyleSeeder.SeedDefaultStylesAsync(logger);
 
