@@ -72,10 +72,10 @@ public static class ServiceCollectionExtensions
         // automatically use the best available model with zero configuration.
         services.TryAddSingleton<IAiModelAdvisor>(sp =>
         {
-            var client = sp.GetRequiredService<IZenGardenClient>();
+            var initProvider = sp.GetService<IZenGardenInitializationProvider>();
             var options = sp.GetService<IOptions<ZenGardenOptions>>()?.Value ?? new ZenGardenOptions();
             var logger = sp.GetService<ILogger<ZenGardenModelAdvisor>>() ?? NullLogger<ZenGardenModelAdvisor>.Instance;
-            return new ZenGardenModelAdvisor(client, options, logger);
+            return new ZenGardenModelAdvisor(initProvider, options, logger);
         });
 
         return services;

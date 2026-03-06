@@ -310,6 +310,8 @@ public sealed class ZenGardenInitializationProviderTests
             _snapshots = snapshots;
         }
 
+        public string? BoundEndpoint => null;
+
         public IDisposable Subscribe(
             ZenGardenSubscription subscription,
             Func<ZenGardenAvailabilityEvent, CancellationToken, ValueTask> handler,

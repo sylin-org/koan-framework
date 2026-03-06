@@ -1912,9 +1912,6 @@ public sealed class ZenGardenClient : IZenGardenClient
                         CacheStone(updated with { Endpoint = evt.Stone.LocalEndpoint });
 
                     PersistRosterFireAndForget();
-                    _logger.LogDebug(
-                        "Koi: stone {StoneName} metadata changed at {Endpoint}.",
-                        evt.Stone.StoneName, evt.Stone.Endpoint);
                 }
                 break;
 

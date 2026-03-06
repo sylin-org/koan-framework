@@ -1,6 +1,7 @@
 ﻿using System.Net.Http.Json;
 using System.Text.Json.Serialization;
 using Koan.Core.AI;
+using Koan.ZenGarden.Core;
 using Microsoft.Extensions.Logging;
 
 namespace Koan.ZenGarden.AI;
@@ -13,13 +14,14 @@ namespace Koan.ZenGarden.AI;
 /// </summary>
 internal sealed class ZenGardenModelAdvisor : IAiModelAdvisor, IDisposable
 {
-    private readonly IZenGardenClient _gardenClient;
+    private readonly IZenGardenInitializationProvider? _initProvider;
     private readonly ZenGardenOptions _options;
     private readonly ILogger<ZenGardenModelAdvisor> _logger;
     private readonly HttpClient _httpClient;
     private readonly bool _ownsHttpClient;
 
     private volatile RecommendationSnapshot? _snapshot;
+    private volatile Uri? _resolvedProxyUri;
     private readonly SemaphoreSlim _refreshLock = new(1, 1);
 
     // Orchestrator wire-format capability names (returned by /v1/recommendations)
@@ -59,12 +61,12 @@ internal sealed class ZenGardenModelAdvisor : IAiModelAdvisor, IDisposable
     };
 
     public ZenGardenModelAdvisor(
-        IZenGardenClient gardenClient,
+        IZenGardenInitializationProvider? initProvider,
         ZenGardenOptions options,
         ILogger<ZenGardenModelAdvisor> logger,
         HttpClient? httpClient = null)
     {
-        _gardenClient = gardenClient;
+        _initProvider = initProvider;
         _options = options;
         _logger = logger;
         _httpClient = httpClient ?? new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
@@ -97,7 +99,7 @@ internal sealed class ZenGardenModelAdvisor : IAiModelAdvisor, IDisposable
 
         try
         {
-            var proxyUri = ResolveProxyEndpoint();
+            var proxyUri = await ResolveProxyEndpointAsync();
             if (proxyUri is null)
             {
                 _logger.LogDebug("Cannot resolve orchestrator proxy endpoint — skipping recommendation refresh");
@@ -158,28 +160,41 @@ internal sealed class ZenGardenModelAdvisor : IAiModelAdvisor, IDisposable
         }
     }
 
-    private Uri? ResolveProxyEndpoint()
+    private async Task<Uri?> ResolveProxyEndpointAsync()
     {
-        // 1. Explicit endpoint from options
+        // 1. Explicit endpoint from options (highest priority)
         if (!string.IsNullOrWhiteSpace(_options.OrchestratorProxyEndpoint))
         {
             if (Uri.TryCreate(_options.OrchestratorProxyEndpoint.TrimEnd('/'), UriKind.Absolute, out var explicit_))
                 return explicit_;
         }
 
-        // 2. Derive from bound stone host + proxy port
-        var stoneEndpoint = _gardenClient.BoundEndpoint;
-        if (!string.IsNullOrWhiteSpace(stoneEndpoint) &&
-            Uri.TryCreate(stoneEndpoint, UriKind.Absolute, out var stoneUri))
-        {
-            return new Uri($"{stoneUri.Scheme}://{stoneUri.Host}:{_options.OrchestratorProxyPort}");
-        }
+        // 2. Cached resolution from a previous successful discovery
+        var cached = _resolvedProxyUri;
+        if (cached is not null) return cached;
 
-        // 3. Derive from explicit Moss endpoint in options
-        if (!string.IsNullOrWhiteSpace(_options.Endpoint) &&
-            Uri.TryCreate(_options.Endpoint, UriKind.Absolute, out var mossUri))
+        // 3. Resolve via ZenGarden offering catalog (ollama::orchestrator)
+        if (_initProvider is not null)
         {
-            return new Uri($"{mossUri.Scheme}://{mossUri.Host}:{_options.OrchestratorProxyPort}");
+            try
+            {
+                var intent = ZenGardenConnectionIntent.ForOffering("ollama", "orchestrator");
+                var resolved = await _initProvider.ResolveAsync(intent).ConfigureAwait(false);
+                var endpoint = resolved?.GetUri("http", "https");
+
+                if (!string.IsNullOrWhiteSpace(endpoint) &&
+                    Uri.TryCreate(endpoint.TrimEnd('/'), UriKind.Absolute, out var uri))
+                {
+                    _resolvedProxyUri = uri;
+                    _logger.LogDebug(
+                        "Resolved orchestrator proxy via ZenGarden offering: {Endpoint}", uri);
+                    return uri;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "ZenGarden offering resolution for orchestrator failed");
+            }
         }
 
         return null;

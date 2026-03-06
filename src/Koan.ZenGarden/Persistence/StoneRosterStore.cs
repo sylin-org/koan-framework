@@ -100,8 +100,6 @@ internal sealed class StoneRosterStore : IStoneRosterStore
             var tmpPath = _filePath + ".tmp";
             await File.WriteAllTextAsync(tmpPath, json, ct).ConfigureAwait(false);
             File.Move(tmpPath, _filePath, overwrite: true);
-
-            _logger.LogDebug("Persisted {Count} stones to roster (path={Path})", toWrite.Count, _filePath);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

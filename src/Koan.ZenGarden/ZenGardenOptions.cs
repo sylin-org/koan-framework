@@ -110,15 +110,9 @@ public sealed class ZenGardenOptions
 
     /// <summary>
     /// Explicit orchestrator proxy endpoint (e.g. "http://localhost:21434").
-    /// When null, derived from the bound Stone host with <see cref="OrchestratorProxyPort"/>.
+    /// When null, resolved via ZenGarden offering catalog (ollama::orchestrator).
     /// </summary>
     public string? OrchestratorProxyEndpoint { get; set; }
-
-    /// <summary>
-    /// Port used for the orchestrator proxy when deriving from the bound Stone host.
-    /// Default: 21434 (standard Zen Garden proxy port).
-    /// </summary>
-    public int OrchestratorProxyPort { get; set; } = 21434;
 
     /// <summary>
     /// TTL in seconds for cached model recommendations. Default: 300 (5 minutes).
