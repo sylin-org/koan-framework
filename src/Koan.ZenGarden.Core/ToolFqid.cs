@@ -14,6 +14,9 @@ public readonly record struct ToolFqid
     /// <summary>Instance separator (canonical).</summary>
     public const char Separator = ':';
 
+    /// <summary>Double-colon separator used on the wire by Moss (e.g., "ollama::orchestrator").</summary>
+    private const string DoubleSeparator = "::";
+
     /// <summary>Legacy instance separator (backward compat).</summary>
     private const char LegacySeparator = '@';
 
@@ -40,6 +43,22 @@ public readonly record struct ToolFqid
             throw new ArgumentException("Tool fqid cannot be empty.", nameof(raw));
 
         var normalized = StripLegacyPrefix(raw.Trim()).ToLowerInvariant();
+
+        // Handle wire-format double-colon separator first (e.g., "ollama::orchestrator")
+        var doubleIndex = normalized.IndexOf(DoubleSeparator, StringComparison.Ordinal);
+        if (doubleIndex > 0)
+        {
+            var offering = normalized[..doubleIndex];
+            var instance = normalized[(doubleIndex + DoubleSeparator.Length)..];
+
+            if (string.IsNullOrEmpty(instance))
+                return new ToolFqid(offering, null);
+
+            if (string.Equals(offering, instance, StringComparison.Ordinal))
+                return new ToolFqid(offering, null);
+
+            return new ToolFqid(offering, instance);
+        }
 
         var separatorIndex = normalized.IndexOf(Separator);
         if (separatorIndex < 0)

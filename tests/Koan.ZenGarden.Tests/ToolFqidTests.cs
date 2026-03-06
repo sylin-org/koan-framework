@@ -290,4 +290,46 @@ public sealed class ToolFqidTests
     {
         ToolFqid.Parse("MongoDB:PROD").Should().Be(ToolFqid.Parse("mongodb:prod"));
     }
+
+    // ── Double-colon wire format (Moss canonical) ─────────────────
+
+    [Fact]
+    public void Parse_double_colon_wire_format()
+    {
+        var fqid = ToolFqid.Parse("ollama::orchestrator");
+        fqid.OfferingType.Should().Be("ollama");
+        fqid.Instance.Should().Be("orchestrator");
+        fqid.IsQualified.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Double_colon_matches_single_colon()
+    {
+        ToolFqid.Parse("ollama::orchestrator")
+            .Should().Be(ToolFqid.Parse("ollama:orchestrator"));
+    }
+
+    [Fact]
+    public void MatchesSnapshot_double_colon_fqid()
+    {
+        var query = ToolFqid.Parse("ollama:orchestrator");
+        query.MatchesSnapshot("ollama::orchestrator", "ollama", null).Should().BeTrue();
+    }
+
+    [Fact]
+    public void Parse_double_colon_same_name_collapses()
+    {
+        var fqid = ToolFqid.Parse("mongodb::mongodb");
+        fqid.OfferingType.Should().Be("mongodb");
+        fqid.Instance.Should().BeNull();
+        fqid.IsQualified.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Parse_double_colon_bare_trailing()
+    {
+        var fqid = ToolFqid.Parse("ollama::");
+        fqid.OfferingType.Should().Be("ollama");
+        fqid.Instance.Should().BeNull();
+    }
 }
