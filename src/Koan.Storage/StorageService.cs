@@ -5,6 +5,7 @@ namespace Koan.Storage;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Koan.Storage.Options;
+using Koan.Storage.Replication;
 using System.Collections.Concurrent;
 using System.Security.Cryptography;
 
@@ -14,6 +15,10 @@ public sealed class StorageService : IStorageService
     private readonly IReadOnlyDictionary<string, IStorageProvider> _providers;
     private readonly IOptionsMonitor<StorageOptions> _options;
     private readonly ConcurrentDictionary<string, ResilientStorageDecorator> _resilientDecorators = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, ReplicatedStorageProvider> _replicatedProviders = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Well-known provider name patterns considered "local".</summary>
+    private static readonly string[] LocalProviderNames = ["local", "filesystem", "disk"];
 
     public StorageService(
         ILogger<StorageService> logger,
@@ -243,7 +248,7 @@ public sealed class StorageService : IStorageService
             if (!opts.Profiles.TryGetValue(profile, out var explicitProfile))
                 throw new InvalidOperationException($"Unknown storage profile '{profile}'.");
 
-            var explicitProvider = MaybeWrapResilient(profile, explicitProfile, _providers[explicitProfile.Provider]);
+            var explicitProvider = ResolveProvider(profile, explicitProfile);
             var explicitContainer = string.IsNullOrWhiteSpace(container) ? explicitProfile.Container : container;
             return (explicitProvider, explicitContainer);
         }
@@ -254,7 +259,7 @@ public sealed class StorageService : IStorageService
             if (!opts.Profiles.TryGetValue(opts.DefaultProfile, out var defaultProf))
                 throw new InvalidOperationException($"Configured DefaultProfile '{opts.DefaultProfile}' not found in Profiles.");
 
-            var defProvider = MaybeWrapResilient(opts.DefaultProfile, defaultProf, _providers[defaultProf.Provider]);
+            var defProvider = ResolveProvider(opts.DefaultProfile, defaultProf);
             var defContainer = string.IsNullOrWhiteSpace(container) ? defaultProf.Container : container;
             return (defProvider, defContainer);
         }
@@ -266,7 +271,7 @@ public sealed class StorageService : IStorageService
             {
                 var kv = opts.Profiles.First();
                 var prof = kv.Value;
-                var prov = MaybeWrapResilient(kv.Key, prof, _providers[prof.Provider]);
+                var prov = ResolveProvider(kv.Key, prof);
                 var cont = string.IsNullOrWhiteSpace(container) ? prof.Container : container;
                 _logger.LogWarning("Storage profile not specified; using the only configured profile '{ProfileName}' (provider: {Provider})", kv.Key, prof.Provider);
                 return (prov, cont);
@@ -277,6 +282,207 @@ public sealed class StorageService : IStorageService
 
         // 4) Disabled or NamedDefault without DefaultProfile set -> fail fast
         throw new InvalidOperationException("No storage profile specified and fallback is disabled. Set DefaultProfile or pass a profile name.");
+    }
+
+    /// <summary>
+    /// Resolves the effective <see cref="IStorageProvider"/> for a profile, handling:
+    /// - Explicit provider name → direct lookup
+    /// - Absent provider + Mode → auto-detect from registered providers
+    /// - Replicated mode → compose ReplicatedStorageProvider
+    /// - Legacy Resilient flag → ResilientStorageDecorator
+    /// </summary>
+    private IStorageProvider ResolveProvider(string profileName, StorageOptions.StorageProfile profile)
+    {
+        // Determine effective mode
+        var mode = profile.Mode;
+
+        // If provider is explicit, use legacy path (with resilient/replicated wrapping)
+        if (!string.IsNullOrWhiteSpace(profile.Provider))
+        {
+            if (!_providers.TryGetValue(profile.Provider, out var named))
+                throw new InvalidOperationException($"Storage profile '{profileName}' references unknown provider '{profile.Provider}'.");
+
+            // Explicit Mode=Replicated with explicit provider: compose with auto-detected counterpart
+            if (mode == StorageMode.Replicated)
+            {
+                return ComposeReplicated(profileName, profile, named);
+            }
+
+            return MaybeWrapResilient(profileName, profile, named);
+        }
+
+        // No explicit provider — auto-detect from registered providers
+        var (localProvider, remoteProvider) = DetectProviders();
+
+        return mode switch
+        {
+            StorageMode.Local => localProvider
+                ?? throw new InvalidOperationException($"Storage profile '{profileName}' requires Mode=Local but no local provider is registered."),
+
+            StorageMode.Remote => remoteProvider
+                ?? throw new InvalidOperationException($"Storage profile '{profileName}' requires Mode=Remote but no remote provider is registered."),
+
+            StorageMode.Replicated => ComposeReplicatedFromDetected(profileName, profile, localProvider, remoteProvider),
+
+            // null = auto-detect
+            null => AutoDetectProvider(profileName, profile, localProvider, remoteProvider),
+
+            _ => throw new InvalidOperationException($"Storage profile '{profileName}' has unsupported mode '{mode}'.")
+        };
+    }
+
+    /// <summary>
+    /// Auto-detect the best provider arrangement from registered providers.
+    /// </summary>
+    private IStorageProvider AutoDetectProvider(
+        string profileName,
+        StorageOptions.StorageProfile profile,
+        IStorageProvider? localProvider,
+        IStorageProvider? remoteProvider)
+    {
+        // Both available → replicated
+        if (localProvider is not null && remoteProvider is not null)
+        {
+            _logger.LogInformation(
+                "Storage profile '{Profile}': auto-detected replicated mode (cache={Cache}, durable={Durable})",
+                profileName, localProvider.Name, remoteProvider.Name);
+            return ComposeReplicatedFromDetected(profileName, profile, localProvider, remoteProvider);
+        }
+
+        // Only local
+        if (localProvider is not null)
+        {
+            _logger.LogDebug("Storage profile '{Profile}': auto-detected local mode ({Provider})", profileName, localProvider.Name);
+            return localProvider;
+        }
+
+        // Only remote
+        if (remoteProvider is not null)
+        {
+            _logger.LogDebug("Storage profile '{Profile}': auto-detected remote mode ({Provider})", profileName, remoteProvider.Name);
+            return remoteProvider;
+        }
+
+        throw new InvalidOperationException(
+            $"Storage profile '{profileName}' has no Provider configured and no providers are registered for auto-detection.");
+    }
+
+    /// <summary>
+    /// Compose a <see cref="ReplicatedStorageProvider"/> when an explicit provider is set
+    /// but Mode=Replicated. The explicit provider is used as durable; local is auto-detected.
+    /// </summary>
+    private IStorageProvider ComposeReplicated(
+        string profileName,
+        StorageOptions.StorageProfile profile,
+        IStorageProvider explicitProvider)
+    {
+        var (localProvider, _) = DetectProviders();
+
+        if (localProvider is null)
+        {
+            _logger.LogWarning(
+                "Storage profile '{Profile}' is Mode=Replicated but no local provider found. Falling back to explicit provider only.",
+                profileName);
+            return explicitProvider;
+        }
+
+        // If the explicit provider IS the local one, look for a remote counterpart
+        if (IsLocalProvider(explicitProvider))
+        {
+            var (_, remoteProvider) = DetectProviders();
+            if (remoteProvider is null)
+            {
+                _logger.LogWarning(
+                    "Storage profile '{Profile}' is Mode=Replicated but only a local provider is available. Using local only.",
+                    profileName);
+                return explicitProvider;
+            }
+            return GetOrCreateReplicated(profileName, profile, explicitProvider, remoteProvider);
+        }
+
+        return GetOrCreateReplicated(profileName, profile, localProvider, explicitProvider);
+    }
+
+    private IStorageProvider ComposeReplicatedFromDetected(
+        string profileName,
+        StorageOptions.StorageProfile profile,
+        IStorageProvider? localProvider,
+        IStorageProvider? remoteProvider)
+    {
+        if (localProvider is not null && remoteProvider is not null)
+            return GetOrCreateReplicated(profileName, profile, localProvider, remoteProvider);
+
+        if (localProvider is not null)
+        {
+            _logger.LogWarning("Storage profile '{Profile}': replicated mode requested but no remote provider available. Using local only.", profileName);
+            return localProvider;
+        }
+
+        if (remoteProvider is not null)
+        {
+            _logger.LogWarning("Storage profile '{Profile}': replicated mode requested but no local provider available. Using remote only.", profileName);
+            return remoteProvider;
+        }
+
+        throw new InvalidOperationException($"Storage profile '{profileName}' requires replicated mode but no providers are registered.");
+    }
+
+    private ReplicatedStorageProvider GetOrCreateReplicated(
+        string profileName,
+        StorageOptions.StorageProfile profile,
+        IStorageProvider cache,
+        IStorageProvider durable)
+    {
+        return _replicatedProviders.GetOrAdd(profileName, _ =>
+        {
+            _logger.LogInformation(
+                "Storage profile '{Profile}': composing replicated provider (cache={Cache}, durable={Durable})",
+                profileName, cache.Name, durable.Name);
+
+            return new ReplicatedStorageProvider(
+                cache: cache,
+                durable: durable,
+                container: profile.Container,
+                cacheOptions: profile.LocalCache,
+                logger: _logger);
+        });
+    }
+
+    /// <summary>
+    /// Detects a local and a remote provider from the registered set.
+    /// </summary>
+    private (IStorageProvider? Local, IStorageProvider? Remote) DetectProviders()
+    {
+        IStorageProvider? local = null;
+        IStorageProvider? remote = null;
+
+        foreach (var provider in _providers.Values)
+        {
+            if (IsLocalProvider(provider))
+            {
+                local ??= provider;
+            }
+            else
+            {
+                remote ??= provider;
+            }
+        }
+
+        return (local, remote);
+    }
+
+    /// <summary>
+    /// Heuristic: a provider is "local" if its name matches well-known local patterns.
+    /// </summary>
+    private static bool IsLocalProvider(IStorageProvider provider)
+    {
+        var name = provider.Name;
+        foreach (var pattern in LocalProviderNames)
+        {
+            if (name.Contains(pattern, StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+        return false;
     }
 
     private IStorageProvider MaybeWrapResilient(string profileName, StorageOptions.StorageProfile profile, IStorageProvider provider)
@@ -300,14 +506,14 @@ public sealed class StorageService : IStorageService
             throw new InvalidOperationException("Koan.Storage: No storage Profiles configured. Configure Koan:Storage:Profiles and at least one entry.");
         }
 
-        // Each profile must reference a registered provider
+        // Each profile must reference a registered provider (or be null for auto-detect)
         foreach (var (name, prof) in opts.Profiles)
         {
-            if (string.IsNullOrWhiteSpace(prof.Provider))
-                throw new InvalidOperationException($"Koan.Storage: Profile '{name}' has no Provider configured.");
             if (string.IsNullOrWhiteSpace(prof.Container))
                 throw new InvalidOperationException($"Koan.Storage: Profile '{name}' has no Container configured.");
-            if (!_providers.ContainsKey(prof.Provider))
+
+            // Provider is now nullable — skip provider validation when absent (auto-detect)
+            if (!string.IsNullOrWhiteSpace(prof.Provider) && !_providers.ContainsKey(prof.Provider))
                 throw new InvalidOperationException($"Koan.Storage: Profile '{name}' references unknown provider '{prof.Provider}'. Ensure the provider is registered.");
         }
 
