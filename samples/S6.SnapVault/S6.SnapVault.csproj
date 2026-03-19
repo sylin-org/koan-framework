@@ -24,6 +24,7 @@
     <!-- Storage -->
     <ProjectReference Include="..\..\src\Koan.Storage\Koan.Storage.csproj" />
     <ProjectReference Include="..\..\src\Connectors\Storage\Local\Koan.Storage.Connector.Local.csproj" />
+    <ProjectReference Include="..\..\src\Connectors\Storage\S3\Koan.Storage.Connector.S3.csproj" />
 
     <!-- AI -->
     <ProjectReference Include="..\..\src\Koan.AI\Koan.AI.csproj" />

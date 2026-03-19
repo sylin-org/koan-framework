@@ -1,5 +1,6 @@
 using Koan.Core.AI;
 using Koan.Core;
+using Koan.Core.Hosting.App;
 using Koan.Web;
 using Koan.Web.Extensions;
 using Koan.ZenGarden;
@@ -10,6 +11,8 @@ using S6.SnapVault.Services.AI;
 using S6.SnapVault.Hubs;
 using S6.SnapVault.Initialization;
 using S6.SnapVault.Controllers;
+
+[assembly: KoanApp(Name = "SnapVault", Code = "snap-vault", Description = "Photo management and AI analysis")]
 
 var builder = WebApplication.CreateBuilder(args);
 
