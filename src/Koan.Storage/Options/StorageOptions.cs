@@ -18,5 +18,11 @@ public sealed class StorageOptions
     {
         public required string Provider { get; init; }
         public required string Container { get; init; }
+
+        /// <summary>
+        /// When true, wraps the resolved provider with <see cref="ResilientStorageDecorator"/>
+        /// for write-behind caching during primary unavailability.
+        /// </summary>
+        public bool Resilient { get; init; }
     }
 }

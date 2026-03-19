@@ -5,6 +5,7 @@ namespace Koan.Storage;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Koan.Storage.Options;
+using System.Collections.Concurrent;
 using System.Security.Cryptography;
 
 public sealed class StorageService : IStorageService
@@ -12,6 +13,7 @@ public sealed class StorageService : IStorageService
     private readonly ILogger<StorageService> _logger;
     private readonly IReadOnlyDictionary<string, IStorageProvider> _providers;
     private readonly IOptionsMonitor<StorageOptions> _options;
+    private readonly ConcurrentDictionary<string, ResilientStorageDecorator> _resilientDecorators = new(StringComparer.OrdinalIgnoreCase);
 
     public StorageService(
         ILogger<StorageService> logger,
@@ -241,7 +243,7 @@ public sealed class StorageService : IStorageService
             if (!opts.Profiles.TryGetValue(profile, out var explicitProfile))
                 throw new InvalidOperationException($"Unknown storage profile '{profile}'.");
 
-            var explicitProvider = _providers[explicitProfile.Provider];
+            var explicitProvider = MaybeWrapResilient(profile, explicitProfile, _providers[explicitProfile.Provider]);
             var explicitContainer = string.IsNullOrWhiteSpace(container) ? explicitProfile.Container : container;
             return (explicitProvider, explicitContainer);
         }
@@ -252,7 +254,7 @@ public sealed class StorageService : IStorageService
             if (!opts.Profiles.TryGetValue(opts.DefaultProfile, out var defaultProf))
                 throw new InvalidOperationException($"Configured DefaultProfile '{opts.DefaultProfile}' not found in Profiles.");
 
-            var defProvider = _providers[defaultProf.Provider];
+            var defProvider = MaybeWrapResilient(opts.DefaultProfile, defaultProf, _providers[defaultProf.Provider]);
             var defContainer = string.IsNullOrWhiteSpace(container) ? defaultProf.Container : container;
             return (defProvider, defContainer);
         }
@@ -264,7 +266,7 @@ public sealed class StorageService : IStorageService
             {
                 var kv = opts.Profiles.First();
                 var prof = kv.Value;
-                var prov = _providers[prof.Provider];
+                var prov = MaybeWrapResilient(kv.Key, prof, _providers[prof.Provider]);
                 var cont = string.IsNullOrWhiteSpace(container) ? prof.Container : container;
                 _logger.LogWarning("Storage profile not specified; using the only configured profile '{ProfileName}' (provider: {Provider})", kv.Key, prof.Provider);
                 return (prov, cont);
@@ -275,6 +277,19 @@ public sealed class StorageService : IStorageService
 
         // 4) Disabled or NamedDefault without DefaultProfile set -> fail fast
         throw new InvalidOperationException("No storage profile specified and fallback is disabled. Set DefaultProfile or pass a profile name.");
+    }
+
+    private IStorageProvider MaybeWrapResilient(string profileName, StorageOptions.StorageProfile profile, IStorageProvider provider)
+    {
+        if (!profile.Resilient)
+            return provider;
+
+        return _resilientDecorators.GetOrAdd(profileName, _ =>
+        {
+            var walBasePath = Path.Combine(".Koan", "storage-wal");
+            _logger.LogInformation("Storage profile '{Profile}' using resilient decorator with WAL at {WalPath}", profileName, walBasePath);
+            return new ResilientStorageDecorator(provider, _logger, walBasePath);
+        });
     }
 
     private void ValidateConfiguration(StorageOptions opts)
