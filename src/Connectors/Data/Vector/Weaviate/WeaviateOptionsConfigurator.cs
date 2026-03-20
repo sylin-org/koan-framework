@@ -63,6 +63,11 @@ internal sealed class WeaviateOptionsConfigurator : AdapterOptionsConfigurator<W
         // Read Weaviate-specific configuration
         var endpoint = ReadProviderConfiguration(options.Endpoint, WeaviateItems.EndpointKeys);
 
+        // User-explicit endpoint always beats auto-discovery.
+        // If the user configured an endpoint that differs from the default, it is authoritative.
+        var hasUserExplicitEndpoint = !string.IsNullOrWhiteSpace(endpoint)
+            && !string.Equals(endpoint, new WeaviateOptions().Endpoint, StringComparison.OrdinalIgnoreCase);
+
         var apiKey = ReadProviderConfiguration(options.ApiKey ?? string.Empty, WeaviateItems.ApiKeyKeys);
 
         var explicitConnectionString = ReadProviderConfiguration(string.Empty, WeaviateItems.ConnectionStringKeys);
@@ -76,13 +81,15 @@ internal sealed class WeaviateOptionsConfigurator : AdapterOptionsConfigurator<W
             if (TryResolveZenGardenConnection(zenGardenIntent!, out var resolved))
             {
                 options.ConnectionString = resolved;
-                options.Endpoint = resolved;
+                if (!hasUserExplicitEndpoint)
+                    options.Endpoint = resolved;
                 KoanLog.ConfigInfo(Logger, LogActions.ZenGarden, "intent-resolved", ("intent", requestedConnection));
             }
             else
             {
                 options.ConnectionString = ResolveAutonomousConnection();
-                options.Endpoint = options.ConnectionString;
+                if (!hasUserExplicitEndpoint)
+                    options.Endpoint = options.ConnectionString;
                 KoanLog.ConfigWarning(Logger, LogActions.ZenGarden, "intent-fallback-autonomous", ("intent", requestedConnection));
             }
         }
@@ -90,7 +97,8 @@ internal sealed class WeaviateOptionsConfigurator : AdapterOptionsConfigurator<W
         {
             KoanLog.ConfigInfo(Logger, LogActions.Config, "connection-explicit", ("source", "configuration"));
             options.ConnectionString = explicitConnectionString;
-            options.Endpoint = explicitConnectionString; // For backward compatibility
+            if (!hasUserExplicitEndpoint)
+                options.Endpoint = explicitConnectionString;
         }
         else if (IsAutoConnection(requestedConnection))
         {
@@ -98,21 +106,33 @@ internal sealed class WeaviateOptionsConfigurator : AdapterOptionsConfigurator<W
             if (TryResolveZenGardenConnection(defaultIntent, out var resolved))
             {
                 options.ConnectionString = resolved;
-                options.Endpoint = resolved;
+                if (!hasUserExplicitEndpoint)
+                    options.Endpoint = resolved;
                 KoanLog.ConfigInfo(Logger, LogActions.ZenGarden, "auto-resolved", ("offering", defaultIntent.ToOfferingSelector()));
             }
             else
             {
                 KoanLog.ConfigInfo(Logger, LogActions.Discovery, "auto-mode");
                 options.ConnectionString = ResolveAutonomousConnection();
-                options.Endpoint = options.ConnectionString; // For backward compatibility
+                if (!hasUserExplicitEndpoint)
+                    options.Endpoint = options.ConnectionString;
             }
         }
         else
         {
             KoanLog.ConfigInfo(Logger, LogActions.Config, "connection-preconfigured");
             options.ConnectionString = requestedConnection ?? string.Empty;
-            options.Endpoint = options.ConnectionString; // For backward compatibility
+            if (!hasUserExplicitEndpoint)
+                options.Endpoint = options.ConnectionString;
+        }
+
+        // Apply user-explicit endpoint — final authority, never overridden by discovery
+        if (hasUserExplicitEndpoint)
+        {
+            options.Endpoint = endpoint!;
+            KoanLog.ConfigInfo(Logger, LogActions.Config, "endpoint-user-explicit",
+                ("endpoint", endpoint!),
+                ("note", "User configuration beats auto-discovery"));
         }
 
         // Apply other configuration
