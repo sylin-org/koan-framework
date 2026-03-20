@@ -351,8 +351,12 @@ public sealed class S3StorageProvider : IStorageProvider, IStatOperations, IServ
         var opts = _options.CurrentValue;
         if (string.IsNullOrWhiteSpace(opts.Endpoint)) return;
 
+        var handler = new S3DiagnosticHandler(_logger);
+        var httpClient = new HttpClient(handler);
+
         var builder = new MinioClient()
-            .WithEndpoint(opts.Endpoint);
+            .WithEndpoint(opts.Endpoint)
+            .WithHttpClient(httpClient);
 
         // Credentials come from garden storage discovery (generated per replica set)
         // or from explicit configuration. Always present after resolution.
@@ -361,10 +365,7 @@ public sealed class S3StorageProvider : IStorageProvider, IStatOperations, IServ
             builder = builder.WithCredentials(opts.AccessKey, opts.SecretKey);
         }
 
-        if (opts.UseSsl)
-        {
-            builder = builder.WithSSL();
-        }
+        builder = builder.WithSSL(opts.UseSsl);
 
         builder = builder.WithRegion(opts.Region);
 
@@ -477,5 +478,38 @@ public sealed class S3StorageProvider : IStorageProvider, IStatOperations, IServ
     {
         (_client as IDisposable)?.Dispose();
         _presignHttpClient.Dispose();
+    }
+}
+
+/// <summary>
+/// Diagnostic HTTP handler that logs request/response details for S3 troubleshooting.
+/// </summary>
+internal sealed class S3DiagnosticHandler : DelegatingHandler
+{
+    private readonly ILogger? _logger;
+
+    public S3DiagnosticHandler(ILogger? logger) : base(new HttpClientHandler())
+    {
+        _logger = logger;
+    }
+
+    protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+    {
+        _logger?.LogDebug("S3 >> {Method} {Uri}", request.Method, request.RequestUri);
+
+        var response = await base.SendAsync(request, ct);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var body = await response.Content.ReadAsStringAsync(ct);
+            _logger?.LogWarning("S3 << {Status} {Method} {Uri} Body={Body}",
+                (int)response.StatusCode, request.Method, request.RequestUri, body);
+        }
+        else
+        {
+            _logger?.LogDebug("S3 << {Status} {Method} {Uri}", (int)response.StatusCode, request.Method, request.RequestUri);
+        }
+
+        return response;
     }
 }
