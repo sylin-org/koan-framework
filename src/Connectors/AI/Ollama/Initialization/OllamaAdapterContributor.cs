@@ -688,11 +688,10 @@ internal sealed class OllamaAdapterContributor : IAiAdapterContributor
         try
         {
             var resolvedOptions = optionsMonitor?.CurrentValue;
-            var timeoutSeconds = resolvedOptions?.RequestTimeoutSeconds ?? 180;
 
             var http = new HttpClient
             {
-                Timeout = TimeSpan.FromSeconds(timeoutSeconds)
+                Timeout = Timeout.InfiniteTimeSpan
             };
 
             var baseAddress = ResolveAdapterBaseAddress(services, configuration);

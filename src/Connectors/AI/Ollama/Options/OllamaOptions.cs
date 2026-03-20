@@ -11,11 +11,6 @@ public sealed class OllamaOptions
     public string? DefaultModel { get; set; }
 
     /// <summary>
-    /// Timeout for AI inference requests (in seconds). Default is 180 seconds.
-    /// </summary>
-    public int RequestTimeoutSeconds { get; set; } = 180;
-
-    /// <summary>
     /// Maximum number of concurrent requests allowed against a single Ollama endpoint.
     /// Set to 0 to disable throttling. Default is 3.
     /// </summary>

@@ -240,8 +240,7 @@ internal sealed class OllamaAdapter : IChatAdapter, IEmbedAdapter
     {
         if (!string.IsNullOrWhiteSpace(connectionString))
         {
-            var timeoutSeconds = _options.RequestTimeoutSeconds > 0 ? _options.RequestTimeoutSeconds : 180;
-            return new HttpClient { BaseAddress = new Uri(connectionString), Timeout = TimeSpan.FromSeconds(timeoutSeconds) };
+            return new HttpClient { BaseAddress = new Uri(connectionString), Timeout = Timeout.InfiniteTimeSpan };
         }
 
         return _http;
