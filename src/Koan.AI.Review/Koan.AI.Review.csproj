@@ -11,6 +11,7 @@
   </PropertyGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Koan.AI.Review.Tests" />
+    <InternalsVisibleTo Include="Koan.AI.Integration.Tests" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Koan.Core\Koan.Core.csproj" />

@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="FluentAssertions" Version="8.8.0" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.0.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Koan.AI\Koan.AI.csproj" />
+    <ProjectReference Include="..\..\src\Koan.AI.Contracts\Koan.AI.Contracts.csproj" />
+    <ProjectReference Include="..\..\src\Koan.AI.Contracts.Shared\Koan.AI.Contracts.Shared.csproj" />
+    <ProjectReference Include="..\..\src\Koan.AI.Models\Koan.AI.Models.csproj" />
+    <ProjectReference Include="..\..\src\Koan.AI.Orchestration\Koan.AI.Orchestration.csproj" />
+    <ProjectReference Include="..\..\src\Koan.AI.Eval\Koan.AI.Eval.csproj" />
+    <ProjectReference Include="..\..\src\Koan.AI.Training\Koan.AI.Training.csproj" />
+    <ProjectReference Include="..\..\src\Koan.AI.Review\Koan.AI.Review.csproj" />
+    <ProjectReference Include="..\..\src\Koan.AI.Agents\Koan.AI.Agents.csproj" />
+    <ProjectReference Include="..\..\src\Koan.AI.Prompt\Koan.AI.Prompt.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Core\Koan.Core.csproj" />
+  </ItemGroup>
+</Project>
