@@ -7,6 +7,7 @@ using Koan.ZenGarden.Extensions;
 using S18.Prism.Initialization;
 using S18.Prism.Services;
 using S18.Prism.Services.Extraction;
+using S18.Prism.Services.SourcePulling;
 
 [assembly: KoanApp(Name = "Prism", Code = "prism", Description = "Personal Knowledge Intelligence")]
 
@@ -26,9 +27,18 @@ builder.Services.AddScoped<IContentExtractor, AiFallbackExtractor>();
 builder.Services.AddScoped<INoteIngestionService, NoteIngestionService>();
 builder.Services.AddSingleton<IPulseService, PulseService>();
 
+// Source pull adapters
+builder.Services.AddHttpClient();
+builder.Services.AddSingleton<ISourcePullAdapter, RssPullAdapter>();
+builder.Services.AddSingleton<ISourcePullAdapter, HackerNewsPullAdapter>();
+builder.Services.AddSingleton<ISourcePullAdapter, GitHubPullAdapter>();
+builder.Services.AddSingleton<ISourcePullAdapter, FolderWatchPullAdapter>();
+builder.Services.AddSingleton<ISourcePullAdapter, WebPullAdapter>();
+
 // Background workers
 builder.Services.AddHostedService<SourcePullWorker>();
 builder.Services.AddHostedService<ResearchBriefWorker>();
+builder.Services.AddHostedService<ModelCrawlerWorker>();
 
 // SignalR for real-time updates
 builder.Services.AddSignalR();

@@ -13,4 +13,21 @@ public sealed record PulseBriefing
     public int PendingFindingsCount { get; init; }
     public List<string> TopConcepts { get; init; } = [];
     public string? Summary { get; init; }
+
+    // Structured response with AI-generated group summaries
+    public List<PulseGroup> Groups { get; init; } = [];
+    public int TotalNewItems { get; init; }
 }
+
+public sealed record PulseGroup(
+    string Origin,
+    string Summary,
+    int Count,
+    List<PulseItem> Items);
+
+public sealed record PulseItem(
+    string NoteId,
+    string? Title,
+    string? Summary,
+    string? SourceName,
+    DateTime? Date);
