@@ -4,7 +4,7 @@ namespace Koan.AI.Training;
 
 /// <summary>
 /// Training service that delegates to registered <see cref="ITrainingRuntime"/> instances.
-/// If no runtime is installed, operations fail with clear guidance.
+/// Runtime implementations are discovered via Reference = Intent.
 /// </summary>
 internal sealed class TrainingService : ITrainingService
 {
@@ -61,10 +61,10 @@ internal sealed class TrainingService : ITrainingService
             EstimatedCost = null,
             RecommendedCompute = _runtimes.Count > 0
                 ? _runtimes[0].Id
-                : "No training runtime installed",
+                : "No training runtime available",
             FitsLocalGpu = false,
             Reason = _runtimes.Count == 0
-                ? "Install Koan.AI.Training.Container or Koan.AI.Training.Python for training execution."
+                ? "No training runtimes registered."
                 : $"Available runtimes: {string.Join(", ", _runtimes.Select(r => r.Id))}"
         };
 
@@ -138,8 +138,7 @@ internal sealed class TrainingService : ITrainingService
     {
         if (_runtimes.Count == 0)
             throw new InvalidOperationException(
-                "No training runtime registered. Install Koan.AI.Training.Container " +
-                "(recommended) or Koan.AI.Training.Python to enable training.");
+                "No training runtime registered. Add a training runtime reference to enable training.");
 
         // Find a runtime that supports the requested method and is available
         foreach (var runtime in _runtimes)
@@ -164,8 +163,7 @@ internal sealed class TrainingService : ITrainingService
     {
         if (_runtimes.Count == 0)
             throw new InvalidOperationException(
-                "No training runtime registered. Install Koan.AI.Training.Container " +
-                "(recommended) or Koan.AI.Training.Python to enable training.");
+                "No training runtime registered. Add a training runtime reference to enable training.");
 
         foreach (var runtime in _runtimes)
         {

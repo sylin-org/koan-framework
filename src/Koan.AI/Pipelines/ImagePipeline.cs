@@ -53,10 +53,9 @@ public sealed class ImagePipeline : IAiPipelineStage<byte[]>
                 ? Client.Scope(all: _context.Source)
                 : null)
             {
-                // TODO: Implement text-to-image generation when API is available
-                throw new NotImplementedException(
-                    "Text-to-image generation not yet implemented. " +
-                    "Requires integration with image generation models (DALL-E, Stable Diffusion, etc.)");
+                throw new InvalidOperationException(
+                    "Text-to-image generation requires an adapter that supports image generation " +
+                    "(e.g., DALL-E, Stable Diffusion). No image generation adapter is currently registered.");
             }
         });
     }

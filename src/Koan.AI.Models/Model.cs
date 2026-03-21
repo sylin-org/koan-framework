@@ -39,15 +39,18 @@ public static class Model
     /// <summary>
     /// Download a model from any source (HF Hub, Ollama, URL, local path).
     /// Auto-detects format. Registers in local catalog.
+    /// When multiple adapters can handle the model, specify <paramref name="to"/>
+    /// to disambiguate (e.g., "ollama", "lmstudio").
     /// </summary>
     public static async Task<ModelEntry> Pull(
         string id,
+        string? to = null,
         ModelFormat? format = null,
         IProgress<ModelPullProgress>? progress = null,
         CancellationToken ct = default)
     {
         var service = ResolveService();
-        return await service.PullAsync(id, format, progress, ct);
+        return await service.PullAsync(id, to, format, progress, ct);
     }
 
     /// <summary>Get detailed metadata for a model.</summary>

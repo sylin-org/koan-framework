@@ -10,8 +10,8 @@ namespace Koan.AI.Eval;
 internal sealed class EvalService : IEvalService
 {
     private const string NoComputersMessage =
-        "No metric computers registered. Install Koan.AI.Eval.Metrics " +
-        "for text metrics or implement IMetricComputer.";
+        "No metric computers registered. Implement IMetricComputer and register via DI " +
+        "to enable metric evaluation.";
 
     private readonly IReadOnlyList<IMetricComputer> _computers;
 

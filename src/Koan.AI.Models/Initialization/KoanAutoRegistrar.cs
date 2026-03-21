@@ -24,7 +24,6 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
     public void Describe(ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
         module.Describe(ModuleVersion);
-        module.AddNote("Model catalog registered (local catalog via Entity<ModelEntry>).");
-        module.AddNote("Remote operations (Pull, Convert, Deploy) require extension packages.");
+        module.AddNote("Model catalog registered (adapter-first resolution via IAiAdapterRegistry, Entity<ModelEntry> catalog).");
     }
 }

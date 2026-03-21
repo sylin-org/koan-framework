@@ -12,7 +12,7 @@ public interface IModelService
     // Discovery
     Task<IReadOnlyList<ModelEntry>> SearchAsync(string query, string? source, CancellationToken ct);
     Task<IReadOnlyList<ModelEntry>> SearchAsync(ModelQuery query, CancellationToken ct);
-    Task<ModelEntry> PullAsync(string id, ModelFormat? format, IProgress<ModelPullProgress>? progress, CancellationToken ct);
+    Task<ModelEntry> PullAsync(string id, string? to = null, ModelFormat? format = null, IProgress<ModelPullProgress>? progress = null, CancellationToken ct = default);
     Task<ModelEntry?> InspectAsync(string id, CancellationToken ct);
 
     // Transformation
