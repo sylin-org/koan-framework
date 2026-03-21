@@ -100,12 +100,17 @@ body {
     border-left: 1px solid var(--surface-border);
     overflow-y: auto;
     flex-shrink: 0;
-    display: none;
-    transition: width var(--transition-normal);
+    transform: translateX(100%);
+    transition: transform var(--transition-normal);
+    position: fixed;
+    right: 0;
+    top: 52px;
+    bottom: 24px;
+    z-index: 5;
 }
 
 .detail-panel.open {
-    display: block;
+    transform: translateX(0);
 }
 
 /* Status bar */
@@ -139,4 +144,20 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
     background: var(--text-tertiary);
+}
+
+/* ─── Responsive ───────────────────────────────────────── */
+
+@media (max-width: 1200px) {
+    .detail-panel { width: 320px; }
+}
+
+@media (max-width: 900px) {
+    .sidebar { width: 200px; }
+    .detail-panel { display: none !important; }
+}
+
+@media (max-width: 600px) {
+    .sidebar { display: none; }
+    .app-header { padding: var(--space-2); }
 }

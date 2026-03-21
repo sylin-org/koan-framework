@@ -13,6 +13,10 @@ public static partial class HtmlStripper
         if (string.IsNullOrWhiteSpace(html))
             return "";
 
+        // Limit input to prevent ReDoS on extremely large documents
+        if (html.Length > 500_000)
+            html = html[..500_000];
+
         // Remove entire script/style/nav/footer blocks
         var cleaned = ScriptPattern().Replace(html, " ");
         cleaned = StylePattern().Replace(cleaned, " ");

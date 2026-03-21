@@ -25,7 +25,7 @@ builder.Services.AddScoped<IContentExtractor, AiFallbackExtractor>();
 
 // Application services
 builder.Services.AddScoped<INoteIngestionService, NoteIngestionService>();
-builder.Services.AddSingleton<IPulseService, PulseService>();
+builder.Services.AddScoped<IPulseService, PulseService>();
 
 // Source pull adapters
 builder.Services.AddHttpClient();
@@ -47,7 +47,9 @@ builder.Services.AddSignalR();
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
-        policy.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader());
+        policy.WithOrigins("http://localhost:5087", "http://127.0.0.1:5087")
+              .AllowAnyMethod()
+              .AllowAnyHeader());
 });
 
 var app = builder.Build();

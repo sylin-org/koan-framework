@@ -1,9 +1,14 @@
 /**
  * NoteList - Main content area showing note cards
  * Switches between Pulse view and Search results
+ *
+ * NOTE (U31): innerHTML re-creates entire DOM on each render.
+ * A virtual DOM or targeted update approach would improve performance
+ * for large lists but is acceptable overhead for this sample app.
  */
 
 import { Events } from '../utils/EventBus.js';
+import { escapeHtml, escapeAttr } from '../utils/html.js';
 
 const ORIGIN_LABELS = {
     Upload: 'Upload',
@@ -75,21 +80,25 @@ export class NoteList {
         const date = note.createdAt ? this.formatDate(note.createdAt) : '';
         const isSelected = note.id === this.selectedNoteId;
 
+        // U27: tabindex and role for keyboard navigation
         return `
-            <div class="note-card ${isSelected ? 'selected' : ''}" data-note-id="${this.escapeAttr(note.id)}">
+            <div class="note-card ${isSelected ? 'selected' : ''}"
+                 data-note-id="${escapeAttr(note.id)}"
+                 tabindex="0"
+                 role="button">
                 <div class="note-card-header">
-                    <div class="note-card-title">${this.escapeHtml(title)}</div>
+                    <div class="note-card-title">${escapeHtml(title)}</div>
                     <span class="note-card-origin ${originClass}">${originLabel}</span>
                 </div>
-                ${summary ? `<div class="note-card-summary">${this.escapeHtml(summary)}</div>` : ''}
+                ${summary ? `<div class="note-card-summary">${escapeHtml(summary)}</div>` : ''}
                 ${concepts.length > 0 ? `
                     <div class="note-card-tags">
-                        ${concepts.slice(0, 4).map(c => `<span class="tag">${this.escapeHtml(c)}</span>`).join('')}
+                        ${concepts.slice(0, 4).map(c => `<span class="tag">${escapeHtml(c)}</span>`).join('')}
                         ${concepts.length > 4 ? `<span class="tag">+${concepts.length - 4}</span>` : ''}
                     </div>
                 ` : ''}
                 <div class="note-card-footer">
-                    ${category ? `<span class="note-card-category">${this.escapeHtml(category)}</span>` : '<span></span>'}
+                    ${category ? `<span class="note-card-category">${escapeHtml(category)}</span>` : '<span></span>'}
                     <span>${date}</span>
                 </div>
             </div>
@@ -98,9 +107,17 @@ export class NoteList {
 
     bindCardEvents() {
         this.container.querySelectorAll('.note-card').forEach(card => {
-            card.addEventListener('click', () => {
+            const handler = () => {
                 const noteId = card.dataset.noteId;
                 this.selectNote(noteId);
+            };
+            card.addEventListener('click', handler);
+            // U27: Keyboard support
+            card.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    handler();
+                }
             });
         });
     }
@@ -125,7 +142,7 @@ export class NoteList {
         const headerHtml = `
             <div class="search-results-header">
                 <span>
-                    <span class="search-results-query">"${this.escapeHtml(data.query)}"</span>
+                    <span class="search-results-query">"${escapeHtml(data.query)}"</span>
                     &mdash; ${data.count} result${data.count !== 1 ? 's' : ''}
                 </span>
             </div>
@@ -137,7 +154,7 @@ export class NoteList {
                 <div class="empty-state">
                     <div class="empty-state-icon">&#9888;</div>
                     <p>Search failed</p>
-                    <p class="text-sm text-tertiary">${this.escapeHtml(data.error)}</p>
+                    <p class="text-sm text-tertiary">${escapeHtml(data.error)}</p>
                 </div>
             `;
             return;
@@ -173,15 +190,5 @@ export class NoteList {
         } catch {
             return '';
         }
-    }
-
-    escapeHtml(str) {
-        const div = document.createElement('div');
-        div.textContent = str || '';
-        return div.innerHTML;
-    }
-
-    escapeAttr(str) {
-        return String(str || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     }
 }

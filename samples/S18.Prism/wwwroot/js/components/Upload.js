@@ -3,21 +3,24 @@
  */
 
 import { Events } from '../utils/EventBus.js';
+import { escapeHtml, escapeAttr } from '../utils/html.js';
+
+const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
 
 export class Upload {
     constructor(app) {
         this.app = app;
         this.modal = document.getElementById('upload-modal');
         this.activeTab = 'file';
+        this.addButton = document.getElementById('btn-add');
 
         this.setupAddButton();
         this.setupModal();
     }
 
     setupAddButton() {
-        const addBtn = document.getElementById('btn-add');
-        if (addBtn) {
-            addBtn.addEventListener('click', () => this.open());
+        if (this.addButton) {
+            this.addButton.addEventListener('click', () => this.open());
         }
     }
 
@@ -83,17 +86,49 @@ export class Upload {
                 this.close();
             }
         });
+
+        // U26: Trap Tab key within modal
+        this.modal.addEventListener('keydown', (e) => {
+            if (e.key !== 'Tab' || this.modal.hidden) return;
+
+            const focusable = this.modal.querySelectorAll(
+                'button:not([hidden]), input:not([hidden]), select:not([hidden]), textarea:not([hidden]), a[href]'
+            );
+            if (focusable.length === 0) return;
+
+            const first = focusable[0];
+            const last = focusable[focusable.length - 1];
+
+            if (e.shiftKey) {
+                if (document.activeElement === first) {
+                    e.preventDefault();
+                    last.focus();
+                }
+            } else {
+                if (document.activeElement === last) {
+                    e.preventDefault();
+                    first.focus();
+                }
+            }
+        });
     }
 
     open() {
         this.updateSpaceOptions();
         this.modal.hidden = false;
         this.resetState();
+
+        // U26: Focus the first interactive element
+        const firstInput = this.modal.querySelector('.tab-panel.active input, .tab-panel.active textarea, .drop-zone');
+        if (firstInput) firstInput.focus();
     }
 
     close() {
         this.modal.hidden = true;
         this.resetState();
+
+        // U26: Return focus to the Add button
+        if (this.addButton) this.addButton.focus();
     }
 
     resetState() {
@@ -114,15 +149,22 @@ export class Upload {
         if (urlInput) urlInput.value = '';
 
         const dropZone = document.getElementById('drop-zone');
-        if (dropZone) dropZone.querySelector('p').textContent = 'Drop files here or click to browse';
+        if (dropZone) dropZone.querySelector('p').textContent =
+            'Drop files here or click to browse (PDF, Text, Markdown, CSV, JSON, HTML)';
+
+        // U16: Remove indeterminate class
+        const bar = document.getElementById('upload-progress-bar');
+        if (bar) bar.classList.remove('indeterminate');
     }
 
     switchTab(tabName) {
         this.activeTab = tabName;
 
-        // Update tab buttons
+        // Update tab buttons (U25: aria-selected)
         this.modal.querySelectorAll('.tab').forEach(tab => {
-            tab.classList.toggle('active', tab.dataset.tab === tabName);
+            const isActive = tab.dataset.tab === tabName;
+            tab.classList.toggle('active', isActive);
+            tab.setAttribute('aria-selected', isActive ? 'true' : 'false');
         });
 
         // Update panels
@@ -139,18 +181,34 @@ export class Upload {
         const currentSpace = this.app.state.get('currentSpace');
 
         select.innerHTML = spaces.map(s => `
-            <option value="${this.escapeAttr(s.id)}" ${s.id === currentSpace ? 'selected' : ''}>
-                ${this.escapeHtml(s.name)}
+            <option value="${escapeAttr(s.id)}" ${s.id === currentSpace ? 'selected' : ''}>
+                ${escapeHtml(s.name)}
             </option>
         `).join('');
     }
 
     handleFiles(fileList) {
-        this.pendingFiles = fileList;
+        // U4: Client-side size check
+        const validFiles = [];
+        for (const file of fileList) {
+            if (file.size > MAX_FILE_SIZE) {
+                this.app.showToast(`File too large: ${file.name} (max 50MB)`, 'error');
+            } else {
+                validFiles.push(file);
+            }
+        }
+
+        if (validFiles.length === 0) {
+            this.pendingFiles = null;
+            return;
+        }
+
+        this.pendingFiles = validFiles;
         const dropZone = document.getElementById('drop-zone');
         if (dropZone) {
-            const names = Array.from(fileList).map(f => f.name).join(', ');
-            dropZone.querySelector('p').textContent = `${fileList.length} file${fileList.length > 1 ? 's' : ''}: ${names}`;
+            const names = validFiles.map(f => f.name).join(', ');
+            dropZone.querySelector('p').textContent =
+                `${validFiles.length} file${validFiles.length > 1 ? 's' : ''}: ${names}`;
         }
     }
 
@@ -178,6 +236,7 @@ export class Upload {
         } catch (error) {
             console.error('[Upload] Submit failed:', error);
             this.setStatus(`Error: ${error.message}`);
+            this.app.showToast(`Upload failed: ${error.message}`, 'error');
             this.app.events.emit(Events.UPLOAD_ERROR, error.message);
         }
     }
@@ -206,6 +265,7 @@ export class Upload {
         }
 
         this.setStatus('Upload complete');
+        this.app.showToast('Upload complete', 'success');
         this.app.events.emit(Events.UPLOAD_COMPLETE);
         this.app.events.emit(Events.NOTE_CREATED);
 
@@ -223,13 +283,16 @@ export class Upload {
             return;
         }
 
+        // U16: Use indeterminate progress for text submissions
         this.setProgress(true);
+        this.setIndeterminate(true);
         this.setStatus('Ingesting text...');
         this.app.events.emit(Events.UPLOAD_STARTED);
 
         await this.app.api.post('/api/notes/text', { spaceId, text, title });
 
         this.setStatus('Text added');
+        this.app.showToast('Text added', 'success');
         this.app.events.emit(Events.UPLOAD_COMPLETE);
         this.app.events.emit(Events.NOTE_CREATED);
 
@@ -245,13 +308,16 @@ export class Upload {
             return;
         }
 
+        // U16: Use indeterminate progress for URL submissions
         this.setProgress(true);
+        this.setIndeterminate(true);
         this.setStatus('Fetching URL...');
         this.app.events.emit(Events.UPLOAD_STARTED);
 
         await this.app.api.post('/api/notes/url', { spaceId, url });
 
         this.setStatus('URL ingested');
+        this.app.showToast('URL ingested', 'success');
         this.app.events.emit(Events.UPLOAD_COMPLETE);
         this.app.events.emit(Events.NOTE_CREATED);
 
@@ -261,12 +327,21 @@ export class Upload {
     setProgress(visible) {
         const el = document.getElementById('upload-progress');
         if (el) el.classList.toggle('hidden', !visible);
-        if (!visible) this.setProgressValue(0);
+        if (!visible) {
+            this.setProgressValue(0);
+            this.setIndeterminate(false);
+        }
     }
 
     setProgressValue(pct) {
         const bar = document.getElementById('upload-progress-bar');
         if (bar) bar.style.width = `${Math.round(pct)}%`;
+    }
+
+    // U16: Indeterminate progress for text/URL uploads
+    setIndeterminate(on) {
+        const bar = document.getElementById('upload-progress-bar');
+        if (bar) bar.classList.toggle('indeterminate', on);
     }
 
     setStatus(msg) {
@@ -275,15 +350,5 @@ export class Upload {
             el.textContent = msg;
             el.classList.toggle('hidden', !msg);
         }
-    }
-
-    escapeHtml(str) {
-        const div = document.createElement('div');
-        div.textContent = str || '';
-        return div.innerHTML;
-    }
-
-    escapeAttr(str) {
-        return String(str || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     }
 }

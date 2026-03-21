@@ -3,6 +3,7 @@
  */
 
 import { Events } from '../utils/EventBus.js';
+import { escapeHtml, escapeAttr } from '../utils/html.js';
 
 export class NoteDetail {
     constructor(app) {
@@ -12,6 +13,14 @@ export class NoteDetail {
 
         this.app.events.on(Events.NOTE_SELECTED, (noteId) => this.loadNote(noteId));
         this.app.events.on(Events.NOTE_DESELECTED, () => this.close());
+
+        // U6: Global Escape listener to close detail panel
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && this.panel.classList.contains('open')) {
+                this.close();
+                this.app.events.emit(Events.NOTE_DESELECTED);
+            }
+        });
     }
 
     async loadNote(noteId) {
@@ -22,6 +31,7 @@ export class NoteDetail {
             this.open();
         } catch (error) {
             console.error('[NoteDetail] Failed to load note:', error);
+            this.app.showToast('Failed to load note', 'error');
         }
     }
 
@@ -57,7 +67,7 @@ export class NoteDetail {
         this.panel.innerHTML = `
             <div class="fade-in">
                 <div class="detail-header">
-                    <div class="detail-title">${this.escapeHtml(title)}</div>
+                    <div class="detail-title">${escapeHtml(title)}</div>
                     <button class="btn-close" id="btn-close-detail">&times;</button>
                 </div>
 
@@ -66,7 +76,7 @@ export class NoteDetail {
                     ${summary ? `
                         <div class="detail-section">
                             <div class="detail-section-title">Summary</div>
-                            <div class="detail-summary">${this.escapeHtml(summary)}</div>
+                            <div class="detail-summary">${escapeHtml(summary)}</div>
                         </div>
                     ` : ''}
 
@@ -83,7 +93,7 @@ export class NoteDetail {
                         <div class="detail-section">
                             <div class="detail-section-title">Key Concepts</div>
                             <div class="detail-tags">
-                                ${concepts.map(c => `<span class="tag">${this.escapeHtml(c)}</span>`).join('')}
+                                ${concepts.map(c => `<span class="tag">${escapeHtml(c)}</span>`).join('')}
                             </div>
                         </div>
                     ` : ''}
@@ -96,11 +106,11 @@ export class NoteDetail {
                         <div class="detail-section-title">Info</div>
                         <div class="detail-meta">
                             <div class="detail-meta-row">
-                                <span>Origin</span><span>${this.escapeHtml(origin)}</span>
+                                <span>Origin</span><span>${escapeHtml(origin)}</span>
                             </div>
                             ${category ? `
                                 <div class="detail-meta-row">
-                                    <span>Category</span><span>${this.escapeHtml(category)}</span>
+                                    <span>Category</span><span>${escapeHtml(category)}</span>
                                 </div>
                             ` : ''}
                             ${createdAt ? `
@@ -119,7 +129,7 @@ export class NoteDetail {
                     <!-- Source URL -->
                     ${sourceUrl ? `
                         <div class="detail-section">
-                            <a class="detail-link" href="${this.escapeAttr(sourceUrl)}"
+                            <a class="detail-link" href="${escapeAttr(sourceUrl)}"
                                target="_blank" rel="noopener noreferrer">
                                 Open original &#8599;
                             </a>
@@ -152,7 +162,7 @@ export class NoteDetail {
 
         switch (kind) {
             case 'Text':
-                return `<div class="detail-block">${this.escapeHtml(content)}</div>`;
+                return `<div class="detail-block">${escapeHtml(content)}</div>`;
 
             case 'Table':
                 return `<div class="detail-block detail-block-table">${this.renderTableContent(block)}</div>`;
@@ -160,20 +170,20 @@ export class NoteDetail {
             case 'Image':
                 return `<div class="detail-block">
                     <div class="text-xs text-tertiary mb-2">Image description</div>
-                    ${this.escapeHtml(content)}
+                    ${escapeHtml(content)}
                 </div>`;
 
             case 'Audio':
                 return `<div class="detail-block">
                     <div class="text-xs text-tertiary mb-2">Audio transcript</div>
-                    ${this.escapeHtml(content)}
+                    ${escapeHtml(content)}
                 </div>`;
 
             case 'Data':
-                return `<div class="detail-block detail-block-code"><pre>${this.escapeHtml(content)}</pre></div>`;
+                return `<div class="detail-block detail-block-code"><pre>${escapeHtml(content)}</pre></div>`;
 
             default:
-                return `<div class="detail-block">${this.escapeHtml(content)}</div>`;
+                return `<div class="detail-block">${escapeHtml(content)}</div>`;
         }
     }
 
@@ -187,11 +197,11 @@ export class NoteDetail {
                     return `
                         <table>
                             <thead>
-                                <tr>${headers.map(h => `<th>${this.escapeHtml(h)}</th>`).join('')}</tr>
+                                <tr>${headers.map(h => `<th>${escapeHtml(h)}</th>`).join('')}</tr>
                             </thead>
                             <tbody>
                                 ${data.map(row => `
-                                    <tr>${headers.map(h => `<td>${this.escapeHtml(String(row[h] ?? ''))}</td>`).join('')}</tr>
+                                    <tr>${headers.map(h => `<td>${escapeHtml(String(row[h] ?? ''))}</td>`).join('')}</tr>
                                 `).join('')}
                             </tbody>
                         </table>
@@ -201,7 +211,7 @@ export class NoteDetail {
                 // Fall through to text rendering
             }
         }
-        return `<pre>${this.escapeHtml(block.content)}</pre>`;
+        return `<pre>${escapeHtml(block.content)}</pre>`;
     }
 
     renderAnalysis(analysis) {
@@ -236,9 +246,9 @@ export class NoteDetail {
     renderAnalysisList(title, items) {
         return `
             <div class="mb-2">
-                <div class="text-xs text-tertiary mb-2">${this.escapeHtml(title)}</div>
+                <div class="text-xs text-tertiary mb-2">${escapeHtml(title)}</div>
                 <ul class="detail-analysis-list">
-                    ${items.map(item => `<li>${this.escapeHtml(item)}</li>`).join('')}
+                    ${items.map(item => `<li>${escapeHtml(item)}</li>`).join('')}
                 </ul>
             </div>
         `;
@@ -266,28 +276,17 @@ export class NoteDetail {
         }
     }
 
+    // U11: Use dedicated rate endpoint instead of PUT with full note
     async rateNote(rating) {
         if (!this.currentNote) return;
 
         try {
-            await this.app.api.put(`/api/notes/${this.currentNote.id}`, {
-                ...this.currentNote,
-                userRating: rating
-            });
+            await this.app.api.post(`/api/notes/${this.currentNote.id}/rate`, { rating });
             this.currentNote = { ...this.currentNote, userRating: rating };
             this.render();
         } catch (error) {
             console.error('[NoteDetail] Failed to rate note:', error);
+            this.app.showToast('Failed to rate note', 'error');
         }
-    }
-
-    escapeHtml(str) {
-        const div = document.createElement('div');
-        div.textContent = str || '';
-        return div.innerHTML;
-    }
-
-    escapeAttr(str) {
-        return String(str || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     }
 }

@@ -39,7 +39,7 @@ public class ResearchBriefWorker : BackgroundService
 
     private async Task ExecuteDueBriefsAsync(CancellationToken ct)
     {
-        var briefs = await ResearchBrief.Query(_ => true, ct);
+        var briefs = await ResearchBrief.Query(b => b.Enabled, ct);
 
         foreach (var brief in briefs)
         {

@@ -3,6 +3,7 @@
  */
 
 import { Events } from '../utils/EventBus.js';
+import { escapeHtml, escapeAttr } from '../utils/html.js';
 
 export class Sidebar {
     constructor(app) {
@@ -27,18 +28,25 @@ export class Sidebar {
         const spaceBriefs = briefs.filter(b => b.spaceId === currentSpaceId);
 
         this.container.innerHTML = `
+            <button class="sidebar-notes-btn" id="btn-view-notes" title="Browse all notes in this space">
+                <span>&#128196;</span>
+                <span>Notes</span>
+            </button>
+
             <div class="sidebar-section">
                 <div class="sidebar-heading">
                     <span>Spaces</span>
                     <button class="btn btn-ghost btn-sm" id="btn-add-space" title="New space">+</button>
                 </div>
-                ${spaces.map(space => `
-                    <button class="sidebar-item ${space.id === currentSpaceId ? 'active' : ''}"
-                            data-space-id="${this.escapeAttr(space.id)}">
-                        <span class="space-dot" style="background: ${this.spaceColor(space.name)}"></span>
-                        <span class="sidebar-item-label">${this.escapeHtml(space.name)}</span>
-                    </button>
-                `).join('')}
+                <div class="sidebar-items" id="spaces-list">
+                    ${spaces.map(space => `
+                        <button class="sidebar-item ${space.id === currentSpaceId ? 'active' : ''}"
+                                data-space-id="${escapeAttr(space.id)}">
+                            <span class="space-dot" style="background: ${this.spaceColor(space.name)}"></span>
+                            <span class="sidebar-item-label">${escapeHtml(space.name)}</span>
+                        </button>
+                    `).join('')}
+                </div>
             </div>
 
             <div class="sidebar-section">
@@ -49,11 +57,11 @@ export class Sidebar {
                 ${spaceSources.length === 0
                     ? '<div class="text-xs text-tertiary px-3 py-2">No sources configured</div>'
                     : spaceSources.map(source => `
-                        <div class="sidebar-item" data-source-id="${this.escapeAttr(source.id)}">
+                        <button class="sidebar-item" data-source-id="${escapeAttr(source.id)}">
                             <span class="sidebar-item-icon">${this.sourceIcon(source.type)}</span>
-                            <span class="sidebar-item-label">${this.escapeHtml(source.name)}</span>
+                            <span class="sidebar-item-label">${escapeHtml(source.name)}</span>
                             <span class="sidebar-item-count">${source.totalItemsPulled || 0}</span>
-                        </div>
+                        </button>
                     `).join('')}
             </div>
 
@@ -65,11 +73,11 @@ export class Sidebar {
                 ${spaceBriefs.length === 0
                     ? '<div class="text-xs text-tertiary px-3 py-2">No research briefs</div>'
                     : spaceBriefs.map(brief => `
-                        <div class="sidebar-item" data-brief-id="${this.escapeAttr(brief.id)}">
+                        <button class="sidebar-item" data-brief-id="${escapeAttr(brief.id)}">
                             <span class="sidebar-item-icon" style="color: var(--accent-brief)">&#9671;</span>
-                            <span class="sidebar-item-label">${this.escapeHtml(brief.name)}</span>
+                            <span class="sidebar-item-label">${escapeHtml(brief.name)}</span>
                             <span class="sidebar-item-count">${brief.totalItemsFound || 0}</span>
-                        </div>
+                        </button>
                     `).join('')}
             </div>
         `;
@@ -78,6 +86,14 @@ export class Sidebar {
     }
 
     bindEvents() {
+        // U1: Notes button
+        const notesBtn = this.container.querySelector('#btn-view-notes');
+        if (notesBtn) {
+            notesBtn.addEventListener('click', () => {
+                this.app.events.emit(Events.VIEW_NOTES);
+            });
+        }
+
         // Space selection
         this.container.querySelectorAll('[data-space-id]').forEach(el => {
             el.addEventListener('click', () => {
@@ -88,28 +104,58 @@ export class Sidebar {
             });
         });
 
-        // Add space button
+        // U2: Add space button — inline input instead of prompt()
         const addBtn = this.container.querySelector('#btn-add-space');
         if (addBtn) {
-            addBtn.addEventListener('click', () => this.promptNewSpace());
+            addBtn.addEventListener('click', () => {
+                const list = this.container.querySelector('#spaces-list');
+                if (!list || list.querySelector('.space-name-input')) return;
+
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.className = 'space-name-input';
+                input.placeholder = 'Space name...';
+                input.addEventListener('keydown', async (e) => {
+                    if (e.key === 'Enter' && input.value.trim()) {
+                        await this.createSpace(input.value.trim());
+                        input.remove();
+                    }
+                    if (e.key === 'Escape') input.remove();
+                });
+                input.addEventListener('blur', () => setTimeout(() => input.remove(), 200));
+                list.prepend(input);
+                input.focus();
+            });
         }
+
+        // U7: Source item click handlers
+        this.container.querySelectorAll('[data-source-id]').forEach(el => {
+            el.addEventListener('click', () => {
+                this.app.events.emit(Events.SOURCE_SELECTED, el.dataset.sourceId);
+            });
+        });
+
+        // U7: Brief item click handlers
+        this.container.querySelectorAll('[data-brief-id]').forEach(el => {
+            el.addEventListener('click', () => {
+                this.app.events.emit(Events.BRIEF_SELECTED, el.dataset.briefId);
+            });
+        });
     }
 
-    async promptNewSpace() {
-        const name = prompt('New space name:');
-        if (!name || !name.trim()) return;
-
+    // U2: Create space via API (replaces promptNewSpace)
+    async createSpace(name) {
         try {
-            const space = await this.app.api.post('/api/spaces', {
-                name: name.trim()
-            });
+            const space = await this.app.api.post('/api/spaces', { name });
             const spaces = this.app.state.get('spaces') || [];
             this.app.state.set('spaces', [...spaces, space]);
             this.app.state.set('currentSpace', space.id);
             this.app.events.emit(Events.SPACE_CREATED, space);
             this.app.events.emit(Events.SPACE_SELECTED, space.id);
+            this.app.showToast(`Space "${name}" created`, 'success');
         } catch (error) {
             console.error('[Sidebar] Failed to create space:', error);
+            this.app.showToast('Failed to create space', 'error');
         }
     }
 
@@ -119,6 +165,7 @@ export class Sidebar {
             this.app.state.set('spaces', spaces);
         } catch (e) {
             console.error('[Sidebar] Failed to reload spaces:', e);
+            this.app.showToast('Failed to reload spaces', 'error');
         }
         this.render();
     }
@@ -153,15 +200,5 @@ export class Sidebar {
             Web: '&#127760;'
         };
         return icons[type] || '&#9679;';
-    }
-
-    escapeHtml(str) {
-        const div = document.createElement('div');
-        div.textContent = str;
-        return div.innerHTML;
-    }
-
-    escapeAttr(str) {
-        return String(str).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     }
 }

@@ -16,6 +16,11 @@ public sealed class HackerNewsPullAdapter : ISourcePullAdapter
     private const string ItemUrl = "https://hacker-news.firebaseio.com/v0/item/{0}.json";
     private const int MaxStoriesToFetch = 50;
 
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true
+    };
+
     public HackerNewsPullAdapter(IHttpClientFactory httpFactory, ILogger<HackerNewsPullAdapter> logger)
     {
         _httpFactory = httpFactory;
@@ -39,6 +44,13 @@ public sealed class HackerNewsPullAdapter : ISourcePullAdapter
         // Take first N to avoid hammering the API
         var candidateIds = ids.Take(MaxStoriesToFetch).ToList();
 
+        // Pre-fetch existing source URLs for this source to avoid N+1 queries
+        var existingNotes = await Note.Query(
+            n => n.SourceId == source.Id.ToString(), ct);
+        var existingUrls = new HashSet<string>(
+            existingNotes.Where(n => n.SourceUrl is not null).Select(n => n.SourceUrl!),
+            StringComparer.OrdinalIgnoreCase);
+
         var notes = new List<Note>();
 
         foreach (var id in candidateIds)
@@ -59,14 +71,13 @@ public sealed class HackerNewsPullAdapter : ISourcePullAdapter
 
                 // Skip duplicates
                 var storyUrl = story.Url ?? $"https://news.ycombinator.com/item?id={id}";
-                var existing = await Note.Query(n => n.SourceUrl == storyUrl, ct);
-                if (existing.Count > 0)
+                if (existingUrls.Contains(storyUrl))
                     continue;
 
                 var contentText = $"Score: {story.Score} | Comments: {story.Descendants}\n\n";
 
                 // Optionally fetch page content if URL present
-                if (!string.IsNullOrEmpty(story.Url))
+                if (!string.IsNullOrEmpty(story.Url) && UrlValidator.IsSafeUrl(story.Url))
                 {
                     try
                     {
@@ -133,10 +144,7 @@ public sealed class HackerNewsPullAdapter : ISourcePullAdapter
     {
         var url = string.Format(ItemUrl, id);
         var json = await http.GetStringAsync(url, ct);
-        return JsonSerializer.Deserialize<HnStory>(json, new JsonSerializerOptions
-        {
-            PropertyNameCaseInsensitive = true
-        });
+        return JsonSerializer.Deserialize<HnStory>(json, JsonOptions);
     }
 
     private static bool MatchesKeywords(HnStory story, List<string> keywords)

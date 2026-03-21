@@ -30,6 +30,9 @@ public class FindingsController : EntityController<ResearchFinding>
             if (finding is null)
                 return NotFound(new { Error = $"Finding '{id}' not found" });
 
+            if (finding.Status is FindingStatus.Approved or FindingStatus.Dismissed)
+                return Conflict(new { Error = $"Finding '{id}' is already {finding.Status}" });
+
             finding.Status = FindingStatus.Approved;
             finding.ReviewStatus = Koan.AI.Review.ReviewStatus.Approved;
             finding.ReviewedAt = DateTime.UtcNow;
@@ -61,6 +64,9 @@ public class FindingsController : EntityController<ResearchFinding>
             var finding = await ResearchFinding.Get(id, ct);
             if (finding is null)
                 return NotFound(new { Error = $"Finding '{id}' not found" });
+
+            if (finding.Status is FindingStatus.Approved or FindingStatus.Dismissed)
+                return Conflict(new { Error = $"Finding '{id}' is already {finding.Status}" });
 
             finding.Status = FindingStatus.Dismissed;
             finding.ReviewStatus = Koan.AI.Review.ReviewStatus.Rejected;

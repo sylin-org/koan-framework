@@ -92,8 +92,11 @@ public class PulseService : IPulseService
         if (notes.Count == 0)
             return "No items.";
 
-        var prompt = $"Summarize these {notes.Count} {origin} items in one sentence: " +
-                     string.Join("; ", notes.Select(n => n.Title ?? n.Summary ?? "untitled"));
+        var titles = string.Join("; ", notes.Take(20).Select(n => n.Title ?? n.Summary ?? "untitled"));
+        if (titles.Length > 2000)
+            titles = titles[..2000] + "...";
+
+        var prompt = $"Summarize these {notes.Count} {origin} items in one sentence: " + titles;
 
         try
         {

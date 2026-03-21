@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Prism — Personal Knowledge Intelligence</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#9672;</text></svg>">
     <link rel="stylesheet" href="/css/design-tokens.css">
     <link rel="stylesheet" href="/css/layout.css">
     <link rel="stylesheet" href="/css/components.css">
@@ -17,18 +18,18 @@
                     <span class="logo-icon">&#9672;</span> Prism
                 </h1>
             </div>
-            <div class="header-center" id="search-bar">
+            <div class="header-center" id="search-bar" role="search">
                 <!-- SearchBar component renders here -->
             </div>
             <div class="header-right">
                 <button class="btn btn-primary" id="btn-add">
-                    <span class="btn-icon">+</span> Add
+                    <span class="btn-icon">+</span> Add Note
                 </button>
             </div>
         </header>
 
         <div class="app-content">
-            <aside class="sidebar" id="sidebar">
+            <aside class="sidebar" id="sidebar" role="navigation" aria-label="Spaces">
                 <!-- Sidebar component renders here -->
             </aside>
 
@@ -36,7 +37,7 @@
                 <!-- NoteList or Pulse component renders here -->
             </main>
 
-            <aside class="detail-panel" id="detail-panel">
+            <aside class="detail-panel" id="detail-panel" role="complementary" aria-label="Note details">
                 <!-- NoteDetail component renders here -->
             </aside>
         </div>
@@ -49,29 +50,30 @@
 
     <!-- Upload modal -->
     <div class="modal-overlay" id="upload-modal" hidden>
-        <div class="modal">
+        <div class="modal" role="dialog" aria-modal="true" aria-label="Add to Prism">
             <div class="modal-header">
                 <h2>Add to Prism</h2>
                 <button class="btn-close" id="btn-close-upload">&times;</button>
             </div>
             <div class="modal-body">
-                <div class="upload-tabs">
-                    <button class="tab active" data-tab="file">File</button>
-                    <button class="tab" data-tab="text">Text</button>
-                    <button class="tab" data-tab="url">URL</button>
+                <div class="upload-tabs" role="tablist">
+                    <button class="tab active" data-tab="file" role="tab" aria-selected="true">File</button>
+                    <button class="tab" data-tab="text" role="tab" aria-selected="false">Text</button>
+                    <button class="tab" data-tab="url" role="tab" aria-selected="false">URL</button>
                 </div>
                 <div class="upload-content">
-                    <div class="tab-panel active" data-panel="file">
+                    <div class="tab-panel active" data-panel="file" role="tabpanel">
                         <div class="drop-zone" id="drop-zone">
-                            <p>Drop files here or click to browse</p>
-                            <input type="file" id="file-input" multiple hidden>
+                            <p>Drop files here or click to browse (PDF, Text, Markdown, CSV, JSON, HTML)</p>
+                            <input type="file" id="file-input" multiple hidden
+                                   accept=".pdf,.txt,.md,.csv,.json,.html,.xml,.epub,.docx">
                         </div>
                     </div>
-                    <div class="tab-panel" data-panel="text">
+                    <div class="tab-panel" data-panel="text" role="tabpanel">
                         <textarea id="text-input" placeholder="Paste text, notes, code..." rows="10"></textarea>
                         <input type="text" id="text-title" placeholder="Title (optional)">
                     </div>
-                    <div class="tab-panel" data-panel="url">
+                    <div class="tab-panel" data-panel="url" role="tabpanel">
                         <input type="url" id="url-input" placeholder="https://...">
                     </div>
                 </div>
@@ -88,6 +90,7 @@
         </div>
     </div>
 
+    <div id="toast-container"></div>
     <script src="/js/app.js" type="module"></script>
 </body>
 </html>

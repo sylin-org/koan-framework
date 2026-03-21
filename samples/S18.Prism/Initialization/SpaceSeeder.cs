@@ -9,22 +9,36 @@ public static class SpaceSeeder
     {
         logger.LogInformation("Seeding default spaces...");
 
-        var existing = await Space.All();
-        if (existing.Any())
+        for (var attempt = 0; attempt < 5; attempt++)
         {
-            logger.LogInformation("Spaces already seeded ({Count} spaces found)", existing.Count);
-            return;
+            try
+            {
+                var existing = await Space.All();
+                if (existing.Any())
+                {
+                    logger.LogInformation("Spaces already seeded ({Count} spaces found)", existing.Count);
+                    return;
+                }
+
+                var defaultSpace = new Space
+                {
+                    Name = "Personal",
+                    Description = "Your private knowledge base",
+                    Access = SpaceAccess.Private
+                };
+
+                await defaultSpace.Save();
+                logger.LogInformation("Seeded default space: {SpaceName} ({SpaceId})",
+                    defaultSpace.Name, defaultSpace.Id);
+                return;
+            }
+            catch (Exception ex) when (attempt < 4)
+            {
+                logger.LogWarning(
+                    "Seeder attempt {Attempt} failed, retrying in 3s: {Error}",
+                    attempt + 1, ex.Message);
+                await Task.Delay(3000);
+            }
         }
-
-        var defaultSpace = new Space
-        {
-            Name = "Personal",
-            Description = "Your private knowledge base",
-            Access = SpaceAccess.Private
-        };
-
-        await defaultSpace.Save();
-        logger.LogInformation("Seeded default space: {SpaceName} ({SpaceId})",
-            defaultSpace.Name, defaultSpace.Id);
     }
 }

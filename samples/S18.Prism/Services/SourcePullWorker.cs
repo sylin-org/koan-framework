@@ -73,9 +73,9 @@ public class SourcePullWorker : BackgroundService
                 source.LastPulledAt = DateTime.UtcNow;
                 source.TotalItemsPulled += notes.Count;
 
-                // Clear immediate flag after execution
+                // Clear immediate flag after execution (no interval = won't re-run automatically)
                 if (source.Schedule.Immediate)
-                    source.Schedule = Schedule.Daily;
+                    source.Schedule = new Schedule { Immediate = false };
 
                 await source.Save(ct);
 

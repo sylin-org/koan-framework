@@ -1,8 +1,9 @@
 /**
- * SearchBar - Top search with space selector and lens selector
+ * SearchBar - Top search with space selector
  */
 
 import { Events } from '../utils/EventBus.js';
+import { escapeHtml, escapeAttr } from '../utils/html.js';
 
 export class SearchBar {
     constructor(app) {
@@ -12,6 +13,14 @@ export class SearchBar {
 
         this.app.events.on(Events.SPACES_LOADED, () => this.updateSpaceOptions());
 
+        // U18: Sync space dropdown with sidebar selection
+        this.app.events.on(Events.SPACE_SELECTED, (spaceId) => {
+            const spaceSelect = this.container.querySelector('#search-space-select');
+            if (spaceSelect) {
+                spaceSelect.value = spaceId || '';
+            }
+        });
+
         this.render();
     }
 
@@ -19,6 +28,7 @@ export class SearchBar {
         const spaces = this.app.state.get('spaces') || [];
         const currentSpace = this.app.state.get('currentSpace');
 
+        // U5: Lens dropdown removed — non-functional UI should not ship
         this.container.innerHTML = `
             <div class="search-container">
                 <div class="search-input-wrap">
@@ -27,22 +37,16 @@ export class SearchBar {
                            class="search-input"
                            id="search-input"
                            placeholder="Search notes, concepts, sources..."
+                           aria-label="Search notes"
                            autocomplete="off">
                 </div>
                 <select class="search-select" id="search-space-select" title="Filter by space">
                     <option value="">All spaces</option>
                     ${spaces.map(s => `
-                        <option value="${this.escapeAttr(s.id)}" ${s.id === currentSpace ? 'selected' : ''}>
-                            ${this.escapeHtml(s.name)}
+                        <option value="${escapeAttr(s.id)}" ${s.id === currentSpace ? 'selected' : ''}>
+                            ${escapeHtml(s.name)}
                         </option>
                     `).join('')}
-                </select>
-                <select class="search-select" id="search-lens-select" title="Lens">
-                    <option value="">All</option>
-                    <option value="research">Research</option>
-                    <option value="write">Write</option>
-                    <option value="ops">Ops</option>
-                    <option value="learn">Learn</option>
                 </select>
             </div>
         `;
@@ -110,6 +114,7 @@ export class SearchBar {
                 `Found ${result.count} result${result.count !== 1 ? 's' : ''} for "${query}"`);
         } catch (error) {
             console.error('[SearchBar] Search failed:', error);
+            this.app.showToast('Search failed', 'error');
             this.app.events.emit(Events.SEARCH_RESULTS, {
                 query,
                 count: 0,
@@ -130,15 +135,5 @@ export class SearchBar {
     updateSpaceOptions() {
         // Re-render to pick up new spaces
         this.render();
-    }
-
-    escapeHtml(str) {
-        const div = document.createElement('div');
-        div.textContent = str;
-        return div.innerHTML;
-    }
-
-    escapeAttr(str) {
-        return String(str).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     }
 }

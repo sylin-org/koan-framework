@@ -28,13 +28,21 @@ public sealed class FolderWatchPullAdapter : ISourcePullAdapter
             return [];
         }
 
-        if (!Directory.Exists(config.Path))
+        var fullPath = Path.GetFullPath(config.Path);
+        var allowedBases = new[] { Directory.GetCurrentDirectory(), "/app/storage", "/app/data" };
+        if (!allowedBases.Any(b => fullPath.StartsWith(b, StringComparison.OrdinalIgnoreCase)))
         {
-            _logger.LogWarning("FolderWatch path does not exist: {Path}", config.Path);
+            _logger.LogWarning("Path {Path} is outside allowed directories", config.Path);
             return [];
         }
 
-        _logger.LogInformation("Scanning folder {Path} with pattern {Pattern}", config.Path, config.Pattern);
+        if (!Directory.Exists(fullPath))
+        {
+            _logger.LogWarning("FolderWatch path does not exist: {Path}", fullPath);
+            return [];
+        }
+
+        _logger.LogInformation("Scanning folder {Path} with pattern {Pattern}", fullPath, config.Pattern);
 
         // Resolve glob pattern: support simple patterns like "*.md" or "**/*.md"
         var searchPattern = ExtractSearchPattern(config.Pattern);
@@ -42,7 +50,14 @@ public sealed class FolderWatchPullAdapter : ISourcePullAdapter
             ? SearchOption.AllDirectories
             : SearchOption.TopDirectoryOnly;
 
-        var files = Directory.GetFiles(config.Path, searchPattern, searchOption);
+        var files = Directory.GetFiles(fullPath, searchPattern, searchOption);
+
+        // Pre-fetch all existing notes for this source to avoid N+1 queries
+        var existingNotes = await Note.Query(
+            n => n.SourceId == source.Id.ToString(), ct);
+        var existingByUrl = existingNotes
+            .Where(n => n.SourceUrl is not null)
+            .ToDictionary(n => n.SourceUrl!, StringComparer.OrdinalIgnoreCase);
 
         var notes = new List<Note>();
 
@@ -59,13 +74,11 @@ public sealed class FolderWatchPullAdapter : ISourcePullAdapter
                     fileInfo.LastWriteTimeUtc <= source.LastPulledAt.Value)
                     continue;
 
-                // Skip duplicates by source URL (use file path as URL)
+                // Check for existing note by source URL (use file path as URL)
                 var fileUrl = new Uri(filePath).AbsoluteUri;
-                var existing = await Note.Query(n => n.SourceUrl == fileUrl, ct);
-                if (existing.Count > 0)
+                if (existingByUrl.TryGetValue(fileUrl, out var existingNote))
                 {
                     // If file was modified, update the existing note's content
-                    var existingNote = existing[0];
                     var updatedContent = await File.ReadAllTextAsync(filePath, ct);
                     existingNote.Blocks =
                     [

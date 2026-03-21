@@ -28,6 +28,9 @@ public class SearchController : ControllerBase
             if (string.IsNullOrWhiteSpace(request.Query))
                 return BadRequest(new { Error = "query is required" });
 
+            var limit = Math.Clamp(request.Limit, 1, 200);
+            var offset = Math.Max(request.Offset, 0);
+
             _logger.LogInformation(
                 "Searching for '{Query}' in spaces [{Spaces}]",
                 request.Query,
@@ -36,16 +39,18 @@ public class SearchController : ControllerBase
             // Text-based search across notes (vector search will be wired when embeddings are populated)
             var notes = request.SpaceIds is { Count: > 0 }
                 ? await Note.Query(n => request.SpaceIds.Contains(n.SpaceId), ct)
-                : await Note.All(ct);
+                : await Note.Query(n =>
+                    (n.Title != null && n.Title.Contains(request.Query)) ||
+                    (n.Summary != null && n.Summary.Contains(request.Query)), ct);
 
-            var queryLower = request.Query.ToLowerInvariant();
             var results = notes
                 .Where(n =>
                     (n.Title?.Contains(request.Query, StringComparison.OrdinalIgnoreCase) ?? false) ||
                     n.KeyConcepts.Any(c => c.Contains(request.Query, StringComparison.OrdinalIgnoreCase)) ||
                     (n.Summary?.Contains(request.Query, StringComparison.OrdinalIgnoreCase) ?? false) ||
                     n.Blocks.Any(b => b.Content.Contains(request.Query, StringComparison.OrdinalIgnoreCase)))
-                .Take(request.MaxResults)
+                .Skip(offset)
+                .Take(limit)
                 .Select(n => new
                 {
                     n.Id,
@@ -54,6 +59,7 @@ public class SearchController : ControllerBase
                     n.SpaceId,
                     n.KeyConcepts,
                     n.Category,
+                    n.Origin,
                     n.CreatedAt
                 })
                 .ToList();
@@ -77,5 +83,6 @@ public class SearchRequest
 {
     public string Query { get; set; } = "";
     public List<string>? SpaceIds { get; set; }
-    public int MaxResults { get; set; } = 20;
+    public int Limit { get; set; } = 50;
+    public int Offset { get; set; }
 }

@@ -87,6 +87,9 @@ public sealed class ModelCrawlerWorker : BackgroundService
                 var (newCount, updatedCount) = await CrawlCategoryAsync(category, ct);
                 totalNew += newCount;
                 totalUpdated += updatedCount;
+
+                // Rate limit between category fetches
+                await Task.Delay(500, ct);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {

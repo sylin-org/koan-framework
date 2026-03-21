@@ -31,6 +31,12 @@ public sealed class WebPullAdapter : ISourcePullAdapter
             return [];
         }
 
+        if (!UrlValidator.IsSafeUrl(config.Url))
+        {
+            _logger.LogWarning("Blocked unsafe URL: {Url}", config.Url);
+            return [];
+        }
+
         // Skip if already fetched (Web is one-off)
         var existing = await Note.Query(n => n.SourceUrl == config.Url, ct);
         if (existing.Count > 0)

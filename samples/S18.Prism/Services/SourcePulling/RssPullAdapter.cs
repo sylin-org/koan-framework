@@ -34,6 +34,12 @@ public sealed class RssPullAdapter : ISourcePullAdapter
             return [];
         }
 
+        if (!UrlValidator.IsSafeUrl(config.FeedUrl))
+        {
+            _logger.LogWarning("Blocked unsafe URL: {Url}", config.FeedUrl);
+            return [];
+        }
+
         _logger.LogInformation("Fetching RSS feed from {FeedUrl}", config.FeedUrl);
 
         using var http = _httpFactory.CreateClient();
@@ -57,7 +63,7 @@ public sealed class RssPullAdapter : ISourcePullAdapter
                 .ToList();
         }
 
-        // Check for duplicates by URL
+        // Check for duplicates by URL (batched query)
         var existingUrls = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         if (items.Count > 0)
         {
@@ -66,11 +72,11 @@ public sealed class RssPullAdapter : ISourcePullAdapter
                 .Select(i => i.Url!)
                 .ToList();
 
-            foreach (var url in urlsToCheck)
+            var existingNotes = await Note.Query(n => urlsToCheck.Contains(n.SourceUrl!), ct);
+            foreach (var note in existingNotes)
             {
-                var existing = await Note.Query(n => n.SourceUrl == url, ct);
-                if (existing.Count > 0)
-                    existingUrls.Add(url);
+                if (note.SourceUrl is not null)
+                    existingUrls.Add(note.SourceUrl);
             }
         }
 

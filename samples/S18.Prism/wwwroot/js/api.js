@@ -3,6 +3,8 @@
  * Handles all HTTP requests to the backend
  */
 
+const DEFAULT_TIMEOUT = 30000;
+
 export class API {
     constructor() {
         this.baseUrl = window.location.origin;
@@ -12,86 +14,142 @@ export class API {
      * GET request
      * @param {string} url - API path
      * @param {object} params - Query parameters
+     * @param {number} timeout - Request timeout in ms (default 30s)
      * @returns {Promise<any>} Response data
      */
-    async get(url, params = {}) {
+    async get(url, params = {}, timeout = DEFAULT_TIMEOUT) {
         const queryString = new URLSearchParams(params).toString();
         const fullUrl = `${this.baseUrl}${url}${queryString ? `?${queryString}` : ''}`;
 
-        const response = await fetch(fullUrl, {
-            method: 'GET',
-            headers: { 'Accept': 'application/json' }
-        });
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), timeout);
 
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        try {
+            const response = await fetch(fullUrl, {
+                method: 'GET',
+                headers: { 'Accept': 'application/json' },
+                signal: controller.signal
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            return await response.json();
+        } catch (error) {
+            if (error.name === 'AbortError') {
+                throw new Error('Request timed out');
+            }
+            throw error;
+        } finally {
+            clearTimeout(timer);
         }
-
-        return await response.json();
     }
 
     /**
      * POST request with JSON body
      * @param {string} url - API path
      * @param {any} data - Request body
+     * @param {number} timeout - Request timeout in ms (default 30s)
      * @returns {Promise<any>} Response data
      */
-    async post(url, data = null) {
-        const response = await fetch(`${this.baseUrl}${url}`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-            },
-            body: data ? JSON.stringify(data) : null
-        });
+    async post(url, data = null, timeout = DEFAULT_TIMEOUT) {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), timeout);
 
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        try {
+            const response = await fetch(`${this.baseUrl}${url}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: data ? JSON.stringify(data) : null,
+                signal: controller.signal
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            const text = await response.text();
+            return text ? JSON.parse(text) : null;
+        } catch (error) {
+            if (error.name === 'AbortError') {
+                throw new Error('Request timed out');
+            }
+            throw error;
+        } finally {
+            clearTimeout(timer);
         }
-
-        const text = await response.text();
-        return text ? JSON.parse(text) : null;
     }
 
     /**
      * PUT request with JSON body
      * @param {string} url - API path
      * @param {any} data - Request body
+     * @param {number} timeout - Request timeout in ms (default 30s)
      * @returns {Promise<any>} Response data
      */
-    async put(url, data) {
-        const response = await fetch(`${this.baseUrl}${url}`, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-            },
-            body: JSON.stringify(data)
-        });
+    async put(url, data, timeout = DEFAULT_TIMEOUT) {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), timeout);
 
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        try {
+            const response = await fetch(`${this.baseUrl}${url}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify(data),
+                signal: controller.signal
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            return await response.json();
+        } catch (error) {
+            if (error.name === 'AbortError') {
+                throw new Error('Request timed out');
+            }
+            throw error;
+        } finally {
+            clearTimeout(timer);
         }
-
-        return await response.json();
     }
 
     /**
      * DELETE request
      * @param {string} url - API path
+     * @param {number} timeout - Request timeout in ms (default 30s)
      * @returns {Promise<boolean>} Success
      */
-    async delete(url) {
-        const response = await fetch(`${this.baseUrl}${url}`, {
-            method: 'DELETE'
-        });
+    async delete(url, timeout = DEFAULT_TIMEOUT) {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), timeout);
 
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        try {
+            const response = await fetch(`${this.baseUrl}${url}`, {
+                method: 'DELETE',
+                signal: controller.signal
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            return response.ok;
+        } catch (error) {
+            if (error.name === 'AbortError') {
+                throw new Error('Request timed out');
+            }
+            throw error;
+        } finally {
+            clearTimeout(timer);
         }
-
-        return response.ok;
     }
 
     /**
@@ -124,6 +182,12 @@ export class API {
             xhr.addEventListener('error', () => {
                 reject(new Error('Upload failed'));
             });
+
+            xhr.addEventListener('timeout', () => {
+                reject(new Error('Upload timed out'));
+            });
+
+            xhr.timeout = 120000; // 2 minutes for file uploads
 
             xhr.open('POST', `${this.baseUrl}${url}`);
             xhr.send(formData);

@@ -21,21 +21,23 @@ public class AiFallbackExtractor : IContentExtractor
         _logger.LogInformation(
             "AI fallback extractor invoked for MIME type {MimeType}", mimeType);
 
-        // Attempt to read as text; if the content is binary, store a placeholder
+        // Detect binary by sampling first 8KB before reading the entire stream
         try
         {
-            using var reader = new StreamReader(content, leaveOpen: true);
-            var text = await reader.ReadToEndAsync(ct);
+            var sampleSize = (int)Math.Min(8192, content.Length);
+            var buffer = new byte[sampleSize];
+            var bytesRead = await content.ReadAsync(buffer.AsMemory(0, sampleSize), ct);
+            content.Position = 0; // Reset for actual reading
 
-            // Basic heuristic: if the text contains many null bytes, it's likely binary
-            if (text.Length > 0 && text.Count(c => c == '\0') > text.Length / 10)
+            // Check for null bytes in sample — indicates binary content
+            if (buffer.AsSpan(0, bytesRead).Contains((byte)0))
             {
                 return
                 [
                     new ContentBlock
                     {
                         Kind = ContentKind.Data,
-                        Content = $"[Binary content: {mimeType}, awaiting AI extraction]",
+                        Content = $"Binary file ({content.Length} bytes)",
                         Order = 0,
                         Source = new ContentSource("stream", mimeType, Extractor: nameof(AiFallbackExtractor)),
                         Meta = new Dictionary<string, string>
@@ -46,6 +48,9 @@ public class AiFallbackExtractor : IContentExtractor
                     }
                 ];
             }
+
+            using var reader = new StreamReader(content, leaveOpen: true);
+            var text = await reader.ReadToEndAsync(ct);
 
             return
             [

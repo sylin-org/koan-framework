@@ -11,6 +11,7 @@ public class ResearchBrief : Entity<ResearchBrief>
     public List<string> Exclusions { get; set; } = [];
     public SearchScope Scope { get; set; } = new();
     public Schedule Schedule { get; set; } = Schedule.Daily;
+    public bool Enabled { get; set; } = true;
     public IngestPolicy Policy { get; set; } = IngestPolicy.Adaptive;
     public int MaxItemsPerRun { get; set; } = 20;
     public double RelevanceThreshold { get; set; } = 0.7;

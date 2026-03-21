@@ -119,8 +119,31 @@
 }
 
 .sidebar-heading .btn-ghost {
-    padding: 2px 4px;
-    font-size: var(--font-size-xs);
+    padding: var(--space-1) var(--space-2);
+    font-size: var(--font-size-sm);
+    min-width: 28px;
+    min-height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Inline space name input (U2) */
+.space-name-input {
+    width: calc(100% - var(--space-6));
+    margin: var(--space-1) var(--space-3);
+    padding: var(--space-1) var(--space-2);
+    background: var(--surface-secondary);
+    border: 1px solid var(--accent-primary);
+    border-radius: var(--radius-md);
+    color: var(--text-primary);
+    font-size: var(--font-size-sm);
+    font-family: var(--font-sans);
+    outline: none;
+}
+
+.space-name-input::placeholder {
+    color: var(--text-tertiary);
 }
 
 .sidebar-item {
@@ -609,6 +632,11 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-2);
+    transition: background var(--transition-fast);
+}
+
+.pulse-item:hover {
+    background: var(--surface-hover);
 }
 
 .pulse-item-title {
@@ -869,6 +897,17 @@
     width: 0%;
 }
 
+.progress-fill.indeterminate,
+.upload-progress-bar.indeterminate {
+    animation: indeterminate 1.5s infinite ease-in-out;
+    width: 30% !important;
+}
+
+@keyframes indeterminate {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(400%); }
+}
+
 .upload-status {
     font-size: var(--font-size-xs);
     color: var(--text-secondary);
@@ -926,4 +965,115 @@
     font-size: 40px;
     color: var(--text-tertiary);
     margin-bottom: var(--space-3);
+}
+
+/* ─── Toast Notifications (U3) ─────────────────────────── */
+
+#toast-container {
+    position: fixed;
+    bottom: var(--space-8);
+    right: var(--space-4);
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+}
+
+.toast {
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-sm);
+    color: var(--text-primary);
+    opacity: 0;
+    transform: translateX(100%);
+    transition: all var(--transition-normal);
+    max-width: 400px;
+}
+
+.toast.show {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+.toast-info {
+    background: var(--surface-active);
+    border: 1px solid var(--surface-border);
+}
+
+.toast-error {
+    background: #3d1518;
+    border: 1px solid var(--accent-danger);
+}
+
+.toast-success {
+    background: #1a3a2a;
+    border: 1px solid var(--accent-success);
+}
+
+/* ─── Undo Button (U8) ─────────────────────────────────── */
+
+.btn-undo {
+    background: none;
+    border: none;
+    color: var(--text-link);
+    cursor: pointer;
+    font-size: var(--font-size-xs);
+    font-family: var(--font-sans);
+    padding: 0;
+    text-decoration: underline;
+}
+
+.btn-undo:hover {
+    color: var(--accent-primary);
+}
+
+/* ─── Sidebar Notes Button (U1) ────────────────────────── */
+
+.sidebar-notes-btn {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    margin: var(--space-2) var(--space-3) 0;
+    cursor: pointer;
+    background: none;
+    border: 1px solid var(--surface-border);
+    border-radius: var(--radius-md);
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+    font-family: var(--font-sans);
+    width: calc(100% - var(--space-6));
+    text-align: left;
+    transition: all var(--transition-fast);
+}
+
+.sidebar-notes-btn:hover {
+    background: var(--surface-hover);
+    color: var(--text-primary);
+    border-color: var(--text-tertiary);
+}
+
+/* ─── Load More Button (U17) ───────────────────────────── */
+
+.load-more-container {
+    display: flex;
+    justify-content: center;
+    padding: var(--space-4);
+}
+
+.btn-load-more {
+    padding: var(--space-2) var(--space-6);
+    background: var(--surface-secondary);
+    border: 1px solid var(--surface-border);
+    border-radius: var(--radius-md);
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+    font-family: var(--font-sans);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.btn-load-more:hover {
+    background: var(--surface-hover);
+    color: var(--text-primary);
 }

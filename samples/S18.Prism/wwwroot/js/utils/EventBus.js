@@ -102,6 +102,11 @@ export const Events = {
 
     // View events
     VIEW_CHANGED: 'view:changed',
+    VIEW_NOTES: 'view:notes',
+
+    // Sidebar filter events
+    SOURCE_SELECTED: 'source:selected',
+    BRIEF_SELECTED: 'brief:selected',
 
     // Upload events
     UPLOAD_STARTED: 'upload:started',
