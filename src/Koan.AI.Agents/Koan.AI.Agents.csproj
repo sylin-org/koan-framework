@@ -15,5 +15,7 @@
     <ProjectReference Include="..\Koan.AI.Contracts\Koan.AI.Contracts.csproj" />
     <ProjectReference Include="..\Koan.AI.Contracts.Shared\Koan.AI.Contracts.Shared.csproj" />
     <ProjectReference Include="..\Koan.AI.Orchestration\Koan.AI.Orchestration.csproj" />
+    <ProjectReference Include="..\Koan.AI\Koan.AI.csproj" />
+    <ProjectReference Include="..\Koan.Data.Vector\Koan.Data.Vector.csproj" />
   </ItemGroup>
 </Project>
