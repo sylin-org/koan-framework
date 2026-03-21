@@ -77,6 +77,63 @@ public static class Client
     }
 
     // ========================================================================
+    // Chat with Prompt
+    // ========================================================================
+
+    /// <summary>
+    /// Chat with AI using a Prompt and variables for resolution.
+    /// </summary>
+    public static async Task<string> Chat(
+        Prompt.Prompt prompt, object? variables = null, CancellationToken ct = default)
+    {
+        var message = prompt.Resolve(variables);
+        var options = BuildOptionsFromPrompt(prompt);
+        var response = await Resolve().PromptAsync(BuildChatRequest(message, options), ct);
+        return response.Text;
+    }
+
+    /// <summary>
+    /// Chat with AI using a Prompt and return a typed, parsed response.
+    /// JSON schema constraint is sent to the model from Prompt.OutputFormat.
+    /// </summary>
+    public static async Task<T> Chat<T>(
+        Prompt.Prompt prompt, object? variables = null, CancellationToken ct = default)
+    {
+        var message = prompt.Resolve(variables);
+        var options = BuildOptionsFromPrompt(prompt);
+
+        // Add JSON response format constraint if OutputSpec has a schema
+        if (prompt.OutputFormat?.JsonSchema is not null)
+        {
+            options = options with { ResponseFormat = "json_object" };
+        }
+
+        var response = await Resolve().PromptAsync(BuildChatRequest(message, options), ct);
+        return System.Text.Json.JsonSerializer.Deserialize<T>(response.Text)
+            ?? throw new InvalidOperationException($"Failed to parse AI response as {typeof(T).Name}");
+    }
+
+    /// <summary>
+    /// Chat with AI using a Prompt and return a typed, parsed response.
+    /// Convenience overload: uses the prompt's raw text as the message.
+    /// </summary>
+    public static async Task<T> Chat<T>(string message, CancellationToken ct = default)
+    {
+        var options = new ChatOptions { ResponseFormat = "json_object" };
+        var response = await Resolve().PromptAsync(BuildChatRequest(message, options), ct);
+        return System.Text.Json.JsonSerializer.Deserialize<T>(response.Text)
+            ?? throw new InvalidOperationException($"Failed to parse AI response as {typeof(T).Name}");
+    }
+
+    private static ChatOptions BuildOptionsFromPrompt(Prompt.Prompt prompt)
+    {
+        return new ChatOptions
+        {
+            SystemPrompt = prompt.System
+        };
+    }
+
+    // ========================================================================
     // Stream
     // ========================================================================
 

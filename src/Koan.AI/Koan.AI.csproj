@@ -12,6 +12,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Koan.Core\Koan.Core.csproj" />
     <ProjectReference Include="..\Koan.AI.Contracts\Koan.AI.Contracts.csproj" />
+    <ProjectReference Include="..\Koan.AI.Prompt\Koan.AI.Prompt.csproj" />
     <ProjectReference Include="..\Koan.Storage\Koan.Storage.csproj" />
     <ProjectReference Include="..\Koan.Media.Abstractions\Koan.Media.Abstractions.csproj" />
     <PackageReference Include="Microsoft.Extensions.AI" Version="10.0.0" />
