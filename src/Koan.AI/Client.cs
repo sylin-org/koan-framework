@@ -76,6 +76,28 @@ public static class Client
         };
     }
 
+    /// <summary>
+    /// Chat with AI using detailed options and return a rich result with metadata.
+    /// </summary>
+    public static async Task<ChatResult> ChatResult(string message, ChatOptions options, CancellationToken ct = default)
+    {
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        var response = await Resolve().PromptAsync(BuildChatRequest(message, options), ct);
+        sw.Stop();
+
+        return new ChatResult
+        {
+            Text = response.Text,
+            Model = response.Model,
+            TokensIn = response.TokensIn,
+            TokensOut = response.TokensOut,
+            TokensUsed = (response.TokensIn ?? 0) + (response.TokensOut ?? 0),
+            Latency = sw.Elapsed,
+            AdapterId = response.AdapterId,
+            FinishReason = response.FinishReason
+        };
+    }
+
     // ========================================================================
     // Chat with Prompt
     // ========================================================================

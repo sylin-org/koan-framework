@@ -156,7 +156,7 @@ internal sealed class ChainExecutor : IChainExecutor
         var message = ResolveTemplate(step.Value, context);
         var options = BuildChatOptions(context);
 
-        var result = await Koan.AI.Client.ChatResult(message, ct);
+        var result = await Koan.AI.Client.ChatResult(message, options, ct);
 
         context.SetOutput(result.Text);
         context.AddTokens(result.TokensUsed ?? 0);
