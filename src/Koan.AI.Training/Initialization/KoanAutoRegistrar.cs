@@ -18,7 +18,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 
     public void Initialize(IServiceCollection services)
     {
-        services.AddSingleton<ITrainingService, TrainingServiceStub>();
+        services.AddSingleton<ITrainingService, TrainingService>();
         services.AddSingleton<IDatasetService, DatasetService>();
     }
 

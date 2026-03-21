@@ -173,17 +173,71 @@ internal sealed class EvalService : IEvalService
     public Task<DriftResult> DriftAsync(
         EvalResult baseline, EvalResult current, CancellationToken ct = default)
     {
-        throw new NotImplementedException(
-            "Drift detection requires embedding distribution analysis. " +
-            "This will be available in a future release.");
+        // Compare score distributions between baseline and current evaluations.
+        // Drift score is the mean absolute difference across shared metrics.
+        var baselineScores = baseline.Scores.ToDictionary(s => s.Metric, s => s.Value);
+        var currentScores = current.Scores.ToDictionary(s => s.Metric, s => s.Value);
+
+        var sharedMetrics = baselineScores.Keys.Intersect(currentScores.Keys).ToList();
+
+        if (sharedMetrics.Count == 0)
+        {
+            return Task.FromResult(new DriftResult
+            {
+                Score = 0,
+                Status = DriftStatus.OK,
+                TopShifts = [],
+                Recommendation = "No shared metrics between baseline and current — unable to compute drift."
+            });
+        }
+
+        var shifts = new List<string>();
+        var totalDrift = 0.0;
+
+        foreach (var metric in sharedMetrics)
+        {
+            var diff = Math.Abs(currentScores[metric] - baselineScores[metric]);
+            totalDrift += diff;
+            if (diff > 0.05)
+                shifts.Add($"{metric}: {baselineScores[metric]:F3} → {currentScores[metric]:F3} (Δ{diff:F3})");
+        }
+
+        var avgDrift = totalDrift / sharedMetrics.Count;
+
+        var status = avgDrift switch
+        {
+            < 0.1 => DriftStatus.OK,
+            < 0.3 => DriftStatus.Notice,
+            _ => DriftStatus.Warning
+        };
+
+        var recommendation = status switch
+        {
+            DriftStatus.Warning => "Significant drift detected. Consider retraining with recent data.",
+            DriftStatus.Notice => "Minor drift observed. Monitor closely.",
+            _ => null
+        };
+
+        return Task.FromResult(new DriftResult
+        {
+            Score = avgDrift,
+            Status = status,
+            TopShifts = shifts,
+            Recommendation = recommendation
+        });
     }
 
-    public Task<EvalResult> BenchmarkAsync(
+    public async Task<EvalResult> BenchmarkAsync(
         ModelRef model, DatasetRef data, CancellationToken ct = default)
     {
-        throw new NotImplementedException(
-            "Benchmark suite wraps lm-eval-harness and is not yet available. " +
-            "Use MeasureAsync for individual metric evaluation.");
+        // Benchmark delegates to MeasureAsync with a standard set of metrics.
+        // The actual metric computation depends on registered IMetricComputer instances.
+        var standardMetrics = new[]
+        {
+            Metric.Accuracy, Metric.F1, Metric.Perplexity, Metric.Coherence
+        };
+
+        return await MeasureAsync(model, data, standardMetrics, ct);
     }
 
     // ── Internal Helpers ──
