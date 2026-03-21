@@ -1,0 +1,56 @@
+using Koan.Core;
+using Koan.Core.Hosting.App;
+using Koan.Web;
+using Koan.Web.Extensions;
+using Koan.ZenGarden;
+using Koan.ZenGarden.Extensions;
+using S18.Prism.Initialization;
+using S18.Prism.Services;
+using S18.Prism.Services.Extraction;
+
+[assembly: KoanApp(Name = "Prism", Code = "prism", Description = "Personal Knowledge Intelligence")]
+
+var builder = WebApplication.CreateBuilder(args);
+
+// Koan Framework - "Reference = Intent"
+builder.Services
+    .AddKoan()
+    .AsWebApi();
+builder.Services.AddKoanZenGarden(builder.Configuration);
+
+// Content extractors (ordered by Priority)
+builder.Services.AddScoped<IContentExtractor, TextExtractor>();
+builder.Services.AddScoped<IContentExtractor, AiFallbackExtractor>();
+
+// Application services
+builder.Services.AddScoped<INoteIngestionService, NoteIngestionService>();
+builder.Services.AddSingleton<IPulseService, PulseService>();
+
+// Background workers
+builder.Services.AddHostedService<SourcePullWorker>();
+builder.Services.AddHostedService<ResearchBriefWorker>();
+
+// SignalR for real-time updates
+builder.Services.AddSignalR();
+
+// CORS
+builder.Services.AddCors(options =>
+{
+    options.AddDefaultPolicy(policy =>
+        policy.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader());
+});
+
+var app = builder.Build();
+AppHost.Current ??= app.Services;
+
+// Seed default spaces
+var logger = app.Services.GetRequiredService<ILogger<Program>>();
+await SpaceSeeder.SeedDefaultsAsync(logger);
+
+app.UseCors();
+app.UseStaticFiles();
+app.UseRouting();
+app.MapControllers();
+app.MapFallbackToFile("index.html");
+
+app.Run();
