@@ -13,6 +13,7 @@ using Newtonsoft.Json;
 using Koan.AI.Contracts.Adapters;
 using Koan.AI.Contracts.Models;
 using Koan.Core.Adapters;
+using Koan.Core.AI;
 using Koan.Orchestration;
 using Koan.Orchestration.Attributes;
 using Koan.Orchestration.Models;
@@ -53,6 +54,16 @@ internal sealed class LMStudioAdapter : BaseKoanAdapter,
     public override string Name => DisplayName;
     public string Type => Constants.Adapter.Type;
     public IAiModelManager? ModelManager => null;
+
+    /// <summary>AI-level capabilities declared for AdapterResolver routing.</summary>
+    IReadOnlySet<string> IAiAdapter.Capabilities { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    {
+        AiCapability.Chat,
+        AiCapability.Embed,
+        AiCapability.Streaming,
+        AiCapability.ModelList,
+        AiCapability.ServeGGUF,
+    };
 
     public LMStudioAdapter(
         HttpClient http,

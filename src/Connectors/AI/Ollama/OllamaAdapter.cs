@@ -12,6 +12,7 @@ using Newtonsoft.Json.Linq;
 using Koan.AI.Contracts.Adapters;
 using Koan.AI.Contracts.Models;
 using Koan.Core.Adapters;
+using Koan.Core.AI;
 using Koan.AI.Connector.Ollama.Options;
 
 namespace Koan.AI.Connector.Ollama;
@@ -27,6 +28,22 @@ internal sealed class OllamaAdapter : IChatAdapter, IEmbedAdapter
     public string Id => "ollama";
     public string Name => "Ollama AI Provider";
     public string Type => "ollama";
+
+    public IReadOnlySet<string> Capabilities { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    {
+        AiCapability.Chat,
+        AiCapability.Embed,
+        AiCapability.Vision,
+        AiCapability.Streaming,
+        AiCapability.Tools,
+        AiCapability.Pull,
+        AiCapability.ModelRemove,
+        AiCapability.ModelList,
+        AiCapability.ServeGGUF,
+    };
+
+    public IAiModelManager? ModelManager => _modelManager ??= new OllamaModelManager(_http, _logger);
+    private OllamaModelManager? _modelManager;
 
     public OllamaAdapter(
         HttpClient http,

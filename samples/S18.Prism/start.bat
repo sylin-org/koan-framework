@@ -1,15 +1,8 @@
 @echo off
-setlocal enableextensions enabledelayedexpansion
+setlocal enableextensions
 
 set "ROOT=%~dp0"
 pushd "%ROOT%" >nul
-
-REM Resolve repo root as absolute path (avoids .dockerignore lookup bug with relative ..\..\.. paths)
-for %%I in ("%ROOT%..\..") do set "REPO_ROOT=%%~fI"
-
-set "CONTAINER_NAME=koan-s18-prism"
-set "IMAGE_NAME=koan-s18-prism:dev"
-set "OPEN_URL=http://localhost:5087"
 
 where docker >nul 2>nul
 if errorlevel 1 (
@@ -36,13 +29,13 @@ docker ps >nul 2>nul
 if not errorlevel 1 goto docker_started
 
 set /a ELAPSED+=2
-if !ELAPSED! geq %TIMEOUT_SECONDS% (
+if %ELAPSED% geq %TIMEOUT_SECONDS% (
   echo Timeout waiting for Docker Desktop to start.
   echo Please start Docker Desktop manually and try again.
   popd & exit /b 1
 )
 
-echo Still waiting... [!ELAPSED!s/%TIMEOUT_SECONDS%s]
+echo Still waiting... [%ELAPSED%s/%TIMEOUT_SECONDS%s]
 goto wait_loop
 
 :docker_started
@@ -51,37 +44,18 @@ echo Docker Desktop is ready!
 :docker_ready
 echo Docker Desktop is running.
 
-REM Stop any existing container
-docker stop %CONTAINER_NAME% >nul 2>nul
-docker rm %CONTAINER_NAME% >nul 2>nul
-
-echo Building image...
-docker build -t %IMAGE_NAME% -f "%ROOT%Dockerfile" "%REPO_ROOT%"
-if errorlevel 1 (popd & exit /b 1)
-
-REM Ensure volume directories exist
-if not exist "%ROOT%.Koan\Data" mkdir "%ROOT%.Koan\Data"
-if not exist "%ROOT%.Koan\cache" mkdir "%ROOT%.Koan\cache"
-if not exist "%ROOT%.Koan\storage" mkdir "%ROOT%.Koan\storage"
-
-echo Starting Prism container...
-docker run -d --name %CONTAINER_NAME% ^
-  --env-file docker-run.env ^
-  -p 5087:5087 ^
-  -v "%ROOT%.Koan\Data:/app/data" ^
-  -v "%ROOT%.Koan\cache:/app/cache" ^
-  -v "%ROOT%.Koan\storage:/app/storage" ^
-  %IMAGE_NAME%
+echo Starting Prism stack (MongoDB + Weaviate + Ollama + Prism)...
+docker compose up --build -d
 if errorlevel 1 (popd & exit /b 1)
 
 echo.
 echo Prism is starting up!
-echo Opening browser to %OPEN_URL%
+echo Opening browser to http://localhost:5087
 echo.
-echo   Logs:    docker logs -f %CONTAINER_NAME%
-echo   Stop:    docker stop %CONTAINER_NAME%
-echo   Restart: docker restart %CONTAINER_NAME%
+echo   Logs:    docker compose logs -f prism
+echo   Stop:    docker compose down
+echo   Restart: docker compose restart prism
 echo.
-start "" "%OPEN_URL%" >nul 2>&1
+start "" "http://localhost:5087" >nul 2>&1
 popd
 exit /b 0
