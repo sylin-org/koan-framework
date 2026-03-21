@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prism — Personal Knowledge Intelligence</title>
+    <link rel="stylesheet" href="/css/design-tokens.css">
+    <link rel="stylesheet" href="/css/layout.css">
+    <link rel="stylesheet" href="/css/components.css">
+    <link rel="stylesheet" href="/css/utilities.css">
+</head>
+<body>
+    <div class="app" id="app">
+        <header class="app-header">
+            <div class="header-left">
+                <h1 class="app-logo">
+                    <span class="logo-icon">&#9672;</span> Prism
+                </h1>
+            </div>
+            <div class="header-center" id="search-bar">
+                <!-- SearchBar component renders here -->
+            </div>
+            <div class="header-right">
+                <button class="btn btn-primary" id="btn-add">
+                    <span class="btn-icon">+</span> Add
+                </button>
+            </div>
+        </header>
+
+        <div class="app-content">
+            <aside class="sidebar" id="sidebar">
+                <!-- Sidebar component renders here -->
+            </aside>
+
+            <main class="main-content" id="main-content">
+                <!-- NoteList or Pulse component renders here -->
+            </main>
+
+            <aside class="detail-panel" id="detail-panel">
+                <!-- NoteDetail component renders here -->
+            </aside>
+        </div>
+
+        <footer class="status-bar" id="status-bar">
+            <span class="status-text" id="status-text">Ready</span>
+            <span class="status-counts" id="status-counts"></span>
+        </footer>
+    </div>
+
+    <!-- Upload modal -->
+    <div class="modal-overlay" id="upload-modal" hidden>
+        <div class="modal">
+            <div class="modal-header">
+                <h2>Add to Prism</h2>
+                <button class="btn-close" id="btn-close-upload">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="upload-tabs">
+                    <button class="tab active" data-tab="file">File</button>
+                    <button class="tab" data-tab="text">Text</button>
+                    <button class="tab" data-tab="url">URL</button>
+                </div>
+                <div class="upload-content">
+                    <div class="tab-panel active" data-panel="file">
+                        <div class="drop-zone" id="drop-zone">
+                            <p>Drop files here or click to browse</p>
+                            <input type="file" id="file-input" multiple hidden>
+                        </div>
+                    </div>
+                    <div class="tab-panel" data-panel="text">
+                        <textarea id="text-input" placeholder="Paste text, notes, code..." rows="10"></textarea>
+                        <input type="text" id="text-title" placeholder="Title (optional)">
+                    </div>
+                    <div class="tab-panel" data-panel="url">
+                        <input type="url" id="url-input" placeholder="https://...">
+                    </div>
+                </div>
+                <div class="upload-space">
+                    <label>Space:</label>
+                    <select id="upload-space-select"></select>
+                </div>
+                <div class="upload-progress hidden" id="upload-progress">
+                    <div class="upload-progress-bar" id="upload-progress-bar"></div>
+                </div>
+                <div class="upload-status hidden" id="upload-status"></div>
+                <button class="btn btn-primary btn-full" id="btn-submit-upload">Add to Prism</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/app.js" type="module"></script>
+</body>
+</html>
