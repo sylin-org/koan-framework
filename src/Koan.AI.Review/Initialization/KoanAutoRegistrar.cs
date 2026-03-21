@@ -19,6 +19,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
     public void Initialize(IServiceCollection services)
     {
         services.AddSingleton<ReviewQueueRegistry>();
+        services.AddSingleton<IReviewActionHandler, ReviewActionHandler>();
     }
 
     public void Describe(ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)

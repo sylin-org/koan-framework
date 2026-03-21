@@ -18,12 +18,12 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 
     public void Initialize(IServiceCollection services)
     {
-        services.AddSingleton<IEvalService, EvalServiceStub>();
+        services.AddSingleton<IEvalService, EvalService>();
     }
 
     public void Describe(ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
         module.Describe(ModuleVersion);
-        module.AddNote("Eval service registered (stub — measurement backends not yet implemented).");
+        module.AddNote("Eval service registered (delegates to IMetricComputer implementations).");
     }
 }

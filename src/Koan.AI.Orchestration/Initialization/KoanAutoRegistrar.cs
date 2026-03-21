@@ -18,7 +18,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 
     public void Initialize(IServiceCollection services)
     {
-        services.AddSingleton<IChainExecutor, ChainExecutorStub>();
+        services.AddSingleton<IChainExecutor, ChainExecutor>();
     }
 
     public void Describe(ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
