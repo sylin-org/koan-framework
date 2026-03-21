@@ -21,6 +21,7 @@ date: 2026-03-20
 - Network compute unreachable mid-job: Job checkpoints locally; resumes when compute returns; user notified via progress callback.
 - `Dataset.From<Entity>()` with zero matching entities: Returns empty dataset with diagnostic; `Training.Train()` rejects with clear message ("Dataset contains 0 examples, minimum 10 required").
 - `Model.Convert()` requested but conversion toolchain not installed: Framework checks for container runtime first; if unavailable, checks local Python/llama.cpp; if neither, fails with installation guidance per platform.
+- `Model.Convert()` requested but no adapter has the `Convert` capability: Fails with clear error — `"No adapter with 'Convert' capability. Install Koan.AI.Training.Python (Python Sidecar) to enable format conversion."` No silent fallback; no guessing.
 - `Prompt.Load()` with no matching `PromptEntry`: Falls back to inline prompt string; logs dev-mode guidance.
 
 ## Context
@@ -171,7 +172,170 @@ Cross-boundary communication uses **domain events** on the Koan event bus:
 - `ReviewCompleted` → Entity updated; next `Dataset.From<T>()` includes feedback
 - `EvalGateFailed` → Pipeline halts; notification emitted
 
-### Part 2: Personas and Facade Alignment
+### Part 2: Capability-Driven Adapter Resolution
+
+All lifecycle verbs — `Model.Pull()`, `Model.Convert()`, `Model.Deploy()`, `Training.Train()`, `Eval.Measure()` — resolve to the right adapter through a single, unified pattern: adapters declare capabilities via string flags, and the framework queries those capabilities at invocation time. There are no separate abstractions for sourcing, deployment, conversion, or training runtimes — the adapter IS the provider.
+
+#### Expanded `AiCapability` Constants
+
+The existing `AiCapability` string constants (AI-0021: `Chat`, `Embed`, `Ocr`, `Vision`, etc.) are extended to cover the full lifecycle:
+
+```csharp
+// In Koan.Core.AI
+public static class AiCapability
+{
+    // ── Inference (existing, AI-0021) ──
+    public const string Chat = "Chat";
+    public const string Embed = "Embed";
+    public const string Ocr = "Ocr";
+    public const string Vision = "Vision";
+    public const string Transcribe = "Transcribe";
+    public const string Tools = "Tools";
+    public const string Streaming = "Streaming";
+    public const string JsonMode = "JsonMode";
+    public const string BatchEmbed = "BatchEmbed";
+
+    // ── Model Lifecycle (new) ──
+    public const string Pull = "Pull";
+    public const string Push = "Push";
+    public const string Remove = "Remove";
+    public const string ModelList = "ModelList";
+
+    // ── Format Support (new) ──
+    public const string ServeGGUF = "Serve.GGUF";
+    public const string ServeSafeTensors = "Serve.SafeTensors";
+    public const string ServeONNX = "Serve.ONNX";
+    public const string Convert = "Convert";
+    public const string Quantize = "Quantize";
+
+    // ── Training (new) ──
+    public const string Train = "Train";
+    public const string Align = "Align";
+
+    // ── Evaluation (new) ──
+    public const string MetricCompute = "MetricCompute";
+}
+```
+
+**Why strings, not an enum:** Matches the existing `AiSourceDefinition.Capabilities` pattern from AI-0015. Strings are extensible — custom adapters can declare capabilities (`"MyCompany.CustomInference"`) without framework changes. Enums would require a framework release for every new capability.
+
+#### `IAiAdapter.Capabilities` Surface
+
+Every adapter declares the set of capabilities it supports. This is the **single surface** that all resolution flows query:
+
+```csharp
+public interface IAiAdapter
+{
+    string Id { get; }
+    string Name { get; }
+    string Type { get; }
+    IReadOnlySet<string> Capabilities { get; }  // NEW
+    bool HasCapability(string capability) => Capabilities.Contains(capability);
+    IAiModelManager? ModelManager => null;
+    Task<IReadOnlyList<AiModelDescriptor>> ListModelsAsync(CancellationToken ct = default);
+}
+```
+
+#### `AdapterResolver` — Universal Resolution
+
+One resolver, one pattern, used by every facade verb:
+
+```csharp
+internal static class AdapterResolver
+{
+    public static IAiAdapter Resolve(
+        IAiAdapterRegistry registry,
+        string capability,
+        string? target = null)
+    {
+        if (target is not null)
+            return registry.Get(target) ?? throw new UnknownAdapterException(target);
+
+        var candidates = registry.All
+            .Where(a => a.HasCapability(capability))
+            .ToList();
+
+        return candidates.Count switch
+        {
+            0 => throw new InvalidOperationException(
+                $"No adapter with '{capability}' capability. " +
+                $"Install a connector package that provides it."),
+            1 => candidates[0],
+            _ => throw new AmbiguousAdapterException(capability,
+                candidates.Select(a => a.Id).ToList())
+        };
+    }
+}
+```
+
+**Resolution rules (identical for ALL verbs):**
+
+1. **Explicit target** (`to:` parameter) → look up adapter by ID directly.
+2. **One adapter** with the capability → use it (unambiguous, zero-config).
+3. **Multiple adapters** → if only one can handle the specific model ID → use it.
+4. **Still ambiguous** → `AmbiguousAdapterException` with candidate list; developer adds `to:` parameter.
+5. **Zero adapters** → clear error naming the missing capability and suggesting a package.
+
+#### Adapter Capability Matrix
+
+| Adapter | Package | Capabilities |
+|---------|---------|-------------|
+| Ollama | `Koan.AI.Connector.Ollama` | `Chat`, `Embed`, `Vision`, `Pull`, `Remove`, `ModelList`, `Serve.GGUF`, `Streaming`, `Tools` |
+| HuggingFace | `Koan.AI.Connector.HuggingFace` | `Chat`, `Embed`, `Pull`, `Push`, `ModelList`, `Serve.SafeTensors`, `Streaming`, `Tools` |
+| LM Studio | `Koan.AI.Connector.LMStudio` | `Chat`, `Embed`, `ModelList`, `Serve.GGUF`, `Streaming` |
+| ONNX Runtime | `Koan.AI.Models.Onnx` | `Embed`, `Serve.ONNX`, `BatchEmbed` |
+| Python Sidecar | `Koan.AI.Training.Python` | `Train`, `Align`, `Convert`, `Quantize`, `Serve.SafeTensors` |
+| TGI | `Koan.AI.Connector.TGI` | `Chat`, `Streaming`, `Tools`, `Serve.SafeTensors` |
+| TEI | `Koan.AI.Connector.TEI` | `Embed`, `BatchEmbed`, `Serve.SafeTensors` |
+
+#### How Facade Verbs Use Resolution
+
+Every facade verb delegates to `AdapterResolver.Resolve()` with the appropriate capability:
+
+```csharp
+// Model.Pull("meta-llama/Llama-3.1-8B-Instruct")
+//   → AdapterResolver.Resolve(registry, AiCapability.Pull)
+//   → Only HuggingFace adapter has Pull for HF IDs → unambiguous
+
+// Model.Pull("llama3.1:8b")
+//   → AdapterResolver.Resolve(registry, AiCapability.Pull)
+//   → Both Ollama and HF have Pull → model ID format disambiguates (Ollama tag syntax)
+
+// Model.Convert(model, to: ModelFormat.GGUF)
+//   → AdapterResolver.Resolve(registry, AiCapability.Convert)
+//   → Only Python Sidecar has Convert → unambiguous
+
+// Model.Deploy(model)
+//   → AdapterResolver.Resolve(registry, AiCapability.ServeGGUF)  // based on model format
+//   → Ollama and LM Studio both have Serve.GGUF → developer adds to: "ollama-local"
+
+// Training.Train(options)
+//   → AdapterResolver.Resolve(registry, AiCapability.Train)
+//   → Only Python Sidecar has Train → unambiguous
+
+// Eval.Measure(model, data, metrics)
+//   → AdapterResolver.Resolve(registry, AiCapability.MetricCompute)
+//   → Only Python Sidecar has MetricCompute → unambiguous
+```
+
+#### `AmbiguousAdapterException`
+
+When multiple adapters match and the model ID does not disambiguate, the exception provides actionable guidance:
+
+```csharp
+public class AmbiguousAdapterException : InvalidOperationException
+{
+    public string Capability { get; }
+    public IReadOnlyList<string> CandidateAdapterIds { get; }
+
+    // Message: "Multiple adapters support 'Serve.GGUF': [ollama-local, lmstudio-local].
+    //           Specify the target adapter: Model.Deploy(model, to: \"ollama-local\")"
+}
+```
+
+This pattern eliminates `IModelSourceProvider`, `IModelRuntime`, `IFormatConverter`, `ITrainingRuntime`, and `IMetricComputer` as separate abstractions. The adapter IS the provider — it declares what it can do, and the resolver finds the right one.
+
+### Part 3: Personas and Facade Alignment
 
 Six personas use the system. Each has a **home facade** where they spend 80% of their time. All facades share the same entities, catalog, and compute fabric.
 
@@ -194,7 +358,7 @@ Every facade follows the **progressive disclosure ladder**:
 | 3 | Rich result | Read metadata | `job.Output.Lineage` |
 | 4 | Escape hatch | Full control | `Training.Run(script: "custom.py")` |
 
-### Part 3: `Model.*` — Centralized Model Lifecycle (AI-0023)
+### Part 4: `Model.*` — Centralized Model Lifecycle (AI-0023)
 
 Models are **first-class entities** with lifecycle, lineage, and version history. A model is not "an Ollama model" — it is a Koan model that can be sourced, converted, and deployed to any compatible runtime.
 
@@ -246,13 +410,13 @@ await plan.Apply();
 await Model.Register(path: "/results/my-model/", lineage: ...);
 ```
 
-**Runtime abstraction:** `IModelRuntime` interface with implementations for Ollama, ONNX Runtime, TGI, TEI, TorchServe, Python sidecar. Runtimes describe supported formats and capabilities. Model deployment selects the best runtime automatically.
+**Runtime resolution:** Adapters declare `Serve.*` capabilities (`Serve.GGUF`, `Serve.SafeTensors`, `Serve.ONNX`) and the `AdapterResolver` (Part 2) matches models to adapters by format. No separate `IModelRuntime` interface — the adapter IS the runtime.
 
-**Format conversion:** Submitted as jobs. Both core converters (bundled in container images) and extension converters (user-installed tools detected at runtime). Conversion graph: SafeTensors ↔ GGUF, SafeTensors → ONNX, ONNX → CoreML, etc.
+**Format conversion:** Resolved via `AdapterResolver.Resolve(registry, AiCapability.Convert)`. Adapters with the `Convert` capability (e.g., Python Sidecar) handle conversion. Submitted as jobs. Conversion graph: SafeTensors ↔ GGUF, SafeTensors → ONNX, ONNX → CoreML, etc.
 
 Full specification in **AI-0023**.
 
-### Part 4: `Prompt()` — Uri-Inspired Prompt Primitive (AI-0025)
+### Part 5: `Prompt()` — Uri-Inspired Prompt Primitive (AI-0025)
 
 Prompts are values with structure, like `Uri`. A string goes in; a rich, inspectable, immutable object comes out. Variables are extracted. The prompt round-trips losslessly.
 
@@ -290,7 +454,7 @@ await Client.Chat<Summary>(prompt, article);  // Typed response + variable resol
 
 Full specification in **AI-0025**.
 
-### Part 5: `Compute.*` — Hardware-Agnostic Fabric (AI-0024)
+### Part 6: `Compute.*` — Hardware-Agnostic Fabric (AI-0024)
 
 Compute extends ZenGarden's topology discovery to include hardware capabilities. Work (training, conversion, evaluation) is described as **intent**; the fabric resolves **where** it runs.
 
@@ -328,7 +492,7 @@ await Training.Train(options, compute: Compute.Require(minVram: GiB(48)));
 
 Full specification in **AI-0024**.
 
-### Part 6: `Chain.*` — Composition Primitives (AI-0026)
+### Part 7: `Chain.*` — Composition Primitives (AI-0026)
 
 Chains compose AI operations into typed, immutable pipelines. Inspired by LangChain's LCEL but native to Koan's type system and entity model.
 
@@ -355,7 +519,7 @@ Chains are **immutable blueprints** — `.Run()` creates an execution. This enab
 
 Full specification in **AI-0026**.
 
-### Part 7: `[MediaAnalysis]` — AI for Storage/Media Entities (AI-0027)
+### Part 8: `[MediaAnalysis]` — AI for Storage/Media Entities (AI-0027)
 
 Extends the existing `MediaEntity<T>` (MEDIA-0001) and `StorageEntity<T>` (STOR-0001) with automatic AI processing, mirroring how `[Embedding]` (AI-0020) auto-embeds on save.
 
@@ -381,7 +545,7 @@ public class PhotoAsset : MediaEntity<PhotoAsset>
 
 Full specification in **AI-0027**.
 
-### Part 8: `Training.*` and `Dataset.*` — The Entity-Native Bridge (AI-0028)
+### Part 9: `Training.*` and `Dataset.*` — The Entity-Native Bridge (AI-0028)
 
 The core differentiator. Production entities become training data without ETL.
 
@@ -433,7 +597,7 @@ await Model.Register(path: "/results/custom/", lineage: ...);
 
 Full specification in **AI-0028**.
 
-### Part 9: `Eval.*` — Quality Enforcement (AI-0029)
+### Part 10: `Eval.*` — Quality Enforcement (AI-0029)
 
 **Core verbs:** `Measure`, `Compare`, `Regress`, `Gate`, `Drift`, `Judge`.
 
@@ -467,7 +631,7 @@ var comparison = await Eval.Compare(
 
 Full specification in **AI-0029**.
 
-### Part 10: `Review.*` — Human Feedback Loop (AI-0030)
+### Part 11: `Review.*` — Human Feedback Loop (AI-0030)
 
 Closes the loop between AI output and training data. Domain experts review, approve, correct, and label AI outputs — directly on entities.
 
@@ -501,7 +665,7 @@ var alignment = Dataset.From<SupportTicket>(
 
 Full specification in **AI-0030**.
 
-### Part 11: Strategic Opportunities (Future ADRs)
+### Part 12: Strategic Opportunities (Future ADRs)
 
 Identified during analysis, deferred to dedicated ADRs:
 
@@ -517,14 +681,13 @@ Identified during analysis, deferred to dedicated ADRs:
 
 **Principle for scope:** Build where entity-awareness is the value. Interop where orchestration maturity is the value. Agent and Graph are deferred pending evaluation of whether Koan-native implementations outperform LangGraph interop.
 
-### Part 12: Package Structure
+### Part 13: Package Structure
 
 ```
 Koan.AI.Contracts.Shared       ← Shared boundary models (ModelRef, JobRef, EvalScore, etc.)
 Koan.AI                        ← Client facade, routing, pipeline (exists)
 Koan.AI.Contracts              ← Adapter interfaces, options (exists)
 Koan.AI.Models                 ← Model.* facade, ModelEntry entity, catalog
-Koan.AI.Models.HuggingFace     ← HF Hub client, SafeTensors support
 Koan.AI.Models.Onnx            ← ONNX Runtime adapter, in-process inference
 Koan.AI.Prompt                 ← Prompt() type, PromptEntry entity, builder
 Koan.AI.Compute                ← Compute.* facade, discovery, routing
@@ -538,7 +701,7 @@ Koan.AI.Review                 ← Review.* facade, queue endpoints
 Koan.AI.Web                    ← HTTP controllers (exists, extended)
 Koan.AI.Connector.Ollama       ← Extended with model management (exists)
 Koan.AI.Connector.LMStudio     ← Extended with model management (exists)
-Koan.AI.Connector.HuggingFace  ← Inference API adapter
+Koan.AI.Connector.HuggingFace  ← HF Hub client, Inference API, model search/download (Connector pattern)
 Koan.AI.Connector.TGI          ← Text Generation Inference adapter
 Koan.AI.Connector.TEI          ← Text Embeddings Inference adapter
 Koan.AI.Connector.TorchServe   ← TorchServe REST adapter
@@ -552,7 +715,7 @@ Koan.AI.Convert.ONNX           ← optimum-based ONNX conversion
 Koan.AI.Convert.CoreML         ← coremltools-based CoreML conversion
 ```
 
-### Part 13: Phasing
+### Part 14: Phasing
 
 | Phase | ADR | Deliverables | Dependency |
 |-------|-----|-------------|------------|
@@ -567,7 +730,7 @@ Koan.AI.Convert.CoreML         ← coremltools-based CoreML conversion
 | P9 | Future | `Signal.From<T,U>()`, `Model.Advisor()`, `Chain.Gaps()` | AI-0028, AI-0029 |
 | P10 | Future | `Agent.*` / `Graph.*` (build vs interop decision) | AI-0026 |
 
-### Part 14: The Closed Loop
+### Part 15: The Closed Loop
 
 The complete cycle, touching every bounded context:
 

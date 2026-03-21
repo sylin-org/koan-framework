@@ -12,7 +12,7 @@ date: 2026-03-20
 
 - **Inputs:** Trained models (`ModelRef` from AI-0023), evaluation datasets (`Dataset.From<T>()` from AI-0028), metric specifications (`Metric.*` constants), baseline references (model version or explicit scores), judge model references (for LLM-as-evaluator), benchmark suite identifiers, gate requirement functions.
 - **Outputs:** `EvalResult` (shared boundary model from AI-0022) containing per-metric scores, pass/fail determination, and diagnostic reason; `ComparisonResult` with ranked model table; `DriftResult` with distribution shift score, status, and top shifts; `GateFailedException` with full diagnostic when quality conditions are not met; `BenchmarkResult` with standard suite scores.
-- **Error Modes:** Missing metric implementation degrades to `MetricNotAvailableException` with installation guidance (e.g., "Install Koan.AI.Eval.Python for BERTScore support"). Dataset yielding zero examples returns diagnostic `EvalResult` with `Passed = false` and reason "Dataset contains 0 examples, minimum 1 required for evaluation". Judge model unreachable falls back to non-judge metrics with warning; if all requested metrics require a judge, throws `JudgeUnavailableException`. Baseline model not found in catalog throws `BaselineNotFoundException` with the model ID and available versions. Gate failure is **not an error** — it is the expected output of a functioning quality gate. Compute unavailable for metric computation (e.g., BERTScore needs GPU) degrades to CPU with performance warning, same as AI-0024 pattern.
+- **Error Modes:** Missing metric implementation degrades to `MetricNotAvailableException` with installation guidance (e.g., "BERTScore requires an adapter with AiCapability.MetricCompute — add Koan.AI.Connector.PythonSidecar or ensure a remote Worker has MetricCompute capability"). Dataset yielding zero examples returns diagnostic `EvalResult` with `Passed = false` and reason "Dataset contains 0 examples, minimum 1 required for evaluation". Judge model unreachable falls back to non-judge metrics with warning; if all requested metrics require a judge, throws `JudgeUnavailableException`. Baseline model not found in catalog throws `BaselineNotFoundException` with the model ID and available versions. Gate failure is **not an error** — it is the expected output of a functioning quality gate. Compute unavailable for metric computation (e.g., BERTScore needs GPU) degrades to CPU with performance warning, same as AI-0024 pattern.
 - **Acceptance Criteria:** A developer can `Dataset.From<SupportTicket>(where: t => t.IsGoldenTestCase, input: t => t.Question, expected: t => t.GoldAnswer)`, run `Eval.Measure()` with text and RAG metrics, `Eval.Gate()` against a baseline with threshold requirements, `Eval.Drift()` between training-era and current-era entity queries, and `Eval.Compare()` across model versions — all with entity-native data, full lineage recording, and boot report integration.
 
 **Edge Cases**
@@ -22,7 +22,7 @@ date: 2026-03-20
 - `Eval.Drift()` where baseline and current have zero overlap in embedding space: Returns `DriftScore = 1.0` with `Status = Critical` and recommendation "Distributions are entirely disjoint — input domain has changed fundamentally".
 - `Eval.Compare()` with a single model: Degrades to `Eval.Measure()` semantics — returns results without ranking.
 - `Eval.Judge()` where the judge model is weaker than the evaluated model: Emits a warning via boot report ("Judge model 'llama3.1:8b' has fewer parameters than evaluated model 'llama3.1:70b' — results may be unreliable") but proceeds. The developer decides.
-- `Eval.Gate()` where the metric library container is unavailable: Metrics computable in .NET (Accuracy, F1, Precision, Recall, Latency, ErrorRate) proceed. Python-dependent metrics (RougeL, BLEU, BERTScore) fail with `MetricNotAvailableException`. Gate fails if any required metric is unavailable — failing safe is the correct behavior for a quality gate.
+- `Eval.Gate()` where no `MetricCompute`-capable adapter is available: Metrics computable in .NET (Accuracy, F1, Precision, Recall, Latency, ErrorRate) proceed. Metrics requiring `AiCapability.MetricCompute` (RougeL, BLEU, BERTScore) fail with `MetricNotAvailableException`. Gate fails if any required metric is unavailable — failing safe is the correct behavior for a quality gate.
 - `Eval.Benchmark()` with a model format incompatible with lm-eval-harness: Returns `BenchmarkResult` with `Status = Unsupported` and guidance ("Model format GGUF requires conversion to SafeTensors or ONNX for benchmark evaluation. Use `Model.Convert()` first.").
 - Concurrent `Eval.Gate()` calls for the same model: Each evaluation is independent and idempotent. No locking. Results are recorded independently in lineage — the most recent passing gate is authoritative.
 
@@ -101,7 +101,7 @@ public static class Metric
 
 - User-defined metrics (e.g., `"domain_accuracy"`, `"brand_voice_score"`) are first-class without framework changes.
 - `EvalScore.Metric` is already `string` in the shared boundary model (AI-0022). An enum would require serialization mapping.
-- Metric implementations are registered via DI (`IMetricComputer`), not switched on enum values. New metrics are new implementations, not new cases.
+- Metric implementations are resolved via adapter capabilities (`AiCapability.MetricCompute` for text metrics, `AiCapability.Chat` for LLM-as-judge) or registered as built-in .NET implementations via DI. New metrics are new implementations, not new cases.
 
 **Metric categories by computation strategy:**
 
@@ -466,7 +466,7 @@ No export. No separate snapshot storage. The same entity that serves production,
 
 **How drift is computed:**
 
-1. Both datasets are embedded using the entity's configured embedding model (via `[Embedding]` attribute from AI-0020, or an explicit model if specified in `DriftOptions`).
+1. Both datasets are embedded using an `Embed`-capable adapter resolved via `AdapterResolver.Resolve(registry, AiCapability.Embed)`. By default, the entity's configured embedding model is used (via `[Embedding]` attribute from AI-0020). An explicit model can be specified in `DriftOptions.EmbeddingModel`, which routes to the appropriate `Embed`-capable adapter.
 2. The framework computes distribution statistics over the embedding vectors:
    - **Centroid shift:** Euclidean distance between the mean embedding vectors of baseline and current.
    - **Variance change:** Difference in embedding space dispersion.
@@ -626,48 +626,52 @@ var pipeline = Pipeline.Create("model-promotion")
 
 ### Part 11: Metric Implementation Architecture
 
-Metrics are implemented as `IMetricComputer` instances registered via DI. The framework ships built-in computers for classification and operational metrics. Text quality, embedding-based, and generative metrics run in containers.
+Metric computation uses the **capability-driven adapter resolution** pattern (AI-0021). Instead of a separate `IMetricComputer` service interface, adapters with appropriate capabilities handle metric computation. The `EvalService` resolves the right adapter for each metric category:
+
+| Metric Category | Resolution | Adapter Capability |
+|----------------|------------|--------------------|
+| Classification (Accuracy, F1, Precision, Recall) | In-process .NET — no adapter needed | N/A (built-in) |
+| Operational (Latency, ErrorRate, CostPerQuery) | In-process .NET — no adapter needed | N/A (built-in) |
+| Ranking (RecallAtK, NDCG, MRR) | In-process .NET — no adapter needed | N/A (built-in) |
+| Text Quality (RougeL, BLEU, BERTScore) | `AdapterResolver.Resolve(registry, AiCapability.MetricCompute)` | `MetricCompute` |
+| Generative (Perplexity, Toxicity) | `AdapterResolver.Resolve(registry, AiCapability.MetricCompute)` | `MetricCompute` |
+| RAG / LLM-as-judge (Faithfulness, Relevancy) | `AdapterResolver.Resolve(registry, AiCapability.Chat)` | `Chat` |
 
 ```csharp
-public interface IMetricComputer
-{
-    string MetricName { get; }
-    MetricRequirement Requirements { get; }
-    Task<double> Compute(
-        IReadOnlyList<string> predictions,
-        IReadOnlyList<string>? references,
-        CancellationToken ct = default);
-}
+// EvalService internally resolves adapters per metric category:
 
-[Flags]
-public enum MetricRequirement
-{
-    None = 0,
-    References = 1,      // Requires expected outputs
-    Context = 2,         // Requires retrieval context (RAG metrics)
-    ModelInference = 4,  // Requires running a model (BERTScore, judge metrics)
-    Python = 8           // Requires Python runtime (rouge-score, sacrebleu)
-}
+// Text metrics → adapter with MetricCompute capability
+// (e.g., PythonSidecar adapter or container adapter that has rouge-score, sacrebleu installed)
+var metricAdapter = AdapterResolver.Resolve(registry, AiCapability.MetricCompute);
+
+// LLM-as-judge metrics → adapter with Chat capability
+// (e.g., Ollama adapter, OpenAI adapter, any Chat-capable adapter)
+var judgeAdapter = AdapterResolver.Resolve(registry, AiCapability.Chat);
 ```
 
-**Built-in .NET implementations (no container required):**
+**Built-in .NET implementations (no adapter required):**
 
 - `AccuracyComputer`, `F1Computer`, `PrecisionComputer`, `RecallComputer` — confusion matrix arithmetic.
 - `LatencyComputer`, `ErrorRateComputer`, `CostPerQueryComputer` — telemetry aggregation from inference logs.
 - `RecallAtKComputer`, `NDCGComputer`, `MRRComputer` — ranking metric arithmetic.
 
-**Container implementations (`koan/eval:python`):**
+**`MetricCompute`-capable adapter implementations:**
 
+A Python sidecar adapter (`Koan.AI.Connector.PythonSidecar`) or container adapter declaring `AiCapability.MetricCompute` handles:
 - `RougeLComputer`, `BleuComputer` — wraps `rouge-score` and `sacrebleu` Python packages.
 - `BERTScoreComputer` — wraps `bert-score` Python package, requires model inference.
 - `PerplexityComputer`, `ToxicityComputer` — wraps `evaluate` Python package.
 
-**LLM-as-judge implementations (via `Client.Chat()`):**
+A remote `Koan.AI.Worker` with `MetricCompute` capability can also compute these metrics on GPU hardware when BERTScore or embedding-based metrics require it.
 
-- `FaithfulnessComputer`, `ContextRelevancyComputer`, `AnswerRelevancyComputer`, `ContextRecallComputer` — structured evaluation prompts sent to the judge model.
+**`Chat`-capable adapter for LLM-as-judge:**
+
+RAG metrics (Faithfulness, Relevancy, ContextRecall) and `Eval.Judge()` resolve to any adapter with `AiCapability.Chat`. The strongest available chat model is used by default (via `Client.Scope(AiCategory.Chat)` routing). This means judge evaluation works with any inference provider — Ollama, OpenAI, Anthropic, or a remote Worker with `Chat` capability.
+
+- `FaithfulnessComputer`, `ContextRelevancyComputer`, `AnswerRelevancyComputer`, `ContextRecallComputer` — structured evaluation prompts sent to the `Chat`-capable adapter.
 - `CoherenceComputer` — rates text coherence on a structured rubric.
 
-**User-defined metrics:** Register a custom `IMetricComputer` via DI. It becomes available to `Eval.Measure()`, `Eval.Gate()`, and all other verbs by its `MetricName`.
+**User-defined metrics:** Register a custom metric implementation via DI. It becomes available to `Eval.Measure()`, `Eval.Gate()`, and all other verbs by its `MetricName`. Custom metrics that need Python compute should delegate to a `MetricCompute`-capable adapter.
 
 ### Part 12: Boot Report Integration
 
@@ -681,9 +685,9 @@ public enum MetricRequirement
 │                       precision, recall,     │
 │                       latency, error_rate,   │
 │                       recall_at_k, ndcg, mrr │
-│ Metrics (container) : rouge_l, bleu,        │
-│                       bert_score, perplexity │
-│ Container available : Yes (koan/eval:python) │
+│ MetricCompute adapter: PythonSidecar         │
+│   Metrics available : rouge_l, bleu,         │
+│                       bert_score, perplexity  │
 │ Judge model         : claude-sonnet-4-6     │
 │ Benchmark harness   : Not installed          │
 │ Registered custom   : domain_accuracy,       │
@@ -696,12 +700,12 @@ The boot report makes it immediately clear which metrics are available, whether 
 ### Part 13: Package Structure
 
 ```
-Koan.AI.Eval                    ← Eval.* facade, gate DSL, metric interfaces, built-in .NET metrics
-Koan.AI.Eval.Python             ← Container-based metric computers (RougeL, BLEU, BERTScore, etc.)
+Koan.AI.Eval                    ← Eval.* facade, gate DSL, built-in .NET metrics
+                                   (classification, operational, ranking)
 Koan.AI.Eval.Benchmark          ← lm-eval-harness integration, benchmark suite definitions
 ```
 
-**Reference = Intent:** Adding `Koan.AI.Eval` enables measurement with built-in metrics and gating. Adding `Koan.AI.Eval.Python` enables text quality and embedding-based metrics. Adding `Koan.AI.Eval.Benchmark` enables standard benchmark suites. Each package reference expands capability without configuration.
+**Reference = Intent:** Adding `Koan.AI.Eval` enables measurement with built-in .NET metrics and gating. Text quality metrics (RougeL, BLEU, BERTScore) resolve to any adapter with `AiCapability.MetricCompute` — typically a `Koan.AI.Connector.PythonSidecar` or `Koan.AI.Connector.TrainerContainer` that has `MetricCompute` in its capabilities. LLM-as-judge metrics resolve to any adapter with `AiCapability.Chat`. Adding `Koan.AI.Eval.Benchmark` enables standard benchmark suites. No separate `Koan.AI.Eval.Python` package is needed — metric computation is an adapter capability, not a separate package.
 
 ## Consequences
 
@@ -712,14 +716,14 @@ Koan.AI.Eval.Benchmark          ← lm-eval-harness integration, benchmark suite
 - **Drift detection uses temporal entity queries.** Comparing `t.CreatedAt >= trainDate` against `t.CreatedAt >= lastWeek` on the same `Entity<T>` requires no snapshot infrastructure. The entity store is the snapshot store.
 - **Full audit trail via lineage.** Every evaluation — pass or fail — is recorded in the model's `Lineage`. Teams can answer "why was v5 not deployed?" months later.
 - **Progressive disclosure maintained.** `Eval.Measure()` (informational) → `Eval.Gate()` (enforcing) → `Eval.Drift()` (monitoring) → `Eval.Benchmark()` (comprehensive). Each verb adds responsibility without requiring the previous ones.
-- **Extensible metric system.** `IMetricComputer` interface allows domain-specific metrics (`brand_voice_score`, `medical_accuracy`) to participate in gates and pipelines as first-class citizens.
+- **Extensible metric system.** Adapter capabilities (`MetricCompute`, `Chat`) and custom DI-registered metrics allow domain-specific metrics (`brand_voice_score`, `medical_accuracy`) to participate in gates and pipelines as first-class citizens.
 - **Pipeline integration enables automation.** Train → Gate → Shadow → Gate → Deploy as a single pipeline. Drift monitoring triggers retraining. The closed loop (AI-0022, Part 14) includes automated quality checkpoints.
 
 ### Negative / Trade-offs
 
-- **Python container dependency for advanced metrics.** RougeL, BLEU, BERTScore, and generative metrics require `koan/eval:python`. Classification and operational metrics work without containers, but most text-focused evaluations need the container.
+- **`MetricCompute` adapter dependency for advanced metrics.** RougeL, BLEU, BERTScore, and generative metrics require an adapter with `AiCapability.MetricCompute` (e.g., `PythonSidecar` or `TrainerContainer`). Classification and operational metrics are built-in .NET and work without any adapter, but most text-focused evaluations need a `MetricCompute`-capable adapter.
 - **LLM-as-judge costs.** RAG metrics (Faithfulness, Relevancy) and `Eval.Judge()` consume inference tokens. Evaluating 1,000 examples with 4 RAG metrics means approximately 4,000 LLM calls to the judge model. Cost scales linearly with dataset size.
-- **Drift detection requires embeddings.** `Eval.Drift()` embeds both datasets, which requires a functioning embedding model and compute for the embedding inference. This is a dependency on the AI-0020 `[Embedding]` infrastructure.
+- **Drift detection requires embeddings.** `Eval.Drift()` embeds both datasets via an `Embed`-capable adapter, which requires a functioning embedding model and compute for the embedding inference. This is a dependency on the AI-0020 `[Embedding]` infrastructure and the adapter resolution pattern (AI-0021).
 - **Benchmark harness is heavyweight.** `lm-eval-harness` in a container requires significant disk space and download time for evaluation datasets. The `Koan.AI.Eval.Benchmark` package is deliberately separate to avoid imposing this cost on teams that don't need academic benchmarks.
 - **Gate exception pattern may surprise.** Developers accustomed to result-returning APIs may find the exception-throwing gate pattern unfamiliar. This is a deliberate design choice documented in Part 3 — the exception forces acknowledgment, which is the correct behavior for a quality gate.
 

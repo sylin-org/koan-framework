@@ -121,6 +121,9 @@ public sealed class AgentBuilder
     // ── Custom tools (same as Chain) ──
     public AgentBuilder WithTools(params Tool[] tools);
 
+    // ── Adapter capability tools ──
+    public AgentBuilder WithAdapterTools(params string[] capabilities);
+
     // ── Memory ──
     public AgentBuilder WithMemory(AgentMemory memory);
 
@@ -371,7 +374,29 @@ app.MapAgent("/api/assistant", agent);
 // → SSE stream of AgentStep events
 ```
 
-### Part 7: MCP Tool Reuse
+### Part 7: Adapter Capability Tools
+
+Beyond entity CRUD, agents can generate tools from **adapter capabilities**. This allows an agent to invoke model management, training, or other AI lifecycle operations if the user grants access.
+
+```csharp
+// Prism's setup agent — can search HuggingFace and pull models
+var setupAgent = Agent.Create()
+    .System("You help users discover and install AI models.")
+    .WithAdapterTools(AiCapability.Pull, AiCapability.ModelList)
+    .Run("Find a good 7B model for code generation and pull it");
+
+// Agent generates tools from adapter capabilities:
+// model_list() → calls adapter with ModelList capability
+// model_pull(name) → calls adapter with Pull capability
+```
+
+`.WithAdapterTools(params string[] capabilities)` introspects the adapter registry for adapters that declare the specified capabilities and generates tool definitions for each. The agent's chat model is resolved via the existing `AiCategoryRouter` (`Chat` capability). Tool execution may route to different adapters based on their capabilities — a `Pull` tool call routes to the `Pull`-capable adapter, which may be a different adapter than the one providing `Chat`.
+
+Adapter capabilities are queryable at build time: the agent knows which capabilities are available in the current deployment and only generates tools for capabilities that have registered adapters. If no adapter has `Pull` capability, `WithAdapterTools(AiCapability.Pull)` generates no tools (with a build-time warning).
+
+This is a minor extension to the core agent design. Entity tools remain the primary differentiator — adapter tools provide access to the broader AI lifecycle for specialized agents like Prism's setup or administration workflows.
+
+### Part 8: MCP Tool Reuse
 
 Entity tool generation reuses the same entity introspection that MCP Code Mode (AI-0014) already performs. The `IEntityToolGenerator` interface is shared:
 
@@ -391,7 +416,7 @@ internal interface IEntityToolGenerator
 
 This ensures parity: the tools an agent sees are identical to the tools an MCP client sees. No divergence.
 
-### Part 8: Usage Examples
+### Part 9: Usage Examples
 
 **Customer support agent:**
 
@@ -446,7 +471,7 @@ var result = await inventoryAgent.Run("Set all Widget prices to $29.99");
 // write: true required — without it, save/create/delete tools are not generated
 ```
 
-### Part 9: What Agent Does NOT Do
+### Part 10: What Agent Does NOT Do
 
 Explicitly out of scope — these are orchestration concerns handled by external engines via MCP:
 
@@ -460,7 +485,7 @@ Explicitly out of scope — these are orchestration concerns handled by external
 
 The agent is a **single-turn reasoning loop**. For multi-step workflows with persistence, use external engines that consume Koan via MCP. For human review of agent outputs, use `Review.*` (AI-0030).
 
-### Part 10: Package and Dependencies
+### Part 11: Package and Dependencies
 
 **Package:** `Koan.AI.Agents` (follows Reference = Intent — adding the package reference enables Agent.*)
 

@@ -23,6 +23,12 @@ public interface IAiAdapter
     /// <summary>An optional model manager surfaced when the adapter can provision or retire models.</summary>
     IAiModelManager? ModelManager => null;
 
+    /// <summary>Set of capabilities this adapter supports (from AiCapability constants).</summary>
+    IReadOnlySet<string> Capabilities => new HashSet<string>();
+
+    /// <summary>Whether this adapter has the specified capability.</summary>
+    bool HasCapability(string capability) => Capabilities.Contains(capability);
+
     /// <summary>Lists models available through this adapter.</summary>
     Task<IReadOnlyList<AiModelDescriptor>> ListModelsAsync(CancellationToken ct = default);
 }

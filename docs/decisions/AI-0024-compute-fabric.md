@@ -692,11 +692,32 @@ internal sealed class ComputeResolver : IComputeResolver
 }
 ```
 
-### Part 8: Koan.AI.Worker — Compute-Capable Hosted Service
+### Part 8: Koan.AI.Worker — Compute-Capable Adapter
 
-The Worker is a lightweight service that runs on machines with GPU hardware. It registers with ZenGarden, advertises compute capabilities, and accepts delegated work.
+The Worker is a lightweight service that runs on machines with GPU hardware. It registers as an **AI adapter** with capabilities reflecting the remote machine's hardware and installed runtimes, advertises compute via ZenGarden, and accepts delegated work.
 
-#### 8.1 Registration
+#### 8.1 Worker as Adapter
+
+`Koan.AI.Worker` is itself an `IAiAdapter`. It registers with capabilities that reflect the remote machine's actual hardware and software. For example, a Worker on a machine with an A100 and Ollama installed might declare:
+
+```csharp
+// Worker adapter registration — capabilities reflect the machine
+public IReadOnlySet<string> Capabilities => new HashSet<string>
+{
+    AiCapability.Train,           // PyTorch available
+    AiCapability.Align,           // trl available
+    AiCapability.Convert,         // llama.cpp available
+    AiCapability.Quantize,        // llama.cpp available
+    AiCapability.Serve.GGUF,      // Ollama installed
+    AiCapability.Chat,            // Inference via Ollama
+    AiCapability.Embed,           // Embedding via Ollama
+    AiCapability.MetricCompute,   // Python eval libraries installed
+};
+```
+
+Callers resolve compute-bound operations through the standard adapter resolution pattern. For example, `Training.Train()` internally calls `AdapterResolver.Resolve(registry, AiCapability.Train)` to find the adapter (local or remote Worker) that can handle training. If only the remote Worker has `Train` capability, the work is transparently delegated.
+
+#### 8.2 Registration
 
 ```csharp
 // Program.cs on a GPU-capable machine
@@ -704,7 +725,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services
     .AddKoan()
-    .AsAiWorker();     // Registers with ZenGarden, starts compute advertisement
+    .AsAiWorker();     // Registers as adapter with hardware-inferred capabilities
 
 var app = builder.Build();
 app.Run();
@@ -713,18 +734,20 @@ app.Run();
 `AsAiWorker()` does the following:
 
 1. Runs local compute detection (Part 5).
-2. Registers with ZenGarden as a stone with `compute` capability (Part 6.1).
-3. Starts a background service that:
+2. Infers adapter capabilities from detected hardware and runtimes (e.g., `Train` if PyTorch is available, `Serve.GGUF` if Ollama is installed).
+3. Registers the Worker as an `IAiAdapter` in the adapter registry with those capabilities.
+4. Registers with ZenGarden as a stone with `compute` capability (Part 6.1).
+5. Starts a background service that:
    - Refreshes GPU utilization every 15 seconds.
    - Updates ZenGarden capability advertisement on utilization change > 10%.
    - Listens for work delegation requests via ZenGarden protocol.
-4. Exposes management endpoints:
+6. Exposes management endpoints:
    - `GET /api/v1/compute/status` — current resource state.
    - `POST /api/v1/compute/jobs` — accept a new job.
    - `GET /api/v1/compute/jobs/{id}/progress` — SSE stream of progress events.
    - `DELETE /api/v1/compute/jobs/{id}` — cancel a running job.
 
-#### 8.2 Configuration
+#### 8.3 Configuration
 
 ```json
 {
@@ -1152,7 +1175,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 }
 ```
 
-### Part 14: Integration with AI-0015 Source-Member Architecture
+### Part 14: Integration with AI-0015 Source-Member Architecture and Adapter Resolution
 
 The compute fabric complements, not replaces, the source-member architecture:
 
@@ -1167,9 +1190,25 @@ The compute fabric complements, not replaces, the source-member architecture:
 When both are present, they coordinate:
 
 - `Client.Chat()` continues to use source-member routing (AI-0015).
-- `Training.Train()` uses compute fabric routing (AI-0024).
+- `Training.Train()` resolves via `AdapterResolver.Resolve(registry, AiCapability.Train)` — the `Train`-capable adapter (local Python sidecar or remote Worker) handles execution.
+- `Model.Convert()` resolves via `AdapterResolver.Resolve(registry, AiCapability.Convert)` — no separate conversion runtime interface.
 - `Model.Deploy()` uses compute fabric to find a node, then registers a new source-member endpoint for inference routing.
 - `Compute.Fleet()` reports both inference endpoints (from source registry) and compute resources (from compute fabric) for a unified fleet view.
+
+**Capability-driven resolution unifies compute routing.** An adapter declaring `Train` signals it has access to training-capable compute. An adapter declaring `Convert` + `Quantize` signals it can handle model format operations. The `AdapterResolver` finds the right adapter; the compute fabric provides the hardware context (VRAM, accelerator type, utilization) that informs which adapter is best positioned to execute.
+
+```csharp
+// Training resolves through adapter capabilities, not separate service interfaces
+var trainAdapter = AdapterResolver.Resolve(registry, AiCapability.Train);
+// → Returns Worker adapter on gpu-server (has PyTorch + A100)
+// → Or local Python sidecar adapter (if local GPU is sufficient)
+
+// Conversion follows the same pattern
+var convertAdapter = AdapterResolver.Resolve(registry, AiCapability.Convert);
+// → Returns adapter with llama.cpp available
+```
+
+When multiple adapters declare the same capability (e.g., two Workers both have `Train`), the compute fabric's resolution rules (VRAM, utilization, locality) disambiguate. The `to:` parameter on `AdapterResolver.Resolve()` can also target a specific adapter explicitly.
 
 ### Part 15: Security Considerations
 

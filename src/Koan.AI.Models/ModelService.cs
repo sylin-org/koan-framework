@@ -2,34 +2,25 @@ using Koan.AI.Contracts.Adapters;
 using Koan.AI.Contracts.Models;
 using Koan.AI.Contracts.Routing;
 using Koan.AI.Contracts.Shared;
+using Koan.AI.Resolution;
+using Koan.Core.AI;
 using Koan.Data.Core;
 
 namespace Koan.AI.Models;
 
 /// <summary>
-/// Default implementation of <see cref="IModelService"/> that resolves model operations
-/// through the existing adapter infrastructure (<see cref="IAiAdapterRegistry"/>,
-/// <see cref="IAiModelManager"/>). Falls back to <see cref="IModelSourceProvider"/>
-/// instances for sources that are not full adapters (e.g., HuggingFace Hub client).
+/// Default implementation of <see cref="IModelService"/> that resolves all model operations
+/// through adapter capabilities via <see cref="Resolution.AdapterResolver"/>.
+/// One resolution pattern for everything: query capability, find adapter, delegate.
 /// </summary>
 internal sealed class ModelService : IModelService
 {
-    private readonly IAiAdapterRegistry _adapterRegistry;
-    private readonly IReadOnlyList<IModelSourceProvider> _sourceProviders;
-    private readonly IReadOnlyList<IModelRuntime> _runtimes;
-    private readonly IReadOnlyList<IFormatConverter> _converters;
+    private readonly IAiAdapterRegistry _registry;
     private const string DefaultCacheDirectory = ".Koan/models";
 
-    public ModelService(
-        IAiAdapterRegistry adapterRegistry,
-        IEnumerable<IModelSourceProvider> sourceProviders,
-        IEnumerable<IModelRuntime> runtimes,
-        IEnumerable<IFormatConverter> converters)
+    public ModelService(IAiAdapterRegistry registry)
     {
-        _adapterRegistry = adapterRegistry;
-        _sourceProviders = sourceProviders.ToList().AsReadOnly();
-        _runtimes = runtimes.ToList().AsReadOnly();
-        _converters = converters.ToList().AsReadOnly();
+        _registry = registry;
     }
 
     // ── Discovery (catalog operations) ──
@@ -41,64 +32,30 @@ internal sealed class ModelService : IModelService
             return await ModelEntry.All(ct);
         }
 
-        // If a specific source is requested, try adapter first, then provider
-        if (!string.IsNullOrWhiteSpace(source))
+        var adapters = source is not null
+            ? new List<IAiAdapter> { AdapterResolver.Resolve(_registry, AiCapability.ModelList, source) }
+            : AdapterResolver.ResolveAll(_registry, AiCapability.ModelList).ToList();
+
+        var results = new List<ModelEntry>();
+
+        // Local catalog
+        if (string.IsNullOrWhiteSpace(source))
         {
-            var adapter = _adapterRegistry.All.FirstOrDefault(a =>
-                string.Equals(a.Id, source, StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(a.Type, source, StringComparison.OrdinalIgnoreCase));
-
-            if (adapter is not null)
-            {
-                var adapterModels = await adapter.ListModelsAsync(ct);
-                return adapterModels
-                    .Where(m => m.Name.Contains(query, StringComparison.OrdinalIgnoreCase))
-                    .Select(ToModelEntry)
-                    .ToList()
-                    .AsReadOnly();
-            }
-
-            var provider = _sourceProviders.FirstOrDefault(p =>
-                string.Equals(p.Name, source, StringComparison.OrdinalIgnoreCase));
-
-            if (provider is not null)
-            {
-                return await provider.SearchAsync(query, ct: ct);
-            }
-
-            // Unknown source — fall through to local catalog
+            var localResults = await ModelEntry.Query(
+                m => m.HubId.Contains(query) || m.Tags.Contains(query), ct);
+            results.AddRange(localResults);
         }
 
-        // Search local catalog
-        var localResults = await ModelEntry.Query(
-            m => m.HubId.Contains(query) || m.Tags.Contains(query),
-            ct);
-
-        var allResults = new List<ModelEntry>(localResults);
-
-        // Search all adapters
-        foreach (var adapter in _adapterRegistry.All)
+        // Remote adapters with ModelList capability
+        foreach (var adapter in adapters)
         {
-            var adapterModels = await adapter.ListModelsAsync(ct);
-            var matching = adapterModels
+            var models = await adapter.ListModelsAsync(ct);
+            results.AddRange(models
                 .Where(m => m.Name.Contains(query, StringComparison.OrdinalIgnoreCase))
-                .Select(ToModelEntry);
-            allResults.AddRange(matching);
+                .Select(ToModelEntry));
         }
 
-        // Search all source providers
-        foreach (var provider in _sourceProviders)
-        {
-            var remoteResults = await provider.SearchAsync(query, ct: ct);
-            allResults.AddRange(remoteResults);
-        }
-
-        // Deduplicate by HubId, preferring local entries (which have LocalPath set)
-        return allResults
-            .GroupBy(m => m.HubId)
-            .Select(g => g.FirstOrDefault(m => m.LocalPath is not null) ?? g.First())
-            .ToList()
-            .AsReadOnly();
+        return results.DistinctBy(m => m.HubId).ToList().AsReadOnly();
     }
 
     public async Task<IReadOnlyList<ModelEntry>> SearchAsync(ModelQuery query, CancellationToken ct)
@@ -161,8 +118,8 @@ internal sealed class ModelService : IModelService
             return local;
         }
 
-        // Try adapters with ModelManager
-        foreach (var adapter in _adapterRegistry.All)
+        // Try all adapters
+        foreach (var adapter in _registry.All)
         {
             var models = await adapter.ListModelsAsync(ct);
             var match = models.FirstOrDefault(m =>
@@ -172,14 +129,6 @@ internal sealed class ModelService : IModelService
             {
                 return ToModelEntry(match);
             }
-        }
-
-        // Try source providers
-        var provider = _sourceProviders.FirstOrDefault(p => p.CanHandle(id));
-
-        if (provider is not null)
-        {
-            return await provider.GetMetadataAsync(id, ct);
         }
 
         return null;
@@ -195,12 +144,12 @@ internal sealed class ModelService : IModelService
 
     public async Task<IReadOnlyList<ModelEntry>> ListAsync(ModelStatus? status, CancellationToken ct)
     {
-        // Aggregate local catalog entries
         var all = await ModelEntry.All(ct);
         var allList = new List<ModelEntry>(all);
 
-        // Also include models reported by adapters (not yet in local catalog)
-        foreach (var adapter in _adapterRegistry.All)
+        // Also include models reported by adapters with ModelList capability
+        var listAdapters = AdapterResolver.ResolveAll(_registry, AiCapability.ModelList);
+        foreach (var adapter in listAdapters)
         {
             var adapterModels = await adapter.ListModelsAsync(ct);
             foreach (var am in adapterModels)
@@ -244,6 +193,16 @@ internal sealed class ModelService : IModelService
 
     public async Task RemoveAsync(string modelId, CancellationToken ct)
     {
+        // Try adapter with ModelRemove capability first
+        var removeAdapters = AdapterResolver.ResolveAll(_registry, AiCapability.ModelRemove);
+        foreach (var adapter in removeAdapters)
+        {
+            if (adapter.ModelManager is { } manager)
+            {
+                await manager.FlushAsync(new AiModelOperationRequest { Model = modelId }, ct);
+            }
+        }
+
         await ModelEntry.Remove(modelId, ct);
     }
 
@@ -268,120 +227,89 @@ internal sealed class ModelService : IModelService
         return Task.FromResult(empty);
     }
 
-    // ── Pull (adapters first, then source providers) ──
+    // ── Pull (via adapter with Pull capability) ──
 
     public async Task<ModelEntry> PullAsync(
         string id, string? to, ModelFormat? format,
         IProgress<ModelPullProgress>? progress, CancellationToken ct)
     {
-        // When 'to' is specified, route directly to that adapter or provider
-        if (!string.IsNullOrWhiteSpace(to))
+        var adapter = AdapterResolver.Resolve(_registry, AiCapability.Pull, to);
+        var manager = adapter.ModelManager
+            ?? throw new InvalidOperationException(
+                $"Adapter '{adapter.Id}' has Pull capability but no ModelManager.");
+
+        progress?.Report(new ModelPullProgress
         {
-            return await PullFromTargetAsync(id, to, format, progress, ct);
+            Phase = $"Pulling via {adapter.Name}",
+            Percent = 0
+        });
+
+        var result = await manager.EnsureInstalledAsync(
+            new AiModelOperationRequest { Model = id }, ct);
+
+        if (!result.Success)
+        {
+            throw new InvalidOperationException(
+                $"Failed to pull '{id}' via {adapter.Name}: {result.Message}");
         }
 
-        // Gather adapters with ModelManager capability
-        var managedAdapters = _adapterRegistry.All
-            .Where(a => a.ModelManager is not null)
-            .ToList();
-
-        // Single adapter with ModelManager → unambiguous
-        if (managedAdapters.Count == 1)
+        progress?.Report(new ModelPullProgress
         {
-            return await PullViaAdapterAsync(managedAdapters[0], id, format, progress, ct);
-        }
+            Phase = "Complete",
+            Percent = 100
+        });
 
-        // Multiple adapters — try to narrow by model ID pattern
-        if (managedAdapters.Count > 1)
-        {
-            var candidates = new List<IAiAdapter>();
-
-            foreach (var adapter in managedAdapters)
+        var entry = result.Model is { } descriptor
+            ? new ModelEntry
             {
-                // Check if the adapter already knows this model
-                var models = await adapter.ListModelsAsync(ct);
-                if (models.Any(m => string.Equals(m.Name, id, StringComparison.OrdinalIgnoreCase) ||
-                                     m.Name.StartsWith(id, StringComparison.OrdinalIgnoreCase)))
-                {
-                    candidates.Add(adapter);
-                }
+                HubId = descriptor.Name,
+                Origin = MapOrigin(adapter.Type),
+                ContextWindow = descriptor.ContextWindow,
+                EmbeddingDim = descriptor.EmbeddingDim,
+                Version = 1,
+                Tags = [adapter.Type]
             }
-
-            if (candidates.Count == 1)
+            : new ModelEntry
             {
-                return await PullViaAdapterAsync(candidates[0], id, format, progress, ct);
-            }
+                HubId = id,
+                Origin = MapOrigin(adapter.Type),
+                Version = 1,
+                Tags = [adapter.Type]
+            };
 
-            // If no adapter recognized the model, check source providers before giving up
-            if (candidates.Count == 0)
-            {
-                var provider = _sourceProviders.FirstOrDefault(p => p.CanHandle(id));
-                if (provider is not null)
-                {
-                    return await PullViaProviderAsync(provider, id, format, progress, ct);
-                }
-
-                // No one recognized it — try all adapters (first one that succeeds)
-                // This handles "pull a new model that no adapter has listed yet"
-                if (managedAdapters.Count == 1)
-                {
-                    return await PullViaAdapterAsync(managedAdapters[0], id, format, progress, ct);
-                }
-
-                throw new AmbiguousModelSourceException(id,
-                    managedAdapters.Select(a => a.Id).ToList().AsReadOnly());
-            }
-
-            // Multiple adapters claim to know the model
-            throw new AmbiguousModelSourceException(id,
-                candidates.Select(a => a.Id).ToList().AsReadOnly());
-        }
-
-        // No adapters with ModelManager — fall back to source providers
-        var fallbackProvider = _sourceProviders.FirstOrDefault(p => p.CanHandle(id));
-
-        if (fallbackProvider is not null)
-        {
-            return await PullViaProviderAsync(fallbackProvider, id, format, progress, ct);
-        }
-
-        // Build a descriptive error
-        var sources = new List<string>();
-        sources.AddRange(_adapterRegistry.All.Select(a => $"{a.Id} (adapter)"));
-        sources.AddRange(_sourceProviders.Select(p => $"{p.Name} (provider)"));
-
-        var registered = sources.Count > 0
-            ? $"Registered sources: [{string.Join(", ", sources)}]"
-            : "No adapters or model source providers registered";
-
-        throw new InvalidOperationException(
-            $"No adapter or source provider can handle '{id}'. {registered}.");
+        await entry.Save(ct);
+        return entry;
     }
 
-    // ── Format Conversion ──
+    // ── Format Conversion (via adapter with Convert capability) ──
 
     public async Task<JobRef> ConvertAsync(string modelId, ModelFormat to, Quantization quantization, CancellationToken ct)
     {
         var model = await InspectAsync(modelId, ct)
             ?? throw new InvalidOperationException($"Model '{modelId}' not found in catalog.");
 
-        var converter = _converters.FirstOrDefault(c =>
-            c.SourceFormats.Contains(model.Format) && c.TargetFormats.Contains(to));
+        var adapter = AdapterResolver.Resolve(_registry, AiCapability.Convert);
+        var manager = adapter.ModelManager
+            ?? throw new InvalidOperationException(
+                $"Adapter '{adapter.Id}' has Convert capability but no ModelManager.");
 
-        if (converter is null)
-            throw new InvalidOperationException(
-                $"No converter registered for {model.Format} -> {to}. " +
-                $"Registered converters: [{string.Join(", ", _converters.Select(c => $"{string.Join(",", c.SourceFormats)}->{string.Join(",", c.TargetFormats)}"))}].");
+        // Delegate conversion to the adapter's model manager
+        var result = await manager.EnsureInstalledAsync(
+            new AiModelOperationRequest
+            {
+                Model = modelId,
+                Parameters = new Dictionary<string, string>
+                {
+                    ["targetFormat"] = to.ToString(),
+                    ["quantization"] = quantization.ToString()
+                }
+            }, ct);
 
-        var result = await converter.ConvertAsync(new ConversionRequest
+        if (!result.Success)
         {
-            SourcePath = model.LocalPath ?? throw new InvalidOperationException(
-                $"Model '{modelId}' has no local path. Pull it first with Model.Pull()."),
-            SourceFormat = model.Format,
-            TargetFormat = to,
-            OutputDirectory = Path.Combine(DefaultCacheDirectory, modelId, to.ToString().ToLowerInvariant()),
-            Quantization = quantization
-        }, ct: ct);
+            throw new InvalidOperationException(
+                $"Conversion of '{modelId}' to {to} failed via {adapter.Name}: {result.Message}");
+        }
 
         // Register converted model in catalog
         var converted = new ModelEntry
@@ -389,14 +317,12 @@ internal sealed class ModelService : IModelService
             HubId = model.HubId,
             Version = model.Version,
             Base = model.ToRef(),
-            Format = result.Format,
+            Format = to,
             Parameters = model.Parameters,
             ContextWindow = model.ContextWindow,
             EmbeddingDim = model.EmbeddingDim,
-            Quantization = result.Quantization,
+            Quantization = quantization,
             Capabilities = [.. model.Capabilities],
-            LocalPath = result.OutputPath,
-            DiskSizeBytes = result.FileSizeBytes,
             Origin = model.Origin,
             License = model.License
         };
@@ -419,60 +345,31 @@ internal sealed class ModelService : IModelService
             "LoRA merge requires a training runtime. Use Training.Run() with a merge script.");
     }
 
-    // ── Deployment ──
+    // ── Deployment (via adapter with Serve.* capability) ──
 
     public async Task DeployAsync(string modelId, string? runtimeId, DeployOptions? options, CancellationToken ct)
     {
         var model = await InspectAsync(modelId, ct)
             ?? throw new InvalidOperationException($"Model '{modelId}' not found in catalog.");
 
-        // Check if an adapter with ModelManager can handle deployment
-        if (runtimeId is not null)
-        {
-            var adapter = _adapterRegistry.Get(runtimeId);
-            if (adapter?.ModelManager is { } adapterManager)
-            {
-                var result = await adapterManager.EnsureInstalledAsync(
-                    new AiModelOperationRequest { Model = modelId }, ct);
+        var serveCapability = $"Serve.{model.Format}";
+        var adapter = AdapterResolver.Resolve(_registry, serveCapability, runtimeId);
+        var manager = adapter.ModelManager
+            ?? throw new InvalidOperationException(
+                $"Adapter '{adapter.Id}' can serve {model.Format} but has no ModelManager for deployment.");
 
-                if (result.Success)
-                {
-                    if (!model.DeployedTo.Contains(adapter.Id))
-                    {
-                        model.DeployedTo = [.. model.DeployedTo, adapter.Id];
-                        await model.Save(ct);
-                    }
-                    return;
-                }
-            }
+        var result = await manager.EnsureInstalledAsync(
+            new AiModelOperationRequest { Model = modelId }, ct);
+
+        if (!result.Success)
+        {
+            throw new InvalidOperationException(
+                $"Failed to deploy '{modelId}' via {adapter.Name}: {result.Message}");
         }
 
-        IModelRuntime runtime;
-        if (runtimeId is not null)
+        if (!model.DeployedTo.Contains(adapter.Id))
         {
-            runtime = _runtimes.FirstOrDefault(r => r.Id == runtimeId)
-                ?? throw new InvalidOperationException($"Runtime '{runtimeId}' not registered.");
-        }
-        else
-        {
-            // Auto-select: find a runtime that supports this model's format
-            runtime = _runtimes.FirstOrDefault(r =>
-                r.SupportedFormats.Contains(model.Format) &&
-                r.SupportedCapabilities.Intersect(model.Capabilities.Select(c => (ModelCapability)c)).Any())
-                ?? throw new InvalidOperationException(
-                    $"No runtime supports format {model.Format}. " +
-                    $"Registered runtimes: [{string.Join(", ", _runtimes.Select(r => $"{r.Id} ({string.Join(",", r.SupportedFormats)})"))}].");
-        }
-
-        if (!await runtime.IsAvailableAsync(ct))
-            throw new InvalidOperationException($"Runtime '{runtime.Id}' is not available.");
-
-        await runtime.DeployAsync(model, options, ct);
-
-        // Update catalog
-        if (!model.DeployedTo.Contains(runtime.Id))
-        {
-            model.DeployedTo = [.. model.DeployedTo, runtime.Id];
+            model.DeployedTo = [.. model.DeployedTo, adapter.Id];
             await model.Save(ct);
         }
     }
@@ -484,37 +381,34 @@ internal sealed class ModelService : IModelService
 
         var routes = new List<ModelRoute>();
 
-        foreach (var runtime in _runtimes)
+        foreach (var adapter in _registry.All)
         {
-            if (!await runtime.IsAvailableAsync(ct)) continue;
-
-            // Direct deployment (format matches)
-            if (runtime.SupportedFormats.Contains(model.Format))
+            var serveCapability = $"Serve.{model.Format}";
+            if (adapter.HasCapability(serveCapability))
             {
                 routes.Add(new ModelRoute
                 {
                     Format = model.Format,
-                    RuntimeId = runtime.Id,
-                    ComputeNode = runtime.Location.ToString(),
+                    RuntimeId = adapter.Id,
+                    ComputeNode = adapter.Id,
                     RequiresConversion = false,
                     EstimatedVramBytes = model.EstimatedVramBytes
                 });
             }
 
-            // Conversion paths
-            foreach (var converter in _converters)
+            // Check conversion paths: adapter can convert and serve other formats
+            if (adapter.HasCapability(AiCapability.Convert))
             {
-                if (!converter.SourceFormats.Contains(model.Format)) continue;
-
-                foreach (var targetFormat in converter.TargetFormats)
+                foreach (var cap in adapter.Capabilities.Where(c => c.StartsWith("Serve.")))
                 {
-                    if (runtime.SupportedFormats.Contains(targetFormat))
+                    var targetFormat = cap.Replace("Serve.", "");
+                    if (Enum.TryParse<ModelFormat>(targetFormat, out var fmt) && fmt != model.Format)
                     {
                         routes.Add(new ModelRoute
                         {
-                            Format = targetFormat,
-                            RuntimeId = runtime.Id,
-                            ComputeNode = runtime.Location.ToString(),
+                            Format = fmt,
+                            RuntimeId = adapter.Id,
+                            ComputeNode = adapter.Id,
                             RequiresConversion = true,
                             EstimatedVramBytes = model.EstimatedVramBytes
                         });
@@ -523,7 +417,7 @@ internal sealed class ModelService : IModelService
             }
         }
 
-        return routes;
+        return routes.AsReadOnly();
     }
 
     // ── Versioning ──
@@ -538,7 +432,6 @@ internal sealed class ModelService : IModelService
             ?? throw new InvalidOperationException(
                 $"Model '{name}' version {version} not found in catalog.");
 
-        // Find the currently deployed version and undeploy it
         var current = (await ModelEntry.Query(
             m => m.HubId == name && m.DeployedTo.Count > 0, ct))
             .OrderByDescending(m => m.Version)
@@ -546,19 +439,19 @@ internal sealed class ModelService : IModelService
 
         if (current is not null && current.Version != version)
         {
-            // Move current to standby
             var deployedRuntimes = current.DeployedTo.ToList();
             current.DeployedTo = [];
             current.Tags = [.. current.Tags.Where(t => t != "production"), "standby"];
             await current.Save(ct);
 
-            // Deploy target to the same runtimes
+            // Redeploy target to the same runtimes via adapter capabilities
             foreach (var runtimeId in deployedRuntimes)
             {
-                var runtime = _runtimes.FirstOrDefault(r => r.Id == runtimeId);
-                if (runtime is not null && await runtime.IsAvailableAsync(ct))
+                var adapter = _registry.Get(runtimeId);
+                if (adapter?.ModelManager is { } manager)
                 {
-                    await runtime.DeployAsync(target, null, ct);
+                    await manager.EnsureInstalledAsync(
+                        new AiModelOperationRequest { Model = target.HubId }, ct);
                 }
             }
 
@@ -577,100 +470,12 @@ internal sealed class ModelService : IModelService
 
     // ── Private Helpers ──
 
-    private async Task<ModelEntry> PullFromTargetAsync(
-        string id, string target, ModelFormat? format,
-        IProgress<ModelPullProgress>? progress, CancellationToken ct)
+    private static ModelOrigin MapOrigin(string adapterType) => adapterType.ToLowerInvariant() switch
     {
-        // Try adapter by Id or Type
-        var adapter = _adapterRegistry.All.FirstOrDefault(a =>
-            string.Equals(a.Id, target, StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(a.Type, target, StringComparison.OrdinalIgnoreCase));
-
-        if (adapter?.ModelManager is not null)
-        {
-            return await PullViaAdapterAsync(adapter, id, format, progress, ct);
-        }
-
-        // Try source provider by Name
-        var provider = _sourceProviders.FirstOrDefault(p =>
-            string.Equals(p.Name, target, StringComparison.OrdinalIgnoreCase));
-
-        if (provider is not null)
-        {
-            return await PullViaProviderAsync(provider, id, format, progress, ct);
-        }
-
-        var available = new List<string>();
-        available.AddRange(_adapterRegistry.All
-            .Where(a => a.ModelManager is not null)
-            .Select(a => a.Id));
-        available.AddRange(_sourceProviders.Select(p => p.Name));
-
-        throw new InvalidOperationException(
-            $"Target '{target}' not found. " +
-            $"Available targets: [{string.Join(", ", available)}].");
-    }
-
-    private async Task<ModelEntry> PullViaAdapterAsync(
-        IAiAdapter adapter, string id, ModelFormat? format,
-        IProgress<ModelPullProgress>? progress, CancellationToken ct)
-    {
-        var manager = adapter.ModelManager
-            ?? throw new InvalidOperationException(
-                $"Adapter '{adapter.Id}' does not support model management.");
-
-        progress?.Report(new ModelPullProgress
-        {
-            Phase = $"Pulling via {adapter.Name}",
-            Percent = 0
-        });
-
-        var request = new AiModelOperationRequest { Model = id };
-        var result = await manager.EnsureInstalledAsync(request, ct);
-
-        if (!result.Success)
-        {
-            throw new InvalidOperationException(
-                $"Failed to pull '{id}' via {adapter.Name}: {result.Message}");
-        }
-
-        progress?.Report(new ModelPullProgress
-        {
-            Phase = "Complete",
-            Percent = 100
-        });
-
-        // Create or update catalog entry from the adapter result
-        var entry = result.Model is { } descriptor
-            ? new ModelEntry
-            {
-                HubId = descriptor.Name,
-                Origin = ModelOrigin.Custom,
-                ContextWindow = descriptor.ContextWindow,
-                EmbeddingDim = descriptor.EmbeddingDim,
-                Version = 1,
-                Tags = [adapter.Type]
-            }
-            : new ModelEntry
-            {
-                HubId = id,
-                Origin = ModelOrigin.Custom,
-                Version = 1,
-                Tags = [adapter.Type]
-            };
-
-        await entry.Save(ct);
-        return entry;
-    }
-
-    private async Task<ModelEntry> PullViaProviderAsync(
-        IModelSourceProvider provider, string id, ModelFormat? format,
-        IProgress<ModelPullProgress>? progress, CancellationToken ct)
-    {
-        var entry = await provider.PullAsync(id, DefaultCacheDirectory, format, progress, ct);
-        await entry.Save(ct);
-        return entry;
-    }
+        "ollama" => ModelOrigin.Ollama,
+        "huggingface" => ModelOrigin.HuggingFace,
+        _ => ModelOrigin.Custom
+    };
 
     private static ModelEntry ToModelEntry(AiModelDescriptor descriptor) => new()
     {

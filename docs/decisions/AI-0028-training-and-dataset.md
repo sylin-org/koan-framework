@@ -602,11 +602,27 @@ Queued → Running → Completed
 
 `Training.Resume()` creates a **new job** that continues from the specified checkpoint. The original job remains in its terminal state. This preserves history and avoids mutating completed job records.
 
-### Part 7: Training Runtime
+### Part 7: Training Runtime as Adapter
 
-#### Container-First (Default)
+Training runtimes are **adapters** in the capability-driven resolution system (AI-0021). There is no separate `ITrainingRuntime` interface — the adapter IS the provider. Each runtime registers as an `IAiAdapter` with capabilities that reflect what it can do.
 
-Training runs in Docker/Podman containers. Three base images cover the accelerator matrix:
+#### Adapter Registration
+
+| Adapter | Capabilities | Runtime |
+|---------|-------------|---------|
+| `Koan.AI.Connector.TrainerContainer` | `Train, Align, Convert, Quantize, Serve.SafeTensors` | Docker/Podman container |
+| `Koan.AI.Connector.PythonSidecar` | `Train, Align, Convert, Quantize, MetricCompute` | Local Python venv |
+| `Koan.AI.Worker` (remote) | `Train, Align, Convert, Quantize, Serve.GGUF, ...` | Remote GPU machine |
+
+`Training.Train()` resolves via `AdapterResolver.Resolve(registry, AiCapability.Train)`. If only one adapter declares `Train`, it handles the job unambiguously. If multiple adapters declare `Train`, the caller can disambiguate with the `to:` parameter or let the compute fabric's resolution rules (VRAM, locality, utilization) select the best target. Ambiguity without disambiguation throws `AmbiguousAdapterException`.
+
+`Training.Align()` resolves via `AdapterResolver.Resolve(registry, AiCapability.Align)`. Same pattern.
+
+`Training.Run()` (Level 3 escape hatch) also routes to the `Train`-capable adapter — the custom script executes within the adapter's runtime environment.
+
+#### Container Adapter (Default)
+
+The container adapter runs training in Docker/Podman containers. Three base images cover the accelerator matrix:
 
 | Image | Accelerator | Pre-installed |
 |-------|------------|---------------|
@@ -625,11 +641,11 @@ Training runs in Docker/Podman containers. Three base images cover the accelerat
 .koan/cache/models/  → /models/       (read-only, shared model cache)
 ```
 
-#### Local Python (Opt-In Fallback)
+#### Python Sidecar Adapter (Opt-In Fallback)
 
 Configured via `Koan:Ai:Training:Runtime = "local-python"`.
 
-The framework manages a virtual environment in `.koan/training-venv/` or uses a user-specified Python interpreter via `Koan:Ai:Training:PythonPath`. Dependencies are installed into the virtual environment.
+The Python sidecar adapter manages a virtual environment in `.koan/training-venv/` or uses a user-specified Python interpreter via `Koan:Ai:Training:PythonPath`. It registers with capabilities `Train, Align, Convert, Quantize, MetricCompute`.
 
 **Trade-offs acknowledged:**
 - No isolation between jobs
@@ -737,24 +753,28 @@ await Model.Deploy(aligned.Output, tag: "acme-support:current");
 ### Part 9: Package Structure
 
 ```
-Koan.AI.Training               ← Training.*, Dataset.* facades, job engine,
-                                   TrainOptions, DataFormat, ChunkStrategy,
-                                   filesystem contract types
-Koan.AI.Training.Container      ← Container runtime: image selection, volume
-                                   mounting, container lifecycle, progress tailing
-Koan.AI.Training.Python         ← Local Python sidecar: venv management,
-                                   dependency installation, process lifecycle
+Koan.AI.Training                    ← Training.*, Dataset.* facades, job engine,
+                                       TrainOptions, DataFormat, ChunkStrategy,
+                                       filesystem contract types
+Koan.AI.Connector.TrainerContainer  ← Container adapter: registers IAiAdapter with
+                                       Train/Align/Convert/Quantize capabilities,
+                                       image selection, volume mounting, container
+                                       lifecycle, progress tailing
+Koan.AI.Connector.PythonSidecar     ← Python sidecar adapter: registers IAiAdapter
+                                       with Train/Align/Convert/Quantize/MetricCompute
+                                       capabilities, venv management, dependency
+                                       installation, process lifecycle
 ```
 
 **Dependencies:**
 
-- `Koan.AI.Contracts.Shared` — shared boundary models (`ModelRef`, `DatasetRef`, `ComputeRequirement`, `JobRef`, `Lineage`)
+- `Koan.AI.Contracts.Shared` — shared boundary models (`ModelRef`, `DatasetRef`, `ComputeRequirement`, `JobRef`, `Lineage`), `IAiAdapter` interface, `AiCapability` constants
 - `Koan.AI.Models` (AI-0023) — Model Catalog for base model resolution and output registration
-- `Koan.AI.Compute` (AI-0024) — Compute Fabric for routing training jobs to appropriate hardware
+- `Koan.AI.Compute` (AI-0024) — Compute Fabric for hardware context during adapter resolution
 - `Koan.Data.Core` — entity system for `Dataset.From<T>()` expression-tree query translation
 - `Koan.Core` — guard clauses, options registration, orchestration
 
-`Koan.AI.Training.Container` and `Koan.AI.Training.Python` are separate packages because the runtime is a deployment concern. A production environment that only uses container training doesn't need the Python sidecar package, and vice versa.
+`Koan.AI.Connector.TrainerContainer` and `Koan.AI.Connector.PythonSidecar` are separate packages because the runtime is a deployment concern. Each registers as an `IAiAdapter` with capabilities reflecting its environment. A production environment that only uses container training only needs the container adapter package — `AdapterResolver` finds it via `AiCapability.Train`. The same adapter handles `Training.Train()`, `Training.Align()`, and `Training.Run()` calls.
 
 ### Part 10: Configuration
 
@@ -806,7 +826,7 @@ All settings have sensible defaults. Zero-config works for the common case (cont
 - **Live queries are a double-edged sword.** A dataset that changes between training and evaluation can produce misleading results. Mitigation: `dataset.Save()` for pinning, `DatasetRef.Hash` for change detection.
 - **Container startup latency.** Installing user `Dependencies` at container startup adds time. Mitigation: cache pip packages in a persistent volume; provide guidance on building custom images for frequently-used dependency sets.
 - **`Training.Compare()` is compute-intensive.** N variations × full training runs. No early stopping across variations (each variation runs independently). Mitigation: `Training.Estimate()` before `Training.Compare()` to understand total cost.
-- **Local Python fallback is explicitly second-class.** Dependency conflicts, non-reproducible environments, no isolation. Documented as development-only, not production-recommended.
+- **Python sidecar adapter is explicitly second-class.** Dependency conflicts, non-reproducible environments, no isolation. Documented as development-only, not production-recommended.
 - **Lineage at Level 4 is self-reported.** The framework cannot verify that an externally-trained model was actually trained on the claimed data with the claimed method. Lineage accuracy depends on user honesty.
 
 ## References

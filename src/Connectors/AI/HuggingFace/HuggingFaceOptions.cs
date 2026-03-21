@@ -1,4 +1,4 @@
-namespace Koan.AI.Models.HuggingFace;
+namespace Koan.AI.Connector.HuggingFace;
 
 /// <summary>
 /// Configuration for the HuggingFace Hub integration.

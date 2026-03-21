@@ -371,7 +371,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.AI.Review", "src\Koan.
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.AI.Contracts.Shared.Tests", "tests\Koan.AI.Contracts.Shared.Tests\Koan.AI.Contracts.Shared.Tests.csproj", "{D24C91B5-48BB-498D-9915-3F1420E6B98F}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.AI.Models.HuggingFace", "src\Koan.AI.Models.HuggingFace\Koan.AI.Models.HuggingFace.csproj", "{BD55A14B-E962-47C5-B6B7-3579DB1EDBFD}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.AI.Connector.HuggingFace", "src\Connectors\AI\HuggingFace\Koan.AI.Connector.HuggingFace.csproj", "{BD55A14B-E962-47C5-B6B7-3579DB1EDBFD}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

@@ -24,6 +24,6 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
     public void Describe(ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
         module.Describe(ModuleVersion);
-        module.AddNote("Model catalog registered (adapter-first resolution via IAiAdapterRegistry, Entity<ModelEntry> catalog).");
+        module.AddNote("Model catalog registered (capability-based resolution via IAiAdapterRegistry + AdapterResolver).");
     }
 }

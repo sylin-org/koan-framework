@@ -1,11 +1,12 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
-using Koan.AI.Models.HuggingFace.Api;
+using Koan.AI.Connector.HuggingFace.Api;
+using Koan.AI.Models;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
-namespace Koan.AI.Models.HuggingFace;
+namespace Koan.AI.Connector.HuggingFace;
 
 /// <summary>
 /// Low-level HTTP client for the HuggingFace Hub API.

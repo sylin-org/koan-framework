@@ -1,4 +1,4 @@
-using Koan.AI.Models;
+using Koan.AI.Contracts.Adapters;
 using Koan.Core;
 using Koan.Core.Modules;
 using Koan.Core.Provenance;
@@ -7,23 +7,25 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 
-namespace Koan.AI.Models.HuggingFace.Initialization;
+namespace Koan.AI.Connector.HuggingFace.Initialization;
 
 /// <summary>
-/// Auto-registers the HuggingFace Hub model source when this package is referenced.
+/// Auto-registers the HuggingFace Hub adapter when this package is referenced.
 /// Follows the Reference = Intent pattern.
 /// </summary>
 public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
 {
-    public string ModuleName => "Koan.AI.Models.HuggingFace";
+    public string ModuleName => "Koan.AI.Connector.HuggingFace";
     public string? ModuleVersion => typeof(KoanAutoRegistrar).Assembly.GetName().Version?.ToString();
 
     public void Initialize(IServiceCollection services)
     {
         services.AddKoanOptions<HuggingFaceOptions>("Koan:Ai:HuggingFace");
         services.TryAddSingleton<HuggingFaceClient>();
-        services.TryAddEnumerable(
-            ServiceDescriptor.Singleton<IModelSourceProvider, HuggingFaceModelSourceProvider>());
+        services.TryAddSingleton<HuggingFaceAdapter>();
+
+        // Register as an adapter contributor that adds itself to the registry
+        services.AddSingleton<IAiAdapterContributor, HuggingFaceAdapterContributor>();
     }
 
     public void Describe(ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)

@@ -11,21 +11,21 @@ date: 2026-03-20
 **Contract**
 
 - **Inputs:** Model identifiers (HF Hub IDs, Ollama library tags, local paths, URLs), existing `IAiAdapter` / `IAiModelManager` infrastructure (AI-0015), `AiModelDescriptor` from adapters, format conversion requests, deployment targets, fleet specifications, version references, compute availability from ZenGarden topology.
-- **Outputs:** `ModelEntry` entities (first-class Koan entities with lineage, versioning, and queryability), `JobRef` for async operations (conversion, quantization, merge), `IModelRuntime` deployment targets, unified model inventory across all sources, format conversion graph with automatic toolchain resolution, version history with rollback capability, fleet placement plans, health and cost telemetry.
+- **Outputs:** `ModelEntry` entities (first-class Koan entities with lineage, versioning, and queryability), `JobRef` for async operations (conversion, quantization, merge), capability-driven adapter resolution for deployment targets (adapters with `Serve.*` capabilities), unified model inventory across all sources, format conversion via adapters with `Convert` capability, version history with rollback capability, fleet placement plans, health and cost telemetry.
 - **Error Modes:** Model pull from unreachable hub degrades to local catalog lookup; format conversion requested but toolchain not installed returns guidance per platform (container → local Python → manual install); deployment to unavailable runtime falls back to next viable runtime from `Model.Routes()` ranking; `Model.Remove()` on a deployed model fails with dependency list; `Model.Rollback()` to a version whose weights were pruned fails with restore guidance; air-gapped environment with no database falls back to `.Koan/models/catalog.json` file-based catalog.
 - **Acceptance Criteria:** A developer can `Model.Pull("meta-llama/Llama-3.1-8B-Instruct")` from HuggingFace Hub, `Model.Convert(model, to: ModelFormat.GGUF, quantization: Quantization.Q4_K_M)` to a quantized GGUF, `Model.Deploy(gguf)` to an auto-detected Ollama runtime, query `Model.History("meta-llama/Llama-3.1-8B-Instruct")` for the full version chain with lineage, and `Model.Rollback("meta-llama/Llama-3.1-8B-Instruct", to: 2)` to swap back — all through a single static facade, with `ModelEntry` persisted as a queryable Koan entity, across heterogeneous runtimes.
 
 **Edge Cases**
 
 - `Model.Pull()` for a model that already exists locally at the same version: Returns existing `ModelEntry` without re-downloading. If `force: true` is specified, re-downloads and increments version.
-- `Model.Convert()` requested but no converter registered for the source→target format pair: Fails with clear message listing the conversion graph and which extension packages would enable the path (e.g., "Install Koan.AI.Convert.GGUF for SafeTensors → GGUF conversion").
-- `Model.Deploy()` with no compatible runtime available: `Model.Routes()` returns empty; deploy fails with message listing required runtimes and installation guidance. If a runtime exists but the format is incompatible, suggests conversion path.
+- `Model.Convert()` requested but no adapter has the `Convert` capability: Fails with clear error — `"No adapter with 'Convert' capability. Install Koan.AI.Training.Python (Python Sidecar) to enable format conversion."` If a converter adapter exists but does not support the specific source→target format pair, the error lists the supported conversion graph and which additional packages would enable the path.
+- `Model.Deploy()` with no adapter having a matching `Serve.*` capability: `Model.Routes()` returns empty; deploy fails with `"No adapter with 'Serve.GGUF' capability."` and lists connector packages that provide it. If an adapter exists but the model format is incompatible, suggests conversion path via `Convert` capability.
 - `Model.Remove()` on a model with active deployments: Fails with `ModelInUseException` listing deployment targets. Developer must `Model.Undeploy()` first or use `force: true` to cascade.
 - `Model.Prune(keep: 3)` when fewer than 3 models exist: No-op, returns empty removal list.
 - `Model.Register()` with a path that does not exist: Fails with `FileNotFoundException`. No catalog entry created.
 - `Model.Rollback()` to a version that was pruned: Fails with `ModelVersionPrunedException` containing the version's lineage metadata and guidance to re-pull or re-convert.
 - `Model.Search()` with no hub connectivity: Returns local catalog results only; logs warning about unreachable hubs with connectivity diagnostic.
-- `Model.Deploy()` to Ollama when the model is SafeTensors format: Auto-converts to GGUF if converter available; otherwise fails with conversion guidance. The conversion is submitted as a job; deployment queues behind it.
+- `Model.Deploy()` to Ollama when the model is SafeTensors format: Auto-converts to GGUF if an adapter with `Convert` capability is available; otherwise fails with conversion guidance. The conversion is submitted as a job; deployment queues behind it.
 - `Model.Plan()` with heterogeneous compute (CUDA + Metal): Plans respect accelerator compatibility; GGUF models can target either; ONNX models prefer the node with matching execution provider; PyTorch models require CUDA nodes.
 - `Model.Health()` when a deployed model's runtime is unreachable: Returns `RuntimeModelStatus.Unreachable` with last-known metrics and unreachable duration.
 - Air-gapped deployment with no database provider configured: Catalog falls back to `.Koan/models/catalog.json` with file-based CRUD. `ModelEntry.Query()` supports basic predicate filtering over the JSON catalog.
@@ -53,7 +53,7 @@ AI-0022 designates `Model.*` as Phase 1 (no dependencies) — the foundation tha
 - **Entity-first.** `ModelEntry` must be `Entity<ModelEntry>` — queryable, versionable, persistable through the standard Koan data pipeline. This is non-negotiable; it enables `ModelEntry.Query(m => m.Format == ModelFormat.GGUF)` and integrates with the entity event system for cross-context communication.
 - **Runtime-agnostic facade.** The `Model.*` verbs never mention a specific runtime. `Model.Deploy()` auto-selects. `Model.Routes()` shows options. The developer thinks in models, not runtimes.
 - **Async operations are jobs.** Conversion, quantization, and merge are long-running. They return `JobRef` immediately and report progress via callbacks. The job infrastructure is shared with Training (AI-0028) and Compute (AI-0024).
-- **Extension-based converters.** Format conversion requires external toolchains (llama.cpp, optimum, coremltools). These are delivered as extension packages detected at runtime, not bundled in the core. The core provides the conversion graph and job orchestration; extensions provide the actual conversion logic.
+- **Capability-driven conversion.** Format conversion requires external toolchains (llama.cpp, optimum, coremltools). Adapters with the `Convert` capability (e.g., Python Sidecar) handle conversion. The core provides the conversion graph and job orchestration; adapter packages provide the actual conversion logic. No separate `IFormatConverter` interface — the adapter IS the converter (see AI-0022 Part 2).
 - **Air-gapped fallback.** Not every deployment has a database. The catalog must work with a local JSON file for disconnected or edge scenarios.
 
 ## Decision
@@ -450,11 +450,15 @@ public static async Task<FleetPlan> Plan(
 **Auto-deployment flow:**
 
 ```csharp
-// Framework resolves: GGUF model → Ollama runtime available → deploy there
+// Framework resolves: GGUF model → AdapterResolver finds adapter with Serve.GGUF → deploy there
 var result = await Model.Deploy("llama3.1:8b-q4km");
 // result.Runtime: "ollama-local"
 // result.Endpoint: "http://localhost:11434"
 // result.Source: "ollama-local" (registered as AI source for Client.Chat)
+
+// Explicit target when multiple adapters have Serve.GGUF (e.g., Ollama + LM Studio)
+var result = await Model.Deploy("llama3.1:8b-q4km", new DeployOptions { RuntimeId = "ollama-local" });
+// Or equivalently via to: parameter in the facade shorthand
 
 // Model is now usable through the standard Client facade
 var answer = await Client.Chat("Hello", new ChatOptions
@@ -667,51 +671,40 @@ var advice = await Model.Advisor();
 // ]
 ```
 
-### Part 4: `IModelRuntime` Interface
+### Part 4: Capability-Driven Deployment Resolution
 
-Runtimes are the deployment targets for models. Each runtime describes what formats and capabilities it supports, and the framework matches models to runtimes automatically.
+Deployment targets are **not** a separate abstraction. Adapters declare `Serve.*` capabilities (`Serve.GGUF`, `Serve.SafeTensors`, `Serve.ONNX`) and the `AdapterResolver` (AI-0022 Part 2) matches models to the right adapter based on the model's format. The adapter IS the runtime.
+
+**Capability mapping (deployment-relevant subset):**
+
+| Adapter | Package | Serve Capabilities | Additional |
+|---------|---------|-------------------|------------|
+| Ollama | `Koan.AI.Connector.Ollama` | `Serve.GGUF` | `Pull`, `Remove`, `ModelList` |
+| LM Studio | `Koan.AI.Connector.LMStudio` | `Serve.GGUF` | `ModelList` |
+| ONNX Runtime | `Koan.AI.Models.Onnx` | `Serve.ONNX` | `BatchEmbed` |
+| TGI | `Koan.AI.Connector.TGI` | `Serve.SafeTensors` | `Streaming`, `Tools` |
+| TEI | `Koan.AI.Connector.TEI` | `Serve.SafeTensors` | `BatchEmbed` |
+| HuggingFace | `Koan.AI.Connector.HuggingFace` | `Serve.SafeTensors` | `Pull`, `Push`, `ModelList` |
+| Python Sidecar | `Koan.AI.Training.Python` | `Serve.SafeTensors` | `Train`, `Align`, `Convert`, `Quantize` |
+
+**Deployment resolution algorithm:**
+
+```
+1. Determine the model's format → map to Serve.{Format} capability
+2. AdapterResolver.Resolve(registry, AiCapability.Serve{Format}, to)
+   a. If `to:` parameter specified → look up adapter by ID directly
+   b. One adapter with Serve.{Format} → use it (unambiguous)
+   c. Multiple adapters → AmbiguousAdapterException with candidate list
+3. The resolved adapter's IAiModelManager.EnsureInstalledAsync() handles deployment
+4. If no adapter has the matching Serve.{Format} capability:
+   a. Check if an adapter has Convert capability
+   b. Suggest conversion path: "Model is SafeTensors. Install Koan.AI.Connector.TGI
+      to serve directly, or convert to GGUF for Ollama."
+```
+
+**Supporting types for deployment status and health remain unchanged:**
 
 ```csharp
-namespace Koan.AI.Models.Runtimes;
-
-/// <summary>
-/// Abstraction over a model serving runtime. Implementations handle
-/// the mechanics of deploying, unloading, and monitoring models on
-/// a specific serving infrastructure (Ollama, ONNX Runtime, TGI, etc.).
-/// </summary>
-public interface IModelRuntime
-{
-    /// <summary>Stable identifier (e.g., "ollama-local", "tgi-gpu-server").</summary>
-    string Id { get; }
-
-    /// <summary>Where this runtime runs.</summary>
-    RuntimeLocation Location { get; }
-
-    /// <summary>Model formats this runtime can serve natively.</summary>
-    ModelFormat[] SupportedFormats { get; }
-
-    /// <summary>AI capabilities this runtime supports.</summary>
-    ModelCapability[] SupportedCapabilities { get; }
-
-    /// <summary>Accelerator available on this runtime's host.</summary>
-    Accelerator Accelerator { get; }
-
-    /// <summary>Available VRAM in bytes. Null if unknown or CPU-only.</summary>
-    long? AvailableVramBytes { get; }
-
-    /// <summary>Check if the runtime is reachable and ready to accept work.</summary>
-    Task<bool> IsAvailableAsync(CancellationToken ct = default);
-
-    /// <summary>Deploy a model to this runtime. Idempotent — re-deploying an already-loaded model is a no-op.</summary>
-    Task DeployAsync(ModelEntry model, DeployOptions options, CancellationToken ct = default);
-
-    /// <summary>Unload a model from this runtime. Frees resources.</summary>
-    Task UnloadAsync(string modelId, CancellationToken ct = default);
-
-    /// <summary>Current status of a model on this runtime.</summary>
-    Task<RuntimeModelStatus> StatusAsync(string modelId, CancellationToken ct = default);
-}
-
 public enum RuntimeLocation
 {
     Local,      // Same machine as the Koan application
@@ -741,31 +734,15 @@ public enum RuntimeModelState
 }
 ```
 
-**Built-in runtime implementations:**
+**`Model.Routes()` — queries all adapters for `Serve.*` capabilities:**
 
-| Runtime | Package | Format | Location | Notes |
-|---------|---------|--------|----------|-------|
-| `OllamaRuntime` | `Koan.AI.Connector.Ollama` | GGUF | Local, Remote | Bridges existing `OllamaAdapter` + `IAiModelManager` |
-| `OnnxRuntime` | `Koan.AI.Models.Onnx` | ONNX | Local (in-process) | Microsoft.ML.OnnxRuntime, CPU/CUDA/DirectML providers |
-| `TgiRuntime` | `Koan.AI.Connector.TGI` | SafeTensors, GGUF | Container, Remote | HuggingFace Text Generation Inference |
-| `TeiRuntime` | `Koan.AI.Connector.TEI` | SafeTensors, ONNX | Container, Remote | HuggingFace Text Embeddings Inference |
-| `TorchServeRuntime` | `Koan.AI.Connector.TorchServe` | PyTorch | Container, Remote | PyTorch model archive (.mar) |
-| `LMStudioRuntime` | `Koan.AI.Connector.LMStudio` | GGUF | Local, Remote | Bridges existing `LMStudioAdapter` |
-| `PythonSidecarRuntime` | `Koan.AI.Models` | Any | Local | Escape hatch: runs a user Python script with model loading |
-
-**Runtime auto-selection algorithm:**
-
-```
-1. Filter runtimes by model format compatibility
-2. Filter by model capability requirements
-3. Filter by availability (IsAvailableAsync)
-4. Rank by:
-   a. Location preference (Local > Container > Remote, unless user specifies)
-   b. Accelerator match (prefer GPU runtime for large models)
-   c. Available VRAM (must fit model's estimated footprint)
-   d. Existing deployment (prefer runtime where model is already loaded)
-5. Select top-ranked runtime
-6. If no runtime matches format natively, check conversion graph for a viable path
+```csharp
+// Model.Routes() builds the route table by querying all registered adapters:
+// 1. For each adapter with any Serve.* capability:
+//    a. Check if the model's format matches the adapter's Serve capability
+//    b. If not, check if a Convert-capable adapter can bridge the format gap
+//    c. Build DeployRoute with conversion steps, estimated time, and compute info
+// 2. Rank routes by: format match (native > conversion), location, accelerator, VRAM
 ```
 
 ### Part 5: Runtime-to-Source Bridge
@@ -806,49 +783,42 @@ The `AiSourceRegistry` (AI-0015) listens for `ModelDeployedEvent` and creates a 
 await Client.Chat("Hello", new ChatOptions { Model = "llama3.1:8b-q4km" });
 ```
 
-### Part 6: Format Conversion Architecture
+### Part 6: Format Conversion via Capability Resolution
 
-Conversion is orchestrated by the `Model.*` facade but executed by `IFormatConverter` implementations delivered in extension packages. The core provides the conversion graph and job infrastructure; extensions provide the actual conversion logic.
+Conversion is orchestrated by the `Model.*` facade and executed by adapters that declare the `Convert` and/or `Quantize` capabilities. There is no separate `IFormatConverter` interface — the adapter IS the converter (see AI-0022 Part 2).
+
+**Resolution flow:**
 
 ```csharp
-namespace Koan.AI.Models.Conversion;
+// Model.Convert(model, to: ModelFormat.GGUF)
+//   → AdapterResolver.Resolve(registry, AiCapability.Convert)
+//   → Python Sidecar has Convert capability → delegates to sidecar
+//   → Sidecar invokes llama.cpp / optimum / coremltools in container or locally
 
-/// <summary>
-/// Converts model weights between formats. Implementations are discovered
-/// at runtime via DI registration from extension packages.
-/// </summary>
-public interface IFormatConverter
-{
-    /// <summary>Source format this converter reads.</summary>
-    ModelFormat From { get; }
+// Model.Convert(model, to: ModelFormat.GGUF, target: "my-custom-converter")
+//   → AdapterResolver.Resolve(registry, AiCapability.Convert, target: "my-custom-converter")
+//   → Explicit adapter lookup by ID
+```
 
-    /// <summary>Target format this converter produces.</summary>
-    ModelFormat To { get; }
+**Conversion graph (supported by Python Sidecar and extension packages):**
 
-    /// <summary>Whether this converter supports quantization during conversion.</summary>
-    bool SupportsQuantization { get; }
+```
+SafeTensors ←→ GGUF         (llama.cpp)
+SafeTensors  → ONNX         (optimum)
+ONNX         → CoreML       (coremltools)
+ONNX         → OpenVINO     (openvino toolkit)
+SafeTensors ←→ PyTorch      (torch.save / safetensors.torch)
+```
 
-    /// <summary>Supported quantization methods (empty if quantization not supported).</summary>
-    Quantization[] SupportedQuantizations { get; }
+**Two execution modes (within the adapter):**
 
-    /// <summary>
-    /// Check if the conversion toolchain is available on this system.
-    /// Returns installation guidance if not available.
-    /// </summary>
-    Task<ConverterAvailability> CheckAvailabilityAsync(CancellationToken ct = default);
+1. **Container converter** (preferred): The adapter launches a container image (e.g., `koan/convert-gguf:latest`). The conversion runs in an isolated container with all dependencies pre-installed. Requires Docker/Podman.
 
-    /// <summary>Execute the conversion. Called within a job context.</summary>
-    Task<ConversionResult> ConvertAsync(
-        ConversionRequest request,
-        IProgress<JobProgress>? progress = null,
-        CancellationToken ct = default);
-}
+2. **Local converter** (fallback): The adapter detects local toolchain installation (e.g., `llama-quantize` binary, Python with `optimum` package). Uses the local toolchain directly. Requires manual tool installation.
 
-public record ConverterAvailability(
-    bool IsAvailable,
-    string? ToolchainVersion = null,
-    string? InstallGuidance = null);
+**Supporting types for conversion requests and results:**
 
+```csharp
 public record ConversionRequest(
     ModelEntry Source,
     ModelFormat TargetFormat,
@@ -862,38 +832,14 @@ public record ConversionResult(
     Quantization? Quantization,
     long OutputSizeBytes,
     TimeSpan Duration);
+
+public record ConverterAvailability(
+    bool IsAvailable,
+    string? ToolchainVersion = null,
+    string? InstallGuidance = null);
 ```
 
-**Conversion graph (core):**
-
-```
-SafeTensors ←→ GGUF         (Koan.AI.Convert.GGUF — llama.cpp)
-SafeTensors  → ONNX         (Koan.AI.Convert.ONNX — optimum)
-ONNX         → CoreML       (Koan.AI.Convert.CoreML — coremltools)
-ONNX         → OpenVINO     (Koan.AI.Convert.OpenVINO — openvino toolkit)
-SafeTensors ←→ PyTorch      (built-in — torch.save / safetensors.torch)
-```
-
-**Two execution modes:**
-
-1. **Container converter** (preferred): The extension package includes a container image reference (e.g., `koan/convert-gguf:latest`). The conversion runs in an isolated container with all dependencies pre-installed. Requires Docker/Podman.
-
-2. **Local converter** (fallback): The extension package detects local toolchain installation (e.g., `llama-quantize` binary, Python with `optimum` package). Uses the local toolchain directly. Requires manual tool installation.
-
-```csharp
-// Extension package registration (in Koan.AI.Convert.GGUF)
-public sealed class GgufConverterRegistrar : IKoanAutoRegistrar
-{
-    public void Register(IServiceCollection services)
-    {
-        services.AddSingleton<IFormatConverter, SafeTensorsToGgufConverter>();
-        services.AddSingleton<IFormatConverter, GgufToSafeTensorsConverter>();
-    }
-}
-
-// The converters are discovered by the Model facade at runtime
-// No explicit registration needed — Reference = Intent
-```
+**Custom converters** can be added by implementing a new adapter that declares `Convert` capability and registering it via `KoanAutoRegistrar`. The extension packages (`Koan.AI.Convert.GGUF`, etc.) each contribute an adapter with `Convert` capability scoped to their format pairs — Reference = Intent.
 
 ### Part 7: Storage and Catalog
 
@@ -987,68 +933,89 @@ else
 
 ### Part 8: How Existing Adapters Change
 
-The `Model.*` facade unifies model management that currently lives in individual adapters. Existing adapters gain `IModelRuntime` implementations alongside their existing `IChatAdapter`/`IEmbedAdapter` roles.
+The `Model.*` facade unifies model management that currently lives in individual adapters. Existing adapters declare their capabilities via `IAiAdapter.Capabilities` and the `AdapterResolver` (AI-0022 Part 2) routes lifecycle verbs to the right adapter. No separate `IModelRuntime` implementations needed — the adapter IS the runtime.
 
 **OllamaAdapter evolution:**
 
 ```csharp
 // Before (current): IAiAdapter + IAiModelManager
-// After: IChatAdapter + IEmbedAdapter + IModelRuntime
+// After: IAiAdapter with expanded Capabilities set
 
-internal sealed class OllamaRuntime : IModelRuntime
+internal sealed class OllamaAdapter : IAiAdapter
 {
-    private readonly OllamaAdapter _adapter;
+    public string Id => "ollama-local";
+    public string Name => "Ollama";
+    public string Type => "Ollama";
 
-    public string Id => _adapter.Id;
-    public RuntimeLocation Location => RuntimeLocation.Local; // or Remote for network Ollama
-    public ModelFormat[] SupportedFormats => [ModelFormat.GGUF];
-    public ModelCapability[] SupportedCapabilities => [ModelCapability.Chat, ModelCapability.Embed];
-    public Accelerator Accelerator { get; }  // Detected from Ollama /api/ps
-    public long? AvailableVramBytes { get; }  // Detected from Ollama /api/ps
-
-    public async Task DeployAsync(ModelEntry model, DeployOptions options, CancellationToken ct)
+    public IReadOnlySet<string> Capabilities { get; } = new HashSet<string>
     {
-        // Delegates to existing IAiModelManager.EnsureInstalledAsync
-        await _adapter.ModelManager!.EnsureInstalledAsync(
-            new AiModelOperationRequest { Model = model.HubId }, ct);
-    }
+        AiCapability.Chat,
+        AiCapability.Embed,
+        AiCapability.Vision,
+        AiCapability.Pull,
+        AiCapability.Remove,
+        AiCapability.ModelList,
+        AiCapability.ServeGGUF,
+        AiCapability.Streaming,
+        AiCapability.Tools
+    };
 
-    public async Task UnloadAsync(string modelId, CancellationToken ct)
-    {
-        await _adapter.ModelManager!.FlushAsync(
-            new AiModelOperationRequest { Model = modelId }, ct);
-    }
+    public IAiModelManager? ModelManager => _modelManager;
 
-    public async Task<RuntimeModelStatus> StatusAsync(string modelId, CancellationToken ct)
-    {
-        var models = await _adapter.ListModelsAsync(ct);
-        var match = models.FirstOrDefault(m => m.Name == modelId);
-        return new RuntimeModelStatus
-        {
-            ModelId = modelId,
-            State = match is not null ? RuntimeModelState.Ready : RuntimeModelState.NotLoaded
-        };
-    }
+    // Model.Deploy() resolves to this adapter via Serve.GGUF capability,
+    // then delegates to ModelManager.EnsureInstalledAsync()
+    // Model.Pull("llama3.1:8b") resolves via Pull capability + Ollama tag format
 }
 ```
 
-**LMStudioAdapter gains `IModelRuntime`:**
+**LMStudioAdapter declares capabilities:**
 
 ```csharp
-internal sealed class LMStudioRuntime : IModelRuntime
+internal sealed class LMStudioAdapter : IAiAdapter
 {
-    public ModelFormat[] SupportedFormats => [ModelFormat.GGUF];
-    // LM Studio model deployment is file-based: copy GGUF to models directory
+    public IReadOnlySet<string> Capabilities { get; } = new HashSet<string>
+    {
+        AiCapability.Chat,
+        AiCapability.Embed,
+        AiCapability.ModelList,
+        AiCapability.ServeGGUF,
+        AiCapability.Streaming
+    };
+    // No Pull capability — LM Studio model management is external
+    // Serve.GGUF — file-based deployment: copy GGUF to models directory
     // Status checks via /v1/models endpoint
 }
 ```
 
-**New HuggingFaceAdapter:**
+**New HuggingFaceAdapter (Connector pattern):**
 
-The `Koan.AI.Connector.HuggingFace` package provides:
-- `HuggingFaceInferenceAdapter` implementing `IChatAdapter` + `IEmbedAdapter` for the HF Inference API
+The `Koan.AI.Connector.HuggingFace` package follows the same Connector directory pattern as Ollama and LMStudio:
+
+```csharp
+internal sealed class HuggingFaceAdapter : IAiAdapter
+{
+    public IReadOnlySet<string> Capabilities { get; } = new HashSet<string>
+    {
+        AiCapability.Chat,
+        AiCapability.Embed,
+        AiCapability.Pull,
+        AiCapability.Push,
+        AiCapability.ModelList,
+        AiCapability.ServeSafeTensors,
+        AiCapability.Streaming,
+        AiCapability.Tools
+    };
+
+    // Pull capability: HuggingFaceHubClient for model search and download
+    // Push capability: upload models/adapters to HF Hub
+    // Serve.SafeTensors: HF Inference API as serving target
+}
+```
+
 - `HuggingFaceHubClient` for model search and download (used by `Model.Pull()` and `Model.Search()`)
-- No `IModelRuntime` — HF Hub is a source, not a deployment target (TGI/TEI are the deployment targets)
+- HF Inference API for `Chat` and `Embed` capabilities
+- `Pull` and `Push` capabilities for hub operations
+- Located in `src/Connectors/AI/HuggingFace/` alongside Ollama and LMStudio
 
 ### Part 9: Configuration
 
@@ -1134,14 +1101,14 @@ The `Koan.AI.Models` module reports its status through the standard `IKoanAutoRe
 ║   Cache     → .Koan/models/ (42.3 GB, 7 models)                       ║
 ║   HF Hub    → authenticated (token from env:HF_TOKEN)                  ║
 ║                                                                         ║
-║ Runtimes                                                                ║
-║   ollama-local     │ GGUF       │ Local  │ CUDA (8 GB) │ healthy       ║
-║   onnx-local       │ ONNX       │ Local  │ DirectML    │ healthy       ║
-║   tgi-gpu-server   │ SafeTensors│ Remote │ CUDA (80 GB)│ healthy       ║
+║ Adapters (Serve Capabilities)                                           ║
+║   ollama-local     │ Serve.GGUF       │ Local  │ CUDA (8 GB) │ healthy ║
+║   onnx-local       │ Serve.ONNX       │ Local  │ DirectML    │ healthy ║
+║   tgi-gpu-server   │ Serve.SafeTensors│ Remote │ CUDA (80 GB)│ healthy ║
 ║                                                                         ║
-║ Converters                                                              ║
-║   SafeTensors → GGUF   │ Koan.AI.Convert.GGUF  │ llama.cpp v3892     ║
-║   SafeTensors → ONNX   │ Koan.AI.Convert.ONNX  │ optimum 1.19       ║
+║ Convert Capability                                                      ║
+║   SafeTensors → GGUF   │ python-sidecar  │ llama.cpp v3892           ║
+║   SafeTensors → ONNX   │ python-sidecar  │ optimum 1.19             ║
 ║                                                                         ║
 ║ Auto-prune  → disabled                                                  ║
 ║                                                                         ║
@@ -1459,14 +1426,14 @@ public record JobProgress
 
 | Package | Contents | Dependencies |
 |---------|----------|-------------|
-| `Koan.AI.Contracts.Shared` | `ModelRef`, `ModelFormat`, `Quantization`, `Lineage`, `JobRef`, `Accelerator`, `EvalScore` | None |
-| `Koan.AI.Models` | `Model.*` facade, `ModelEntry`, `IModelCatalog`, `IModelRuntime`, `IFormatConverter`, `PythonSidecarRuntime` | `Koan.AI.Contracts.Shared`, `Koan.Core` |
-| `Koan.AI.Models.HuggingFace` | `HuggingFaceHubClient` (search, download, metadata) | `Koan.AI.Models` |
-| `Koan.AI.Models.Onnx` | `OnnxRuntime` (in-process ONNX inference) | `Koan.AI.Models`, `Microsoft.ML.OnnxRuntime` |
-| `Koan.AI.Convert.GGUF` | `SafeTensorsToGgufConverter`, `GgufToSafeTensorsConverter` | `Koan.AI.Models` |
-| `Koan.AI.Convert.ONNX` | `SafeTensorsToOnnxConverter` | `Koan.AI.Models` |
-| `Koan.AI.Convert.CoreML` | `OnnxToCoreMLConverter` | `Koan.AI.Models` |
-| `Koan.AI.Convert.OpenVINO` | `OnnxToOpenVINOConverter` | `Koan.AI.Models` |
+| `Koan.AI.Contracts.Shared` | `ModelRef`, `ModelFormat`, `Quantization`, `Lineage`, `JobRef`, `Accelerator`, `EvalScore`, `AiCapability` constants | None |
+| `Koan.AI.Models` | `Model.*` facade, `ModelEntry`, `IModelCatalog`, `AdapterResolver` | `Koan.AI.Contracts.Shared`, `Koan.Core` |
+| `Koan.AI.Connector.HuggingFace` | `HuggingFaceAdapter` (inference, hub client, search, download, push), Connector pattern | `Koan.AI.Contracts.Shared`, `Koan.Core` |
+| `Koan.AI.Models.Onnx` | ONNX Runtime adapter with `Serve.ONNX` + `BatchEmbed` capabilities | `Koan.AI.Models`, `Microsoft.ML.OnnxRuntime` |
+| `Koan.AI.Convert.GGUF` | Adapter with `Convert` capability for SafeTensors ↔ GGUF | `Koan.AI.Models` |
+| `Koan.AI.Convert.ONNX` | Adapter with `Convert` capability for SafeTensors → ONNX | `Koan.AI.Models` |
+| `Koan.AI.Convert.CoreML` | Adapter with `Convert` capability for ONNX → CoreML | `Koan.AI.Models` |
+| `Koan.AI.Convert.OpenVINO` | Adapter with `Convert` capability for ONNX → OpenVINO | `Koan.AI.Models` |
 
 All packages follow the **Reference = Intent** principle: adding a package reference to a project activates its functionality through `KoanAutoRegistrar` without explicit registration code.
 
@@ -1474,12 +1441,14 @@ All packages follow the **Reference = Intent** principle: adding a package refer
 
 **`IAiModelManager` bridge:**
 
-The existing `IAiModelManager` (implemented by `OllamaAdapter`) is not deprecated. It continues to serve adapters that can provision models. `IModelRuntime` implementations for adapters with `IAiModelManager` delegate to it:
+The existing `IAiModelManager` (implemented by `OllamaAdapter`) is not deprecated. It continues to serve adapters that can provision models. When `AdapterResolver` routes a `Pull` or `Deploy` verb to an adapter, the facade delegates to `IAiModelManager.EnsureInstalledAsync()` on that adapter:
 
 ```csharp
-// OllamaRuntime.DeployAsync delegates to IAiModelManager.EnsureInstalledAsync
-// OllamaRuntime.UnloadAsync delegates to IAiModelManager.FlushAsync
-// OllamaRuntime.StatusAsync combines ListModelsAsync + ListManagedModelsAsync
+// AdapterResolver.Resolve(registry, AiCapability.Pull) → OllamaAdapter
+// Model facade calls adapter.ModelManager!.EnsureInstalledAsync()
+// AdapterResolver.Resolve(registry, AiCapability.ServeGGUF) → OllamaAdapter
+// Model facade calls adapter.ModelManager!.EnsureInstalledAsync() for deployment
+// Undeploy delegates to adapter.ModelManager!.FlushAsync()
 ```
 
 **`AiModelDescriptor` enrichment:**
@@ -1520,21 +1489,21 @@ using (Client.Scope(chat: "model:acme-support:v3"))
 ### Positive
 
 - **Models become queryable entities.** `ModelEntry.Query(m => m.Format == ModelFormat.GGUF)` works with any Koan data provider. Version history and lineage are first-class, not afterthoughts.
-- **Runtime-agnostic deployment.** Developers think in models, not in "how to configure Ollama" or "how to launch TGI." `Model.Deploy()` resolves the optimal runtime automatically.
+- **Runtime-agnostic deployment.** Developers think in models, not in "how to configure Ollama" or "how to launch TGI." `Model.Deploy()` resolves the optimal adapter via `Serve.*` capability matching automatically.
 - **Format conversion is discoverable.** `Model.Routes()` shows all viable paths. The developer sees that SafeTensors can become GGUF and what tools are needed. No guessing.
 - **Lineage enables audit.** `Model.Audit("acme-support", at: lastMonth)` answers "what model was serving production on March 1st, where did it come from, and what eval scores did it achieve?"
-- **Extension-based converters preserve core size.** `Koan.AI.Models` stays lean. Heavy toolchain dependencies (llama.cpp, optimum, coremltools) live in extension packages.
+- **Capability-driven converters preserve core size.** `Koan.AI.Models` stays lean. Heavy toolchain dependencies (llama.cpp, optimum, coremltools) live in adapter packages that declare `Convert` capability.
 - **Air-gapped fallback.** The JSON catalog ensures the Model facade works in disconnected environments, edge deployments, and CI pipelines without a database.
-- **Backward compatible.** Existing `IAiModelManager` and `AiModelDescriptor` continue to function. The runtime bridge layers on top without breaking existing adapter contracts.
+- **Backward compatible.** Existing `IAiModelManager` and `AiModelDescriptor` continue to function. The capability-driven resolution layers on top without breaking existing adapter contracts. Adapters simply declare their `Capabilities` set.
 - **Foundation for Training and Eval.** `ModelRef`, `Lineage`, and `ModelEntry` are the shared boundary models that AI-0028 (Training) and AI-0029 (Eval) reference. Building Model first enables clean cross-context communication.
 
 ### Negative / Trade-offs
 
-- **Adapter authors must implement `IModelRuntime`.** Existing adapters (Ollama, LM Studio) need new implementations. Mitigated by providing base classes and clear delegation patterns to existing `IAiModelManager` methods.
+- **Adapter authors must declare `Capabilities` and may need to implement `IAiModelManager`.** Existing adapters (Ollama, LM Studio) need to populate their `Capabilities` set. Adapters that support model lifecycle operations (Pull, Deploy) should implement `IAiModelManager`. Mitigated by clear capability matrix documentation and delegation patterns.
 - **HuggingFace Hub dependency.** `Model.Search()` and `Model.Pull()` for HF models require network access and optionally an API token. Mitigated by graceful degradation to local-only results.
-- **Container dependency for conversion.** The preferred conversion path uses container images. Environments without Docker/Podman fall back to local toolchains, which require manual installation. Mitigated by clear `CheckAvailabilityAsync()` guidance.
+- **Container dependency for conversion.** The preferred conversion path uses container images. Environments without Docker/Podman fall back to local toolchains, which require manual installation. Mitigated by clear availability guidance from `Convert`-capable adapters.
 - **VRAM estimation is approximate.** `Model.Plan()` and `DeployRoute.EstimatedVramBytes` are heuristics based on parameter count, format, and quantization. Actual VRAM depends on batch size, sequence length, and runtime implementation. The `Warnings` field on `FleetPlan` communicates uncertainty.
-- **Catalog divergence risk.** If models are managed outside the `Model.*` facade (e.g., `ollama pull` from CLI), the catalog becomes stale. Mitigated by periodic reconciliation: `IModelRuntime.StatusAsync()` cross-checks catalog state on health probe cycles.
+- **Catalog divergence risk.** If models are managed outside the `Model.*` facade (e.g., `ollama pull` from CLI), the catalog becomes stale. Mitigated by periodic reconciliation: adapters with `ModelList` capability are queried to cross-check catalog state on health probe cycles.
 - **JSON catalog limitations.** The air-gapped `JsonModelCatalog` does not support concurrent writes safely across processes, complex queries, or transactions. It is a single-process fallback, not a production catalog.
 
 ## References
@@ -1544,9 +1513,11 @@ using (Client.Scope(chat: "model:acme-support:v3"))
 - AI-0015: Canonical Source-Member Architecture (source/member routing, `AiSourceDefinition`, `AiSourceRegistry`)
 - AI-0020: Entity-First AI and Transaction Coordination (`Entity<T>` lifecycle, `[Embedding]` attribute)
 - AI-0019: Koan.AI Zero-Config on Microsoft.Extensions.AI (auto-registrar, pipeline foundation)
-- `src/Koan.AI.Contracts/Adapters/IAiAdapter.cs` — Base adapter identity (extended, not replaced)
-- `src/Koan.AI.Contracts/Adapters/IAiModelManager.cs` — Existing model provisioning contract (bridged by `IModelRuntime`)
+- AI-0022 Part 2: Capability-Driven Adapter Resolution (`AdapterResolver`, `AiCapability` expansion, capability matrix)
+- `src/Koan.AI.Contracts/Adapters/IAiAdapter.cs` — Base adapter identity (extended with `Capabilities` surface)
+- `src/Koan.AI.Contracts/Adapters/IAiModelManager.cs` — Existing model provisioning contract (delegates from capability-resolved adapters)
 - `src/Koan.AI.Contracts/Models/AiModelDescriptor.cs` — Existing model metadata (enriched by `ModelEntry`)
 - `src/Koan.ZenGarden/AI/ZenGardenModelAdvisor.cs` — Existing model advisory (consumed by `Model.Advisor()`)
 - `src/Connectors/AI/Ollama/OllamaAdapter.cs` — Reference adapter implementing `IAiModelManager`
-- `src/Connectors/AI/LMStudio/LMStudioAdapter.cs` — Reference adapter for `IModelRuntime` extension
+- `src/Connectors/AI/LMStudio/LMStudioAdapter.cs` — Reference adapter with `Serve.GGUF` capability
+- `src/Connectors/AI/HuggingFace/HuggingFaceAdapter.cs` — Connector pattern adapter with hub operations

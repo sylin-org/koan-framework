@@ -25,7 +25,7 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
     public void Describe(ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
         module.Describe(ModuleVersion);
-        module.AddNote("Training orchestration registered (requires container runtime for execution).");
+        module.AddNote("Training orchestration registered (resolves adapters with Train capability).");
         module.AddNote("Dataset service registered (entity-to-dataset conversion active).");
     }
 }

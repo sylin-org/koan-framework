@@ -1,37 +1,45 @@
+using Koan.AI.Contracts.Adapters;
+using Koan.AI.Contracts.Routing;
 using Koan.AI.Contracts.Shared;
+using Koan.AI.Resolution;
+using Koan.Core.AI;
 
 namespace Koan.AI.Training;
 
 /// <summary>
-/// Training service that delegates to registered <see cref="ITrainingRuntime"/> instances.
-/// Runtime implementations are discovered via Reference = Intent.
+/// Training service that resolves training operations through adapters
+/// with <see cref="AiCapability.Train"/> and <see cref="AiCapability.Align"/> capabilities.
 /// </summary>
 internal sealed class TrainingService : ITrainingService
 {
-    private readonly IReadOnlyList<ITrainingRuntime> _runtimes;
+    private readonly IAiAdapterRegistry _registry;
 
-    public TrainingService(IEnumerable<ITrainingRuntime> runtimes)
+    public TrainingService(IAiAdapterRegistry registry)
     {
-        _runtimes = runtimes.ToList().AsReadOnly();
+        _registry = registry;
     }
 
     public async Task<TrainingJob> TrainAsync(
         TrainOptions options, IProgress<TrainingProgress>? progress, CancellationToken ct)
     {
-        var runtime = await ResolveRuntime(options.Method, ct);
+        var adapter = AdapterResolver.Resolve(_registry, AiCapability.Train, options.Compute?.PreferredNode);
+        var runtime = ResolveTrainingRuntime(adapter);
         return await runtime.LaunchAsync(options, progress, ct);
     }
 
     public async Task<TrainingJob> RunAsync(
         RunOptions options, IProgress<TrainingProgress>? progress, CancellationToken ct)
     {
-        var runtime = await ResolveAnyRuntime(ct);
+        var adapter = AdapterResolver.Resolve(_registry, AiCapability.Train, options.Compute?.PreferredNode);
+        var runtime = ResolveTrainingRuntime(adapter);
         return await runtime.LaunchScriptAsync(options, progress, ct);
     }
 
     public async Task<TrainingJob> AlignAsync(AlignOptions options, CancellationToken ct)
     {
-        // Alignment is a specialized training run
+        var adapter = AdapterResolver.Resolve(_registry, AiCapability.Align, options.Compute?.PreferredNode);
+        var runtime = ResolveTrainingRuntime(adapter);
+
         var trainOptions = new TrainOptions
         {
             Base = options.Base,
@@ -47,25 +55,25 @@ internal sealed class TrainingService : ITrainingService
             Compute = options.Compute
         };
 
-        var runtime = await ResolveRuntime(trainOptions.Method, ct);
         return await runtime.LaunchAsync(trainOptions, null, ct);
     }
 
     public Task<TrainingEstimate> EstimateAsync(TrainOptions options, CancellationToken ct)
     {
-        // Estimation doesn't require a runtime — it's computation based on dataset size and model
+        var trainAdapters = AdapterResolver.ResolveAll(_registry, AiCapability.Train);
+
         var estimate = new TrainingEstimate
         {
-            Tokens = 0, // Would be computed from Dataset.Analyze()
+            Tokens = 0,
             EstimatedGpuHours = 0,
             EstimatedCost = null,
-            RecommendedCompute = _runtimes.Count > 0
-                ? _runtimes[0].Id
-                : "No training runtime available",
+            RecommendedCompute = trainAdapters.Count > 0
+                ? trainAdapters[0].Id
+                : "No training adapter available",
             FitsLocalGpu = false,
-            Reason = _runtimes.Count == 0
-                ? "No training runtimes registered."
-                : $"Available runtimes: {string.Join(", ", _runtimes.Select(r => r.Id))}"
+            Reason = trainAdapters.Count == 0
+                ? "No adapter with Train capability registered."
+                : $"Available training adapters: {string.Join(", ", trainAdapters.Select(a => a.Id))}"
         };
 
         return Task.FromResult(estimate);
@@ -73,26 +81,36 @@ internal sealed class TrainingService : ITrainingService
 
     public async Task<TrainingJob> StatusAsync(string jobId, CancellationToken ct)
     {
-        foreach (var runtime in _runtimes)
+        var trainAdapters = AdapterResolver.ResolveAll(_registry, AiCapability.Train);
+
+        foreach (var adapter in trainAdapters)
         {
+            var runtime = adapter as ITrainingRuntime;
+            if (runtime is null) continue;
+
             try
             {
                 return await runtime.StatusAsync(jobId, ct);
             }
             catch
             {
-                // This runtime doesn't know about this job — try next
+                // This adapter doesn't know about this job — try next
             }
         }
 
         throw new InvalidOperationException(
-            $"Job '{jobId}' not found in any registered training runtime.");
+            $"Job '{jobId}' not found in any registered training adapter.");
     }
 
     public async Task CancelAsync(string jobId, CancellationToken ct)
     {
-        foreach (var runtime in _runtimes)
+        var trainAdapters = AdapterResolver.ResolveAll(_registry, AiCapability.Train);
+
+        foreach (var adapter in trainAdapters)
         {
+            var runtime = adapter as ITrainingRuntime;
+            if (runtime is null) continue;
+
             try
             {
                 await runtime.CancelAsync(jobId, ct);
@@ -100,79 +118,47 @@ internal sealed class TrainingService : ITrainingService
             }
             catch
             {
-                // Try next runtime
+                // Try next adapter
             }
         }
 
         throw new InvalidOperationException(
-            $"Job '{jobId}' not found in any registered training runtime.");
+            $"Job '{jobId}' not found in any registered training adapter.");
     }
 
     public async Task<TrainingJob> ResumeAsync(string jobId, string? checkpoint, CancellationToken ct)
     {
-        foreach (var runtime in _runtimes)
+        var trainAdapters = AdapterResolver.ResolveAll(_registry, AiCapability.Train);
+
+        foreach (var adapter in trainAdapters)
         {
+            var runtime = adapter as ITrainingRuntime;
+            if (runtime is null) continue;
+
             try
             {
                 return await runtime.ResumeAsync(jobId, checkpoint, ct);
             }
             catch
             {
-                // Try next runtime
+                // Try next adapter
             }
         }
 
         throw new InvalidOperationException(
-            $"Job '{jobId}' not found in any registered training runtime.");
+            $"Job '{jobId}' not found in any registered training adapter.");
     }
 
     public Task<IReadOnlyList<TrainingJob>> ListAsync(CancellationToken ct)
     {
-        // Aggregate jobs from all runtimes — for now return empty
-        // Real implementation would query each runtime
         IReadOnlyList<TrainingJob> empty = [];
         return Task.FromResult(empty);
     }
 
-    private async Task<ITrainingRuntime> ResolveRuntime(TrainMethod method, CancellationToken ct)
+    private static ITrainingRuntime ResolveTrainingRuntime(IAiAdapter adapter)
     {
-        if (_runtimes.Count == 0)
-            throw new InvalidOperationException(
-                "No training runtime registered. Add a training runtime reference to enable training.");
-
-        // Find a runtime that supports the requested method and is available
-        foreach (var runtime in _runtimes)
-        {
-            if (runtime.SupportedMethods.Contains(method) && await runtime.IsAvailableAsync(ct))
-                return runtime;
-        }
-
-        // Fall back to any available runtime
-        foreach (var runtime in _runtimes)
-        {
-            if (await runtime.IsAvailableAsync(ct))
-                return runtime;
-        }
-
-        throw new InvalidOperationException(
-            $"No available training runtime supports {method}. " +
-            $"Registered: [{string.Join(", ", _runtimes.Select(r => r.Id))}].");
-    }
-
-    private async Task<ITrainingRuntime> ResolveAnyRuntime(CancellationToken ct)
-    {
-        if (_runtimes.Count == 0)
-            throw new InvalidOperationException(
-                "No training runtime registered. Add a training runtime reference to enable training.");
-
-        foreach (var runtime in _runtimes)
-        {
-            if (await runtime.IsAvailableAsync(ct))
-                return runtime;
-        }
-
-        throw new InvalidOperationException(
-            $"No training runtime is currently available. " +
-            $"Registered: [{string.Join(", ", _runtimes.Select(r => r.Id))}].");
+        return adapter as ITrainingRuntime
+            ?? throw new InvalidOperationException(
+                $"Adapter '{adapter.Id}' has Train capability but does not implement ITrainingRuntime.");
     }
 }

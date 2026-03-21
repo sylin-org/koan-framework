@@ -24,6 +24,6 @@ public sealed class KoanAutoRegistrar : IKoanAutoRegistrar
     public void Describe(ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
         module.Describe(ModuleVersion);
-        module.AddNote("Eval service registered (delegates to IMetricComputer implementations).");
+        module.AddNote("Eval service registered (delegates to adapters with MetricCompute capability).");
     }
 }

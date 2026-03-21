@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace Koan.AI.Models.HuggingFace.Api;
+namespace Koan.AI.Connector.HuggingFace.Api;
 
 /// <summary>
 /// HuggingFace API file entry from the model tree endpoint.
